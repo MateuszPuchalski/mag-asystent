@@ -1500,3 +1500,71 @@ describe("Sprawdzenie zwrotu płatności w Allegro", () => {
     expect(await screen.findByText("Allegro ogranicza zapytania.")).toBeInTheDocument();
   });
 });
+
+describe("Sprawdzenie WSZYSTKICH zwrotów w Allegro", () => {
+  afterEach(() => { vi.unstubAllGlobals(); });
+  const odczyt = (url: string) => url === "/api/biuro/kosze/pominiete" ? { pominiete: [] } : undefined;
+  const ADRES = "POST /api/obsluga/zwroty/platnosci/sprawdz-wszystkie";
+  const wynik = (nadpisz: Record<string, unknown> = {}) => ({
+    sprawdzonych: 383, zapisane: 12, zatrzasniete: 9, bezZwrotuPlatnosci: 0,
+    zPowodem: [], urwane: false, ...nadpisz });
+  const przycisk = () => screen.findByRole("button", { name: "Sprawdź wszystkie w Allegro" });
+
+  it("otwarcie ekranu niczego nie zapisuje", async () => {
+    const zapisy = atrapaZapisow(odczyt);
+    pokaz();
+    expect(await przycisk()).toBeInTheDocument();
+    expect(zapisy.wyslane).toEqual([]);
+  });
+
+  it("klik robi jeden POST bez ciała i zostawia podsumowanie na ekranie", async () => {
+    const zapisy = atrapaZapisow(odczyt, () => ({ status: 200, cialo: wynik() }));
+    pokaz();
+    await userEvent.click(await przycisk());
+    const status = await screen.findByRole("status");
+    expect(status).toHaveTextContent("Sprawdzono 383 zwrotów. Przypięto wypłatę z Allegro przy 9.");
+    expect(status).not.toHaveTextContent("Allegro nie zna zwrotu płatności");
+    expect(status).not.toHaveTextContent("Lista Allegro jest dłuższa");
+    expect(zapisy.wyslane).toEqual([ADRES]);
+    const init = vi.mocked(fetch).mock.calls.find((c) => (c[1] as RequestInit | undefined)?.method === "POST")?.[1] as RequestInit;
+    expect(init.body).toBeUndefined();
+  });
+
+  it("wynik przeżywa zmianę kubełka, a Zamknij go zdejmuje", async () => {
+    atrapaZapisow(odczyt, () => ({ status: 200, cialo: wynik() }));
+    pokaz();
+    await userEvent.click(await przycisk());
+    await screen.findByRole("status");
+    await userEvent.click(screen.getByRole("button", { name: /Do zwrotu/ }));
+    expect(screen.getByRole("status")).toHaveTextContent("Sprawdzono 383 zwrotów");
+    await userEvent.click(screen.getByRole("button", { name: "Zamknij" }));
+    expect(screen.queryByRole("status")).toBeNull();
+  });
+
+  it("pokazuje brak zwrotu płatności, powody wprost i urwaną listę", async () => {
+    atrapaZapisow(odczyt, () => ({ status: 200, cialo: wynik({
+      bezZwrotuPlatnosci: 4, urwane: true,
+      zPowodem: [{ powod: "kwota w Allegro różni się od naszej", ile: 3 }] }) }));
+    pokaz();
+    await userEvent.click(await przycisk());
+    const status = await screen.findByRole("status");
+    expect(status).toHaveTextContent("Allegro nie zna zwrotu płatności dla 4 zwrotów.");
+    expect(status).toHaveTextContent("3 zwrotów nie przypięto: kwota w Allegro różni się od naszej.");
+    expect(status).toHaveTextContent("Lista Allegro jest dłuższa, niż bierzemy naraz — kliknij jeszcze raz, żeby dojść dalej.");
+  });
+
+  it("zero sprawdzonych mówi, że nie ma czego sprawdzać", async () => {
+    atrapaZapisow(odczyt, () => ({ status: 200, cialo: wynik({ sprawdzonych: 0, zatrzasniete: 0 }) }));
+    pokaz();
+    await userEvent.click(await przycisk());
+    expect(await screen.findByRole("status")).toHaveTextContent("Nie ma zwrotów do sprawdzenia.");
+  });
+
+  it("błąd 429 pokazuje treść serwera", async () => {
+    atrapaZapisow(odczyt, () => ({ status: 429, cialo: { error: "Allegro ogranicza zapytania." } }));
+    pokaz();
+    await userEvent.click(await przycisk());
+    expect(await screen.findByText("Allegro ogranicza zapytania.")).toBeInTheDocument();
+    expect(screen.queryByRole("status")).toBeNull();
+  });
+});
