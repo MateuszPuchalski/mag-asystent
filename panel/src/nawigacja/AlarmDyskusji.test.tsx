@@ -33,7 +33,8 @@ beforeEach(() => {
 });
 afterEach(() => vi.unstubAllGlobals());
 
-function pokaz(adres = "/", element: React.ReactNode = <PasekAlarmuDyskusji />) {
+/* Domyślny adres to kolejka dyskusji: tylko tam pasek się pokazuje. */
+function pokaz(adres = "/obsluga/dyskusje", element: React.ReactNode = <PasekAlarmuDyskusji />) {
   const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   render(<QueryClientProvider client={qc}>
     <MemoryRouter initialEntries={[adres]}>{element}</MemoryRouter></QueryClientProvider>);
@@ -85,8 +86,9 @@ describe("PasekAlarmuDyskusji", () => {
   /* Odpowiedź na zdrowie przychodzi asynchronicznie, więc „nie ma paska"
      sprawdzamy dopiero po tym, jak licznik na tej samej stronie się pokazał.
      Inaczej test przeszedłby, zanim dane w ogóle dojechały. */
-  it.each(["/obsluga/reklamacje", "/obsluga/reklamacje/5"])(
-    "na reklamacjach (%s) paska nie ma — alarm niesie licznik zakładki", async (adres) => {
+  it.each(["/", "/obsluga", "/obsluga/zwroty", "/obsluga/reklamacje", "/obsluga/reklamacje/5",
+    "/obsluga/skrzynka/3", "/obsluga/klient/abc"])(
+    "poza dyskusjami (%s) paska nie ma — alarm niesie licznik zakładki", async (adres) => {
       zdrowie = { ...BAZA, dyskusje: ALARM };
       pokaz(adres, <><PasekAlarmuDyskusji /><LicznikAlarmuDyskusji /></>);
       await screen.findByLabelText(/2 dyskusje czekają/);
@@ -94,17 +96,19 @@ describe("PasekAlarmuDyskusji", () => {
       expect(zapisy).toEqual([]);
     });
 
-  it("poza reklamacjami pasek dalej woła, np. na zwrotach", async () => {
-    zdrowie = { ...BAZA, dyskusje: ALARM };
-    pokaz("/obsluga/zwroty");
-    expect(await screen.findByRole("alert", { name: "Dyskusje bez odpowiedzi" })).toBeInTheDocument();
-  });
+  it.each(["/obsluga/dyskusje", "/obsluga/dyskusje/8"])(
+    "na dyskusjach (%s) pasek woła", async (adres) => {
+      zdrowie = { ...BAZA, dyskusje: ALARM };
+      pokaz(adres);
+      expect(await screen.findByRole("alert", { name: "Dyskusje bez odpowiedzi" })).toBeInTheDocument();
+    });
 
-  it("adres tylko PODOBNY do reklamacji pasek zostawia", async () => {
+  it("adres tylko PODOBNY do dyskusji paska nie dostaje", async () => {
     /* Warunek patrzy na cały człon ścieżki, nie na jej początek jako tekst. */
     zdrowie = { ...BAZA, dyskusje: ALARM };
-    pokaz("/obsluga/reklamacjex");
-    expect(await screen.findByRole("alert")).toBeInTheDocument();
+    pokaz("/obsluga/dyskusjex", <><PasekAlarmuDyskusji /><LicznikAlarmuDyskusji /></>);
+    await screen.findByLabelText(/2 dyskusje czekają/);
+    expect(screen.queryByRole("alert")).toBeNull();
   });
 });
 
