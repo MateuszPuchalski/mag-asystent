@@ -12,6 +12,7 @@ import {
   urlWatkow,
   urlWiadomosci,
   urlWiadomosciDyskusji,
+  urlZwrotowPlatnosci,
   urlZwrotu,
   zapytajAllegro,
 } from "./adapters/allegro.http.js";
@@ -191,6 +192,36 @@ async function main(): Promise<void> {
       await sekcja("`/order/refund-claims` — roszczenia o zwrot prowizji", async () =>
         tablica(await zapytajAllegro(urlRoszczenProwizji(api, 0)), "refundClaims")
       )
+    ).md
+  );
+
+  /* Zwroty PŁATNOŚCI to osobna rodzina od zwrotów klienta: niosą rozbicie na
+     pozycje, które biuro widzi w Sales Center. Dwie sekcje, bo odpowiadają na
+     dwa pytania. Lista konta pokazuje kształt. Pytanie o zamówienie ze
+     zwrotów klienta sprawdza, czy zwrot zrobiony ręką też tu jest, i czy
+     `lineItems` bywa puste. Pierwsze sprawdzenie bierze zamówienia z już
+     pobranych zwrotów, więc nie potrzeba numerów z głowy. */
+  sekcje.push(
+    (
+      await sekcja("`/payments/refunds` — zwroty płatności (konto)", async () =>
+        tablica(await zapytajAllegro(urlZwrotowPlatnosci(api)), "refunds")
+      )
+    ).md
+  );
+
+  sekcje.push(
+    (
+      await sekcja("`/payments/refunds?order.id` — zwroty płatności zamówień ze zwrotów", async () => {
+        const zebrane: unknown[] = [];
+        const zamowienia = zwroty.rekordy
+          .map((r) => (r as Record<string, unknown>)?.orderId)
+          .filter((v): v is string => typeof v === "string")
+          .slice(0, ROZMOW);
+        for (const id of zamowienia) {
+          zebrane.push(...tablica(await zapytajAllegro(urlZwrotowPlatnosci(api, { orderId: id })), "refunds"));
+        }
+        return zebrane;
+      })
     ).md
   );
 

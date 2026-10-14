@@ -499,7 +499,7 @@ export function Reklamacje() {
                   { onError: (e) => setBladProwadze((e as Error).message) });
               }}
               onOdswiez={() => odswiez.mutate({ id: r.id })} odswieza={odswiez.isPending} />
-            <DrogaSprawy szczegol={d} sprawdzaPrzesylke={sprawdzPrzesylke.isPending}
+            <DrogaSprawy dane={d} biezaca={{ rodzaj: "reklamacja", id: r.id }} sprawdzaPrzesylke={sprawdzPrzesylke.isPending}
               bladPrzesylki={bladPrzesylki}
               onSprawdzPrzesylke={() => {
                 setBladPrzesylki("");

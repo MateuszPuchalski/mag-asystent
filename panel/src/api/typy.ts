@@ -261,11 +261,7 @@ export type WpisOsi = {
   rodzaj: "wiadomosc" | "zlecenie" | "wynik_zadania" | "odeslanie_zadania"
     | "komentarz" | "status"
     /* Kamień milowy zwrotu (0.502.0) — zdarzenie, nie wypowiedź; `Os.tsx` ZDARZENIE. */
-    | "zwrot"
-    /* Zdarzenie ZAKUPU wstawione do osi po stronie panelu (`skrzynka/zakup.ts`):
-       złożone, opłacone, dostarczone, zwrot, reklamacja, dyskusja. Nie przychodzi
-       z serwera, nie jest wypowiedzią i nie wchodzi do paska przebiegu. */
-    | "zakup";
+    | "zwrot";
   autor: string;
   odKlienta: boolean;
   tresc: string;
@@ -1428,6 +1424,35 @@ export type StanZwrotuPieniedzy = {
   przelew: { kiedy: string; przez: string | null; referencja: string | null } | null;
   moznaZapisacPrzelew: boolean;
   powodPrzelewu: string | null;
+  /**
+   * Zwroty płatności z lustra Allegro, najnowszy pierwszy; puste, gdy lustro
+   * nic nie zna. Tak biuro widzi wypłatę w Sales Center: status, kwota
+   * i rozbicie na pozycje zamówienia.
+   */
+  platnosci: ZwrotPlatnosciAllegro[];
+};
+
+/** Jeden zwrot płatności z Allegro (`ZwrotPlatnosci` na serwerze). */
+export type ZwrotPlatnosciAllegro = {
+  refundId: string;
+  paymentId: string | null;
+  orderId: string | null;
+  /** Surowo: SUCCESS, PARTIAL, NEW, VALIDATED, IN_PROGRESS, CANCELED, VALIDATE_FAILED… */
+  status: string;
+  reason: string | null;
+  utworzonoAt: string;
+  kwotaGrosze: number | null;
+  waluta: string | null;
+  dostawaGrosze: number | null;
+  pozycje: Array<{
+    /** Identyfikator pozycji zamówienia (`lineItems[].id`). */
+    id: string;
+    type: "QUANTITY" | "AMOUNT";
+    quantity: number | null;
+    kwotaGrosze: number | null;
+    /** Nazwa z pozycji zamówienia; `null`, gdy zamówienia nie mamy. */
+    nazwa?: string | null;
+  }>;
 };
 
 /**
@@ -1714,6 +1739,24 @@ export interface SzczegolReklamacji {
      go nie zna, a brak ma znaczyć „nie wiemy". */
   /** Ostatnia dostawa towaru; `null` = nie wiemy, skąd przyszła sztuka. */
   dostawa?: OstatniaDostawaReklamacji | null;
+}
+
+/**
+ * Droga klienta po numerze zamówienia — odpowiedź `GET /api/obsluga/droga/:orderId`.
+ *
+ * Pola `zamowienie`, `przesylka`, `droga`, `sprawy` i `reklamacja` mają ten sam
+ * kształt co w szczególe reklamacji, żeby jeden pasek czytał oba. Różnica:
+ * tu `sprawy` i `droga` niosą CAŁY zakup, bez wycinania sprawy, na której
+ * stoi ekran, a `reklamacja` to najnowsza reklamacja zamówienia albo `null`.
+ */
+export interface OdpowiedzDrogi {
+  orderId: string;
+  linkZamowienia: string | null;
+  zamowienie: Zamowienie | null;
+  przesylka: StanPrzesylki | null;
+  droga: PrzystanekDrogi[];
+  sprawy: SprawaZakupu[];
+  reklamacja: Reklamacja | null;
 }
 
 /** Ślad w historii: ile spraw, ile skończyło się uznaniem, ile odmową. */

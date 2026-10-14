@@ -117,8 +117,9 @@ export function Naglowek({ zwrot }: { zwrot: Zwrot }) {
  * o zwrocie: klient bywa w tej samej sprawie w pół zdania.
  *
  * JEDNA ROZMOWA, NAJNOWSZA. Reszta zostaje w dowodach — od 0.518.0 jako
- * przystanki drogi w sekcji „Ten zakup u nas"; nagłówek mówi tylko, ile ich jest. „Czeka na odpowiedź" niesie niebieski, nie bursztyn —
- * to wezwanie do ruchu, a nie ostrzeżenie o błędzie.
+ * przystanki paska drogi klienta pod nagłówkiem; nagłówek mówi tylko, ile ich
+ * jest. „Czeka na odpowiedź" niesie niebieski, nie bursztyn — to wezwanie
+ * do ruchu, a nie ostrzeżenie o błędzie.
  */
 function RozmowaWNaglowku({ rozmowy }: { rozmowy: RozmowaZwrotu[] }) {
   const r = rozmowy[0]!;
@@ -138,6 +139,6 @@ function RozmowaWNaglowku({ rozmowy }: { rozmowy: RozmowaZwrotu[] }) {
       <span className="font-semibold text-slate-600">{r.odKlienta ? "Klient: " : "My: "}</span>
       „{r.ostatniaTresc}”</p>}
     {rozmowy.length > 1 && <span className="mt-1 block text-xs text-slate-600">
-      i {ile(rozmowy.length - 1, "inna rozmowa", "inne rozmowy", "innych rozmów")} o tym zakupie — w „Ten zakup u nas”</span>}
+      i {ile(rozmowy.length - 1, "inna rozmowa", "inne rozmowy", "innych rozmów")} o tym zakupie — na pasku drogi poniżej</span>}
   </RouterLink>;
 }

@@ -23,7 +23,7 @@ się po cichu: zniknie albo zaświeci na czerwono.
 **Pierwszym mostkiem jest numer zamówienia**: `message.related_order_id`,
 `zwrot_klienta.order_id` i `reklamacja_klienta.order_id`. Każda z czterech
 kolejek widzi trzy pozostałe, czyli dwanaście przejść z dwunastu. Wszystkie
-idą przez `services/droga-klienta.ts` i jeden blok `panel/src/sprawy/Spoiwo.tsx`.
+idą przez `services/droga-klienta.ts` i pasek drogi klienta (`panel/src/sprawy/DrogaKlienta.tsx`).
 Ręczne wskazanie zamówienia rozmowy czyta każda strona z jednej relacji
 `ROZMOWA_ZAMOWIENIA` (test o tej nazwie w `droga-klienta.test.ts`).
 

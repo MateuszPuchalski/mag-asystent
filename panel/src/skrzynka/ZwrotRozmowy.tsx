@@ -28,9 +28,12 @@ export function ZwrotRozmowy({ zwrot }: { zwrot: Zwrot }) {
   const kubelek = KUBELKI.find((k) => k.id === zwrot.kubelek);
   const wracaja = zwrot.pozycje;
   /* Płasko, bez tła i kreski: zwrot stoi w ramie „Wymaga Ciebie" albo
-     w wierszu „Zamknięte sprawy", a kreskę i oddech daje mu tamto miejsce. */
+     w wierszu „Zamknięte zwroty", a kreskę i oddech daje mu tamto miejsce. */
   return <section aria-label="Zwrot" className="space-y-2 text-sm">
     <div className="flex flex-wrap items-center gap-2">
+      {/* Numer stoi widocznie w tytule: przystanek paska niesie go tylko
+          w nazwie łącza, a dwa zamknięte zwroty tego samego klienta agent
+          odróżnia na oko właśnie po numerze. */}
       <b className="text-wertis-ink">Zwrot</b>
       {zwrot.numer && <span className="font-mono text-xs text-slate-600">{zwrot.numer}</span>}
       {zwrot.zrodlo === "nieodebrana" && <span className="rounded bg-slate-200 px-1.5 py-0.5 text-podpis font-bold text-slate-700">
@@ -45,8 +48,9 @@ export function ZwrotRozmowy({ zwrot }: { zwrot: Zwrot }) {
     </div>
 
     {/* ZEGAR PIERWSZY: termin rozstrzyga, czy zwrot czeka na ruch dziś, więc
-        stoi tam, gdzie oko czyta na pewno. Datę zgłoszenia mówi linia osi
-        „Zwrot zgłoszony", a brak paczki to zdanie, nie pusta komórka. */}
+        stoi tam, gdzie oko czyta na pewno. Termin zostaje tutaj, bo przystanek
+        zwrotu na pasku drogi ma tylko datę. Datę zgłoszenia mówi ten przystanek,
+        a brak paczki to zdanie, nie pusta komórka. */}
     <dl className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-0.5 text-xs">
       <dt className="text-slate-500">Termin</dt>
       {/* Termin rusza dopiero od paczki u nas, więc bywa pusty. */}

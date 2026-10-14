@@ -1,5 +1,5 @@
 import React from "react";
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router-dom";
@@ -34,7 +34,7 @@ const szczegol = (r: Partial<Reklamacja> = {}, reszta: Partial<SzczegolReklamacj
 const krok = (s: SzczegolReklamacji, klucz: string) => krokiDrogi(s).find((k) => k.klucz === klucz)!;
 
 const pokaz = (s: SzczegolReklamacji, pytanie: PytanieOPaczke = {}) =>
-  render(<MemoryRouter><DrogaSprawy szczegol={s} {...pytanie} /></MemoryRouter>);
+  render(<MemoryRouter><DrogaSprawy dane={s} {...pytanie} /></MemoryRouter>);
 
 const przesylka = (n: Partial<StanPrzesylki> = {}): StanPrzesylki => ({
   waybill: null, przewoznik: null, status: null, dostarczonoAt: null, sprawdzonoAt: null, ...n,
@@ -268,5 +268,178 @@ describe("Inne sprawy tego zakupu stoją na drodze", () => {
     /* Przed zgłoszeniem nic nie wiemy o doręczeniu, więc zwrot czeka przed nim. */
     expect(ulozone("2026-09-19T10:00:00.000Z"))
       .toEqual(["zakup", "zwrot", "doreczono", "zgloszenie", "rozmowa", "decyzja", "rozliczenie"]);
+  });
+});
+
+/* ── Pasek bez szczegółu reklamacji ──────────────────────────────────────────
+   Zwroty, dyskusje, skrzynka i profil karmią pasek `DaneDrogi` z drogi
+   klienta, a nie szczegółem reklamacji. Pilnujemy trzech rzeczy: brak
+   reklamacji nie udaje reklamacji, sprawa ekranu zostaje na pasku jako
+   „tu jesteś” bez łącza, a reklamacja z krokami nie staje drugi raz. */
+describe("Droga klienta bez szczegółu reklamacji", () => {
+  const przystanek = (rodzaj: PrzystanekDrogi["rodzaj"], id: number, at = "2026-09-25T10:00:00.000Z") =>
+    ({ rodzaj, id, at, opis: null });
+  const bezReklamacji = (n: Partial<SzczegolReklamacji> = {}) =>
+    ({ ...szczegol({}, n), reklamacja: null }) as unknown as import("./DrogaSprawy").DaneDrogi;
+  const pokazDane = (d: import("./DrogaSprawy").DaneDrogi, p: Partial<React.ComponentProps<typeof DrogaSprawy>> = {}) =>
+    render(<MemoryRouter><DrogaSprawy dane={d} {...p} /></MemoryRouter>);
+
+  it("bez reklamacji stoją tylko Zakup i Doręczono, bez szarych kroków reklamacji", () => {
+    pokazDane(bezReklamacji());
+    const nazwy = screen.getAllByRole("listitem").map((li) => li.textContent ?? "");
+    expect(nazwy).toHaveLength(2);
+    expect(nazwy[0]).toContain("Zakup");
+    expect(nazwy[1]).toContain("Doręczono");
+    expect(screen.queryByText(/Zgłoszenie|Rozmowa|Decyzja|Rozliczenie/)).toBeNull();
+    expect(krokiDrogi(bezReklamacji()).map((k) => k.klucz)).toEqual(["zakup", "doreczono"]);
+  });
+
+  it("bez reklamacji zakup bierze numer z danych drogi, nie z reklamacji", () => {
+    pokazDane({ ...bezReklamacji(), orderId: "ord-77", linkZamowienia: "https://allegro.pl/z/77" });
+    expect(screen.getByRole("link", { name: /ord-77/ })).toHaveAttribute("href", "https://allegro.pl/z/77");
+  });
+
+  it("bezNumerow wyłącza numer zamówienia i przesyłki, bo ekran pokazuje je sam", () => {
+    pokazDane({ ...bezReklamacji({ przesylka: przesylka({ waybill: "600000727616", przewoznik: "INPOST",
+      sprawdzonoAt: "2026-09-29T10:00:00.000Z" }) }), orderId: "ord-77" }, { bezNumerow: true });
+    expect(screen.queryByText(/ord-77|6000/)).toBeNull();
+    expect(screen.queryByTitle("Kopiuj numer zamówienia")).toBeNull();
+    expect(screen.queryByTitle("Kopiuj numer przesyłki")).toBeNull();
+  });
+
+  it("sprawa ekranu zostaje na pasku jako przystanek „tu jesteś”, bez łącza do siebie", () => {
+    pokazDane(bezReklamacji({ droga: [przystanek("rozmowa", 3), przystanek("zwrot", 7, "2026-09-26T10:00:00.000Z")] }),
+      { biezaca: { rodzaj: "zwrot", id: 7 } });
+    const tu = screen.getAllByRole("listitem").filter((li) => li.getAttribute("aria-current") === "location");
+    expect(tu).toHaveLength(1);
+    expect(tu[0]).toHaveAttribute("data-przystanek", "zwrot");
+    expect(tu[0]).toHaveTextContent("tu jesteś");
+    expect(within(tu[0]).queryByRole("link")).toBeNull();
+    /* Pozostałe przystanki dalej prowadzą do swoich kolejek. */
+    expect(screen.getByRole("link", { name: /^Pytanie z/ })).toHaveAttribute("href", "/obsluga/skrzynka/3");
+    expect(screen.queryByRole("link", { name: /^Zwrot/ })).toBeNull();
+  });
+
+  it("bez biezaca wszystkie przystanki są łączami, a nic nie jest „tu”", () => {
+    pokazDane(bezReklamacji({ droga: [przystanek("zwrot", 7)] }));
+    expect(screen.getByRole("link", { name: /^Zwrot z/ })).toHaveAttribute("href", "/obsluga/zwroty/7");
+    expect(document.querySelector("[aria-current]")).toBeNull();
+  });
+
+  it("reklamacja z krokami nie staje przystankiem, nawet gdy jest na drodze i wśród spraw", () => {
+    const sprawaReklamacji = { id: 5, typ: "CLAIM", numer: null, temat: null, statusAllegro: null,
+      decyzjaDo: null, otwartoAt: "2026-09-28T12:32:00.000Z", prowadzi: null, otwarta: true };
+    const dane = { ...szczegol({}, { droga: [przystanek("reklamacja", 5, "2026-09-28T12:32:00.000Z"),
+      przystanek("zwrot", 7, "2026-09-30T10:00:00.000Z")], sprawy: [sprawaReklamacji] }) };
+    /* Ekran zwrotu: reklamacja 5 ma kroki, zwrot 7 jest „tu jesteś”. */
+    pokazDane(dane, { biezaca: { rodzaj: "zwrot", id: 7 } });
+    expect(document.querySelectorAll('[data-przystanek="reklamacja"]')).toHaveLength(0);
+    expect(screen.getAllByText("Zgłoszenie")).toHaveLength(1);
+    expect(document.querySelectorAll('[data-przystanek="zwrot"][aria-current="location"]')).toHaveLength(1);
+    expect(screen.getAllByRole("listitem")).toHaveLength(7);
+  });
+
+  it("na ekranie reklamacji sprawa bieżąca to ta z krokami, więc przystanku „tu” nie ma", () => {
+    pokazDane(szczegol({}, { droga: [przystanek("reklamacja", 5), przystanek("zwrot", 7)] }),
+      { biezaca: { rodzaj: "reklamacja", id: 5 } });
+    expect(document.querySelector('[aria-current="location"]')).toBeNull();
+    expect(document.querySelectorAll('[data-przystanek="reklamacja"]')).toHaveLength(0);
+    expect(screen.getAllByRole("listitem")).toHaveLength(7);
+  });
+
+  it("wariant płaski nie rysuje własnej kreski ani tła, bo karta ma swoje", () => {
+    pokazDane(bezReklamacji(), { plaska: true });
+    const lista = screen.getByRole("list", { name: "Droga sprawy" });
+    expect(lista.className).not.toMatch(/border-t|bg-wertis-paper/);
+    expect(lista.className).toContain("overflow-x-auto");
+  });
+});
+
+/* ── Przystanek niesie stan sprawy ───────────────────────────────────────────
+   Pasek jest jedynym domem innych spraw zakupu, więc przystanek mówi to, co
+   mówił osobny blok: zamknięta słowem, termin otwartej, temat i numer oraz
+   prowadzącego w nazwie łącza. Zwrot i rozmowa nie mają wiersza stanu, więc
+   przystanek nie zgaduje, że są otwarte. */
+describe("Przystanek ze stanem sprawy", () => {
+  const droga = (rodzaj: PrzystanekDrogi["rodzaj"], id: number, opis: string | null = null): PrzystanekDrogi =>
+    ({ rodzaj, id, at: "2026-09-25T10:00:00.000Z", opis });
+  const sprawa = (n: Record<string, unknown>) => ({ id: 8, typ: "DISPUTE", numer: null, temat: "Gdzie paczka",
+    statusAllegro: null, decyzjaDo: null, otwartoAt: "2026-09-25T10:00:00.000Z", prowadzi: null, otwarta: true, ...n });
+  const bez = (n: Partial<SzczegolReklamacji>) =>
+    ({ ...szczegol({}, n), reklamacja: null }) as unknown as import("./DrogaSprawy").DaneDrogi;
+  const pokazDane = (d: import("./DrogaSprawy").DaneDrogi, p: Partial<React.ComponentProps<typeof DrogaSprawy>> = {}) =>
+    render(<MemoryRouter><DrogaSprawy dane={d} {...p} /></MemoryRouter>);
+
+  /* Termin liczy się od teraz, więc zegar stoi w miejscu. */
+  beforeEach(() => { vi.useFakeTimers({ toFake: ["Date"] }); vi.setSystemTime(new Date("2026-10-01T10:00:00.000Z")); });
+  afterEach(() => vi.useRealTimers());
+
+  it("zamknięta sprawa mówi o tym słowem i nie ma terminu", () => {
+    pokazDane(bez({ droga: [droga("dyskusja", 8)],
+      sprawy: [sprawa({ otwarta: false, decyzjaDo: "2026-09-30T00:00:00.000Z" })] as never }));
+    const li = document.querySelector('[data-przystanek="dyskusja"]') as HTMLElement;
+    expect(li).toHaveTextContent("zamknięta");
+    expect(li.textContent).not.toMatch(/do \d/);
+    expect(within(li).getByRole("link").getAttribute("aria-label")).toContain("zamknięta");
+  });
+
+  it("otwarta sprawa z terminem pokazuje czerwone „do dd.mm”, prowadzącego i temat w nazwie łącza", () => {
+    pokazDane(bez({ droga: [droga("reklamacja", 8)],
+      sprawy: [sprawa({ typ: "CLAIM", numer: "REK-8/2026", decyzjaDo: "2026-10-12T00:00:00.000Z",
+        prowadzi: "Ola Kowalska" })] as never }));
+    const li = document.querySelector('[data-przystanek="reklamacja"]') as HTMLElement;
+    const termin = within(li).getByText(`do ${dzienMiesiac("2026-10-12T00:00:00.000Z")}`);
+    expect(termin.className).toContain("text-ranga-zle");
+    expect(li.textContent).not.toContain("zamknięta");
+    const nazwa = within(li).getByRole("link").getAttribute("aria-label")!;
+    expect(nazwa).toContain("REK-8/2026");
+    expect(nazwa).toContain("prowadzi Ola Kowalska");
+    expect(nazwa).toContain("termin");
+  });
+
+  it("otwarta sprawa po terminie mówi „po terminie” czerwonym słowem pod datą", () => {
+    pokazDane(bez({ droga: [droga("reklamacja", 8)],
+      sprawy: [sprawa({ typ: "CLAIM", numer: "REK-8/2026", decyzjaDo: "2026-09-28T00:00:00.000Z" })] as never }));
+    const li = document.querySelector('[data-przystanek="reklamacja"]') as HTMLElement;
+    const stan = within(li).getByText("po terminie");
+    expect(stan.className).toContain("text-ranga-zle");
+    expect(li.textContent).not.toMatch(/do \d/);
+    expect(within(li).getByRole("link").getAttribute("aria-label")).toContain("po terminie");
+    /* Słowo stoi w osobnej linii pod datą, a przystanek się nie rozrasta. */
+    expect(stan.previousElementSibling).toHaveTextContent(dzienMiesiac("2026-09-25T10:00:00.000Z"));
+    expect(stan.className).toContain("text-xs");
+  });
+
+  it("dyskusja bez terminu jest po prostu „otwarta”, bez zegara", () => {
+    pokazDane(bez({ droga: [droga("dyskusja", 8)], sprawy: [sprawa({})] as never }));
+    const li = document.querySelector('[data-przystanek="dyskusja"]') as HTMLElement;
+    expect(within(li).getByText("otwarta")).toBeVisible();
+    expect(li.textContent).not.toMatch(/zamknięta|do \d|po terminie/);
+    expect(within(li).getByRole("link").getAttribute("aria-label")).toContain("Gdzie paczka");
+  });
+
+  it("zwrot i rozmowa niosą numer i temat w nazwie łącza, ale bez stanu", () => {
+    pokazDane(bez({ droga: [droga("zwrot", 7, "ZW/2026/10/0077"), droga("rozmowa", 3, "Pytanie o dostawę")] }));
+    const zwrot = document.querySelector('[data-przystanek="zwrot"]') as HTMLElement;
+    expect(within(zwrot).getByRole("link").getAttribute("aria-label")).toContain("nr ZW/2026/10/0077");
+    expect(zwrot.textContent).not.toMatch(/zamknięta|otwarta|po terminie|do \d/);
+    const rozmowa = document.querySelector('[data-przystanek="rozmowa"]') as HTMLElement;
+    expect(within(rozmowa).getByRole("link").getAttribute("aria-label")).toContain("Pytanie o dostawę");
+  });
+
+  it("przystanek „tu jesteś” nie niesie stanu, bo agent stoi na tej sprawie", () => {
+    pokazDane(bez({ droga: [droga("dyskusja", 8)],
+      sprawy: [sprawa({ decyzjaDo: "2026-10-12T00:00:00.000Z" })] as never }),
+      { biezaca: { rodzaj: "dyskusja", id: 8 } });
+    const li = document.querySelector('[data-przystanek="dyskusja"]') as HTMLElement;
+    expect(li.textContent).not.toMatch(/zamknięta|do \d/);
+  });
+
+  it("bezPrzesylki wyłącza tylko numer listu: numer zamówienia zostaje na pasku", () => {
+    pokazDane({ ...bez({ przesylka: przesylka({ waybill: "600000727616", przewoznik: "INPOST",
+      sprawdzonoAt: "2026-09-29T10:00:00.000Z" }) }), orderId: "ord-77" } as never, { bezPrzesylki: true });
+    expect(screen.getByTitle("Kopiuj numer zamówienia")).toBeInTheDocument();
+    expect(screen.queryByText(/6000/)).toBeNull();
+    expect(screen.queryByTitle("Kopiuj numer przesyłki")).toBeNull();
   });
 });

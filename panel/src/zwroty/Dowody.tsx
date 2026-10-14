@@ -1,19 +1,16 @@
 import React, { useEffect, useState } from "react";
 import {
   CalendarClock, CalendarDays, CreditCard, NotebookPen, Package, Receipt,
-  RefreshCw, Route, ShoppingCart, Truck, Undo2, Wallet,
+  RefreshCw, ShoppingCart, Truck, Undo2, Wallet,
 } from "lucide-react";
 import type { Tag } from "../api/typy";
-import type { KandydatFaktury, PozycjaZwrotu, PrzystanekDrogi, SprawaZakupu, WpisOsiZwrotu, Zwrot }
+import type { KandydatFaktury, PozycjaZwrotu, WpisOsiZwrotu, Zwrot }
   from "../api/typy";
 import { PrzebiegZwrotu } from "./Os";
 import { Dokument, ikonaDokumentu } from "./Dokument";
 import { useDociagnijZamowienia, zlote } from "../api/zwroty";
 import { czas, NaglowekSekcji, Przycisk, Skopiuj } from "../ui";
-import { Link } from "./Link";
-import { ZnakAllegro } from "../ui/ZnakAllegro";
 import { KafelOferty } from "../towar/Kafel";
-import { DrogaZakupu, SprawyZakupu } from "../sprawy/Spoiwo";
 import { ZlecHali, jedynaKartoteka } from "../sprawy/ZlecHali";
 import { Link as RouterLink } from "react-router-dom";
 import { etykietaKodu } from "./Pieniadze";
@@ -168,7 +165,7 @@ function Etykieta({ ikona, nazwa }: { ikona: React.ReactNode; nazwa: string }) {
 }
 
 export function Dowody({ zwrot, kandydaciFaktury = [], fakturaTrwa = false,
-  fakturaBlad = "", onFaktura, os = [], sprawy = [], droga = [], kosze = [],
+  fakturaBlad = "", onFaktura, os = [], kosze = [],
   trwaNotatka = false, bladNotatki = "", onNotatka, onCofnijNotatke,
   }: {
   zwrot: Zwrot;
@@ -179,10 +176,6 @@ export function Dowody({ zwrot, kandydaciFaktury = [], fakturaTrwa = false,
   onFaktura?: (dokId: number | null) => void;
   /** Przebieg sprawy (0.313.0); pusta lista nie rysuje sekcji. */
   os?: WpisOsiZwrotu[];
-  /* Spoiwo kolejek (S1 i S3). Domyślnie puste, bo kolumna bywa rysowana bez
-     szczegółu — a wtedy pusta lista po prostu nie rysuje sekcji. */
-  sprawy?: SprawaZakupu[];
-  droga?: PrzystanekDrogi[];
   /** Kosze z towarem tego zwrotu (0.438.0) — druga strona wiązania kosz ↔ zwrot. */
   kosze?: Array<{ id: number; kod: string; status: string }>;
   trwaNotatka?: boolean;
@@ -238,10 +231,9 @@ export function Dowody({ zwrot, kandydaciFaktury = [], fakturaTrwa = false,
                 : "Allegro nie podało przy tym zwrocie numeru zamówienia — wyceniasz z pozycji, zamykasz numerem korekty."}</p>
           </>
         : <>
-            <div className="flex items-center gap-1">
-              <Link href={zam.link}>Otwórz w <ZnakAllegro wysokosc={11} /></Link>
-              <Skopiuj tekst={zam.externalId} />
-            </div>
+            {/* NUMER ZAMÓWIENIA Z ODNOŚNIKIEM DO ALLEGRO I KOPIOWANIEM stoi na
+                pasku drogi klienta pod nagłówkiem (krok Zakup). Tu zostają
+                same fakty o zamówieniu. */}
             {/* ── IKONA ZAMIAST ETYKIETY (0.455.0) ──────────────────────────
                 Zgłoszenie właściciela: „ulżyj przeładowaniu tekstem". Pięć
                 etykiet stało przy każdym zwrocie w tej samej kolejności, więc
@@ -413,32 +405,10 @@ export function Dowody({ zwrot, kandydaciFaktury = [], fakturaTrwa = false,
         Danych nadawcy i konta bankowego nie pobieramy.</p>
     </Sekcja>
 
-    {/* ── JEDNA SEKCJA ZAMIAST TRZECH (0.518.0) ─────────────────────────────
-        Zgłoszenie agentów: „aplikacja przytłacza". Pod kolumną stały trzy
-        sekcje o jednym zakupie: „Sprawy tego zakupu", „Droga tego zakupu"
-        i „Wiadomości o tym zakupie". Dwie pierwsze rysowały przy tym DRUGI
-        nagłówek nad własną listą — `wSekcji` brakowało, choć reklamacje
-        naprawiły to samo w 0.387.0.
-
-        Kształt i powód są te same co w reklamacji 0.416.0: droga jest
-        nadzbiorem. Rozmowy wchodzą na
-        nią po tej samej relacji `ROZMOWA_ZAMOWIENIA`, z której serwer bierze
-        `zwrot.rozmowy`, a każdy przystanek prowadzi do skrzynki. Najnowszą
-        rozmowę z treścią i stanem niesie nagłówek. Rodzeństwo spraw zostaje,
-        bo mówi to, czego droga nie ma: termin, prowadzącego i czy otwarta.
-
-        Historia miejsca: wiadomości weszły tu w 0.169.0 (mostek
-        `related_order_id`), sprawy w S1 spoiwa — biuro oddawało pieniądze,
-        nie wiedząc o otwartej reklamacji o ten sam towar. Pusta sekcja
-        MILCZY (0.370.0): „nic nie powiązano" jest zdaniem o Allegro,
-        nie o sprawie. */}
-    {(droga.length > 1 || sprawy.length > 0) &&
-    <Sekcja ikona={<Route size={14} />} tytul="Ten zakup u nas">
-      {droga.length > 1 && <DrogaZakupu droga={droga} tutaj={{ rodzaj: "zwrot", id: zwrot.id }} wSekcji />}
-      {sprawy.length > 0 && <div className={droga.length > 1 ? "mt-1.5" : ""}>
-        <SprawyZakupu sprawy={sprawy} wSekcji />
-      </div>}
-    </Sekcja>}
+    {/* SEKCJI „TEN ZAKUP U NAS" TU JUŻ NIE MA. Inne sprawy tego zakupu
+        (rozmowy, dyskusje, reklamacje, drugi zwrot) mówi wyłącznie pasek drogi
+        klienta pod nagłówkiem, ze stanem, terminem i prowadzącym na przystanku.
+        Ten sam fakt w dwóch miejscach kazał sprawdzać, czy oba mówią to samo. */}
 
     {/* KOSZE Z TOWAREM TEGO ZWROTU (0.438.0). Pozycja pisała „w koszyku
         zwrotów" bez nazwy i bez drogi, a pytanie „gdzie jest towar z tego
