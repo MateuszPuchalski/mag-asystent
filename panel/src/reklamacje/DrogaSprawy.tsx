@@ -450,8 +450,18 @@ export function DrogaSprawy({ dane, biezaca, bezNumerow = false, bezPrzesylki = 
           {!ostatni && <span className={LINIA(k.stan === "zrobiony")} />}
         </span>
         <span className="flex flex-col whitespace-nowrap pr-2">
-          <span className={`text-sm ${NAPIS[k.stan]}`}>
-            {k.etykieta}<span className="sr-only">{k.kwota ? ` opłacony: ${k.kwota}` : ""}, {STAN_SLOWEM[k.stan]}</span></span>
+          {/* Kroki reklamacji nie są przystankami (reklamacja stoi na pasku
+              krokami, żeby nie dublować), więc z innego ekranu to jedyna
+              droga do niej: łączem jest „Zgłoszenie”, jeden cel i jedna nazwa
+              dla czytnika. Na ekranie samej reklamacji łącza nie ma. */}
+          {k.klucz === "zgloszenie" && r && !(biezaca?.rodzaj === "reklamacja" && biezaca.id === r.id)
+            ? <Link to={`${KOLEJKI.reklamacja.sciezka}/${r.id}`}
+                aria-label={`Zgłoszenie${r.otwartoAt ? ` z ${dataCyfrowa(r.otwartoAt)}` : ""}, ${STAN_SLOWEM[k.stan]} — otwórz ${KOLEJKI.reklamacja.cel}`}
+                title={`Otwórz ${KOLEJKI.reklamacja.cel}`}
+                className="rounded text-sm font-semibold text-sky-700 underline underline-offset-2 hover:text-sky-900 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sky-700">
+                {k.etykieta}</Link>
+            : <span className={`text-sm ${NAPIS[k.stan]}`}>
+                {k.etykieta}<span className="sr-only">{k.kwota ? ` opłacony: ${k.kwota}` : ""}, {STAN_SLOWEM[k.stan]}</span></span>}
           {k.podpis && <span className="text-xs text-slate-600">{k.podpis}
             {/* Bez pytania o paczkę „sprawdź” staje w tej samej linii. */}
             {k.klucz === "doreczono" && dane.przesylka?.sprawdzonoAt === null && !pytanie.bladPrzesylki

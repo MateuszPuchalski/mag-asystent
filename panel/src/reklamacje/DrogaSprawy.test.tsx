@@ -243,7 +243,8 @@ describe("Inne sprawy tego zakupu stoją na drodze", () => {
   it("bez innych spraw droga jest jak była — sześć kroków, żadnego przystanku", () => {
     pokaz(szczegol({}, { droga: [przystanek("reklamacja", 5)], sprawy: [] }));
     expect(screen.getAllByRole("listitem")).toHaveLength(6);
-    expect(screen.queryAllByRole("link", { name: /otwórz/ })).toHaveLength(0);
+    /* Jedyne łącze to „Zgłoszenie” do reklamacji; przystanków nie ma. */
+    expect(screen.getAllByRole("link", { name: /otwórz/ })).toHaveLength(1);
     expect(document.querySelector("[data-przystanek]")).toBeNull();
   });
 
@@ -345,6 +346,33 @@ describe("Droga klienta bez szczegółu reklamacji", () => {
     expect(document.querySelector('[aria-current="location"]')).toBeNull();
     expect(document.querySelectorAll('[data-przystanek="reklamacja"]')).toHaveLength(0);
     expect(screen.getAllByRole("listitem")).toHaveLength(7);
+  });
+
+  it("z innego ekranu „Zgłoszenie” jest łączem do reklamacji, jedynym na kroki", () => {
+    pokazDane(szczegol({}, { droga: [przystanek("zwrot", 7)] }), { biezaca: { rodzaj: "zwrot", id: 7 } });
+    const lacza = screen.getAllByRole("link", { name: /otwórz reklamację/i });
+    expect(lacza).toHaveLength(1);
+    expect(lacza[0]).toHaveAttribute("href", "/obsluga/reklamacje/5");
+    expect(lacza[0]).toHaveTextContent("Zgłoszenie");
+    for (const slowo of ["Rozmowa", "Decyzja", "Rozliczenie"]) {
+      expect(screen.getByText(slowo).closest("a")).toBeNull();
+    }
+  });
+
+  it("bez ekranu bieżącego też prowadzi do reklamacji", () => {
+    pokazDane(szczegol());
+    expect(screen.getByRole("link", { name: /otwórz reklamację/i })).toHaveAttribute("href", "/obsluga/reklamacje/5");
+  });
+
+  it("na ekranie tej reklamacji „Zgłoszenie” nie jest łączem", () => {
+    pokazDane(szczegol(), { biezaca: { rodzaj: "reklamacja", id: 5 } });
+    expect(screen.queryByRole("link", { name: /otwórz reklamację/i })).toBeNull();
+    expect(screen.getByText("Zgłoszenie").closest("a")).toBeNull();
+  });
+
+  it("bez reklamacji nie ma czego łączyć", () => {
+    pokazDane(bezReklamacji(), { biezaca: { rodzaj: "rozmowa", id: 3 } });
+    expect(screen.queryByRole("link", { name: /otwórz reklamację/i })).toBeNull();
   });
 
   it("wariant płaski nie rysuje własnej kreski ani tła, bo karta ma swoje", () => {
