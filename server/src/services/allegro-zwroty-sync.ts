@@ -11,6 +11,7 @@ import { oczyscSurowy } from "./allegro-oczyszczanie.js";
 import { odkodujEncje } from "../tekst.js";
 import { uzupelnijDoreczenia, type DoSprawdzenia } from "./allegro-tracking.js";
 import { uzupelnijWyplaty, zwrotyDoSprawdzeniaWyplaty } from "./allegro-wyplaty.js";
+import { synchronizujZwrotyPlatnosci } from "./allegro-zwroty-platnosci.js";
 
 /* ── Synchronizator zwrotów klienckich (0.150.0) ─────────────────────────────
    Kształt pól pochodzi z OFICJALNEJ specyfikacji OpenAPI Allegro (modele
@@ -272,6 +273,21 @@ export async function synchronizujAllegroZwroty(deps: ZwrotySyncDeps = {}): Prom
        `allegro:api:payments:read` albo zepsuta końcówka płatności nie ma prawa
        zabrać ani nowych zwrotów, ani doręczeń. 429 idzie wyżej — limit jest
        wspólny dla całego konta. */
+    /* LUSTRO ZWROTÓW PŁATNOŚCI PRZED PYTANIEM O OPERACJE. Jedno żądanie na
+       przebieg zatrzaskuje to, co zobaczy, a lista pytań o płatność kurczy się
+       o zwroty już rozliczone. Własny parasol z tego samego powodu co wyżej. */
+    try {
+      const lustro = await synchronizujZwrotyPlatnosci(
+        database, konto, { query: deps.query, apiUrl });
+      if (lustro.zatrzasniete) {
+        console.log(`[zwroty] wypłata z listy zwrotów płatności przy ${lustro.zatrzasniete} zwrotach`);
+      }
+    } catch (error) {
+      if (error instanceof BladLimituAllegro) throw error;
+      console.warn("[zwroty] lista zwrotów płatności nie doszła:",
+        error instanceof Error ? error.message : error);
+    }
+
     try {
       const zatrzasniete = await uzupelnijWyplaty(
         database, zwrotyDoSprawdzeniaWyplaty(database, konto),

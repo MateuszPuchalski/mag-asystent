@@ -3,6 +3,7 @@ import { db as defaultDb, transaction, type Db } from "../db/db.js";
 import { dopasujPozycjeZamowienia } from "./dopasowanie-sku.js";
 import { logEvent } from "./events.js";
 import { iloscLiczona } from "./ilosc-zwrotu.js";
+import { zwrotyPlatnosciZwrotu, type ZwrotPlatnosci } from "./allegro-zwroty-platnosci.js";
 import {
   DOSYLKA_ZWROTU_SQL, dosylkaSledzona, jestKodemDosylki, naDosylkeSprawy, opisZamrozonej, zycieWiersza,
   type TonDosylki,
@@ -206,6 +207,12 @@ export type StanZwrotuPieniedzy = {
   } | null;
   odmowa: { kod: string; powod: string | null; kiedy: string | null } | null;
   /**
+   * Zwroty płatności z Allegro (`GET /payments/refunds`): ile i za co wyszło,
+   * także gdy pieniądze oddano ręką w Sales Center. Najnowszy pierwszy.
+   * Puste, dopóki lustro nic nie zna o tym zamówieniu.
+   */
+  platnosci: ZwrotPlatnosci[];
+  /**
    * Dosyłka tego zwrotu (0.536.1), gdy NASZA odmowa albo kod z Allegro to
    * kod dosyłki. Poza `odmowa`, bo odmowa złożona w panelu Allegro przychodzi
    * tylko kodem synchronizacji — a ekran ma pokazać dosyłkę i przy niej.
@@ -302,12 +309,13 @@ export function stanZwrotuPieniedzy(
         id: w.zwrot_pieniedzy_id,
         status: w.zwrot_pieniedzy_status,
         kiedy: w.zwrot_pieniedzy_at,
-        potwierdzone: STATUSY_ODDANE.has(String(w.status_allegro ?? "")),
+        potwierdzone: Boolean(w.rozliczony_allegro_at) || STATUSY_ODDANE.has(String(w.status_allegro ?? "")),
       }
       : null,
     odmowa: w.odmowa_kod
       ? { kod: w.odmowa_kod, powod: w.odmowa_powod, kiedy: w.odmowa_at } : null,
     dosylka,
+    platnosci: zwrotyPlatnosciZwrotu(database, zwrotId),
     /* Bez loginu kupującego dosyłki nie ma do czyjej sprawy przypiąć —
        przycisk, który zawsze odmawia, uczyłby nie klikać żadnego. */
     sledzicDosylke: kodDosylki && Boolean(w.order_id) && Boolean(w.kupujacy_login) && dosylka === null,

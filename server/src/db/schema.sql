@@ -1619,6 +1619,33 @@ CREATE TABLE IF NOT EXISTS zwrot_klienta (
 CREATE INDEX IF NOT EXISTS ix_zwrot_klienta_termin
   ON zwrot_klienta(created_at);
 
+-- Lustro `GET /payments/refunds`: zwroty PŁATNOŚCI, czyli pieniądze, które
+-- naprawdę wyszły (albo nie) do kupującego, razem z rozbiciem na pozycje.
+-- Osobna tabela od `zwrot_klienta`, bo to inny byt Allegro: zwrot klienta
+-- mówi o towarze, zwrot płatności o pieniądzach, a jeden zwrot towaru może
+-- mieć kilka zwrotów płatności. Kolumny są kwotami i identyfikatorami;
+-- komentarza sprzedawcy nie trzymamy, bo bywa tam treść od ludzi.
+CREATE TABLE IF NOT EXISTS zwrot_platnosci (
+  channel_account_id INTEGER NOT NULL REFERENCES channel_account(id),
+  refund_id TEXT NOT NULL,
+  payment_id TEXT,
+  order_id TEXT,
+  -- Bez `CHECK`: lista statusów w odpowiedzi różni się od listy w filtrze,
+  -- a nieznana wartość ma przejść, nie wywrócić synchronizację.
+  status TEXT NOT NULL,
+  reason TEXT,
+  utworzono_at TEXT NOT NULL,
+  kwota_grosze INTEGER,
+  waluta TEXT,
+  dostawa_grosze INTEGER,
+  -- `lineItems` po normalizacji: [{id, type, quantity?, kwotaGrosze?}].
+  pozycje_json TEXT,
+  sprawdzono_at TEXT NOT NULL,
+  PRIMARY KEY (channel_account_id, refund_id)
+);
+CREATE INDEX IF NOT EXISTS ix_zwrot_platnosci_zamowienie
+  ON zwrot_platnosci(channel_account_id, order_id);
+
 CREATE TABLE IF NOT EXISTS zwrot_klienta_pozycja (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   zwrot_id INTEGER NOT NULL REFERENCES zwrot_klienta(id) ON DELETE CASCADE,

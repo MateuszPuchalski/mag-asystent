@@ -87,9 +87,9 @@ test("paginacja idzie dalej niż pierwsza strona i staje na bezpieczniku", async
   await synchronizujAllegroZwroty({
     database: d, apiUrl: "https://api", now: () => new Date("2026-09-01T10:00:00Z"),
     /* Zawsze pełna strona: bez bezpiecznika ta pętla biłaby w konto bez końca.
-       Odświeżenie znanych zwrotów to osobne żądanie i osobny test — tu nie liczy się. */
+       Odświeżenie znanych zwrotów i lista zwrotów płatności to osobne żądania — tu nie liczą się. */
     query: async (u) => {
-      if (u.includes("limit=1000")) return odpowiedz([]);
+      if (u.includes("limit=1000") || u.includes("/payments/")) return odpowiedz([]);
       strony++;
       return odpowiedz(Array.from({ length: 100 }, (_, i) => zwrot(`s${strony}-${i}`, "2026-08-30T00:00:00Z")));
     },

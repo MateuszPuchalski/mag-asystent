@@ -4,7 +4,7 @@ import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router-dom";
 import { Pieniadze } from "./Pieniadze";
 import type { AkcjeKlawiszy } from "./klawisze";
-import type { StanZwrotuPieniedzy } from "../api/typy";
+import type { StanZwrotuPieniedzy, ZwrotPlatnosciAllegro } from "../api/typy";
 
 /* ── Pieniądze przy zwrocie (§25a, 0.190.0) ──────────────────────────────────
    Ten ekran jako pierwszy w panelu rusza cudze pieniądze, więc testy pilnują
@@ -16,7 +16,7 @@ const stan = (n: Partial<StanZwrotuPieniedzy> = {}): StanZwrotuPieniedzy => ({
   moznaZwrocic: true, moznaOdmowic: true, powod: null,
   kwotaGrosze: 6498, waluta: "PLN", oddane: null, odmowa: null,
   przelew: null, moznaZapisacPrzelew: false, powodPrzelewu: null,
-  dosylka: null, sledzicDosylke: false, ...n,
+  dosylka: null, sledzicDosylke: false, platnosci: [], ...n,
 });
 
 /* Router, bo zdanie o dosyłce prowadzi odnośnikiem do profilu klienta. */
@@ -357,5 +357,56 @@ describe("Pieniądze przy zwrocie", () => {
     rerender(<Pieniadze stan={poOdmowie()} trwa={false} blad="" onZwroc={vi.fn()} onOdmow={vi.fn()} />);
     expect(screen.queryByLabelText("Kod odmowy")).toBeNull();
     expect(screen.queryByRole("button", { name: /Wyślij odmowę/ })).toBeNull();
+  });
+  /* ── Wypłata z Allegro, jak w Sales Center ───────────────────────────────
+     Pasek „Oddano” mówi tylko, że zlecenie jest potwierdzone. Biuro chce
+     widzieć status, kwotę i to, co dokładnie wróciło klientowi. */
+  const wyplata = (n: Partial<ZwrotPlatnosciAllegro> = {}): ZwrotPlatnosciAllegro => ({
+    refundId: "r-1", paymentId: "p-1", orderId: "o-1", status: "SUCCESS", reason: "REFUND",
+    utworzonoAt: "2026-09-28T10:00:00Z", kwotaGrosze: 5498, waluta: "PLN", dostawaGrosze: 0,
+    pozycje: [], ...n });
+  const NAZWY = { "li-aaa111": "Sekator ogrodowy" };
+
+  it("SUCCESS: Wypłacone, kwota, data i pozycje z nazwą oraz sztukami", () => {
+    ekran({ nazwyPozycji: NAZWY, stan: stan({ platnosci: [wyplata({
+      pozycje: [{ id: "li-aaa111", type: "QUANTITY", quantity: 2, kwotaGrosze: null }] })] }) });
+    expect(screen.getByText("Wypłacone")).toBeInTheDocument();
+    expect(screen.getByText("54,98 PLN")).toBeInTheDocument();
+    expect(screen.getByText("28.09.2026")).toBeInTheDocument();
+    expect(screen.getByText("Sekator ogrodowy")).toBeInTheDocument();
+    expect(screen.getByText("2 szt.")).toBeInTheDocument();
+    expect(screen.queryByText("Dostawa")).toBeNull();
+  });
+
+  it("pozycja AMOUNT pokazuje kwotę, a bez nazwy — końcówkę id; dostawa osobnym wierszem", () => {
+    ekran({ stan: stan({ platnosci: [wyplata({ dostawaGrosze: 1200,
+      pozycje: [{ id: "li-zzz999999", type: "AMOUNT", quantity: null, kwotaGrosze: 4298 }] })] }) });
+    expect(screen.getByText("Pozycja zamówienia …999999")).toBeInTheDocument();
+    expect(screen.getByText("42,98 PLN")).toBeInTheDocument();
+    expect(screen.getByText("Dostawa")).toBeInTheDocument();
+    expect(screen.getByText("12,00 PLN")).toBeInTheDocument();
+  });
+
+  it("PARTIAL to wypłata częściowa, nie pełna", () => {
+    ekran({ stan: stan({ platnosci: [wyplata({ status: "PARTIAL" })] }) });
+    expect(screen.getByText("Wypłacone częściowo")).toBeInTheDocument();
+    expect(screen.queryByText("Wypłacone")).toBeNull();
+  });
+
+  it("NEW, VALIDATED i IN_PROGRESS to „W toku”; odrzucenie i anulowanie mają własne słowa", () => {
+    ekran({ stan: stan({ platnosci: [
+      wyplata({ refundId: "a", status: "NEW" }), wyplata({ refundId: "b", status: "VALIDATED" }),
+      wyplata({ refundId: "c", status: "IN_PROGRESS" }), wyplata({ refundId: "d", status: "CANCELED" }),
+      wyplata({ refundId: "e", status: "VALIDATE_FAILED" }), wyplata({ refundId: "f", status: "DZIWNY" })] }) });
+    expect(screen.getAllByText("W toku")).toHaveLength(3);
+    expect(screen.getByText("Anulowane")).toBeInTheDocument();
+    expect(screen.getByText("Odrzucone przez Allegro")).toBeInTheDocument();
+    expect(screen.getByText("DZIWNY")).toBeInTheDocument();
+  });
+
+  it("bez zwrotów płatności nie dodaje niczego — ani listy, ani komunikatu o braku", () => {
+    ekran({ stan: stan({ platnosci: [] }) });
+    expect(screen.queryByRole("list", { name: "Wypłaty z Allegro" })).toBeNull();
+    expect(screen.queryByText(/brak/i)).toBeNull();
   });
 });
