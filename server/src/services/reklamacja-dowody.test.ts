@@ -189,23 +189,34 @@ test("zgłoszenie u dostawcy bez dostawcy, ze złym wynikiem albo bez wersji odp
   assert.equal((d.prepare("SELECT COUNT(*) n FROM reklamacja_u_dostawcy").get() as { n: number }).n, 0);
 });
 
-test("szczegół niesie dowody, zgłoszenie u dostawcy i dostawę towaru z pewnej kartoteki", () => {
+test("szczegół niesie dowody, zgłoszenie u dostawcy i dostawę spornego towaru z paragonu", () => {
   const { d, konto, id } = stanowisko();
   dodajDowod(d, id, { tresc: "Widać pęknięcie." }, ALA);
   zapiszUDostawcy(d, id, { dostawca: "AGRO", wersja: 0 }, ALA);
-  /* Wiersz nie ma kartoteki z paragonu ani z mapowania, ale SKU oferty trafia
-     w jedną kartotekę. Taka kartoteka jest pewna, więc dostawa liczy się dla
-     niej — inaczej panel pokazałby symbol z SKU i „nie wiemy" przy dostawcy. */
+  /* Dostawa liczy się dla spornej pozycji paragonu, tej samej, z której karta
+     „Produkt" rysuje stan i ceny. Wiersz sam kartoteki nie zna, a SKU oferty
+     trafia w tę samą kartotekę. Dostawę rozstrzyga jednak dokument. */
   d.prepare(`INSERT INTO offer_snapshot(channel_account_id,external_id,nazwa,sku,synced_at)
     VALUES (?,'of-1','Nóż','NOZ-1','2026-09-07T10:00:00Z')`).run(konto);
   d.prepare("INSERT INTO sgt_towar(tw_id,symbol,nazwa) VALUES (501,'NOZ-1','Nóż')").run();
   d.prepare(`INSERT INTO sgt_dokument(dok_id,typ,nr_pelny,data_wyst,mag_id,dostawca,nr_oryg)
     VALUES (1,?,'FZ 1/2026','2026-08-01',?,'AGRO','FV/1')`).run(etykietyDostaw()[0] ?? "FZ", config.magId.MAG);
   d.prepare("INSERT INTO sgt_pozycja(dok_id,tw_id,ilosc) VALUES (1,501,4)").run();
+  /* Paragon zamówienia z jednym towarem. Kopia zamówienia bez daty zakupu,
+     więc dokument szukany jest od dziś wstecz. */
+  const nr = "5a1e0000-0000-4000-8000-000000000501";
+  d.prepare("UPDATE reklamacja_klienta SET order_id=? WHERE id=?").run(nr, id);
+  const zam = Number(d.prepare(`INSERT INTO zamowienie_klienta(channel_account_id,external_id,
+    synced_at) VALUES (?,?,'2026-09-07T10:00:00Z')`).run(konto, nr).lastInsertRowid);
+  d.prepare(`INSERT INTO zamowienie_klienta_pozycja(zamowienie_id,offer_id,nazwa,ilosc,
+    cena_grosze,waluta) VALUES (?,'of-1','Nóż',1,5000,'PLN')`).run(zam);
+  d.prepare(`INSERT INTO sgt_faktura(dok_id,typ,nr_pelny,nr_oryg,data_wyst)
+    VALUES (9,'PA','PA 9/2026',?,?)`).run(nr.slice(0, 30), new Date().toISOString().slice(0, 10));
+  d.prepare("INSERT INTO sgt_faktura_pozycja(dok_id,tw_id,ilosc) VALUES (9,501,1)").run();
 
   const s = szczegolReklamacji(d, id);
   assert.equal(s.reklamacja.twId, null, "wiersz sam kartoteki nie zna");
-  assert.equal(s.kartoteka?.pewnosc, "sku");
+  assert.equal(s.paragon.spornaTwId, 501);
   assert.deepEqual(s.dostawa, { dostawca: "AGRO", data: "2026-08-01", numer: "FV/1", przedZakupem: false });
   assert.deepEqual(s.dowody.map((w) => w.tresc), ["Widać pęknięcie."]);
   assert.equal(s.uDostawcy?.dostawca, "AGRO");

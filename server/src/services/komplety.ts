@@ -67,8 +67,9 @@ const PUSTY = (powod: string): SkladPozycji => ({ skladniki: [], zrodlo: null, p
 /** Wiersz dokumentu sprzedaży zsumowany po kartotece, razem z usługami. */
 export interface PozycjaDokumentuSprzedazy {
   twId: number;
-  symbol: string;
-  nazwa: string;
+  /** `null`, gdy kartoteki nie ma w kopii Subiekta. */
+  symbol: string | null;
+  nazwa: string | null;
   ilosc: number;
   /** Pozycja usługowa (`pomijane.ts`), np. przesyłka — nie jest towarem. */
   usluga: boolean;
@@ -82,8 +83,8 @@ export interface PozycjaDokumentuSprzedazy {
  * przesyłki wyglądałby jak inny dokument. Koszyk zwrotów filtruje flagę sam
  * (`pozycjeDokumentu`), więc obie drogi czytają to samo zapytanie.
  *
- * Kartoteka spoza kopii Subiekta dostaje zastępczy symbol i nazwę jak
- * w `kartoteka`; usługą nie jest, bo brak symbolu to towar bez nazwy.
+ * Kartoteka spoza kopii Subiekta ma `null` w symbolu i nazwie. Usługą nie
+ * jest, bo brak symbolu to towar, którego nie umiemy nazwać.
  */
 export function wierszeDokumentuSprzedazy(database: Db, dokId: number): PozycjaDokumentuSprzedazy[] {
   const w = database.prepare(
@@ -93,8 +94,8 @@ export function wierszeDokumentuSprzedazy(database: Db, dokId: number): PozycjaD
     .all(dokId) as Array<{ tw_id: number; ilosc: number; symbol: string | null; nazwa: string | null }>;
   return w.map((x) => ({
     twId: Number(x.tw_id),
-    symbol: x.symbol ?? String(x.tw_id),
-    nazwa: x.nazwa ?? `kartoteka ${x.tw_id}`,
+    symbol: x.symbol,
+    nazwa: x.nazwa,
     ilosc: Number(x.ilosc),
     usluga: pomijanaPozycja(x.symbol),
   }));

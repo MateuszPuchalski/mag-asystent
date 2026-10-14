@@ -1456,13 +1456,22 @@ export function szczegolReklamacji(
     kartoteka = kartotekaOferty(database, konto, reklamacja.offerId,
       snap ? snap.sku : undefined);
   }
-  /* Licznik „ten towar" pyta o kartotekę, którą pokazuje kolumna dowodów:
-     paragon albo wskazanie człowieka, a bez nich powiązanie po SKU lub
-     z pamięci. Tę samą regułę ma `kartotekaKolumny` w panelu. Propozycja bez
-     `twId` (symbol zdublowany) zostaje brakiem i licznik milczy. */
-  const twIdTowaru = reklamacja.twId
-    ?? (kartoteka && (kartoteka.pewnosc === "sku" || kartoteka.pewnosc === "pamiec")
-      ? kartoteka.twId : null);
+  /* Kandydaci na sporną pozycję to mapowanie oferty i sygnatura z pozycji
+     zamówienia. Obie są tylko podpowiedzią: rozstrzyga dokument po
+     odejmowaniu, a symbol na ekran idzie wyłącznie z dokumentu. */
+  const paragon = paragonReklamacji(database, {
+    konto, orderId: reklamacja.orderId, offerId: reklamacja.offerId,
+    kupionoAt: reklamacja.kupionoAt,
+    kandydaci: [
+      w.tw_id == null ? null : Number(w.tw_id),
+      reklamacja.twZParagonu ? reklamacja.twId : null,
+    ],
+  }, teraz);
+  /* Towar sprawy to sporna pozycja paragonu i nic innego. Karta „Produkt"
+     w panelu rysuje stan i ceny z `paragon.spornaTwId`, więc licznik „ten
+     towar" i dostawa liczone z mapowania mówiłyby o innej rzeczy w tej samej
+     karcie. Bez spornej pozycji obu nie ma, bo towar sprawy byłby zgadnięty. */
+  const towarSprawy = paragon.spornaTwId;
 
   return {
     reklamacja,
@@ -1470,24 +1479,11 @@ export function szczegolReklamacji(
     zalaczniki: zalacznikiSprawy(database, id),
     zwroty, rozmowy, sprawy, droga, zamowienie, przesylka, kartoteka,
     karta: kartaSprawy(database, id),
-    historia: historiaSprawy(database, konto, id, twIdTowaru, reklamacja.kupujacyLogin),
-    /* Dostawa liczy się dla tej samej kartoteki co licznik: propozycja
-       niejednoznaczna nie wchodzi, bo dostawca podany do niej byłby
-       zgadywaniem. */
-    dostawa: ostatniaDostawa(database, twIdTowaru, reklamacja.kupionoAt),
+    historia: historiaSprawy(database, konto, id, towarSprawy, reklamacja.kupujacyLogin),
+    dostawa: ostatniaDostawa(database, towarSprawy, reklamacja.kupionoAt),
     dowody: dowodyReklamacji(database, id),
     uDostawcy: uDostawcyReklamacji(database, id),
-    /* Kandydaci na sporną pozycję to mapowanie oferty i sygnatura z pozycji
-       zamówienia. Obie są tylko podpowiedzią: rozstrzyga obecność na
-       dokumencie, a symbol na ekran idzie wyłącznie z dokumentu. */
-    paragon: paragonReklamacji(database, {
-      konto, orderId: reklamacja.orderId, offerId: reklamacja.offerId,
-      kupionoAt: reklamacja.kupionoAt,
-      kandydaci: [
-        w.tw_id == null ? null : Number(w.tw_id),
-        reklamacja.twZParagonu ? reklamacja.twId : null,
-      ],
-    }, teraz),
+    paragon,
   };
 }
 

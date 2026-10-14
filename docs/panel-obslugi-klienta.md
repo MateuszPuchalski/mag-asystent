@@ -6300,8 +6300,9 @@ towar niż ten, który wyjechał w paczce.
   albo „Faktura …” i pod nim WSZYSTKIE pozycje: symbol, nazwa, ilość. Kilka
   dokumentów stoi po kolei, od najstarszego.
 - **Reklamowana pozycja** ma szare tło i napis „reklamowany”, nie bursztyn.
-  Wskazuje ją serwer, tylko gdy jest jednoznaczna. Inaczej nic nie świeci,
-  a zdanie mówi, że dokument tego nie rozstrzyga.
+  Wskazuje ją serwer, tylko gdy jest jednoznaczna. Najpierw odejmuje towary
+  innych ofert zamówienia, bo jedyny towar na paragonie bywa cudzy. Inaczej
+  nic nie świeci, a zdanie mówi, że dokument tego nie rozstrzyga.
 - **Usługa**, na przykład przesyłka, stoi wyciszona i bez kopiowania.
 - **Symbol kopiuje się kliknięciem** przez `ui/kopiuj.ts`, bo biuro pracuje
   po zwykłym HTTP. Nazwa pozycji otwiera przekrój towaru.

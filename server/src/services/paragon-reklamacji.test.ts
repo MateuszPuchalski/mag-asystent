@@ -102,6 +102,7 @@ test("jedna pozycja towarowa jest sporna, przesyłka jest usługą", () => {
   const { d, konto } = stanowisko();
   towar(d, 900, "PRZESYŁKA");
   dokument(d, 7, { linie: [[11, 1], [900, 1], [11, 1]] });
+  zamowienie(d, konto, [{ offerId: "of-1" }]);
 
   const p = paragonReklamacji(d, sprawa(konto), TERAZ);
   assert.equal(p.brak, null);
@@ -115,9 +116,64 @@ test("jedna pozycja towarowa jest sporna, przesyłka jest usługą", () => {
   }], "cały dokument, ilość zsumowana po kartotece, usługa zostaje z flagą");
 });
 
+test("bez kopii zamówienia albo bez naszej oferty w niej nic się nie świeci", () => {
+  /* Nie wiemy wtedy, co jeszcze było na dokumencie. Jedyny towar mógł
+     należeć do oferty, której zamówienia nie znamy. */
+  const { d, konto } = stanowisko();
+  dokument(d, 7, { linie: [[11, 1]] });
+  const bezKopii = paragonReklamacji(d, sprawa(konto, { kandydaci: [11] }), TERAZ);
+  assert.equal(bezKopii.spornaTwId, null);
+  assert.equal(bezKopii.dokumenty[0].pozycje.length, 1, "dokument i tak jest na ekranie");
+
+  /* Reklamowanej oferty nie ma w kopii zamówienia, a jedyna oferta bez
+     kartoteki jest cudza. Reszta dokumentu trafiłaby do niej. */
+  const { d: d2, konto: k2 } = stanowisko();
+  dokument(d2, 7, { linie: [[11, 1], [12, 1]] });
+  zamowienie(d2, k2, [{ offerId: "of-2" }, { offerId: "of-3" }]);
+  mapowanie(d2, k2, "of-3", 12);
+  assert.equal(paragonReklamacji(d2, sprawa(k2), TERAZ).spornaTwId, null);
+});
+
+test("jedyny towar na dokumencie, zabrany przez inną ofertę, nie jest sporny", () => {
+  /* Dokument niesie tylko towar of-2; reklamowana of-1 jest gdzie indziej. */
+  const { d, konto } = stanowisko();
+  dokument(d, 7, { linie: [[12, 1]] });
+  zamowienie(d, konto, [{ offerId: "of-1" }, { offerId: "of-2" }]);
+  mapowanie(d, konto, "of-1", 11);
+  mapowanie(d, konto, "of-2", 12);
+  const p = paragonReklamacji(d, sprawa(konto, { kandydaci: [11] }), TERAZ);
+  assert.equal(p.spornaTwId, null);
+  assert.deepEqual(sporne(p), []);
+});
+
+test("kandydat zabrany w całości przez inną ofertę nie wygrywa", () => {
+  /* Mapowanie of-1 jest stare i wskazuje towar, który kupiono w of-2.
+     Po odjęciu zostaje 11 i to on jest towarem of-1. */
+  const { d, konto } = stanowisko();
+  dokument(d, 7, { linie: [[11, 1], [12, 1]] });
+  zamowienie(d, konto, [{ offerId: "of-1" }, { offerId: "of-2" }]);
+  mapowanie(d, konto, "of-1", 12);
+  mapowanie(d, konto, "of-2", 12);
+  const p = paragonReklamacji(d, sprawa(konto, { kandydaci: [12] }), TERAZ);
+  assert.equal(p.spornaTwId, 11);
+  assert.deepEqual(sporne(p), [11]);
+});
+
+test("kartoteka spoza kopii Subiekta: symbol i nazwa są puste, nie zastępcze", () => {
+  const { d, konto } = stanowisko();
+  dokument(d, 7, { linie: [[11, 1]] });
+  d.prepare("INSERT INTO sgt_faktura_pozycja(dok_id,tw_id,ilosc) VALUES (7,555,1)").run();
+  zamowienie(d, konto, [{ offerId: "of-1" }]);
+  const p = paragonReklamacji(d, sprawa(konto, { kandydaci: [11] }), TERAZ);
+  assert.deepEqual(p.dokumenty[0].pozycje.find((x) => x.twId === 555),
+    { twId: 555, symbol: null, nazwa: null, ilosc: 1, usluga: false, sporna: false });
+  assert.equal(p.spornaTwId, 11);
+});
+
 test("kilka pozycji: rozstrzyga kandydat obecny na dokumencie", () => {
   const { d, konto } = stanowisko();
   dokument(d, 7, { linie: [[11, 1], [12, 1], [13, 1]] });
+  zamowienie(d, konto, [{ offerId: "of-1" }]);
 
   const p = paragonReklamacji(d, sprawa(konto, { kandydaci: [12, null, 99] }), TERAZ);
   assert.equal(p.spornaTwId, 12);
@@ -242,4 +298,35 @@ test("szczegół reklamacji niesie paragon i otwiera się bez zapisu", () => {
   assert.equal(s.paragon.spornaTwId, 11);
   assert.deepEqual(s.paragon.dokumenty[0].pozycje.map((x) => [x.symbol, x.sporna]),
     [["STARY-DOSTAWCA", true], ["SYM-12", false]]);
+});
+
+test("licznik „ten towar” i dostawa liczą się ze spornej pozycji, nie z mapowania", () => {
+  const { d, konto } = stanowisko();
+  const reklamacja = (ext: string, offer: string, order: string | null, status: string) =>
+    Number(d.prepare(`INSERT INTO reklamacja_klienta
+      (channel_account_id,external_id,order_id,offer_id,kupujacy_login,status_allegro,
+       otwarto_at,synced_at)
+      VALUES (?,?,?,?,?,?,'2026-10-10T08:00:00Z','2026-10-10T08:00:00Z')`)
+      .run(konto, ext, order, offer, `k-${ext}`, status).lastInsertRowid);
+  /* Stare mapowanie of-1 wskazuje 12, a paragon po odjęciu of-2 daje 11. */
+  dokument(d, 7, { linie: [[11, 1], [12, 1]] });
+  zamowienie(d, konto, [{ offerId: "of-1" }, { offerId: "of-2" }]);
+  mapowanie(d, konto, "of-1", 12);
+  mapowanie(d, konto, "of-2", 12);
+  mapowanie(d, konto, "of-8", 11);
+  const ta = reklamacja("c-0", "of-1", ZAMOWIENIE, "CLAIM_SUBMITTED");
+  reklamacja("c-8", "of-8", null, "CLAIM_ACCEPTED");
+
+  const s = szczegolReklamacji(d, ta, TERAZ);
+  assert.equal(s.paragon.spornaTwId, 11);
+  /* Liczy się sprawa towaru 11 (of-8). Licznik z mapowania pytałby o 12
+     i nie zobaczyłby jej wcale. */
+  assert.deepEqual(s.historia.towar, { ile: 1, uznanych: 1, odrzuconych: 0 });
+
+  /* Bez paragonu towar sprawy jest nieznany: mapowanie go nie zastępuje. */
+  const bez = reklamacja("c-1", "of-2", null, "CLAIM_SUBMITTED");
+  const sb = szczegolReklamacji(d, bez, TERAZ);
+  assert.equal(sb.paragon.brak, "bez-zamowienia");
+  assert.equal(sb.historia.towar, null);
+  assert.equal(sb.dostawa, null);
 });

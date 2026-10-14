@@ -23,8 +23,12 @@ import { odejmijInneOferty, wierszeDokumentuSprzedazy } from "./komplety.js";
 
 export interface PozycjaParagonu {
   twId: number;
-  symbol: string;
-  nazwa: string;
+  /**
+   * `null`, gdy kartoteki nie ma w kopii Subiekta. Zastępczy symbol udawałby
+   * symbol z dokumentu, a agent przepisałby go do zgłoszenia u dostawcy.
+   */
+  symbol: string | null;
+  nazwa: string | null;
   /** Suma po kartotece w tym dokumencie. */
   ilosc: number;
   /** Pozycja usługowa (`pomijane.ts`), np. przesyłka. */
@@ -71,13 +75,25 @@ export interface SprawaParagonu {
 /**
  * Która kartoteka dokumentów jest reklamowanym towarem; `null` = nie wiadomo.
  *
- * Trzy kroki od najpewniejszego, każdy przyjmuje wyłącznie JEDNO trafienie.
+ * NAJPIERW ODEJMOWANIE, potem wybór. Inne oferty zamówienia zabierają swoje
+ * sztuki tą samą regułą co komplet, a wybierać wolno tylko z reszty. Bez tego
+ * jedyny towar na paragonie albo kandydat z mapowania wygrywał, choć należał
+ * do cudzej oferty. Kandydat zabrany w całości przez inną ofertę nie wygra.
+ *
+ * Bez kopii zamówienia albo bez naszej oferty w niej odpowiedzią jest `null`.
+ * Nie wiemy wtedy, co jeszcze było na dokumencie, więc reszta byłaby zgadywaniem.
+ *
  * Pozycję liczymy po kartotece, nie po dokumencie. Faktura do paragonu
- * niesie ten sam towar drugi raz, a to wciąż jedna rzecz, nie dwie.
+ * niesie ten sam towar drugi raz, a to wciąż jedna rzecz.
  */
 function wskazSporna(
   database: Db, dokumenty: DokumentParagonu[], s: SprawaParagonu,
 ): number | null {
+  if (!s.orderId || !s.offerId) return null;
+  /* Przesyłka się nie liczy: nie da się jej reklamować jako towaru.
+     Dokumenty sumują się razem, bo zamówienie bywa rozbite na dwa paragony.
+     Faktura do paragonu podwaja wtedy sztuki, reszta rośnie i wybór milczy,
+     a to jest wynik bezpieczny. */
   const naDokumentach = new Map<number, number>();
   for (const d of dokumenty) {
     for (const p of d.pozycje) {
@@ -85,29 +101,20 @@ function wskazSporna(
       naDokumentach.set(p.twId, (naDokumentach.get(p.twId) ?? 0) + p.ilosc);
     }
   }
-  const towary = [...naDokumentach.keys()];
+  const odjete = odejmijInneOferty(database, s.konto, s.orderId, s.offerId, naDokumentach);
+  if (!odjete || !odjete.oferty.some((o) => o.offer_id === s.offerId)) return null;
+  const pozostale = [...odjete.zostalo.keys()];
 
-  /* Jedyny towar na dokumentach to ten, który klient reklamuje. Przesyłka
-     się nie liczy: jej nie da się reklamować jako towaru. */
-  if (towary.length === 1) return towary[0];
-
-  /* Kandydat obecny na dokumencie. Dwa kandydaci obecni naraz to sprzeczność
-     mapowania z sygnaturą, więc ten krok milczy i oddaje głos odejmowaniu. */
+  /* Kandydat oferty wśród reszty. Dwóch naraz to sprzeczność mapowania
+     z sygnaturą, więc ten krok milczy. */
   const kandydaci = new Set(s.kandydaci.filter((k): k is number => k !== null));
-  const trafione = towary.filter((t) => kandydaci.has(t));
+  const trafione = pozostale.filter((t) => kandydaci.has(t));
   if (trafione.length === 1) return trafione[0];
 
-  /* Odejmowanie tą samą regułą co komplet: inne oferty zamówienia zabierają
-     swoje sztuki. Dwie oferty bez kartoteki znaczą podział nie do zgadnięcia.
-     Dokumenty sumują się razem, bo zamówienie bywa rozbite na dwa paragony.
-     Faktura do paragonu podwaja wtedy sztuki i odejmowanie milczy, a to jest
-     wynik bezpieczny. */
-  if (s.orderId && s.offerId) {
-    const odjete = odejmijInneOferty(database, s.konto, s.orderId, s.offerId, naDokumentach);
-    if (odjete && odjete.bezKartoteki.length <= 1 && odjete.zostalo.size === 1) {
-      return [...odjete.zostalo.keys()][0];
-    }
-  }
+  /* Jedyna reszta jest nasza tylko wtedy, gdy żadna INNA oferta nie została
+     bez kartoteki. Cudza oferta bez kartoteki mogła być właśnie tą resztą. */
+  const obcaBezKartoteki = odjete.bezKartoteki.some((o) => o !== s.offerId);
+  if (pozostale.length === 1 && !obcaBezKartoteki) return pozostale[0];
   return null;
 }
 
