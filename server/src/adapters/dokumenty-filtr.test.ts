@@ -108,7 +108,7 @@ test("dokumenty bez pozycji mówią o sobie, zamiast wyglądać na spokojny dzie
 
 /* ── Dokumenty sprzedaży (0.174.0) ───────────────────────────────────────────
    Okno jest DATĄ, nie listą identyfikatorów, i to nie jest kwestia gustu.
-   Sześćdziesiąt dni sprzedaży to dziesiątki tysięcy dokumentów, a `IN (id,…)`
+   Kilka tygodni sprzedaży to dziesiątki tysięcy dokumentów, a `IN (id,…)`
    tej długości położyło wdrożenie 0.53.0 błędem 8623 na przemian z timeoutem
    — import startowy jest twardym błędem, więc API weszło w pętlę restartów. */
 
