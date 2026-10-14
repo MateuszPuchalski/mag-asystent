@@ -10,6 +10,12 @@ z wersją monorepo" — i właśnie tak przestał być zgodny: `0.3.0` przetrwa�
 sześć zmergowanych zmian, w tym takie, które wymagały nowego uprawnienia SQL.
 Komentarz nie jest mechanizmem.
 
+## 0.583.2 — 14 października 2026
+
+**„Sprawdź w Allegro” przestało pisać „jeszcze nie w pełni wypłacony” obok wypłaconej kwoty.** Gdy Allegro oddało pieniądze, a zwrot nie został przypięty do wypłaty, panel mówi to wprost i podaje powód: inny powód zwrotu płatności niż zwrot towaru, wypłata sprzed zgłoszenia, odrzucony zwrot albo kilka zwrotów przy jednym zamówieniu.
+
+Ręcznie dodana paczka nieodebrana nie blokuje już przypięcia wypłaty do zwrotu z Allegro przy tym samym zamówieniu.
+
 ## 0.583.1 — 14 października 2026
 
 Czerwony pasek „dyskusje czekają na odpowiedź dłużej niż 24 godz." pokazuje się teraz tylko na ekranach dyskusji. Na pozostałych ekranach alarm niesie czerwony licznik przy zakładce „Dyskusje".
