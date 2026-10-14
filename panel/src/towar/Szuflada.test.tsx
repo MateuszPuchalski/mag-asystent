@@ -50,6 +50,8 @@ describe("szuflada towaru", () => {
     expect(await within(s).findByText("brak na stanie")).toBeInTheDocument();
     expect(within(s).getByText(/zamówione 20 szt\. u Rosa-Pol/)).toBeInTheDocument();
     expect(await within(s).findByText(/sprzedane 10 · zwrócone 3 \(30%\)/)).toBeInTheDocument();
+    /* Źródło sprzedaży stoi na ekranie, bo wcześniej liczba szła z jednej oferty Allegro. */
+    expect(within(s).getByText(/Sprzedaż z paragonów i faktur w Subiekcie/)).toBeInTheDocument();
     expect(within(s).getByRole("link", { name: /Z-7/ })).toHaveAttribute("href", "/obsluga/zwroty/7");
     expect(within(s).getByRole("link", { name: /reklamacja 12\/2026/ })).toHaveAttribute("href", "/obsluga/reklamacje/9");
     /* Pusta lista się nie rysuje (0.514.0): rozmów o tym towarze nie ma,
