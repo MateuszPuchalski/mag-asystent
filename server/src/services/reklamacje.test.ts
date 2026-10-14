@@ -489,7 +489,11 @@ test("flaga podglądu jedzie przy KAŻDYM załączniku, w rozmowie i przy sprawi
 
   const s = szczegolReklamacji(d, id, TERAZ);
   assert.equal(s.czat[0].zalaczniki[0].podglad, true, "zdjęcie rysuje się na osi");
-  assert.equal(s.zalaczniki[0].podglad, false, "PDF zostaje przy pobieraniu");
+  assert.equal(s.czat[0].zalaczniki[0].pdf, false, "zdjęcie nie udaje PDF-a");
+  /* PDF nie jest obrazem, więc `podglad` zostaje fałszem; miniaturę obiecuje
+     osobne pole, żeby panel wiedział, którym kaflem go narysować. */
+  assert.equal(s.zalaczniki[0].podglad, false, "PDF nie jest obrazem na osi");
+  assert.equal(s.zalaczniki[0].pdf, true, "PDF dostaje miniaturę pierwszej strony");
 });
 
 test("odnośnik do sprawy niesie UUID, a nie numer czytelny", () => {

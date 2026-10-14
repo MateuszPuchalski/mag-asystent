@@ -127,13 +127,7 @@ export async function api<T = any>(sciezka: string, init: RequestInit = {}): Pro
  * numer z trasy.
  */
 export async function pobierzPlik(sciezka: string, nazwa: string): Promise<void> {
-  const odp = await polacz(sciezka, { headers: { "x-session": token() } });
-  if (odp.status === 401) throw new BrakSesji("Sesja wygasła — zaloguj się");
-  if (!odp.ok) {
-    const dane = await odp.json().catch(() => ({}));
-    if (BRAMA.has(odp.status) && !dane.error) throw new BrakPolaczenia();
-    throw new Error(dane.error ?? `Błąd ${odp.status}`);
-  }
+  const odp = await odbierzPlik(sciezka);
   const url = URL.createObjectURL(await odp.blob());
   const a = document.createElement("a");
   a.href = url;
@@ -146,4 +140,39 @@ export async function pobierzPlik(sciezka: string, nazwa: string): Promise<void>
      czytelnika i bywa wielomegabajtowy. Natychmiastowe `revoke` po `click()`
      ucina jednak zapis w części przeglądarek — stąd odbicie przez `setTimeout`. */
   setTimeout(() => URL.revokeObjectURL(url), 60_000);
+}
+
+/** Serwer odpowiedział o SAMYM pliku: 404 nie ma, 413 za duży, 415 to nie ten typ. */
+export class OdmowaPodgladu extends Error {
+  constructor(komunikat: string, public readonly status: number) { super(komunikat); }
+}
+
+const ODMOWY_PODGLADU = new Set([404, 413, 415]);
+
+/* GET pliku bez ciała, więc bez typu treści — reguła klienta HTTP jak w `api()`.
+   Wspólny dla pobrania na dysk i bajtów podglądu, żeby 401, brama i zdanie
+   serwera znaczyły w obu to samo. Odmowa o pliku ma własny typ, bo ekran
+   rysuje ją inaczej niż awarię: zostaje kafel z nazwą, bez „Spróbuj ponownie". */
+async function odbierzPlik(sciezka: string): Promise<Response> {
+  const odp = await polacz(sciezka, { headers: { "x-session": token() } });
+  if (odp.status === 401) throw new BrakSesji("Sesja wygasła — zaloguj się");
+  if (!odp.ok) {
+    const dane = await odp.json().catch(() => ({}));
+    if (BRAMA.has(odp.status) && !dane.error) throw new BrakPolaczenia();
+    if (ODMOWY_PODGLADU.has(odp.status)) throw new OdmowaPodgladu(dane.error ?? `Błąd ${odp.status}`, odp.status);
+    throw new Error(dane.error ?? `Błąd ${odp.status}`);
+  }
+  return odp;
+}
+
+/**
+ * Surowe bajty pliku zza sesji, np. PDF-a do narysowania w panelu.
+ *
+ * Bajty, nie adres `blob:`: pdf.js czyta dokument z pamięci. `<iframe>`
+ * z `blob:` oddałby wbudowanemu czytnikowi PDF-ów nasz origin, a z nim
+ * skrypty dokumentu przysłanego przez obcego człowieka.
+ */
+export async function pobierzBajty(sciezka: string): Promise<Uint8Array> {
+  const odp = await odbierzPlik(sciezka);
+  return new Uint8Array(await odp.arrayBuffer());
 }

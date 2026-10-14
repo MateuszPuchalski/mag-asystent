@@ -178,7 +178,7 @@ const { zapamietajSzkic } = await import("../sprawy/useSzkicSprawy");
 const wiad = (n: Partial<WiadomoscReklamacji> = {}): WiadomoscReklamacji => ({
   id: 1, externalId: "w-1", autorLogin: "klient1", autorRola: "BUYER",
   tresc: "Kosiarka przestała ciąć", utworzonoAt: "2026-09-06T10:01:00.000Z",
-  zalaczniki: [{ id: 9, wiadomoscId: 1, nazwa: "usterka.jpg", podglad: true }], ...n,
+  zalaczniki: [{ id: 9, wiadomoscId: 1, nazwa: "usterka.jpg", podglad: true, pdf: false }], ...n,
 });
 
 const STATYSTYKI: StatystykiReklamacji = {

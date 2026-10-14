@@ -5,7 +5,7 @@ import {
 } from "lucide-react";
 import type { WiadomoscReklamacji, ZalacznikReklamacji } from "../api/typy";
 import { pobierzZalacznik } from "../api/reklamacje";
-import { useZdjecieZalacznikaReklamacji } from "../towar/useZdjecie";
+import { sciezkaPodgladuReklamacji, useZdjecieZalacznikaReklamacji } from "../towar/useZdjecie";
 import { KafelZalacznika } from "../towar/Zalacznik";
 import { dniSlowo, dzienMiesiac, godzina, ile, odmien, Pusto } from "../ui";
 import { kopiujDoSchowka } from "../ui/kopiuj";
@@ -44,10 +44,13 @@ const chwila = (v: string | null | undefined) => (v ? `${dzienMiesiac(v)}, ${god
 export function ZalacznikSprawy({ reklamacjaId, z }: {
   reklamacjaId: number; z: ZalacznikReklamacji;
 }) {
-  const obraz = useZdjecieZalacznikaReklamacji(reklamacjaId, z.podglad ? z.id : null);
+  /* PDF nie idzie do kolejki obrazów. Ta sama trasa oddaje go z sukcesem,
+     a `<img>` z bajtami PDF-a to ikona zepsutego obrazu. */
+  const obraz = useZdjecieZalacznikaReklamacji(reklamacjaId, z.podglad && !z.pdf ? z.id : null);
   /* Zawsze do pobrania: `PostPurchaseIssueAttachment` nie niesie stanu
      `SAFE`/`UNSAFE`, więc nie mamy podstaw, żeby pobranie zablokować. */
-  return <KafelZalacznika nazwa={z.nazwa || "załącznik"} podglad={z.podglad} obraz={obraz}
+  return <KafelZalacznika nazwa={z.nazwa || "załącznik"} podglad={z.podglad && !z.pdf} obraz={obraz}
+    pdf={z.pdf ? sciezkaPodgladuReklamacji(reklamacjaId, z.id) : null}
     pobierz={() => pobierzZalacznik(reklamacjaId, z.id, z.nazwa)} />;
 }
 

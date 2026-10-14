@@ -71,6 +71,15 @@ test("gdy pierwszy JEST obrazem, dalszych nie ruszamy", () => {
   assert.equal(wybierzObraz([JPEG, PNG])?.bajty, JPEG);
 });
 
+test("PDF z zakładki „Opis” nie trafia na kolektor jako zdjęcie", () => {
+  /* `rozpoznajMime` zna PDF dla podglądu dokumentu na osi rozmowy. Kolektor
+     rysuje wyłącznie obrazy, więc PDF jest tu tym samym, co OLE: pomijamy. */
+  const PDF = Buffer.from("%PDF-1.7\n%\u00e2\u00e3", "latin1");
+  const JPEG = Buffer.from([0xff, 0xd8, 0xff, 0xe0, 0x00, 0x10, 0x4a, 0x46]);
+  assert.equal(wybierzObraz([PDF, JPEG])?.bajty, JPEG);
+  assert.equal(wybierzObraz([PDF]), null, "sam PDF to brak zdjęcia");
+});
+
 test("same śmieci to brak zdjęcia, nie błąd", () => {
   const RTF = Buffer.from([0x7b, 0x5c, 0x72, 0x74, 0x66, 0x31, 0x00, 0x00]);
   assert.equal(wybierzObraz([RTF, null, Buffer.alloc(0)]), null);
@@ -100,6 +109,14 @@ test("rozpoznaje formaty, które kolektor umie narysować", () => {
   /* WebP z Androida: `RIFF` + rozmiar + `WEBP`. Sam `RIFF` (WAV, AVI) nie wystarcza. */
   assert.equal(rozpoznajMime(Buffer.from("RIFF\u0010\u0000\u0000\u0000WEBPVP8 ", "latin1")), "image/webp");
   assert.equal(rozpoznajMime(Buffer.from("RIFF\u0010\u0000\u0000\u0000WAVEfmt ", "latin1")), null);
+});
+
+test("PDF rozpoznaje po `%PDF-`, a nie po samym `%PDF`", () => {
+  /* Format dla podglądu dokumentu na osi. Myślnik należy do sygnatury:
+     bez niego cztery bajty bywają początkiem zwykłego tekstu. */
+  assert.equal(rozpoznajMime(Buffer.from("%PDF-1.4\n", "latin1")), "application/pdf");
+  assert.equal(rozpoznajMime(Buffer.from("%PDF", "latin1")), null);
+  assert.equal(rozpoznajMime(Buffer.from("%PDFx", "latin1")), null);
 });
 
 test("kontener OLE i RTF są ODRZUCANE, nie przepuszczane jako obraz", () => {

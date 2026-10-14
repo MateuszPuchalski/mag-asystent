@@ -210,7 +210,8 @@ którym cytują je komentarze w kodzie.
 - **Załączniki: nazwa, typ i stan, bez pliku.** Nazwa bywa daną osobową
   (`faktura_Kowalski.pdf`); przy treści rozmowy w bazie nie zmienia to skali
   ryzyka. Pobranie idzie przez nasz serwer, bo token konta firmy nie opuszcza
-  maszyny. Pliku `UNSAFE` nie da się pobrać.
+  maszyny. Pliku `UNSAFE` nie da się pobrać. Podgląd na osi dostaje tylko
+  `SAFE`: obraz albo PDF rozpoznany po sygnaturze, jak w reklamacjach.
 - **Szkic i komentarze zostają u nas.** Szkic wychodzi WYŁĄCZNIE przez wysyłkę,
   na jawne kliknięcie agenta. Komentarz wewnętrzny ma osobną tabelę, a adapter
   Allegro czyta wyłącznie `message`.
@@ -401,8 +402,12 @@ a ulica rozstrzyga to w jednym spojrzeniu.
   dostaje długość notatki i nazwę tagu, a `events` nie ma retencji.
 - **`PostPurchaseIssue` nie niesie** adresu, telefonu ani konta, więc kolumn
   na nie nie ma. Plików załączników nie trzymamy; pobranie idzie przez nasz
-  serwer. Na oś idą wyłącznie JPEG, PNG i GIF, rozpoznane po sygnaturze,
+  serwer. Na oś idą wyłącznie JPEG, PNG, GIF i PDF, rozpoznane po sygnaturze,
   z `nosniff`, bo załącznik nie ma pola `SAFE`. Hala reklamacji nie widzi.
+- **PDF na osi** rysuje pdf.js w przeglądarce, bez skryptów pliku. Odpowiedź
+  podglądu niesie `content-security-policy: sandbox`, więc wejście paskiem
+  nie daje skryptowi naszego origin. Podgląd przyjmuje do 20 MiB, większy
+  plik dostaje 413 i zostaje przy pobraniu. Do Copilota PDF nie idzie.
 - **Dowody biura** (`reklamacja_dowod`) to słowa BIURA o towarze: co widać na
   zdjęciu, czego brakuje i co ustaliliśmy. Zostaje treść do 2000 znaków,
   numer powiązanego zdjęcia klienta, imię i konto autora oraz czas. Danych
