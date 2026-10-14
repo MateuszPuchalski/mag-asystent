@@ -10,6 +10,14 @@ z wersją monorepo" — i właśnie tak przestał być zgodny: `0.3.0` przetrwa�
 sześć zmergowanych zmian, w tym takie, które wymagały nowego uprawnienia SQL.
 Komentarz nie jest mechanizmem.
 
+## 0.581.0 — 14 października 2026
+
+**Zwrot znika z kolejki, gdy Allegro potwierdzi wypłatę.** Serwer czyta teraz `GET /payments/refunds`, czyli zwroty płatności z kwotą, statusem i rozbiciem na pozycje, także te zrobione ręką w Sales Center. Zwrot klienta, za który wyszedł zwrot płatności ze statusem `SUCCESS`, dostaje potwierdzenie wypłaty bez pytania o każdą płatność osobno.
+
+Zatrzask jest ostrożny: pomija reklamacje, zwroty częściowe, przelewy sprzed zgłoszenia i zamówienia z dwoma zwrotami. **Wypłata z Allegro na ekranie zwrotu.** W sekcji pieniędzy widać każdy zwrot płatności: status słowami (wypłacone, częściowo, w toku, anulowane), kwotę, datę i rozbicie na produkty z liczbą sztuk albo kwotą oraz dostawę, tak jak w Sales Center.
+
+Sonda (`npm run sonda`) opisuje kształt tej końcówki.
+
 ## 0.580.0 — 13 października 2026
 
 **Droga klienta na każdym ekranie sprawy.** Pasek „Zakup, Doręczono, pytanie, zgłoszenie, rozmowa, decyzja, rozliczenie" widać teraz przy zwrocie, dyskusji, rozmowie w skrzynce i w profilu klienta, a nie tylko przy reklamacji. Inne sprawy tego samego zakupu stoją na pasku jako przystanki i prowadzą do swojej kolejki.
