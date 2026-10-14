@@ -36,6 +36,8 @@ import {
 import { paczkiKlienta } from "../services/zamowienia.js";
 import { powiazZaleglosci } from "../services/wiazania.js";
 import { kandydaciFaktury, wskazFakture } from "../services/faktury.js";
+import { SprawdzenieZwrotuBlad, sprawdzZwrotPlatnosci } from "../services/allegro-zwroty-platnosci.js";
+import { BladLimituAllegro } from "../adapters/allegro.js";
 import { dociagnijZwrotPoLiscie, synchronizujAllegroZwroty } from "../services/allegro-zwroty-sync.js";
 import { config } from "../config.js";
 import { logEvent } from "../services/events.js";
@@ -961,6 +963,30 @@ export async function zwrotyRoutes(app: FastifyInstance) {
           return reply.code(409).send({ error: e.message });
         }
         return reply.code(400).send({ error: (e as Error).message });
+      }
+    });
+
+  /* SPRAWDZENIE ZWROTU PŁATNOŚCI NA ŻĄDANIE. POST, bo klik zapisuje wynik
+     w lustrze i w dzienniku — nie jest patrzeniem, więc nie łamie umowy, że
+     otwarcie ekranu niczego nie mutuje. Bez `autoryzuj()`: trasa tylko CZYTA
+     z Allegro i zapisuje to, co Allegro powiedziało, nie rusza pieniędzy. */
+  app.post<{ Params: { id: string } }>(
+    "/api/obsluga/zwroty/:id/platnosci/sprawdz", async (req, reply) => {
+      const nie = odmowa(reply);
+      if (nie) return nie;
+      if (!config.allegro.clientId) {
+        return reply.code(400).send({ error: "Konto Allegro nie jest sparowane" });
+      }
+      try {
+        return await sprawdzZwrotPlatnosci(db(), Number(req.params.id), kto());
+      } catch (e) {
+        if (e instanceof SprawdzenieZwrotuBlad) return reply.code(400).send({ error: e.message });
+        if (e instanceof BladLimituAllegro) {
+          return reply.code(429).send({ error: "Allegro prosi o chwilę przerwy — spróbuj za minutę." });
+        }
+        return reply.code(502).send({
+          error: `Allegro nie odpowiedziało: ${(e as Error).message}. Spróbuj jeszcze raz za chwilę.`,
+        });
       }
     });
 

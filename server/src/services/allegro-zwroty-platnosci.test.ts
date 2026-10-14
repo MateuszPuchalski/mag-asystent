@@ -4,7 +4,8 @@ import fs from "node:fs";
 import { DatabaseSync } from "node:sqlite";
 import { migrate, type Db } from "../db/db.js";
 import {
-  groszeZKwoty, synchronizujZwrotyPlatnosci, zwrotyPlatnosciZwrotu, zwrotZOdpowiedzi,
+  groszeZKwoty, sprawdzZwrotPlatnosci, SprawdzenieZwrotuBlad, synchronizujZwrotyPlatnosci,
+  zwrotyPlatnosciZwrotu, zwrotZOdpowiedzi,
 } from "./allegro-zwroty-platnosci.js";
 
 /* Kształt rekordu stoi na schemacie `RefundDetails` w docs/allegro/swagger.yaml.
@@ -142,4 +143,75 @@ test("pozycje zwrotu płatności dostają nazwę z pozycji zamówienia o tym sam
     ]));
   const [z] = zwrotyPlatnosciZwrotu(d, id);
   assert.deepEqual(z.pozycje.map((x) => x.nazwa), ["Sekator Gardena", null]);
+});
+
+const biuro = { id: 1, name: "Ewa" };
+
+test("sprawdzenie na żądanie pyta o zamówienie, zapisuje wynik i zatrzaskuje zwrot", async () => {
+  const d = stanowisko();
+  const id = zwrot(d, "ret1", "ord1");
+  const adresy: string[] = [];
+  const wynik = await sprawdzZwrotPlatnosci(d, id, biuro, {
+    apiUrl: "https://x", query: async (u) => { adresy.push(u); return odpowiedz(rekord()); },
+  });
+  assert.equal(wynik.znaleziono, 1);
+  assert.equal(wynik.wyplacone, true);
+  assert.equal(wynik.platnosci[0].kwotaGrosze, 5990);
+  assert.deepEqual(adresy, ["https://x/payments/refunds?limit=100&offset=0&order.id=ord1"]);
+  const ev = d.prepare("SELECT payload FROM events WHERE type='zwrot_platnosci_sprawdzone'")
+    .get() as { payload: string };
+  assert.match(ev.payload, /"znaleziono":1/);
+});
+
+test("sprawdzenie bez odpowiedzi od Allegro to wynik, nie błąd — i pyta jeszcze o płatność", async () => {
+  const d = stanowisko();
+  const id = zwrot(d, "ret1", "ord1");
+  d.prepare(`INSERT INTO zamowienie_klienta(channel_account_id, external_id, platnosc_id, synced_at)
+    VALUES (1,'ord1','pay1','2026-09-22T08:00:00Z')`).run();
+  const adresy: string[] = [];
+  const wynik = await sprawdzZwrotPlatnosci(d, id, biuro, {
+    apiUrl: "https://x", query: async (u) => { adresy.push(u); return odpowiedz(); },
+  });
+  assert.equal(wynik.znaleziono, 0);
+  assert.equal(wynik.wyplacone, false, "brak rekordu nie zatrzaskuje");
+  assert.equal(adresy.length, 2);
+  assert.match(adresy[1], /payment\.id=pay1/);
+});
+
+test("rekord bez order łączy się z zamówieniem po płatności już przy zapisie", async () => {
+  const d = stanowisko();
+  const id = zwrot(d, "ret1", "ord1");
+  d.prepare(`INSERT INTO zamowienie_klienta(channel_account_id, external_id, platnosc_id, synced_at)
+    VALUES (1,'ord1','pay1','2026-09-22T08:00:00Z')`).run();
+  const wynik = await sprawdzZwrotPlatnosci(d, id, biuro, {
+    apiUrl: "https://x",
+    query: async (u) => u.includes("payment.id") ? odpowiedz(rekord({ order: undefined })) : odpowiedz(),
+  });
+  assert.equal(wynik.wyplacone, true);
+  const p = d.prepare("SELECT order_id FROM zwrot_platnosci").get() as { order_id: string };
+  assert.equal(p.order_id, "ord1");
+});
+
+test("zatrzask łączy po płatności także rekord zapisany, zanim znaliśmy zamówienie", async () => {
+  const d = stanowisko();
+  const id = zwrot(d, "ret1", "ord1");
+  d.prepare(`INSERT INTO zwrot_platnosci(channel_account_id, refund_id, payment_id, order_id, status, reason,
+      utworzono_at, sprawdzono_at) VALUES (1,'r1','pay1',NULL,'SUCCESS','REFUND','2026-09-10T10:00:00Z','x')`).run();
+  d.prepare(`INSERT INTO zamowienie_klienta(channel_account_id, external_id, platnosc_id, synced_at)
+    VALUES (1,'ord1','pay1','2026-09-22T08:00:00Z')`).run();
+  const wynik = await synchronizujZwrotyPlatnosci(d, 1, { apiUrl: "https://x", query: async () => odpowiedz() });
+  assert.equal(wynik.zatrzasniete, 1);
+  const w = d.prepare("SELECT rozliczony_allegro_at AS r FROM zwrot_klienta WHERE id=?").get(id) as { r: string };
+  assert.equal(w.r, "2026-09-10T10:00:00Z");
+});
+
+test("sprawdzenie odmawia przy paczce nieodebranej i zwrocie bez zamówienia", async () => {
+  const d = stanowisko();
+  const nieodebrana = zwrot(d, "nieodebrana:1", "ord1");
+  const bez = Number(d.prepare(`INSERT INTO zwrot_klienta
+    (channel_account_id, external_id, order_id, created_at, synced_at) VALUES (1,'x',NULL,'2026-09-01T08:00:00Z','s')`)
+    .run().lastInsertRowid);
+  const deps = { apiUrl: "https://x", query: async () => { throw new Error("nie wolno pytać"); } };
+  await assert.rejects(sprawdzZwrotPlatnosci(d, nieodebrana, biuro, deps), SprawdzenieZwrotuBlad);
+  await assert.rejects(sprawdzZwrotPlatnosci(d, bez, biuro, deps), SprawdzenieZwrotuBlad);
 });

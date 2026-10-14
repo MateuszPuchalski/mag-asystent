@@ -231,10 +231,14 @@ export function urlOperacjiPlatnosci(
  */
 export function urlZwrotowPlatnosci(
   apiUrl: string,
-  filtr: { orderId?: string | null; refundId?: string | null; od?: string | null; offset?: number } = {},
+  filtr: {
+    orderId?: string | null; paymentId?: string | null; refundId?: string | null;
+    od?: string | null; offset?: number;
+  } = {},
 ): string {
   const q = [`limit=100`, `offset=${Math.max(0, Math.trunc(filtr.offset ?? 0))}`];
   if (filtr.orderId) q.push(`order.id=${encodeURIComponent(filtr.orderId)}`);
+  if (filtr.paymentId) q.push(`payment.id=${encodeURIComponent(filtr.paymentId)}`);
   if (filtr.refundId) q.push(`id=${encodeURIComponent(filtr.refundId)}`);
   if (filtr.od) q.push(`occurredAt.gte=${encodeURIComponent(filtr.od)}`);
   return `${apiUrl}/payments/refunds?${q.join("&")}`;
