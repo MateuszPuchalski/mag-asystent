@@ -10,6 +10,10 @@ z wersją monorepo" — i właśnie tak przestał być zgodny: `0.3.0` przetrwa�
 sześć zmergowanych zmian, w tym takie, które wymagały nowego uprawnienia SQL.
 Komentarz nie jest mechanizmem.
 
+## 0.587.2 — 15 października 2026
+
+**Pozycja, która już weszła, nie da się odłożyć drugi raz „z ręki".** Gdy odpowiedź na odłożenie zginęła w dziurze Wi-Fi, kolektor dalej pokazywał pozycję jako nietkniętą, a serwer odpowiadał komunikatem o ilości. Magazynier wpisywał wtedy ilość ręcznie i ta sama partia lądowała drugi raz jako nadmiar (audyt z 14 października: 30 szt. + 29 szt. przy fakturze na 30). Serwer odpowiada teraz „już odłożona w całości" z kodem `juz_odlozona`, a kolektor zdejmuje zaznaczenie i odświeża listę.
+
 ## 0.587.1 — 14 października 2026
 
 Przy zamówieniu z kilkoma zwrotami klienta wypłata z Allegro nie zdejmowała z kolejki żadnego z nich. Teraz aplikacja przypisuje wypłatę po pozycjach: zwrot jest rozliczony, gdy zwrot płatności wymienia wszystkie jego pozycje, a inny zwrot tego zamówienia nie dzieli z nim pozycji. Zwrot całego zamówienia (anulowanie przez kupującego, nieodebrana paczka) rozlicza wszystkie jego zwroty.
