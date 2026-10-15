@@ -795,7 +795,7 @@ export function putawayLine(
   location: string,
   user: string,
   opts: PutawayLineOpts = {}
-): { ok: true; queueId?: number; mismatch: boolean; status: string } | { error: string; status?: number } {
+): { ok: true; queueId?: number; mismatch: boolean; status: string } | { error: string; status?: number; kod?: string } {
   const line = db().prepare("SELECT * FROM delivery_line WHERE id = ?").get(lineId) as any;
   if (!line) return { error: "Brak pozycji" };
   const locAction = opts.locAction ?? "replace";
@@ -804,6 +804,19 @@ export function putawayLine(
   const locErr = validateDeliveryLocation(code);
   if (locErr) return { error: locErr };
 
+  /* „Cała reszta" przy zerowej reszcie to NIE błąd ilości, tylko ślad po tym,
+     że poprzednie odłożenie już weszło: odpowiedź na nie zgubiła się w dziurze
+     Wi-Fi, a kolektor dalej pokazuje pozycję jako nietkniętą. Goły komunikat
+     o ilości zostawiał magazyniera z pytaniem „co jest nie tak z ilością?"
+     i z pokusą wpisania jej ręcznie, czyli odłożenia tej samej partii drugi
+     raz jako nadmiaru. `kod` pozwala kolektorowi odświeżyć pozycję. */
+  if (opts.qty === undefined && line.ilosc_odlozona >= line.ilosc_dok) {
+    return {
+      error: `Ta pozycja jest już odłożona w całości (${line.ilosc_odlozona} z ${line.ilosc_dok}) — odśwież listę`,
+      status: 409,
+      kod: "juz_odlozona",
+    };
+  }
   const putQty = opts.qty ?? Math.max(line.ilosc_dok - line.ilosc_odlozona, 0);
   if (!Number.isFinite(putQty) || putQty <= 0) return { error: "Ilość musi być większa od zera" };
 

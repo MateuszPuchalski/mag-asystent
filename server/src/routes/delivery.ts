@@ -96,7 +96,7 @@ export async function deliveryRoutes(app: FastifyInstance) {
         recznie,
       });
       // uwaga: lock zwalnia sam putawayLine — tu tylko odpowiedź
-      if ("error" in r) return reply.code(r.status ?? 400).send({ error: r.error });
+      if ("error" in r) return reply.code(r.status ?? 400).send({ error: r.error, kod: r.kod });
       return r;
     }
   );
