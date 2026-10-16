@@ -535,11 +535,11 @@ zapytaniami z tego rozdziału na bazie firmy (2026-08-08).
 
 | kolumna | typ | rola |
 |---|---|---|
-| `zd_Id` | `int` | klucz wiersza — **jedyne pewne kryterium porządku** |
+| `zd_Id` | `int` NOT NULL, bez IDENTITY | klucz wiersza — **jedyne pewne kryterium porządku** |
 | `zd_IdTowar` | `int` | klucz obcy do `tw__Towar` |
 | `zd_Zdjecie` | `image` | sam obraz |
 | `zd_Glowne` | `bit` | zdjęcie główne („Ustaw jako główną" w Subiekcie) |
-| `zd_CRC` | `int` | suma kontrolna treści |
+| `zd_CRC` | `int` NOT NULL | suma kontrolna treści |
 
 Konfiguracja, która z tego wynika:
 
@@ -566,6 +566,28 @@ niczego: przy dwóch zdjęciach bez flagi „główne" baza zwracałaby raz jedn
 drugie. Objawem nie byłby błąd, tylko skaczący ETag i kolektory ściągające
 obraz przy każdym wejściu na kartę. Porządek domyka dopiero `zd_Id`, a brak
 tego ustawienia zatrzymuje start serwera (walidacja w `config.ts`).
+
+### Jak dopisać wiersz zdjęcia
+
+Ustalone na bazie firmy po pierwszym nieudanym INSERT-cie (2026-10-16):
+
+- **`zd_Id` wydaje licznik Subiekta**, nie serwer SQL. Tabela `ins_ident`
+  ma kolumny `ido_nazwa`, `ido_wartosc` i `ido_minIdValue`. Wiersz
+  `tw_ZdjecieTw` miał `ido_wartosc` = 6281 przy `MAX(zd_Id)` = 6280, więc
+  wartość to NASTĘPNY wolny numer. Subiekt ma do tego procedurę
+  `spIdentyfikator @nazwa, @liczba, @wynik OUTPUT`. WERTIS jej nie woła, bo
+  nie wiadomo, który numer oddaje w `@wynik`. Czyta licznik i przesuwa go
+  sam, pod blokadą, w transakcji INSERT-u (`sfera.sql.ts`).
+- **`zd_CRC` jest NOT NULL**, choć domyślna wartość to `NULL`. WERTIS
+  wpisuje CRC32 bajtów obrazu jako `int` ze znakiem. Algorytmu Subiekta nie
+  sprawdzono — przy kartotece próbnej (DEPLOY §6) zobacz, czy zdjęcie się rysuje.
+- **Na tabeli stoją wyzwalacze** `zzz_rtnetSymSyncItemPicture*` i
+  `zzz_rtnetCT_Zdjecia_*`. To synchronizacja zewnętrznego programu. Odpala
+  się na naszym wierszu tak samo jak na wierszu Subiekta i tak ma być.
+
+Prawa konta: `GRANT INSERT ON dbo.tw_ZdjecieTw`, `GRANT SELECT ON
+dbo.ins_ident` i `GRANT UPDATE ON dbo.ins_ident (ido_wartosc)`. Nadaje je
+instalator z `-ZdjeciaZapis`.
 
 ### Czego przy okazji NIE ma
 

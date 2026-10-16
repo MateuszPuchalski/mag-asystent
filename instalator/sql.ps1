@@ -824,7 +824,11 @@ function Get-WertisSkryptUprawnien {
         "GRANT INSERT ON dbo.{0} TO [{1}];   -- {2}" -f $_.Tabela, $Login, $_.Po
     }) -join "`n"
     if ($wiersze) {
-        $wiersze = "`n-- DOPISYWANIE WIERSZY: wyłącznie tabela zdjęć kartotek.`n$wiersze"
+        # Numer wiersza zdjęcia wydaje licznik Subiekta (ins_ident), bo zd_Id
+        # nie jest IDENTITY. Bez tych dwóch linii INSERT pada na prawie zapisu.
+        $wiersze = "`n-- DOPISYWANIE WIERSZY: wyłącznie tabela zdjęć kartotek.`n$wiersze" +
+            "`nGRANT SELECT ON dbo.ins_ident TO [$Login];   -- licznik numerów zdjęć" +
+            "`nGRANT UPDATE ON dbo.ins_ident (ido_wartosc) TO [$Login];   -- licznik numerów zdjęć"
     }
 
     return @"
@@ -1003,6 +1007,12 @@ function Test-WertisUprawnienia {
         $tab = $_.Tabela
         -not @($insert | Where-Object { $_.obiekt -eq $tab })
     })
+
+    # Licznik numerów zdjęć — żądany tylko razem z zapisem zdjęć, jak INSERT.
+    $licznikOk = (-not $ZapisZdjec) -or [bool]@($update | Where-Object {
+        $_.obiekt -eq "ins_ident" -and $_.kolumna -eq "ido_wartosc"
+    })
+    if (-not $licznikOk) { $brakujaceWiersze += @{ Tabela = "ins_ident" } }
 
     $wymagane = @(Get-WertisTabeleOdczytu -Zdjecia $Zdjecia -PoziomyCen $PoziomyCen).Count
     return [pscustomobject]@{

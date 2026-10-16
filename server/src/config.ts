@@ -855,12 +855,14 @@ export const config = {
     /**
      * [WERYFIKUJ] kolumna sumy kontrolnej (`zd_CRC` w `tw_ZdjecieTw`).
      *
-     * PUSTE ZNACZY „nie wpisujemy jej wcale" i to jest wartość domyślna.
-     * Algorytmu, którym Subiekt liczy tę sumę, repozytorium NIE ZNA — wpisanie
-     * własnej liczby byłoby zgadywaniem, a wynik zgadywania siedziałby w bazie
-     * firmy. Czy Subiekt znosi `NULL`, rozstrzyga kartoteka próbna (DEPLOY §6).
+     * Przy tabeli Subiekta domyślnie `zd_CRC`, bo tam kolumna jest NOT NULL
+     * i INSERT bez niej pada. Wpisujemy CRC32 obrazu (`sumaZdjecia`).
+     * Jawne puste `ZDJECIA_KOLUMNA_CRC=` znaczy „nie wpisujemy jej wcale" —
+     * dla innej tabeli zdjęć, w której ta kolumna dopuszcza NULL.
      */
-    kolumnaCrc: process.env.ZDJECIA_KOLUMNA_CRC ?? "",
+    kolumnaCrc:
+      process.env.ZDJECIA_KOLUMNA_CRC ??
+      ((process.env.ZDJECIA_TABELA ?? "") === "tw_ZdjecieTw" ? "zd_CRC" : ""),
     /**
      * Ile kilobajtów wolno przyjąć od kolektora.
      *

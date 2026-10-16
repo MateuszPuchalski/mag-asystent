@@ -795,6 +795,7 @@ nietknięty.
 | `SELECT` | `tw_ZdjecieTw`, `vwPoziomyCen` (gdy są w bazie) | zdjęcia kartotek, nazwy poziomów cen |
 | `UPDATE` | `tw__Towar`: kolumna z `MSSQL_LOC_COLUMN` i `tw_PodstKodKresk` | lokalizacja, kod kreskowy z kolektora |
 | `INSERT` | `tw_ZdjecieTw` (tylko `-ZdjeciaZapis`) | zdjęcie dodane z kolektora (etap 2a) |
+| `SELECT`, `UPDATE (ido_wartosc)` | `ins_ident` (tylko `-ZdjeciaZapis`) | numer wiersza zdjęcia z licznika Subiekta |
 
 Aplikacja **nie ma innego prawa zapisu**. Kreator sprawdza obecność obiektów
 opcjonalnych, bo `GRANT` na nieistniejący obiekt przerywa cały skrypt. Nazwy
@@ -904,7 +905,8 @@ Instrukcja: [`tlo-worker/README.md`](tlo-worker/README.md). Najpierw na KOPII ba
 > w `wertis-api.err.log`). Wycofanie: wyczyść klucz i zrestartuj usługę.
 
 Przy `subiekt` nadaj grant instalatorem z `-ZdjeciaZapis` albo w SSMS:
-`GRANT INSERT ON dbo.tw_ZdjecieTw TO wertis;`. Potem otwórz kartotekę próbną
+`GRANT INSERT ON dbo.tw_ZdjecieTw TO wertis;`, `GRANT SELECT ON dbo.ins_ident TO wertis;`
+i `GRANT UPDATE ON dbo.ins_ident (ido_wartosc) TO wertis;`. Potem otwórz kartotekę próbną
 w Subiekcie, zakładka „Opis": zdjęcie ma się rysować bez czarnego prostokąta.
 To **bramka**: przezroczystość i `zd_CRC` są `[WERYFIKUJ]`. Bez `wertis-tlo`
 zdjęcie zapisuje się z tłem. Bez grantu zostaje w bazie WERTIS, a

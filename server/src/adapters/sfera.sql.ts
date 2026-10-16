@@ -1,4 +1,5 @@
 import sql from "mssql";
+import zlib from "node:zlib";
 import { db } from "../db/db.js";
 import { mssqlPool, assertSafeColumn } from "../db/mssql.js";
 import { config } from "../config.js";
@@ -48,8 +49,10 @@ function opiszBladZdjecia(e: unknown, tabela: string): string {
   const tresc = e instanceof Error ? e.message : String(e);
   if (!/permission was denied|odmowa|denied/i.test(tresc)) return tresc;
   return (
-    `Konto SQL nie ma prawa dopisywania do tabeli ${tabela}. Wykonaj w SSMS ` +
-    `na bazie podmiotu: GRANT INSERT ON dbo.${tabela} TO wertis; ` +
+    `Konto SQL nie ma prawa dopisania zdjęcia. Wykonaj w SSMS na bazie ` +
+    `podmiotu: GRANT INSERT ON dbo.${tabela} TO wertis; ` +
+    `GRANT SELECT ON dbo.ins_ident TO wertis; ` +
+    `GRANT UPDATE ON dbo.ins_ident (ido_wartosc) TO wertis; ` +
     `— potem PONÓW to zadanie. Zdjęcie NIE ZGINĘŁO: leży w bazie WERTIS ` +
     `i widać je na karcie towaru. Komunikat serwera SQL: ${tresc}`
   );
@@ -68,28 +71,58 @@ function opiszBladZdjecia(e: unknown, tabela: string): string {
  * Rozstrzyga to `@glowne`, wyliczone przez wołającego w tej samej transakcji —
  * dwa zdjęcia oznaczone jako główne dałyby ETag skaczący przy każdym odczycie.
  *
- * Kolumna sumy kontrolnej wchodzi tylko wtedy, gdy ktoś ją nazwał. Algorytmu
- * `zd_CRC` repozytorium NIE ZNA, a własna liczba w tej kolumnie byłaby
- * zgadywaniem zapisanym do bazy firmy.
+ * Kolumna sumy kontrolnej wchodzi tylko wtedy, gdy ktoś ją nazwał. W bazie
+ * firmy `zd_CRC` jest NOT NULL, więc tam nazwana być musi — patrz `config.ts`.
+ *
+ * Klucz wiersza (`zd_Id`) nie jest IDENTITY: numer wydaje licznik Subiekta
+ * w `ins_ident`, a INSERT bez niego pada na NOT NULL. Bierzemy go w tym samym
+ * wsadzie, pod blokadą licznika i tabeli. Dwa zadania naraz dostałyby inaczej
+ * ten sam numer, a Subiekt własnym zapisem zderzyłby się z naszym.
+ *
+ * `ido_wartosc` to NASTĘPNY wolny numer: na bazie firmy licznik stał na 6281
+ * przy `MAX(zd_Id)` = 6280. Licznik spóźniony względem tabeli nie wydaje
+ * numeru zajętego — wtedy bierzemy MAX + 1 i licznik go dogania.
  */
 export function budujZapytanieInsert(opts: {
   tabela: string;
   kolumna: string;
   klucz: string;
   glowne: string;
+  idWiersza: string;
   crc?: string;
 }): string {
   const t = assertSafeColumn(opts.tabela);
   const k = assertSafeColumn(opts.kolumna);
   const klucz = assertSafeColumn(opts.klucz);
   const glowne = assertSafeColumn(opts.glowne);
-  const kolumny = [klucz, k, glowne];
-  const wartosci = ["@id", "@obraz", "@glowne"];
+  const idw = assertSafeColumn(opts.idWiersza);
+  const kolumny = [idw, klucz, k, glowne];
+  const wartosci = ["@nowe", "@id", "@obraz", "@glowne"];
   if (opts.crc) {
     kolumny.push(assertSafeColumn(opts.crc));
     wartosci.push("@crc");
   }
-  return `INSERT INTO ${t} (${kolumny.join(", ")}) VALUES (${wartosci.join(", ")})`;
+  return [
+    "DECLARE @maks int, @nowe int;",
+    `SELECT @maks = ISNULL(MAX(${idw}), 0) FROM ${t} WITH (UPDLOCK, HOLDLOCK);`,
+    "SELECT @nowe = ido_wartosc FROM ins_ident WITH (UPDLOCK, HOLDLOCK) WHERE ido_nazwa = @licznik;",
+    "IF @nowe IS NULL OR @nowe <= @maks SET @nowe = @maks + 1;",
+    "UPDATE ins_ident SET ido_wartosc = @nowe + 1 WHERE ido_nazwa = @licznik;",
+    `INSERT INTO ${t} (${kolumny.join(", ")}) VALUES (${wartosci.join(", ")});`,
+    "SELECT @nowe AS zdId;",
+  ].join("\n");
+}
+
+/**
+ * Suma kontrolna obrazu dla `zd_CRC`: CRC32 bajtów jako `int` ze znakiem.
+ *
+ * [WERYFIKUJ] Algorytmu Subiekta nie sprawdzono na żywej bazie. CRC32 to
+ * najpewniejszy kandydat dla kolumny `int` o tej nazwie. Kolumna jest NOT
+ * NULL, więc jakąś wartość wpisać trzeba, a ta przynajmniej zmienia się
+ * razem z obrazem.
+ */
+export function sumaZdjecia(obraz: Buffer): number {
+  return zlib.crc32(obraz) | 0;
 }
 
 /** Ile zdjęć ma już ta kartoteka — od tego zależy `zd_Glowne` nowego wiersza. */
@@ -190,14 +223,17 @@ export class SqlSferaAdapter implements SferaAdapter {
         kolumna: c.kolumna,
         klucz: c.kolumnaKlucza,
         glowne: c.kolumnaGlowne,
+        idWiersza: c.kolumnaKolejnosc,
         crc: c.kolumnaCrc || undefined,
       });
       const req = trans
         .request()
         .input("id", sql.Int, twId)
         .input("obraz", sql.VarBinary(sql.MAX), wlasne.obraz)
-        .input("glowne", sql.Bit, pierwsze);
-      if (c.kolumnaCrc) req.input("crc", sql.Int, null);
+        .input("glowne", sql.Bit, pierwsze)
+        /* Licznik Subiekta nazywa się jak tabela, której numery wydaje. */
+        .input("licznik", sql.VarChar(50), c.tabela);
+      if (c.kolumnaCrc) req.input("crc", sql.Int, sumaZdjecia(wlasne.obraz));
       await req.query(zapytanie);
       await trans.commit();
     } catch (e) {
