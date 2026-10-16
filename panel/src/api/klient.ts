@@ -66,6 +66,9 @@ export class Konflikt extends Error {
   }
 }
 
+/** Zasób przeminął (410), np. podgląd zdjęcia. Ekran zaczyna wtedy krok od nowa zamiast pokazać błąd. */
+export class Wygaslo extends Error {}
+
 export const token = () => localStorage.getItem(KLUCZ) ?? "";
 export const zapiszToken = (t: string) => localStorage.setItem(KLUCZ, t);
 export const wyczyscToken = () => localStorage.removeItem(KLUCZ);
@@ -104,6 +107,7 @@ export async function api<T = any>(sciezka: string, init: RequestInit = {}): Pro
   }
   /* 429 z czasem przerwy: ekran, który prowadzi długą zbiórkę, ma poczekać
      tyle, ile prosi Allegro, a nie pytać od razu i pogłębiać przerwę. */
+  if (odp.status === 410) throw new Wygaslo(dane.error ?? "To już wygasło — zacznij jeszcze raz");
   if (odp.status === 429) throw new PrzerwaAllegro(dane.error ?? "Allegro prosi o przerwę", dane.poIluMs ?? null);
   if (!odp.ok) throw new Error(dane.error ?? `Błąd ${odp.status}`);
   return dane as T;

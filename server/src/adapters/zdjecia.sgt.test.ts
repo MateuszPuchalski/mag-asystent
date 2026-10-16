@@ -1,6 +1,13 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { budujZapytanieBlob, nazwaZeWzorca, rozpoznajMime, wybierzObraz } from "./zdjecia.sgt.js";
+import {
+  budujZapytanieBezZdjecia,
+  budujZapytanieBlob,
+  nazwaZeWzorca,
+  rozpoznajMime,
+  wybierzObraz,
+  wzorzecLike,
+} from "./zdjecia.sgt.js";
 
 /* ── Części czyste adaptera zdjęć ────────────────────────────────────────────
    Reszta modułu to wejście/wyjście, którego bez serwera MSSQL i bez udziału
@@ -140,4 +147,53 @@ test("symbol z kartoteki nie wyprowadza odczytu poza katalog", () => {
   // jest prawdziwy, więc ../ też może się kiedyś trafić
   assert.equal(nazwaZeWzorca("{symbol}.jpg", 1, "../../etc/passwd"), "passwd.jpg");
   assert.equal(nazwaZeWzorca("{symbol}.jpg", 1, "W43-0506(K)"), "W43-0506(K).jpg");
+});
+
+// ── Lista kartotek bez zdjęcia ──────────────────────────────────────────────
+
+test("osobna tabela zdjęć: brak to NOT EXISTS po kluczu obcym", () => {
+  const { strona, razem } = budujZapytanieBezZdjecia({
+    tabela: "tw_ZdjecieTw", kolumna: "zd_Zdjecie", klucz: "zd_IdTowar", zFiltrem: false,
+  });
+  assert.match(strona, /NOT EXISTS \(SELECT 1 FROM tw_ZdjecieTw z WITH \(NOLOCK\) WHERE z\.zd_IdTowar = t\.tw_Id\)/);
+  assert.match(strona, /t\.tw_Zablokowany = 0/);
+  /* Porządek domyka tw_Id: symbol nie jest unikalny, a stronicowanie bez
+     pełnego porządku gubi i dubluje wiersze między stronami. */
+  assert.match(strona, /ORDER BY t\.tw_Symbol, t\.tw_Id OFFSET @offset ROWS FETCH NEXT @limit ROWS ONLY$/);
+  assert.match(razem, /^SELECT COUNT\(\*\) AS razem FROM tw__Towar t/);
+  assert.doesNotMatch(strona, /@q/);
+});
+
+test("zdjęcie w samej kartotece: brak to pusta kolumna", () => {
+  const { strona } = budujZapytanieBezZdjecia({ tabela: "", kolumna: "tw_Zdjecie", klucz: "tw_Id", zFiltrem: false });
+  assert.match(strona, /\(t\.tw_Zdjecie IS NULL OR DATALENGTH\(t\.tw_Zdjecie\) = 0\)/);
+  assert.doesNotMatch(strona, /NOT EXISTS/);
+});
+
+test("filtr szuka po symbolu, nazwie i EAN-ie, parametrem, w obu zapytaniach", () => {
+  const { strona, razem } = budujZapytanieBezZdjecia({
+    tabela: "tw_ZdjecieTw", kolumna: "zd_Zdjecie", klucz: "zd_IdTowar", zFiltrem: true,
+  });
+  for (const z of [strona, razem]) {
+    assert.match(z, /t\.tw_Symbol LIKE @q/);
+    assert.match(z, /t\.tw_Nazwa LIKE @q/);
+    assert.match(z, /t\.tw_PodstKodKresk LIKE @q ESCAPE '!'/);
+  }
+});
+
+test("nazwa z konfiguracji nie wstrzyknie SQL do listy braków", () => {
+  assert.throws(() =>
+    budujZapytanieBezZdjecia({ tabela: "x; DROP TABLE y", kolumna: "k", klucz: "id", zFiltrem: false })
+  );
+  assert.throws(() =>
+    budujZapytanieBezZdjecia({ tabela: "t", kolumna: "k", klucz: "id--", zFiltrem: false })
+  );
+});
+
+test("wieloznaczniki LIKE w tekście szukania są zwykłymi znakami", () => {
+  assert.equal(wzorzecLike("W43_05"), "%W43!_05%");
+  assert.equal(wzorzecLike("50%"), "%50!%%");
+  assert.equal(wzorzecLike("[A]"), "%![A]%");
+  assert.equal(wzorzecLike("Hej!"), "%Hej!!%");
+  assert.equal(wzorzecLike("a/b\\c"), "%a/b\\c%");
 });

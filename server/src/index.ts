@@ -39,6 +39,7 @@ import { tagiRoutes } from "./routes/tagi.js";
 import { ustawieniaRoutes } from "./routes/ustawienia.js";
 import { koszeRoutes } from "./routes/kosze.js";
 import { spoiwoRoutes } from "./routes/spoiwo.js";
+import { zdjeciaRoutes } from "./routes/zdjecia.js";
 import { konfiguracjaRoutes } from "./routes/konfiguracja.js";
 import { problemNieznanychKluczy } from "./konfiguracja-rejestr.js";
 import {
@@ -560,6 +561,7 @@ export async function buildApp(opcje: {
   });
 
   await app.register(productRoutes);
+  await app.register(zdjeciaRoutes);
   await app.register(queueRoutes);
   await app.register(przesuniecieRoutes);
   await app.register(deliveryRoutes);
