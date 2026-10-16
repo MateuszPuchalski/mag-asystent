@@ -27,6 +27,8 @@ export const OBOWIAZUJE: Readonly<Record<string, Pole>> = {
 
   ALLEGRO_CLIENT_ID: (c) => c.allegro.clientId,
   ALLEGRO_USER_AGENT: (c) => c.allegro.userAgent,
+  SELLASIST_KONTO: (c) => c.sellasist.konto,
+  SELLASIST_STATUSY_ZEBRANE: (c) => c.sellasist.statusyZebrane,
   ALLEGRO_INBOX_OD: (c) => c.allegro.inboxOd,
   ALLEGRO_ZWROTY_OD: (c) => c.allegro.zwrotyOd,
   REKLAMACJE_OD: (c) => c.allegro.reklamacjeOd,

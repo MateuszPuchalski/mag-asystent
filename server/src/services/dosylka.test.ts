@@ -1078,3 +1078,64 @@ test("źródło numeru stoi i znika razem z numerem na każdej drodze zapisu", a
   assert.deepEqual([wiersz("z-2")!.waybill, wiersz("z-2")!.zrodlo], ["N2", "allegro"]);
   assert.equal(rozjazd(), 0, "przejęcie");
 });
+
+/* ── Kandydaci z Sellasist ──────────────────────────────────────────────── */
+
+test("numer z Sellasist: wykryty, gdy Allegro ma tylko oryginał; źródło i dziennik mówią skąd", async () => {
+  zamowienie("z-1", "kl");
+  const zw = zwrot("kl", { zgloszono: "2026-09-22T10:00:00.000Z" });
+  D.zalozDosylkeZOdmowy(db(), zw, ala, TERAZ);
+  const a = allegro({
+    przesylki: { "z-1": [{ waybill: "ORYG", carrierId: "DPD", createdAt: "2026-09-10T10:00:00Z" }] },
+    statusy: { "S-DOS": [{ code: "IN_TRANSIT", occurredAt: "2026-09-28T09:30:00Z" }] },
+  });
+  const pytano: Array<[string, string, string]> = [];
+  const sellasist = async (z: string, l: string, at: string) => {
+    pytano.push([z, l, at]);
+    return [{ waybill: "ORYG", carrierId: "DPD", createdAt: "2026-09-10T10:00:00.000Z" },
+      { waybill: "S-DOS", carrierId: "DPD", createdAt: "2026-09-28T08:30:00.000Z" }];
+  };
+  const w = await D.sledzDosylki(db(), { ...a.deps(za(2)), sellasist });
+  assert.deepEqual(w, { wykryte: 1, doreczone: 0, problemy: 0 });
+  assert.deepEqual(pytano, [["z-1", "kl", "2026-09-22T10:00:00.000Z"]]);
+  assert.deepEqual([wiersz()!.waybill, wiersz()!.zrodlo, wiersz()!.status], ["S-DOS", "sellasist", "IN_TRANSIT"]);
+  assert.deepEqual(wpisy("klient_dosylka_wykryta").map((e) => JSON.parse(e.payload)),
+    [{ sprawa: sprawa().id, zrodlo: "sellasist" }]);
+  assert.doesNotMatch(JSON.stringify(wpisy("%")), /S-DOS/);
+});
+
+test("numer w obu systemach to numer z Allegro — klient widzi go przy zamówieniu", async () => {
+  zamowienie("z-1", "kl");
+  const zw = zwrot("kl", { zgloszono: "2026-09-22T10:00:00.000Z" });
+  D.zalozDosylkeZOdmowy(db(), zw, ala, TERAZ);
+  const a = allegro({ przesylki: { "z-1": [{ waybill: "D1", carrierId: "INPOST", createdAt: "2026-09-28T09:00:00Z" }] } });
+  await D.sledzDosylki(db(), { ...a.deps(za(2)),
+    sellasist: async () => [{ waybill: "D1", carrierId: "INPOST", createdAt: "2026-09-28T08:59:00.000Z" }] });
+  assert.deepEqual([wiersz()!.waybill, wiersz()!.zrodlo], ["D1", "allegro"]);
+});
+
+test("Sellasist, który nie odpowiada (także 429), nie zabiera wykrycia z Allegro", async () => {
+  zamowienie("z-1", "kl");
+  const zw = zwrot("kl", { zgloszono: "2026-09-22T10:00:00.000Z" });
+  D.zalozDosylkeZOdmowy(db(), zw, ala, TERAZ);
+  const { BladLimituSellasist } = await import("../adapters/sellasist.http.js");
+  const a = allegro({ przesylki: { "z-1": [{ waybill: "D1", carrierId: "INPOST", createdAt: "2026-09-28T09:00:00Z" }] } });
+  const w = await D.sledzDosylki(db(), { ...a.deps(za(2)),
+    sellasist: async () => { throw new BladLimituSellasist("Sellasist prosi o przerwę (429).", 1000); } });
+  assert.equal(w.wykryte, 1);
+  assert.deepEqual([wiersz()!.waybill, wiersz()!.zrodlo], ["D1", "allegro"]);
+});
+
+test("po 429 z Sellasist przebieg nie pyta go o następne dosyłki — limit jest wspólny z lustrem", async () => {
+  zamowienie("z-1", "kl");
+  zamowienie("z-2", "k2");
+  D.zalozDosylkeZOdmowy(db(), zwrot("kl", { zamowienie: "z-1", zgloszono: "2026-09-22T10:00:00.000Z" }), ala, TERAZ);
+  D.zalozDosylkeZOdmowy(db(), zwrot("k2", { zamowienie: "z-2", zgloszono: "2026-09-22T10:00:00.000Z" }), ala, TERAZ);
+  const { BladLimituSellasist } = await import("../adapters/sellasist.http.js");
+  let pytan = 0;
+  const a = allegro();
+  await D.sledzDosylki(db(), { ...a.deps(za(2)),
+    sellasist: async () => { pytan++; throw new BladLimituSellasist("Sellasist prosi o przerwę (429).", 1000); } });
+  assert.equal(pytan, 1);
+  assert.equal(a.wolane.filter((u) => u.endsWith("/shipments")).length, 2, "Allegro pyta dalej o obie dosyłki");
+});

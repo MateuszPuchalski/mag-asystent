@@ -51,7 +51,7 @@ export interface DosylkaZamowienia {
   status: string | null;
   dostarczonoAt: string | null;
   maNumer: boolean;
-  zrodlo: "allegro" | "recznie" | null;
+  zrodlo: "allegro" | "sellasist" | "recznie" | null;
 }
 
 export interface StanPrzesylkiZamowienia {
@@ -105,7 +105,7 @@ export function przesylkaZamowienia(
     sprawdzonoAt: tekst(w.przesylka_sprawdzono_at),
     dosylka: d ? {
       status: tekst(d.status), dostarczonoAt: tekst(d.dostarczono_at), maNumer: tekst(d.waybill) !== null,
-      zrodlo: zrodlo === "allegro" || zrodlo === "recznie" ? zrodlo : null,
+      zrodlo: zrodlo === "allegro" || zrodlo === "sellasist" || zrodlo === "recznie" ? zrodlo : null,
     } : null,
   };
 }

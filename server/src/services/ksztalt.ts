@@ -67,6 +67,9 @@ const ZAKAZANE_KLUCZE = [
      kopią w bazie biura. Rozróżnienie stoi w `docs/obsluga-klienta.md`,
      w polityce danych zwrotów. */
   "waybill", "parcel", "tracking",
+  /* Sellasist: `description` to opis adresu wpisany przez człowieka („brama
+     od podwórza"), a `file` to PDF etykiety z adresem odbiorcy. */
+  "description", "file",
 ];
 
 /**

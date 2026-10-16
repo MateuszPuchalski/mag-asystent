@@ -22,6 +22,9 @@ import {
   type PrzesylkaDeps,
 } from "./przesylka-zamowienia.js";
 import { config } from "../config.js";
+import { sellasistWlaczony } from "../adapters/sellasist.http.js";
+import { chwilaUtc } from "../czas.js";
+import { odswiezZamowienieSellasist } from "./sellasist-sync.js";
 import { ofertyPoSygnaturze, type LinkDoOferty } from "./allegro-oferty-po-sygnaturze.js";
 import {
   przygotujZdjeciaRozmowy, spisZdjec, type Pobieracz, type WynikZdjec, type ZdjecieZBramki,
@@ -740,6 +743,25 @@ async function odswiezZamowienieRozmowy(
   await odswiezZamowienie(db(), id, deps, teraz).catch(() => undefined);
 }
 
+/** Lustro Sellasist młodsze niż to nie wymaga pytania przed szkicem; ticker i tak je odświeża. */
+const SWIEZOSC_SELLASIST_MS = 10 * 60_000;
+
+/**
+ * Zamówienie z Sellasist przed szkicem, gdy lustra nie ma albo jest
+ * nieświeże — klient pyta też o zamówienia sprzed startu lustra. Ta sama
+ * zasada co przy Allegro: wolno tylko stąd, nie z otwarcia rozmowy.
+ * Odmowa Sellasist zostawia lustro, jakie było (`odswiezZamowienieSellasist`).
+ */
+async function odswiezSellasistRozmowy(conversationId: number, teraz: Date): Promise<void> {
+  if (!sellasistWlaczony()) return;
+  const numer = numerZamowieniaRozmowy(conversationId);
+  if (!numer) return;
+  const w = db().prepare("SELECT MAX(pobrano_at) AS at FROM sellasist_zamowienie WHERE external_id = ?")
+    .get(numer.externalId) as { at: string | null } | undefined;
+  if (w?.at && teraz.getTime() - chwilaUtc(w.at) < SWIEZOSC_SELLASIST_MS) return;
+  await odswiezZamowienieSellasist(db(), numer.externalId).catch(() => undefined);
+}
+
 /**
  * Ułożenie szkicu: fakty → model → SPRAWDZENIE → zapis. Rzuca, gdy dostawca
  * odmówił albo gdy model wyszedł poza fakty; w obu razach wywołanie było
@@ -786,6 +808,7 @@ export async function ulozSzkic(
      zostaje stan zapisany wcześniej albo milczenie. */
   await odswiezZamowienieRozmowy(conversationId, przesylka, teraz.getTime());
   await odswiezPrzesylke(conversationId, przesylka);
+  await odswiezSellasistRozmowy(conversationId, teraz);
 
   const kontekst = kontekstSzkicu(conversationId, subiekt, teraz);
 
