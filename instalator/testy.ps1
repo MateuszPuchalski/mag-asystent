@@ -315,6 +315,32 @@ Sprawdz "wlaczony zapis zdjec dodaje GRANT INSERT na tabele zdjec" {
     Zaloz (-not ($zZapisem -match "GRANT INSERT ON dbo\.dok__Dokument")) "prawo zapisu dokumentow"
 }
 
+Sprawdz "zapis zdjec nadaje prawo do licznika numerow ins_ident" {
+    # zd_Id nie jest IDENTITY: numer wydaje licznik Subiekta. Bez tych linii
+    # INSERT zdjecia pada na prawie zapisu, choc GRANT INSERT stoi.
+    $zZapisem = Get-WertisSkryptUprawnien -Baza "T" -KolumnaLokalizacji "tw_Pole3" `
+        -Haslo "x" -ZapisZdjec $true
+    Zaloz ($zZapisem -match "GRANT SELECT ON dbo\.ins_ident") "brak odczytu licznika"
+    Zaloz ($zZapisem -match "GRANT UPDATE ON dbo\.ins_ident \(ido_wartosc\)") "brak zapisu licznika"
+    $bez = Get-WertisSkryptUprawnien -Baza "T" -KolumnaLokalizacji "tw_Pole3" -Haslo "x"
+    Zaloz (-not ($bez -match "ins_ident")) "prawo do licznika bez zapisu zdjec"
+
+    $ile = @(Get-WertisTabeleOdczytu -Zdjecia $true).Count
+    $upr = @(1..$ile | ForEach-Object {
+        [pscustomobject]@{ permission_name = "SELECT"; state_desc = "GRANT"; obiekt = "tabela$_"; kolumna = $null }
+    })
+    $upr += @(Get-WertisKolumnyZapisu -KolumnaLokalizacji "tw_Pole3" | ForEach-Object {
+        [pscustomobject]@{ permission_name = "UPDATE"; state_desc = "GRANT"; obiekt = "tw__Towar"; kolumna = $_.Kolumna }
+    })
+    $upr += [pscustomobject]@{ permission_name = "INSERT"; state_desc = "GRANT"; obiekt = "tw_ZdjecieTw"; kolumna = $null }
+    $bezLicznika = Test-WertisUprawnienia -Uprawnienia $upr -KolumnaLokalizacji "tw_Pole3" -ZapisZdjec $true
+    Zaloz (-not $bezLicznika.Ok) "prog przepuszcza brak prawa do licznika"
+    Zaloz ($bezLicznika.BrakujaceWiersze -contains "ins_ident") "komunikat nie nazywa licznika"
+    $upr += [pscustomobject]@{ permission_name = "UPDATE"; state_desc = "GRANT"; obiekt = "ins_ident"; kolumna = "ido_wartosc" }
+    $komplet = Test-WertisUprawnienia -Uprawnienia $upr -KolumnaLokalizacji "tw_Pole3" -ZapisZdjec $true
+    Zaloz $komplet.Ok "prog odrzuca komplet z licznikiem"
+}
+
 Sprawdz "prog odrzuca komplet BEZ prawa dopisywania zdjec" {
     # Objawem braku tego grantu jest zadanie set_zdjecie w bledzie — a karta
     # towaru i tak pokazuje zdjecie, bo lezy w bazie WERTIS. Bez tego progu

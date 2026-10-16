@@ -325,7 +325,7 @@ export const KLUCZE: readonly Klucz[] = [
     nazwa: "Zdjęcie z kolektora", wartosci: { "": "nie wolno", wertis: "zostaje u nas", subiekt: "u nas i w kartotece Subiekta" },
     opis: "Czy wolno zrobić zdjęcie kartoteki kolektorem i gdzie ono trafia." },
   { klucz: "ZDJECIA_KOLUMNA_CRC", grupa: "zdjecia", kto: "zaawansowane",
-    opis: "Kolumna sumy kontrolnej zdjęcia; puste = nie wpisujemy." },
+    opis: "Kolumna sumy kontrolnej zdjęcia; przy tw_ZdjecieTw domyślnie zd_CRC, jawnie puste = nie wpisujemy." },
   { klucz: "ZDJECIA_MAX_KB", grupa: "zdjecia", kto: "zaawansowane",
     opis: "Największe zdjęcie kartoteki, jakie serwer weźmie." },
   { klucz: "ZDJECIA_UPLOAD_MAX_KB", grupa: "zdjecia", kto: "zaawansowane",
