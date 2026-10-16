@@ -258,3 +258,108 @@ export function zresetujBezpiecznik(): void {
   odciecieDo = 0;
   brakDostepuDoZdjec = null;
 }
+
+/* ── Kartoteki BEZ zdjęcia — lista dla biura ────────────────────────────────
+   Biuro dokłada zdjęcia z panelu i potrzebuje wiedzieć, KTÓRYM towarom ich
+   brakuje. Pytamy Subiekt wprost, nie nasz cache: cache zna tylko kartoteki,
+   które ktoś otworzył, więc lista z niego byłaby losową próbką. */
+
+export interface TowarBezZdjecia {
+  twId: number;
+  symbol: string;
+  nazwa: string;
+  ean: string | null;
+}
+
+/**
+ * Warunek „ta kartoteka nie ma zdjęcia" dla skonfigurowanego źródła.
+ *
+ * Dwa kształty, bo zdjęcie siedzi albo w kolumnie samej kartoteki, albo
+ * w osobnej tabeli z kluczem obcym. Wiersz z OLE zamiast obrazu liczy się
+ * jako zdjęcie: odróżnić go można tylko po bajtach, a tu bajtów nie czytamy.
+ */
+function warunekBrakuZdjecia(opts: { tabela: string; kolumna: string; klucz: string }): string {
+  const k = assertSafeColumn(opts.kolumna);
+  if (!opts.tabela || opts.tabela === "tw__Towar") {
+    return `(t.${k} IS NULL OR DATALENGTH(t.${k}) = 0)`;
+  }
+  const tab = assertSafeColumn(opts.tabela);
+  const id = assertSafeColumn(opts.klucz);
+  return `NOT EXISTS (SELECT 1 FROM ${tab} z WITH (NOLOCK) WHERE z.${id} = t.tw_Id)`;
+}
+
+/**
+ * Dwa zapytania: strona i liczba wszystkich. Osobno, bo `COUNT(*) OVER()`
+ * na pustej stronie nie zwraca nic i panel straciłby licznik przy przewinięciu.
+ *
+ * Tylko `tw_Zablokowany = 0`, ten sam filtr co import kartoteki. Usług nie
+ * wycinamy: import też ich nie wycina, a kolumny rodzaju repo nie potwierdziło.
+ * Porządek domyka `tw_Id`, bo symbol nie musi być unikalny, a stronicowanie
+ * bez pełnego porządku gubi i dubluje wiersze między stronami.
+ */
+export function budujZapytanieBezZdjecia(opts: {
+  tabela: string;
+  kolumna: string;
+  klucz: string;
+  zFiltrem: boolean;
+}): { strona: string; razem: string } {
+  const warunki = ["t.tw_Zablokowany = 0", warunekBrakuZdjecia(opts)];
+  if (opts.zFiltrem) {
+    warunki.push(
+      "(t.tw_Symbol LIKE @q ESCAPE '!' OR t.tw_Nazwa LIKE @q ESCAPE '!' OR t.tw_PodstKodKresk LIKE @q ESCAPE '!')"
+    );
+  }
+  const skad = `FROM tw__Towar t WITH (NOLOCK) WHERE ${warunki.join(" AND ")}`;
+  return {
+    strona:
+      `SELECT t.tw_Id AS twId, t.tw_Symbol AS symbol, t.tw_Nazwa AS nazwa, t.tw_PodstKodKresk AS ean ${skad} ` +
+      "ORDER BY t.tw_Symbol, t.tw_Id OFFSET @offset ROWS FETCH NEXT @limit ROWS ONLY",
+    razem: `SELECT COUNT(*) AS razem ${skad}`,
+  };
+}
+
+/**
+ * Wzorzec LIKE z tekstu wpisanego przez człowieka.
+ *
+ * `%`, `_` i `[` w symbolu to zwykłe znaki, nie wieloznaczniki. Bez ucieczki
+ * wpisanie „W43_05" pasowałoby do „W43-05" i lista kłamałaby o trafieniu.
+ * Znakiem ucieczki jest `!`, bo ukośnik wsteczny bywa w symbolach kartotek.
+ */
+export function wzorzecLike(q: string): string {
+  return "%" + q.replace(/[!%_[]/g, (z) => "!" + z) + "%";
+}
+
+/** Strona kartotek bez zdjęcia prosto z Subiekta; wyjątek = nie dało się zapytać. */
+export async function towaryBezZdjecia(z: {
+  q: string;
+  limit: number;
+  offset: number;
+}): Promise<{ razem: number; pozycje: TowarBezZdjecia[] }> {
+  const c = config.zdjecia;
+  const zapytania = budujZapytanieBezZdjecia({
+    tabela: c.tabela,
+    kolumna: c.kolumna,
+    klucz: c.kolumnaKlucza,
+    zFiltrem: z.q !== "",
+  });
+  const pool = await mssqlPool();
+  const zapytanie = () => {
+    const r = pool.request();
+    if (z.q !== "") r.input("q", sql.NVarChar(200), wzorzecLike(z.q));
+    return r;
+  };
+  const strona = await zapytanie()
+    .input("offset", sql.Int, z.offset)
+    .input("limit", sql.Int, z.limit)
+    .query<{ twId: number; symbol: string; nazwa: string; ean: string | null }>(zapytania.strona);
+  const razem = await zapytanie().query<{ razem: number }>(zapytania.razem);
+  return {
+    razem: Number(razem.recordset[0]?.razem ?? 0),
+    pozycje: strona.recordset.map((w) => ({
+      twId: w.twId,
+      symbol: w.symbol,
+      nazwa: w.nazwa,
+      ean: w.ean && w.ean.trim() ? w.ean.trim() : null,
+    })),
+  };
+}

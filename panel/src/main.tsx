@@ -3,7 +3,7 @@ import { createRoot } from "react-dom/client";
 import { BrowserRouter, Link, Navigate, Route, Routes, useLocation } from "react-router-dom";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { nowyKlientZapytan } from "./api/klient-zapytan";
-import { ClipboardList, Inbox, ListChecks, MessagesSquare, PanelLeftClose, PanelLeftOpen, ShieldQuestion, Truck, Undo2 } from "lucide-react";
+import { ClipboardList, ImagePlus, Inbox, ListChecks, MessagesSquare, PanelLeftClose, PanelLeftOpen, ShieldQuestion, Truck, Undo2 } from "lucide-react";
 import logoBiale from "./assets/wertis-logo-biale.png";
 import { SESJA_WYGASLA, token, wyczyscToken } from "./api/klient";
 import { useJa, useWzmianki } from "./api/rozmowy";
@@ -31,6 +31,7 @@ import { Kosze } from "./ekrany/Kosze";
 import { Dziennik } from "./ekrany/Dziennik";
 import { Analiza } from "./ekrany/Analiza";
 import { Stan } from "./ekrany/Stan";
+import { Zdjecia } from "./ekrany/Zdjecia";
 import { Protokol } from "./druk/Protokol";
 import "./index.css";
 import { CoNowego } from "./coNowego/CoNowego";
@@ -70,6 +71,9 @@ const ZAKLADKI = [
      KOSZY TU NIE MA od 0.438.0 — decyzją właściciela mieszkają w zakładce
      Zwroty, bo są dalszym ciągiem zwrotu. Powód przy `zwroty/Przelacznik.tsx`. */
   { do: "/obsluga/dostawy", etykieta: "Dostawy", ikona: <Truck size={16} />, korzen: false, kreska: true },
+  /* ZDJĘCIA OBOK DOSTAW: to też praca na kartotece Subiekta, nie na sprawie
+     klienta. Biuro robi je seriami, więc stoją w pracy, a nie w menu „Więcej”. */
+  { do: "/obsluga/zdjecia", etykieta: "Zdjęcia", ikona: <ImagePlus size={16} />, korzen: false, kreska: false },
 ];
 
 /* Licznik nieodhaczonych wzmianek stoi przy ZAKŁADCE, a nie na jej ekranie:
@@ -280,6 +284,7 @@ function Rama({ wyloguj }: { wyloguj: () => void }) {
             przy nagłówku `ekrany/Dostawy.tsx`. */}
         <Route path="/obsluga/dostawy" element={<Dostawy />} />
         <Route path="/obsluga/dostawy/:id" element={<Dostawy />} />
+        <Route path="/obsluga/zdjecia" element={<Zdjecia />} />
         {/* Rozmowa ma własny adres, więc odświeżenie strony jej nie gubi,
             a link do sprawy da się wkleić koledze. */}
         <Route path="/obsluga/skrzynka" element={<Skrzynka />} />
