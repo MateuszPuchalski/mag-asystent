@@ -5,6 +5,7 @@ import React from "react";
 import { MemoryRouter, Route, Routes, useLocation } from "react-router-dom";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { SKROTY, SzukajIKlawisze } from "./Klawisze";
+import { KLAWISZE_KUBELKA } from "../ekrany/Zwroty";
 import zrodloSzkicu from "../skrzynka/SzkicCopilota.tsx?raw";
 
 /* ── Ctrl+K i lista skrótów pod `?` (23 września 2026) ───────────────────────
@@ -80,7 +81,7 @@ describe("lista skrótów pod ?", () => {
     await userEvent.keyboard("?");
     const okno = screen.getByRole("dialog", { name: "Skróty klawiszowe" });
     const sekcje = within(okno).getAllByRole("region").map((s) => s.getAttribute("aria-label"));
-    expect(sekcje.slice(0, 3)).toEqual(["Wszędzie", "Każda kolejka", "Zwroty"]);
+    expect(sekcje.slice(0, 3)).toEqual(["Wszędzie", "Skrzynka, zwroty, reklamacje, dyskusje", "Zwroty"]);
     expect(within(okno).getByText(/tu jesteś/)).toBeTruthy();
     await userEvent.keyboard("{Escape}");
     expect(screen.queryByRole("dialog")).toBeNull();
@@ -90,6 +91,26 @@ describe("lista skrótów pod ?", () => {
     pokaz();
     await userEvent.type(screen.getByLabelText("notatka"), "czy?");
     expect(screen.queryByRole("dialog")).toBeNull();
+  });
+});
+
+describe("lista pod ? zna każdy klawisz zwrotów", () => {
+  it("każdy klawisz z paska nad zwrotem stoi w sekcji Zwroty", () => {
+    /* Pasek nad zwrotem pokazuje klawisze tylko w pasującym stanie, a lista
+       pod `?` jest jedynym miejscem, gdzie widać je wszystkie naraz. Test
+       łapie klawisz dołożony do `KLAWISZE_KUBELKA` bez wpisu na liście.
+       Klawisze doklejane ze stanu stoją niżej ręką, więc nowy taki klawisz
+       trzeba dopisać i tu. */
+    const zwroty = SKROTY.find((s) => s.tytul === "Zwroty")!;
+    const znane = new Set(zwroty.klawisze.flatMap(([k]) => k.toLowerCase().split(/\s+/)));
+    const zEkranu = [
+      ...Object.values(KLAWISZE_KUBELKA).flatMap((l) => l.map(([k]) => k)),
+      // Doklejane ze stanu zwrotu, poza tabelą kubełków.
+      "N", "W", "Z", "R",
+    ];
+    for (const k of zEkranu) {
+      for (const czlon of k.toLowerCase().split("+")) expect(znane, `brak „${k}"`).toContain(czlon);
+    }
   });
 });
 

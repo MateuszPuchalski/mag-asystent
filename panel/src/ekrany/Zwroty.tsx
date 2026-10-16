@@ -42,6 +42,7 @@ import { useSkaner } from "../skaner";
 import { SkrotyKlawiszy } from "../sprawy/Skroty";
 import type { AkcjeKlawiszy } from "../zwroty/klawisze";
 import { pasujeDoFrazy, rozbij } from "../sprawy/szukanie";
+import { useKursorListy } from "../nawigacja/kursor";
 
 /* ── Ekran zwrotów (0.150.0) ─────────────────────────────────────────────────
    Trzy kolumny, jak skrzynka — dwa ekrany obsługi mają mieć jeden nawyk,
@@ -64,7 +65,7 @@ import { pasujeDoFrazy, rozbij } from "../sprawy/szukanie";
  * nasłuchu, a `KUBELKI` opisują kolejkę, którą czyta także `Kolejka.tsx`.
  * Zmiana klawisza ma się rozjechać z paskiem najwyżej o jedną linijkę.
  */
-const KLAWISZE_KUBELKA: Record<string, ReadonlyArray<readonly [string, string]>> = {
+export const KLAWISZE_KUBELKA: Record<string, ReadonlyArray<readonly [string, string]>> = {
   decyzja: [["P", "przyjmij"], ["S", "przyjmij i na stan"], ["U", "przyjmij i utylizacja"],
     ["O", "odrzuć"]],
   ocena: [["S", "na stan"], ["U", "utylizacja"], ["O", "na outlet"],
@@ -714,26 +715,9 @@ export function Zwroty() {
     nawiguj(pierwszy ? `/obsluga/zwroty/${pierwszy.id}` : "/obsluga/zwroty");
   };
 
-  /* MIEJSCE W LIŚCIE PRZEŻYWA WYJŚCIE ZWROTU Z KUBEŁKA (audyt, 15 września 2026).
-     Po `P` przyjęty zwrot znika z listy DO DECYZJI, a kursor zostaje na nim.
-     `idz` liczyło wtedy od pozycji zero plus jeden, więc `j` przeskakiwało
-     zwrot, który właśnie wskoczył na zwolnione miejsce — praca kubełkiem
-     gubiła co drugi zwrot. Zapamiętujemy więc ostatnią pozycję widzianą. */
-  const ostatnieMiejsce = useRef(0);
-  const miejsce = widoczne.findIndex((z) => z.id === wybrany);
-  if (miejsce >= 0) ostatnieMiejsce.current = miejsce;
-
-  /* Kursor chodzi po liście WIDOCZNEJ, nie po kubełku: przy włączonym filtrze
-     `j` ma iść do następnego wyniku, a nie do zwrotu schowanego przed oczami. */
-  const idz = (o: number) => {
-    if (!widoczne.length) return;
-    const i = widoczne.findIndex((z) => z.id === wybrany);
-    /* Zwrotu nie ma już na liście: następny STOI na jego miejscu, poprzedni
-       o jedno wyżej. */
-    const cel = i >= 0 ? i + o : (o > 0 ? ostatnieMiejsce.current : ostatnieMiejsce.current - 1);
-    const nast = widoczne[Math.min(widoczne.length - 1, Math.max(0, cel))];
-    if (nast) nawiguj(`/obsluga/zwroty/${nast.id}`);
-  };
+  /* Po `P` przyjęty zwrot schodzi z kubełka, a `j` ma otworzyć ten, który
+     stanął na jego miejscu. Powód przy `nawigacja/kursor.ts`. */
+  const idz = useKursorListy(widoczne, wybrany, (z) => nawiguj(`/obsluga/zwroty/${z.id}`));
 
   /* Rejestr akcji dla klawiszy, które sięgają do stanu kolumny środkowej
      (powód odmowy, zaznaczenie pozycji) — powód w `zwroty/klawisze.ts`. */
@@ -1011,7 +995,11 @@ export function Zwroty() {
     { wPolach: true },
   );
 
-  if (error) return <Blad>{(error as Error).message}</Blad>;
+  /* Zapytanie padło i nie ma danych: błąd zamiast listy, a kafle bez liczb.
+     Pusta lista albo „0” przy awarii czytałyby się jako „nic nie czeka”.
+     Nieudane odświeżenie przy danych w pamięci nie zdejmuje ekranu, bo
+     serwer znika przy każdej aktualizacji, a operator jest w środku zwrotu. */
+  const bezDanych = Boolean(error && !data);
 
   const opis = KUBELKI.find((k) => k.id === kubelek);
 
@@ -1102,12 +1090,12 @@ export function Zwroty() {
         <FiltrSegmentowy<Kubelek | null> kafle wybrany={kubelek} onWybierz={przelacz}
           pozycje={[
             ...KUBELKI.map((k, i) => ({ klucz: k.id, etykieta: k.etykieta,
-              ile: data?.liczniki?.[k.id] ?? 0,
+              ile: data ? data.liczniki?.[k.id] ?? 0 : undefined,
               /* Ta sama ikona co na osi etapów nad zwrotem — słownik ikon
                  ma jedną wagę na jedno znaczenie. */
               ikona: React.createElement(IKONA_KUBELKA[k.id], { size: 18 }),
               podpowiedz: `${k.pytanie} (klawisz ${i + 1})` })),
-            { klucz: null, etykieta: "Wszystkie", ile: data?.zwroty?.length ?? 0,
+            { klucz: null, etykieta: "Wszystkie", ile: data?.zwroty.length,
               ikona: <List size={18} />,
               podpowiedz: `Wszystkie zwroty (klawisz ${KUBELKI.length + 1})` },
           ]} />
@@ -1273,7 +1261,9 @@ export function Zwroty() {
           uczyłaby przebiegać wzrokiem obok tego jednego, który jest do rzeczy.
           Sit „moje"/„niczyje" tu nie ma: zwrot nie nosi prowadzącego. */}
       <div className="min-h-0 flex-1 overflow-y-auto">
-        {isLoading
+        {bezDanych
+          ? <div className="p-3"><Blad>{(error as Error).message}</Blad></div>
+          : isLoading
           ? <Pusto waga="lista">Wczytuję kolejkę…</Pusto>
           : <Kolejka zwroty={widoczne} wybrany={wybrany}
               zKubelkiem={Boolean(pasujace) || kubelek === null}
@@ -1282,8 +1272,9 @@ export function Zwroty() {
     </Karta>
 
     <Karta className="flex min-h-0 flex-col overflow-hidden">
+      {/* Bez kolejki nie ma czego wybrać, więc środek milczy. */}
       {!zwrot
-        ? <Pusto ikona={Undo2}>
+        ? bezDanych ? null : <Pusto ikona={Undo2}>
             Wybierz zwrot z kolejki — strzałkami albo kliknięciem.</Pusto>
         : <>
             <Naglowek zwrot={zwrot} />
