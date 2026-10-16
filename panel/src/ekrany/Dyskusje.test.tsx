@@ -58,6 +58,8 @@ const scena = vi.hoisted(() => ({
   czat: [] as unknown[],
   /* Błąd „prowadzę" — `null` znaczy, że serwer przyjął. */
   bladProwadze: null as Error | null,
+  /* Własna kolejka testu; `null` znaczy `DYSKUSJE`. */
+  lista: null as Dyskusja[] | null,
 }));
 
 /* Tożsamość zalogowanego — bez niej sita „Moje" nie ma w drzewie. */
@@ -105,7 +107,7 @@ vi.mock("../api/dyskusje", async () => {
     ...rzeczywisty,
     useDyskusje: () => ({
       data: {
-        dyskusje: DYSKUSJE,
+        dyskusje: scena.lista ?? DYSKUSJE,
         liczniki: { odpowiedz: 3, klient: 0, zamknieta: 1 },
         stan: scena.stan,
       },
@@ -113,7 +115,7 @@ vi.mock("../api/dyskusje", async () => {
     }),
     useDyskusja: (id: number | null) => ({
       data: id === null ? undefined : {
-        dyskusja: DYSKUSJE.find((d) => d.id === id) ?? DYSKUSJE[0],
+        dyskusja: (scena.lista ?? DYSKUSJE).find((d) => d.id === id) ?? DYSKUSJE[0],
         czat: scena.czat,
         zalaczniki: [], zwroty: [], rozmowy: [], sprawy: [], droga: [],
       },
@@ -166,6 +168,7 @@ function pokaz(adres = "/obsluga/dyskusje", czat: WiadomoscReklamacji[] = [wiad(
    włączałby filtr następnemu. */
 afterEach(() => {
   scena.bladProwadze = null;
+  scena.lista = null;
   try { localStorage.clear(); } catch { /* prywatne okno */ }
 });
 
@@ -269,6 +272,29 @@ describe("Ekran dyskusji", () => {
     expect(screen.getByText("Co odpisać?")).toBeInTheDocument();
   });
 
+  it("`j` po odpowiedzi idzie do NASTĘPNEJ sprawy, a nie przez nią przeskakuje", async () => {
+    /* Odpowiedziana sprawa schodzi z „Do odpowiedzi”, a kursor zostaje na
+       niej. Liczenie od zera plus jeden omijało sprawę, która stanęła na
+       zwolnionym miejscu. Kolejność ustala czas czekania. */
+    const czeka = (id: number, godzin: number, kubelek: KubelekDyskusji = "odpowiedz") =>
+      ({ ...dys(id, kubelek, `Sprawa ${id}`), czekaOdGodzin: godzin });
+    scena.lista = [czeka(31, 300), czeka(32, 200), czeka(33, 100)];
+    const klient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    /* Świeży element przy każdym rysowaniu, bo atrapa czyta scenę przy rysowaniu. */
+    const drzewo = () => <QueryClientProvider client={klient}>
+      <MemoryRouter initialEntries={["/obsluga/dyskusje/31"]}><Routes>
+        <Route path="/obsluga/dyskusje" element={<Dyskusje />} />
+        <Route path="/obsluga/dyskusje/:id" element={<Dyskusje />} />
+      </Routes></MemoryRouter></QueryClientProvider>;
+    const { rerender } = render(drzewo());
+    expect(screen.getByRole("button", { name: /Sprawa 31/ })).toHaveAttribute("aria-current", "true");
+
+    scena.lista = [czeka(31, 300, "klient"), czeka(32, 200), czeka(33, 100)];
+    rerender(drzewo());
+    await userEvent.keyboard("j");
+    expect(screen.getByRole("button", { name: /Sprawa 32/ })).toHaveAttribute("aria-current", "true");
+  });
+
   it("przełączenie kubełka przestawia kursor na jego pierwszą sprawę", async () => {
     pokaz("/obsluga/dyskusje/1");
     /* Zamknięte stoją od 0.522.0 pod „Więcej", z tym samym licznikiem. */
@@ -286,8 +312,12 @@ describe("Ekran dyskusji", () => {
     expect(screen.queryByRole("button", { name: /synchronizuj/i })).not.toBeInTheDocument();
     /* Zdanie jest samodzielne: w ciszy schodzi „synchronizacja: ...", więc zaimek
        „ją" nie miałby do czego się odnosić. */
-    expect(screen.getByText(/synchronizację odświeżasz w reklamacjach/i)).toBeInTheDocument();
+    expect(screen.getByText(/synchronizację odświeżasz/i)).toHaveTextContent(
+      /synchronizację odświeżasz w reklamacjach/i);
     expect(screen.queryByText(/odświeżasz ją/i)).not.toBeInTheDocument();
+    /* Odesłanie prowadzi tam jednym kliknięciem, zamiast kazać szukać zakładki. */
+    expect(screen.getByRole("link", { name: "w reklamacjach" }))
+      .toHaveAttribute("href", "/obsluga/reklamacje");
   });
 
   it("punkt świeżości bierze ostatnią NIE naszą wiadomość, także doradcy", async () => {

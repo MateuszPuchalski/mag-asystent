@@ -36,7 +36,9 @@ export const SKROTY: ReadonlyArray<SekcjaSkrotow> = [
     ["?", "ta lista"],
     ["Esc", "zamknij okno"],
   ] },
-  { tytul: "Każda kolejka", sciezka: null, klawisze: [
+  /* Kosze nie mają klawiatury, więc tytuł wylicza kolejki, w których te
+     klawisze działają. */
+  { tytul: "Skrzynka, zwroty, reklamacje, dyskusje", sciezka: null, klawisze: [
     ["j k", "następna / poprzednia sprawa"],
     ["1–9", "kubełek"],
   ] },
@@ -71,11 +73,18 @@ export const SKROTY: ReadonlyArray<SekcjaSkrotow> = [
     ["m", "moje sprawy"],
     ["n", "niczyje sprawy"],
   ] },
+  /* Pełna lista klawiszy ekranu zwrotów, także tych, które pasek nad
+     zwrotem pokazuje tylko przy pasującym stanie. Kompletności pilnuje test
+     obok, porównując ją z `KLAWISZE_KUBELKA`. */
   { tytul: "Zwroty", sciezka: "/obsluga/zwroty", klawisze: [
     ["P", "przyjmij zwrot"],
     ["O", "odmów (w ocenie: outlet)"],
+    ["N", "nie odesłał — odmów"],
     ["s u", "ocena: na stan / utylizacja"],
     ["Shift S", "wszystkie na stan"],
+    ["-", "wróciło mniej sztuk"],
+    ["D", "potrącenie"],
+    ["W", "wszystko OK — na półkę i wypłata"],
     ["Z", "oddaj pieniądze"],
     ["Enter", "zapisz kwotę / numer korekty"],
     ["R", "cofnij korektę"],
