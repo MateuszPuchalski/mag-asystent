@@ -10,6 +10,14 @@ z wersją monorepo" — i właśnie tak przestał być zgodny: `0.3.0` przetrwa�
 sześć zmergowanych zmian, w tym takie, które wymagały nowego uprawnienia SQL.
 Komentarz nie jest mechanizmem.
 
+## 0.588.0 — 16 października 2026
+
+**Towary bez zdjęcia w panelu.** Nowa zakładka „Zdjęcia" pokazuje aktywne
+towary, które w Subiekcie nie mają żadnego zdjęcia. Plik przeciąga się albo
+wkleja, obraca i kadruje. Panel wycina tło, kładzie towar na białym kwadracie
+z marginesem i wyrównuje jasność. Po zatwierdzeniu zdjęcie trafia do Subiekta
+tą samą drogą co zdjęcie z kolektora.
+
 ## 0.587.3 — 16 października 2026
 
 **Klawisz `j` w reklamacjach i dyskusjach nie przeskakuje już sprawy.** Po
