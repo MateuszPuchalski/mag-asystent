@@ -10,6 +10,18 @@ z wersją monorepo" — i właśnie tak przestał być zgodny: `0.3.0` przetrwa�
 sześć zmergowanych zmian, w tym takie, które wymagały nowego uprawnienia SQL.
 Komentarz nie jest mechanizmem.
 
+## 0.588.1 — 16 października 2026
+
+**Zdjęcie dodane w WERTIS wchodzi do kartoteki Subiekta.** Zadanie
+„Zdjęcie · …" kończyło się błędem o pustym `zd_Id`. Numer wiersza bierze się
+teraz z licznika Subiekta (`ins_ident`), a `zd_CRC` dostaje CRC32 obrazu.
+Zadania, które już padły, wystarczy ponowić z kolejki.
+
+**[wymaga działania]** Konto SQL potrzebuje dwóch nowych praw do licznika
+numerów. Instalator z `-TylkoKonfiguracja -ZdjeciaZapis` albo w SSMS na bazie
+podmiotu: `GRANT SELECT ON dbo.ins_ident TO wertis;` i
+`GRANT UPDATE ON dbo.ins_ident (ido_wartosc) TO wertis;`.
+
 ## 0.588.0 — 16 października 2026
 
 **Towary bez zdjęcia w panelu.** Nowa zakładka „Zdjęcia" pokazuje aktywne
