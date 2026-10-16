@@ -43,8 +43,8 @@ export function tloAlarmuje(p: {
 export function PasekTla({ prog, onPrzelaczProg, stanTekst, onSynchronizuj, trwaSync }: {
   prog?: ProgKolejki | null;
   onPrzelaczProg?: (zdejmij: boolean) => void;
-  /** Jedno zdanie o kanale, np. „synchronizacja działa”. */
-  stanTekst?: string;
+  /** Jedno zdanie o kanale, np. „synchronizacja działa”. Może nieść odnośnik. */
+  stanTekst?: React.ReactNode;
   /** Bez niej wiersz nie rysuje przycisku — ekran dyskusji go nie ma. */
   onSynchronizuj?: () => void;
   trwaSync?: boolean;

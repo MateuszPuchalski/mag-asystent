@@ -33,7 +33,7 @@ zapisu patrzy na `fetch`, a nie na haki.
   ma danych, ekran pokazuje błąd zamiast listy, a licznik kubełka dostaje
   `undefined`, nie zero. Serwer znika w każdej aktualizacji, a „nic nie
   czeka" przy awarii agent czyta jako koniec pracy.
-  *Strażnik: `src/ekrany/BrakPolaczenia.test.tsx` (Dostawy, Kosze, Skrzynka).*
+  *Strażnik: `src/ekrany/BrakPolaczenia.test.tsx` (Dostawy, Kosze, Skrzynka, Zwroty, Dyskusje).*
 - **Brak połączenia ma jeden typ: `BrakPolaczenia`** z `api/klient.ts`.
   Pasek pod nagłówkiem (`nawigacja/Polaczenie.tsx`) mówi o nim raz.
   Własny `fetch` poza `api()` zamienia brak sieci na ten sam typ.
