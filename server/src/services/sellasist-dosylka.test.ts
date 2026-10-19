@@ -30,9 +30,9 @@ test("etykiety oryginału i kopii z datą; cudze zamówienie kupującego odpada"
   const a = atrapa({
     "/orders?external_id=": [{ id: 10 }],
     "/orders?external_user=kl&date_from=2026-09-22%2012%3A00%3A00": [{ id: 10 }, { id: 11 }, { id: 12 }],
-    "/orders/10": zam(10, { shipments: [{ service: "DPD", tracking_number: "ORYG" }] }),
+    "/orders/10": zam(10, { shipments: [{ ordershipment_id: 3, service: "DPD", tracking_number: "ORYG" }] }),
     "/orders/11": zam(11, { is_copied: "1", copied_order_id: 10, external_data: {},
-      shipments: [{ service: "InPost Paczkomaty", tracking_number: "KOPIA" }] }),
+      shipments: [{ ordershipment_id: 4, service: "InPost Paczkomaty", tracking_number: "KOPIA" }] }),
     "/orders/12": zam(12, { external_data: { external_id: "allegro-2" },
       shipments: [{ service: "DPD", tracking_number: "CUDZE" }] }),
     "/ordersshipments?order_id=10": [{ tracking_number: "ORYG", created_date: "2026-09-10 12:00:00" }],
@@ -61,4 +61,15 @@ test("numer ze szczegółu bez listu przewozowego zostaje bez daty", async () =>
   });
   assert.deepEqual(await przesylkiDosylkiSellasist("allegro-1", "kl", "2026-09-22T10:00:00.000Z", a.query),
     [{ waybill: "BEZ-DATY", carrierId: "GLS", createdAt: null }]);
+});
+
+test("etykieta z nowego serwisu wysyłek: numer bez daty i bez pytania o listę przewozową", async () => {
+  const a = atrapa({
+    "/orders?external_id=": [{ id: 10 }],
+    "/orders?external_user=": [],
+    "/orders/10": zam(10, { shipments: [{ ordershipment_id: 0, service: "allegroOneBox", tracking_number: "A00BOX" }] }),
+  });
+  assert.deepEqual(await przesylkiDosylkiSellasist("allegro-1", "kl", "2026-09-22T10:00:00.000Z", a.query),
+    [{ waybill: "A00BOX", carrierId: "ALLEGRO", createdAt: null }]);
+  assert.ok(!a.wolania.some((w) => w.startsWith("/ordersshipments")));
 });

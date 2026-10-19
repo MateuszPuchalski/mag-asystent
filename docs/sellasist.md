@@ -58,15 +58,31 @@ serwer odświeża zamówienie, gdy lustro jest starsze niż dziesięć minut.
 Z kupującego przechodzi wyłącznie login. Pełna polityka stoi
 w `docs/obsluga-klienta.md`, w sekcji „Polityka danych Sellasist".
 
-## Do potwierdzenia sondą
+## Co pokazała sonda
 
-Schemat zostawia otwarte cztery rzeczy. Odpowiada na nie
-`npm --prefix server run sellasist:sonda` na żywym koncie:
+Sonda biegła na żywym koncie 19 października 2026, na próbce dwudziestu
+zamówień i stu wpisów dziennika. Trzy pytania zamknęła:
 
-1. Czy `external_id` zamówień z Allegro to numer formularza zakupu. Po nim
-   wiążemy Sellasist z zamówieniami, zwrotami i rozmowami.
-2. Czy daty przychodzą w czasie polskim, bez strefy.
-3. Czy `object_id` przy zmianie statusu to nowy status zamówienia.
-4. Na którą drogę trafia etykieta dosyłki: oryginał czy kopia.
+1. `external_id` zamówień z Allegro to UUID formularza zakupu, 20 na 20.
+   Wiązanie z zamówieniami, zwrotami i rozmowami działa po tym numerze.
+2. Daty przychodzą stemplem `RRRR-MM-DD HH:MM:SS`, a `deadline` samym
+   dniem. Mapowanie obsługuje oba kształty.
+3. `object_id` przy zmianie statusu to nowy status zamówienia, 12 na 12.
+   Zebranie z dziennika liczy się więc poprawnie.
 
-Do czasu sondy integracja działa na odczycie schematu, a nie na obserwacji.
+Czwarte, o kopię zamówienia przy dosyłce, zostaje otwarte. W próbce nie było
+ani jednej kopii, choć konto ma status „Dosyłki reklamacyjne".
+
+**Lista przewozowa bywa pusta.** Etykiety firmy idą przez nowy serwis wysyłek
+(Allegro One Box, Packeta). Taka etykieta ma `ordershipment_id` równe zero
+i nie stoi na `GET /ordersshipments`, więc daty wydruku nie znamy. Dzień
+spakowania bierze się wtedy z chwili, w której lustro zobaczyło etykietę.
+Ticker chodzi co cztery minuty, więc doba wychodzi dobrze.
+
+**Pola liczbowe przychodzą tekstem**: `id`, `status.id`, `quantity`,
+`object_id`. Mapowanie czyta je przez liczbę, więc kształt mu nie szkodzi.
+
+**Statusy „zebrane" u tej firmy** to warianty „do pakowania" oraz „Regał
+Braki/Można pakować": `13,41,43,47,68,71`. „Do ponownej kompletacji" (44, 51)
+nie wchodzi, bo tam zbieranie dopiero się powtarza. Decyzja właściciela
+z 19 października 2026.

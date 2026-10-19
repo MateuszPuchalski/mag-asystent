@@ -39,6 +39,9 @@ export async function przesylkiDosylkiSellasist(
   const kupujacego = mapujListeZamowien(await query(sciezkaZamowienKupujacego(login, stempelLokalny(zwrotAt))))
     .filter((z) => !oryginaly.has(z.id)).slice(0, KANDYDATOW);
   const uslugi = new Map<string, string>();
+  /* Lista przewozowa tylko dla zamówień z etykietą, która na niej stoi.
+     Etykieta z nowego serwisu wysyłek (`ordershipment_id` 0) ma pustą listę. */
+  const zListy = new Set<number>();
   for (const k of [...oryginaly].map((id) => ({ id })).concat(kupujacego)) {
     const z = mapujZamowienie(await query(sciezkaZamowienia(k.id)));
     if (!z) continue;
@@ -47,10 +50,11 @@ export async function przesylkiDosylkiSellasist(
     if (!nasze) continue;
     if (!oryginaly.has(z.id)) doEtykiet.push(z.id);
     for (const p of z.przesylki) uslugi.set(p.waybill, p.przewoznik);
+    if (z.przesylki.some((p) => p.naLiscie)) zListy.add(z.id);
   }
 
   const daty = new Map<string, string | null>();
-  for (const id of doEtykiet) {
+  for (const id of doEtykiet.filter((i) => zListy.has(i))) {
     for (const l of mapujListyPrzewozowe(await query(sciezkaPrzesylek(id)))) {
       daty.set(l.waybill, l.utworzonoAt ?? daty.get(l.waybill) ?? null);
     }

@@ -70,6 +70,11 @@ test("zamówienie: numery połączone przecinkiem to osobne paczki, przewoźnik 
   const z = S.mapujZamowienie(ZAMOWIENIE)!;
   assert.deepEqual(z.przesylki.map((p) => [p.waybill, p.przewoznik]),
     [["6032", "INPOST"], ["6033", "INPOST"], ["XYZ1", "OTHER"]]);
+  assert.ok(z.przesylki.every((p) => p.naLiscie), "etykiety z numerem listu stoją na liście przewozowej");
+  /* „0 dla ESP/INSPIGO" (opis pola): nowy serwis wysyłek, lista przewozowa pusta. */
+  const esp = S.mapujZamowienie({ ...ZAMOWIENIE, shipments: [{ ordershipment_id: 0, service: "allegroOneBox",
+    tracking_number: "A00X" }] })!;
+  assert.deepEqual(esp.przesylki, [{ waybill: "A00X", usluga: "allegroOneBox", przewoznik: "ALLEGRO", naLiscie: false }]);
 });
 
 test("zamówienie bez numeru i odpowiedź nie-obiekt to null, nie wymyślony wiersz", () => {

@@ -53,15 +53,16 @@ const tekst = (v: unknown): string | null => (v == null || String(v) === "" ? nu
 
 /**
  * Daty etykiet, których jeszcze nie znamy. Szczegół zamówienia nie ma daty
- * etykiety, ma ją tylko lista przewozowa. Pytamy wyłącznie o zamówienie
- * z nowym numerem, więc zamówienie bez zmian etykiet kosztuje jedno żądanie.
+ * etykiety, ma ją tylko lista przewozowa. Pytamy wyłącznie o etykietę bez
+ * daty, która na tej liście stoi (`naLiscie`), więc zamówienie bez zmian
+ * etykiet i etykieta z nowego serwisu wysyłek kosztują jedno żądanie.
  */
 async function datyEtykiet(
   database: DatabaseSync, z: ZamowienieSellasist, query: ZapytanieSellasist,
 ): Promise<Map<string, string | null>> {
   const znane = new Map((database.prepare(`SELECT waybill, utworzono_at FROM sellasist_przesylka
       WHERE zamowienie_id = ?`).all(z.id) as Wiersz[]).map((w) => [String(w.waybill), tekst(w.utworzono_at)]));
-  if (z.przesylki.every((p) => znane.get(p.waybill))) return znane;
+  if (!z.przesylki.some((p) => p.naLiscie && !znane.get(p.waybill))) return znane;
   for (const l of mapujListyPrzewozowe(await query(sciezkaPrzesylek(z.id)))) {
     if (l.utworzonoAt) znane.set(l.waybill, l.utworzonoAt);
   }
