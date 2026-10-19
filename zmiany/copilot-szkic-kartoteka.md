@@ -12,5 +12,6 @@ Szkic korzysta z tych samych narzędzi co dopytanie, w najwyżej trzech
 rundach. Narzędzia pokazują dodatkowo ceny sprzedaży z kartoteki (nigdy cenę
 zakupu) i nasze aktywne oferty Allegro towaru. Wynik narzędzia ma w szkicu
 własne oznaczenie `N#`. Walidacja numerów i faktów sprawdza go tak samo jak
-pozostałe fakty. Przełącznik `COPILOT_SZKIC_NARZEDZIA=0` wraca do szkicu
+pozostałe fakty. Szkic, który użył narzędzi, nie wychodzi automatem w
+przepływie na żywo, tylko czeka na agenta. Przełącznik `COPILOT_SZKIC_NARZEDZIA=0` wraca do szkicu
 z jednym wywołaniem.

@@ -14,7 +14,10 @@ import {
 import type { NadawcaSzkicu, OdpowiedzSzkicu } from "../services/copilot-szkic.js";
 import type { Tokeny } from "../services/copilot-koszt.js";
 import type { NadawcaPytania, OdpowiedzNaPytanie } from "../services/copilot-pytania.js";
-import type { UzycieNarzedzia } from "../services/copilot-narzedzia.js";
+import type { AutoParseableOutputFormat } from "@anthropic-ai/sdk/lib/parser";
+import type {
+  UzycieNarzedzia, WynikWywolania, ZestawNarzedzi,
+} from "../services/copilot-narzedzia.js";
 import type {
   NadawcaRozpoznania, OdpowiedzRozpoznania,
 } from "../services/copilot-reklamacja.js";
@@ -307,7 +310,22 @@ const Szkic = z.object({
    ── WIERSZ ALLEGRO: ─────────────────────────────────────────────────────────
    W Problemie z zakupem pisze też doradca Allegro. Bez własnej etykiety jego
    zdanie stałoby w wierszu KLIENT:, a szkic odpowiadałby kupującemu na słowa
-   Allegro. Etykietę stawia `zamaskujWatekZeSladem`, regułę — `glos-allegro.ts`. */
+   Allegro. Etykietę stawia `zamaskujWatekZeSladem`, regułę — `glos-allegro.ts`.
+
+   ── AKAPIT NARZĘDZIA ───────────────────────────────────────────────────────
+   Decyzja właściciela z 19 października 2026: szkic sięga do bazy jak
+   dopytanie. Klient pyta o towar spoza faktów, a szkic bez narzędzi
+   odpowiadał z wiedzy modelu, choć odpowiedź leżała w kartotece obok.
+   Numer N# ma ten sam kształt co F#, bo serwis sprawdza go tymi samymi
+   sitami: odwołanie spoza wyników wywraca szkic. „Nie ma w bazie" to brak
+   wiedzy, bo kartoteka nie zna wszystkich zamienników, a „nie pasuje"
+   odradzałoby zakup bez dowodu.
+
+   Cenę klient dostaje wyłącznie z oferty z linkiem, bo kupuje na Allegro
+   po cenie aukcji, a poziom cennika bywa od niej różny. Kopia ofert jest
+   przy tym niepełna i spóźniona o dobę, więc brak oferty w wyniku nie
+   znaczy braku aukcji. Cennik idzie wtedy do agenta, który sprawdzi aukcję,
+   a nie do klienta jako cena, której możemy nie dotrzymać. */
 const INSTRUKCJA_SZKICU = [
   "Układasz SZKIC odpowiedzi dla agenta obsługi klienta w sklepie z częściami",
   "do sprzętu ogrodniczego (kosiarki, pilarki, kosy, gaźniki, uszczelki).",
@@ -464,6 +482,19 @@ const INSTRUKCJA_SZKICU = [
   "8f. Nie opisuj klientowi jego własnego zdjęcia zdanie po zdaniu. On wie,",
   "   co przysłał. Użyj odczytu do odpowiedzi na jego pytanie.",
   "",
+  "NARZĘDZIA. Czasem masz narzędzia, które czytają naszą kartotekę i nasze oferty.",
+  "Gdy klient pyta o towar spoza FAKTÓW (inny numer, inna nazwa, inna aukcja),",
+  "sprawdź w bazie, zanim odpowiesz z własnej wiedzy.",
+  "- Wynik narzędzia zaczyna się od numeru w nawiasie, np. [N2]. To baza sklepu:",
+  "  w `twierdzenia` podpisz go źródłem „fakty”, a numer N2 wpisz do `odwolanie`",
+  "  i do `uzyteFakty`. W tekście znakuj go tak jak fakt, np. „(N2)”.",
+  "- Wynik „nie ma w bazie” znaczy „nie wiemy”, a nie „nie pasuje”.",
+  "- Cenę podajesz klientowi WYŁĄCZNIE z wyniku naszej oferty, razem z jej adresem.",
+  "  Gdy oferty nie znasz, ceny z cennika kartoteki NIE PISZ klientowi. Wpisz ją",
+  "  do `zastrzezenia` dla agenta, że cennik kartoteki podaje taką kwotę, do sprawdzenia na aukcji.",
+  "- Kartoteka znaleziona narzędziem jest kartoteką z faktów w rozumieniu reguły 7,",
+  "  a adres aukcji z wyniku przepisz znak w znak, jak adres z faktu (reguła 7b).",
+  "",
   "FORMA ODPOWIEDZI DLA KLIENTA: pisz ją tak, żeby dała się przeczytać na",
   "telefonie: krótkie akapity po jednej myśli, pusta linia między nimi. Gdy",
   "wyliczasz części, kroki albo rzeczy do sprawdzenia, zrób z tego listę: każda",
@@ -492,85 +523,79 @@ const INSTRUKCJA_SZKICU = [
   "`odczytZeZdjec` (co widać na zdjęciach, wg reguły 8a; pusta lista bez zdjęć).",
 ].join("\n");
 
+/* Ile rund narzędzi na jeden szkic. Mniej niż przy dopytaniu, bo szkic
+   ma już fakty, a sięga po bazę tylko o towar spoza nich: znajdź symbol,
+   otwórz kartę albo oferty. Szkic układa też takt, więc każda runda to
+   pełne żądanie płacone bez kliknięcia człowieka. */
+export const SUFIT_RUND_SZKICU = 3;
+
 /** Realny nadawca szkicu. Wstrzykuje go TRASA, jak nadawcę klasyfikacji. */
 export const nadawcaSzkicuAnthropic: NadawcaSzkicu =
-  async (watek, fakty, zdjecia = []): Promise<OdpowiedzSzkicu> => {
+  async (watek, fakty, zdjecia = [], narzedzia): Promise<OdpowiedzSzkicu> => {
   const start = Date.now();
-  try {
-    const odp = await anthropic().messages.parse({
-      model: config.copilot.model,
-      /* Szkic ma do 1800 znaków polskiego tekstu plus JSON wokół.
-         ── BLIZNA 0.253.1 ────────────────────────────────────────────────────
-         0.253.0 dołożyło do wyjścia WYMAGANĄ listę `twierdzenia`, a ten sufit
-         został na liczbie policzonej dla samego szkicu. Osiem twierdzeń po zdaniu to kilkaset tokenów więcej, więc
-         JSON urywał się w połowie i przestawał być JSON-em. SDK rzuca wtedy
-         `AnthropicError`, a agent czytał „usterka po naszej stronie" bez
-         jednego słowa o tym, co się stało.
-         Rosnąc o pole w wyjściu, rośnij o sufit — inaczej limit obcina nie to
-         pole, które dołożyłeś, tylko całą odpowiedź.
-         ── I ZNOWU, TYM RAZEM Z WYPRZEDZENIEM ────────────────────────────────
-         `odczytZeZdjec` to najdłuższe pole, jakie ten schemat kiedykolwiek
-         dostał: przepisana tabliczka znamionowa ma kilkanaście linii numerów,
-         a zdjęć bywa `SUFIT_SZTUK_ROZMOWY`. Stąd 4500, nie 3000. Blizna wyżej
-         kosztowała wydanie naprawcze i mówiła dokładnie to samo. */
-      max_tokens: 4500,
-      system: [{ type: "text", text: INSTRUKCJA_SZKICU, cache_control: { type: "ephemeral" } }],
-      output_config: {
-        /* Średni wysiłek: tu powstaje tekst dla klienta, nie etykieta.
-           Warunek jak przy klasyfikacji: `COPILOT_MODEL` na Haiku 4.5 dałby
-           inaczej 400 na każdym szkicu. */
-        ...(wspieraWysilek(config.copilot.model) ? { effort: "medium" as const } : {}),
-        format: zodOutputFormat(Szkic),
-      },
-      /* ── OBRAZY PRZED TEKSTEM ─────────────────────────────────────────────
-         Ten sam kształt, co przy karcie reklamacyjnej (0.283.0), i z tego
-         samego powodu: bez spisu na końcu tekstu model widzi obrazy, ale nie
-         wie, który jest którym `Z`, a wtedy odczyt przestaje być sprawdzalny.
-         Spis dokleja serwis do FAKTÓW, nie adapter — tu jest tylko kolejność.
+  const tekst = `FAKTY:\n${String(fakty)}\n\nROZMOWA:\n${String(watek)}`;
+  const r = await rozmowaZNarzedziami({
+    system: INSTRUKCJA_SZKICU,
+    format: zodOutputFormat(Szkic),
+    narzedzia,
+    sufitRund: SUFIT_RUND_SZKICU,
+    /* Szkic ma do 1800 znaków polskiego tekstu plus JSON wokół.
+       ── BLIZNA 0.253.1 ──────────────────────────────────────────────────────
+       0.253.0 dołożyło do wyjścia WYMAGANĄ listę `twierdzenia`, a ten sufit
+       został na liczbie policzonej dla samego szkicu. Osiem twierdzeń po zdaniu to kilkaset tokenów więcej, więc
+       JSON urywał się w połowie i przestawał być JSON-em. SDK rzuca wtedy
+       `AnthropicError`, a agent czytał „usterka po naszej stronie" bez
+       jednego słowa o tym, co się stało.
+       Rosnąc o pole w wyjściu, rośnij o sufit — inaczej limit obcina nie to
+       pole, które dołożyłeś, tylko całą odpowiedź.
+       ── I ZNOWU, TYM RAZEM Z WYPRZEDZENIEM ──────────────────────────────────
+       `odczytZeZdjec` to najdłuższe pole, jakie ten schemat kiedykolwiek
+       dostał: przepisana tabliczka znamionowa ma kilkanaście linii numerów,
+       a zdjęć bywa `SUFIT_SZTUK_ROZMOWY`. Stąd 4500, nie 3000. Blizna wyżej
+       kosztowała wydanie naprawcze i mówiła dokładnie to samo.
+       Sufit liczy się NA RUNDĘ, więc rundy narzędzi go nie zjadają. */
+    maxTokens: 4500,
+    /* Średni wysiłek: tu powstaje tekst dla klienta, nie etykieta.
+       Warunek `wspieraWysilek` siedzi w pętli. */
+    wysilek: "medium",
+    coNieOddal: "szkicu",
+    numerujWyniki: true,
+    /* ── OBRAZY PRZED TEKSTEM ───────────────────────────────────────────────
+       Ten sam kształt, co przy karcie reklamacyjnej (0.283.0), i z tego
+       samego powodu: bez spisu na końcu tekstu model widzi obrazy, ale nie
+       wie, który jest którym `Z`, a wtedy odczyt przestaje być sprawdzalny.
+       Spis dokleja serwis do FAKTÓW, nie adapter — tu jest tylko kolejność.
 
-         Bez zdjęć `content` zostaje gołym łańcuchem, dokładnie jak przed tym
-         wydaniem: prefiks żądania ma być bit w bit ten sam, bo na nim stoi
-         cache instrukcji, a rozmowa bez zdjęć to dalej większość rozmów. */
-      messages: [{
-        role: "user",
-        content: zdjecia.length === 0
-          ? `FAKTY:\n${String(fakty)}\n\nROZMOWA:\n${String(watek)}`
-          : [
-            ...zdjecia.map((z) => ({
-              type: "image" as const,
-              source: { type: "base64" as const, media_type: z.typ, data: z.base64 },
-            })),
-            {
-              type: "text" as const,
-              text: `FAKTY:\n${String(fakty)}\n\nROZMOWA:\n${String(watek)}`,
-            },
-          ],
-      }],
-    });
-    const u = odp.usage;
-    const w = odp.parsed_output;
-    if (!w) {
-      throw new BladOdpowiedziCopilota(
-        `Model nie oddał szkicu (stop: ${odp.stop_reason ?? "?"})`, 200);
-    }
-    return {
-      tresc: w.tresc, uzyteFakty: w.uzyteFakty, zastrzezenia: w.zastrzezenia,
-      twierdzenia: w.twierdzenia,
-      /* Wpis bez numeru albo bez treści wypada tu, nie w serwisie: to kształt,
-         nie treść. Serwis sprawdza, czy numer jest NASZ — a to co innego. */
-      odczytZeZdjec: w.odczytZeZdjec
-        .map((o) => ({ zdjecie: o.zdjecie.trim(), tekst: o.tekst.trim() }))
-        .filter((o) => o.zdjecie && o.tekst),
-      model: odp.model ?? config.copilot.model,
-      zuzycie: {
-        wej: u?.input_tokens ?? 0, wyj: u?.output_tokens ?? 0,
-        cacheZapis: u?.cache_creation_input_tokens ?? 0, cacheOdczyt: u?.cache_read_input_tokens ?? 0,
-      },
-      ms: Date.now() - start,
-    };
-  } catch (e) {
-    throw naNasz(e);
-  }
+       Bez zdjęć `content` zostaje gołym łańcuchem: prefiks żądania ma być
+       bit w bit ten sam, bo na nim stoi cache instrukcji, a rozmowa bez
+       zdjęć to dalej większość rozmów. */
+    wiadomosci: [{
+      role: "user",
+      content: zdjecia.length === 0 ? tekst : [
+        ...zdjecia.map((z) => ({
+          type: "image" as const,
+          source: { type: "base64" as const, media_type: z.typ, data: z.base64 },
+        })),
+        { type: "text" as const, text: tekst },
+      ],
+    }],
+  });
+  const w = r.wynik;
+  return {
+    tresc: w.tresc, uzyteFakty: w.uzyteFakty, zastrzezenia: w.zastrzezenia,
+    twierdzenia: w.twierdzenia,
+    /* Wpis bez numeru albo bez treści wypada tu, nie w serwisie: to kształt,
+       nie treść. Serwis sprawdza, czy numer jest NASZ — a to co innego. */
+    odczytZeZdjec: w.odczytZeZdjec
+      .map((o) => ({ zdjecie: o.zdjecie.trim(), tekst: o.tekst.trim() }))
+      .filter((o) => o.zdjecie && o.tekst),
+    model: r.model,
+    zuzycie: r.zuzycie,
+    ms: Date.now() - start,
+    narzedzia: r.uzyte,
+    wynikiNarzedzi: r.wyniki,
+    rund: r.rund,
+  };
 };
 
 /* ── Dopytanie Copilota (0.332.0) ────────────────────────────────────────────
@@ -634,64 +659,75 @@ const INSTRUKCJA_PYTANIA = [
    musi odpowiedzieć tym, co już zebrał. Każda runda to pełne żądanie. */
 export const SUFIT_RUND_NARZEDZI = 5;
 
+/** Wynik wspólnej pętli: sparsowana odpowiedź i rachunek wszystkich rund. */
+interface WynikRozmowy<T> {
+  wynik: T;
+  model: string;
+  /** Suma ze WSZYSTKICH rund — tyle kosztowało jedno zadanie. */
+  zuzycie: Tokeny;
+  uzyte: UzycieNarzedzia[];
+  wyniki: WynikWywolania[];
+  /** Ile żądań poszło do dostawcy, łącznie z ostatnim. */
+  rund: number;
+}
+
 /**
- * Dopytanie z narzędziami (0.507.0). Pętla stoi TUTAJ, bo tylko ten plik
- * rozmawia z dostawcą; serwis podaje zestaw i dostaje ślad wywołań.
+ * Rozmowa z narzędziami: jedna pętla dla szkicu i dopytania. Pętla stoi
+ * TUTAJ, bo tylko ten plik rozmawia z dostawcą; serwis podaje zestaw
+ * i dostaje ślad wywołań.
  *
  * `create`, NIE `parse`. Parser SDK czyta JSON z KAŻDEGO bloku tekstu,
- * więc zdanie wstępu przed wywołaniem narzędzia wywracałoby dopytanie
+ * więc zdanie wstępu przed wywołaniem narzędzia wywracałoby odpowiedź
  * błędem parsowania. Format i tak wymusza `zodOutputFormat` — to ten sam
  * obiekt, a ostatni blok tekstu czyta jego własny `parse`.
+ *
+ * Bez narzędzi to dokładnie jedno żądanie bez `tools`, bo lista narzędzi
+ * stoi w prefiksie żądania, a prefiks cache instrukcji ma zostać bit w bit.
  */
-export const nadawcaPytaniaAnthropic: NadawcaPytania = async (k): Promise<OdpowiedzNaPytanie> => {
-  const start = Date.now();
+async function rozmowaZNarzedziami<T>(o: {
+  system: string;
+  wiadomosci: Anthropic.MessageParam[];
+  format: AutoParseableOutputFormat<T>;
+  narzedzia?: ZestawNarzedzi | null;
+  sufitRund: number;
+  maxTokens: number;
+  wysilek: "low" | "medium" | "high";
+  /** Dopełnienie zdania „Model nie oddał …” przy pustej odpowiedzi. */
+  coNieOddal: string;
+  /**
+   * Czy wynik narzędzia wraca do modelu z przedrostkiem `[N#]`. Tylko szkic:
+   * on cytuje wyniki i serwis sprawdza te odwołania. Dopytanie podpisuje
+   * wynik nazwą narzędzia, więc numer byłby mu szumem bez kontroli.
+   */
+  numerujWyniki: boolean;
+}): Promise<WynikRozmowy<T>> {
   const model = config.copilot.model;
-  const format = zodOutputFormat(OdpowiedzPytania);
   const zuzycie: Tokeny = { wej: 0, wyj: 0, cacheZapis: 0, cacheOdczyt: 0 };
   const uzyte: UzycieNarzedzia[] = [];
+  const wyniki: WynikWywolania[] = [];
+  const wiadomosci = [...o.wiadomosci];
+  const zestaw = o.narzedzia?.definicje.length ? o.narzedzia : null;
+  const narzedzia: Anthropic.ToolUnion[] = (zestaw?.definicje ?? []).map((d) => ({ ...d }));
   try {
-    const historia = k.historia
-      .map((h, i) => `[D${i + 1}] AGENT: ${h.pytanie}\n[D${i + 1}] TY: ${h.odpowiedz}`)
-      .join("\n");
-    const tekst = [
-      `FAKTY:\n${String(k.fakty)}`,
-      `ROZMOWA Z KLIENTEM:\n${String(k.watek)}`,
-      k.szkic ? `AKTUALNY SZKIC:\n${k.szkic}` : "AKTUALNY SZKIC: (jeszcze go nie ma)",
-      historia ? `POPRZEDNIE DOPYTANIA:\n${historia}` : "",
-      `PYTANIE AGENTA:\n${k.pytanie}`,
-    ].filter(Boolean).join("\n\n");
-
-    const wiadomosci: Anthropic.MessageParam[] = [{
-      role: "user",
-      content: k.zdjecia.length === 0 ? tekst : [
-        ...k.zdjecia.map((z) => ({
-          type: "image" as const,
-          source: { type: "base64" as const, media_type: z.typ, data: z.base64 },
-        })),
-        { type: "text" as const, text: tekst },
-      ],
-    }];
-    const narzedzia: Anthropic.ToolUnion[] = (k.narzedzia?.definicje ?? []).map((d) => ({ ...d }));
-
     for (let runda = 0; ; runda++) {
-      const ostatnia = runda >= SUFIT_RUND_NARZEDZI;
+      const ostatnia = runda >= o.sufitRund;
       const odp = await anthropic().messages.create({
         model,
-        /* Sufit NA RUNDĘ. Odpowiedź bywa wyliczeniem czterech rzeczy do
-           sprawdzenia, a myślenie przed wywołaniem narzędzia liczy się do
-           tego samego sufitu. Ucięta runda to zapłacone żądanie bez odpowiedzi. */
-        max_tokens: 4000,
-        /* Cache NA CAŁOŚĆ, nie tylko na instrukcję. Każda runda wysyła całą
-           dotychczasową rozmowę z wynikami narzędzi, więc bez tego piąta runda
-           płaciłaby pełną cenę za cztery poprzednie. */
-        cache_control: { type: "ephemeral" },
-        system: [{ type: "text", text: INSTRUKCJA_PYTANIA, cache_control: { type: "ephemeral" } }],
+        /* Sufit NA RUNDĘ. Myślenie przed wywołaniem narzędzia liczy się do
+           tego samego sufitu, a ucięta runda to zapłacone żądanie bez odpowiedzi. */
+        max_tokens: o.maxTokens,
+        /* Cache NA CAŁOŚĆ, gdy są narzędzia. Każda runda wysyła całą
+           dotychczasową rozmowę z wynikami, więc bez tego piąta runda płaciłaby
+           pełną cenę za cztery poprzednie. Bez narzędzi rundy jest jedna,
+           a zapis całości do cache byłby dopłatą za coś, czego nikt nie odczyta. */
+        ...(zestaw ? { cache_control: { type: "ephemeral" as const } } : {}),
+        system: [{ type: "text", text: o.system, cache_control: { type: "ephemeral" } }],
         output_config: {
-          /* Średni wysiłek: to jest rozstrzyganie wątpliwości, nie etykieta. */
-          ...(wspieraWysilek(model) ? { effort: "medium" as const } : {}),
-          format,
+          /* `wspieraWysilek`: Haiku 4.5 i Sonnet 4.5 odrzucają wysiłek błędem 400. */
+          ...(wspieraWysilek(model) ? { effort: o.wysilek } : {}),
+          format: o.format,
         },
-        ...(narzedzia.length ? {
+        ...(zestaw ? {
           tools: narzedzia,
           ...(ostatnia ? { tool_choice: { type: "none" as const } } : {}),
         } : {}),
@@ -705,7 +741,7 @@ export const nadawcaPytaniaAnthropic: NadawcaPytania = async (k): Promise<Odpowi
       zuzycie.cacheOdczyt += u?.cache_read_input_tokens ?? 0;
 
       const wywolania = odp.content.filter((b): b is Anthropic.ToolUseBlock => b.type === "tool_use");
-      if (odp.stop_reason === "tool_use" && wywolania.length && k.narzedzia && !ostatnia) {
+      if (odp.stop_reason === "tool_use" && wywolania.length && zestaw && !ostatnia) {
         /* Treść asystenta wraca BEZ ZMIAN, z blokami myślenia — model
            kontynuuje własny tok, a zmieniona historia go unieważnia. */
         wiadomosci.push({ role: "assistant", content: odp.content });
@@ -714,13 +750,14 @@ export const nadawcaPytaniaAnthropic: NadawcaPytania = async (k): Promise<Odpowi
         wiadomosci.push({
           role: "user",
           content: wywolania.map((w) => {
-            const { wynik, blad } = k.narzedzia!.wykonaj(w.name, w.input);
-            uzyte.push({
-              nazwa: w.name,
-              argument: String((w.input as { zapytanie?: unknown } | null)?.zapytanie ?? "").slice(0, 120),
-              znakow: wynik.length,
-            });
-            return { type: "tool_result" as const, tool_use_id: w.id, content: String(wynik), is_error: blad };
+            const { wynik, blad } = zestaw.wykonaj(w.name, w.input);
+            const argument = String((w.input as { zapytanie?: unknown } | null)?.zapytanie ?? "").slice(0, 120);
+            /* Numer N# biegnie przez całą rozmowę, jak F# przez fakty. Na nim
+               model opiera odwołanie, a serwis sprawdza, czy takie wywołanie było. */
+            const id = `N${wyniki.length + 1}`;
+            uzyte.push({ nazwa: w.name, argument, znakow: wynik.length });
+            wyniki.push({ id, nazwa: w.name, argument, tresc: String(wynik) });
+            return { type: "tool_result" as const, tool_use_id: w.id, content: o.numerujWyniki ? `[${id}] ${String(wynik)}` : String(wynik), is_error: blad };
           }),
         });
         continue;
@@ -729,25 +766,67 @@ export const nadawcaPytaniaAnthropic: NadawcaPytania = async (k): Promise<Odpowi
       const ostatniTekst = odp.content.filter((b): b is Anthropic.TextBlock => b.type === "text").at(-1);
       if (!ostatniTekst || odp.stop_reason === "max_tokens" || odp.stop_reason === "refusal") {
         throw new BladOdpowiedziCopilota(
-          `Model nie oddał odpowiedzi (stop: ${odp.stop_reason ?? "?"})`, 200);
+          `Model nie oddał ${o.coNieOddal} (stop: ${odp.stop_reason ?? "?"})`, 200);
       }
-      const w = format.parse(ostatniTekst.text);
       return {
-        tresc: w.tresc,
-        twierdzenia: w.twierdzenia,
+        wynik: o.format.parse(ostatniTekst.text),
         model: odp.model ?? model,
-        zuzycie,
-        ms: Date.now() - start,
-        narzedzia: uzyte,
+        zuzycie, uzyte, wyniki, rund: runda + 1,
       };
     }
   } catch (e) {
     /* Tokeny zapłaconych rund nie giną z błędem: serwis zapisuje je w księdze
-       razem z porażką, bo inaczej pomiar zaniżałby koszt nieudanych dopytań. */
+       razem z porażką, bo inaczej pomiar zaniżałby koszt nieudanych wywołań. */
     const blad = naNasz(e);
     (blad as { zuzycie?: Tokeny }).zuzycie = { ...zuzycie };
     throw blad;
   }
+}
+
+/** Dopytanie z narzędziami (0.507.0) — przez wspólną pętlę. */
+export const nadawcaPytaniaAnthropic: NadawcaPytania = async (k): Promise<OdpowiedzNaPytanie> => {
+  const start = Date.now();
+  const historia = k.historia
+    .map((h, i) => `[D${i + 1}] AGENT: ${h.pytanie}\n[D${i + 1}] TY: ${h.odpowiedz}`)
+    .join("\n");
+  const tekst = [
+    `FAKTY:\n${String(k.fakty)}`,
+    `ROZMOWA Z KLIENTEM:\n${String(k.watek)}`,
+    k.szkic ? `AKTUALNY SZKIC:\n${k.szkic}` : "AKTUALNY SZKIC: (jeszcze go nie ma)",
+    historia ? `POPRZEDNIE DOPYTANIA:\n${historia}` : "",
+    `PYTANIE AGENTA:\n${k.pytanie}`,
+  ].filter(Boolean).join("\n\n");
+
+  const r = await rozmowaZNarzedziami({
+    system: INSTRUKCJA_PYTANIA,
+    format: zodOutputFormat(OdpowiedzPytania),
+    narzedzia: k.narzedzia,
+    sufitRund: SUFIT_RUND_NARZEDZI,
+    /* Odpowiedź bywa wyliczeniem czterech rzeczy do sprawdzenia. */
+    maxTokens: 4000,
+    /* Średni wysiłek: to jest rozstrzyganie wątpliwości, nie etykieta. */
+    wysilek: "medium",
+    coNieOddal: "odpowiedzi",
+    numerujWyniki: false,
+    wiadomosci: [{
+      role: "user",
+      content: k.zdjecia.length === 0 ? tekst : [
+        ...k.zdjecia.map((z) => ({
+          type: "image" as const,
+          source: { type: "base64" as const, media_type: z.typ, data: z.base64 },
+        })),
+        { type: "text" as const, text: tekst },
+      ],
+    }],
+  });
+  return {
+    tresc: r.wynik.tresc,
+    twierdzenia: r.wynik.twierdzenia,
+    model: r.model,
+    zuzycie: r.zuzycie,
+    ms: Date.now() - start,
+    narzedzia: r.uzyte,
+  };
 };
 
 /**

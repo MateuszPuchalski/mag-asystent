@@ -39,7 +39,7 @@ before(async () => {
 
 beforeEach(() => {
   const d = db();
-  for (const t of ["offer_snapshot", "oferta_kartoteka", "events", "channel_account"]) {
+  for (const t of ["offer_snapshot", "oferta_kartoteka", "events", "channel_account", "sgt_cena"]) {
     d.prepare(`DELETE FROM ${t}`).run();
   }
 });
@@ -55,7 +55,7 @@ function odcisk(): string {
 }
 
 test("zestaw to wyłącznie odczyt towaru i ofert", () => {
-  assert.deepEqual(N.DEFINICJE.map((d) => d.name), ["szukaj_towaru", "karta_towaru", "tresc_oferty"]);
+  assert.deepEqual(N.DEFINICJE.map((d) => d.name), ["szukaj_towaru", "karta_towaru", "tresc_oferty", "oferty_towaru"]);
 });
 
 test("żadne narzędzie nie zapisuje i nie woła sieci", () => {
@@ -103,5 +103,69 @@ test("zły symbol, puste zapytanie i nieznane narzędzie wracają do modelu jako
   assert.ok(String(wykonaj("karta_towaru", "XX-NIE-MA").wynik).includes("szukaj_towaru"),
     "zły symbol podpowiada właściwe narzędzie");
   assert.equal(wykonaj("karta_towaru", "   ").blad, true);
+  assert.match(String(wykonaj("szukaj_towaru", "ZZZ-NIC-TAKIEGO").wynik), /Nie znaleźliśmy.*To nie znaczy, że takiej części nie ma/,
+    "pusty wynik to brak wiedzy, nie „nie pasuje”");
   assert.equal(wykonaj("kasuj_wszystko", "GAZ-MS250").blad, true);
+});
+
+/* ── Ceny sprzedaży i nasze oferty ──────────────────────────────────────────
+   Szkic dla klienta czyta te same narzędzia, więc wynik może dojść do klienta.
+   Poziom 0 to cena zakupu: kwota 123,45 nie ma prawa stać w ŻADNYM wyniku. */
+
+const ZAKUP = 12345;
+
+function ofertaZeStatusem(konto: number, id: string, status: string, cena: number) {
+  db().prepare(`INSERT INTO offer_snapshot(channel_account_id,external_id,nazwa,sku,synced_at,cena_grosze,waluta,status)
+    VALUES (?,?,?,?,?,?,?,?)`).run(konto, id, `Gaźnik ${id}`, "GAZ-MS250", "2026-09-01T00:00:00Z", cena, "PLN", status);
+}
+
+function przygotujCenyIOferty(): void {
+  const d = db();
+  const cena = d.prepare("INSERT INTO sgt_cena(tw_id,poziom,nazwa,netto_grosze,brutto_grosze) VALUES (?,?,?,?,?)");
+  cena.run(GAZNIK, 0, "zakupu", ZAKUP, ZAKUP);
+  cena.run(GAZNIK, 1, "detaliczna", 7000, 8610);
+  cena.run(GAZNIK, 2, "hurtowa", 0, 0);
+  const konto = Number(d.prepare("INSERT INTO channel_account(channel,external_account_id) VALUES ('allegro','s')")
+    .run().lastInsertRowid);
+  ofertaZeStatusem(konto, "9001", "ACTIVE", 8999);
+  ofertaZeStatusem(konto, "9002", "ENDED", 7999);
+}
+
+test("karta towaru niesie cennik sprzedaży, bez poziomu zakupu i bez zerowych kwot", () => {
+  przygotujCenyIOferty();
+  const k = String(wykonaj("karta_towaru", "GAZ-MS250").wynik);
+  assert.ok(k.includes("Cennik sklepu (kartoteka): detaliczna 86,10 zł brutto"), k);
+  assert.ok(!k.includes("hurtowa"), "zerowa kwota to brak wiedzy, nie cena");
+});
+
+test("żadne narzędzie nie zdradza ceny zakupu (poziom 0)", () => {
+  przygotujCenyIOferty();
+  for (const d of N.DEFINICJE) {
+    for (const q of ["GAZ-MS250", "Stihl MS 250", "1123 120 0650"]) {
+      const w = String(wykonaj(d.name, q).wynik);
+      for (const slad of ["123,45", "123.45", String(ZAKUP), "zakupu"]) {
+        assert.ok(!w.includes(slad), `${d.name}(${q}) zdradza cenę zakupu: ${w}`);
+      }
+    }
+  }
+});
+
+test("oferty_towaru zwraca wyłącznie aktywne oferty, z linkiem i ceną, bez sieci", () => {
+  przygotujCenyIOferty();
+  const fetchBylo = globalThis.fetch;
+  let zawolano = 0;
+  globalThis.fetch = (async () => { zawolano += 1; throw new Error("sieć zakazana"); }) as typeof fetch;
+  try {
+    const w = String(wykonaj("oferty_towaru", "GAZ-MS250").wynik);
+    assert.ok(w.includes("https://allegro.pl/oferta/9001"), w);
+    assert.ok(w.includes("89,99 zł"), w);
+    assert.ok(w.includes("stan z kopii z 2026-09-01"), "cena z kopii mówi, z kiedy jest");
+    assert.ok(!w.includes("9002"), "zakończona oferta nie jest naszą aktywną aukcją");
+    /* Kopia jest niepełna: pusty wynik to brak wiedzy, nie brak oferty. */
+    assert.equal(String(wykonaj("oferty_towaru", "FIL-GX160").wynik),
+      "W naszej kopii nie ma aktywnej oferty tego towaru. To nie znaczy, że jej nie ma.");
+  } finally {
+    globalThis.fetch = fetchBylo;
+  }
+  assert.equal(zawolano, 0);
 });

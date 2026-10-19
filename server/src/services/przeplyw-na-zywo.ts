@@ -27,6 +27,10 @@ import { biezacaDecyzja, kategorieNaZywo } from "./przeplyw-kategorii.js";
    pominięcie bez zapisu: kandydat zostaje i agent obsłuży go ręcznie.
    Zbiorczy wpis dziennika na koniec przebiegu mówi, ile i dlaczego.
 
+   ÓSMY WARUNEK, szkic bez narzędzi, jest jedynym z powodem przy propozycji.
+   Ten stan nie mija sam, więc propozycja wypada z kandydatów od razu,
+   a karta mówi agentowi, dlaczego automat jej nie wysłał.
+
    BŁĄD NIE JEST PONAWIANY. Wysyłka, która padła, zapisuje powód przy
    propozycji i wypada z kandydatów. Ponowienie co takt szłoby na koszt
    klienta, a po niejednoznacznym timeoucie §8.5 zabrania go w ogóle. */
@@ -75,7 +79,11 @@ export interface WynikNaZywo {
 }
 
 /** Powody pominięcia, w kolejności warunków. Klucze idą do dziennika. */
-type Powod = "decyzja" | "odpisano" | "szkic" | "agentPisze" | "przydzial" | "obecnosc" | "konflikt";
+type Powod = "decyzja" | "odpisano" | "szkic" | "narzedzia" | "agentPisze" | "przydzial" | "obecnosc"
+  | "konflikt";
+
+/** Powód przy propozycji, gdy szkic sięgał do bazy. Karta pokazuje go po „Automat nie wysłał:”. */
+export const POWOD_NARZEDZIA = "szkic sięgał do kartoteki, sprawdź ceny i linki przed wysłaniem";
 
 const NIC: WynikNaZywo = { wyslanych: 0, pominietych: 0, bledow: 0, przerwane: null };
 
@@ -148,14 +156,24 @@ export async function wyslijNaZywo(rozmowyId: number[], deps: NaZywoDeps = {}): 
     /* 3. Szkic pod tę wiadomość i tę decyzję, bez zastrzeżeń, nieodrzucony
           i nieruszony przez agenta. Zastrzeżenie znaczy, że model czegoś
           nie wiedział, a wtedy zgaduje on, nie fakty. */
-    const szkic = database.prepare(`SELECT tresc, message_id, decyzja_id, zastrzezenia, ocena
+    const szkic = database.prepare(`SELECT tresc, message_id, decyzja_id, zastrzezenia, ocena, narzedzia
       FROM szkic_copilota WHERE conversation_id = ?`).get(rozmowa) as
       { tresc: string; message_id: number | null; decyzja_id: number | null;
-        zastrzezenia: string | null; ocena: string | null } | undefined;
+        zastrzezenia: string | null; ocena: string | null; narzedzia: string | null } | undefined;
     if (!szkic || Number(szkic.message_id) !== wiadomosc
       || Number(szkic.decyzja_id) !== Number(p.decyzja_id)
       || szkic.ocena !== null || !bezZastrzezen(szkic.zastrzezenia)
       || !String(szkic.tresc ?? "").trim()) { pomin("szkic"); continue; }
+
+    /* 8. Szkic, który sięgał do kartoteki, czeka na człowieka. Ceny i linki
+          wzięte przez model z bazy nie wychodzą do klienta bez spojrzenia
+          agenta, dopóki właściciel nie zdecyduje inaczej. Sprawdzenie stoi
+          przy szkicu, bo czyta ten sam wiersz. */
+    if (!bezNarzedzi(szkic.narzedzia)) {
+      pomin("narzedzia");
+      oznaczNarzedzia(database, p);
+      continue;
+    }
 
     /* 4. Agent coś pisze albo dołożył plik. Wysyłka zabrałaby jego załącznik
           do odpowiedzi automatu i skasowała mu szkic. */
@@ -251,6 +269,35 @@ function bezZastrzezen(json: string | null): boolean {
   } catch {
     return false;
   }
+}
+
+/** Pusta lista narzędzi szkicu. Uszkodzony JSON to brak wiedzy, więc nie wysyłamy. */
+function bezNarzedzi(json: string | null): boolean {
+  return bezZastrzezen(json);
+}
+
+/**
+ * Powód przy propozycji bez wysyłki i bez konta automatu: nic nie wyszło,
+ * więc nie ma czego podpisywać.
+ *
+ * To nie jest awaria, a idzie jako `przeplyw_na_zywo_blad` ŚWIADOMIE. Osobny
+ * typ wymaga polskiej nazwy w panelu (`dziennik/nazwy.ts`, pilnuje tego
+ * `nazwy.test.ts`), a bez niej dziennik pokazałby goły klucz. Obecny typ
+ * panel nazywa „Automat nie wysłał odpowiedzi”, co jest tu prawdą, a powód
+ * stoi w ładunku i przy propozycji.
+ */
+function oznaczNarzedzia(
+  database: DatabaseSync, p: { id: number; conversation_id: number; kategoria: string },
+): void {
+  transaction(database, () => {
+    database.prepare("UPDATE propozycja_przeplywu SET wykonanie_blad = ? WHERE id = ?")
+      .run(POWOD_NARZEDZIA, p.id);
+    logEvent("przeplyw_na_zywo_blad", NAZWA_AUTOMATU, null, {
+      conversationId: Number(p.conversation_id), propozycjaId: p.id, kategoria: p.kategoria,
+      outboxId: null, blad: POWOD_NARZEDZIA,
+    }, null, database);
+  })();
+  publishConversationEvent("assignment.changed", Number(p.conversation_id), { przeplyw: true });
 }
 
 /** Powód przy propozycji i wpis w dzienniku. Propozycja z powodem nie wraca do kandydatów. */
