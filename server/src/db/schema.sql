@@ -3036,6 +3036,17 @@ CREATE TABLE IF NOT EXISTS sellasist_do_pobrania (
   proby         INTEGER NOT NULL DEFAULT 0
 );
 
+-- Pomyłki zbierania złapane przy pakowaniu: wejście zamówienia w status
+-- z `SELLASIST_STATUSY_POMYLKA`, jeden wiersz na wpis dziennika Sellasist.
+-- BEZ PRACOWNIKA: kto zbierał źle, to monitoring pracowniczy (art. 22² KP),
+-- a miara dzienna go nie potrzebuje. `user_id` dziennika odrzuca mapowanie.
+CREATE TABLE IF NOT EXISTS sellasist_pomylka_zlapana (
+  log_id        INTEGER PRIMARY KEY,    -- numer wpisu dziennika; ten sam wpis drugi raz to nic
+  zamowienie_id INTEGER NOT NULL,
+  at            TEXT NOT NULL           -- chwila wejścia w status, ISO UTC
+);
+CREATE INDEX IF NOT EXISTS ix_sellasist_pomylka_at ON sellasist_pomylka_zlapana(at);
+
 CREATE TABLE IF NOT EXISTS sellasist_sync_state (
   id              INTEGER PRIMARY KEY CHECK (id = 1),
   kursor_at       TEXT,                 -- data ostatniego wpisu dziennika, ISO UTC

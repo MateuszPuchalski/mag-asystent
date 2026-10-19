@@ -57,8 +57,10 @@ test("stan konfiguracji niesie obowiązującą przy domyślnej, bez niej przy se
 });
 
 test("Sellasist: konto jak w pliku, statusy „zebrane” po przecinku, klucz API bez wartości", () => {
-  const c = { ...config, sellasist: { ...config.sellasist, konto: "firma", apiKey: "tajny", statusyZebrane: [5, 7] } } as Config;
+  const c = { ...config, sellasist: { ...config.sellasist, konto: "firma", apiKey: "tajny", statusyZebrane: [5, 7],
+    statusyPomylka: [30] } } as Config;
   assert.equal(wartoscObowiazujaca("SELLASIST_KONTO", c), "firma");
   assert.equal(wartoscObowiazujaca("SELLASIST_STATUSY_ZEBRANE", c), "5,7");
+  assert.equal(wartoscObowiazujaca("SELLASIST_STATUSY_POMYLKA", c), "30");
   assert.equal(wartoscObowiazujaca("SELLASIST_API_KEY", c), null);
 });

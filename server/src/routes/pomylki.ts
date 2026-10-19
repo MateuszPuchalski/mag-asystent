@@ -6,6 +6,9 @@ import {
   listaPomylek, podsumowanieMiesiaca, pozycjeDoWyboru, wznowPomylke, zakonczPomylke, zmienPomylke,
   type NowaPomylka, type ZmianaPomylki,
 } from "../services/pomylki.js";
+import { sellasistWlaczony } from "../adapters/sellasist.http.js";
+import { config } from "../config.js";
+import { zlapanePomylki } from "../services/sellasist-sync.js";
 import { ROLE_BIUROWE } from "../services/users.js";
 
 /* ── Pomyłki wysyłkowe: trasy zakładki ───────────────────────────────────────
@@ -58,6 +61,13 @@ export async function pomylkiRoutes(app: FastifyInstance) {
     } catch (e) {
       return blad(reply, e);
     }
+  });
+
+  /* Pomyłki złapane przy pakowaniu, z Sellasist. Liczba na dobę bez osób,
+     więc widzi ją całe biuro, nie tylko admin. Czysty odczyt lustra. */
+  app.get("/api/pomylki/zlapane", async (_req, reply) => {
+    const nie = odmowa(reply); if (nie) return nie;
+    return zlapanePomylki(db(), sellasistWlaczony() && config.sellasist.statusyPomylka.length > 0);
   });
 
   app.get("/api/pomylki/licznik", async (_req, reply) => {

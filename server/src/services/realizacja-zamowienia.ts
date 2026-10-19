@@ -1,5 +1,6 @@
 import { db as defaultDb, type Db } from "../db/db.js";
 import type { SubiektAdapter } from "../adapters/subiekt.js";
+import { config } from "../config.js";
 import { dataLokalna } from "../czas.js";
 import { dokumentySprzedazyZamowienia, type DokumentZamowienia } from "./faktury.js";
 import { kartotekaOferty } from "./dopasowanie-sku.js";
@@ -169,19 +170,30 @@ export function ocenRealizacji(s: StanRealizacji, teraz: Date): OcenaRealizacji 
 /**
  * Oryginał zamówienia z lustra Sellasist. Kopia (dosyłka) odpada: pytanie
  * „czy wyjdzie dziś" dotyczy zamówienia klienta, a nie drugiej paczki.
+ *
+ * STATUS POMYŁKI TO NIE BRAK DLA KLIENTA. Pakowanie złapało pomyłkę
+ * zbierania i towar właśnie się donosi (fakt właściciela). Braki z tej
+ * chwili zdjęłyby obietnicę paczce, która wyjdzie za kwadrans, a nazwa
+ * statusu („Brak podczas pakowania") w szkicu brzmiałaby jak brak towaru.
  */
-function realizacjaSellasist(database: Db, externalId: string): RealizacjaSellasist | null {
-  const z = database.prepare(`SELECT id, status_nazwa, spakowano_at FROM sellasist_zamowienie
+export function realizacjaSellasist(
+  database: Db, externalId: string, statusyPomylka: readonly number[] = config.sellasist.statusyPomylka,
+): RealizacjaSellasist | null {
+  const z = database.prepare(`SELECT id, status_id, status_nazwa, spakowano_at FROM sellasist_zamowienie
       WHERE external_id = ? AND skopiowane_z IS NULL ORDER BY id LIMIT 1`).get(externalId) as
     Record<string, unknown> | undefined;
   if (!z) return null;
+  const etykietaAt = z.spakowano_at == null ? null : String(z.spakowano_at);
+  if (z.status_id != null && statusyPomylka.includes(Number(z.status_id))) {
+    return { status: null, etykietaAt, braki: [] };
+  }
   const braki = (database.prepare(`SELECT nazwa, symbol, ilosc, brakuje FROM sellasist_pozycja
       WHERE zamowienie_id = ? AND brakuje > 0 ORDER BY koszyk_id`).all(Number(z.id)) as Array<Record<string, unknown>>)
     .map((p) => ({ nazwa: String(p.nazwa ?? p.symbol ?? "pozycja"), potrzeba: Number(p.ilosc),
       jest: Math.max(0, Number(p.ilosc) - Number(p.brakuje)) }));
   return {
     status: z.status_nazwa == null ? null : String(z.status_nazwa),
-    etykietaAt: z.spakowano_at == null ? null : String(z.spakowano_at),
+    etykietaAt,
     braki,
   };
 }

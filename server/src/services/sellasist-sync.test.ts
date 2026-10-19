@@ -37,7 +37,7 @@ before(async () => {
 beforeEach(() => {
   const d = db();
   for (const t of ["sellasist_pozycja", "sellasist_przesylka", "sellasist_zamowienie", "sellasist_do_pobrania",
-    "sellasist_sync_state", "zbiorka", "sgt_towar", "events"]) d.exec(`DELETE FROM ${t}`);
+    "sellasist_sync_state", "sellasist_pomylka_zlapana", "zbiorka", "sgt_towar", "events"]) d.exec(`DELETE FROM ${t}`);
   d.prepare("INSERT INTO sgt_towar(tw_id, symbol, nazwa, ean) VALUES (?,?,?,?)").run(11, "NOZ-01", "Nóż", "5901");
 });
 
@@ -69,8 +69,8 @@ function atrapa(odpowiedzi: Record<string, Odp>) {
   return { query, wolania };
 }
 
-const przebieg = (query: (s: string) => Promise<unknown>, statusyZebrane: number[] = []) =>
-  S.synchronizujSellasist(db(), { query, teraz: () => TERAZ, statusyZebrane });
+const przebieg = (query: (s: string) => Promise<unknown>, statusyZebrane: number[] = [], statusyPomylka: number[] = []) =>
+  S.synchronizujSellasist(db(), { query, teraz: () => TERAZ, statusyZebrane, statusyPomylka });
 
 test("pierwszy przebieg: dziennik dwa dni wstecz, szczegół do lustra bez adresów", async () => {
   const a = atrapa({
@@ -283,4 +283,50 @@ test("etykieta z nowego serwisu wysyłek (ordershipment_id 0): bez pytania o pus
   assert.equal(z.spakowano_at, TERAZ.toISOString());
   const prz = db().prepare("SELECT przewoznik, utworzono_at FROM sellasist_przesylka WHERE zamowienie_id = 210").get();
   assert.deepEqual({ ...prz }, { przewoznik: "ALLEGRO", utworzono_at: null });
+});
+
+/* ── Pomyłki złapane przy pakowaniu ─────────────────────────────────────── */
+
+test("wejście w status pomyłki liczy się raz na wpis dziennika — drugie wejście to druga pomyłka", async () => {
+  const wpisy = [
+    { id: 20, order_id: 800, operation_tag: "order_status_change", object_id: 30, date: "2026-10-13 09:00:00" },
+    { id: 21, order_id: 800, operation_tag: "order_status_change", object_id: 13, date: "2026-10-13 09:05:00" },
+    { id: 22, order_id: 800, operation_tag: "order_status_change", object_id: 30, date: "2026-10-13 09:20:00" },
+    { id: 23, order_id: 801, operation_tag: "order_edit", object_id: 30, date: "2026-10-13 09:30:00" },
+  ];
+  await przebieg(atrapa({ "/orders_logs": wpisy, "/orders/800": zamowienie(800), "/orders/801": zamowienie(801) }).query,
+    [], [30]);
+  /* Ten sam dziennik drugi raz (kursor cofnięty) niczego nie dubluje. */
+  db().exec("DELETE FROM sellasist_sync_state");
+  await przebieg(atrapa({ "/orders_logs": wpisy, "/orders/800": zamowienie(800), "/orders/801": zamowienie(801) }).query,
+    [], [30]);
+  const w = db().prepare("SELECT log_id, zamowienie_id, at FROM sellasist_pomylka_zlapana ORDER BY log_id").all();
+  assert.deepEqual(w.map((r) => ({ ...r })), [
+    { log_id: 20, zamowienie_id: 800, at: "2026-10-13T07:00:00.000Z" },
+    { log_id: 22, zamowienie_id: 800, at: "2026-10-13T07:20:00.000Z" },
+  ], "edycja zamówienia z tym samym numerem obiektu to nie zmiana statusu");
+});
+
+test("bez ustawionego statusu pomyłki nic się nie liczy", async () => {
+  await przebieg(atrapa({ "/orders_logs": [{ id: 20, order_id: 800, operation_tag: "order_status_change",
+    object_id: 30, date: "2026-10-13 09:00:00" }], "/orders/800": zamowienie(800) }).query);
+  assert.equal(db().prepare("SELECT COUNT(*) AS n FROM sellasist_pomylka_zlapana").get()!.n, 0);
+});
+
+test("złapane na dobę: wyłączone i przed pierwszym przebiegiem puste, potem doby od startu lustra", () => {
+  assert.deepEqual(S.zlapanePomylki(db(), false, TERAZ), { wlaczone: false, dni: [], razem: 0 });
+  assert.deepEqual(S.zlapanePomylki(db(), true, TERAZ), { wlaczone: true, dni: [], razem: 0 },
+    "przed pierwszym udanym przebiegiem nie ma dób — brak danych to nie zero");
+  db().prepare("INSERT INTO sellasist_sync_state(id, pierwszy_sukces_at) VALUES (1, '2026-10-11T10:00:00.000Z')").run();
+  const ins = db().prepare("INSERT INTO sellasist_pomylka_zlapana(log_id, zamowienie_id, at) VALUES (?,?,?)");
+  ins.run(1, 1, "2026-10-11T08:00:00.000Z");
+  ins.run(2, 2, "2026-10-13T07:00:00.000Z");
+  ins.run(3, 3, "2026-10-13T08:00:00.000Z");
+  /* 12 października 22:30 UTC to już 13 października w magazynie. */
+  ins.run(4, 4, "2026-10-12T22:30:00.000Z");
+  const z = S.zlapanePomylki(db(), true, TERAZ);
+  assert.deepEqual(z.dni, [
+    { data: "2026-10-11", zlapanych: 1 }, { data: "2026-10-12", zlapanych: 0 }, { data: "2026-10-13", zlapanych: 3 },
+  ]);
+  assert.equal(z.razem, 4);
 });

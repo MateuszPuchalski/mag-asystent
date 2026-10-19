@@ -17,6 +17,7 @@ sama zasada co przy Allegro, opisana w `docs/sellasist/README.md`.
 | liczba spakowanych paczek | pierwsza etykieta zamówienia | Analiza → Strefa złota |
 | „czy wyjdzie dziś" | status, braki i etykieta | fakt w szkicu Copilota |
 | notatka do zamówienia | agent na profilu klienta | Sellasist, przy zamówieniu |
+| pomyłki złapane przy pakowaniu | wejście w status z `SELLASIST_STATUSY_POMYLKA` | zakładka „Pomyłki” |
 
 Notatka to jedyny zapis do Sellasist. Status, koszyk i etykiety zostają
 w rękach magazynu, a automat ich nie dotyka.
@@ -81,6 +82,13 @@ Ticker chodzi co cztery minuty, więc doba wychodzi dobrze.
 
 **Pola liczbowe przychodzą tekstem**: `id`, `status.id`, `quantity`,
 `object_id`. Mapowanie czyta je przez liczbę, więc kształt mu nie szkodzi.
+
+**Pomyłka zbierania złapana przy pakowaniu.** Status 30 „Brak podczas
+pakowania" to według właściciela zwykle pomyłka zbierania, naprawiana
+doniesieniem towaru przed wysyłką. Klient dostaje pełną paczkę, więc ten
+status nie zakłada sprawy klienta i nie trafia do szkicu jako brak. Każde
+wejście w niego liczy się w zakładce „Pomyłki" jako pomyłka złapana
+(`SELLASIST_STATUSY_POMYLKA=30`). Liczba idzie na dobę, bez osób.
 
 **Statusy „zebrane" u tej firmy** to warianty „do pakowania" oraz „Regał
 Braki/Można pakować": `13,41,43,47,68,71`. „Do ponownej kompletacji" (44, 51)

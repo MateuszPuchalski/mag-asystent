@@ -163,3 +163,13 @@ test("zestawienie win na osobę widzi tylko admin; biuro dostaje pustą listę o
   assert.deepEqual(dlaAdmina.podsumowanie.osoby,
     [{ userId: marek.userId, nazwa: "Marek", zbieral: 0, pakowal: 1, winny: 1 }]);
 });
+
+test("złapane przy pakowaniu: bramka biura, a bez Sellasist pusta odpowiedź bez zer", async () => {
+  assert.equal((await app.inject({ method: "GET", url: "/api/pomylki/zlapane" })).statusCode, 401);
+  const hala = login("magazynier", "Hala Z");
+  assert.equal((await app.inject({ method: "GET", url: "/api/pomylki/zlapane", headers: hala.naglowki })).statusCode, 403);
+  const biuro = login("biuro", "Ola Z");
+  const r = await app.inject({ method: "GET", url: "/api/pomylki/zlapane", headers: biuro.naglowki });
+  assert.equal(r.statusCode, 200);
+  assert.deepEqual(r.json(), { wlaczone: false, dni: [], razem: 0 });
+});

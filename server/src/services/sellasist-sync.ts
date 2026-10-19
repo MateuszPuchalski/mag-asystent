@@ -44,6 +44,7 @@ export interface SellasistDeps {
   query?: ZapytanieSellasist;
   teraz?: () => Date;
   statusyZebrane?: readonly number[];
+  statusyPomylka?: readonly number[];
 }
 
 type Wiersz = Record<string, unknown>;
@@ -172,9 +173,14 @@ function stanSync(database: DatabaseSync): Wiersz {
  * Dziennik od kursora do kolejki. Kursor stoi na (dacie, numerze) ostatniego
  * wpisu: `date_from` łapie też wpisy z tej samej sekundy, więc numer odsiewa
  * te, które już były. Strona niepełna kończy dziennik na ten przebieg.
+ *
+ * Wejście w status z `SELLASIST_STATUSY_POMYLKA` to pomyłka zbierania
+ * złapana przy pakowaniu. Liczy się każde wejście, także drugie w tym samym
+ * zamówieniu: to druga pomyłka, a nie powtórka. Kluczem jest numer wpisu.
  */
 async function czytajDziennik(
-  database: DatabaseSync, query: ZapytanieSellasist, statusyZebrane: readonly number[], teraz: Date,
+  database: DatabaseSync, query: ZapytanieSellasist, statusyZebrane: readonly number[],
+  statusyPomylka: readonly number[], teraz: Date,
 ): Promise<number> {
   const s = stanSync(database);
   const kursorAt = tekst(s.kursor_at) ?? new Date(teraz.getTime() - START_WSTECZ_MS).toISOString();
@@ -187,6 +193,8 @@ async function czytajDziennik(
       const kolejka = database.prepare(`INSERT INTO sellasist_do_pobrania(zamowienie_id, od, zebrano_at)
           VALUES (?,?,?) ON CONFLICT(zamowienie_id) DO UPDATE SET
           zebrano_at = COALESCE(sellasist_do_pobrania.zebrano_at, excluded.zebrano_at)`);
+      const pomylka = database.prepare(`INSERT OR IGNORE INTO sellasist_pomylka_zlapana(log_id, zamowienie_id, at)
+          VALUES (?,?,?)`);
       for (const w of wpisy) {
         const at = w.at ?? kursor.at;
         if (at === kursor.at && w.id <= kursor.id) continue;
@@ -196,6 +204,9 @@ async function czytajDziennik(
         if (chwilaUtc(at) < chwilaUtc(kursor.at)) continue;
         const zebrane = w.tag === "order_status_change" && w.obiekt !== null && statusyZebrane.includes(w.obiekt);
         kolejka.run(w.zamowienieId, teraz.toISOString(), zebrane ? at : null);
+        if (w.tag === "order_status_change" && w.obiekt !== null && statusyPomylka.includes(w.obiekt)) {
+          pomylka.run(w.id, w.zamowienieId, at);
+        }
         kursor = { at, id: w.id };
         zmian++;
       }
@@ -218,10 +229,11 @@ export async function synchronizujSellasist(
   const query = deps.query ?? zapytajSellasist;
   const teraz = (deps.teraz ?? (() => new Date()))();
   const statusyZebrane = deps.statusyZebrane ?? config.sellasist.statusyZebrane;
+  const statusyPomylka = deps.statusyPomylka ?? config.sellasist.statusyPomylka;
   stanSync(database);
   database.prepare("UPDATE sellasist_sync_state SET last_attempt_at = ? WHERE id = 1").run(teraz.toISOString());
   try {
-    const zmian = await czytajDziennik(database, query, statusyZebrane, teraz);
+    const zmian = await czytajDziennik(database, query, statusyZebrane, statusyPomylka, teraz);
     let pobranych = 0;
     const kolejka = database.prepare(`SELECT zamowienie_id, zebrano_at FROM sellasist_do_pobrania
         ORDER BY od, zamowienie_id LIMIT ?`).all(NA_PRZEBIEG) as Wiersz[];
@@ -319,4 +331,40 @@ export function stanSellasist(database: DatabaseSync, wlaczony: boolean, teraz =
     wKolejce: Number((database.prepare("SELECT COUNT(*) AS n FROM sellasist_do_pobrania").get() as Wiersz).n),
     dni: [...licznik.values()],
   };
+}
+
+/* ── Pomyłki złapane przy pakowaniu ─────────────────────────────────────── */
+
+/** Ile ostatnich dób pokazuje zakładka „Pomyłki". Dwa tygodnie to dwa cykle pracy. */
+export const DNI_ZLAPANYCH = 14;
+
+export interface ZlapanePomylki {
+  /** `false`: Sellasist wyłączony albo status pomyłki nieustawiony. */
+  wlaczone: boolean;
+  /**
+   * Doby magazynu od najstarszej, tylko od pierwszego udanego przebiegu.
+   * Pusta lista znaczy „brak danych", nie zero — ta sama zasada co w Strefie.
+   */
+  dni: Array<{ data: string; zlapanych: number }>;
+  razem: number;
+}
+
+/** Pomyłki złapane przy pakowaniu na dobę — CZYSTY ODCZYT, bez pytania Sellasist. */
+export function zlapanePomylki(database: DatabaseSync, wlaczone: boolean, teraz = new Date()): ZlapanePomylki {
+  if (!wlaczone) return { wlaczone, dni: [], razem: 0 };
+  const s = database.prepare("SELECT pierwszy_sukces_at FROM sellasist_sync_state WHERE id = 1").get() as
+    Wiersz | undefined;
+  const pierwszy = tekst(s?.pierwszy_sukces_at);
+  if (pierwszy === null) return { wlaczone, dni: [], razem: 0 };
+  const dzis = dataLokalna(teraz.toISOString());
+  const doby = Array.from({ length: DNI_ZLAPANYCH }, (_, i) => dodajDni(dzis, i - (DNI_ZLAPANYCH - 1)))
+    .filter((d) => d >= dataLokalna(pierwszy));
+  const licznik = new Map(doby.map((d) => [d, 0]));
+  const od = new Date(teraz.getTime() - (DNI_ZLAPANYCH + 1) * 24 * 60 * 60_000).toISOString();
+  for (const w of database.prepare("SELECT at FROM sellasist_pomylka_zlapana WHERE at >= ?").all(od) as Wiersz[]) {
+    const d = dataLokalna(String(w.at));
+    if (licznik.has(d)) licznik.set(d, licznik.get(d)! + 1);
+  }
+  const dni = doby.map((data) => ({ data, zlapanych: licznik.get(data)! }));
+  return { wlaczone, dni, razem: dni.reduce((a, d) => a + d.zlapanych, 0) };
 }

@@ -588,6 +588,9 @@ Tabela `pomylka_wysylki` trzyma jeden wiersz na zamówienie.
   pracy), tak jak zestawienie spraw w polityce sprawy klienta.
 - **Dziennik nie dostaje loginu ani opisu.** Zdarzenia pomyłek niosą jej
   numer. Pomyłki nie wychodzą do Copilota, CSV, migawki ani raportu tygodnia.
+- **Pomyłki złapane przy pakowaniu** (z Sellasist) to sam numer wpisu,
+  zamówienie i chwila, bez pracownika. Zakładka pokazuje liczbę na dobę,
+  więc widzi ją całe biuro: liczba bez osób nie jest monitoringiem.
 - **Retencji nie ma**, jak w sprawie klienta. O archiwizacji decyduje właściciel.
   Kopia anonimizowana (`tools/anonimizuj-baze.mjs`) zamienia login i imiona.
 
