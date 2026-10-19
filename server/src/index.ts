@@ -28,6 +28,7 @@ import { dostawcyRoutes } from "./routes/dostawcy.js";
 import { kartonRoutes } from "./routes/karton.js";
 import { allegroRoutes } from "./routes/allegro.js";
 import { zadaniaTerenoweRoutes } from "./routes/zadania-terenowe.js";
+import { pomylkiRoutes } from "./routes/pomylki.js";
 import { panelObslugiRoutes, problemPaneluObslugi, wersjaPaneluObslugi }
   from "./routes/panel-obslugi.js";
 import { skrzynkaRoutes } from "./routes/skrzynka.js";
@@ -588,6 +589,7 @@ export async function buildApp(opcje: {
   await app.register(zwrotyRoutes);
   await app.register(reklamacjeRoutes);
   await app.register(dyskusjeRoutes);
+  await app.register(pomylkiRoutes);
   await app.register(tagiRoutes);
   await app.register(ustawieniaRoutes);
   await app.register(aktualizacjaRoutes);

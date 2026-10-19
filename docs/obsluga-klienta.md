@@ -536,6 +536,33 @@ Drugi przyrost S6 dokłada tabelę `klient_dosylka` z numerem przesyłki.
 - **Retencja idzie za sprawą** (kaskada). Ticker przestaje pytać po
   trzydziestu dniach, ale numeru nie kasuje, bo reklamacja dosyłki go wymaga.
 
+## Polityka danych pomyłek wysyłkowych
+
+Zakładka „Pomyłki” (`@wydanie`) zastępuje arkusz biura z pomyłkami w paczkach.
+Tabela `pomylka_wysylki` trzyma jeden wiersz na zamówienie.
+
+- **Zapisujemy** login kupującego jako klucz klienta, numer zamówienia
+  z kontem kanału, co zamówił i co dostał, krótką uwagę i datę zgłoszenia.
+  Nie ma adresu, telefonu ani nazwy odbiorcy. Uwaga to wolny tekst, więc
+  zakaz adresu jest regułą dla człowieka.
+- **Przy paragonie w miejscu loginu stoi nazwa klienta**, zwykle imię
+  i nazwisko, bo klient spoza Allegro nie ma innego klucza. Arkusz biura
+  trzymał ją tak samo. Panel prosi o najkrótszą nazwę, po której biuro
+  rozpozna klienta, bez adresu i telefonu.
+- **Nowy towar, powrót towaru i odmowę wypłaty czytamy z kolejek**: dosyłki
+  i zwrotu. Ręczny znacznik ma tylko sprzedaż poza Allegro, bo tam kolejki
+  nic nie wiedzą. Druga prawda o tym samym fakcie rozjechałaby się.
+- **Kto zbierał, kto pakował i kto zawinił to dane o NAS.** Imię i konto
+  z `app_user`, bez klucza obcego, bo ten blokowałby kasowanie kont. Przy
+  pojedynczej pomyłce widzi je całe biuro, jak w arkuszu.
+- **Zestawienie win na osobę widzi wyłącznie admin**, decyzją właściciela.
+  Dla reszty biura byłoby monitoringiem pracowniczym (art. 22² Kodeksu
+  pracy), tak jak zestawienie spraw w polityce sprawy klienta.
+- **Dziennik nie dostaje loginu ani opisu.** Zdarzenia pomyłek niosą jej
+  numer. Pomyłki nie wychodzą do Copilota, CSV, migawki ani raportu tygodnia.
+- **Retencji nie ma**, jak w sprawie klienta. O archiwizacji decyduje właściciel.
+  Kopia anonimizowana (`tools/anonimizuj-baze.mjs`) zamienia login i imiona.
+
 ## Co się nie zmienia
 
 Poza tą przebudową stoją: kosze i przyjęcia z dokumentu MM, kolektor (dotyka

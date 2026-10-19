@@ -1247,3 +1247,13 @@ test("ręczne zamknięcie zwrotu: bez sesji 401, rola magazynu 403", async () =>
     method: "POST", url: "/api/obsluga/zwroty/1/zamkniecie-reczne/cofnij", headers: naglowki });
   assert.equal(c.statusCode, 403);
 });
+
+test("zwrot na liście i w szczególe niesie konto kanału — „Zła paczka” wysyła je z numerem", async () => {
+  const { naglowki } = login("biuro", "Ala liczy konto");
+  const konto = Number((db().prepare("SELECT channel_account_id AS k FROM zwrot_klienta WHERE id=?").get(zwrot) as
+    { k: number }).k);
+  const lista = await app.inject({ method: "GET", url: "/api/obsluga/zwroty", headers: naglowki });
+  assert.equal(lista.json().zwroty[0].konto, konto);
+  const szczegol = await app.inject({ method: "GET", url: `/api/obsluga/zwroty/${zwrot}`, headers: naglowki });
+  assert.equal(szczegol.json().zwrot.konto, konto);
+});

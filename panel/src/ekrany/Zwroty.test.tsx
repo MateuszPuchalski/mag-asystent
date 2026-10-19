@@ -1314,7 +1314,7 @@ describe("Dosyłka pod odmową wypłaty", () => {
 
   it("otwarcie zwrotu z odmową i stanem dosyłki niczego nie zapisuje", async () => {
     scena.wolano = [];
-    scena.zwroty = dwaZwroty();
+    scena.zwroty = dwaZwroty().map((z) => ({ ...z, kupujacyLogin: "zielony" }));
     scena.szczegol = pieniadze(odmowa(), {
       dosylka: { opis: "Dosyłka w drodze (stan z 14:10)", login: "zielony", ton: null } });
     try {
@@ -1330,6 +1330,8 @@ describe("Dosyłka pod odmową wypłaty", () => {
       expect(within(pasek).getByRole("link", { name: /^Pytanie z .* — otwórz rozmowę/ }))
         .toHaveAttribute("href", "/obsluga/skrzynka/3");
       expect(odczyty.filter((u) => u.startsWith("/api/obsluga/droga/"))).toEqual(["/api/obsluga/droga/ord-6"]);
+      /* „Zła paczka” stoi przy drodze tego zakupu i niczego nie zapisuje, dopóki ktoś jej nie kliknie. */
+      expect(screen.getByRole("button", { name: "Zła paczka" })).toBeInTheDocument();
       expect(scena.wolano).toEqual([]);
       expect(zapisy).toEqual([]);
     } finally { sprzatnij(); }

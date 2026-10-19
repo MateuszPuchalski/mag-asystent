@@ -2,11 +2,12 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import React from "react";
-import { MemoryRouter, Route, Routes, useNavigate } from "react-router-dom";
+import { MemoryRouter, Route, Routes, useLocation, useNavigate } from "react-router-dom";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { ProfilKlienta, najnowszeZamowienie } from "./ProfilKlienta";
 import type { DosylkaSprawy, ProfilKlienta as Profil, SprawaKlienta } from "../api/spoiwo";
 import { dataLokalna } from "../ui";
+import { pomylka } from "../test/pomylki";
 
 /* ── PROFIL KLIENTA (24 września 2026) ───────────────────────────────────────
    Pilnujemy: otwarcie niczego nie zapisuje; sygnał „źle" prowadzi do sprawy;
@@ -112,6 +113,9 @@ beforeEach(() => {
       profil = { ...profil, sprawa: po };
       return new Response(JSON.stringify({ sprawa: po }));
     }
+    if (metoda === "POST" && url === "/api/pomylki") {
+      return new Response(JSON.stringify({ pomylka: pomylka({ id: 5, zgloszono: "2026-10-19" }) }), { status: 201 });
+    }
     if (metoda !== "GET") return new Response(JSON.stringify({ ok: true }));
     if (url === "/api/obsluga/droga/z-1") return new Response(JSON.stringify(DROGA));
     if (wstrzymanie) await wstrzymanie;
@@ -120,6 +124,12 @@ beforeEach(() => {
   }));
 });
 afterEach(() => { vi.unstubAllGlobals(); vi.useRealTimers(); });
+
+/* Ekran pomyłek w teście mówi tylko, dokąd przyszło przejście. */
+function Polozenie() {
+  const l = useLocation();
+  return <p>ekran pomyłek {l.search}</p>;
+}
 
 /* Przyciski przejścia poza trasą — jak pasek przeglądarki: do klienta A i wstecz. */
 function Nawigacja() {
@@ -134,7 +144,8 @@ function pokaz(login = "chrzanowski1234") {
   const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   return render(<QueryClientProvider client={qc}><MemoryRouter initialEntries={[`/obsluga/klient/${login}`]}>
     <Nawigacja />
-    <Routes><Route path="/obsluga/klient/:login" element={<ProfilKlienta />} /></Routes>
+    <Routes><Route path="/obsluga/klient/:login" element={<ProfilKlienta />} />
+      <Route path="/obsluga/pomylki" element={<Polozenie />} /></Routes>
   </MemoryRouter></QueryClientProvider>);
 }
 
@@ -173,6 +184,34 @@ describe("PROFIL KLIENTA", () => {
     await userEvent.click(z);
     expect(screen.getByText("1×")).toBeTruthy();
     expect(screen.getByRole("link", { name: /zamówienie z-1 w Allegro/ })).toBeTruthy();
+  });
+
+  it("„Zła paczka” przy zamówieniu: rozwinięcie nic nie zapisuje, klik zakłada pomyłkę i prowadzi do jej wiersza", async () => {
+    /* Konto kanału jedzie z zamówieniem: numer jest unikalny tylko na koncie. */
+    profil = { ...PROFIL, zamowienia: PROFIL.zamowienia.map((z) => (z.id === "z-1" ? { ...z, konto: 2 } : z)) };
+    pokaz();
+    await userEvent.click(await screen.findByRole("button", { name: /Nóż kosiarki HECHT 1803S/ }));
+    const przycisk = screen.getByRole("button", { name: "Zła paczka" });
+    expect(zapisy()).toEqual([]);
+    await userEvent.click(przycisk);
+    expect(await screen.findByText("ekran pomyłek ?id=5&miesiac=2026-10")).toBeTruthy();
+    expect(zapisy().map((z) => [z.metoda, z.url, JSON.parse(z.body!)])).toEqual(
+      [["POST", "/api/pomylki", { login: "Chrzanowski1234", zamowienie: "z-1", konto: 2 }]]);
+  });
+
+  it("pomyłki klienta prowadzą do swojego wiersza w rejestrze — wiązanie zwrotne", async () => {
+    profil = { ...PROFIL, pomylki: [pomylka({ id: 8, zgloszono: "2026-09-30", opis: "Dostał nóż 40 cm zamiast 46 cm" })] };
+    pokaz();
+    const sekcja = await screen.findByRole("region", { name: "Pomyłki wysyłkowe" });
+    expect(within(sekcja).getByRole("link", { name: /Dostał nóż 40 cm zamiast 46 cm/ }))
+      .toHaveAttribute("href", "/obsluga/pomylki?id=8&miesiac=2026-09");
+    expect(zapisy()).toEqual([]);
+  });
+
+  it("bez pomyłek sekcji nie ma", async () => {
+    pokaz();
+    await screen.findByText("Chrzanowski1234");
+    expect(screen.queryByRole("region", { name: "Pomyłki wysyłkowe" })).toBeNull();
   });
 
   it("notatka zapisuje się na kliknięcie, a cofnięcie idzie bez ciała", async () => {

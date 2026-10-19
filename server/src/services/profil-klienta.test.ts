@@ -29,7 +29,7 @@ beforeEach(() => {
   const d = db();
   /* `klient_prowadzenie` PRZED `app_user`: prowadzący sprawy klienta to klucz
      obcy bez kaskady. */
-  for (const t of ["klient_prowadzenie", "klient_notatka", "zamowienie_klienta_pozycja", "zamowienie_klienta", "zwrot_klienta",
+  for (const t of ["klient_prowadzenie", "pomylka_wysylki", "klient_notatka", "zamowienie_klienta_pozycja", "zamowienie_klienta", "zwrot_klienta",
     "allegro_zwrot", "reklamacja_klienta", "message", "conversation", "allegro_inbox_thread", "channel_account", "events",
     "app_user"]) d.prepare(`DELETE FROM ${t}`).run();
   konto = Number(d.prepare("INSERT INTO channel_account(channel,external_account_id) VALUES ('allegro','s')")
@@ -304,4 +304,13 @@ test("profil z dosyłką i propozycją dalej jest odczytem", async () => {
   assert.equal(p.sprawa?.dosylki.length, 1);
   assert.equal(p.propozycjaDosylki?.zamowienie, "z-2");
   assert.equal((db().prepare("SELECT total_changes() n").get() as { n: number }).n, przed);
+});
+
+test("profil niesie pomyłki wysyłkowe klienta bez wielkości liter — wiązanie zwrotne zakładki", () => {
+  zamowienie("z-1", "Chrzanowski1234", dni(10));
+  db().prepare(`INSERT INTO pomylka_wysylki(zgloszono,login,konto,zamowienie,co_dostal,zrodlo,utworzono_at,zmieniono_at)
+      VALUES ('2026-10-01','CHRZANOWSKI1234',?,'z-1','nóż 40','recznie','x','x')`).run(konto);
+  const p = P.profilKlienta("chrzanowski1234", TERAZ, db())!;
+  assert.deepEqual(p.pomylki.map((x) => [x.zamowienie, x.opis]), [["z-1", "Dostał nóż 40"]]);
+  assert.equal(p.zamowienia[0].konto, konto, "zamówienie niesie konto dla „Zła paczka”");
 });

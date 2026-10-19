@@ -23,6 +23,7 @@ import { Blad, FiltrSegmentowy, Karta, Pusto, SIATKA_TRZECH_KOLUMN } from "../ui
 import { PrzelacznikZwrotow } from "../zwroty/Przelacznik";
 import { Naglowek } from "../zwroty/Naglowek";
 import { DrogaKlienta } from "../sprawy/DrogaKlienta";
+import { ZlaPaczka } from "../pomylki/ZlaPaczka";
 import { Etapy, IKONA_KUBELKA } from "../zwroty/Etapy";
 import { KUBELKI, Kolejka } from "../zwroty/Kolejka";
 import { Dowody } from "../zwroty/Dowody";
@@ -1281,9 +1282,13 @@ export function Zwroty() {
             {/* Droga klienta pod nagłówkiem: gdzie ten zakup jest i jakie inne
                 sprawy już miał. Ten zwrot stoi na niej jako „tu jesteś”, nie
                 jako łącze do siebie. Poza `Naglowek`, bo jego testy nie mają
-                klienta zapytań, a pasek pyta serwer. */}
-            <div className="shrink-0 border-b border-slate-200 bg-wertis-paper px-4 py-3 empty:hidden">
+                klienta zapytań, a pasek pyta serwer.
+                „Zła paczka" stoi przy drodze, bo dotyczy tego samego zakupu:
+                zły towar w zwrocie zakłada pomyłkę z tym zamówieniem. */}
+            <div className="flex shrink-0 items-start gap-3 border-b border-slate-200 bg-wertis-paper px-4 py-3 empty:hidden">
               <DrogaKlienta plaska orderId={zwrot.orderId} biezaca={{ rodzaj: "zwrot", id: zwrot.id }} />
+              <ZlaPaczka className="ml-auto shrink-0" login={zwrot.kupujacyLogin} zamowienie={zwrot.orderId}
+                konto={zwrot.konto} />
             </div>
             {/* Oś etapów (0.453.0): gdzie jest sprawa i co jeszcze przed nią —
                 zamiast zdań rozsianych po sekcjach. */}

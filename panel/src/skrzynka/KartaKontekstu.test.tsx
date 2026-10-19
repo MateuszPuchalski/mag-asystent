@@ -283,6 +283,8 @@ describe("KartaKontekstu", () => {
 
   it("niczego nie zapisuje i nie pyta serwera o przesyłkę", () => {
     pokaz(dane(), historia());
+    /* „Zła paczka” stoi przy numerze zamówienia, a sama obecność nic nie wysyła. */
+    expect(screen.getByRole("button", { name: "Zła paczka" })).toBeInTheDocument();
     expect(zapisy.filter((z) => !z.startsWith("GET "))).toEqual([]);
     expect(zapisy.some((z) => /przesylk/i.test(z))).toBe(false);
   });

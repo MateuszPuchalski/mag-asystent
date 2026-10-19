@@ -11,6 +11,7 @@ import { ODNOSNIK } from "./odnosniki";
 import { stanZakupu } from "./zakup";
 import { Anulowanie } from "./Anulowanie";
 import { DrogaKlienta } from "../sprawy/DrogaKlienta";
+import { ZlaPaczka } from "../pomylki/ZlaPaczka";
 
 /* ── KARTA ZAKUPU I KLIENTA NAD ROZMOWĄ ─────────────────────────────────────
    Zgłoszenie właściciela: „więcej informacji osadzonych w rozmowie w środkowym
@@ -244,9 +245,13 @@ export function KartaKontekstu({ dane, historia }: { dane: OsRozmowy; historia?:
         zamówienia nie jest pobrana albo zamówienie anulowano: pasek pyta serwer
         po numerze, a anulowany zakup też może mieć sprawę, której nigdzie
         indziej już nie widać. */}
-    {numer && <div className="border-t border-slate-100 pt-2">
+    {/* „Zła paczka" obok drogi tego zakupu: klient pisze o złym towarze
+        i agent zakłada pomyłkę z tym zamówieniem, bez przepisywania numeru. */}
+    {numer && <div className="flex items-start gap-3 border-t border-slate-100 pt-2">
       <DrogaKlienta plaska bezNumerow orderId={numer}
-        biezaca={{ rodzaj: "rozmowa", id: dane.rozmowa.id }} /></div>}
+        biezaca={{ rodzaj: "rozmowa", id: dane.rozmowa.id }} />
+      <ZlaPaczka className="ml-auto shrink-0" login={login ?? dane.rozmowa.klient} zamowienie={numer}
+        konto={dane.zamowienie?.konto} /></div>}
     {klient && <div className="border-t border-slate-100 pt-2">{klient}</div>}
   </section>{pasek}</>;
 }
