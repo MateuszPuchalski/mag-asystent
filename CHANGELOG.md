@@ -10,6 +10,13 @@ z wersją monorepo" — i właśnie tak przestał być zgodny: `0.3.0` przetrwa�
 sześć zmergowanych zmian, w tym takie, które wymagały nowego uprawnienia SQL.
 Komentarz nie jest mechanizmem.
 
+## 0.590.0 — 19 października 2026
+
+**Towary bez zdjęcia według stanu.** Zakładka „Zdjęcia" pokazuje przy każdym
+towarze stan ze wszystkich magazynów i domyślnie układa listę od największego.
+Kolejność da się zmienić na symbol, nazwę albo najnowsze kartoteki, a „Tylko na
+stanie" chowa towary, których nie ma czym sfotografować.
+
 ## 0.589.0 — 19 października 2026
 
 **Copilot sam sprawdza kartotekę, gdy pisze szkic odpowiedzi.** Klient pyta

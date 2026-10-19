@@ -157,11 +157,56 @@ test("osobna tabela zdjęć: brak to NOT EXISTS po kluczu obcym", () => {
   });
   assert.match(strona, /NOT EXISTS \(SELECT 1 FROM tw_ZdjecieTw z WITH \(NOLOCK\) WHERE z\.zd_IdTowar = t\.tw_Id\)/);
   assert.match(strona, /t\.tw_Zablokowany = 0/);
-  /* Porządek domyka tw_Id: symbol nie jest unikalny, a stronicowanie bez
-     pełnego porządku gubi i dubluje wiersze między stronami. */
-  assert.match(strona, /ORDER BY t\.tw_Symbol, t\.tw_Id OFFSET @offset ROWS FETCH NEXT @limit ROWS ONLY$/);
+  /* Domyślnie stan malejąco. Porządek domyka tw_Id: symbol nie jest unikalny,
+     a stronicowanie bez pełnego porządku gubi i dubluje wiersze między stronami. */
+  assert.ok(
+    strona.endsWith("ORDER BY ISNULL(s.stan, 0) DESC, t.tw_Symbol, t.tw_Id OFFSET @offset ROWS FETCH NEXT @limit ROWS ONLY"),
+    strona
+  );
   assert.match(razem, /^SELECT COUNT\(\*\) AS razem FROM tw__Towar t/);
   assert.doesNotMatch(strona, /@q/);
+});
+
+/* Złączenie wprost z tw_Stan mnożyłoby wiersze towaru przez liczbę magazynów
+   i ten sam towar stałby na liście kilka razy. */
+test("stan to suma po magazynach z podzapytania, a licznik go nie złącza", () => {
+  const { strona, razem } = budujZapytanieBezZdjecia({
+    tabela: "tw_ZdjecieTw", kolumna: "zd_Zdjecie", klucz: "zd_IdTowar", zFiltrem: false,
+  });
+  assert.ok(strona.includes("ISNULL(s.stan, 0) AS stan"), strona);
+  assert.ok(
+    strona.includes("LEFT JOIN (SELECT st_TowId, SUM(st_Stan) AS stan FROM tw_Stan WITH (NOLOCK) GROUP BY st_TowId) s"),
+    strona
+  );
+  assert.ok(!razem.includes("tw_Stan"), razem);
+});
+
+test("każde sortowanie ma stały porządek domknięty tw_Id", () => {
+  const oczekiwane = {
+    stan: "ISNULL(s.stan, 0) DESC, t.tw_Symbol, t.tw_Id",
+    symbol: "t.tw_Symbol, t.tw_Id",
+    nazwa: "t.tw_Nazwa, t.tw_Id",
+    najnowsze: "t.tw_Id DESC",
+  } as const;
+  for (const [sortuj, porzadek] of Object.entries(oczekiwane)) {
+    const { strona } = budujZapytanieBezZdjecia({
+      tabela: "tw_ZdjecieTw", kolumna: "zd_Zdjecie", klucz: "zd_IdTowar", zFiltrem: false,
+      sortuj: sortuj as keyof typeof oczekiwane,
+    });
+    assert.ok(strona.includes(`ORDER BY ${porzadek} OFFSET`), strona);
+  }
+});
+
+test("filtr „na stanie” zawęża stronę i licznik tak samo", () => {
+  const z = budujZapytanieBezZdjecia({
+    tabela: "tw_ZdjecieTw", kolumna: "zd_Zdjecie", klucz: "zd_IdTowar", zFiltrem: false, naStanie: true,
+  });
+  const warunek = "EXISTS (SELECT 1 FROM tw_Stan st WITH (NOLOCK) WHERE st.st_TowId = t.tw_Id AND st.st_Stan > 0)";
+  assert.ok(z.strona.includes(warunek) && z.razem.includes(warunek));
+  const bez = budujZapytanieBezZdjecia({
+    tabela: "tw_ZdjecieTw", kolumna: "zd_Zdjecie", klucz: "zd_IdTowar", zFiltrem: false,
+  });
+  assert.ok(!bez.razem.includes("st_Stan > 0"));
 });
 
 test("zdjęcie w samej kartotece: brak to pusta kolumna", () => {

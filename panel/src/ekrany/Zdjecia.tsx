@@ -1,6 +1,8 @@
 import React, { useEffect, useState } from "react";
 import { ImageOff, ImagePlus } from "lucide-react";
-import { NA_STRONIE, useBezZdjecia, type PozycjaBezZdjecia, type ZapisanieZdjecia } from "../api/zdjecia";
+import {
+  NA_STRONIE, useBezZdjecia, type PozycjaBezZdjecia, type SortBezZdjecia, type ZapisanieZdjecia,
+} from "../api/zdjecia";
 import { Blad, EtykietaWartosci, Karta, Pole, Przycisk, Pusto, WierszKolejki, ile } from "../ui";
 import { Edytor } from "../zdjecia/Edytor";
 
@@ -17,6 +19,15 @@ import { Edytor } from "../zdjecia/Edytor";
    Zatwierdzone w tej wizycie pamiętamy u siebie. Lista z serwera dochodzi
    chwilę później, a do tego czasu wiersz już ma być w kolejce. */
 
+const SORTOWANIA: Array<{ wartosc: SortBezZdjecia; etykieta: string }> = [
+  { wartosc: "stan", etykieta: "Największy stan" },
+  { wartosc: "symbol", etykieta: "Symbol" },
+  { wartosc: "nazwa", etykieta: "Nazwa" },
+  { wartosc: "najnowsze", etykieta: "Najnowsze kartoteki" },
+];
+
+const LICZBA = new Intl.NumberFormat("pl-PL", { maximumFractionDigits: 3 });
+
 /** Następny towar do zrobienia: pierwszy wolny za bieżącym, potem od góry listy. */
 export function nastepnyWolny(lista: PozycjaBezZdjecia[], biezacy: number, zrobione: ReadonlySet<number>):
   PozycjaBezZdjecia | null {
@@ -31,7 +42,10 @@ function Wiersz({ p, wybrany, wKolejce, onWybierz }: {
   const tresc = <>
     <span className="flex items-baseline justify-between gap-2">
       <span className="truncate font-mono text-sm text-slate-800">{p.symbol}</span>
-      {wKolejce && <EtykietaWartosci className="shrink-0">w kolejce</EtykietaWartosci>}
+      {wKolejce ? <EtykietaWartosci className="shrink-0">w kolejce</EtykietaWartosci>
+        /* Stan przy symbolu: przy sortowaniu po stanie to on tłumaczy kolejność. */
+        : <span className={`shrink-0 text-sm tabular-nums ${p.stan > 0 ? "text-slate-700" : "text-slate-500"}`}>
+            stan {LICZBA.format(p.stan)}</span>}
     </span>
     <span className={`line-clamp-2 text-sm ${wKolejce ? "text-slate-500" : "text-slate-900"}`}>{p.nazwa}</span>
     {p.ean && <span className="font-mono text-podpis text-slate-500">{p.ean}</span>}
@@ -50,11 +64,13 @@ export function Zdjecia() {
   /* Szukanie liczy serwer — ćwierć sekundy przerwy, jak w koszach i dostawach. */
   const [q, setQ] = useState("");
   const [offset, setOffset] = useState(0);
+  const [sortuj, setSortuj] = useState<SortBezZdjecia>("stan");
+  const [naStanie, setNaStanie] = useState(false);
   useEffect(() => {
     const t = setTimeout(() => { setQ(fraza.trim()); setOffset(0); }, 250);
     return () => clearTimeout(t);
   }, [fraza]);
-  const lista = useBezZdjecia(q, offset);
+  const lista = useBezZdjecia(q, offset, sortuj, naStanie);
   const [wybrany, setWybrany] = useState<PozycjaBezZdjecia | null>(null);
   const [zrobione, setZrobione] = useState<ReadonlySet<number>>(() => new Set());
   const [ostatni, setOstatni] = useState("");
@@ -94,7 +110,8 @@ export function Zdjecia() {
   const lewa = lista.isLoading ? <Pusto waga="lista">Wczytuję towary bez zdjęcia…</Pusto>
     /* Błąd bez danych zamiast „wszystko ma zdjęcie” — awaria to nie koniec pracy. */
     : lista.error && !lista.data ? bladListy
-    : pozycje.length === 0 ? <Pusto waga="lista">{q ? "Nic nie pasuje do szukania." : "Każdy towar ma zdjęcie."}</Pusto>
+    : pozycje.length === 0 ? <Pusto waga="lista">{q ? "Nic nie pasuje do szukania."
+        : naStanie ? "Każdy towar na stanie ma zdjęcie." : "Każdy towar ma zdjęcie."}</Pusto>
     : <ul className="divide-y divide-slate-100">
         {pozycje.map((p) => <Wiersz key={p.twId} p={p} wybrany={wybrany?.twId === p.twId}
           wKolejce={p.oczekuje || zrobione.has(p.twId)}
@@ -107,6 +124,21 @@ export function Zdjecia() {
         <div className="shrink-0 p-2">
           <Pole value={fraza} onChange={(e) => setFraza(e.target.value)}
             placeholder="Symbol, nazwa albo EAN" aria-label="Szukaj towaru bez zdjęcia" />
+          {/* Zmiana porządku albo filtra wraca na pierwszą stronę: dalsza strona
+              innego porządku to przypadkowy wycinek listy. */}
+          <div className="mt-2 flex items-center gap-3">
+            <label className="flex min-w-0 flex-1 items-center gap-2 text-sm text-slate-700">Kolejność
+              <select className="field min-w-0 flex-1" value={sortuj}
+                onChange={(e) => { setSortuj(e.target.value as SortBezZdjecia); setOffset(0); }}>
+                {SORTOWANIA.map((s) => <option key={s.wartosc} value={s.wartosc}>{s.etykieta}</option>)}
+              </select>
+            </label>
+            <label className="flex shrink-0 items-center gap-1.5 text-sm text-slate-700">
+              <input type="checkbox" checked={naStanie}
+                onChange={(e) => { setNaStanie(e.target.checked); setOffset(0); }} />
+              Tylko na stanie
+            </label>
+          </div>
         </div>
         <div className="shrink-0 border-y border-slate-200 bg-slate-50 px-3 py-1">
           <span className="text-xs font-semibold text-slate-600">
