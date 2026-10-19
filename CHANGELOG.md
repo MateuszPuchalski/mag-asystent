@@ -10,6 +10,12 @@ z wersją monorepo" — i właśnie tak przestał być zgodny: `0.3.0` przetrwa�
 sześć zmergowanych zmian, w tym takie, które wymagały nowego uprawnienia SQL.
 Komentarz nie jest mechanizmem.
 
+## 0.592.1 — 19 października 2026
+
+Lustro Sellasist nie pyta o listę przewozową, gdy etykieta idzie przez nowy
+serwis wysyłek: tam ta lista jest zawsze pusta. Wyniki sondy z 19 października
+stoją w `docs/sellasist.md`.
+
 ## 0.592.0 — 19 października 2026
 
 **Numer dosyłki sam z Sellasist.** Etykieta dosyłki wydrukowana w Sellasist
