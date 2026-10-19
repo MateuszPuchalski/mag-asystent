@@ -3168,7 +3168,7 @@ i `outbox.created_by` wskazujący konto automatu. Kolumna
 `decyzja_klasyfikacji.tryb` zostaje przy jednej wartości, bo przebudowa
 tabeli nie dodałaby do tego śladu nic.
 
-### 14.6g. Szkic sam szuka w kartotece (@wydanie)
+### 14.6g. Szkic sam szuka w kartotece (0.589.0)
 
 Decyzja właściciela z 19 października 2026. Fakty szkicu znały dotąd jeden
 towar: ten z oferty rozmowy. Klient pyta jednak często numerem OEM, nazwą
