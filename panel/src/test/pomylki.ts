@@ -1,4 +1,4 @@
-import type { OdpowiedzPomylek, Pomylka } from "../api/pomylki";
+import type { OdpowiedzPomylek, Pomylka, ZlapanePomylki } from "../api/pomylki";
 
 /* Wspólne dane testów rejestru pomyłek: ekranu, zera zapisu i wiązań. */
 
@@ -23,9 +23,20 @@ export const lista = (pomylki: Pomylka[], osoby: OdpowiedzPomylek["podsumowanie"
   podsumowanie: { miesiac: "2026-10", razem: pomylki.length, osoby },
 });
 
+/** Złapane przy pakowaniu: domyślnie trzy doby z Sellasist, w tym jedna czysta, i jedna pomyłka do klienta. */
+export const zlapane = (n: Partial<ZlapanePomylki> = {}): ZlapanePomylki => {
+  const dni = n.dni ?? [
+    { data: "2026-10-17", zlapanych: 2 }, { data: "2026-10-18", zlapanych: 0 }, { data: "2026-10-19", zlapanych: 3 },
+  ];
+  const puste = dni.length === 0;
+  return { wlaczone: true, dni, razem: puste ? null : dni.reduce((s, d) => s + d.zlapanych, 0),
+    doKlienta: puste ? null : 1, ...n };
+};
+
 /** Odczyty ekranu pomyłek dla `atrapaZapisow`; nieznany adres → `undefined`. */
-export const odczytPomylek = (pomylki: Pomylka[]) => (url: string): unknown => {
+export const odczytPomylek = (pomylki: Pomylka[], zlapanePakowania: ZlapanePomylki = zlapane()) => (url: string): unknown => {
   if (url.startsWith("/api/pomylki?")) return lista(pomylki);
+  if (url === "/api/pomylki/zlapane") return zlapanePakowania;
   if (url === "/api/users") return { users: MAGAZYNIERZY };
   const poz = url.match(/^\/api\/pomylki\/(\d+)\/pozycje$/);
   if (poz) return { pozycje: [{ nazwa: "Lampa LED 12V", ilosc: 1, sku: "LMP-12" },

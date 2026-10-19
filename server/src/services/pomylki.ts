@@ -273,6 +273,13 @@ export function podsumowanieMiesiaca(miesiac: string, database: Db = defaultDb()
   };
 }
 
+/** Ile pomyłek zgłoszono od doby `od` do doby `doDnia` włącznie — obie `RRRR-MM-DD`. */
+export function zgloszonychWDobach(od: string, doDnia: string, database: Db = defaultDb()): number {
+  const w = database.prepare("SELECT count(*) AS n FROM pomylka_wysylki WHERE zgloszono BETWEEN ? AND ?")
+    .get(od, doDnia) as Wiersz;
+  return Number(w.n);
+}
+
 /** Bieżący miesiąc na zegarze magazynu, nie w UTC — pierwsza noc miesiąca to już nowy rachunek. */
 export const biezacyMiesiac = (teraz = new Date()): string => dataLokalna(teraz.toISOString()).slice(0, 7);
 

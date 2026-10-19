@@ -415,4 +415,5 @@ test("Sellasist: zła subdomena i zły numer statusu to błędy; klucz nie trafi
   assert.equal(subdomena.length, 1);
   assert.match(subdomena[0], /sama subdomena/);
   assert.match(z({ konto: "firma", apiKey: "k", statusyZebrane: [5, Number.NaN] })[0], /SELLASIST_STATUSY_ZEBRANE/);
+  assert.match(z({ konto: "firma", apiKey: "k", statusyPomylka: [0] })[0], /SELLASIST_STATUSY_POMYLKA/);
 });

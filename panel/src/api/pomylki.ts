@@ -112,6 +112,38 @@ export function useLicznikPomylek() {
   });
 }
 
+/**
+ * Pomyłki zbierania złapane przy pakowaniu — z Sellasist, nie z rejestru.
+ *
+ * Liczy wejścia zamówień w status braku przy pakowaniu na dobę magazynu.
+ * Takiej paczki klient nie dostał z błędem, więc rejestr niżej jej nie zna.
+ */
+export interface ZlapanePomylki {
+  /** `false`: Sellasist wyłączony, lustro stoi albo status pomyłki nieustawiony — ekran milczy. */
+  wlaczone: boolean;
+  /**
+   * Doby od najstarszej, najwyżej czternaście: tylko te, które lustro
+   * przeczytało całe z ustawionym statusem. Pusta lista to brak danych, nie zero.
+   */
+  dni: Array<{ data: string; zlapanych: number }>;
+  /** Suma po `dni`; `null` przy pustej liście. */
+  razem: number | null;
+  /** Pomyłki z rejestru zgłoszone w tych samych dobach; `null` przy pustej liście. */
+  doKlienta: number | null;
+}
+
+/* Pod kluczem rejestru, bo nowa pomyłka w rejestrze zmienia liczbę „do
+   klienta”. Odczyt idzie z bazy serwera, nie z Sellasist, więc odświeżenie
+   po zapisie kosztuje jedno lekkie zapytanie. Pięć minut, bo złapane
+   dochodzą przebiegami synchronizacji, nie na żywo. */
+export function useZlapanePomylki() {
+  return useQuery({
+    queryKey: [KLUCZ_POMYLEK, "zlapane"] as const,
+    queryFn: () => api<ZlapanePomylki>("/api/pomylki/zlapane"),
+    staleTime: 5 * 60_000,
+  });
+}
+
 /** Pozycje zamówienia do wyboru „co zamówił"; `null` wyłącza zapytanie. */
 export function usePozycjePomylki(id: number | null) {
   return useQuery({

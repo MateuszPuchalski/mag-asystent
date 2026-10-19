@@ -704,6 +704,13 @@ export const config = {
      */
     statusyZebrane: (process.env.SELLASIST_STATUSY_ZEBRANE ?? "")
       .split(",").map((s) => s.trim()).filter((s) => s !== "").map(Number),
+    /**
+     * Statusy, w które zamówienie wchodzi, gdy pakowanie złapie pomyłkę
+     * zbierania (u tej firmy „Brak podczas pakowania"). Każde wejście liczy
+     * się jako pomyłka złapana, zanim paczka wyszła. Pusta lista wyłącza miarę.
+     */
+    statusyPomylka: (process.env.SELLASIST_STATUSY_POMYLKA ?? "")
+      .split(",").map((s) => s.trim()).filter((s) => s !== "").map(Number),
   },
 
   /**
@@ -1306,6 +1313,9 @@ export function bledyKonfiguracji(c: Config = config): string[] {
   }
   if (s.statusyZebrane.some((n) => !Number.isInteger(n) || n <= 0)) {
     bledy.push("SELLASIST_STATUSY_ZEBRANE — oczekuję numerów statusów po przecinku, np. 5,7.");
+  }
+  if (s.statusyPomylka.some((n) => !Number.isInteger(n) || n <= 0)) {
+    bledy.push("SELLASIST_STATUSY_POMYLKA — oczekuję numerów statusów po przecinku, np. 30.");
   }
 
   /* Magazyn skutku rozstrzyga, którym trybem idzie dokument. Dwa te same id

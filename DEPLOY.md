@@ -1045,6 +1045,11 @@ sellasist:sonda`. Sonda niczego nie zmienia i odpowiada na cztery pytania:
 4. Jakie statusy ma konto. Numery statusu „zebrane" wpisz do
    `SELLASIST_STATUSY_ZEBRANE`; bez nich dniem zbiórki jest dzień etykiety.
 
+Numery statusu „Brak podczas pakowania" z tej samej listy wpisz do
+`SELLASIST_STATUSY_POMYLKA`. Zakładka „Pomyłki" policzy z nich pomyłki
+zbierania złapane przed wysyłką. Liczenie rusza od doby po wpisaniu, wstecz
+nie.
+
 Co robi integracja i czego nie robi: `docs/sellasist.md`. Pierwszy przebieg
 czyta dziennik zmian z dwóch dni, więc lustro dochodzi przez kilkadziesiąt
 minut. `SELLASIST_SYNC_MS=0` wyłącza lustro bez wyłączania reszty.
