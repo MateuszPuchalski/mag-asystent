@@ -73,6 +73,18 @@ export const SKROTY: ReadonlyArray<SekcjaSkrotow> = [
     ["m", "moje sprawy"],
     ["n", "niczyje sprawy"],
   ] },
+  /* Ekran zdjęć: praca seryjna przy biurku, ręka zostaje na klawiaturze.
+     Litery działają tylko poza polem pisania, jak wszędzie. */
+  { tytul: "Zdjęcia", sciezka: "/obsluga/zdjecia", klawisze: [
+    ["j k", "następny / poprzedni towar bez zdjęcia"],
+    ["Ctrl V", "wklej zdjęcie ze schowka"],
+    ["Enter", "usuń tło i pokaż podgląd; w podglądzie zatwierdź"],
+    ["Esc", "w podglądzie: jeszcze raz"],
+    ["L P", "obróć w lewo / w prawo"],
+    ["W", "wyrównaj kolory"],
+    ["T", "usuń tło (w podglądzie)"],
+    ["B", "białe tło i kwadrat (w podglądzie)"],
+  ] },
   /* Pełna lista klawiszy ekranu zwrotów, także tych, które pasek nad
      zwrotem pokazuje tylko przy pasującym stanie. Kompletności pilnuje test
      obok, porównując ją z `KLAWISZE_KUBELKA`. */

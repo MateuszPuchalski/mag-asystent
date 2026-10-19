@@ -1,11 +1,12 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
-import { Check, Crop, ImagePlus, RotateCcw, RotateCw, Undo2 } from "lucide-react";
+import { Check, Crop, ImagePlus, RotateCcw, RotateCw, SkipForward, Undo2 } from "lucide-react";
 import { Konflikt, Wygaslo } from "../api/klient";
 import {
   usePorzucPodglad, useWstepneZdjecie, useZapiszZdjecie, type PodgladZdjecia, type PozycjaBezZdjecia,
   type ZapisanieZdjecia,
 } from "../api/zdjecia";
-import { oknoModalne } from "../nawigacja/fokus";
+import { klawiszZajety, oknoModalne } from "../nawigacja/fokus";
+import { Klawisz } from "../nawigacja/Klawisz";
 import { Blad, NaglowekSekcji, Przycisk, SymbolTowaru } from "../ui";
 import { doWyslania, podgladEdycji, wczytajPlik, zlozGotowy, type Plik, type Zrodlo } from "./obraz";
 import { kadrZPrzeciagniecia, obroc, type Kadr, type Obrot, type Punkt } from "./obrobka";
@@ -13,14 +14,25 @@ import { kadrZPrzeciagniecia, obroc, type Kadr, type Obrot, type Punkt } from ".
 /* ── EDYTOR ZDJĘCIA JEDNEGO TOWARU ─────────────────────────────────────────
    Trzy kroki w jednej kolumnie: zdjęcie, poprawki, podgląd po usunięciu tła.
    Każdy krok ma jedno główne działanie, a reszta stoi obok jako przełącznik.
-   Domyślne ustawienia dają gotowe zdjęcie, więc typowy towar to:
-   wklej, „Usuń tło”, „Zatwierdź”.
+   Typowy towar to: wklej, Enter (usuń tło), Enter (zatwierdź). Ręka nie
+   schodzi z klawiatury, a każdy przełącznik ma swoją literę.
+
+   „Białe tło i kwadrat” jest domyślnie wyłączone, decyzją właściciela.
+   Wybór trzyma ekran, nie edytor: przy pracy seryjnej agent ustawia go
+   raz, a nie przy każdym towarze.
 
    Podgląd żyje na serwerze. Porzucamy go, gdy agent wybiera inne zdjęcie,
    inny towar albo wychodzi z ekranu — inaczej plik czekałby kwadrans
    na wygaśnięcie. */
 
+const LICZBA = new Intl.NumberFormat("pl-PL", { maximumFractionDigits: 3 });
+
 const opis = (e: unknown) => (e instanceof Error ? e.message : String(e));
+
+/* Enter na przycisku, polu wyboru czy etykiecie należy do niego — ten sam
+   klawisz z okna kliknąłby główne działanie drugi raz. */
+const naKontrolce = (t: EventTarget | null) =>
+  t instanceof Element && t.closest("button, a, select, label, input") !== null;
 
 function Przelacznik({ zaznaczony, onZmiana, wylaczony, tytul, children }: {
   zaznaczony: boolean; onZmiana: (v: boolean) => void; wylaczony?: boolean; tytul?: string;
@@ -76,9 +88,13 @@ function Kadrowanie({ adres, kadr, onKadr }: { adres: string; kadr: Kadr | null;
   </div>;
 }
 
-export function Edytor({ towar, onZapisano }: {
+export function Edytor({ towar, onZapisano, onPomin, bialeKwadrat, onBialeKwadrat }: {
   towar: PozycjaBezZdjecia;
   onZapisano: (w: ZapisanieZdjecia) => void;
+  /** Następny towar bez zapisu — gdy tego nie ma pod ręką. */
+  onPomin?: () => void;
+  bialeKwadrat: boolean;
+  onBialeKwadrat: (v: boolean) => void;
 }) {
   const { twId } = towar;
   const wstepne = useWstepneZdjecie();
@@ -93,7 +109,6 @@ export function Edytor({ towar, onZapisano }: {
   const [przygotowuje, setPrzygotowuje] = useState(false);
   const [podglad, setPodglad] = useState<{ dane: PodgladZdjecia; wyslany: Plik } | null>(null);
   const [usunTlo, setUsunTlo] = useState(true);
-  const [bialeKwadrat, setBialeKwadrat] = useState(true);
   /* `undefined` = gotowe zdjęcie się składa; `null` = nie ma czego składać. */
   const [gotowy, setGotowy] = useState<Plik | null | undefined>(null);
   const [blad, setBlad] = useState("");
@@ -184,7 +199,6 @@ export function Edytor({ towar, onZapisano }: {
         /* Tło usunięte — domyślnie bierzemy wycięcie. Tło zostało — nie ma
            czego włączać, więc przełącznik gaśnie razem z powodem obok. */
         setUsunTlo(dane.tlo === "usuniete");
-        setBialeKwadrat(true);
       },
       onError: (e) => setBlad(opis(e)),
       onSettled: () => setPrzygotowuje(false),
@@ -226,6 +240,42 @@ export function Edytor({ towar, onZapisano }: {
   };
 
   const wylaczone = wstepne.error instanceof Konflikt || zapisz.error instanceof Konflikt;
+  const mozePrzygotowac = !!zrodlo && !podglad && !przygotowuje && !wylaczone && !!edycja && "adres" in edycja;
+  const mozeZatwierdzic = !!podglad && !zapisz.isPending && !(bialeKwadrat && !gotowy) && !wylaczone;
+  const obrocW = (kierunek: 1 | -1) => { setObrot((o) => obroc(o, kierunek)); setKadr(null); };
+
+  /* Klawisze czyta ref, bo słuchacz okna wstaje raz, a stan zmienia się
+     przy każdym kroku. Pod oknem modalnym i w polu pisania milczą. */
+  const klawisz = useRef<(e: KeyboardEvent) => void>(() => undefined);
+  klawisz.current = (e) => {
+    if (e.ctrlKey || e.altKey || e.metaKey || klawiszZajety(e.target)) return;
+    if (e.key === "Enter") {
+      if (naKontrolce(e.target)) return;
+      if (podglad ? mozeZatwierdzic : mozePrzygotowac) {
+        e.preventDefault();
+        if (podglad) zatwierdz(); else void przygotuj();
+      }
+      return;
+    }
+    if (e.key === "Escape") {
+      if (podglad && !zapisz.isPending) { e.preventDefault(); jeszczeRaz(); }
+      return;
+    }
+    const k = e.key.toLowerCase();
+    if (zrodlo && !podglad) {
+      if (k === "l") obrocW(-1);
+      else if (k === "p") obrocW(1);
+      else if (k === "w") setWyrownaj((v) => !v);
+    } else if (podglad) {
+      if (k === "t" && podglad.dane.tlo === "usuniete") setUsunTlo(!zTla);
+      else if (k === "b") onBialeKwadrat(!bialeKwadrat);
+    }
+  };
+  useEffect(() => {
+    const sluchaj = (e: KeyboardEvent) => klawisz.current(e);
+    window.addEventListener("keydown", sluchaj);
+    return () => window.removeEventListener("keydown", sluchaj);
+  }, []);
   const poAdres = !podglad ? null
     : bialeKwadrat ? gotowy?.adres ?? null
       : zTla ? `data:${podglad.dane.mime};base64,${podglad.dane.png}` : podglad.wyslany.adres;
@@ -235,6 +285,11 @@ export function Edytor({ towar, onZapisano }: {
       <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm">
         <SymbolTowaru symbol={towar.symbol} />
         {towar.ean && <span className="font-mono text-slate-600">EAN {towar.ean}</span>}
+        {/* Stan mówi, czy towar w ogóle jest do sfotografowania na półce. */}
+        <span className="tabular-nums text-slate-600">stan {LICZBA.format(towar.stan)}</span>
+        {onPomin && <Przycisk className="ml-auto" onClick={onPomin}
+          title="Następny towar bez zdjęcia — nic się nie zapisuje">
+          <SkipForward size={16} />Pomiń <Klawisz>j</Klawisz></Przycisk>}
       </div>
       <h2 className="mt-1 text-naglowek font-bold text-slate-900">{towar.nazwa}</h2>
     </header>
@@ -260,18 +315,18 @@ export function Edytor({ towar, onZapisano }: {
           <div className="flex flex-wrap items-center gap-2">
             {/* Obrót kasuje kadr: prostokąt narysowany na leżącym zdjęciu
                 po obrocie wskazywałby inny fragment, niż agent zaznaczył. */}
-            <Przycisk onClick={() => { setObrot((o) => obroc(o, -1)); setKadr(null); }}>
-              <RotateCcw size={16} />Obróć w lewo</Przycisk>
-            <Przycisk onClick={() => { setObrot((o) => obroc(o, 1)); setKadr(null); }}>
-              <RotateCw size={16} />Obróć w prawo</Przycisk>
+            <Przycisk onClick={() => obrocW(-1)}>
+              <RotateCcw size={16} />Obróć w lewo <Klawisz>L</Klawisz></Przycisk>
+            <Przycisk onClick={() => obrocW(1)}>
+              <RotateCw size={16} />Obróć w prawo <Klawisz>P</Klawisz></Przycisk>
             <Przycisk onClick={() => setKadr(null)} disabled={!kadr}>Cały kadr</Przycisk>
             <Przelacznik zaznaczony={wyrownaj} onZmiana={setWyrownaj}
               tytul="Rozciąga jasność i kolory, żeby biel była bielą. Łagodnie, bez przesadnych barw.">
-              Wyrównaj kolory</Przelacznik>
+              Wyrównaj kolory <Klawisz>W</Klawisz></Przelacznik>
           </div>
           <div className="flex flex-wrap items-center gap-2 border-t border-slate-200 pt-4">
-            <Przycisk wariant="glowny" onClick={() => void przygotuj()} disabled={przygotowuje || wylaczone || !edycja || !("adres" in edycja)}>
-              {przygotowuje ? "Usuwam tło…" : "Usuń tło i pokaż podgląd"}</Przycisk>
+            <Przycisk wariant="glowny" onClick={() => void przygotuj()} disabled={!mozePrzygotowac}>
+              {przygotowuje ? "Usuwam tło…" : "Usuń tło i pokaż podgląd"} <Klawisz>Enter</Klawisz></Przycisk>
             <WyborPliku onPlik={(p) => void przyjmij(p)}>Inne zdjęcie</WyborPliku>
           </div>
         </>}
@@ -296,16 +351,16 @@ export function Edytor({ towar, onZapisano }: {
           <div className="flex flex-wrap items-center gap-x-5 gap-y-1">
             <Przelacznik zaznaczony={zTla} onZmiana={setUsunTlo} wylaczony={podglad.dane.tlo !== "usuniete"}
               tytul={podglad.dane.tlo !== "usuniete" ? "Tła nie udało się usunąć, więc nie ma czego włączyć." : undefined}>
-              Usuń tło</Przelacznik>
-            <Przelacznik zaznaczony={bialeKwadrat} onZmiana={setBialeKwadrat}
+              Usuń tło <Klawisz>T</Klawisz></Przelacznik>
+            <Przelacznik zaznaczony={bialeKwadrat} onZmiana={onBialeKwadrat}
               tytul="Biel pod towarem, przycięcie do towaru i kwadrat z marginesem.">
-              Białe tło i kwadrat</Przelacznik>
+              Białe tło i kwadrat <Klawisz>B</Klawisz></Przelacznik>
           </div>
           <div className="flex flex-wrap items-center gap-2 border-t border-slate-200 pt-4">
-            <Przycisk wariant="glowny" onClick={zatwierdz}
-              disabled={zapisz.isPending || (bialeKwadrat && !gotowy) || wylaczone}>
-              <Check size={16} />{zapisz.isPending ? "Zapisuję…" : "Zatwierdź"}</Przycisk>
-            <Przycisk onClick={jeszczeRaz} disabled={zapisz.isPending}><Undo2 size={16} />Jeszcze raz</Przycisk>
+            <Przycisk wariant="glowny" onClick={zatwierdz} disabled={!mozeZatwierdzic}>
+              <Check size={16} />{zapisz.isPending ? "Zapisuję…" : "Zatwierdź"} <Klawisz>Enter</Klawisz></Przycisk>
+            <Przycisk onClick={jeszczeRaz} disabled={zapisz.isPending}>
+              <Undo2 size={16} />Jeszcze raz <Klawisz>Esc</Klawisz></Przycisk>
           </div>
         </>}
 

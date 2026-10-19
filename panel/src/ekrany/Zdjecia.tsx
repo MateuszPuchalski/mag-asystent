@@ -1,10 +1,11 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { ImageOff, ImagePlus } from "lucide-react";
 import {
   NA_STRONIE, useBezZdjecia, type PozycjaBezZdjecia, type SortBezZdjecia, type ZapisanieZdjecia,
 } from "../api/zdjecia";
 import { Blad, EtykietaWartosci, Karta, Pole, Przycisk, Pusto, WierszKolejki, ile } from "../ui";
 import { Edytor } from "../zdjecia/Edytor";
+import { klawiszZajety } from "../nawigacja/fokus";
 
 /* ── ZDJĘCIA: TOWARY BEZ ZDJĘCIA ───────────────────────────────────────────
    Praca seryjna przy biurku: kartoteki Subiekta bez obrazu, jedna po drugiej.
@@ -34,6 +35,16 @@ export function nastepnyWolny(lista: PozycjaBezZdjecia[], biezacy: number, zrobi
   const wolny = (p: PozycjaBezZdjecia) => !p.oczekuje && !zrobione.has(p.twId) && p.twId !== biezacy;
   const i = lista.findIndex((p) => p.twId === biezacy);
   return lista.slice(i + 1).find(wolny) ?? lista.slice(0, Math.max(0, i)).find(wolny) ?? null;
+}
+
+/** Sąsiad w liście dla `j`/`k`, z pominięciem towarów czekających w kolejce. */
+export function sasiad(lista: PozycjaBezZdjecia[], biezacy: number | null, krok: 1 | -1,
+  zrobione: ReadonlySet<number>): PozycjaBezZdjecia | null {
+  const wolne = lista.filter((p) => !p.oczekuje && !zrobione.has(p.twId));
+  if (wolne.length === 0) return null;
+  const i = wolne.findIndex((p) => p.twId === biezacy);
+  if (i < 0) return wolne[krok === 1 ? 0 : wolne.length - 1];
+  return wolne[i + krok] ?? null;
 }
 
 function Wiersz({ p, wybrany, wKolejce, onWybierz }: {
@@ -74,6 +85,9 @@ export function Zdjecia() {
   const [wybrany, setWybrany] = useState<PozycjaBezZdjecia | null>(null);
   const [zrobione, setZrobione] = useState<ReadonlySet<number>>(() => new Set());
   const [ostatni, setOstatni] = useState("");
+  /* Domyślnie wyłączone, decyzją właściciela. Stan żyje tu, nie w edytorze,
+     więc przeżywa przejście do następnego towaru. */
+  const [bialeKwadrat, setBialeKwadrat] = useState(false);
 
   const pozycje = lista.data?.pozycje ?? [];
   /* Pierwszy wolny towar wybiera się sam. Wybór nie jest zapisem, a oszczędza
@@ -83,6 +97,21 @@ export function Zdjecia() {
     const p = pozycje.find((x) => !x.oczekuje && !zrobione.has(x.twId));
     if (p) setWybrany(p);
   }, [pozycje, wybrany, zrobione]);
+
+  /* j/k jak w kolejkach obsługi: ten sam ruch po liście na każdym ekranie
+     pracy seryjnej. Słuchacz czyta ref, bo wstaje raz. */
+  const ruch = useRef<(e: KeyboardEvent) => void>(() => undefined);
+  ruch.current = (e) => {
+    if (e.ctrlKey || e.altKey || e.metaKey || klawiszZajety(e.target)) return;
+    if (e.key !== "j" && e.key !== "k") return;
+    const p = sasiad(pozycje, wybrany?.twId ?? null, e.key === "j" ? 1 : -1, zrobione);
+    if (p) { e.preventDefault(); setWybrany(p); setOstatni(""); }
+  };
+  useEffect(() => {
+    const sluchaj = (e: KeyboardEvent) => ruch.current(e);
+    window.addEventListener("keydown", sluchaj);
+    return () => window.removeEventListener("keydown", sluchaj);
+  }, []);
 
   if (lista.data && !lista.data.wlaczone) {
     return <Karta className="flex lg:h-full">
@@ -97,6 +126,12 @@ export function Zdjecia() {
       ? `Zapisano zdjęcie ${biezacy.symbol}. Do Subiekta trafi z kolejki za chwilę.`
       : `Zapisano zdjęcie ${biezacy.symbol} w WERTIS. Ta instalacja nie wysyła zdjęć do Subiekta.`);
     setWybrany(nastepnyWolny(pozycje, biezacy.twId, nowe));
+  };
+
+  /* „Pomiń” niczego nie zapisuje: towar zostaje na liście, a ekran idzie dalej. */
+  const pomin = (biezacy: PozycjaBezZdjecia) => {
+    const p = nastepnyWolny(pozycje, biezacy.twId, zrobione);
+    return p ? () => { setWybrany(p); setOstatni(""); } : undefined;
   };
 
   const razem = lista.data?.razem;
@@ -157,7 +192,9 @@ export function Zdjecia() {
         {ostatni && <p role="status" className="shrink-0 border-b border-emerald-200 bg-emerald-50 px-4 py-2 text-sm text-emerald-900">{ostatni}</p>}
         {wybrany
           /* Klucz po towarze: nowy towar to świeży edytor, a stary porzuca swój podgląd. */
-          ? <Edytor key={wybrany.twId} towar={wybrany} onZapisano={zapisano(wybrany)} />
+          ? <Edytor key={wybrany.twId} towar={wybrany} onZapisano={zapisano(wybrany)}
+              bialeKwadrat={bialeKwadrat} onBialeKwadrat={setBialeKwadrat}
+              onPomin={pomin(wybrany)} />
           : <Pusto ikona={ImagePlus}>{pozycje.length ? "Wybierz towar z listy." : "Nie ma towaru do zdjęcia."}</Pusto>}
       </Karta>
     </div>
