@@ -10,6 +10,20 @@ z wersją monorepo" — i właśnie tak przestał być zgodny: `0.3.0` przetrwa�
 sześć zmergowanych zmian, w tym takie, które wymagały nowego uprawnienia SQL.
 Komentarz nie jest mechanizmem.
 
+## 0.591.0 — 19 października 2026
+
+**Pomyłki wysyłkowe zamiast arkusza.** Nowa zakładka „Pomyłki” w panelu
+obsługi. Odmowa wypłaty z powodu wysłania nowego towaru zakłada pomyłkę sama.
+Wystarczy kliknąć, co klient zamówił, wpisać, co dostał, i wskazać, kto
+zbierał i kto pakował. Drugie kliknięcie w imię oznacza winnego.
+
+**Reszta wypełnia się sama.** Wysłanie nowego towaru, powrót pomylonego
+towaru i odmowę w Allegro system bierze ze zwrotu i dosyłki. Pomyłka kończy
+się sama, gdy wszystko jest załatwione. Przycisk „Zła paczka” stoi przy
+zwrocie, rozmowie i w profilu klienta.
+
+Zestawienie win na osobę widzi tylko admin.
+
 ## 0.590.0 — 19 października 2026
 
 **Towary bez zdjęcia według stanu.** Zakładka „Zdjęcia" pokazuje przy każdym

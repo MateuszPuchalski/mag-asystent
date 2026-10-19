@@ -538,7 +538,7 @@ Drugi przyrost S6 dokłada tabelę `klient_dosylka` z numerem przesyłki.
 
 ## Polityka danych pomyłek wysyłkowych
 
-Zakładka „Pomyłki” (`@wydanie`) zastępuje arkusz biura z pomyłkami w paczkach.
+Zakładka „Pomyłki” (`0.591.0`) zastępuje arkusz biura z pomyłkami w paczkach.
 Tabela `pomylka_wysylki` trzyma jeden wiersz na zamówienie.
 
 - **Zapisujemy** login kupującego jako klucz klienta, numer zamówienia
