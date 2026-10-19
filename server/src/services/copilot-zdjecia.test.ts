@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import { DatabaseSync } from "node:sqlite";
 import fs from "node:fs";
 import { migrate } from "../db/db.js";
+import { BladRozmiaruZalacznika } from "../adapters/allegro.http.js";
 import {
   kandydaciRozmowy, przygotujZdjecia, przygotujZdjeciaRozmowy, spisZdjec,
   SUFIT_SZTUK_ROZMOWY, SUFIT_ZDJEC,
@@ -170,6 +171,26 @@ test("każde pobranie niesie sufit na sztukę — inaczej plik wchodzi w całoś
     return PNG.buffer.slice(PNG.byteOffset, PNG.byteOffset + PNG.byteLength) as ArrayBuffer;
   });
   assert.deepEqual(opcje, { maksBajtow: SUFIT_ZDJEC.naSztuke });
+});
+
+test("zdjęcie z aparatu telefonu mieści się w suficie na sztukę", () => {
+  /* Pełne zdjęcie z telefonu waży 3–6 MB. Przy progu 3,5 MB odpadało
+     właśnie ono, a doszły tylko zrzuty ekranu. Górna granica to limit
+     dostawcy: 10 MB po base64, które rozdyma bajty o jedną trzecią. */
+  assert.ok(SUFIT_ZDJEC.naSztuke >= 6_000_000);
+  assert.ok(Math.ceil(SUFIT_ZDJEC.naSztuke / 3) * 4 <= 10_000_000);
+});
+
+test("plik ponad sufit to „pominięto”, nie błąd pobrania", async () => {
+  /* Liczony jako błąd, kazał modelowi pisać „nie udało się pobrać",
+     a dziennik pokazywał awarię Allegro tam, gdzie stał nasz próg. */
+  const { d, id, zalacznik } = stanowisko();
+  zalacznik("ogromne.jpg", null);
+  const w = await przygotujZdjecia(d, id, async () => {
+    throw new BladRozmiaruZalacznika(SUFIT_ZDJEC.naSztuke + 1, SUFIT_ZDJEC.naSztuke);
+  });
+  assert.equal(w.bledow, 0);
+  assert.equal(w.pominieto, 1);
 });
 
 /* ── Ścieżka rozmowy ze skrzynki ─────────────────────────────────────────── */

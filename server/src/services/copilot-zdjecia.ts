@@ -1,5 +1,7 @@
 import type { DatabaseSync } from "node:sqlite";
-import { pobierzZalacznik, pobierzZalacznikWiadomosci } from "../adapters/allegro.http.js";
+import {
+  BladRozmiaruZalacznika, pobierzZalacznik, pobierzZalacznikWiadomosci,
+} from "../adapters/allegro.http.js";
 import { config } from "../config.js";
 import { rozpoznajMime } from "../adapters/zdjecia.sgt.js";
 import { typPodgladu } from "./typ-podgladu.js";
@@ -39,15 +41,19 @@ export type TypModelu = (typeof TYPY_MODELU)[number];
 /**
  * Sufity bajtów.
  *
- * `NA_SZTUKE` to próg NASZ, dobrany z zapasem pod limit dostawcy na pojedynczy
- * obraz — base64 rozdyma bajty o jedną trzecią, więc 3,5 MB surowych to około
- * 4,7 MB w żądaniu. Dokładny limit dostawcy potwierdzić w jego dokumentacji
- * `vision`, nie w pamięci.
+ * `naSztuke` stoi pod limitem dostawcy na jeden obraz: API Anthropic przyjmuje
+ * 10 MB po zakodowaniu base64 (dokumentacja `vision`, sprawdzone 2026-10-19).
+ * Base64 rozdyma bajty o jedną trzecią, więc 7 MB surowych to około 9,3 MB.
+ * Niżej stawiać go nie wolno: zwykłe zdjęcie z aparatu telefonu waży 3–6 MB,
+ * a przy niższym progu odpadało właśnie ono, czyli zdjęcie, które klient
+ * zrobił maszynie. Rozdzielczości nie zmniejszamy sami, bo dostawca robi to
+ * po swojej stronie.
  *
- * `LACZNIE` chroni całe żądanie. Przy sprawie z kilkudziesięcioma zdjęciami
- * idą najnowsze, a karta mówi, ile zostało poza.
+ * `lacznie` chroni całe żądanie, które u dostawcy ma sufit 32 MB: 20 MB
+ * surowych to około 27 MB base64 plus tekst. Przy sprawie z kilkudziesięcioma
+ * zdjęciami idą najnowsze, a karta mówi, ile zostało poza.
  */
-export const SUFIT_ZDJEC = { naSztuke: 3_500_000, lacznie: 20_000_000 } as const;
+export const SUFIT_ZDJEC = { naSztuke: 7_000_000, lacznie: 20_000_000 } as const;
 
 /**
  * SUFIT SZTUK — ale WYŁĄCZNIE dla rozmowy ze skrzynki.
@@ -195,7 +201,14 @@ async function przezBramke(
     let dane: ArrayBuffer;
     try {
       dane = await pobierz(k.url, { maksBajtow: SUFIT_ZDJEC.naSztuke });
-    } catch {
+    } catch (e) {
+      /* Za duży plik to nie błąd pobrania. Liczony jako błąd, kazał modelowi
+         pisać „nie udało się pobrać", a dziennik pokazywał awarię Allegro
+         tam, gdzie stał nasz próg. */
+      if (e instanceof BladRozmiaruZalacznika) {
+        wynik.pominieto += 1;
+        continue;
+      }
       /* Powodu nie zapisujemy przy zdjęciu: idzie do dziennika jako liczba,
          a treść odmowy Allegro bywa z adresem pliku. */
       wynik.bledow += 1;
