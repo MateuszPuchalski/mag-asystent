@@ -3168,6 +3168,37 @@ i `outbox.created_by` wskazujący konto automatu. Kolumna
 `decyzja_klasyfikacji.tryb` zostaje przy jednej wartości, bo przebudowa
 tabeli nie dodałaby do tego śladu nic.
 
+### 14.6g. Szkic sam szuka w kartotece (@wydanie)
+
+Decyzja właściciela z 19 października 2026. Fakty szkicu znały dotąd jeden
+towar: ten z oferty rozmowy. Klient pyta jednak często numerem OEM, nazwą
+części albo inną aukcją. Szkic odpowiadał wtedy z wiedzy modelu.
+
+**Narzędzia dopytania przy szkicu.** Szkic dostaje te same narzędzia, które
+ma dopytanie: `szukaj_towaru`, `karta_towaru`, `tresc_oferty` i nowe
+`oferty_towaru`. Ma najwyżej trzy rundy narzędzi i jedno żądanie końcowe bez
+nich, mniej niż dopytanie, bo szkic chodzi też taktem. Wszystkie czytają
+lokalny odczyt Subiekta i kopię ofert, nie piszą i nie wołają sieci.
+
+**Wynik narzędzia to fakt `N#`.** Model cytuje go jak `F#`, a walidacja
+szkicu traktuje go jak fakt. Numer z wyniku nie odrzuca szkicu. Numer
+zmyślony i `N#` spoza wyników odrzucają go jak dotąd.
+
+**Ceny sprzedaży i nasze oferty.** Karta towaru podaje cennik sklepu bez
+poziomu 0, bo poziom 0 to cena zakupu. `oferty_towaru` podaje link, tytuł
+i cenę naszych aktywnych aukcji z datą kopii. Cenę klientowi model podaje
+tylko z oferty, z linkiem. Kopia ofert zna tylko część aukcji i bywa sprzed
+doby. Gdy oferty nie znamy, cennik kartoteki trafia do zastrzeżeń dla agenta,
+nie do klienta.
+
+**Szkic z narzędziami nie wychodzi automatem.** Przepływ na żywo (§14.6f)
+dostał ósmy warunek. Ceny i linki z kartoteki idą do klienta dopiero po
+spojrzeniu człowieka.
+
+**Wyłącznik.** `COPILOT_SZKIC_NARZEDZIA=0` w `wertis.env` przywraca szkic
+z jednym wywołaniem. Dziennik `copilot_szkic` zapisuje nazwy użytych narzędzi
+i liczbę rund, bez treści.
+
 ### 14.7. Co działa: dane doboru z rozmowy (etap F, przyrost trzeci)
 
 > **Usunięte.** Dobór części i baza wiedzy wyszły z WERTIS w całości

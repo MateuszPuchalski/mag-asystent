@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import Anthropic from "@anthropic-ai/sdk";
 import {
   _ustawKlienta, nadawcaAnthropic, nadawcaPytaniaAnthropic, nadawcaSzkicuAnthropic,
-  SUFIT_RUND_NARZEDZI, wspieraWysilek,
+  SUFIT_RUND_NARZEDZI, SUFIT_RUND_SZKICU, wspieraWysilek,
 } from "./copilot.anthropic.js";
 import type { KontekstPytania } from "../services/copilot-pytania.js";
 import type { WynikNarzedzia, ZestawNarzedzi } from "../services/copilot-narzedzia.js";
@@ -28,7 +28,9 @@ const TRESC = "Czy nóż pasuje?" as TrescBezpieczna;
 
 /** Klient, którego jedyną umiejętnością jest wywrócić się tak, jak podano. */
 function klientRzucajacy(e: unknown) {
-  _ustawKlienta({ messages: { parse: async () => { throw e; } } } as unknown as Anthropic);
+  _ustawKlienta({ messages: {
+    parse: async () => { throw e; }, create: async () => { throw e; },
+  } } as unknown as Anthropic);
 }
 
 const odpowiedzDostawcy = (status: number, typ: string, komunikat: string) =>
@@ -183,9 +185,9 @@ test("szkic też nie wysyła wysiłku do Haiku 4.5", async () => {
   const bylo = config.copilot.model;
   (config.copilot as { model: string }).model = "claude-haiku-4-5";
   const wyslane: Record<string, unknown>[] = [];
-  _ustawKlienta({ messages: { parse: async (p: Record<string, unknown>) => {
+  _ustawKlienta({ messages: { create: async (p: Record<string, unknown>) => {
     wyslane.push(p);
-    return { parsed_output: null, model: undefined, stop_reason: "end_turn",
+    return { content: [], model: undefined, stop_reason: "end_turn",
       usage: { input_tokens: 1, output_tokens: 1 } };
   } } } as unknown as Anthropic);
   try {
@@ -204,9 +206,9 @@ test("szkic też nie wysyła wysiłku do Haiku 4.5", async () => {
    nie czyta, model i tak by wypełniał, płacąc tokenami za nic. */
 test("schemat i instrukcja szkicu nie znają danych doboru ani pasowania", async () => {
   let wyslane: Record<string, unknown> | null = null;
-  _ustawKlienta({ messages: { parse: async (p: Record<string, unknown>) => {
+  _ustawKlienta({ messages: { create: async (p: Record<string, unknown>) => {
     wyslane = p;
-    return { parsed_output: null, model: undefined, stop_reason: "end_turn",
+    return { content: [], model: undefined, stop_reason: "end_turn",
       usage: { input_tokens: 1, output_tokens: 1 } };
   } } } as unknown as Anthropic);
   try {
@@ -336,6 +338,83 @@ test("dopytanie bez zestawu nie wysyła narzędzi, a ucięta odpowiedź niesie k
     assert.ok(e instanceof BladOdpowiedziCopilota);
     assert.equal((e as { zuzycie?: { wej: number } }).zuzycie?.wej, 100, "koszt uciętej rundy idzie do księgi");
     assert.equal("tools" in zadania[0]!, false);
+  } finally {
+    _ustawKlienta(null);
+  }
+});
+
+/* ── Pętla narzędzi szkicu ──────────────────────────────────────────────────
+   Szkic idzie tą samą pętlą co dopytanie, z niższym sufitem rund, bo układa
+   go też takt. Bez zestawu ma być dokładnie jedno żądanie bez `tools`, czyli
+   to, co szkic wysyłał przed narzędziami. */
+
+const SZKIC = JSON.stringify({
+  tresc: "Pasuje (N1).", uzyteFakty: ["N1"], zastrzezenia: [], twierdzenia: [], odczytZeZdjec: [],
+});
+
+test("szkic: sufit rund kończy pętlę rundą bez narzędzi, a koszt to suma rund", async () => {
+  const { zestaw, wywolania } = atrapaNarzedzi();
+  let nr = 0;
+  const zadania = klientSekwencja([(p) => (p.tool_choice
+    ? { stop_reason: "end_turn", model: "m", usage: zuzycieRundy, content: [{ type: "text", text: SZKIC }] }
+    : { stop_reason: "tool_use", model: "m", usage: zuzycieRundy,
+      content: [{ type: "tool_use", id: `tu_${++nr}`, name: "karta_towaru", input: { zapytanie: "X" } }] })]);
+  try {
+    const o = await nadawcaSzkicuAnthropic(TRESC, FAKTY, [], zestaw);
+    assert.equal(o.tresc, "Pasuje (N1).");
+    assert.equal(wywolania.length, SUFIT_RUND_SZKICU);
+    assert.equal(zadania.length, SUFIT_RUND_SZKICU + 1);
+    assert.deepEqual(zadania.at(-1)!.tool_choice, { type: "none" });
+    assert.equal(o.zuzycie.wej, 100 * (SUFIT_RUND_SZKICU + 1), "tokeny ze wszystkich rund");
+    assert.equal(o.rund, SUFIT_RUND_SZKICU + 1);
+    assert.deepEqual(o.wynikiNarzedzi!.map((w) => w.id), ["N1", "N2", "N3"]);
+    const wyniki = (zadania[1]!.messages as Array<{ content: unknown }>)[2]!.content as Array<{ content: string }>;
+    assert.ok(wyniki[0]!.content.startsWith("[N1] "), "model widzi numer, na który ma się powołać");
+    assert.ok(!o.wynikiNarzedzi![0]!.tresc.startsWith("["), "serwis dostaje czystą treść wyniku");
+  } finally {
+    _ustawKlienta(null);
+  }
+});
+
+test("szkic bez narzędzi: jedno żądanie bez tools i bez cache całości", async () => {
+  const zadania = klientSekwencja([() => ({ stop_reason: "end_turn", model: "m", usage: zuzycieRundy,
+    content: [{ type: "text", text: SZKIC }] })]);
+  try {
+    const o = await nadawcaSzkicuAnthropic(TRESC, FAKTY);
+    assert.equal(zadania.length, 1);
+    assert.equal("tools" in zadania[0]!, false);
+    assert.equal("cache_control" in zadania[0]!, false);
+    assert.equal(zadania[0]!.max_tokens, 4500);
+    assert.deepEqual(o.wynikiNarzedzi, []);
+  } finally {
+    _ustawKlienta(null);
+  }
+});
+
+test("dopytanie: wynik narzędzia wraca bez numeru N#, numer ma tylko szkic", async () => {
+  const { zestaw } = atrapaNarzedzi();
+  const zadania = klientSekwencja([
+    () => ({ stop_reason: "tool_use", model: "m", usage: zuzycieRundy,
+      content: [{ type: "tool_use", id: "tu_1", name: "karta_towaru", input: { zapytanie: "GAZ-1" } }] }),
+    () => ({ stop_reason: "end_turn", model: "m", usage: zuzycieRundy, content: [{ type: "text", text: ODPOWIEDZ }] }),
+  ]);
+  try {
+    await nadawcaPytaniaAnthropic(kontekstPytania(zestaw));
+    const wyniki = (zadania[1]!.messages as Array<{ content: unknown }>)[2]!.content as Array<{ content: string }>;
+    assert.equal(wyniki[0]!.content, "Kartoteka GAZ-1: gaźnik");
+  } finally {
+    _ustawKlienta(null);
+  }
+});
+
+test("instrukcja szkicu: cena klientowi tylko z oferty, cennik kartoteki do zastrzeżeń", async () => {
+  const zadania = klientSekwencja([() => ({ stop_reason: "end_turn", model: "m", usage: zuzycieRundy,
+    content: [{ type: "text", text: SZKIC }] })]);
+  try {
+    await nadawcaSzkicuAnthropic(TRESC, FAKTY);
+    const tekst = (zadania[0]!.system as Array<{ text: string }>)[0]!.text;
+    assert.match(tekst, /Cenę podajesz klientowi WYŁĄCZNIE z wyniku naszej oferty/);
+    assert.match(tekst, /ceny z cennika kartoteki NIE PISZ klientowi[\s\S]*`zastrzezenia`/);
   } finally {
     _ustawKlienta(null);
   }

@@ -202,6 +202,10 @@ export function migrate(database: DatabaseSync) {
      bez tej kolumny nie dałoby się poznać, że szkic pisano pod starą. Stare
      szkice mają NULL, czyli „nie wiadomo" — i pierwsza poprawka je odświeży. */
   addColumn("szkic_copilota", "decyzja_id", "INTEGER");
+  /* Narzędzia, po które sięgnął szkic — patrz `szkic_copilota.narzedzia`
+     w `schema.sql`. Stare szkice dostają pustą listę, i to jest o nich
+     prawda: powstały, zanim szkic mógł sięgać do bazy. */
+  addColumn("szkic_copilota", "narzedzia", "TEXT NOT NULL DEFAULT '[]'");
   /* Wykonanie propozycji na żywo — patrz `propozycja_przeplywu` w `schema.sql`.
      Tabela mogła już stać z trybu cienia, a stare wiersze mają NULL, czyli
      „automat niczego nie wysłał", co jest o nich prawdą. */

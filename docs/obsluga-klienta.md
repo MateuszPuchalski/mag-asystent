@@ -264,6 +264,16 @@ z firmy nie wychodzi ani jeden znak. Klasyfikacja nie pisze do klienta.
   numery, dostępność dziś), treść oferty i rozpoznanie klasyfikatora. Nie
   idą: półka, rezerwacje, rozbicie na magazyny, pełny opis kartoteki, historia
   zakupów klienta ani jego adres.
+- **Szkic i dopytanie sięgają do kartoteki narzędziami.** Klient pyta często
+  o towar spoza oferty rozmowy, numerem albo nazwą. Model sam szuka wtedy
+  w lokalnym odczycie Subiekta, w szkicu najwyżej trzy rundy narzędzi. Narzędzia nie
+  piszą i nie wołają sieci. Wynik ma oznaczenie `N#` i przechodzi tę samą
+  walidację co fakty.
+- **Ceny sprzedaży i nasze oferty Allegro wychodzą, cena zakupu nie.**
+  Właściciel zdecydował 19 października, że Copilot podaje klientowi cenę
+  i link do naszej aukcji. Cennik sklepu i oferty to dane, które klient
+  i tak widzi. Poziom 0 cennika to cena zakupu i nie wychodzi nigdy. Pilnuje
+  tego test narzędzi (`copilot-narzedzia.test.ts`).
 - **Szkic nie staje się odpowiedzią sam.** Stoi w pustym polu jako tekst do
   poprawiania, nie zapisany; do klienta idzie po „Wyślij".
 
