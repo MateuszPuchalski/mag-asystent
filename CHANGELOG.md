@@ -10,6 +10,25 @@ z wersją monorepo" — i właśnie tak przestał być zgodny: `0.3.0` przetrwa�
 sześć zmergowanych zmian, w tym takie, które wymagały nowego uprawnienia SQL.
 Komentarz nie jest mechanizmem.
 
+## 0.594.0 — 19 października 2026
+
+**Pomyłki złapane przy pakowaniu.** Zakładka „Pomyłki” pokazuje, ile pomyłek
+zbierania wyłapało pakowanie w ostatnich dwóch tygodniach, zanim paczka
+wyszła. Obok stoi liczba pomyłek z rejestru z tych samych dni, czyli
+przepuszczonych do klienta. Z obu wychodzi, ile wykrytych pomyłek zatrzymało
+pakowanie. Liczba na dzień, bez osób. Dane biorą się z Sellasist, ze statusu
+ustawionego w `SELLASIST_STATUSY_POMYLKA` (u nas 30, „Brak podczas pakowania”).
+Liczenie rusza od doby po wpisaniu statusu, bo wcześniejszego dziennika nikt
+z tym statusem nie czytał.
+
+Zamówienie, które dziś weszło w ten status, nie jest już dla szkicu odpowiedzi
+brakiem towaru. Towar się donosi, więc „wyślemy dziś” zostaje. Zamówienie
+stojące w tym statusie od wczoraj szkic znowu widzi jako brak.
+
+**[wymaga działania]** W panelu: Ustawienia → Konfiguracja, grupa Sellasist.
+Wpisz w `SELLASIST_STATUSY_POMYLKA` numer statusu „Brak podczas pakowania”
+(u nas 30). Bez niego blok w zakładce „Pomyłki” się nie pokaże.
+
 ## 0.593.0 — 19 października 2026
 
 **„Białe tło i kwadrat" domyślnie wyłączone.** Zdjęcie idzie do Subiekta tak,
