@@ -123,7 +123,7 @@ test("pełna strona dziennika ciągnie następną z tym samym date_from", async 
 test("etykieta: data z listy przewozowej, pierwsza etykieta to dzień zebrania i spakowania", async () => {
   const a = atrapa({
     "/orders_logs": [{ id: 7, order_id: 200, operation_tag: "order_edit", date: "2026-10-13 11:00:00" }],
-    "/orders/200": zamowienie(200, { shipments: [{ service: "DPD Polska", tracking_number: "DPD1" }] }),
+    "/orders/200": zamowienie(200, { shipments: [{ ordershipment_id: 1, service: "DPD Polska", tracking_number: "DPD1" }] }),
     "/ordersshipments": [{ tracking_number: "DPD1", created_date: "2026-10-13 10:15:00", file: "JVBER" }],
   });
   const w = await przebieg(a.query);
@@ -145,7 +145,7 @@ test("etykieta: data z listy przewozowej, pierwsza etykieta to dzień zebrania i
 test("znana etykieta z datą nie pyta drugi raz o listę przewozową", async () => {
   const odp = {
     "/orders_logs": [{ id: 7, order_id: 200, operation_tag: "order_edit", date: "2026-10-13 11:00:00" }],
-    "/orders/200": zamowienie(200, { shipments: [{ service: "DPD", tracking_number: "DPD1" }] }),
+    "/orders/200": zamowienie(200, { shipments: [{ ordershipment_id: 1, service: "DPD", tracking_number: "DPD1" }] }),
     "/ordersshipments": [{ tracking_number: "DPD1", created_date: "2026-10-13 10:15:00" }],
   };
   await przebieg(atrapa(odp).query);
@@ -161,7 +161,7 @@ test("zebrane statusem z dziennika wygrywa z etykietą, a późniejsza data nie 
     "/orders_logs": [{ id: 9, order_id: 300, operation_tag: "order_status_change", object_id: 5,
       date: "2026-10-12 16:00:00" }],
     "/orders/300": zamowienie(300, { status: { id: 6, name: "Spakowane" },
-      shipments: [{ service: "InPost", tracking_number: "IN1" }] }),
+      shipments: [{ ordershipment_id: 1, service: "InPost", tracking_number: "IN1" }] }),
     "/ordersshipments": [{ tracking_number: "IN1", created_date: "2026-10-13 08:00:00" }],
   });
   await przebieg(a.query, [5]);
@@ -174,7 +174,7 @@ test("zebrane statusem z dziennika wygrywa z etykietą, a późniejsza data nie 
   /* Nowa etykieta dzień później — dzień spakowania zostaje wtorkowy. */
   const b = atrapa({
     "/orders_logs": [{ id: 10, order_id: 300, operation_tag: "order_edit", date: "2026-10-13 11:00:00" }],
-    "/orders/300": zamowienie(300, { shipments: [{ service: "InPost", tracking_number: "IN2" }] }),
+    "/orders/300": zamowienie(300, { shipments: [{ ordershipment_id: 1, service: "InPost", tracking_number: "IN2" }] }),
     "/ordersshipments": [{ tracking_number: "IN2", created_date: "2026-10-14 08:00:00" }],
   });
   await przebieg(b.query, [5]);
@@ -195,7 +195,7 @@ test("wiersz zbiórki z pliku wygrywa — API go nie nadpisuje", async () => {
   db().prepare("INSERT INTO zbiorka(koszyk_id, tw_id, symbol_csv, data, ilosc) VALUES (2000, 11, 'NOZ-01', '2026-10-01', 2)").run();
   await przebieg(atrapa({
     "/orders_logs": [{ id: 7, order_id: 200, operation_tag: "order_edit", date: "2026-10-13 11:00:00" }],
-    "/orders/200": zamowienie(200, { shipments: [{ service: "DPD", tracking_number: "DPD1" }] }),
+    "/orders/200": zamowienie(200, { shipments: [{ ordershipment_id: 1, service: "DPD", tracking_number: "DPD1" }] }),
     "/ordersshipments": [{ tracking_number: "DPD1", created_date: "2026-10-13 10:15:00" }],
   }).query);
   assert.equal((db().prepare("SELECT data FROM zbiorka WHERE koszyk_id = 2000").get() as { data: string }).data,
@@ -246,7 +246,7 @@ test("stan przed pierwszym udanym przebiegiem nie ma dób — brak danych to nie
 test("stan dla panelu: siedem dób magazynu, zamówienia zebrane i spakowane", async () => {
   await przebieg(atrapa({
     "/orders_logs": [{ id: 7, order_id: 200, operation_tag: "order_edit", date: "2026-10-13 11:00:00" }],
-    "/orders/200": zamowienie(200, { shipments: [{ service: "DPD", tracking_number: "DPD1" }] }),
+    "/orders/200": zamowienie(200, { shipments: [{ ordershipment_id: 1, service: "DPD", tracking_number: "DPD1" }] }),
     "/ordersshipments": [{ tracking_number: "DPD1", created_date: "2026-10-13 10:15:00" }],
   }).query);
   /* Lustro ruszyło dziś, więc doby sprzed dziś nie istnieją — nie są zerami. */
@@ -269,4 +269,18 @@ test("odświeżenie na żądanie: zamówienia numeru źródła do lustra, błąd
   assert.equal(db().prepare("SELECT COUNT(*) AS n FROM sellasist_zamowienie WHERE id = 700").get()!.n, 1);
   const b = atrapa({ "/orders": () => { throw new BladSellasist("x", 500); } });
   assert.equal(await S.odswiezZamowienieSellasist(db(), "allegro-701", { query: b.query }), false);
+});
+
+test("etykieta z nowego serwisu wysyłek (ordershipment_id 0): bez pytania o pustą listę, dzień z chwili odczytu", async () => {
+  const a = atrapa({
+    "/orders_logs": [{ id: 7, order_id: 210, operation_tag: "order_edit", date: "2026-10-13 11:00:00" }],
+    "/orders/210": zamowienie(210, { shipments: [{ ordershipment_id: 0, service: "allegroOneBox",
+      tracking_number: "A00BOX1" }] }),
+  });
+  await przebieg(a.query);
+  assert.ok(!a.wolania.some((w) => w.startsWith("/ordersshipments")), "pusta lista nie kosztuje żądania");
+  const z = db().prepare("SELECT spakowano_at FROM sellasist_zamowienie WHERE id = 210").get() as { spakowano_at: string };
+  assert.equal(z.spakowano_at, TERAZ.toISOString());
+  const prz = db().prepare("SELECT przewoznik, utworzono_at FROM sellasist_przesylka WHERE zamowienie_id = 210").get();
+  assert.deepEqual({ ...prz }, { przewoznik: "ALLEGRO", utworzono_at: null });
 });

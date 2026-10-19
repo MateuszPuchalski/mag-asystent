@@ -199,6 +199,13 @@ export interface PrzesylkaSellasist {
   usluga: string | null;
   /** `carrierId` Allegro wyliczony z nazwy; `OTHER`, gdy nazwa nieznana. */
   przewoznik: string;
+  /**
+   * Etykieta stoi na liście przewozowej (`GET /ordersshipments`), jedynej
+   * z datą wydruku. Opis pola mówi „`ordershipment_id` 0 dla ESP/INSPIGO",
+   * czyli nowego serwisu wysyłek, a sonda z 19 października pokazała tam
+   * pustą listę. Etykiety z zerem nie ma o co pytać.
+   */
+  naLiscie: boolean;
 }
 
 export interface ZamowienieSellasist {
@@ -227,10 +234,11 @@ function przesylkiZamowienia(z: Obiekt): PrzesylkaSellasist[] {
   const wynik = new Map<string, PrzesylkaSellasist>();
   for (const s of lista(z.shipments)) {
     const usluga = tekst(s.service);
+    const naLiscie = calkowita(s.ordershipment_id) !== null;
     for (const n of String(s.tracking_number ?? "").split(",")) {
       const waybill = n.trim();
       if (waybill && waybill.length <= 64 && !wynik.has(waybill)) {
-        wynik.set(waybill, { waybill, usluga, przewoznik: przewoznikAllegro(usluga) });
+        wynik.set(waybill, { waybill, usluga, przewoznik: przewoznikAllegro(usluga), naLiscie });
       }
     }
   }
