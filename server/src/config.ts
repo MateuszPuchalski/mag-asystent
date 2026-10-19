@@ -1107,6 +1107,14 @@ export const config = {
      */
     szkicPoRozpoznaniu: process.env.COPILOT_SZKIC_PO_ROZPOZNANIU !== "0",
     /**
+     * NARZĘDZIA KARTOTEKI PRZY SZKICU (decyzja właściciela z 19 października
+     * 2026). Szkic sięga do bazy tak jak dopytanie, bo klient pyta o towar
+     * spoza faktów, a odpowiedź leży obok. Włączone domyślnie, bo to odczyt
+     * lokalny bez nowych kosztów poza rundami modelu. `0` albo `false`
+     * wyłącza, gdy rundy okażą się za drogie.
+     */
+    szkicNarzedzia: !["0", "false"].includes(String(process.env.COPILOT_SZKIC_NARZEDZIA ?? "").trim().toLowerCase()),
+    /**
      * Rytm krótszy niż przy szkicu, bo rozpoznanie ma stać przy wiadomości,
      * ZANIM agent ją otworzy — a jedno wywołanie trwa sekundę, nie kilka.
      */

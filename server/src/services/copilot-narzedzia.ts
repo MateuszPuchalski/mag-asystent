@@ -5,6 +5,7 @@ import { buildProductCard } from "./stock.js";
 import { kiedyBedzie } from "./copilot-szkic.js";
 import { szukajPoIdentyfikatorze } from "./identyfikatory.js";
 import { zwin } from "../tekst.js";
+import { linkOferty } from "./allegro-linki.js";
 
 /* ── Narzędzia Copilota: model sam sięga do bazy (0.507.0) ──────────────────
 
@@ -20,7 +21,11 @@ import { zwin } from "../tekst.js";
      nie ma, z tego samego powodu co w faktach szkicu (§14.4). Nie ma też
      półki ani opisu kartoteki w całości (§10.4 — opis bywa notatką magazynu).
    - UCIĘTE. Wynik ma sufit znaków, bo każdy wraca do modelu w następnej
-     rundzie i płaci się za niego przy każdej kolejnej.                    */
+     rundzie i płaci się za niego przy każdej kolejnej.
+   - CENY SPRZEDAŻY TAK, ZAKUPU NIGDY. Ceny poziomów sprzedaży i nasze
+     aktywne oferty wolno pokazać, bo szkic podaje je klientowi. Poziom 0
+     to cena zakupu i nie wychodzi z tego pliku; `cenySprzedazy` jest
+     jedynym miejscem czytającym ceny, a pilnuje tego test obok.          */
 
 /** Wynik narzędzia. Rodzi się WYŁĄCZNIE tutaj, z naszej kartoteki i kopii ofert. */
 export type WynikNarzedzia = string & { readonly __narzedzie: unique symbol };
@@ -49,6 +54,17 @@ export interface UzycieNarzedzia {
   nazwa: string;
   argument: string;
   znakow: number;
+}
+
+/**
+ * Wynik jednego wywołania z numerem `N#`. Treść zostaje przy szkicu, bo
+ * serwis sprawdza nią numery i odwołania, tak jak sprawdza faktami `F#`.
+ */
+export interface WynikWywolania {
+  id: string;
+  nazwa: string;
+  argument: string;
+  tresc: string;
 }
 
 /** Sufit znaków jednego wyniku. Cztery tysiące to kilkanaście kartotek. */
@@ -83,7 +99,32 @@ export const DEFINICJE: DefinicjaNarzedzia[] = [
   argument("tresc_oferty",
     "Treść naszych ofert Allegro dla kartoteki o danym symbolu, z kopii w naszej bazie: parametry, "
     + "lista „Pasuje do” i początek opisu. To słowa sprzedawcy, nie kartoteka."),
+  /* Na końcu, bo dopisane później: wcześniejsze definicje zostają w prefiksie cache. */
+  argument("oferty_towaru",
+    "Nasze AKTYWNE oferty Allegro dla kartoteki o danym symbolu: adres aukcji, tytuł i cena. "
+    + "Użyj, gdy chcesz podać klientowi link do naszej aukcji albo cenę, za którą sprzedajemy."),
 ];
+
+/** Ile aktywnych ofert pokazuje `oferty_towaru`. Więcej linków klient i tak nie kliknie. */
+const OFERT = 5;
+
+/** Grosze na złote z przecinkiem, jak pisze się cenę klientowi. */
+const zl = (grosze: number) => (grosze / 100).toFixed(2).replace(".", ",");
+
+/**
+ * Cennik sprzedaży kartoteki. JEDYNE miejsce w pliku, które czyta `karta.ceny`.
+ * Poziom 0 to cena zakupu: zdradza naszą marżę, więc nie wychodzi do modelu,
+ * a stąd do klienta. Zerowa albo brakująca kwota znaczy „nie wiemy”, nie „za darmo”.
+ */
+export function cenySprzedazy(
+  karta: { ceny?: Array<{ poziom: number; nazwa: string; bruttoGrosze: number | null }> },
+): string | null {
+  const ceny = (karta.ceny ?? [])
+    .filter((c) => c.poziom !== 0 && c.bruttoGrosze != null && c.bruttoGrosze > 0);
+  if (!ceny.length) return null;
+  return "Cennik sklepu (kartoteka): "
+    + ceny.map((c) => `${c.nazwa.trim() || `poziom ${c.poziom}`} ${zl(c.bruttoGrosze!)} zł brutto`).join("; ");
+}
 
 const dostepnosc = (ile: number, jednostka: string | null) =>
   ile > 0 ? `dostępne dziś: ${ile} ${jednostka ?? "szt."}` : "dziś brak na stanie";
@@ -124,7 +165,11 @@ function szukajTowaru(subiekt: SubiektAdapter, fraza: string, database: Database
     const karta = buildProductCard(subiekt, r.id);
     linie.push(`${r.sym} — ${r.name} — ${karta ? dostepnosc(karta.mag.avail, karta.unit) : "brak karty"}`);
   }
-  if (!linie.length) return wynik([`Nic w naszej kartotece nie pasuje do „${fraza}”.`]);
+  /* „Nie znaleźliśmy”, nie „nie pasuje”: wyszukiwanie zna nasze nazwy i numery,
+     nie wszystkie zamienniki, więc pusty wynik to brak wiedzy, nie dowód. */
+  if (!linie.length) {
+    return wynik([`Nie znaleźliśmy w naszej kartotece „${fraza}”. To nie znaczy, że takiej części nie ma.`]);
+  }
   return wynik([`Trafienia w naszej kartotece dla „${fraza}”:`, ...linie]);
 }
 
@@ -136,6 +181,8 @@ function kartaTowaru(subiekt: SubiektAdapter, symbol: string): WynikNarzedzia {
   const linie = [`Kartoteka ${k.sym}: ${k.name}`];
   if (k.ean) linie.push(`EAN: ${k.ean}`);
   linie.push(dostepnosc(k.mag.avail, k.unit));
+  const cennik = cenySprzedazy(k);
+  if (cennik) linie.push(cennik);
   const kiedy = kiedyBedzie(k);
   if (kiedy) linie.push(kiedy);
   if (k.identyfikatory.length) {
@@ -164,16 +211,53 @@ function czytajListe<T>(json: string | null): T[] {
 /* Z KOPII w naszej bazie, nie z Allegro. Treść dociąga `ulozSzkic` przy
    szkicu; tu nie ma prawa paść ani jedno żądanie, bo model wybiera, ile razy
    to narzędzie zawoła, a Allegro odcina za serie z jednego adresu. */
+interface OfertaKartoteki {
+  id: string; nazwa: string; opis: string | null;
+  parametry_json: string | null; pasuje_do_json: string | null;
+  cena_grosze: number | null; waluta: string | null; synced_at: string | null;
+}
+
+/* Jedno powiązanie oferty z kartoteką dla obu narzędzi: wskazanie ręczne
+   w `oferta_kartoteka`, a bez niego SKU równe symbolowi. Dwie kopie tego
+   warunku rozjechałyby się i model widziałby treść innej oferty niż link. */
+function ofertyKartoteki(
+  database: DatabaseSync, twId: number, symbol: string, o: { tylkoAktywne: boolean; limit: number },
+): OfertaKartoteki[] {
+  return database.prepare(`SELECT s.external_id AS id, s.nazwa, s.opis, s.parametry_json, s.pasuje_do_json,
+        s.cena_grosze, s.waluta, s.synced_at
+      FROM offer_snapshot s
+      LEFT JOIN oferta_kartoteka k ON k.channel_account_id=s.channel_account_id AND k.offer_id=s.external_id
+     WHERE (k.tw_id=? OR (k.tw_id IS NULL AND s.sku IS NOT NULL AND UPPER(TRIM(s.sku))=UPPER(?)))
+       ${o.tylkoAktywne ? "AND s.status='ACTIVE'" : ""}
+     ORDER BY s.tresc_synced_at IS NULL, s.external_id LIMIT ?`)
+    .all(twId, symbol, o.limit) as unknown as OfertaKartoteki[];
+}
+
+/* Z kopii w bazie, jak treść oferty: link i cenę model może chcieć dla
+   każdej kartoteki z rozmowy, a seria żądań do Allegro skończyłaby się odcięciem. */
+function ofertyTowaru(subiekt: SubiektAdapter, symbol: string, database: DatabaseSync): WynikNarzedzia {
+  const t = towarPoSymbolu(subiekt, symbol);
+  if (!t) return brakSymbolu(symbol);
+  const oferty = ofertyKartoteki(database, t.tw_id, t.symbol, { tylkoAktywne: true, limit: OFERT });
+  /* Kopia zna tylko aukcje, pod którymi ktoś napisał albo które synchronizacja
+     zebrała, i bywa sprzed doby. Pusty wynik mówi to wprost, żeby model nie
+     napisał klientowi, że oferty nie ma. */
+  if (!oferty.length) {
+    return wynik(["W naszej kopii nie ma aktywnej oferty tego towaru. To nie znaczy, że jej nie ma."]);
+  }
+  return wynik([`Nasze aktywne oferty dla ${t.symbol}:`, ...oferty.map((o) => {
+    const cena = o.cena_grosze != null && o.cena_grosze > 0
+      ? `${zl(o.cena_grosze)} ${!o.waluta || o.waluta === "PLN" ? "zł" : o.waluta}` : "cena nieznana";
+    /* Data kopii przy każdej ofercie: cena i status mogły się zmienić od tej chwili. */
+    const kopia = o.synced_at ? `stan z kopii z ${o.synced_at.slice(0, 10)}` : "data kopii nieznana";
+    return `${linkOferty(o.id) ?? `oferta ${o.id}`} — ${o.nazwa} — ${cena} (${kopia})`;
+  })]);
+}
+
 function trescOferty(subiekt: SubiektAdapter, symbol: string, database: DatabaseSync): WynikNarzedzia {
   const t = towarPoSymbolu(subiekt, symbol);
   if (!t) return brakSymbolu(symbol);
-  const oferty = database.prepare(`SELECT s.external_id AS id, s.nazwa, s.opis, s.parametry_json, s.pasuje_do_json
-      FROM offer_snapshot s
-      LEFT JOIN oferta_kartoteka k ON k.channel_account_id=s.channel_account_id AND k.offer_id=s.external_id
-     WHERE k.tw_id=? OR (k.tw_id IS NULL AND s.sku IS NOT NULL AND UPPER(TRIM(s.sku))=UPPER(?))
-     ORDER BY s.tresc_synced_at IS NULL, s.external_id LIMIT 3`)
-    .all(t.tw_id, t.symbol) as Array<{ id: string; nazwa: string; opis: string | null;
-      parametry_json: string | null; pasuje_do_json: string | null }>;
+  const oferty = ofertyKartoteki(database, t.tw_id, t.symbol, { tylkoAktywne: false, limit: 3 });
   if (!oferty.length) return wynik([`Nie mamy w bazie oferty powiązanej z ${t.symbol}.`]);
   const linie: string[] = [];
   for (const o of oferty) {
@@ -207,6 +291,7 @@ export function zestawNarzedzi(subiekt: SubiektAdapter, database: DatabaseSync =
           case "szukaj_towaru": return { wynik: szukajTowaru(subiekt, q, database), blad: false };
           case "karta_towaru": return { wynik: kartaTowaru(subiekt, q), blad: false };
           case "tresc_oferty": return { wynik: trescOferty(subiekt, q, database), blad: false };
+          case "oferty_towaru": return { wynik: ofertyTowaru(subiekt, q, database), blad: false };
           default: return { wynik: `Nie ma narzędzia „${nazwa}”.` as WynikNarzedzia, blad: true };
         }
       } catch (e) {

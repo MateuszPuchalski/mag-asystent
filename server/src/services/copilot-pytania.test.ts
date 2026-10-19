@@ -193,7 +193,7 @@ test("model dostaje narzędzia, a wymiana pamięta, po co sięgnął", async () 
   const nadaj: import("./copilot-pytania.js").NadawcaPytania = async (k) => {
     assert.ok(k.narzedzia, "dopytanie idzie z zestawem narzędzi");
     assert.deepEqual(k.narzedzia!.definicje.map((d) => d.name),
-      ["szukaj_towaru", "karta_towaru", "tresc_oferty"]);
+      ["szukaj_towaru", "karta_towaru", "tresc_oferty", "oferty_towaru"]);
     wynik = String(k.narzedzia!.wykonaj("szukaj_towaru", { zapytanie: "gaźnik" }).wynik);
     return {
       tresc: "Sprawdziłem kartotekę.", twierdzenia: [], model: "atrapa",

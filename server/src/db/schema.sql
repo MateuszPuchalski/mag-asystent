@@ -443,7 +443,12 @@ CREATE TABLE IF NOT EXISTS szkic_copilota (
   -- deklarowany tutaj staje się materiałem, z którego wolno cytować, i tym
   -- samym jest sprawdzalny: agent widzi go obok miniatury i rozstrzyga
   -- jednym spojrzeniem, czy model przeczytał tabliczkę, czy ją wymyślił.
-  odczyt_zdjec         TEXT NOT NULL DEFAULT '[]'
+  odczyt_zdjec         TEXT NOT NULL DEFAULT '[]',
+  -- ── NARZĘDZIA, PO KTÓRE SIĘGNĄŁ SZKIC ─────────────────────────────────
+  -- JSON: lista `{nazwa, argument, znakow}`, jak `copilot_pytanie.narzedzia`.
+  -- Niepusta lista zatrzymuje wysyłkę na żywo: ceny i linki wzięte przez
+  -- model z kartoteki nie idą do klienta bez spojrzenia człowieka.
+  narzedzia            TEXT NOT NULL DEFAULT '[]'
 );
 
 -- ── Identyfikatory części z opisów (§11.2, etap E3) ─────────────────────────

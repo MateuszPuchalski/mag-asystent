@@ -277,6 +277,8 @@ export const KLUCZE: readonly Klucz[] = [
   { klucz: "COPILOT_SZKIC_PO_ROZPOZNANIU", grupa: "copilot", kto: "wlasciciel", edycja: PRZELACZNIK,
     nazwa: "Szkic po rozpoznaniu", wartosci: WL_Y,
     opis: "Szkic układany zaraz po rozpoznaniu wiadomości." },
+  { klucz: "COPILOT_SZKIC_NARZEDZIA", grupa: "copilot", kto: "zaawansowane",
+    opis: "0 = szkic nie sięga sam do kartoteki i naszych ofert; domyślnie sięga, jak dopytanie." },
   { klucz: "COPILOT_AUTO_NA_GODZINE", grupa: "copilot", kto: "wlasciciel", edycja: LICZBA,
     nazwa: "Sufit szkiców w tle", jednostka: NA_GODZINE,
     opis: "Sufit automatycznych szkiców na godzinę; hamulec kosztów." },

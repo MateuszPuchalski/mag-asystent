@@ -707,3 +707,73 @@ test("kiedy będzie: tylko przy braku, bez dostawcy, termin nazwany terminem dos
   assert.equal(S.kiedyBedzie({ mag: { avail: -1 }, unit: null, zamowione: [] }),
     "brak otwartych zamówień u dostawcy — terminu nie znamy");
 });
+
+/* ── Narzędzia kartoteki przy szkicu ────────────────────────────────────────
+   Wynik narzędzia jest bazą sklepu jak fakt, więc przechodzi przez te same
+   sita: N# spoza wyników wywraca szkic, a numer z wyniku jest sprawdzalny. */
+
+const WYNIKI = [
+  { id: "N1", nazwa: "szukaj_towaru", argument: "uszczelka GX160", tresc: "06-12038 — Uszczelka filtra" },
+  { id: "N2", nazwa: "karta_towaru", argument: "06-12038", tresc: "Kartoteka 06-12038: Uszczelka; numery: OEM 16221-883-800" },
+];
+const NARZEDZIA = WYNIKI.map((w) => ({ nazwa: w.nazwa, argument: w.argument, znakow: w.tresc.length }));
+
+test("szkic cytujący N2 z wyników przechodzi, znacznik znika, a numer z wyniku nie jest obcy", async () => {
+  const s = await S.ulozSzkic(rozmowa, KTO(), nadawca({
+    tresc: "Pasuje uszczelka 16221-883-800 (N2).", uzyteFakty: ["F1", "N2"],
+    twierdzenia: [{ teza: "Uszczelka 06-12038 ma numer OEM 16221-883-800", zrodlo: "fakty", odwolanie: "N2", pewnosc: "pewne" }],
+    narzedzia: NARZEDZIA, wynikiNarzedzi: WYNIKI, rund: 3,
+  }), subiekt);
+  assert.equal(s.tresc, "Pasuje uszczelka 16221-883-800.");
+  assert.deepEqual(s.uzyteFakty, ["F1", "N2"]);
+  assert.equal(s.twierdzenia[0]!.pewnosc, "pewne", "wynik narzędzia to baza, sufit jak przy faktach");
+  assert.deepEqual(s.narzedzia.map((n) => n.nazwa), ["szukaj_towaru", "karta_towaru"]);
+  const zd = JSON.parse((db().prepare("SELECT payload FROM events WHERE type='copilot_szkic'").get() as { payload: string }).payload);
+  assert.equal(zd.rund, 3);
+  assert.equal(zd.narzedzi, 2);
+  assert.deepEqual(zd.narzedziaNazwy, ["szukaj_towaru", "karta_towaru"]);
+  assert.ok(!JSON.stringify(zd).includes("06-12038"), "argument narzędzia nie idzie do dziennika");
+});
+
+test("zmyślony numer dalej odpada, choć szkic korzystał z narzędzi", async () => {
+  await assert.rejects(S.ulozSzkic(rozmowa, KTO(), nadawca({
+    tresc: "Pasuje uszczelka QQ-7777 (N2).", uzyteFakty: ["N2"], wynikiNarzedzi: WYNIKI,
+  }), subiekt), /QQ-7777/);
+});
+
+test("N9 spoza wyników narzędzi to fakt spoza listy", async () => {
+  await assert.rejects(S.ulozSzkic(rozmowa, KTO(), nadawca({
+    uzyteFakty: ["F1", "N9"], wynikiNarzedzi: WYNIKI,
+  }), subiekt), /N9/);
+  const b = db().prepare("SELECT blad FROM copilot_wywolanie").get() as { blad: string };
+  assert.match(b.blad, /^fakt_spoza_listy: N9/);
+});
+
+test("ulozSzkic podaje nadawcy zestaw narzędzi przy włączonej fladze, a przy wyłączonej nie", async () => {
+  const bylo = config.copilot.szkicNarzedzia;
+  const dostal: unknown[] = [];
+  const podgladacz: import("./copilot-szkic.js").NadawcaSzkicu = async (_w, _f, _z, n) => {
+    dostal.push(n);
+    return odpowiedz();
+  };
+  try {
+    (config.copilot as { szkicNarzedzia: boolean }).szkicNarzedzia = true;
+    await S.ulozSzkic(rozmowa, KTO(), podgladacz, subiekt);
+    (config.copilot as { szkicNarzedzia: boolean }).szkicNarzedzia = false;
+    await S.ulozSzkic(rozmowa, KTO(), podgladacz, subiekt);
+  } finally {
+    (config.copilot as { szkicNarzedzia: boolean }).szkicNarzedzia = bylo;
+  }
+  const zestaw = dostal[0] as import("./copilot-narzedzia.js").ZestawNarzedzi;
+  assert.ok(zestaw?.definicje.some((d) => d.name === "oferty_towaru"), "pełny zestaw, z ofertami");
+  assert.equal(dostal[1], undefined, "wyłączona flaga to szkic jak przed narzędziami");
+});
+
+test("błąd po rundach narzędzi zostawia w księdze tokeny wszystkich rund", async () => {
+  const blad = Object.assign(new Error("ucięte"), { zuzycie: { wej: 300, wyj: 30, cacheZapis: 0, cacheOdczyt: 0 } });
+  await assert.rejects(S.ulozSzkic(rozmowa, KTO(), async () => { throw blad; }, subiekt));
+  const ks = db().prepare("SELECT model, tokeny_wej, wynik FROM copilot_wywolanie").get() as Record<string, unknown>;
+  assert.equal(ks.wynik, "blad");
+  assert.equal(Number(ks.tokeny_wej), 300);
+  assert.notEqual(ks.model, "");
+});
