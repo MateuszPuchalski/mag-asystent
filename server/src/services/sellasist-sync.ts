@@ -9,6 +9,7 @@ import { config } from "../config.js";
 import { chwilaUtc, dataLokalna, dodajDni, stempelLokalny } from "../czas.js";
 import { db as defaultDb, transaction } from "../db/db.js";
 import { logEvent } from "./events.js";
+import { zgloszonychWDobach } from "./pomylki.js";
 import { dopiszZbiorki, type WierszZbiorki } from "./zbiorki.js";
 
 /* ── Lustro zamówień Sellasist ───────────────────────────────────────────────
@@ -184,6 +185,11 @@ async function czytajDziennik(
 ): Promise<number> {
   const s = stanSync(database);
   const kursorAt = tekst(s.kursor_at) ?? new Date(teraz.getTime() - START_WSTECZ_MS).toISOString();
+  /* Liczenie pomyłek rusza od kursora z chwili włączenia klucza, bo dziennik
+     sprzed niego przeczytano bez klucza i drugi raz go nie czytamy. Pusty
+     klucz kasuje start, żeby przerwa nie udawała dób bez pomyłek. */
+  database.prepare(`UPDATE sellasist_sync_state SET pomylki_od_at = CASE WHEN ?1 THEN COALESCE(pomylki_od_at, ?2)
+      ELSE NULL END WHERE id = 1`).run(statusyPomylka.length > 0 ? 1 : 0, kursorAt);
   let kursor = { at: kursorAt, id: Number(s.kursor_id ?? 0) };
   let zmian = 0;
   for (let strona = 0; strona < STRON_DZIENNIKA; strona++) {
@@ -339,26 +345,48 @@ export function stanSellasist(database: DatabaseSync, wlaczony: boolean, teraz =
 export const DNI_ZLAPANYCH = 14;
 
 export interface ZlapanePomylki {
-  /** `false`: Sellasist wyłączony albo status pomyłki nieustawiony. */
+  /** `false`: Sellasist wyłączony, lustro zatrzymane albo status pomyłki nieustawiony. */
   wlaczone: boolean;
   /**
-   * Doby magazynu od najstarszej, tylko od pierwszego udanego przebiegu.
-   * Pusta lista znaczy „brak danych", nie zero — ta sama zasada co w Strefie.
+   * Pełne doby magazynu od najstarszej i bieżąca. Pusta lista znaczy „brak
+   * danych", nie zero — ta sama zasada co w Strefie.
    */
   dni: Array<{ data: string; zlapanych: number }>;
-  razem: number;
+  /** Suma z `dni`; `null` przy pustej liście. */
+  razem: number | null;
+  /**
+   * Pomyłki z rejestru zgłoszone w tych samych dobach, czyli te, które
+   * pakowanie przepuściło do klienta; `null` przy pustej liście.
+   */
+  doKlienta: number | null;
 }
 
-/** Pomyłki złapane przy pakowaniu na dobę — CZYSTY ODCZYT, bez pytania Sellasist. */
+/**
+ * Pomyłki złapane przy pakowaniu na dobę — CZYSTY ODCZYT, bez pytania Sellasist.
+ *
+ * Doba wchodzi, gdy lustro przeczytało ją całą z ustawionym kluczem. Doba
+ * włączenia klucza jest niepełna, więc liczy się od następnej. Doba ostatniego
+ * udanego przebiegu jest pełna tylko wtedy, gdy to dziś: lustro, które stanęło,
+ * nie dopisuje zer za doby, których nie czytało.
+ *
+ * Rejestr liczy się po dniu zgłoszenia, a złapane po dniu pakowania. Obie
+ * miary to dzień wykrycia, więc przy stałym ruchu okno porównuje podobne
+ * paczki, choć zgłoszenie przychodzi kilka dni po wysyłce.
+ */
 export function zlapanePomylki(database: DatabaseSync, wlaczone: boolean, teraz = new Date()): ZlapanePomylki {
-  if (!wlaczone) return { wlaczone, dni: [], razem: 0 };
-  const s = database.prepare("SELECT pierwszy_sukces_at FROM sellasist_sync_state WHERE id = 1").get() as
+  const pusto = { wlaczone, dni: [], razem: null, doKlienta: null };
+  if (!wlaczone) return pusto;
+  const s = database.prepare("SELECT pomylki_od_at, last_success_at FROM sellasist_sync_state WHERE id = 1").get() as
     Wiersz | undefined;
-  const pierwszy = tekst(s?.pierwszy_sukces_at);
-  if (pierwszy === null) return { wlaczone, dni: [], razem: 0 };
+  const odAt = tekst(s?.pomylki_od_at);
+  const ostatniAt = tekst(s?.last_success_at);
+  if (odAt === null || ostatniAt === null) return pusto;
   const dzis = dataLokalna(teraz.toISOString());
+  const ostatni = dataLokalna(ostatniAt);
+  const koniec = ostatni === dzis ? dzis : dodajDni(ostatni, -1);
   const doby = Array.from({ length: DNI_ZLAPANYCH }, (_, i) => dodajDni(dzis, i - (DNI_ZLAPANYCH - 1)))
-    .filter((d) => d >= dataLokalna(pierwszy));
+    .filter((d) => d > dataLokalna(odAt) && d <= koniec);
+  if (doby.length === 0) return pusto;
   const licznik = new Map(doby.map((d) => [d, 0]));
   const od = new Date(teraz.getTime() - (DNI_ZLAPANYCH + 1) * 24 * 60 * 60_000).toISOString();
   for (const w of database.prepare("SELECT at FROM sellasist_pomylka_zlapana WHERE at >= ?").all(od) as Wiersz[]) {
@@ -366,5 +394,8 @@ export function zlapanePomylki(database: DatabaseSync, wlaczone: boolean, teraz 
     if (licznik.has(d)) licznik.set(d, licznik.get(d)! + 1);
   }
   const dni = doby.map((data) => ({ data, zlapanych: licznik.get(data)! }));
-  return { wlaczone, dni, razem: dni.reduce((a, d) => a + d.zlapanych, 0) };
+  return {
+    wlaczone, dni, razem: dni.reduce((a, d) => a + d.zlapanych, 0),
+    doKlienta: zgloszonychWDobach(doby[0], doby[doby.length - 1], database),
+  };
 }

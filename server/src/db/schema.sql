@@ -3053,6 +3053,7 @@ CREATE TABLE IF NOT EXISTS sellasist_sync_state (
   kursor_id       INTEGER,              -- jego numer; wpisy z tą samą datą i niższym numerem już były
   last_success_at TEXT,
   pierwszy_sukces_at TEXT,              -- od tej doby liczby dzienne są pełne; wcześniej lustra nie było
+  pomylki_od_at   TEXT,                 -- kursor z chwili włączenia SELLASIST_STATUSY_POMYLKA; NULL = nie liczymy
   last_attempt_at TEXT,
   blad            TEXT,                 -- stałe zdanie ostatniej porażki, nigdy treść odpowiedzi
   blad_kod        INTEGER

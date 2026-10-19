@@ -119,23 +119,26 @@ export function useLicznikPomylek() {
  * Takiej paczki klient nie dostał z błędem, więc rejestr niżej jej nie zna.
  */
 export interface ZlapanePomylki {
-  /** `false`: Sellasist wyłączony albo status pomyłki nieustawiony — ekran milczy. */
+  /** `false`: Sellasist wyłączony, lustro stoi albo status pomyłki nieustawiony — ekran milczy. */
   wlaczone: boolean;
   /**
-   * Doby od najstarszej, najwyżej czternaście, tylko od pierwszego udanego
-   * przebiegu Sellasist. Pusta lista to brak danych, nie zero.
+   * Doby od najstarszej, najwyżej czternaście: tylko te, które lustro
+   * przeczytało całe z ustawionym statusem. Pusta lista to brak danych, nie zero.
    */
   dni: Array<{ data: string; zlapanych: number }>;
-  /** Suma po `dni`. */
-  razem: number;
+  /** Suma po `dni`; `null` przy pustej liście. */
+  razem: number | null;
+  /** Pomyłki z rejestru zgłoszone w tych samych dobach; `null` przy pustej liście. */
+  doKlienta: number | null;
 }
 
-/* Klucz poza prefiksem rejestru, bo zapis pomyłki nie zmienia tej liczby.
-   Pod `KLUCZ_POMYLEK` każdy klik w imię czytałby Sellasist od nowa. Pięć
-   minut, bo stan zamówień dochodzi przebiegami synchronizacji, nie na żywo. */
+/* Pod kluczem rejestru, bo nowa pomyłka w rejestrze zmienia liczbę „do
+   klienta”. Odczyt idzie z bazy serwera, nie z Sellasist, więc odświeżenie
+   po zapisie kosztuje jedno lekkie zapytanie. Pięć minut, bo złapane
+   dochodzą przebiegami synchronizacji, nie na żywo. */
 export function useZlapanePomylki() {
   return useQuery({
-    queryKey: ["pomylki-zlapane"] as const,
+    queryKey: [KLUCZ_POMYLEK, "zlapane"] as const,
     queryFn: () => api<ZlapanePomylki>("/api/pomylki/zlapane"),
     staleTime: 5 * 60_000,
   });

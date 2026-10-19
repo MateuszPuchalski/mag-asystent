@@ -171,5 +171,23 @@ test("złapane przy pakowaniu: bramka biura, a bez Sellasist pusta odpowiedź be
   const biuro = login("biuro", "Ola Z");
   const r = await app.inject({ method: "GET", url: "/api/pomylki/zlapane", headers: biuro.naglowki });
   assert.equal(r.statusCode, 200);
-  assert.deepEqual(r.json(), { wlaczone: false, dni: [], razem: 0 });
+  assert.deepEqual(r.json(), { wlaczone: false, dni: [], razem: null, doKlienta: null });
+});
+
+test("złapane przy pakowaniu: włączone tylko z kontem, chodzącym lustrem i statusem pomyłki", async () => {
+  const { config } = await import("../config.js");
+  const bylo = { ...config.sellasist };
+  const biuro = login("biuro", "Ola W");
+  const wlaczone = async () => (await app.inject({ method: "GET", url: "/api/pomylki/zlapane",
+    headers: biuro.naglowki })).json().wlaczone;
+  try {
+    Object.assign(config.sellasist, { konto: "firma", apiKey: "k", syncMs: 251_000, statusyPomylka: [30] });
+    assert.equal(await wlaczone(), true);
+    Object.assign(config.sellasist, { statusyPomylka: [] });
+    assert.equal(await wlaczone(), false, "bez statusu pomyłki nie ma czego liczyć");
+    Object.assign(config.sellasist, { statusyPomylka: [30], syncMs: 0 });
+    assert.equal(await wlaczone(), false, "zatrzymane lustro nie czyta dziennika");
+  } finally {
+    Object.assign(config.sellasist, bylo);
+  }
 });

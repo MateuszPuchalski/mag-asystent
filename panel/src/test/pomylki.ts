@@ -23,12 +23,14 @@ export const lista = (pomylki: Pomylka[], osoby: OdpowiedzPomylek["podsumowanie"
   podsumowanie: { miesiac: "2026-10", razem: pomylki.length, osoby },
 });
 
-/** Złapane przy pakowaniu: domyślnie trzy doby z Sellasist, w tym jedna czysta. */
+/** Złapane przy pakowaniu: domyślnie trzy doby z Sellasist, w tym jedna czysta, i jedna pomyłka do klienta. */
 export const zlapane = (n: Partial<ZlapanePomylki> = {}): ZlapanePomylki => {
   const dni = n.dni ?? [
     { data: "2026-10-17", zlapanych: 2 }, { data: "2026-10-18", zlapanych: 0 }, { data: "2026-10-19", zlapanych: 3 },
   ];
-  return { wlaczone: true, dni, razem: dni.reduce((s, d) => s + d.zlapanych, 0), ...n };
+  const puste = dni.length === 0;
+  return { wlaczone: true, dni, razem: puste ? null : dni.reduce((s, d) => s + d.zlapanych, 0),
+    doKlienta: puste ? null : 1, ...n };
 };
 
 /** Odczyty ekranu pomyłek dla `atrapaZapisow`; nieznany adres → `undefined`. */

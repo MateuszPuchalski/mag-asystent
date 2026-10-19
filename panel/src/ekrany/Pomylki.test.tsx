@@ -193,19 +193,20 @@ describe("pomyłki złapane przy pakowaniu", () => {
     await screen.findByText("jan_kowalski");
     /* Odpowiedź musi dojść i przejść przez render. Inaczej brak bloku
        znaczyłby tylko „jeszcze się wczytuje" i test przechodziłby zawsze. */
-    await waitFor(() => expect(qc.getQueryState(["pomylki-zlapane"])?.status).toBe("success"));
+    await waitFor(() => expect(qc.getQueryState(["pomylki", "zlapane"])?.status).toBe("success"));
     await act(() => new Promise((r) => setTimeout(r, 20)));
     expect(screen.queryByRole("region", ZLAPANE)).toBeNull();
     expect(screen.queryByText(/złapan/i)).toBeNull();
   });
 
-  it("zdanie z okresem i liczbą, pod nim doby — bez osób i odrębnie od rejestru", async () => {
+  it("zdanie z okresem i liczbą, obok przepuszczone z rejestru, pod nim doby — bez osób", async () => {
     atrapaZlapanych(zlapane());
     otworz();
     const blok = await screen.findByRole("region", ZLAPANE);
     expect(blok).toHaveTextContent(
       "Od 17.10 do 19.10 pakowanie złapało 5 pomyłek zbierania, zanim paczka wyszła do klienta.");
-    expect(blok).toHaveTextContent("Rejestr niżej liczy pomyłki, które do klienta doszły.");
+    expect(blok).toHaveTextContent(
+      "W tych dniach rejestr niżej zapisał 1 pomyłkę przepuszczoną do klienta, więc pakowanie zatrzymało 5 z 6 wykrytych.");
     const doby = within(within(blok).getByRole("list", { name: "Złapane przy pakowaniu dzień po dniu" }))
       .getAllByRole("listitem");
     /* Czysta doba z Sellasist zostaje cyfrą: to dana, nie brak danych. */
@@ -226,11 +227,24 @@ describe("pomyłki złapane przy pakowaniu", () => {
     expect(await screen.findByRole("region", ZLAPANE)).toHaveTextContent(zdanie);
   });
 
-  it("pusta lista dób mówi, że Sellasist nic nie podał — bez żadnej cyfry", async () => {
-    atrapaZlapanych(zlapane({ dni: [], razem: 0 }));
+  /* Przymiotnik zgadza się z rzeczownikiem, a proporcja „0 z 0" nie staje. */
+  it.each([
+    [{ doKlienta: 3 }, "zapisał 3 pomyłki przepuszczone do klienta, więc pakowanie zatrzymało 5 z 8 wykrytych."],
+    [{ doKlienta: 0 }, "zapisał 0 pomyłek przepuszczonych do klienta, więc pakowanie zatrzymało 5 z 5 wykrytych."],
+    [{ dni: [{ data: "2026-10-19", zlapanych: 0 }], doKlienta: 0 }, "zapisał 0 pomyłek przepuszczonych do klienta."],
+  ])("przepuszczone do klienta: %j", async (n, zdanie) => {
+    atrapaZlapanych(zlapane(n));
     otworz();
     const blok = await screen.findByRole("region", ZLAPANE);
-    expect(blok).toHaveTextContent("Sellasist nie podał jeszcze żadnego dnia");
+    expect(blok).toHaveTextContent(zdanie);
+    if (!zdanie.includes("zatrzymało")) expect(blok).not.toHaveTextContent("zatrzymało");
+  });
+
+  it("pusta lista dób mówi, że Sellasist nic nie podał — bez żadnej cyfry", async () => {
+    atrapaZlapanych(zlapane({ dni: [] }));
+    otworz();
+    const blok = await screen.findByRole("region", ZLAPANE);
+    expect(blok).toHaveTextContent("Sellasist nie podał jeszcze pełnego dnia");
     expect(blok.textContent).not.toMatch(/\d/);
     expect(within(blok).queryByRole("list")).toBeNull();
   });

@@ -1047,7 +1047,8 @@ sellasist:sonda`. Sonda niczego nie zmienia i odpowiada na cztery pytania:
 
 Numery statusu „Brak podczas pakowania" z tej samej listy wpisz do
 `SELLASIST_STATUSY_POMYLKA`. Zakładka „Pomyłki" policzy z nich pomyłki
-zbierania złapane przed wysyłką.
+zbierania złapane przed wysyłką. Liczenie rusza od doby po wpisaniu, wstecz
+nie.
 
 Co robi integracja i czego nie robi: `docs/sellasist.md`. Pierwszy przebieg
 czyta dziennik zmian z dwóch dni, więc lustro dochodzi przez kilkadziesiąt

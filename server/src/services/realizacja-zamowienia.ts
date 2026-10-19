@@ -171,20 +171,26 @@ export function ocenRealizacji(s: StanRealizacji, teraz: Date): OcenaRealizacji 
  * Oryginał zamówienia z lustra Sellasist. Kopia (dosyłka) odpada: pytanie
  * „czy wyjdzie dziś" dotyczy zamówienia klienta, a nie drugiej paczki.
  *
- * STATUS POMYŁKI TO NIE BRAK DLA KLIENTA. Pakowanie złapało pomyłkę
+ * ŚWIEŻY STATUS POMYŁKI TO NIE BRAK DLA KLIENTA. Pakowanie złapało pomyłkę
  * zbierania i towar właśnie się donosi (fakt właściciela). Braki z tej
  * chwili zdjęłyby obietnicę paczce, która wyjdzie za kwadrans, a nazwa
  * statusu („Brak podczas pakowania") w szkicu brzmiałaby jak brak towaru.
+ *
+ * Tylko wejście z bieżącej doby magazynu. Właściciel mówi „zwykle”, nie
+ * „zawsze”: zamówienie, które stoi w tym statusie od wczoraj, ma prawdziwy
+ * brak, więc szkic znowu widzi status i braki.
  */
 export function realizacjaSellasist(
   database: Db, externalId: string, statusyPomylka: readonly number[] = config.sellasist.statusyPomylka,
+  teraz = new Date(),
 ): RealizacjaSellasist | null {
-  const z = database.prepare(`SELECT id, status_id, status_nazwa, spakowano_at FROM sellasist_zamowienie
+  const z = database.prepare(`SELECT id, status_id, status_nazwa, status_at, spakowano_at FROM sellasist_zamowienie
       WHERE external_id = ? AND skopiowane_z IS NULL ORDER BY id LIMIT 1`).get(externalId) as
     Record<string, unknown> | undefined;
   if (!z) return null;
   const etykietaAt = z.spakowano_at == null ? null : String(z.spakowano_at);
-  if (z.status_id != null && statusyPomylka.includes(Number(z.status_id))) {
+  const swiezy = z.status_at != null && dataLokalna(String(z.status_at)) === dataLokalna(teraz.toISOString());
+  if (z.status_id != null && statusyPomylka.includes(Number(z.status_id)) && swiezy) {
     return { status: null, etykietaAt, braki: [] };
   }
   const braki = (database.prepare(`SELECT nazwa, symbol, ilosc, brakuje FROM sellasist_pozycja

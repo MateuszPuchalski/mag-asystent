@@ -210,29 +210,32 @@ function Podsumowanie({ d }: { d: OdpowiedzPomylek["podsumowanie"] }) {
 /* Pomyłki zbierania złapane przy pakowaniu, czyli DOBRA wiadomość: paczka nie
    wyszła z błędem, bo brak wyszedł przy pakowaniu. Stoją osobno od
    podsumowania, bo rejestr niżej liczy pomyłki, które doszły do klienta.
-   Jedna liczba z obu mieszałaby złapane z przepuszczonymi.
+   Jedna liczba z obu mieszałaby złapane z przepuszczonymi. Obie stoją więc
+   obok siebie w zdaniu, z tych samych dni: tak widać, czy kontrola działa.
 
-   BEZ OSÓB. Sellasist podaje sam status zamówienia, nie kto zbierał, więc
-   obok liczb nie stoi żadne imię ani nic, co by je sugerowało.
+   BEZ OSÓB. Dziennik zna konto, które zmieniło status, ale mapowanie je
+   odrzuca: kto zbierał źle, to monitoring pracowniczy (art. 22² KP).
 
    BRAK DANYCH TO NIE ZERO. Pusta lista dni znaczy, że Sellasist nie oddał
-   jeszcze żadnej doby. Padnięte zapytanie daje błąd zamiast bloku. Wyłączona
-   integracja nie rysuje nic, bo zdanie o niej nie pomaga w żadnej pracy. */
+   jeszcze żadnej pełnej doby. Padnięte zapytanie daje błąd zamiast bloku.
+   Wyłączona integracja nie rysuje nic, bo zdanie o niej nie pomaga w żadnej
+   pracy. */
 function ZlapanePrzyPakowaniu() {
   const z = useZlapanePomylki();
   if (z.error && !z.data) {
     return <Blad>Nie udało się wczytać pomyłek złapanych przy pakowaniu: {(z.error as Error).message}</Blad>;
   }
   if (!z.data?.wlaczone) return null;
-  const { dni, razem } = z.data;
+  const { dni, razem, doKlienta } = z.data;
   const ikona = <PackageCheck size={16} className="shrink-0 text-ranga-ok" aria-hidden="true" />;
-  if (dni.length === 0) {
+  if (dni.length === 0 || razem === null) {
     return <Karta className="flex items-center gap-2 px-4 py-2 text-sm" role="region" aria-label="Złapane przy pakowaniu">
       {ikona}
-      <p className="text-slate-600">Pomyłki złapane przy pakowaniu: Sellasist nie podał jeszcze żadnego dnia.
-        Liczba pojawi się po pierwszej udanej synchronizacji.</p>
+      <p className="text-slate-600">Pomyłki złapane przy pakowaniu: Sellasist nie podał jeszcze pełnego dnia.
+        Liczba pojawi się po pierwszej pełnej dobie synchronizacji z ustawionym statusem.</p>
     </Karta>;
   }
+  const wykrytych = razem + (doKlienta ?? 0);
   const od = dzienMiesiac(dni[0].data), doDnia = dzienMiesiac(dni[dni.length - 1].data);
   /* Okres stoi w zdaniu, bo doby nie idą za miesiącem wybranym nad rejestrem:
      czternaście dni wstecz bywa na przełomie dwóch miesięcy. */
@@ -243,8 +246,18 @@ function ZlapanePrzyPakowaniu() {
       {/* Biernik, bo liczba jest dopełnieniem „złapało": „1 pomyłkę", „2 pomyłki", „5 pomyłek". */}
       <span>{okres} pakowanie złapało{" "}
         <b className="tabular-nums">{ile(razem, "pomyłkę", "pomyłki", "pomyłek")} zbierania</b>, zanim paczka
-        wyszła do klienta. <span className="text-slate-600">Rejestr niżej liczy pomyłki, które do klienta doszły.</span></span>
+        wyszła do klienta.</span>
     </p>
+    {/* Imiesłów odmienia się z liczbą, bo zgadza się z rzeczownikiem: „1 pomyłkę
+        przepuszczoną", „2 pomyłki przepuszczone", „5 pomyłek przepuszczonych".
+        Proporcja dopiero przy czymś wykrytym, bo „0 z 0" nic nie mówi. */}
+    {doKlienta !== null && <p className="pl-6">
+      W tych dniach rejestr niżej zapisał{" "}
+      <b className="tabular-nums">{ile(doKlienta, "pomyłkę przepuszczoną", "pomyłki przepuszczone",
+        "pomyłek przepuszczonych")} do klienta</b>
+      {wykrytych > 0 && <>, więc pakowanie zatrzymało{" "}
+        <b className="tabular-nums">{razem} z {wykrytych}</b> wykrytych</>}.
+    </p>}
     {/* Dzień nad liczbą, nie obok: czternaście dni mieści się w jednym rzędzie.
         Zero zostaje cyfrą, bo ta doba przyszła z Sellasist i naprawdę była
         czysta. Jaśniejsze, żeby oko szło do dni z pomyłkami. */}

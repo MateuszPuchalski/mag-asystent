@@ -926,6 +926,10 @@ export function migrate(database: DatabaseSync) {
      dokładnie to, co było prawdą przed tym wydaniem: odłożenia sprzed niego
      nie da się cofnąć, a każde stare zgłoszenie złożył człowiek. */
   addColumn("delivery_line", "cofniecie", "TEXT");
+  /* Start liczenia pomyłek złapanych przy pakowaniu — patrz
+     `sellasist_sync_state.pomylki_od_at` w `schema.sql`. Tabela stoi już na
+     produkcji, a NULL znaczy prawdę: z kluczem jeszcze nic nie przeczytano. */
+  addColumn("sellasist_sync_state", "pomylki_od_at", "TEXT");
   addColumn("problem", "zrodlo",
     "TEXT CHECK (zrodlo IS NULL OR zrodlo IN ('zakonczenie','nadmiar'))");
   identyfikatorZamiennika(database);

@@ -86,9 +86,18 @@ Ticker chodzi co cztery minuty, więc doba wychodzi dobrze.
 **Pomyłka zbierania złapana przy pakowaniu.** Status 30 „Brak podczas
 pakowania" to według właściciela zwykle pomyłka zbierania, naprawiana
 doniesieniem towaru przed wysyłką. Klient dostaje pełną paczkę, więc ten
-status nie zakłada sprawy klienta i nie trafia do szkicu jako brak. Każde
-wejście w niego liczy się w zakładce „Pomyłki" jako pomyłka złapana
-(`SELLASIST_STATUSY_POMYLKA=30`). Liczba idzie na dobę, bez osób.
+status nie zakłada sprawy klienta. Każde wejście w niego liczy się w zakładce
+„Pomyłki" jako pomyłka złapana (`SELLASIST_STATUSY_POMYLKA=30`). Liczba idzie
+na dobę, bez osób.
+
+Doba wchodzi do bloku, gdy lustro przeczytało ją całą z ustawionym statusem.
+Doba wpisania statusu jest niepełna, a lustro, które stoi, nie dopisuje zer.
+Obok stoi liczba pomyłek z rejestru zgłoszonych w tych samych dobach. Razem
+mówią, ile wykrytych pomyłek zatrzymało pakowanie.
+
+Szkic odpowiedzi pomija ten status tylko przy wejściu z bieżącej doby.
+Zamówienie stojące w nim od wczoraj ma prawdziwy brak, bo „zwykle" to nie
+„zawsze".
 
 **Statusy „zebrane" u tej firmy** to warianty „do pakowania" oraz „Regał
 Braki/Można pakować": `13,41,43,47,68,71`. „Do ponownej kompletacji" (44, 51)

@@ -245,15 +245,17 @@ test("etykieta z dziś przy brakach albo bez płatności nie obiecuje wysyłki d
   assert.match(bezPlatnosci.zdanie, /płatność niezakończona/);
 });
 
-test("status pomyłki złapanej przy pakowaniu: bez braków i bez nazwy statusu — towar właśnie się donosi", () => {
+test("świeży status pomyłki złapanej przy pakowaniu: bez braków i bez nazwy statusu — towar właśnie się donosi", () => {
   const d = db();
   d.exec("DELETE FROM sellasist_pozycja; DELETE FROM sellasist_zamowienie;");
-  d.prepare(`INSERT INTO sellasist_zamowienie(id, external_id, status_id, status_nazwa, pobrano_at)
-    VALUES (1, 'ord-1', 30, 'Brak podczas pakowania', '2026-10-06T07:31:00.000Z')`).run();
+  d.prepare(`INSERT INTO sellasist_zamowienie(id, external_id, status_id, status_nazwa, status_at, pobrano_at)
+    VALUES (1, 'ord-1', 30, 'Brak podczas pakowania', '2026-10-06T07:20:00.000Z', '2026-10-06T07:31:00.000Z')`).run();
   d.prepare(`INSERT INTO sellasist_pozycja(koszyk_id, zamowienie_id, nazwa, ilosc, brakuje)
     VALUES (10, 1, 'Pasek', 1, 1)`).run();
-  assert.deepEqual(R.realizacjaSellasist(d, "ord-1", [30]), { status: null, etykietaAt: null, braki: [] });
-  assert.deepEqual(R.realizacjaSellasist(d, "ord-1", []),
-    { status: "Brak podczas pakowania", etykietaAt: null, braki: [{ nazwa: "Pasek", potrzeba: 1, jest: 0 }] },
-    "bez ustawienia status zostaje taki, jaki jest");
+  const brak = { status: "Brak podczas pakowania", etykietaAt: null, braki: [{ nazwa: "Pasek", potrzeba: 1, jest: 0 }] };
+  assert.deepEqual(R.realizacjaSellasist(d, "ord-1", [30], TERAZ), { status: null, etykietaAt: null, braki: [] });
+  assert.deepEqual(R.realizacjaSellasist(d, "ord-1", [], TERAZ), brak, "bez ustawienia status zostaje taki, jaki jest");
+  /* Stoi od wczoraj: to już nie pomyłka w trakcie poprawki, tylko prawdziwy brak. */
+  d.prepare("UPDATE sellasist_zamowienie SET status_at = '2026-10-05T14:00:00.000Z' WHERE id = 1").run();
+  assert.deepEqual(R.realizacjaSellasist(d, "ord-1", [30], TERAZ), brak);
 });

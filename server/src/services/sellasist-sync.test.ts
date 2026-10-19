@@ -37,7 +37,7 @@ before(async () => {
 beforeEach(() => {
   const d = db();
   for (const t of ["sellasist_pozycja", "sellasist_przesylka", "sellasist_zamowienie", "sellasist_do_pobrania",
-    "sellasist_sync_state", "sellasist_pomylka_zlapana", "zbiorka", "sgt_towar", "events"]) d.exec(`DELETE FROM ${t}`);
+    "sellasist_sync_state", "sellasist_pomylka_zlapana", "pomylka_wysylki", "zbiorka", "sgt_towar", "events"]) d.exec(`DELETE FROM ${t}`);
   d.prepare("INSERT INTO sgt_towar(tw_id, symbol, nazwa, ean) VALUES (?,?,?,?)").run(11, "NOZ-01", "Nóż", "5901");
 });
 
@@ -313,20 +313,59 @@ test("bez ustawionego statusu pomyłki nic się nie liczy", async () => {
   assert.equal(db().prepare("SELECT COUNT(*) AS n FROM sellasist_pomylka_zlapana").get()!.n, 0);
 });
 
-test("złapane na dobę: wyłączone i przed pierwszym przebiegiem puste, potem doby od startu lustra", () => {
-  assert.deepEqual(S.zlapanePomylki(db(), false, TERAZ), { wlaczone: false, dni: [], razem: 0 });
-  assert.deepEqual(S.zlapanePomylki(db(), true, TERAZ), { wlaczone: true, dni: [], razem: 0 },
-    "przed pierwszym udanym przebiegiem nie ma dób — brak danych to nie zero");
-  db().prepare("INSERT INTO sellasist_sync_state(id, pierwszy_sukces_at) VALUES (1, '2026-10-11T10:00:00.000Z')").run();
+const PUSTO = { dni: [], razem: null, doKlienta: null };
+const stan = (pomylkiOd: string | null, ostatni: string | null) =>
+  db().prepare("INSERT INTO sellasist_sync_state(id, pomylki_od_at, last_success_at) VALUES (1, ?, ?)")
+    .run(pomylkiOd, ostatni);
+
+test("złapane na dobę: wyłączone i bez startu liczenia puste, potem pełne doby od następnej po starcie", () => {
+  assert.deepEqual(S.zlapanePomylki(db(), false, TERAZ), { wlaczone: false, ...PUSTO });
+  assert.deepEqual(S.zlapanePomylki(db(), true, TERAZ), { wlaczone: true, ...PUSTO },
+    "bez przeczytanego dziennika nie ma dób — brak danych to nie zero");
+  stan("2026-10-10T10:00:00.000Z", "2026-10-13T09:56:00.000Z");
   const ins = db().prepare("INSERT INTO sellasist_pomylka_zlapana(log_id, zamowienie_id, at) VALUES (?,?,?)");
-  ins.run(1, 1, "2026-10-11T08:00:00.000Z");
-  ins.run(2, 2, "2026-10-13T07:00:00.000Z");
-  ins.run(3, 3, "2026-10-13T08:00:00.000Z");
+  ins.run(1, 1, "2026-10-10T12:00:00.000Z");
+  ins.run(2, 2, "2026-10-11T08:00:00.000Z");
+  ins.run(3, 3, "2026-10-13T07:00:00.000Z");
+  ins.run(4, 4, "2026-10-13T08:00:00.000Z");
   /* 12 października 22:30 UTC to już 13 października w magazynie. */
-  ins.run(4, 4, "2026-10-12T22:30:00.000Z");
+  ins.run(5, 5, "2026-10-12T22:30:00.000Z");
   const z = S.zlapanePomylki(db(), true, TERAZ);
   assert.deepEqual(z.dni, [
     { data: "2026-10-11", zlapanych: 1 }, { data: "2026-10-12", zlapanych: 0 }, { data: "2026-10-13", zlapanych: 3 },
-  ]);
+  ], "doba startu jest niepełna, więc jej nie ma");
   assert.equal(z.razem, 4);
+  assert.equal(z.doKlienta, 0);
+});
+
+test("klucz włączony na działającym lustrze: liczenie od kursora, więc dziś jeszcze brak danych", async () => {
+  db().prepare(`INSERT INTO sellasist_sync_state(id, kursor_at, kursor_id, last_success_at, pierwszy_sukces_at)
+    VALUES (1, '2026-10-13T09:50:00.000Z', 5, '2026-10-13T09:56:00.000Z', '2026-10-01T00:00:00.000Z')`).run();
+  await przebieg(atrapa({ "/orders_logs": [] }).query, [], [30]);
+  const s = db().prepare("SELECT pomylki_od_at FROM sellasist_sync_state").get() as { pomylki_od_at: string };
+  assert.equal(s.pomylki_od_at, "2026-10-13T09:50:00.000Z");
+  assert.deepEqual(S.zlapanePomylki(db(), true, TERAZ), { wlaczone: true, ...PUSTO },
+    "dwa tygodnie zer sprzed klucza byłyby nieprawdą");
+  /* Następny przebieg nie przesuwa startu, a pusty klucz go kasuje. */
+  await przebieg(atrapa({ "/orders_logs": [] }).query, [], [30]);
+  assert.equal((db().prepare("SELECT pomylki_od_at FROM sellasist_sync_state").get() as Record<string, unknown>)
+    .pomylki_od_at, "2026-10-13T09:50:00.000Z");
+  await przebieg(atrapa({ "/orders_logs": [] }).query);
+  assert.equal((db().prepare("SELECT pomylki_od_at FROM sellasist_sync_state").get() as Record<string, unknown>)
+    .pomylki_od_at, null);
+});
+
+test("lustro, które stanęło, nie dopisuje zer: doby kończą się przed dobą ostatniego przebiegu", () => {
+  stan("2026-10-01T10:00:00.000Z", "2026-10-10T15:00:00.000Z");
+  const z = S.zlapanePomylki(db(), true, TERAZ);
+  assert.equal(z.dni.at(-1)!.data, "2026-10-09");
+  assert.equal(z.dni[0].data, "2026-10-02", "doba startu, 1 października, jest niepełna");
+});
+
+test("do klienta: pomyłki z rejestru zgłoszone w tych samych dobach", () => {
+  stan("2026-10-10T10:00:00.000Z", "2026-10-13T09:56:00.000Z");
+  const p = db().prepare(`INSERT INTO pomylka_wysylki(zgloszono, login, zrodlo, utworzono_at, zmieniono_at)
+    VALUES (?, 'Kupiec', 'recznie', 'x', 'x')`);
+  for (const d of ["2026-10-10", "2026-10-11", "2026-10-13", "2026-10-14"]) p.run(d);
+  assert.equal(S.zlapanePomylki(db(), true, TERAZ).doKlienta, 2, "doba startu i jutro poza oknem");
 });

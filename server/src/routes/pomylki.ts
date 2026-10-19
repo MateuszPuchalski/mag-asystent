@@ -64,10 +64,12 @@ export async function pomylkiRoutes(app: FastifyInstance) {
   });
 
   /* Pomyłki złapane przy pakowaniu, z Sellasist. Liczba na dobę bez osób,
-     więc widzi ją całe biuro, nie tylko admin. Czysty odczyt lustra. */
+     więc widzi ją całe biuro, nie tylko admin. Czysty odczyt lustra.
+     Zatrzymane lustro wyłącza blok, bo nie czyta dziennika. */
   app.get("/api/pomylki/zlapane", async (_req, reply) => {
     const nie = odmowa(reply); if (nie) return nie;
-    return zlapanePomylki(db(), sellasistWlaczony() && config.sellasist.statusyPomylka.length > 0);
+    const s = config.sellasist;
+    return zlapanePomylki(db(), sellasistWlaczony() && s.syncMs > 0 && s.statusyPomylka.length > 0);
   });
 
   app.get("/api/pomylki/licznik", async (_req, reply) => {
