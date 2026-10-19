@@ -61,7 +61,8 @@ export function dodawanieWlaczone(): boolean {
  * reguła co przy logo dostawcy (`services/logo-dostawcy.ts`).
  */
 export function bajtyZeZdjecia(
-  base64: string
+  base64: string,
+  skad: "kolektor" | "panel" = "kolektor"
 ): { ok: true; obraz: Buffer; mime: string } | { ok: false; error: string } {
   const czysty = String(base64 ?? "").replace(/^data:image\/\w+;base64,/, "");
   if (!czysty) return { ok: false, error: "Puste zdjęcie" };
@@ -79,12 +80,15 @@ export function bajtyZeZdjecia(
     /* Kolektor zmniejsza zdjęcie przed wysyłką (PhotoCapture, 1600 px), więc
        przekroczenie tej liczby znaczy, że coś poszło z jego pominięciem.
        Odmowa NAZYWA powód — „za duże" bez wskazówki zostawia człowieka bez
-       wyjścia, a wyjście jest jedno: zrobić zdjęcie kolektorem. */
+       wyjścia, a wyjście jest jedno: zrobić zdjęcie kolektorem. Panel składa
+       obraz w przeglądarce sam, więc jego wyjściem jest mniejszy kadr. */
+    const wyjscie =
+      skad === "panel"
+        ? "Zmniejsz kadr albo jakość obrazu i zatwierdź jeszcze raz."
+        : "Zrób je jeszcze raz z karty towaru — kolektor zmniejsza obraz sam.";
     return {
       ok: false,
-      error:
-        `Zdjęcie waży ${kb} kB, a maksimum to ${config.zdjecia.uploadMaxKb} kB. ` +
-        "Zrób je jeszcze raz z karty towaru — kolektor zmniejsza obraz sam.",
+      error: `Zdjęcie waży ${kb} kB, a maksimum to ${config.zdjecia.uploadMaxKb} kB. ` + wyjscie,
     };
   }
 
@@ -132,6 +136,36 @@ export function podglad(id: string, twId: number): ZdjeciePodgladu | null {
     bezTla: w.bez_tla ? Buffer.from(w.bez_tla) : null,
     oryginal: Buffer.from(w.oryginal),
     mime: w.mime,
+  };
+}
+
+/**
+ * Które bajty zapisać po zatwierdzeniu podglądu.
+ *
+ * Bez `gotowy` decyduje sam wybór „zostaw tło", jak na kolektorze. Z `gotowy`
+ * zapisujemy obraz złożony w panelu: obrócony, przycięty i wyrównany przez
+ * człowieka. Bajty z podglądu byłyby wtedy wersją, której nikt nie zatwierdził.
+ * `tloUsuniete` dalej wynika z wyboru, bo panel składa obraz z jednej z dwóch
+ * wersji podglądu i tylko on wie, z której.
+ */
+export function obrazDoZapisu(
+  w: ZdjeciePodgladu,
+  wybor: { zTlem: boolean; gotowy?: unknown }
+):
+  | { ok: true; obraz: Buffer; mime: string; tloUsuniete: boolean }
+  | { ok: false; error: string } {
+  const zTlem = wybor.zTlem || w.bezTla === null;
+  if (wybor.gotowy !== undefined && wybor.gotowy !== null) {
+    if (typeof wybor.gotowy !== "string") return { ok: false, error: "Gotowy obraz musi być tekstem base64" };
+    const b = bajtyZeZdjecia(wybor.gotowy, "panel");
+    if (!b.ok) return b;
+    return { ok: true, obraz: b.obraz, mime: b.mime, tloUsuniete: !zTlem };
+  }
+  return {
+    ok: true,
+    obraz: zTlem ? w.oryginal : (w.bezTla as Buffer),
+    mime: zTlem ? w.mime : "image/png",
+    tloUsuniete: !zTlem,
   };
 }
 

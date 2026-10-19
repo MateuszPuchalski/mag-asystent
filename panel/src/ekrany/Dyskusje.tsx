@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
-import { useNavigate, useParams } from "react-router-dom";
+import { Link, useNavigate, useParams } from "react-router-dom";
 import { MessagesSquare, RefreshCw } from "lucide-react";
 import {
   useDyskusja, useDyskusje, useOdpowiedzWDyskusji, useOdswiezDyskusje,
@@ -33,6 +33,7 @@ import { Zakonczenie } from "../dyskusje/Zakonczenie";
 import { Prowadzi } from "../sprawy/Prowadzi";
 import { pasujeDoFrazy, rozbij } from "../sprawy/szukanie";
 import { klawiszZajety } from "../nawigacja/fokus";
+import { useKursorListy } from "../nawigacja/kursor";
 import { OdnosnikAllegro } from "../skrzynka/odnosniki";
 
 /* ── Ekran dyskusji (0.245.0) ────────────────────────────────────────────────
@@ -80,6 +81,15 @@ const kody = (d: Dyskusja) =>
      znaczyło, że im lepiej ktoś opisał sprawę, tym trudniej ją znaleźć. */
   [d.externalId, d.orderId, d.kupujacyLogin, d.temat, d.prowadzi, d.notatka]
     .filter((k): k is string => Boolean(k)).map((k) => k.toLowerCase());
+
+/* Odesłanie do synchronizacji jest ODNOŚNIKIEM, nie drugim przyciskiem.
+   Przycisk zostaje jeden, w reklamacjach, bo obie kolejki jadą jedną listą
+   Allegro i drugi byłby drugą drogą w limit 429. Samo zdanie bez odnośnika
+   kazało jednak szukać zakładki ręką, więc jedno kliknięcie prowadzi tam. */
+function DoSynchronizacji({ children }: { children: React.ReactNode }) {
+  return <Link to="/obsluga/reklamacje"
+    className="underline underline-offset-2 hover:text-slate-800">{children}</Link>;
+}
 
 export function Dyskusje() {
   const { id } = useParams();
@@ -208,15 +218,9 @@ export function Dyskusje() {
     nawiguj(pierwsza ? `/obsluga/dyskusje/${pierwsza.id}` : "/obsluga/dyskusje");
   };
 
-  /* Kursor chodzi po liście WIDOCZNEJ, nie po kubełku: przy włączonym filtrze
-     strzałka ma iść do następnego wyniku, a nie do sprawy schowanej przed
-     oczami. */
-  const idz = (o: number) => {
-    if (!widoczne.length) return;
-    const i = widoczne.findIndex((d) => d.id === wybrana);
-    const nast = widoczne[Math.min(widoczne.length - 1, Math.max(0, (i < 0 ? 0 : i) + o))];
-    if (nast) nawiguj(`/obsluga/dyskusje/${nast.id}`);
-  };
+  /* Po odpowiedzi sprawa schodzi z kubełka, a `j` ma otworzyć tę, która
+     stanęła na jej miejscu. Powód przy `nawigacja/kursor.ts`. */
+  const idz = useKursorListy(widoczne, wybrana, (d) => nawiguj(`/obsluga/dyskusje/${d.id}`));
 
   /* ── SZKIC PRZEŻYWA ZMIANĘ SPRAWY (0.423.0) ───────────────────────────────
      Do 0.422.0 stało tu `setTresc("")` i to kasowało napisaną odpowiedź, gdy
@@ -340,7 +344,10 @@ export function Dyskusje() {
     return () => window.removeEventListener("keydown", nasluch);
   });
 
-  if (error) return <Blad>{(error as Error).message}</Blad>;
+  /* Zapytanie padło i nie ma danych: błąd zamiast listy, a pigułki bez liczb.
+     Nieudane odświeżenie przy danych w pamięci nie zdejmuje ekranu — agent
+     jest w środku odpowiedzi. Powód przy tym samym miejscu w zwrotach. */
+  const bezDanych = Boolean(error && !data);
 
   const opis = KUBELKI.find((k) => k.id === kubelek);
   const alarmTla = tloAlarmuje({
@@ -362,7 +369,8 @@ export function Dyskusje() {
             <span>Synchronizacja spraw posprzedażowych: <b>{STANY[data.stan.status] ?? data.stan.status}</b>
               {data.stan.kodOstatniegoBledu ? `, kod ${data.stan.kodOstatniegoBledu}` : ""}</span>
             <span className="text-slate-500">
-              Dyskusje i reklamacje przyjeżdżają jedną listą — odśwież ją na ekranie reklamacji.
+              Dyskusje i reklamacje przyjeżdżają jedną listą — odśwież ją <DoSynchronizacji>na ekranie
+              reklamacji</DoSynchronizacji>.
             </span>
           </div>}
         </>
@@ -380,8 +388,9 @@ export function Dyskusje() {
              bez pierwszej połowy („synchronizacja: ..."), która w ciszy
              schodzi, „ją" nie miało do czego się odnosić. */
           stanTekst={data?.stan && data.stan.status !== "current"
-            ? `synchronizacja: ${STANY[data.stan.status] ?? data.stan.status} · odświeżasz ją w reklamacjach`
-            : "synchronizację odświeżasz w reklamacjach"} />}
+            ? <>synchronizacja: {STANY[data.stan.status] ?? data.stan.status} · odświeżasz
+                ją <DoSynchronizacji>w reklamacjach</DoSynchronizacji></>
+            : <>synchronizację odświeżasz <DoSynchronizacji>w reklamacjach</DoSynchronizacji></>} />}
 
     <div className={SIATKA_TRZECH_KOLUMN}>
       <Karta className="flex min-h-0 flex-col overflow-hidden">
@@ -408,9 +417,9 @@ export function Dyskusje() {
             wiecej={["zamknieta", null]}
             pozycje={[
               ...KUBELKI.map((k, i) => ({ klucz: k.id, etykieta: k.etykieta,
-                ile: data?.liczniki?.[k.id] ?? 0,
+                ile: data ? data.liczniki?.[k.id] ?? 0 : undefined,
                 podpowiedz: `${k.pytanie} (klawisz ${i + 1})` })),
-              { klucz: null, etykieta: "Wszystkie", ile: data?.dyskusje?.length ?? 0,
+              { klucz: null, etykieta: "Wszystkie", ile: data?.dyskusje.length,
                 podpowiedz: `Wszystkie dyskusje (klawisz ${KUBELKI.length + 1})` },
             ]} />
         </nav>
@@ -449,7 +458,9 @@ export function Dyskusje() {
           onPokazWszystkie={() => przelaczSito(null)} />
 
         <div className="min-h-0 flex-1 overflow-y-auto">
-          {isLoading
+          {bezDanych
+            ? <div className="p-3"><Blad>{(error as Error).message}</Blad></div>
+            : isLoading
             ? <Pusto waga="lista">Wczytuję kolejkę…</Pusto>
             : <Kolejka dyskusje={widoczne} wybrana={wybrana}
                 mojeId={mojeId}

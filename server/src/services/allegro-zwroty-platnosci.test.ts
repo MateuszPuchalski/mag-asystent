@@ -1,0 +1,457 @@
+import { test } from "node:test";
+import assert from "node:assert/strict";
+import fs from "node:fs";
+import { DatabaseSync } from "node:sqlite";
+import { migrate, type Db } from "../db/db.js";
+import {
+  groszeZKwoty, powodBrakuZatrzasku, sprawdzWszystkieZwrotyPlatnosci, sprawdzZwrotPlatnosci, SprawdzenieZwrotuBlad, synchronizujZwrotyPlatnosci,
+  zwrotyPlatnosciZwrotu, zwrotZOdpowiedzi,
+} from "./allegro-zwroty-platnosci.js";
+
+/* Kształt rekordu stoi na schemacie `RefundDetails` w docs/allegro/swagger.yaml.
+   Te testy pilnują trzech rzeczy: czy rekord czytamy po wymaganych polach, czy
+   zatrzask jest ostrożny i czy zwrot w toku dochodzi do końca. */
+
+const schema = fs.readFileSync(new URL("../db/schema.sql", import.meta.url), "utf8");
+
+function stanowisko() {
+  const d = new DatabaseSync(":memory:");
+  d.exec(schema);
+  migrate(d);
+  d.prepare("INSERT INTO channel_account(channel, external_account_id) VALUES ('allegro','k')").run();
+  return d as unknown as Db;
+}
+
+function zwrot(d: Db, ext: string, order: string, utworzono = "2026-09-01T08:00:00Z", extra = "") {
+  return Number(d.prepare(`INSERT INTO zwrot_klienta
+    (channel_account_id, external_id, order_id, created_at, synced_at)
+    VALUES (1,?,?,?,?)`).run(ext, order, utworzono, "2026-09-22T08:00:00Z" + extra).lastInsertRowid);
+}
+
+const rekord = (o: Record<string, unknown> = {}) => ({
+  id: "r1", payment: { id: "pay1" }, order: { id: "ord1" }, reason: "REFUND",
+  status: "SUCCESS", createdAt: "2026-09-10T10:00:00Z",
+  totalValue: { amount: "59.90", currency: "PLN" },
+  lineItems: [
+    { id: "li1", type: "QUANTITY", quantity: 2 },
+    { id: "li2", type: "AMOUNT", value: { amount: "9.90", currency: "PLN" } },
+  ],
+  delivery: { value: { amount: "12.00", currency: "PLN" } },
+  ...o,
+});
+
+const odpowiedz = (...r: unknown[]) => ({ refunds: r, count: r.length, totalCount: r.length });
+
+test("kwota na grosze liczy na tekście i nie zmyśla przy obcym kształcie", () => {
+  assert.equal(groszeZKwoty("19.99"), 1999);
+  assert.equal(groszeZKwoty("5"), 500);
+  assert.equal(groszeZKwoty("0,5"), 50);
+  assert.equal(groszeZKwoty("abc"), null);
+  assert.equal(groszeZKwoty(undefined), null);
+});
+
+test("rekord czytamy po wymaganych polach, pozycje i dostawę po opcjonalnych", () => {
+  const z = zwrotZOdpowiedzi(rekord());
+  assert.ok(z);
+  assert.equal(z.kwotaGrosze, 5990);
+  assert.equal(z.dostawaGrosze, 1200);
+  assert.deepEqual(z.pozycje, [
+    { id: "li1", type: "QUANTITY", quantity: 2, kwotaGrosze: null },
+    { id: "li2", type: "AMOUNT", quantity: null, kwotaGrosze: 990 },
+  ]);
+  assert.equal(zwrotZOdpowiedzi(rekord({ id: undefined })), null, "bez id nie ma klucza");
+  assert.equal(zwrotZOdpowiedzi(rekord({ status: undefined })), null);
+  assert.equal(zwrotZOdpowiedzi(rekord({ order: undefined }))?.orderId, null,
+    "order nie jest wymagane w schemacie");
+});
+
+test("SUCCESS zatrzaskuje zwrot klienta i zostawia ślad ze źródłem", async () => {
+  const d = stanowisko();
+  const id = zwrot(d, "ret1", "ord1");
+  const wynik = await synchronizujZwrotyPlatnosci(d, 1, {
+    apiUrl: "https://x", query: async () => odpowiedz(rekord()),
+  });
+  assert.equal(wynik.zatrzasniete, 1);
+  const w = d.prepare("SELECT rozliczony_allegro_at AS r FROM zwrot_klienta WHERE id=?")
+    .get(id) as { r: string };
+  assert.equal(w.r, "2026-09-10T10:00:00Z");
+  const ev = d.prepare("SELECT payload FROM events WHERE type='zwrot_wyplata_potwierdzona'")
+    .get() as { payload?: string } | undefined;
+  assert.match(String(ev?.payload ?? ""), /payments\/refunds/);
+});
+
+test("zatrzask jest ostrożny: reklamacja, PARTIAL, starszy przelew i dwa zwroty nie zamykają", async () => {
+  const d = stanowisko();
+  zwrot(d, "a", "o-reklamacja");
+  zwrot(d, "b", "o-czesc");
+  zwrot(d, "c", "o-stary", "2026-09-20T08:00:00Z");
+  zwrot(d, "d1", "o-dwa");
+  zwrot(d, "d2", "o-dwa");
+  const wynik = await synchronizujZwrotyPlatnosci(d, 1, {
+    apiUrl: "https://x",
+    query: async () => odpowiedz(
+      rekord({ id: "r1", order: { id: "o-reklamacja" }, reason: "COMPLAINT" }),
+      rekord({ id: "r2", order: { id: "o-czesc" }, status: "PARTIAL" }),
+      rekord({ id: "r3", order: { id: "o-stary" }, createdAt: "2026-09-10T10:00:00Z" }),
+      rekord({ id: "r4", order: { id: "o-dwa" } }),
+    ),
+  });
+  assert.equal(wynik.zatrzasniete, 0);
+  assert.equal(wynik.zapisane, 4, "lustro zapisuje wszystko, zatrzask wybiera");
+});
+
+test("zwrot w toku jest dopytywany po id, aż dojdzie do SUCCESS", async () => {
+  const d = stanowisko();
+  zwrot(d, "ret1", "ord1");
+  const adresy: string[] = [];
+  const query = async (url: string) => {
+    adresy.push(url);
+    return odpowiedz(rekord({ status: url.includes("&id=") ? "SUCCESS" : "IN_PROGRESS" }));
+  };
+  const pierwszy = await synchronizujZwrotyPlatnosci(d, 1, { apiUrl: "https://x", query },
+    new Date("2026-09-10T12:00:00Z"));
+  /* Lista pokazała zwrot w toku, a dopytanie po `id` w tym samym przebiegu
+     zobaczyło już SUCCESS. */
+  assert.ok(adresy.some((u) => u.includes("&id=r1")));
+  assert.equal(pierwszy.zatrzasniete, 1);
+});
+
+test("lista zwrotów płatności zwrotu łączy po zamówieniu, a bez zamówienia po płatności", () => {
+  const d = stanowisko();
+  const id = zwrot(d, "ret1", "ord1");
+  d.prepare(`INSERT INTO zamowienie_klienta(channel_account_id, external_id, platnosc_id, synced_at)
+    VALUES (1,'ord1','pay1','2026-09-22T08:00:00Z')`).run();
+  d.prepare(`INSERT INTO zwrot_platnosci(channel_account_id, refund_id, payment_id, order_id, status,
+      utworzono_at, sprawdzono_at) VALUES (1,'bez-zam','pay1',NULL,'SUCCESS','2026-09-10T00:00:00Z','x')`).run();
+  d.prepare(`INSERT INTO zwrot_platnosci(channel_account_id, refund_id, payment_id, order_id, status,
+      utworzono_at, sprawdzono_at) VALUES (1,'obca','pay9','inne','SUCCESS','2026-09-10T00:00:00Z','x')`).run();
+  assert.deepEqual(zwrotyPlatnosciZwrotu(d, id).map((z) => z.refundId), ["bez-zam"]);
+});
+
+test("pozycje zwrotu płatności dostają nazwę z pozycji zamówienia o tym samym id", () => {
+  const d = stanowisko();
+  const id = zwrot(d, "ret1", "ord1");
+  const m = Number(d.prepare(`INSERT INTO zamowienie_klienta(channel_account_id, external_id, synced_at)
+    VALUES (1,'ord1','2026-09-22T08:00:00Z')`).run().lastInsertRowid);
+  d.prepare(`INSERT INTO zamowienie_klienta_pozycja(zamowienie_id, external_id, nazwa, ilosc, cena_grosze, waluta)
+    VALUES (?,?,?,?,?,?)`).run(m, "li1", "Sekator Gardena", 2, 2995, "PLN");
+  d.prepare(`INSERT INTO zwrot_platnosci(channel_account_id, refund_id, order_id, status, utworzono_at,
+      pozycje_json, sprawdzono_at) VALUES (1,'r1','ord1','SUCCESS','2026-09-10T00:00:00Z',?, 'x')`)
+    .run(JSON.stringify([
+      { id: "li1", type: "QUANTITY", quantity: 2, kwotaGrosze: null },
+      { id: "obca", type: "AMOUNT", quantity: null, kwotaGrosze: 100 },
+    ]));
+  const [z] = zwrotyPlatnosciZwrotu(d, id);
+  assert.deepEqual(z.pozycje.map((x) => x.nazwa), ["Sekator Gardena", null]);
+});
+
+const biuro = { id: 1, name: "Ewa" };
+
+test("sprawdzenie na żądanie pyta o zamówienie, zapisuje wynik i zatrzaskuje zwrot", async () => {
+  const d = stanowisko();
+  const id = zwrot(d, "ret1", "ord1");
+  const adresy: string[] = [];
+  const wynik = await sprawdzZwrotPlatnosci(d, id, biuro, {
+    apiUrl: "https://x", query: async (u) => { adresy.push(u); return odpowiedz(rekord()); },
+  });
+  assert.equal(wynik.znaleziono, 1);
+  assert.equal(wynik.wyplacone, true);
+  assert.equal(wynik.platnosci[0].kwotaGrosze, 5990);
+  assert.deepEqual(adresy, ["https://x/payments/refunds?limit=100&offset=0&order.id=ord1"]);
+  const ev = d.prepare("SELECT payload FROM events WHERE type='zwrot_platnosci_sprawdzone'")
+    .get() as { payload: string };
+  assert.match(ev.payload, /"znaleziono":1/);
+});
+
+test("sprawdzenie bez odpowiedzi od Allegro to wynik, nie błąd — i pyta jeszcze o płatność", async () => {
+  const d = stanowisko();
+  const id = zwrot(d, "ret1", "ord1");
+  d.prepare(`INSERT INTO zamowienie_klienta(channel_account_id, external_id, platnosc_id, synced_at)
+    VALUES (1,'ord1','pay1','2026-09-22T08:00:00Z')`).run();
+  const adresy: string[] = [];
+  const wynik = await sprawdzZwrotPlatnosci(d, id, biuro, {
+    apiUrl: "https://x", query: async (u) => { adresy.push(u); return odpowiedz(); },
+  });
+  assert.equal(wynik.znaleziono, 0);
+  assert.equal(wynik.wyplacone, false, "brak rekordu nie zatrzaskuje");
+  assert.equal(adresy.length, 2);
+  assert.match(adresy[1], /payment\.id=pay1/);
+});
+
+test("rekord bez order łączy się z zamówieniem po płatności już przy zapisie", async () => {
+  const d = stanowisko();
+  const id = zwrot(d, "ret1", "ord1");
+  d.prepare(`INSERT INTO zamowienie_klienta(channel_account_id, external_id, platnosc_id, synced_at)
+    VALUES (1,'ord1','pay1','2026-09-22T08:00:00Z')`).run();
+  const wynik = await sprawdzZwrotPlatnosci(d, id, biuro, {
+    apiUrl: "https://x",
+    query: async (u) => u.includes("payment.id") ? odpowiedz(rekord({ order: undefined })) : odpowiedz(),
+  });
+  assert.equal(wynik.wyplacone, true);
+  const p = d.prepare("SELECT order_id FROM zwrot_platnosci").get() as { order_id: string };
+  assert.equal(p.order_id, "ord1");
+});
+
+test("zatrzask łączy po płatności także rekord zapisany, zanim znaliśmy zamówienie", async () => {
+  const d = stanowisko();
+  const id = zwrot(d, "ret1", "ord1");
+  d.prepare(`INSERT INTO zwrot_platnosci(channel_account_id, refund_id, payment_id, order_id, status, reason,
+      utworzono_at, sprawdzono_at) VALUES (1,'r1','pay1',NULL,'SUCCESS','REFUND','2026-09-10T10:00:00Z','x')`).run();
+  d.prepare(`INSERT INTO zamowienie_klienta(channel_account_id, external_id, platnosc_id, synced_at)
+    VALUES (1,'ord1','pay1','2026-09-22T08:00:00Z')`).run();
+  const wynik = await synchronizujZwrotyPlatnosci(d, 1, { apiUrl: "https://x", query: async () => odpowiedz() });
+  assert.equal(wynik.zatrzasniete, 1);
+  const w = d.prepare("SELECT rozliczony_allegro_at AS r FROM zwrot_klienta WHERE id=?").get(id) as { r: string };
+  assert.equal(w.r, "2026-09-10T10:00:00Z");
+});
+
+test("sprawdzenie odmawia przy paczce nieodebranej i zwrocie bez zamówienia", async () => {
+  const d = stanowisko();
+  const nieodebrana = zwrot(d, "nieodebrana:1", "ord1");
+  const bez = Number(d.prepare(`INSERT INTO zwrot_klienta
+    (channel_account_id, external_id, order_id, created_at, synced_at) VALUES (1,'x',NULL,'2026-09-01T08:00:00Z','s')`)
+    .run().lastInsertRowid);
+  const deps = { apiUrl: "https://x", query: async () => { throw new Error("nie wolno pytać"); } };
+  await assert.rejects(sprawdzZwrotPlatnosci(d, nieodebrana, biuro, deps), SprawdzenieZwrotuBlad);
+  await assert.rejects(sprawdzZwrotPlatnosci(d, bez, biuro, deps), SprawdzenieZwrotuBlad);
+});
+
+test("powód braku zatrzasku nazywa warunek, który zatrzymał wypłatę", async () => {
+  const d = stanowisko();
+  const inny = zwrot(d, "a", "o-powod");
+  const stary = zwrot(d, "b", "o-stary", "2026-09-20T08:00:00Z");
+  const dwa = zwrot(d, "c1", "o-dwa");
+  zwrot(d, "c2", "o-dwa");
+  const odrzucony = zwrot(d, "d", "o-odrz");
+  d.prepare("UPDATE zwrot_klienta SET werdykt='odrzucony' WHERE id=?").run(odrzucony);
+  await synchronizujZwrotyPlatnosci(d, 1, {
+    apiUrl: "https://x",
+    query: async () => odpowiedz(
+      rekord({ id: "r1", order: { id: "o-powod" }, reason: "OVERPAID" }),
+      rekord({ id: "r2", order: { id: "o-stary" } }),
+      rekord({ id: "r3", order: { id: "o-dwa" } }),
+      rekord({ id: "r4", order: { id: "o-odrz" } }),
+    ),
+  });
+  assert.match(powodBrakuZatrzasku(d, inny)!, /OVERPAID.*REFUND, CANCELLED_BY_BUYER, NOT_COLLECTED/);
+  assert.match(powodBrakuZatrzasku(d, stary)!, /wcześniejsza niż zgłoszenie/);
+  assert.match(powodBrakuZatrzasku(d, dwa)!, /kilka zwrotów klienta/);
+  assert.match(powodBrakuZatrzasku(d, odrzucony)!, /odrzucony/);
+});
+
+test("paczka nieodebrana przy zamówieniu nie blokuje zatrzasku zwrotu z Allegro", async () => {
+  const d = stanowisko();
+  const id = zwrot(d, "ret1", "ord1");
+  zwrot(d, "nieodebrana:9", "ord1");
+  const wynik = await sprawdzZwrotPlatnosci(d, id, biuro, {
+    apiUrl: "https://x", query: async () => odpowiedz(rekord()),
+  });
+  assert.equal(wynik.wyplacone, true);
+  assert.equal(wynik.powodBraku, null);
+});
+
+test("sprawdzenie oddaje powód, gdy Allegro oddało pieniądze, a zatrzask się wstrzymał", async () => {
+  const d = stanowisko();
+  const id = zwrot(d, "ret1", "ord1");
+  const wynik = await sprawdzZwrotPlatnosci(d, id, biuro, {
+    apiUrl: "https://x", query: async () => odpowiedz(rekord({ reason: "OVERPAID" })),
+  });
+  assert.equal(wynik.wyplacone, false);
+  assert.match(wynik.powodBraku!, /OVERPAID/);
+});
+
+test("masowe sprawdzenie: jedna lista na wiele zwrotów, raport z powodami reszty", async () => {
+  const d = stanowisko();
+  const dobry = zwrot(d, "ok", "o-ok");
+  zwrot(d, "powod", "o-powod");
+  zwrot(d, "dwa1", "o-dwa");
+  zwrot(d, "dwa2", "o-dwa");
+  zwrot(d, "brak", "o-brak");
+  zwrot(d, "wtoku", "o-wtoku");
+  const adresy: string[] = [];
+  const wynik = await sprawdzWszystkieZwrotyPlatnosci(d, biuro, {
+    apiUrl: "https://x",
+    query: async (u) => {
+      adresy.push(u);
+      return odpowiedz(
+        rekord({ id: "r1", order: { id: "o-ok" } }),
+        rekord({ id: "r2", order: { id: "o-powod" }, reason: "OVERPAID" }),
+        rekord({ id: "r3", order: { id: "o-dwa" } }),
+        rekord({ id: "r4", order: { id: "o-wtoku" }, status: "IN_PROGRESS" }),
+      );
+    },
+  }, new Date("2026-09-30T10:00:00Z"));
+
+  assert.equal(adresy.length, 1, "jedno żądanie na całą listę, nie na zwrot");
+  assert.match(adresy[0], /occurredAt\.gte=/);
+  assert.equal(wynik.sprawdzonych, 6);
+  assert.equal(wynik.zatrzasniete, 1);
+  assert.equal(wynik.bezZwrotuPlatnosci, 1);
+  assert.equal(wynik.urwane, false);
+  const sumaPowodow = wynik.zPowodem.reduce((n, p) => n + p.ile, 0);
+  assert.equal(sumaPowodow, 4, "powód-reszta: nadpłata, dwa zwroty przy zamówieniu, zwrot w toku");
+  assert.ok(wynik.zPowodem.some((p) => /OVERPAID/.test(p.powod)));
+  assert.ok(wynik.zPowodem.some((p) => /jeszcze nie wyszły/.test(p.powod)));
+  const w = d.prepare("SELECT rozliczony_allegro_at AS r FROM zwrot_klienta WHERE id=?").get(dobry) as { r: string };
+  assert.equal(w.r, "2026-09-10T10:00:00Z");
+});
+
+test("masowe sprawdzenie idzie po stronach i mówi, gdy lista była dłuższa niż bierzemy", async () => {
+  const d = stanowisko();
+  zwrot(d, "a", "o-a");
+  let strony = 0;
+  const wynik = await sprawdzWszystkieZwrotyPlatnosci(d, biuro, {
+    apiUrl: "https://x",
+    query: async () => {
+      strony++;
+      return odpowiedz(...Array.from({ length: 100 }, (_, i) =>
+        rekord({ id: `s${strony}-${i}`, order: { id: `inne-${strony}-${i}` } })));
+    },
+  }, new Date("2026-09-30T10:00:00Z"));
+  assert.equal(strony, 20, "bezpiecznik stron, nie pętla bez końca");
+  assert.equal(wynik.urwane, true);
+  assert.equal(wynik.zapisane, 2000);
+});
+
+test("masowe sprawdzenie bez zwrotów w pracy nie pyta Allegro", async () => {
+  const d = stanowisko();
+  const wynik = await sprawdzWszystkieZwrotyPlatnosci(d, biuro, {
+    apiUrl: "https://x", query: async () => { throw new Error("nie wolno pytać"); },
+  });
+  assert.equal(wynik.sprawdzonych, 0);
+});
+
+test("anulowanie przez kupującego i nieodebrana paczka zatrzaskują zwrot, reklamacja i nadpłata nie", async () => {
+  const d = stanowisko();
+  const anulowane = zwrot(d, "a", "o-anul");
+  const nieodebrane = zwrot(d, "b", "o-nieod");
+  const reklamacja = zwrot(d, "c", "o-rekl");
+  const nadplata = zwrot(d, "d", "o-nadp");
+  const wynik = await synchronizujZwrotyPlatnosci(d, 1, {
+    apiUrl: "https://x",
+    query: async () => odpowiedz(
+      rekord({ id: "r1", order: { id: "o-anul" }, reason: "CANCELLED_BY_BUYER" }),
+      rekord({ id: "r2", order: { id: "o-nieod" }, reason: "NOT_COLLECTED" }),
+      rekord({ id: "r3", order: { id: "o-rekl" }, reason: "COMPLAINT" }),
+      rekord({ id: "r4", order: { id: "o-nadp" }, reason: "OVERPAID" }),
+    ),
+  });
+  assert.equal(wynik.zatrzasniete, 2);
+  const r = (id: number) => (d.prepare("SELECT rozliczony_allegro_at AS r FROM zwrot_klienta WHERE id=?")
+    .get(id) as { r: string | null }).r;
+  assert.ok(r(anulowane));
+  assert.ok(r(nieodebrane));
+  assert.equal(r(reklamacja), null);
+  assert.equal(r(nadplata), null);
+});
+
+/** Zamówienie z dwiema pozycjami i dwa zwroty klienta, każdy o jedną pozycję. */
+function zamowienieZDwomaZwrotami(d: Db, order = "o-2z", wspolnaPozycja = false) {
+  const m = Number(d.prepare(`INSERT INTO zamowienie_klienta(channel_account_id, external_id, synced_at)
+    VALUES (1,?,'2026-09-22T08:00:00Z')`).run(order).lastInsertRowid);
+  const linia = (ext: string, oferta: string, nazwa: string) => d.prepare(
+    `INSERT INTO zamowienie_klienta_pozycja(zamowienie_id, external_id, offer_id, nazwa, ilosc, cena_grosze, waluta)
+     VALUES (?,?,?,?,?,?,?)`).run(m, ext, oferta, nazwa, 1, 1000, "PLN");
+  linia("li-a", "of-a", "Sekator");
+  linia("li-b", "of-b", "Nożyce");
+  const zwrotZPozycja = (ext: string, oferta: string, nazwa: string) => {
+    const id = zwrot(d, ext, order);
+    d.prepare(`INSERT INTO zwrot_klienta_pozycja(zwrot_id, klucz, offer_id, nazwa, ilosc, cena_grosze, waluta)
+      VALUES (?,?,?,?,?,?,?)`).run(id, `k-${ext}`, oferta, nazwa, 1, 1000, "PLN");
+    return id;
+  };
+  const a = zwrotZPozycja("ret-a", "of-a", "Sekator");
+  const b = zwrotZPozycja("ret-b", wspolnaPozycja ? "of-a" : "of-b", wspolnaPozycja ? "Sekator" : "Nożyce");
+  return { a, b, order };
+}
+
+const rozliczony = (d: Db, id: number) => (d.prepare(
+  "SELECT rozliczony_allegro_at AS r FROM zwrot_klienta WHERE id=?").get(id) as { r: string | null }).r;
+
+test("dwa zwroty tego samego zamówienia: wypłata trafia do zwrotu, którego pozycje wymienia", async () => {
+  const d = stanowisko();
+  const { a, b } = zamowienieZDwomaZwrotami(d);
+  const wynik = await synchronizujZwrotyPlatnosci(d, 1, {
+    apiUrl: "https://x",
+    query: async () => odpowiedz(rekord({
+      id: "r1", order: { id: "o-2z" }, createdAt: "2026-09-10T10:00:00Z",
+      lineItems: [{ id: "li-a", type: "QUANTITY", quantity: 1 }],
+    })),
+  });
+  assert.equal(wynik.zatrzasniete, 1);
+  assert.ok(rozliczony(d, a), "zwrot z sekatorem rozliczony");
+  assert.equal(rozliczony(d, b), null, "zwrot z nożycami czeka na swoją wypłatę");
+  assert.match(powodBrakuZatrzasku(d, b)!, /nie wymienia wszystkich pozycji/);
+});
+
+test("jedna wypłata za obie pozycje rozlicza oba zwroty tego zamówienia", async () => {
+  const d = stanowisko();
+  const { a, b } = zamowienieZDwomaZwrotami(d);
+  const wynik = await synchronizujZwrotyPlatnosci(d, 1, {
+    apiUrl: "https://x",
+    query: async () => odpowiedz(rekord({
+      id: "r1", order: { id: "o-2z" },
+      lineItems: [
+        { id: "li-a", type: "QUANTITY", quantity: 1 },
+        { id: "li-b", type: "AMOUNT", value: { amount: "9.50", currency: "PLN" } },
+      ],
+    })),
+  });
+  assert.equal(wynik.zatrzasniete, 2);
+  assert.ok(rozliczony(d, a));
+  assert.ok(rozliczony(d, b));
+});
+
+test("dwa zwroty tej samej pozycji nie dostają wypłaty na zgadywanie", async () => {
+  const d = stanowisko();
+  const { a, b } = zamowienieZDwomaZwrotami(d, "o-2z", true);
+  const wynik = await synchronizujZwrotyPlatnosci(d, 1, {
+    apiUrl: "https://x",
+    query: async () => odpowiedz(rekord({
+      id: "r1", order: { id: "o-2z" }, lineItems: [{ id: "li-a", type: "QUANTITY", quantity: 1 }],
+    })),
+  });
+  assert.equal(wynik.zatrzasniete, 0);
+  assert.equal(rozliczony(d, a), null);
+  assert.match(powodBrakuZatrzasku(d, b)!, /tej samej pozycji/);
+});
+
+test("zwrot całego zamówienia rozlicza wszystkie zwroty klienta przy nim", async () => {
+  const d = stanowisko();
+  const { a, b } = zamowienieZDwomaZwrotami(d);
+  const wynik = await synchronizujZwrotyPlatnosci(d, 1, {
+    apiUrl: "https://x",
+    query: async () => odpowiedz(rekord({
+      id: "r1", order: { id: "o-2z" }, reason: "CANCELLED_BY_BUYER", lineItems: [],
+    })),
+  });
+  assert.equal(wynik.zatrzasniete, 2);
+  assert.ok(rozliczony(d, a));
+  assert.ok(rozliczony(d, b));
+});
+
+test("zwrot towaru bez wskazanych pozycji przy dwóch zwrotach niczego nie rozlicza", async () => {
+  const d = stanowisko();
+  const { a } = zamowienieZDwomaZwrotami(d);
+  const wynik = await synchronizujZwrotyPlatnosci(d, 1, {
+    apiUrl: "https://x",
+    query: async () => odpowiedz(rekord({ id: "r1", order: { id: "o-2z" }, lineItems: [] })),
+  });
+  assert.equal(wynik.zatrzasniete, 0);
+  assert.match(powodBrakuZatrzasku(d, a)!, /nie wymienia wszystkich pozycji/);
+});
+
+test("pozycji, której nie da się przypiąć do zamówienia, nie zgadujemy", async () => {
+  const d = stanowisko();
+  zwrot(d, "x1", "o-bez");
+  const drugi = zwrot(d, "x2", "o-bez");
+  d.prepare(`INSERT INTO zwrot_klienta_pozycja(zwrot_id, klucz, offer_id, nazwa, ilosc, cena_grosze, waluta)
+    VALUES (?,?,?,?,?,?,?)`).run(drugi, "k", "nieznana", "Coś", 1, 1000, "PLN");
+  await synchronizujZwrotyPlatnosci(d, 1, {
+    apiUrl: "https://x",
+    query: async () => odpowiedz(rekord({ id: "r1", order: { id: "o-bez" },
+      lineItems: [{ id: "li-a", type: "QUANTITY", quantity: 1 }] })),
+  });
+  assert.equal(rozliczony(d, drugi), null);
+  assert.match(powodBrakuZatrzasku(d, drugi)!, /nie wiem, których pozycji/);
+});

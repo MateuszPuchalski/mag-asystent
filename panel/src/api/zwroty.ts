@@ -1,7 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "./klient";
 import { poZapisieSprawy } from "./spoiwo";
-import type { DoDopisania, FakturaZwrotu, KandydatFaktury, KolejkaZwrotow, KoszZwrotow, Ocena, PozycjaNaOutlet, SkladPozycji, StanZwrotow, StanZwrotuPieniedzy, WierszDokumentu, WpisOsiZwrotu, WynikDosylki, DosylkaZalozona, Zwrot, SprawaZakupu, PrzystanekDrogi } from "./typy";
+import type { DoDopisania, FakturaZwrotu, KandydatFaktury, KolejkaZwrotow, KoszZwrotow, Ocena, PozycjaNaOutlet, SkladPozycji, StanZwrotow, StanZwrotuPieniedzy, WierszDokumentu, WpisOsiZwrotu, WynikDosylki, ZwrotPlatnosciAllegro, DosylkaZalozona, Zwrot, SprawaZakupu, PrzystanekDrogi } from "./typy";
 
 /* Zwroty jadą JEDNYM zapytaniem razem z licznikami. Zwrotów w pracy są
    dziesiątki, nie tysiące, a dzięki temu przełączenie kubełka nie kosztuje
@@ -918,6 +918,102 @@ export function useCofnijPrzelew() {
       qc.invalidateQueries({ queryKey: kluczeZwrotow.kolejka, exact: true });
       qc.invalidateQueries({ queryKey: kluczeZwrotow.zwrot(v.id) });
     },
+  });
+}
+
+/**
+ * Ręczne zamknięcie zwrotu bez korekty i jego cofnięcie.
+ *
+ * Dotyczy WYŁĄCZNIE naszej kolejki: nic nie idzie do Allegro ani do Subiekta.
+ * Unieważniamy po sukcesie i po błędzie, bo odmowa (towar w koszyku, zwrot już
+ * zamknięty) znaczy zwykle, że ekran widzi stary stan zwrotu.
+ */
+export function useZamknijRecznie() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (v: { id: number; wersja: number; powod?: string }) =>
+      api<{ zamknietyAt: string; wersja: number }>(
+        `/api/obsluga/zwroty/${v.id}/zamkniecie-reczne`,
+        { method: "POST", body: JSON.stringify({ wersja: v.wersja, powod: v.powod }) }),
+    onSettled: (_d, _e, v) => {
+      qc.invalidateQueries({ queryKey: kluczeZwrotow.kolejka, exact: true });
+      qc.invalidateQueries({ queryKey: kluczeZwrotow.zwrot(v.id) });
+    },
+  });
+}
+
+export function useOtworzPonownie() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (v: { id: number; wersja: number }) =>
+      api<{ wersja: number }>(`/api/obsluga/zwroty/${v.id}/zamkniecie-reczne/cofnij`,
+        { method: "POST", body: JSON.stringify({ wersja: v.wersja }) }),
+    onSettled: (_d, _e, v) => {
+      qc.invalidateQueries({ queryKey: kluczeZwrotow.kolejka, exact: true });
+      qc.invalidateQueries({ queryKey: kluczeZwrotow.zwrot(v.id) });
+    },
+  });
+}
+
+/**
+ * „Sprawdź w Allegro” przy pieniądzach zwrotu: serwer pyta Allegro o zwroty
+ * płatności tego zamówienia i zapisuje je w lustrze.
+ *
+ * PRZYCISK, NIE AUTOMAT. Zapytanie zmienia lustro, a otwarcie ekranu niczego
+ * nie zapisuje. Agent klika wtedy, gdy Sales Center pokazuje już oddane
+ * pieniądze, a nasz stan jeszcze o nich nie wie.
+ *
+ * IDZIE BEZ CIAŁA (reguła klienta HTTP): serwer bierze zamówienie ze zwrotu.
+ * Unieważniamy kolejkę i szczegół, bo po sprawdzeniu zwrot może zmienić
+ * kubełek, a sekcja pieniędzy ma pokazać wypłatę z Allegro.
+ */
+export function useSprawdzPlatnosci() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (v: { id: number }) =>
+      api<{ znaleziono: number; wyplacone: boolean; platnosci: ZwrotPlatnosciAllegro[];
+        powodBraku: string | null }>(
+        `/api/obsluga/zwroty/${v.id}/platnosci/sprawdz`, { method: "POST" }),
+    onSettled: (_d, _e, v) => Promise.all([
+      qc.invalidateQueries({ queryKey: kluczeZwrotow.kolejka, exact: true }),
+      qc.invalidateQueries({ queryKey: kluczeZwrotow.zwrot(v.id) }),
+    ]),
+  });
+}
+
+/** Podsumowanie hurtowego sprawdzenia płatności — kształt odpowiedzi serwera. */
+export interface WynikSprawdzeniaWszystkich {
+  sprawdzonych: number;
+  zapisane: number;
+  zatrzasniete: number;
+  bezZwrotuPlatnosci: number;
+  /** `powod` to gotowe zdanie serwera; ekran pokazuje je wprost. */
+  zPowodem: Array<{ powod: string; ile: number }>;
+  /** Lista Allegro dłuższa niż jedno wejście (limit stron) — trzeba kliknąć jeszcze raz. */
+  urwane: boolean;
+}
+
+/**
+ * „Sprawdź wszystkie w Allegro” na kolejce: ten sam ruch co `useSprawdzPlatnosci`,
+ * ale dla wszystkich zwrotów w pracy naraz.
+ *
+ * Sprawdzanie po jednym przyciskiem z sekcji pieniędzy było za wolne przy
+ * setkach zwrotów. Żądanie bywa długie (serwer czyta do dwudziestu stron
+ * Allegro), więc ekran blokuje przycisk na czas żądania.
+ *
+ * IDZIE BEZ CIAŁA (reguła klienta HTTP). Unieważniamy kolejkę I SZCZEGÓŁ także
+ * po błędzie: przerwane sprawdzanie mogło część zwrotów już przestawić, a liczniki
+ * kubełków mają pokazać stan faktyczny, nie sprzed kliknięcia.
+ */
+export function useSprawdzWszystkiePlatnosci() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: () => api<WynikSprawdzeniaWszystkich>(
+      "/api/obsluga/zwroty/platnosci/sprawdz-wszystkie", { method: "POST" }),
+    onSettled: () => Promise.all([
+      qc.invalidateQueries({ queryKey: kluczeZwrotow.kolejka, exact: true }),
+      qc.invalidateQueries({ queryKey: kluczeZwrotow.szczegoly }),
+    ]),
   });
 }
 

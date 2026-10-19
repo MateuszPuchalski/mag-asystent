@@ -11,6 +11,7 @@ import { oczyscSurowy } from "./allegro-oczyszczanie.js";
 import { odkodujEncje } from "../tekst.js";
 import { uzupelnijDoreczenia, type DoSprawdzenia } from "./allegro-tracking.js";
 import { uzupelnijWyplaty, zwrotyDoSprawdzeniaWyplaty } from "./allegro-wyplaty.js";
+import { synchronizujZwrotyPlatnosci } from "./allegro-zwroty-platnosci.js";
 
 /* ── Synchronizator zwrotów klienckich (0.150.0) ─────────────────────────────
    Kształt pól pochodzi z OFICJALNEJ specyfikacji OpenAPI Allegro (modele
@@ -272,6 +273,21 @@ export async function synchronizujAllegroZwroty(deps: ZwrotySyncDeps = {}): Prom
        `allegro:api:payments:read` albo zepsuta końcówka płatności nie ma prawa
        zabrać ani nowych zwrotów, ani doręczeń. 429 idzie wyżej — limit jest
        wspólny dla całego konta. */
+    /* LUSTRO ZWROTÓW PŁATNOŚCI PRZED PYTANIEM O OPERACJE. Jedno żądanie na
+       przebieg zatrzaskuje to, co zobaczy, a lista pytań o płatność kurczy się
+       o zwroty już rozliczone. Własny parasol z tego samego powodu co wyżej. */
+    try {
+      const lustro = await synchronizujZwrotyPlatnosci(
+        database, konto, { query: deps.query, apiUrl });
+      if (lustro.zatrzasniete) {
+        console.log(`[zwroty] wypłata z listy zwrotów płatności przy ${lustro.zatrzasniete} zwrotach`);
+      }
+    } catch (error) {
+      if (error instanceof BladLimituAllegro) throw error;
+      console.warn("[zwroty] lista zwrotów płatności nie doszła:",
+        error instanceof Error ? error.message : error);
+    }
+
     try {
       const zatrzasniete = await uzupelnijWyplaty(
         database, zwrotyDoSprawdzeniaWyplaty(database, konto),
@@ -338,7 +354,7 @@ async function odswiezZnane(
   const otwarte = database.prepare(`SELECT external_id, created_at FROM zwrot_klienta
     WHERE channel_account_id = ? AND rozliczony_allegro_at IS NULL
       AND (zamkniety_at IS NULL
-        OR (zamkniety_at >= ? AND werdykt = 'przyjety' AND kwota_grosze > 0
+        OR (zamkniety_at >= ? AND zamkniecie_reczne_at IS NULL AND werdykt = 'przyjety' AND kwota_grosze > 0
             AND zwrot_pieniedzy_id IS NULL AND zwrot_pieniedzy_command_id IS NULL
             AND odmowa_kod IS NULL AND przelew_at IS NULL))`)
     .all(konto, odKiedyZamkniete) as Array<{ external_id: string; created_at: string }>;

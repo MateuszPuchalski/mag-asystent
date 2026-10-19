@@ -34,6 +34,9 @@ import { ocenRealizacji, stanRealizacji } from "./realizacja-zamowienia.js";
 import { odswiezZamowienie } from "./allegro-zamowienia-sync.js";
 import { werdyktOdrzucenia } from "./przeplyw-kategorii.js";
 import { glosAllegro } from "./glos-allegro.js";
+import {
+  zestawNarzedzi, type UzycieNarzedzia, type WynikWywolania, type ZestawNarzedzi,
+} from "./copilot-narzedzia.js";
 
 /* ── Copilot: szkic odpowiedzi z faktów (§14.6, etap F, przyrost drugi) ──────
 
@@ -261,6 +264,15 @@ export interface OdpowiedzSzkicu {
   model: string;
   zuzycie: Tokeny;
   ms: number;
+  /** Po co model sięgnął do bazy, w kolejności wywołań. Brak = nie sięgał. */
+  narzedzia?: UzycieNarzedzia[];
+  /**
+   * Wyniki narzędzi z numerami N#. Na nich serwis sprawdza odwołania
+   * i numery szkicu, tak samo jak na faktach F#.
+   */
+  wynikiNarzedzi?: WynikWywolania[];
+  /** Ile żądań poszło do dostawcy. Brak = jedno, bo nadawca bez pętli wysyła jedno żądanie. */
+  rund?: number;
 }
 
 /**
@@ -271,6 +283,7 @@ export interface OdpowiedzSzkicu {
  */
 export type NadawcaSzkicu = (
   watek: TrescBezpieczna, fakty: FaktyBezpieczne, zdjecia?: ZdjecieZBramki[],
+  narzedzia?: ZestawNarzedzi,
 ) => Promise<OdpowiedzSzkicu>;
 
 export const OCENY_SZKICU = ["wstawiony", "zastapiony", "odrzucony"] as const;
@@ -301,6 +314,8 @@ export interface SzkicCopilota {
    * ma się na co powołać, a to jest jedyne, co z tego pola wynika.
    */
   odczytZeZdjec: OdczytZdjecia[];
+  /** Po co szkic sięgnął do bazy, bez treści wyników. Pusta = nie sięgał. */
+  narzedzia: UzycieNarzedzia[];
 }
 
 /* ── Pytania z intake per typ części (krytyka właściciela, punkt 4) ──────────
@@ -349,7 +364,8 @@ export function pytaniaIntake(nazwaCzesci: string | null): { typ: string; pytani
  */
 export function bezZnacznikow(tresc: string): string {
   return tresc
-    .replace(/\s*\(\s*F\d+(?:\s*,\s*F\d+)*\s*\)/g, "")
+    /* N# to wynik narzędzia: ten sam znacznik dla kontroli, tak samo zbędny klientowi. */
+    .replace(/\s*\(\s*[FN]\d+(?:\s*,\s*[FN]\d+)*\s*\)/g, "")
     .replace(/ {2,}/g, " ")
     .replace(/ +([.,;:!?])/g, "$1");
 }
@@ -850,14 +866,21 @@ export async function ulozSzkic(
     throw new Error("Maskowanie nie oczyściło rozmowy — nic nie wyszło do dostawcy");
   }
 
+  /* NARZĘDZIA KARTOTEKI (decyzja właściciela z 19 października 2026): szkic
+     sięga do bazy jak dopytanie. Tylko odczyt lokalny, granica stoi
+     w `copilot-narzedzia`. Przełącznik zostaje, bo każda runda to żądanie. */
+  const narzedzia = config.copilot.szkicNarzedzia ? zestawNarzedzi(subiekt) : undefined;
   let odp: OdpowiedzSzkicu;
   try {
-    odp = await nadaj(k.watek, tekstFaktow, zdjecia.zdjecia);
+    odp = narzedzia
+      ? await nadaj(k.watek, tekstFaktow, zdjecia.zdjecia, narzedzia)
+      : await nadaj(k.watek, tekstFaktow, zdjecia.zdjecia);
   } catch (e) {
     const slad = (e as { slad?: string }).slad || (e as Error).message;
-    zapiszBlad(conversationId, slad, kto, teraz);
+    zapiszBlad(conversationId, slad, kto, teraz, (e as { zuzycie?: Tokeny }).zuzycie);
     throw e;
   }
+  const wynikiN = odp.wynikiNarzedzi ?? [];
 
   /* SPRAWDZENIE DETERMINISTYCZNE — orkiestrator, nie wyrocznia. Bez ponowienia:
      wywołanie jest zapłacone, agent widzi zdanie i klika drugi raz, jeśli chce. */
@@ -883,7 +906,11 @@ export async function ulozSzkic(
      na równi z faktami i wątkiem. Bez tego każde poprawne odczytanie
      tabliczki wywracałoby własny szkic na odsiewie numerów. */
   const zOdczytu = odp.odczytZeZdjec.map((o) => o.tekst).join("\n");
-  const material = `${tekstFaktow}\n${k.watek}${zOdczytu ? `\n${zOdczytu}` : ""}`;
+  /* Wynik narzędzia to nasza baza, jak fakty: numer z karty znalezionej
+     przez model jest sprawdzalny tak samo jak numer z F#. */
+  const zNarzedzi = wynikiN.map((w) => w.tresc).join("\n");
+  const material = `${tekstFaktow}\n${k.watek}${zOdczytu ? `\n${zOdczytu}` : ""}`
+    + (zNarzedzi ? `\n${zNarzedzi}` : "");
 
   const obce = numeryNiezadeklarowane(odp.tresc, material, odp.twierdzenia);
   if (obce.length) {
@@ -892,7 +919,9 @@ export async function ulozSzkic(
       `Model użył numeru ${obce[0]}, nie mówiąc, skąd go ma — szkic odrzucony. `
       + "Kliknij ponownie albo napisz odpowiedź sam.", 200, "numer_niezadeklarowany");
   }
-  const znane = new Set(k.fakty.map((f) => f.id));
+  /* N# spoza wyników to ta sama furtka co F# spoza listy: odwołanie do
+     czegoś, czego model nie dostał. */
+  const znane = new Set([...k.fakty.map((f) => f.id), ...wynikiN.map((w) => w.id)]);
   const nieznane = odp.uzyteFakty.filter((f) => !znane.has(f));
   if (nieznane.length) {
     zapiszWywolanie(conversationId, odp, "blad", `fakt_spoza_listy: ${nieznane.join(", ")}`, kto, teraz);
@@ -913,24 +942,30 @@ export async function ulozSzkic(
   transaction(db(), () => {
     db().prepare(`INSERT INTO szkic_copilota
       (conversation_id,tresc,zastrzezenia,uzyte_fakty,message_id,model,at,przez,przez_user_id,
-       twierdzenia,odczyt_zdjec,decyzja_id)
-      VALUES (?,?,?,?,?,?,?,?,?,?,?,?)
+       twierdzenia,odczyt_zdjec,decyzja_id,narzedzia)
+      VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)
       ON CONFLICT(conversation_id) DO UPDATE SET
         tresc=excluded.tresc, zastrzezenia=excluded.zastrzezenia, uzyte_fakty=excluded.uzyte_fakty,
         message_id=excluded.message_id, model=excluded.model, at=excluded.at,
         przez=excluded.przez, przez_user_id=excluded.przez_user_id,
         twierdzenia=excluded.twierdzenia,
         odczyt_zdjec=excluded.odczyt_zdjec, decyzja_id=excluded.decyzja_id,
+        narzedzia=excluded.narzedzia,
         /* Nowa propozycja — stara ocena jej nie dotyczy. */
         ocena=NULL, ocena_at=NULL`)
       .run(conversationId, tresc, JSON.stringify(odp.zastrzezenia), JSON.stringify(odp.uzyteFakty),
         k.ostatniaWiadomoscId, odp.model, teraz.toISOString(), kto.name, kto.id,
-        JSON.stringify(twierdzenia), JSON.stringify(odp.odczytZeZdjec), k.decyzjaId);
+        JSON.stringify(twierdzenia), JSON.stringify(odp.odczytZeZdjec), k.decyzjaId,
+        JSON.stringify(odp.narzedzia ?? []));
     zapiszWywolanie(conversationId, odp, "ok", null, kto, teraz);
     /* Ładunki niosą identyfikatory i DŁUGOŚCI, nigdy treść (§19). */
     logEvent("copilot_szkic", kto.name, null, {
       conversationId, znakow: tresc.length, zastrzezen: odp.zastrzezenia.length,
       faktow: k.fakty.length, model: odp.model, tokeny: odp.zuzycie,
+      /* Same nazwy narzędzi, nigdy argument ani treść: argument bywa numerem
+         z rozmowy, a treść to kartoteka, której dziennik nie potrzebuje. */
+      rund: odp.rund ?? 1, narzedzi: (odp.narzedzia ?? []).length,
+      narzedziaNazwy: (odp.narzedzia ?? []).map((n) => n.nazwa),
       /* Zdjęcia LICZBAMI, jak przy reklamacji (0.484.6). Od 0.330.0 żadne
          zdjęcie rozmowy nie doszło do modelu, a dziennik tego nie pokazał,
          bo liczby błędów nikt nie zapisywał. */
@@ -968,7 +1003,7 @@ export function ocenSzkic(
 /** Odczyt propozycji dla osi rozmowy. `null` = nikt jeszcze nie prosił. */
 export function szkicCopilota(conversationId: number): SzkicCopilota | null {
   const w = db().prepare(`SELECT tresc, zastrzezenia, uzyte_fakty, message_id, model, at, przez, ocena,
-      twierdzenia, odczyt_zdjec
+      twierdzenia, odczyt_zdjec, narzedzia
       FROM szkic_copilota WHERE conversation_id=?`).get(conversationId) as Record<string, unknown> | undefined;
   if (!w) return null;
   return {
@@ -980,6 +1015,7 @@ export function szkicCopilota(conversationId: number): SzkicCopilota | null {
     ocena: w.ocena == null ? null : String(w.ocena) as OcenaSzkicu,
     twierdzenia: JSON.parse(String(w.twierdzenia ?? "[]")) as Twierdzenie[],
     odczytZeZdjec: JSON.parse(String(w.odczyt_zdjec ?? "[]")) as OdczytZdjecia[],
+    narzedzia: JSON.parse(String(w.narzedzia ?? "[]")) as UzycieNarzedzia[],
   };
 }
 
@@ -998,9 +1034,17 @@ function zapiszWywolanie(
 
 function zapiszBlad(
   conversationId: number, powod: string, kto: { id: number | null; zadanie?: string }, teraz: Date,
+  /* Rundy narzędzi zapłacone przed błędem. Bez nich porażka po trzech
+     rundach ważyłaby w pomiarze zero, a kosztowała trzy żądania. */
+  zuzycie?: Tokeny,
 ): void {
+  const t = zuzycie && (zuzycie.wej || zuzycie.wyj) ? zuzycie : null;
+  /* Model pusty przy błędzie bez rund, jak dotąd: pomiar go pomija. */
   db().prepare(`INSERT INTO copilot_wywolanie
-    (zadanie,conversation_id,model,wynik,blad,przez_user_id,at)
-    VALUES (?,?,'',?,?,?,?)`)
-    .run(kto.zadanie ?? "szkic", conversationId, "blad", powod.slice(0, 300), kto.id, teraz.toISOString());
+    (zadanie,conversation_id,model,tokeny_wej,tokeny_wyj,tokeny_cache_zapis,tokeny_cache_odczyt,
+     wynik,blad,przez_user_id,at)
+    VALUES (?,?,?,?,?,?,?,?,?,?,?)`)
+    .run(kto.zadanie ?? "szkic", conversationId, t ? config.copilot.model : "",
+      t?.wej ?? 0, t?.wyj ?? 0, t?.cacheZapis ?? 0, t?.cacheOdczyt ?? 0,
+      "blad", powod.slice(0, 300), kto.id, teraz.toISOString());
 }

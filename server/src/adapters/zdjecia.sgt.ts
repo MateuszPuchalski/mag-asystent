@@ -74,6 +74,11 @@ export function rozpoznajMime(b: Buffer): string | null {
   if (b.length >= 12 && b.toString("latin1", 0, 4) === "RIFF" && b.toString("latin1", 8, 12) === "WEBP") {
     return "image/webp";
   }
+  /* PDF: `%PDF-` na samym początku. Funkcja nazywa FORMAT, nie obiecuje
+     obrazu — PDF rozpoznajemy dla podglądu dokumentu na osi rozmowy.
+     Wołający, któremu wolno przyjąć tylko obraz, sprawdza typ sam
+     (`wybierzObraz`, `typPodgladu`, zdjęcia z kolektora). */
+  if (b.length >= 5 && b.toString("latin1", 0, 5) === "%PDF-") return "application/pdf";
   return null;
 }
 
@@ -163,7 +168,9 @@ export function wybierzObraz(kandydaci: Array<Buffer | null>, twId = 0): Zdjecie
   for (const bajty of kandydaci) {
     if (!bajty || bajty.length === 0) continue;
     const mime = rozpoznajMime(bajty.subarray(0, NAGLOWEK));
-    if (mime) {
+    /* Tylko `image/*`: zakładka „Opis" przyjmuje też PDF, a `rozpoznajMime`
+       go zna. PDF wysłany na kolektor to ten sam pusty prostokąt, co OLE. */
+    if (mime?.startsWith("image/")) {
       if (odrzuconych > 0) {
         console.warn(
           `[zdjecia] tw_id=${twId}: pierwsze ${odrzuconych} zdjęć nie jest obrazem — biorę kolejne`
@@ -250,4 +257,151 @@ export function zresetujBezpiecznik(): void {
   bledowZRzedu = 0;
   odciecieDo = 0;
   brakDostepuDoZdjec = null;
+}
+
+/* ── Kartoteki BEZ zdjęcia — lista dla biura ────────────────────────────────
+   Biuro dokłada zdjęcia z panelu i potrzebuje wiedzieć, KTÓRYM towarom ich
+   brakuje. Pytamy Subiekt wprost, nie nasz cache: cache zna tylko kartoteki,
+   które ktoś otworzył, więc lista z niego byłaby losową próbką. */
+
+export interface TowarBezZdjecia {
+  twId: number;
+  symbol: string;
+  nazwa: string;
+  ean: string | null;
+  /** Suma stanu ze wszystkich magazynów; 0, gdy towar nie ma wiersza w `tw_Stan`. */
+  stan: number;
+}
+
+/**
+ * Porządek listy braków. Biuro zaczyna zwykle od tego, co leży na półce
+ * i się sprzedaje, więc domyślnie wygrywa stan, nie alfabet.
+ */
+export const SORTOWANIA_BEZ_ZDJECIA = ["stan", "symbol", "nazwa", "najnowsze"] as const;
+export type SortBezZdjecia = (typeof SORTOWANIA_BEZ_ZDJECIA)[number];
+
+/* Klauzule z tej mapy, nigdy z wejścia: nazwa sortowania przychodzi
+   z adresu, a ORDER BY nie przyjmuje parametru. Każda domyka się `tw_Id`,
+   bo stronicowanie bez pełnego porządku gubi i dubluje wiersze. */
+const PORZADEK: Record<SortBezZdjecia, string> = {
+  stan: "ISNULL(s.stan, 0) DESC, t.tw_Symbol, t.tw_Id",
+  symbol: "t.tw_Symbol, t.tw_Id",
+  nazwa: "t.tw_Nazwa, t.tw_Id",
+  /* tw_Id rośnie z każdą nową kartoteką, więc to najświeższe towary. */
+  najnowsze: "t.tw_Id DESC",
+};
+
+/**
+ * Warunek „ta kartoteka nie ma zdjęcia" dla skonfigurowanego źródła.
+ *
+ * Dwa kształty, bo zdjęcie siedzi albo w kolumnie samej kartoteki, albo
+ * w osobnej tabeli z kluczem obcym. Wiersz z OLE zamiast obrazu liczy się
+ * jako zdjęcie: odróżnić go można tylko po bajtach, a tu bajtów nie czytamy.
+ */
+function warunekBrakuZdjecia(opts: { tabela: string; kolumna: string; klucz: string }): string {
+  const k = assertSafeColumn(opts.kolumna);
+  if (!opts.tabela || opts.tabela === "tw__Towar") {
+    return `(t.${k} IS NULL OR DATALENGTH(t.${k}) = 0)`;
+  }
+  const tab = assertSafeColumn(opts.tabela);
+  const id = assertSafeColumn(opts.klucz);
+  return `NOT EXISTS (SELECT 1 FROM ${tab} z WITH (NOLOCK) WHERE z.${id} = t.tw_Id)`;
+}
+
+/**
+ * Dwa zapytania: strona i liczba wszystkich. Osobno, bo `COUNT(*) OVER()`
+ * na pustej stronie nie zwraca nic i panel straciłby licznik przy przewinięciu.
+ *
+ * Tylko `tw_Zablokowany = 0`, ten sam filtr co import kartoteki. Usług nie
+ * wycinamy: import też ich nie wycina, a kolumny rodzaju repo nie potwierdziło.
+ * Porządek domyka `tw_Id`, bo symbol nie musi być unikalny, a stronicowanie
+ * bez pełnego porządku gubi i dubluje wiersze między stronami.
+ */
+export function budujZapytanieBezZdjecia(opts: {
+  tabela: string;
+  kolumna: string;
+  klucz: string;
+  zFiltrem: boolean;
+  sortuj?: SortBezZdjecia;
+  /** Tylko towary, które gdziekolwiek leżą — reszty i tak nie ma czym sfotografować. */
+  naStanie?: boolean;
+}): { strona: string; razem: string } {
+  const warunki = ["t.tw_Zablokowany = 0", warunekBrakuZdjecia(opts)];
+  if (opts.zFiltrem) {
+    warunki.push(
+      "(t.tw_Symbol LIKE @q ESCAPE '!' OR t.tw_Nazwa LIKE @q ESCAPE '!' OR t.tw_PodstKodKresk LIKE @q ESCAPE '!')"
+    );
+  }
+  if (opts.naStanie) {
+    warunki.push("EXISTS (SELECT 1 FROM tw_Stan st WITH (NOLOCK) WHERE st.st_TowId = t.tw_Id AND st.st_Stan > 0)");
+  }
+  const gdzie = `WHERE ${warunki.join(" AND ")}`;
+  /* Stan sumowany po magazynach w podzapytaniu: złączenie wprost z tw_Stan
+     mnożyłoby wiersze towaru przez liczbę magazynów. Licznik go nie
+     potrzebuje, więc liczy bez złączenia. */
+  const stan =
+    "LEFT JOIN (SELECT st_TowId, SUM(st_Stan) AS stan FROM tw_Stan WITH (NOLOCK) GROUP BY st_TowId) s " +
+    "ON s.st_TowId = t.tw_Id";
+  const porzadek = PORZADEK[opts.sortuj ?? "stan"] ?? PORZADEK.stan;
+  return {
+    strona:
+      "SELECT t.tw_Id AS twId, t.tw_Symbol AS symbol, t.tw_Nazwa AS nazwa, " +
+      `t.tw_PodstKodKresk AS ean, ISNULL(s.stan, 0) AS stan FROM tw__Towar t WITH (NOLOCK) ${stan} ${gdzie} ` +
+      `ORDER BY ${porzadek} OFFSET @offset ROWS FETCH NEXT @limit ROWS ONLY`,
+    razem: `SELECT COUNT(*) AS razem FROM tw__Towar t WITH (NOLOCK) ${gdzie}`,
+  };
+}
+
+/**
+ * Wzorzec LIKE z tekstu wpisanego przez człowieka.
+ *
+ * `%`, `_` i `[` w symbolu to zwykłe znaki, nie wieloznaczniki. Bez ucieczki
+ * wpisanie „W43_05" pasowałoby do „W43-05" i lista kłamałaby o trafieniu.
+ * Znakiem ucieczki jest `!`, bo ukośnik wsteczny bywa w symbolach kartotek.
+ */
+export function wzorzecLike(q: string): string {
+  return "%" + q.replace(/[!%_[]/g, (z) => "!" + z) + "%";
+}
+
+/** Strona kartotek bez zdjęcia prosto z Subiekta; wyjątek = nie dało się zapytać. */
+export async function towaryBezZdjecia(z: {
+  q: string;
+  limit: number;
+  offset: number;
+  sortuj: SortBezZdjecia;
+  naStanie: boolean;
+}): Promise<{ razem: number; pozycje: TowarBezZdjecia[] }> {
+  const c = config.zdjecia;
+  const zapytania = budujZapytanieBezZdjecia({
+    tabela: c.tabela,
+    kolumna: c.kolumna,
+    klucz: c.kolumnaKlucza,
+    zFiltrem: z.q !== "",
+    sortuj: z.sortuj,
+    naStanie: z.naStanie,
+  });
+  const pool = await mssqlPool();
+  const zapytanie = () => {
+    const r = pool.request();
+    if (z.q !== "") r.input("q", sql.NVarChar(200), wzorzecLike(z.q));
+    return r;
+  };
+  const strona = await zapytanie()
+    .input("offset", sql.Int, z.offset)
+    .input("limit", sql.Int, z.limit)
+    .query<{ twId: number; symbol: string; nazwa: string; ean: string | null; stan: number | null }>(
+      zapytania.strona
+    );
+  const razem = await zapytanie().query<{ razem: number }>(zapytania.razem);
+  return {
+    razem: Number(razem.recordset[0]?.razem ?? 0),
+    pozycje: strona.recordset.map((w) => ({
+      twId: w.twId,
+      symbol: w.symbol,
+      nazwa: w.nazwa,
+      ean: w.ean && w.ean.trim() ? w.ean.trim() : null,
+      /* st_Stan to decimal, a sterownik oddaje go jako liczbę albo tekst. */
+      stan: Number(w.stan ?? 0) || 0,
+    })),
+  };
 }

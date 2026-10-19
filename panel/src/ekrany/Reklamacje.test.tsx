@@ -7,7 +7,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Konflikt } from "../api/klient";
 import { atrapaZapisow } from "../test/zapisy";
 import type {
-  KubelekReklamacji, OstatniaDostawaReklamacji, Reklamacja, StatystykiReklamacji,
+  KubelekReklamacji, OstatniaDostawaReklamacji, ParagonReklamacji, Reklamacja, StatystykiReklamacji,
   WiadomoscReklamacji, WynikWerdyktu,
 } from "../api/typy";
 
@@ -87,6 +87,8 @@ const scena = vi.hoisted(() => ({
      ekran dostanie wynik — tak jak robi to `onSettled` prawdziwego haka. */
   wynikWerdyktu: null as unknown,
   poWerdykcie: null as null | (() => void),
+  /* Dokumenty sprzedaży w szczególe; `undefined` udaje starszy serwer. */
+  paragon: undefined as ParagonReklamacji | undefined,
 }));
 
 /* Tożsamość zalogowanego: bez niej sita „Moje" nie ma w drzewie, bo filtr
@@ -136,7 +138,7 @@ vi.mock("../api/reklamacje", async () => {
         czat: scena.czat,
         zalaczniki: [], zwroty: [], rozmowy: [], sprawy: [], droga: [], kartoteka: null,
         zamowienie: null, przesylka: null, historia: { towar: null, klient: null },
-        dostawa: scena.dostawa,
+        dostawa: scena.dostawa, paragon: scena.paragon,
       },
     }),
     useOdpowiedz: zLosem("odpowiedz", () => scena.wynikWysylki),
@@ -178,7 +180,7 @@ const { zapamietajSzkic } = await import("../sprawy/useSzkicSprawy");
 const wiad = (n: Partial<WiadomoscReklamacji> = {}): WiadomoscReklamacji => ({
   id: 1, externalId: "w-1", autorLogin: "klient1", autorRola: "BUYER",
   tresc: "Kosiarka przestała ciąć", utworzonoAt: "2026-09-06T10:01:00.000Z",
-  zalaczniki: [{ id: 9, wiadomoscId: 1, nazwa: "usterka.jpg", podglad: true }], ...n,
+  zalaczniki: [{ id: 9, wiadomoscId: 1, nazwa: "usterka.jpg", podglad: true, pdf: false }], ...n,
 });
 
 const STATYSTYKI: StatystykiReklamacji = {
@@ -222,6 +224,7 @@ afterEach(() => { try { localStorage.clear(); } catch { /* prywatne okno */ } })
 /* Scenę ustawia test PRZED renderem, więc sprząta się ją po nim. */
 afterEach(() => {
   scena.dostawa = null; scena.poWerdykcie = null; scena.statystyki = undefined; scena.bladListy = null;
+  scena.paragon = undefined;
 });
 
 /* ── MUTACJE BEZ ODŚWIEŻENIA WEJŚCIOWEGO ─────────────────────────────────────
@@ -270,6 +273,39 @@ describe("Ekran reklamacji", () => {
       pokaz("/obsluga/reklamacje/1");
       await userEvent.click(screen.getByRole("link", { name: "Profil klienta" }));
       expect(screen.getByText("ekran profilu klienta")).toBeInTheDocument();
+      expect(scena.mutacje).toEqual(['odswiez:{"id":1}']);
+      expect(zapisy.wyslane).toEqual([]);
+      expect(zapisy.nieznane).toEqual([]);
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
+  it("paragon w karcie Produkt czyta kartę spornej pozycji GET-em, a kopiowanie symbolu nic nie wysyła", async () => {
+    /* Kupiony towar to sam odczyt: karta kartoteki idzie GET-em, a klik
+       w symbol trafia do schowka, nie do serwera. */
+    scena.paragon = {
+      dokumenty: [{ dokId: 900, numer: "PA 1234/10/2026", typ: "PA", data: "2026-10-03", pozycje: [
+        { twId: 11, symbol: "14-31051", nazwa: "Nóż dolny 46 cm", ilosc: 1, usluga: false, sporna: true },
+        { twId: 99, symbol: "PRZESYŁKA", nazwa: "Przesyłka kurierska", ilosc: 1, usluga: true, sporna: false },
+      ] }],
+      spornaTwId: 11, brak: null, oknoDni: 60,
+    };
+    const odczyty: Record<string, unknown> = {
+      "/api/obsluga/reklamacje/1/zalaczniki-wysylki": { zalaczniki: [] },
+      "/api/obsluga/reklamacje/1/zalaczniki/9/podglad": {},
+      "/api/products/11": {
+        id: 11, sym: "14-31051", name: "Nóż dolny 46 cm", unit: "szt.", locs: ["D02-01-04"],
+        mag: { stan: 7, rez: 0, avail: 7 }, magazyny: [], ceny: [],
+      },
+    };
+    const zapisy = atrapaZapisow((url) => odczyty[url]);
+    try {
+      pokaz("/obsluga/reklamacje/1");
+      const produkt = screen.getByRole("region", { name: "Produkt" });
+      expect(within(produkt).getByText("reklamowany")).toBeInTheDocument();
+      expect(await within(produkt).findByText(/W Subiekcie:/)).toHaveTextContent("7 szt.");
+      await userEvent.click(within(produkt).getByRole("button", { name: /14-31051/ }));
       expect(scena.mutacje).toEqual(['odswiez:{"id":1}']);
       expect(zapisy.wyslane).toEqual([]);
       expect(zapisy.nieznane).toEqual([]);

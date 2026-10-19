@@ -1,0 +1,654 @@
+import { urlZwrotowPlatnosci, zapytajAllegro } from "../adapters/allegro.http.js";
+import { config } from "../config.js";
+import { dopasujPozycjeZamowienia } from "./dopasowanie-sku.js";
+import { logEvent } from "./events.js";
+import type { Db } from "../db/db.js";
+
+/* ── Zwroty płatności: pieniądze, które naprawdę wyszły ──────────────────────
+   Zwrot klienta (`/order/customer-returns`) mówi o TOWARZE. Jego `status`
+   jest punktem na osi, która biegnie dalej na statusy prowizyjne, a pole
+   `refund` niesie tylko konto bankowe. Z niego nie da się odczytać, czy
+   pieniądze wyszły ani za co.
+
+   `GET /payments/refunds` jest właściwym źródłem: każdy rekord to jeden
+   zwrot płatności (`RefundDetails`) z kwotą, statusem i rozbiciem na pozycje
+   (`lineItems`), dostawę i kaucję — czyli to, co biuro widzi w Sales Center.
+   Rekord nie wygasa i nie zależy od tego, czy ktoś zapytał w dobrej minucie.
+
+   JEDNO ŻĄDANIE NA PRZEBIEG, nie jedno na płatność. Lista konta od ostatnio
+   widzianego zwrotu (z zakładką na spóźnione rekordy) jest tańsza niż pytanie
+   o każdą płatność, a lustro w bazie pozwala odpowiedzieć o dowolny zwrot bez
+   żadnego żądania.
+
+   ZWROT W TOKU SPRAWDZAMY PO `id`. Schemat nie mówi, czy zmiana statusu
+   przesuwa datę rekordu, więc samo okno czasowe mogło nigdy nie zobaczyć
+   przejścia z `IN_PROGRESS` na `SUCCESS`.
+
+   `[WERYFIKUJ]` na żywym koncie: czy lista obejmuje zwroty zrobione ręką
+   w Sales Center i automatyczny zwrot Allegro po terminie. Schemat tego nie
+   rozstrzyga. Do czasu rozstrzygnięcia stara droga (`allegro-wyplaty.ts`)
+   zostaje obok, a ten moduł tylko zatrzaskuje to, co zobaczył.            */
+
+/** Statusy, w których zwrot płatności może się jeszcze zmienić. */
+export const STATUSY_W_TOKU = ["NEW", "VALIDATED", "IN_PROGRESS"] as const;
+
+/** Ile dni wstecz sięgamy przy pierwszym przebiegu na pustym lustrze. */
+const START_DNI = 90;
+/** Zakładka na rekordy, które pojawiły się z opóźnieniem względem `createdAt`. */
+const ZAKLADKA_DNI = 3;
+/** Bezpiecznik na liczbę stron listy w jednym przebiegu (stu rekordów każda). */
+const MAKS_STRON = 5;
+/** Ile zwrotów w toku odpytujemy po `id` w jednym przebiegu. */
+const W_TOKU_NA_PRZEBIEG = 20;
+
+/**
+ * Powody zwrotu płatności, które znaczą „pieniądze za TEN zwrot są u klienta".
+ *
+ * `REFUND` to zwrot towaru. `CANCELLED_BY_BUYER` i `NOT_COLLECTED` to zwroty
+ * CAŁEGO zamówienia (anulowanie przez kupującego, nieodebrana paczka): kupujący
+ * dostał pieniądze, więc zwrot klienta przy tym zamówieniu nie ma czego
+ * wypłacać. Do pierwszego masowego sprawdzenia stały tu tylko `REFUND`,
+ * a pozostałe dwa zatrzymywały 49 z 697 zwrotów w kolejce bez powodu.
+ *
+ * Poza listą zostaje reszta: `COMPLAINT` należy do reklamacji, a `OVERPAID`,
+ * `PAID_VALUE_TOO_LOW` i `PRODUCT_NOT_AVAILABLE` dotyczą cudzej sytuacji na tym
+ * samym zamówieniu. Zatrzask zdejmuje sprawę z kolejki, więc przy powodzie
+ * o niejasnym zasięgu zwrot zostaje w pracy, zamiast po cichu zniknąć.
+ */
+export const POWODY_WYPLATY = ["REFUND", "CANCELLED_BY_BUYER", "NOT_COLLECTED"] as const;
+const POWODY_SQL = POWODY_WYPLATY.map((p) => `'${p}'`).join(",");
+/** Powody, które znaczą zwrot CAŁEGO zamówienia — dotyczą wszystkich zwrotów klienta przy nim. */
+const POWODY_CALEGO_ZAMOWIENIA = ["CANCELLED_BY_BUYER", "NOT_COLLECTED"];
+
+export interface PozycjaZwrotuPlatnosci {
+  /** Identyfikator pozycji zamówienia (`lineItems[].id`). */
+  id: string;
+  type: "QUANTITY" | "AMOUNT";
+  quantity: number | null;
+  kwotaGrosze: number | null;
+  /**
+   * Nazwa z pozycji zamówienia o tym `id`. Dokładamy ją przy odczycie, nie
+   * przy zapisie lustra: zamówienie bywa dociągnięte później niż zwrot
+   * płatności, a nazwa nie ma prawa utknąć w bazie jako pusta.
+   */
+  nazwa?: string | null;
+}
+
+export interface ZwrotPlatnosci {
+  refundId: string;
+  paymentId: string | null;
+  orderId: string | null;
+  status: string;
+  reason: string | null;
+  utworzonoAt: string;
+  kwotaGrosze: number | null;
+  waluta: string | null;
+  dostawaGrosze: number | null;
+  pozycje: PozycjaZwrotuPlatnosci[];
+}
+
+/**
+ * Kwota Allegro (tekst) na grosze, albo `null` gdy kształt jest obcy.
+ *
+ * Liczymy na tekście, nie przez `number`, bo Allegro oddaje kwotę stringiem
+ * właśnie po to, żeby uniknąć błędu zaokrągleń. Obcy kształt nie wywraca
+ * lustra: brak kwoty jest lepszy niż zmyślona.
+ */
+export function groszeZKwoty(amount: unknown): number | null {
+  if (typeof amount !== "string") return null;
+  const m = /^(-?)(\d+)(?:[.,](\d{1,2}))?$/.exec(amount.trim());
+  if (!m) return null;
+  const grosze = Number(m[2]) * 100 + Number((m[3] ?? "0").padEnd(2, "0"));
+  return m[1] === "-" ? -grosze : grosze;
+}
+
+type Obj = Record<string, unknown>;
+const obj = (v: unknown): Obj | null => (v && typeof v === "object" ? v as Obj : null);
+const tekst = (v: unknown): string | null => (typeof v === "string" && v !== "" ? v : null);
+const kwota = (v: unknown) => groszeZKwoty(obj(v)?.amount);
+
+/**
+ * Rekord `RefundDetails` ze schematu na nasz kształt. `null`, gdy brakuje
+ * któregoś z pól wymaganych, na których stoi klucz lustra: `id`, `status`
+ * i `createdAt`. Reszta jest opcjonalna i brak jej niczego nie psuje.
+ */
+export function zwrotZOdpowiedzi(raw: unknown): ZwrotPlatnosci | null {
+  const r = obj(raw);
+  const refundId = tekst(r?.id);
+  const status = tekst(r?.status);
+  const utworzonoAt = tekst(r?.createdAt);
+  if (!r || !refundId || !status || !utworzonoAt) return null;
+
+  const pozycje: PozycjaZwrotuPlatnosci[] = [];
+  for (const p of Array.isArray(r.lineItems) ? r.lineItems : []) {
+    const l = obj(p);
+    const id = tekst(l?.id);
+    if (!l || !id) continue;
+    const ilosc = typeof l.quantity === "number" ? l.quantity : null;
+    pozycje.push(l.type === "AMOUNT"
+      ? { id, type: "AMOUNT", quantity: null, kwotaGrosze: kwota(l.value) }
+      : { id, type: "QUANTITY", quantity: ilosc, kwotaGrosze: null });
+  }
+  return {
+    refundId, status, utworzonoAt, pozycje,
+    paymentId: tekst(obj(r.payment)?.id),
+    /* `order` nie jest wymagane w schemacie — bez niego łączymy po płatności. */
+    orderId: tekst(obj(r.order)?.id),
+    reason: tekst(r.reason),
+    kwotaGrosze: kwota(r.totalValue),
+    waluta: tekst(obj(r.totalValue)?.currency),
+    dostawaGrosze: kwota(obj(r.delivery)?.value),
+  };
+}
+
+/** Zapis do lustra. Ten sam `refund_id` nadpisuje stan, więc zmiana statusu dochodzi. */
+export function zapiszZwrotyPlatnosci(
+  database: Db, konto: number, zwroty: readonly ZwrotPlatnosci[], teraz = new Date(),
+): number {
+  const zapis = database.prepare(`INSERT INTO zwrot_platnosci
+      (channel_account_id, refund_id, payment_id, order_id, status, reason, utworzono_at,
+       kwota_grosze, waluta, dostawa_grosze, pozycje_json, sprawdzono_at)
+    VALUES (?,?,?,?,?,?,?,?,?,?,?,?)
+    ON CONFLICT(channel_account_id, refund_id) DO UPDATE SET
+      payment_id=excluded.payment_id,
+      order_id=COALESCE(excluded.order_id, zwrot_platnosci.order_id),
+      status=excluded.status, reason=excluded.reason,
+      utworzono_at=excluded.utworzono_at, kwota_grosze=excluded.kwota_grosze,
+      waluta=excluded.waluta, dostawa_grosze=excluded.dostawa_grosze,
+      pozycje_json=excluded.pozycje_json, sprawdzono_at=excluded.sprawdzono_at`);
+  /* Rekord bez `order` (pole nie jest wymagane w schemacie) łączymy z zamówieniem
+     po płatności już przy zapisie, żeby zatrzask i ekran widziały to samo. */
+  const poPlatnosci = database.prepare(`SELECT external_id FROM zamowienie_klienta
+      WHERE channel_account_id = ? AND platnosc_id = ?`);
+  const kiedy = teraz.toISOString();
+  for (const z of zwroty) {
+    const zamowienie = z.orderId
+      ?? (z.paymentId
+        ? (poPlatnosci.get(konto, z.paymentId) as { external_id: string } | undefined)?.external_id
+        : undefined) ?? null;
+    zapis.run(konto, z.refundId, z.paymentId, zamowienie, z.status, z.reason, z.utworzonoAt,
+      z.kwotaGrosze, z.waluta, z.dostawaGrosze, JSON.stringify(z.pozycje), kiedy);
+  }
+  return zwroty.length;
+}
+
+/**
+ * Zwroty płatności jednego zwrotu klienta — po numerze zamówienia, z zapasem
+ * na płatność, gdy rekord nie niósł zamówienia. Najnowsze pierwsze.
+ */
+export function zwrotyPlatnosciZwrotu(database: Db, zwrotId: number): Array<ZwrotPlatnosci> {
+  const wiersze = database.prepare(`
+    SELECT DISTINCT p.refund_id, p.payment_id, p.order_id, p.status, p.reason, p.utworzono_at,
+           p.kwota_grosze, p.waluta, p.dostawa_grosze, p.pozycje_json
+      FROM zwrot_klienta z
+      LEFT JOIN zamowienie_klienta m
+        ON m.channel_account_id = z.channel_account_id AND m.external_id = z.order_id
+      JOIN zwrot_platnosci p
+        ON p.channel_account_id = z.channel_account_id
+       AND (p.order_id = z.order_id
+            OR (p.order_id IS NULL AND m.platnosc_id IS NOT NULL AND p.payment_id = m.platnosc_id))
+     WHERE z.id = ? AND z.order_id IS NOT NULL
+     ORDER BY p.utworzono_at DESC, p.refund_id`)
+    .all(zwrotId) as Array<Record<string, unknown>>;
+  const nazwy = new Map(
+    (database.prepare(`SELECT p.external_id AS id, p.nazwa AS nazwa
+        FROM zwrot_klienta z
+        JOIN zamowienie_klienta m
+          ON m.channel_account_id = z.channel_account_id AND m.external_id = z.order_id
+        JOIN zamowienie_klienta_pozycja p ON p.zamowienie_id = m.id
+       WHERE z.id = ? AND p.external_id IS NOT NULL`)
+      .all(zwrotId) as Array<{ id: string; nazwa: string }>).map((n) => [n.id, n.nazwa]));
+  return wiersze.map((w) => ({
+    refundId: String(w.refund_id),
+    paymentId: (w.payment_id as string | null) ?? null,
+    orderId: (w.order_id as string | null) ?? null,
+    status: String(w.status),
+    reason: (w.reason as string | null) ?? null,
+    utworzonoAt: String(w.utworzono_at),
+    kwotaGrosze: w.kwota_grosze == null ? null : Number(w.kwota_grosze),
+    waluta: (w.waluta as string | null) ?? null,
+    dostawaGrosze: w.dostawa_grosze == null ? null : Number(w.dostawa_grosze),
+    pozycje: (JSON.parse(String(w.pozycje_json ?? "[]")) as PozycjaZwrotuPlatnosci[])
+      .map((x) => ({ ...x, nazwa: nazwy.get(x.id) ?? null })),
+  }));
+}
+
+/**
+ * Zatrzask rozliczenia z lustra: zwrot klienta, za który wyszedł zwrot
+ * płatności `SUCCESS`, dostaje `rozliczony_allegro_at`.
+ *
+ * KONSERWATYWNIE, bo zatrzask zdejmuje sprawę z kolejki, a niezatrzaśnięty
+ * zwrot tylko zostaje w pracy. Dlatego:
+ * - tylko powody z `POWODY_WYPLATY` (zwrot towaru, anulowanie, nieodebrana
+ *   paczka); `COMPLAINT` to reklamacje, a te chodzą u nas osobną drogą
+ *   i nie zamykają zwrotu;
+ * - zwrot płatności musi być NOWSZY od zgłoszenia zwrotu — wcześniejszy
+ *   dotyczył czegoś innego na tym samym zamówieniu;
+ * - tylko gdy zamówienie ma JEDEN zwrot klienta z Allegro. Przy dwóch nie
+ *   wiadomo, któremu należy się dany przelew, a zgadywanie zamknęłoby oba.
+ *   Paczka nieodebrana, dodana ręcznie, nie liczy się: Allegro nie zna jej
+ *   i nie ma dla niej zwrotu płatności, więc o przelew nie konkuruje;
+ * - `PARTIAL` nie zatrzaskuje: wyszła część, a nie całość.
+ *
+ * Zatrzask trzyma PIERWSZĄ datę (`rozliczony_allegro_at IS NULL`), tak jak
+ * ten z operacji płatniczych.
+ */
+export function zatrzaskZLustra(database: Db, konto: number, tylkoZwrot: number | null = null): number {
+  const kandydaci = database.prepare(`
+    SELECT z.id AS zwrot_id, MIN(p.utworzono_at) AS kiedy, MIN(p.refund_id) AS refund_id
+      FROM zwrot_klienta z
+      LEFT JOIN zamowienie_klienta m
+        ON m.channel_account_id = z.channel_account_id AND m.external_id = z.order_id
+      JOIN zwrot_platnosci p
+        ON p.channel_account_id = z.channel_account_id
+       AND (p.order_id = z.order_id
+            OR (p.order_id IS NULL AND m.platnosc_id IS NOT NULL AND p.payment_id = m.platnosc_id))
+     WHERE z.channel_account_id = ?
+       AND (? IS NULL OR z.id = ?)
+       AND z.rozliczony_allegro_at IS NULL
+       AND z.order_id IS NOT NULL
+       AND z.external_id NOT LIKE 'nieodebrana:%'
+       AND (z.werdykt IS NULL OR z.werdykt <> 'odrzucony')
+       AND p.status = 'SUCCESS' AND p.reason IN (${POWODY_SQL})
+       AND p.utworzono_at >= z.created_at
+       AND (SELECT COUNT(*) FROM zwrot_klienta d
+             WHERE d.channel_account_id = z.channel_account_id
+               AND d.order_id = z.order_id
+               AND d.external_id NOT LIKE 'nieodebrana:%') = 1
+     GROUP BY z.id`)
+    .all(konto, tylkoZwrot, tylkoZwrot) as Array<{ zwrot_id: number; kiedy: string; refund_id: string }>;
+
+  let zatrzasniete = 0;
+  const zatrzasnij = (zwrotId: number, kiedy: string, refundId: string, zrodlo: string) => {
+    const r = database.prepare(`UPDATE zwrot_klienta SET rozliczony_allegro_at=?
+        WHERE id=? AND rozliczony_allegro_at IS NULL`).run(kiedy, zwrotId);
+    if (Number(r.changes) === 0) return;
+    zatrzasniete++;
+    logEvent("zwrot_wyplata_potwierdzona", "automat (zwroty płatności)", null,
+      { zwrotId, wyplataAt: kiedy, refundId, zrodlo }, undefined, database);
+  };
+  for (const k of kandydaci) zatrzasnij(k.zwrot_id, k.kiedy, k.refund_id, "payments/refunds");
+
+  /* Zamówienia z KILKOMA zwrotami: wypłatę przypisuje się po pozycjach. */
+  const wielu = database.prepare(`
+    SELECT z.id FROM zwrot_klienta z
+     WHERE z.channel_account_id = ? AND (? IS NULL OR z.id = ?)
+       AND z.rozliczony_allegro_at IS NULL AND z.order_id IS NOT NULL
+       AND z.external_id NOT LIKE 'nieodebrana:%'
+       AND (z.werdykt IS NULL OR z.werdykt <> 'odrzucony')
+       AND (SELECT COUNT(*) FROM zwrot_klienta d
+             WHERE d.channel_account_id = z.channel_account_id
+               AND d.order_id = z.order_id
+               AND d.external_id NOT LIKE 'nieodebrana:%') > 1`)
+    .all(konto, tylkoZwrot, tylkoZwrot) as Array<{ id: number }>;
+  for (const { id } of wielu) {
+    const o = ocenaWieluZwrotow(database, Number(id));
+    if (o.data && o.refundId) zatrzasnij(Number(id), o.data, o.refundId, "payments/refunds (pozycje)");
+  }
+  return zatrzasniete;
+}
+
+/**
+ * Identyfikatory pozycji ZAMÓWIENIA (`lineItems[].id`), których dotyczy zwrot
+ * klienta. `null`, gdy którejś pozycji nie da się przypiąć do zamówienia — wtedy
+ * nie wiemy, czego zwrot dotyczy, i niczego nie zgadujemy.
+ */
+function liniePozycjiZwrotu(database: Db, zwrotId: number): Set<string> | null {
+  const z = database.prepare(
+    "SELECT channel_account_id AS konto, order_id FROM zwrot_klienta WHERE id = ?")
+    .get(zwrotId) as { konto: number; order_id: string | null } | undefined;
+  if (!z?.order_id) return null;
+  const pozycje = database.prepare(
+    "SELECT offer_id, nazwa FROM zwrot_klienta_pozycja WHERE zwrot_id = ?")
+    .all(zwrotId) as Array<{ offer_id: string | null; nazwa: string }>;
+  if (!pozycje.length) return null;
+  const linie = new Set<string>();
+  for (const p of pozycje) {
+    const id = dopasujPozycjeZamowienia(database, z.konto, z.order_id, p.offer_id, String(p.nazwa))
+      .pozycja?.external_id;
+    if (!id) return null;
+    linie.add(id);
+  }
+  return linie;
+}
+
+/**
+ * Wypłata dla zwrotu przy zamówieniu, które ma KILKA zwrotów klienta.
+ *
+ * Wypłata na zamówienie nie mówi, któremu zwrotowi się należy, ale zwrot
+ * płatności wymienia pozycje (`lineItems`), a zwrot klienta zna swoje. Zwrot
+ * jest rozliczony, gdy zwrot płatności obejmuje WSZYSTKIE jego pozycje i żaden
+ * inny zwrot tego zamówienia nie dzieli z nim pozycji. Zwrot całego zamówienia
+ * (anulowanie, nieodebrana paczka) rozlicza wszystkie zwroty naraz.
+ *
+ * Gdzie dopasowanie nie jest pewne, zwrot zostaje w pracy z powodem w zdaniu:
+ * zatrzask zdejmuje sprawę z kolejki, a pomyłka oznaczałaby klienta bez pieniędzy.
+ */
+function ocenaWieluZwrotow(
+  database: Db, zwrotId: number,
+): { data: string | null; refundId: string | null; powod: string | null } {
+  const nic = { data: null, refundId: null, powod: null };
+  const z = database.prepare(`SELECT z.channel_account_id AS konto, z.order_id, z.created_at,
+      m.platnosc_id FROM zwrot_klienta z
+      LEFT JOIN zamowienie_klienta m
+        ON m.channel_account_id = z.channel_account_id AND m.external_id = z.order_id
+     WHERE z.id = ?`).get(zwrotId) as
+    { konto: number; order_id: string | null; created_at: string; platnosc_id: string | null } | undefined;
+  if (!z?.order_id) return nic;
+
+  const refundy = (database.prepare(`SELECT refund_id, reason, utworzono_at, pozycje_json
+      FROM zwrot_platnosci
+     WHERE channel_account_id = ? AND status = 'SUCCESS' AND reason IN (${POWODY_SQL})
+       AND utworzono_at >= ?
+       AND (order_id = ? OR (order_id IS NULL AND ? IS NOT NULL AND payment_id = ?))
+     ORDER BY utworzono_at`)
+    .all(z.konto, z.created_at, z.order_id, z.platnosc_id, z.platnosc_id) as
+    Array<{ refund_id: string; reason: string | null; utworzono_at: string; pozycje_json: string | null }>)
+    .map((r) => ({ ...r, pozycje: JSON.parse(r.pozycje_json ?? "[]") as PozycjaZwrotuPlatnosci[] }));
+  if (!refundy.length) return nic;
+
+  /* Zwrot całego zamówienia zamyka każdy zwrot klienta przy nim. */
+  const calosc = refundy.find((r) => !r.pozycje.length
+    && POWODY_CALEGO_ZAMOWIENIA.includes(r.reason ?? ""));
+  if (calosc) return { data: calosc.utworzono_at, refundId: calosc.refund_id, powod: null };
+
+  const moje = liniePozycjiZwrotu(database, zwrotId);
+  if (!moje) {
+    return { ...nic, powod: "nie wiem, których pozycji zamówienia dotyczy ten zwrot, więc nie przypiszę mu wypłaty" };
+  }
+  const inne = database.prepare(`SELECT id FROM zwrot_klienta
+      WHERE channel_account_id = ? AND order_id = ? AND id <> ?
+        AND external_id NOT LIKE 'nieodebrana:%'`).all(z.konto, z.order_id, zwrotId) as Array<{ id: number }>;
+  for (const { id } of inne) {
+    const cudze = liniePozycjiZwrotu(database, Number(id));
+    if (!cudze) {
+      return { ...nic, powod: "nie wiem, których pozycji dotyczy drugi zwrot tego zamówienia, więc nie rozdzielę wypłaty" };
+    }
+    if ([...moje].some((l) => cudze.has(l))) {
+      return { ...nic, powod: "dwa zwroty tego zamówienia dotyczą tej samej pozycji, więc nie wiadomo, któremu należy się wypłata" };
+    }
+  }
+
+  /* Każda pozycja zwrotu musi mieć wypłatę, która ją WYMIENIA, z niezerową
+     ilością albo kwotą. */
+  const pokrywajace = new Map<string, typeof refundy[number]>();
+  for (const linia of moje) {
+    const r = refundy.find((x) => x.pozycje.some((p) => p.id === linia
+      && ((p.quantity ?? 0) > 0 || (p.kwotaGrosze ?? 0) > 0)));
+    if (!r) {
+      return { ...nic, powod: "Allegro oddało pieniądze, ale zwrot płatności nie wymienia wszystkich pozycji tego zwrotu" };
+    }
+    pokrywajace.set(r.refund_id, r);
+  }
+  const pierwsza = [...pokrywajace.values()].sort((a, b) => a.utworzono_at.localeCompare(b.utworzono_at))[0];
+  return { data: pierwsza.utworzono_at, refundId: pierwsza.refund_id, powod: null };
+}
+
+/**
+ * Dlaczego zwrot płatności `SUCCESS` NIE zatrzasnął zwrotu klienta — jedno
+ * zdanie po polsku, albo `null`, gdy nie ma czego tłumaczyć.
+ *
+ * Zatrzask jest ostrożny celowo, ale ostrożność bez wyjaśnienia wygląda jak
+ * błąd: agent widzi „Wypłacone 308 zł", a zwrot dalej stoi w kolejce.
+ * Sprawdzamy te same warunki, w tej samej kolejności co `zatrzaskZLustra`,
+ * i oddajemy pierwszy, który zatrzymał.
+ */
+export function powodBrakuZatrzasku(database: Db, zwrotId: number): string | null {
+  const z = database.prepare(`SELECT z.channel_account_id AS konto, z.order_id, z.created_at,
+      z.werdykt, z.rozliczony_allegro_at AS rozliczony, m.platnosc_id
+      FROM zwrot_klienta z
+      LEFT JOIN zamowienie_klienta m
+        ON m.channel_account_id = z.channel_account_id AND m.external_id = z.order_id
+     WHERE z.id = ?`).get(zwrotId) as
+    { konto: number; order_id: string | null; created_at: string; werdykt: string | null;
+      rozliczony: string | null; platnosc_id: string | null } | undefined;
+  if (!z || z.rozliczony || !z.order_id) return null;
+
+  const udane = database.prepare(`SELECT reason, utworzono_at FROM zwrot_platnosci
+      WHERE channel_account_id = ? AND status = 'SUCCESS'
+        AND (order_id = ? OR (order_id IS NULL AND ? IS NOT NULL AND payment_id = ?))`)
+    .all(z.konto, z.order_id, z.platnosc_id, z.platnosc_id) as
+    Array<{ reason: string | null; utworzono_at: string }>;
+  if (!udane.length) return null;
+
+  if (z.werdykt === "odrzucony") {
+    return "zwrot jest u nas odrzucony, więc wypłaty nie zatrzaskujemy samoczynnie";
+  }
+  const zwrotu = udane.filter((u) => (POWODY_WYPLATY as readonly string[]).includes(u.reason ?? ""));
+  if (!zwrotu.length) {
+    const powody = [...new Set(udane.map((u) => u.reason ?? "brak powodu"))].join(", ");
+    return `Allegro podaje powód ${powody}, a zatrzask uznaje tylko ${POWODY_WYPLATY.join(", ")}`;
+  }
+  if (!zwrotu.some((u) => u.utworzono_at >= z.created_at)) {
+    return "wypłata jest wcześniejsza niż zgłoszenie tego zwrotu, więc dotyczy czegoś innego";
+  }
+  const innych = Number((database.prepare(`SELECT COUNT(*) AS n FROM zwrot_klienta
+      WHERE channel_account_id = ? AND order_id = ? AND id <> ?
+        AND external_id NOT LIKE 'nieodebrana:%'`).get(z.konto, z.order_id, zwrotId) as { n: number }).n);
+  if (innych > 0) {
+    const o = ocenaWieluZwrotow(database, zwrotId);
+    return `to zamówienie ma kilka zwrotów klienta: ${o.powod ?? "wypłata czeka na następne sprawdzenie"}`;
+  }
+  return "zwrot nie spełnił warunków zatrzasku z powodu, którego nie umiem nazwać";
+}
+
+export interface ZwrotyPlatnosciDeps {
+  query?: (url: string) => Promise<unknown | null>;
+  apiUrl?: string;
+}
+
+const lista = (odp: unknown): unknown[] => {
+  const refunds = obj(odp)?.refunds;
+  return Array.isArray(refunds) ? refunds : [];
+};
+
+/**
+ * Przebieg: lista konta od ostatnio widzianego zwrotu, odświeżenie zwrotów
+ * w toku po `id`, zatrzask. Błąd sieci idzie wyżej — wołający ma własny
+ * parasol, a 429 musi dotrzeć do taktu.
+ */
+export async function synchronizujZwrotyPlatnosci(
+  database: Db, konto: number, deps: ZwrotyPlatnosciDeps = {}, teraz = new Date(),
+): Promise<{ zapisane: number; zatrzasniete: number }> {
+  const query = deps.query ?? zapytajAllegro;
+  const apiUrl = deps.apiUrl ?? config.allegro.apiUrl;
+
+  const ostatni = (database.prepare(
+    "SELECT MAX(utworzono_at) AS m FROM zwrot_platnosci WHERE channel_account_id = ?")
+    .get(konto) as { m: string | null }).m;
+  const od = ostatni
+    ? new Date(Date.parse(ostatni) - ZAKLADKA_DNI * 86_400_000).toISOString()
+    : new Date(teraz.getTime() - START_DNI * 86_400_000).toISOString();
+
+  let zapisane = 0;
+  for (let strona = 0; strona < MAKS_STRON; strona++) {
+    const odp = await query(urlZwrotowPlatnosci(apiUrl, { od, offset: strona * 100 }));
+    const surowe = lista(odp);
+    const zwroty = surowe.map(zwrotZOdpowiedzi).filter((z): z is ZwrotPlatnosci => z !== null);
+    zapisane += zapiszZwrotyPlatnosci(database, konto, zwroty, teraz);
+    if (surowe.length < 100) break;
+  }
+
+  const wToku = database.prepare(`SELECT refund_id FROM zwrot_platnosci
+      WHERE channel_account_id = ? AND status IN (${STATUSY_W_TOKU.map(() => "?").join(",")})
+      ORDER BY sprawdzono_at ASC LIMIT ?`)
+    .all(konto, ...STATUSY_W_TOKU, W_TOKU_NA_PRZEBIEG) as Array<{ refund_id: string }>;
+  for (const { refund_id } of wToku) {
+    const odp = await query(urlZwrotowPlatnosci(apiUrl, { refundId: refund_id }));
+    const zwroty = lista(odp).map(zwrotZOdpowiedzi).filter((z): z is ZwrotPlatnosci => z !== null);
+    zapisane += zapiszZwrotyPlatnosci(database, konto, zwroty, teraz);
+    /* Stempel także przy pustej odpowiedzi: zwrot, o którym Allegro milczy,
+       nie ma prawa blokować kolejki pytań przed młodszymi. */
+    database.prepare(`UPDATE zwrot_platnosci SET sprawdzono_at=?
+        WHERE channel_account_id=? AND refund_id=?`).run(teraz.toISOString(), konto, refund_id);
+  }
+
+  return { zapisane, zatrzasniete: zatrzaskZLustra(database, konto) };
+}
+
+export class SprawdzenieZwrotuBlad extends Error {}
+
+export interface WynikSprawdzenia {
+  /** Ile zwrotów płatności Allegro oddało dla tego zamówienia. */
+  znaleziono: number;
+  /** Czy zwrot ma po tym sprawdzeniu potwierdzoną wypłatę. */
+  wyplacone: boolean;
+  platnosci: ZwrotPlatnosci[];
+  /** Gdy Allegro oddało pieniądze, a zwrot nie został zatrzaśnięty: dlaczego. */
+  powodBraku: string | null;
+}
+
+/**
+ * Sprawdzenie JEDNEGO zwrotu na żądanie człowieka.
+ *
+ * Takt zwrotów patrzy na całe konto co kilka minut, a agent ma przed sobą
+ * konkretny zwrot i chce znać odpowiedź teraz. Pytamy o zamówienie, a gdy
+ * Allegro o nim milczy, o płatność — rekord zwrotu płatności nie musi nieść
+ * `order`. Wynik ląduje w tym samym lustrze co z taktu, więc ekran i kolejka
+ * mówią jedno.
+ *
+ * ODPOWIEDŹ „NIC NIE ZNALEZIONO" JEST WYNIKIEM, nie błędem: mówi, że Allegro
+ * nie ma dla tego zamówienia zwrotu płatności, czyli że wypłatę trzeba
+ * rozstrzygnąć inaczej. Ekran ma to powiedzieć wprost, zamiast milczeć.
+ */
+export async function sprawdzZwrotPlatnosci(
+  database: Db, zwrotId: number, kto: { id: number; name: string },
+  deps: ZwrotyPlatnosciDeps = {}, teraz = new Date(),
+): Promise<WynikSprawdzenia> {
+  const query = deps.query ?? zapytajAllegro;
+  const apiUrl = deps.apiUrl ?? config.allegro.apiUrl;
+
+  const z = database.prepare(`SELECT z.channel_account_id AS konto, z.order_id, z.external_id,
+      m.platnosc_id FROM zwrot_klienta z
+      LEFT JOIN zamowienie_klienta m
+        ON m.channel_account_id = z.channel_account_id AND m.external_id = z.order_id
+     WHERE z.id = ?`).get(zwrotId) as
+    { konto: number; order_id: string | null; external_id: string; platnosc_id: string | null } | undefined;
+  if (!z) throw new SprawdzenieZwrotuBlad("Nie znaleziono zwrotu");
+  if (String(z.external_id).startsWith("nieodebrana:")) {
+    throw new SprawdzenieZwrotuBlad("Paczki nieodebranej Allegro nie zna — nie ma czego sprawdzać.");
+  }
+  if (!z.order_id) {
+    throw new SprawdzenieZwrotuBlad("Zwrot nie ma numeru zamówienia, a Allegro szuka zwrotu płatności po nim.");
+  }
+
+  let rekordy = lista(await query(urlZwrotowPlatnosci(apiUrl, { orderId: z.order_id })));
+  if (!rekordy.length && z.platnosc_id) {
+    rekordy = lista(await query(urlZwrotowPlatnosci(apiUrl, { paymentId: z.platnosc_id })));
+  }
+  const zwroty = rekordy.map(zwrotZOdpowiedzi).filter((r): r is ZwrotPlatnosci => r !== null);
+  zapiszZwrotyPlatnosci(database, z.konto, zwroty, teraz);
+  const zatrzasniete = zatrzaskZLustra(database, z.konto, zwrotId);
+
+  const wyplacone = Boolean((database.prepare(
+    "SELECT rozliczony_allegro_at AS r FROM zwrot_klienta WHERE id = ?").get(zwrotId) as { r: string | null }).r);
+  logEvent("zwrot_platnosci_sprawdzone", kto.name, null,
+    { zwrotId, znaleziono: zwroty.length, zatrzasniete, wyplacone }, kto.id, database);
+  return {
+    znaleziono: zwroty.length, wyplacone, platnosci: zwrotyPlatnosciZwrotu(database, zwrotId),
+    powodBraku: wyplacone ? null : powodBrakuZatrzasku(database, zwrotId),
+  };
+}
+
+/** Ile stron listy (po sto rekordów) bierzemy w jednym masowym sprawdzeniu. */
+const MAKS_STRON_MASOWO = 20;
+/** Najdalej wstecz sięgamy przy masowym sprawdzeniu, niezależnie od najstarszego zwrotu. */
+const MASOWO_MAKS_DNI = 400;
+/** Jak długo zwrot zamknięty korektą, a niezapłacony, liczy się jeszcze jako praca. */
+const MASOWO_ZAMKNIETY_DNI = 60;
+
+export interface WynikMasowegoSprawdzenia {
+  /** Ile zwrotów klienta było do sprawdzenia. */
+  sprawdzonych: number;
+  /** Ile zwrotów płatności Allegro oddało i zapisaliśmy w lustrze. */
+  zapisane: number;
+  /** Przy ilu zwrotach przypięliśmy wypłatę. */
+  zatrzasniete: number;
+  /** Ile zwrotów nie ma w Allegro żadnego zwrotu płatności. */
+  bezZwrotuPlatnosci: number;
+  /** Zwroty, przy których Allegro oddało pieniądze, a nie przypięliśmy ich: powód i liczba. */
+  zPowodem: Array<{ powod: string; ile: number }>;
+  /** Lista Allegro była dłuższa, niż bierzemy naraz: powtórz sprawdzenie, żeby dojść dalej. */
+  urwane: boolean;
+}
+
+/**
+ * Sprawdzenie WSZYSTKICH zwrotów w pracy jednym ruchem.
+ *
+ * Nie jedno żądanie na zwrot. Lista zwrotów płatności jest jedna na całe
+ * konto, więc kilka stron od daty najstarszego zwrotu w pracy pokrywa setki
+ * spraw naraz — taki sam zapis, jaki robi takt, tyle że wstecz i na żądanie.
+ *
+ * Raport mówi też, czego NIE przypięliśmy i dlaczego. Przy setkach zwrotów
+ * odpowiedź „przypięto 300" bez słowa o reszcie kazałaby klikać każdy z osobna,
+ * żeby się dowiedzieć, że wszystkie stoją na tym samym powodzie.
+ */
+export async function sprawdzWszystkieZwrotyPlatnosci(
+  database: Db, kto: { id: number; name: string },
+  deps: ZwrotyPlatnosciDeps = {}, teraz = new Date(),
+): Promise<WynikMasowegoSprawdzenia> {
+  const query = deps.query ?? zapytajAllegro;
+  const apiUrl = deps.apiUrl ?? config.allegro.apiUrl;
+
+  const wynik: WynikMasowegoSprawdzenia = {
+    sprawdzonych: 0, zapisane: 0, zatrzasniete: 0, bezZwrotuPlatnosci: 0, zPowodem: [], urwane: false,
+  };
+  const powody = new Map<string, number>();
+
+  const konta = database.prepare(`SELECT DISTINCT channel_account_id AS konto FROM zwrot_klienta
+      WHERE order_id IS NOT NULL`).all() as Array<{ konto: number }>;
+  const zamknietyOd = new Date(teraz.getTime() - MASOWO_ZAMKNIETY_DNI * 86_400_000).toISOString();
+
+  for (const { konto } of konta) {
+    /* Zbiór „w pracy" jak przy pytaniu o operacje płatnicze: bez zamknięcia albo
+       zamknięty, przyjęty i niezapłacony. Reszta to historia i nie kosztuje stron. */
+    const kandydaci = database.prepare(`SELECT z.id, z.created_at FROM zwrot_klienta z
+       WHERE z.channel_account_id = ? AND z.order_id IS NOT NULL
+         AND z.external_id NOT LIKE 'nieodebrana:%'
+         AND z.rozliczony_allegro_at IS NULL
+         AND (z.werdykt IS NULL OR z.werdykt <> 'odrzucony')
+         AND (z.zamkniety_at IS NULL
+              OR (z.werdykt = 'przyjety' AND z.kwota_grosze > 0
+                  AND z.zwrot_pieniedzy_id IS NULL AND z.zwrot_pieniedzy_command_id IS NULL
+                  AND z.przelew_at IS NULL AND z.odmowa_kod IS NULL
+                  AND z.zamkniety_at >= ? AND z.zamkniecie_reczne_at IS NULL))`)
+      .all(konto, zamknietyOd) as Array<{ id: number; created_at: string }>;
+    if (!kandydaci.length) continue;
+    wynik.sprawdzonych += kandydaci.length;
+
+    const najstarszy = kandydaci.reduce((m, k) => (k.created_at < m ? k.created_at : m),
+      kandydaci[0].created_at);
+    const granica = new Date(teraz.getTime() - MASOWO_MAKS_DNI * 86_400_000).toISOString();
+    /* Doba zapasu: zwrot płatności powstaje po zgłoszeniu, ale strefy czasu
+       w `createdAt` bywają różne i lepiej wziąć dzień za dużo niż pominąć rekord. */
+    const od = new Date(Math.max(Date.parse(najstarszy) - 86_400_000, Date.parse(granica))).toISOString();
+
+    for (let strona = 0; strona < MAKS_STRON_MASOWO; strona++) {
+      const surowe = lista(await query(urlZwrotowPlatnosci(apiUrl, { od, offset: strona * 100 })));
+      wynik.zapisane += zapiszZwrotyPlatnosci(database, konto,
+        surowe.map(zwrotZOdpowiedzi).filter((z): z is ZwrotPlatnosci => z !== null), teraz);
+      if (surowe.length < 100) break;
+      if (strona === MAKS_STRON_MASOWO - 1) wynik.urwane = true;
+    }
+
+    wynik.zatrzasniete += zatrzaskZLustra(database, konto);
+
+    const stan = database.prepare(
+      "SELECT rozliczony_allegro_at AS r FROM zwrot_klienta WHERE id = ?");
+    for (const k of kandydaci) {
+      if ((stan.get(k.id) as { r: string | null }).r) continue;
+      const platnosci = zwrotyPlatnosciZwrotu(database, k.id);
+      if (!platnosci.length) { wynik.bezZwrotuPlatnosci++; continue; }
+      const powod = platnosci.some((p) => p.status === "SUCCESS")
+        ? powodBrakuZatrzasku(database, k.id) ?? "powód nieznany"
+        : "Allegro ma zwrot płatności, ale pieniądze jeszcze nie wyszły";
+      powody.set(powod, (powody.get(powod) ?? 0) + 1);
+    }
+  }
+
+  wynik.zPowodem = [...powody].map(([powod, ile]) => ({ powod, ile })).sort((a, b) => b.ile - a.ile);
+  logEvent("zwrot_platnosci_sprawdzone_masowo", kto.name, null,
+    { sprawdzonych: wynik.sprawdzonych, zapisane: wynik.zapisane, zatrzasniete: wynik.zatrzasniete,
+      bezZwrotuPlatnosci: wynik.bezZwrotuPlatnosci, urwane: wynik.urwane }, kto.id, database);
+  return wynik;
+}

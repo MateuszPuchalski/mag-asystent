@@ -411,3 +411,25 @@ test("limit Allegro zatrzymuje przebieg, a propozycja zostaje bez błędu", asyn
   assert.equal(propozycja(b.d, r.propozycja).wykonanie_blad, null, "winne konto, nie ta odpowiedź");
   assert.equal(zdarzenia(b.d, "przeplyw_na_zywo_blad")[0]?.payload?.przerwane, true);
 });
+
+test("8. szkic, który sięgał do kartoteki, czeka na agenta z powodem przy propozycji", async () => {
+  const b = baza();
+  const r = gotowa(b);
+  b.d.prepare(`UPDATE szkic_copilota SET narzedzia=? WHERE conversation_id=?`)
+    .run(JSON.stringify([{ nazwa: "oferty_towaru", argument: "W09-0211", znakow: 80 }]), r.rozmowa);
+  const { wynik, atrapa } = biegnij(b, [r.rozmowa]);
+  assert.deepEqual(await wynik, { wyslanych: 0, pominietych: 1, bledow: 0, przerwane: null });
+  assert.equal(atrapa.strzaly.length, 0, "ceny i linki z kartoteki nie wychodzą bez człowieka");
+  assert.equal(ile(b.d, "SELECT count(*) n FROM outbox"), 0);
+  const p = propozycja(b.d, r.propozycja);
+  assert.equal(p.wykonanie_blad, N.POWOD_NARZEDZIA);
+  assert.equal(p.wykonana_at, null);
+  assert.deepEqual(zdarzenia(b.d, "przeplyw_na_zywo").at(-1)?.payload?.powody, { narzedzia: 1 });
+  assert.equal(ile(b.d, "SELECT count(*) n FROM app_user WHERE login IS NULL"), 0, "konto automatu nie powstaje");
+
+  /* Uszkodzony JSON to brak wiedzy, a nie zgoda na wysyłkę. */
+  const b2 = baza();
+  const r2 = gotowa(b2);
+  b2.d.prepare("UPDATE szkic_copilota SET narzedzia='to nie JSON' WHERE conversation_id=?").run(r2.rozmowa);
+  assert.equal((await biegnij(b2, [r2.rozmowa]).wynik).wyslanych, 0);
+});

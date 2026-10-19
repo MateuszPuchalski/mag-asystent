@@ -1,19 +1,20 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { List, RefreshCw, Undo2 } from "lucide-react";
-import { useDociagnijPoSkanie, useSkanZwrotu, useSynchronizujZwroty, useZwroty, type WynikSkanu } from "../api/zwroty";
+import { useDociagnijPoSkanie, useSkanZwrotu, useSynchronizujZwroty, useZwroty, useSprawdzWszystkiePlatnosci, type WynikSkanu, type WynikSprawdzeniaWszystkich } from "../api/zwroty";
 import { Konflikt } from "../api/klient";
 import type { BilansKartotek, Kubelek, Ocena, StanZwrotow, WynikDosylki, Zwrot } from "../api/typy";
 import { Decyzje } from "../zwroty/Decyzje";
 import { Pieniadze } from "../zwroty/Pieniadze";
+import { ZamkniecieReczne } from "../zwroty/ZamkniecieReczne";
 import { Pozycje } from "../zwroty/Pozycje";
 import { DolozTowar } from "../zwroty/DolozTowar";
 import {
   useCofnijKorekte, useCofnijKwote, useCofnijWerdykt, useDopiszPozycje,
   useIloscZwrocona, useFaktura, useKorekta, useKwota,
   usePaczkiKlienta, useZamowieniaZAllegro, usePrzyjmijNieodebrana, wygladaNaLogin, useOcena, usePotracenie, useWerdykt, useZdejmijPozycje,
-  useZglosRabat, useZwrot, useZwrocPieniadze, useOdmowPlatnosci, useSledzDosylkeZwrotu,
-  useZapiszPrzelew, useCofnijPrzelew,
+  useZglosRabat, useZwrot, useZwrocPieniadze, useOdmowPlatnosci, useSledzDosylkeZwrotu, useSprawdzPlatnosci,
+  useZapiszPrzelew, useCofnijPrzelew, useZamknijRecznie, useOtworzPonownie,
   useNotatkaZwrotu, useCofnijNotatkeZwrotu, useRozjazdyZwrotow,
   useDolozTowar, szukajTowaruDoKosza, type TowarDoKosza, useKosz, usePotwierdzKartoteke,
 } from "../api/zwroty";
@@ -22,6 +23,7 @@ import { Blad, FiltrSegmentowy, Karta, Pusto, SIATKA_TRZECH_KOLUMN } from "../ui
 import { PrzelacznikZwrotow } from "../zwroty/Przelacznik";
 import { Naglowek } from "../zwroty/Naglowek";
 import { DrogaKlienta } from "../sprawy/DrogaKlienta";
+import { ZlaPaczka } from "../pomylki/ZlaPaczka";
 import { Etapy, IKONA_KUBELKA } from "../zwroty/Etapy";
 import { KUBELKI, Kolejka } from "../zwroty/Kolejka";
 import { Dowody } from "../zwroty/Dowody";
@@ -31,6 +33,7 @@ import { NieOdeslany, POWOD_NIE_ODESLAL } from "../zwroty/NieOdeslany";
 import { pewnaPropozycja, szybkaSciezka } from "../zwroty/regulaSzybkiej";
 import { SITA_DECYZJI, sitoDecyzji, type SitoDecyzji } from "../zwroty/sita";
 import { Szukanie } from "../zwroty/Szukanie";
+import { SprawdzWszystkie } from "../zwroty/SprawdzWszystkie";
 import { PasekPorzadku, posortuj, usePorzadek } from "../sprawy/Porzadek";
 import { Koszyk, NowyKoszyk } from "../zwroty/Koszyk";
 import { NaOutlet } from "../zwroty/NaOutlet";
@@ -40,6 +43,7 @@ import { useSkaner } from "../skaner";
 import { SkrotyKlawiszy } from "../sprawy/Skroty";
 import type { AkcjeKlawiszy } from "../zwroty/klawisze";
 import { pasujeDoFrazy, rozbij } from "../sprawy/szukanie";
+import { useKursorListy } from "../nawigacja/kursor";
 
 /* ── Ekran zwrotów (0.150.0) ─────────────────────────────────────────────────
    Trzy kolumny, jak skrzynka — dwa ekrany obsługi mają mieć jeden nawyk,
@@ -62,7 +66,7 @@ import { pasujeDoFrazy, rozbij } from "../sprawy/szukanie";
  * nasłuchu, a `KUBELKI` opisują kolejkę, którą czyta także `Kolejka.tsx`.
  * Zmiana klawisza ma się rozjechać z paskiem najwyżej o jedną linijkę.
  */
-const KLAWISZE_KUBELKA: Record<string, ReadonlyArray<readonly [string, string]>> = {
+export const KLAWISZE_KUBELKA: Record<string, ReadonlyArray<readonly [string, string]>> = {
   decyzja: [["P", "przyjmij"], ["S", "przyjmij i na stan"], ["U", "przyjmij i utylizacja"],
     ["O", "odrzuć"]],
   ocena: [["S", "na stan"], ["U", "utylizacja"], ["O", "na outlet"],
@@ -392,6 +396,12 @@ export function Zwroty() {
   const pieniadze = useZwrocPieniadze();
   const odmowaPlatnosci = useOdmowPlatnosci();
   const sledzDosylke = useSledzDosylkeZwrotu();
+  const sprawdzPlatnosci = useSprawdzPlatnosci();
+  /* Wynik sprawdzenia niesie numer zwrotu z tego samego powodu co błąd wyżej:
+     odpowiedź może przyjść, gdy agent stoi już przy następnym zwrocie. */
+  const [wynikSprawdzenia, setWynikSprawdzenia] = useState<
+    { zwrotId: number; znaleziono: number; wyplacone: boolean; udane: number;
+      powodBraku: string | null } | null>(null);
   const potracenie = usePotracenie();
   const faktura = useFaktura();
   const dopisz = useDopiszPozycje();
@@ -469,8 +479,18 @@ export function Zwroty() {
   const skan = useSkanZwrotu();
   const dociagnij = useDociagnijPoSkanie();
   const synchronizuj = useSynchronizujZwroty();
+  /* Wynik hurtowego sprawdzenia żyje TU, nie w pasku szukania: przełączenie
+     kubełka nie może go zgasić, bo agent czyta go, przeglądając kolejkę. */
+  const sprawdzWszystkie = useSprawdzWszystkiePlatnosci();
+  const [wynikWszystkich, setWynikWszystkich] = useState<WynikSprawdzeniaWszystkich | null>(null);
+  const [bladWszystkich, setBladWszystkich] = useState("");
   const przelew = useZapiszPrzelew();
   const cofnijPrzelew = useCofnijPrzelew();
+  const zamknijRecznie = useZamknijRecznie();
+  const otworzPonownie = useOtworzPonownie();
+  /* Błąd zamknięcia niesie numer zwrotu z tego samego powodu co `bladPieniedzy`:
+     odpowiedź bywa spóźniona, a operator stoi już przy następnym zwrocie. */
+  const [bladZamkniecia, setBladZamkniecia] = useState<{ zwrotId: number; tekst: string } | null>(null);
   const notatka = useNotatkaZwrotu();
   const cofnijNotatke = useCofnijNotatkeZwrotu();
   const [bladNotatki, setBladNotatki] = useState("");
@@ -696,26 +716,9 @@ export function Zwroty() {
     nawiguj(pierwszy ? `/obsluga/zwroty/${pierwszy.id}` : "/obsluga/zwroty");
   };
 
-  /* MIEJSCE W LIŚCIE PRZEŻYWA WYJŚCIE ZWROTU Z KUBEŁKA (audyt, 15 września 2026).
-     Po `P` przyjęty zwrot znika z listy DO DECYZJI, a kursor zostaje na nim.
-     `idz` liczyło wtedy od pozycji zero plus jeden, więc `j` przeskakiwało
-     zwrot, który właśnie wskoczył na zwolnione miejsce — praca kubełkiem
-     gubiła co drugi zwrot. Zapamiętujemy więc ostatnią pozycję widzianą. */
-  const ostatnieMiejsce = useRef(0);
-  const miejsce = widoczne.findIndex((z) => z.id === wybrany);
-  if (miejsce >= 0) ostatnieMiejsce.current = miejsce;
-
-  /* Kursor chodzi po liście WIDOCZNEJ, nie po kubełku: przy włączonym filtrze
-     `j` ma iść do następnego wyniku, a nie do zwrotu schowanego przed oczami. */
-  const idz = (o: number) => {
-    if (!widoczne.length) return;
-    const i = widoczne.findIndex((z) => z.id === wybrany);
-    /* Zwrotu nie ma już na liście: następny STOI na jego miejscu, poprzedni
-       o jedno wyżej. */
-    const cel = i >= 0 ? i + o : (o > 0 ? ostatnieMiejsce.current : ostatnieMiejsce.current - 1);
-    const nast = widoczne[Math.min(widoczne.length - 1, Math.max(0, cel))];
-    if (nast) nawiguj(`/obsluga/zwroty/${nast.id}`);
-  };
+  /* Po `P` przyjęty zwrot schodzi z kubełka, a `j` ma otworzyć ten, który
+     stanął na jego miejscu. Powód przy `nawigacja/kursor.ts`. */
+  const idz = useKursorListy(widoczne, wybrany, (z) => nawiguj(`/obsluga/zwroty/${z.id}`));
 
   /* Rejestr akcji dla klawiszy, które sięgają do stanu kolumny środkowej
      (powód odmowy, zaznaczenie pozycji) — powód w `zwroty/klawisze.ts`. */
@@ -993,7 +996,11 @@ export function Zwroty() {
     { wPolach: true },
   );
 
-  if (error) return <Blad>{(error as Error).message}</Blad>;
+  /* Zapytanie padło i nie ma danych: błąd zamiast listy, a kafle bez liczb.
+     Pusta lista albo „0” przy awarii czytałyby się jako „nic nie czeka”.
+     Nieudane odświeżenie przy danych w pamięci nie zdejmuje ekranu, bo
+     serwer znika przy każdej aktualizacji, a operator jest w środku zwrotu. */
+  const bezDanych = Boolean(error && !data);
 
   const opis = KUBELKI.find((k) => k.id === kubelek);
 
@@ -1084,12 +1091,12 @@ export function Zwroty() {
         <FiltrSegmentowy<Kubelek | null> kafle wybrany={kubelek} onWybierz={przelacz}
           pozycje={[
             ...KUBELKI.map((k, i) => ({ klucz: k.id, etykieta: k.etykieta,
-              ile: data?.liczniki?.[k.id] ?? 0,
+              ile: data ? data.liczniki?.[k.id] ?? 0 : undefined,
               /* Ta sama ikona co na osi etapów nad zwrotem — słownik ikon
                  ma jedną wagę na jedno znaczenie. */
               ikona: React.createElement(IKONA_KUBELKA[k.id], { size: 18 }),
               podpowiedz: `${k.pytanie} (klawisz ${i + 1})` })),
-            { klucz: null, etykieta: "Wszystkie", ile: data?.zwroty?.length ?? 0,
+            { klucz: null, etykieta: "Wszystkie", ile: data?.zwroty.length,
               ikona: <List size={18} />,
               podpowiedz: `Wszystkie zwroty (klawisz ${KUBELKI.length + 1})` },
           ]} />
@@ -1137,6 +1144,16 @@ export function Zwroty() {
         onSzukaj={(v) => { kodZCzytnika.current = ""; szukaj(v); }}
         onSkan={(v) => { void naSkan(v); }}
         towar={skanTowaru}
+        pod={<SprawdzWszystkie
+          trwa={sprawdzWszystkie.isPending} blad={bladWszystkich} wynik={wynikWszystkich}
+          onZamknij={() => { setWynikWszystkich(null); setBladWszystkich(""); }}
+          onSprawdz={() => {
+            setWynikWszystkich(null); setBladWszystkich("");
+            sprawdzWszystkie.mutate(undefined, {
+              onSuccess: (w) => setWynikWszystkich(w),
+              onError: (e) => setBladWszystkich((e as Error).message),
+            });
+          }} />}
         onDociagnij={(v) => dociagnij.mutate(v, {
           onSuccess: przyjmij, onError: (e) => setBladSkanu((e as Error).message) })}
         onWybierz={(x) => { setWynikSkanu(null); nawiguj(`/obsluga/zwroty/${x}`); }}
@@ -1245,7 +1262,9 @@ export function Zwroty() {
           uczyłaby przebiegać wzrokiem obok tego jednego, który jest do rzeczy.
           Sit „moje"/„niczyje" tu nie ma: zwrot nie nosi prowadzącego. */}
       <div className="min-h-0 flex-1 overflow-y-auto">
-        {isLoading
+        {bezDanych
+          ? <div className="p-3"><Blad>{(error as Error).message}</Blad></div>
+          : isLoading
           ? <Pusto waga="lista">Wczytuję kolejkę…</Pusto>
           : <Kolejka zwroty={widoczne} wybrany={wybrany}
               zKubelkiem={Boolean(pasujace) || kubelek === null}
@@ -1254,17 +1273,22 @@ export function Zwroty() {
     </Karta>
 
     <Karta className="flex min-h-0 flex-col overflow-hidden">
+      {/* Bez kolejki nie ma czego wybrać, więc środek milczy. */}
       {!zwrot
-        ? <Pusto ikona={Undo2}>
+        ? bezDanych ? null : <Pusto ikona={Undo2}>
             Wybierz zwrot z kolejki — strzałkami albo kliknięciem.</Pusto>
         : <>
             <Naglowek zwrot={zwrot} />
             {/* Droga klienta pod nagłówkiem: gdzie ten zakup jest i jakie inne
                 sprawy już miał. Ten zwrot stoi na niej jako „tu jesteś”, nie
                 jako łącze do siebie. Poza `Naglowek`, bo jego testy nie mają
-                klienta zapytań, a pasek pyta serwer. */}
-            <div className="shrink-0 border-b border-slate-200 bg-wertis-paper px-4 py-3 empty:hidden">
+                klienta zapytań, a pasek pyta serwer.
+                „Zła paczka" stoi przy drodze, bo dotyczy tego samego zakupu:
+                zły towar w zwrocie zakłada pomyłkę z tym zamówieniem. */}
+            <div className="flex shrink-0 items-start gap-3 border-b border-slate-200 bg-wertis-paper px-4 py-3 empty:hidden">
               <DrogaKlienta plaska orderId={zwrot.orderId} biezaca={{ rodzaj: "zwrot", id: zwrot.id }} />
+              <ZlaPaczka className="ml-auto shrink-0" login={zwrot.kupujacyLogin} zamowienie={zwrot.orderId}
+                konto={zwrot.konto} />
             </div>
             {/* Oś etapów (0.453.0): gdzie jest sprawa i co jeszcze przed nią —
                 zamiast zdań rozsianych po sekcjach. */}
@@ -1309,6 +1333,28 @@ export function Zwroty() {
                 cofnijKwote.mutate({ id: zwrot.id, wersja: zwrot.wersja })}
               onCofnijWerdykt={() =>
                 cofnijWerdykt.mutate({ id: zwrot.id, wersja: zwrot.wersja })} />
+            {/* `key` na zwrocie: otwarte okno i wpisany powód nie przechodzą
+                na następny zwrot. */}
+            <ZamkniecieReczne key={`zamkniecie-${zwrot.id}`} zwrot={zwrot}
+              pieniadzeCzekaja={pieniadzeCzekaja}
+              trwa={zamknijRecznie.isPending || otworzPonownie.isPending}
+              blad={bladZamkniecia?.zwrotId === zwrot.id ? bladZamkniecia.tekst : ""}
+              onZamknij={(powod, poSukcesie) => {
+                setBladZamkniecia(null);
+                const zwrotId = zwrot.id;
+                zamknijRecznie.mutate({ id: zwrotId, wersja: zwrot.wersja, powod }, {
+                  /* Jak po korekcie: zamknięty zwrot schodzi z kubełka, więc
+                     kursor idzie na następny, a nie zostaje na pustym miejscu. */
+                  onSuccess: () => { poSukcesie(); idz(1); },
+                  onError: (e) => setBladZamkniecia({ zwrotId, tekst: (e as Error).message }),
+                });
+              }}
+              onOtworz={() => {
+                setBladZamkniecia(null);
+                const zwrotId = zwrot.id;
+                otworzPonownie.mutate({ id: zwrotId, wersja: zwrot.wersja },
+                  { onError: (e) => setBladZamkniecia({ zwrotId, tekst: (e as Error).message }) });
+              }} />
             {/* Pieniądze STOJĄ POD DECYZJAMI, nie w kolumnie dowodów: to jest
                 ostatni krok tej pracy i ma być tam, gdzie operator właśnie
                 patrzy, a nie o kolumnę dalej. */}
@@ -1320,9 +1366,25 @@ export function Zwroty() {
               stan={szczegol.data.pieniadze}
               przedWerdyktem={zwrot.kubelek === "decyzja"}
               kodAllegro={zwrot.rejectionCode}
+              nazwyPozycji={Object.fromEntries(zwrot.pozycje.flatMap((p) =>
+                p.rabat.lineItemId ? [[p.rabat.lineItemId, p.nazwa]] : []))}
               akcje={akcje}
               trwa={pieniadze.isPending || odmowaPlatnosci.isPending
-                || przelew.isPending || cofnijPrzelew.isPending || sledzDosylke.isPending}
+                || przelew.isPending || cofnijPrzelew.isPending || sledzDosylke.isPending
+                || sprawdzPlatnosci.isPending}
+              sprawdzam={sprawdzPlatnosci.isPending && sprawdzPlatnosci.variables?.id === zwrot.id}
+              wynikSprawdzenia={wynikSprawdzenia?.zwrotId === zwrot.id ? wynikSprawdzenia : null}
+              onSprawdz={() => {
+                setBladPieniedzy(null);
+                setWynikSprawdzenia(null);
+                const zwrotId = zwrot.id;
+                sprawdzPlatnosci.mutate({ id: zwrotId }, {
+                  onSuccess: (w) => setWynikSprawdzenia({ zwrotId, znaleziono: w.znaleziono,
+                    wyplacone: w.wyplacone, powodBraku: w.powodBraku ?? null,
+                    udane: (w.platnosci ?? []).filter((p) => p.status === "SUCCESS").length }),
+                  onError: bladPieniedzyDla(zwrotId),
+                });
+              }}
               blad={bladPieniedzy?.zwrotId === zwrot.id ? bladPieniedzy.tekst : ""}
               wynikDosylki={wynikDosylki?.zwrotId === zwrot.id ? wynikDosylki.wynik : null}
               onZwroc={() => {

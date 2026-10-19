@@ -152,10 +152,17 @@ export function zwrotyDoSprawdzeniaWyplaty(
             OR (z.werdykt = 'przyjety' AND z.kwota_grosze > 0
                 AND z.zwrot_pieniedzy_id IS NULL AND z.zwrot_pieniedzy_command_id IS NULL
                 AND z.przelew_at IS NULL AND z.odmowa_kod IS NULL
-                AND z.zamkniety_at >= ?))
+                AND z.zamkniety_at >= ? AND z.zamkniecie_reczne_at IS NULL))
        AND z.rozliczony_allegro_at IS NULL
        AND (z.werdykt IS NULL OR z.werdykt <> 'odrzucony')
        AND m.platnosc_id IS NOT NULL
+       /* Płatność jest jedna na ZAMÓWIENIE, a zwrotów przy nim bywa kilka.
+          Obciążenie zwrotem na płatności nie mówi, któremu z nich się należało,
+          więc pierwsza wypłata rozliczałaby też drugi, niezapłacony zwrot. Takie
+          zamówienia rozstrzyga lustro zwrotów płatności, które zna pozycje. */
+       AND (SELECT COUNT(*) FROM zwrot_klienta d
+             WHERE d.channel_account_id = z.channel_account_id AND d.order_id = z.order_id
+               AND d.external_id NOT LIKE 'nieodebrana:%') <= 1
      ORDER BY z.wyplata_sprawdzono_at IS NOT NULL, z.wyplata_sprawdzono_at ASC,
               z.created_at ASC, z.id ASC
      LIMIT ?`)

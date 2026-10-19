@@ -58,7 +58,7 @@ beforeEach(() => {
   const d = db();
   /* `klient_prowadzenie` pierwszy: kaskadą zabiera `klient_dosylka`, a przed
      `app_user` musi odejść, bo prowadzący to klucz obcy bez kaskady. */
-  for (const t of ["klient_prowadzenie", "reklamacja_wiadomosc", "reklamacja_klienta", "zwrot_zdarzenie",
+  for (const t of ["klient_prowadzenie", "pomylka_wysylki", "reklamacja_wiadomosc", "reklamacja_klienta", "zwrot_zdarzenie",
     "zwrot_klienta", "allegro_zwrot", "zamowienie_klienta_pozycja", "zamowienie_klienta", "message",
     "conversation", "allegro_inbox_thread", "channel_account", "events", "app_user"]) {
     d.prepare(`DELETE FROM ${t}`).run();
@@ -1138,4 +1138,58 @@ test("po 429 z Sellasist przebieg nie pyta go o następne dosyłki — limit jes
     sellasist: async () => { pytan++; throw new BladLimituSellasist("Sellasist prosi o przerwę (429).", 1000); } });
   assert.equal(pytan, 1);
   assert.equal(a.wolane.filter((u) => u.endsWith("/shipments")).length, 2, "Allegro pyta dalej o obie dosyłki");
+});
+
+/* ── Pomyłka wysyłkowa przy dosyłce ─────────────────────────────────────────
+   Dosyłka złego towaru zakłada pomyłkę w tej samej transakcji, a dosyłka
+   brakującej części — nie, bo to nie pomyłka zbierania. */
+
+const pomylki = () => db().prepare("SELECT login, konto, zamowienie, zrodlo FROM pomylka_wysylki ORDER BY id")
+  .all().map((w) => ({ ...w })) as Array<Record<string, unknown>>;
+
+test("dosyłka złego towaru zakłada jedną pomyłkę; brakująca część i numer przy niej — żadnej", () => {
+  zamowienie("z-1", "kl");
+  const zw = zwrot("kl");
+  D.zalozDosylkeZOdmowy(db(), zw, ala, TERAZ);
+  D.sledzDosylkeZwrotu(db(), zw, ala, TERAZ);
+  assert.deepEqual(pomylki(), [{ login: "kl", konto, zamowienie: "z-1", zrodlo: "dosylka" }]);
+  assert.deepEqual(wpisy("pomylka_%").map((e) => JSON.parse(e.payload).zrodlo), ["dosylka"]);
+
+  zamowienie("z-2", "kl2");
+  D.zalozDosylkeZOdmowy(db(), zwrot("kl2", { zamowienie: "z-2", kod: "MISSING_PART_SENT" }), ala, TERAZ);
+  const s = sprawa("kl2");
+  D.wpiszNumerDosylki("kl2", { zamowienie: "z-2", waybill: "AD-2", przewoznik: "DPD", wersja: s.wersja,
+    odcisk: s.odcisk }, bob, za(1), db());
+  assert.equal(pomylki().length, 1, "zwrot z brakującą częścią rozstrzyga numer wpisany ręką");
+});
+
+test("porażka zapisu pomyłki nie cofa dosyłki: błąd w logu, dosyłka i krok zapisane", () => {
+  zamowienie("z-1", "kl");
+  db().exec(`CREATE TEMP TRIGGER pomylka_pada BEFORE INSERT ON pomylka_wysylki
+    BEGIN SELECT RAISE(ABORT, 'rejestr pomyłek leży'); END`);
+  const blad = console.error;
+  let zalogowano = 0;
+  console.error = () => { zalogowano++; };
+  try {
+    const w = D.zalozDosylkeZOdmowy(db(), zwrot("kl"), ala, TERAZ);
+    assert.equal(w.zalozona, true);
+  } finally {
+    console.error = blad;
+    db().exec("DROP TRIGGER IF EXISTS temp.pomylka_pada");
+  }
+  assert.equal(zalogowano, 1);
+  assert.ok(wiersz(), "dosyłka zapisana");
+  assert.equal(sprawa().krok, "Dosłać nowy towar (etykieta w Sellasist)");
+  assert.equal(pomylki().length, 0);
+});
+
+test("numer wpisany ręką przy zamówieniu bez zwrotu pomyłki nie zakłada", () => {
+  zamowienie("z-1", "kl");
+  zamowienie("z-7", "kl");
+  D.zalozDosylkeZOdmowy(db(), zwrot("kl", { kod: "MISSING_PART_SENT" }), ala, TERAZ);
+  const s = sprawa();
+  D.wpiszNumerDosylki("kl", { zamowienie: "z-7", waybill: "AD-7", przewoznik: "DPD", wersja: s.wersja,
+    odcisk: s.odcisk }, bob, za(1), db());
+  assert.equal(wiersz("z-7")!.waybill, "AD-7");
+  assert.deepEqual(pomylki(), [], "druga paczka bez zwrotu złym towarem to nie pomyłka zbierania");
 });

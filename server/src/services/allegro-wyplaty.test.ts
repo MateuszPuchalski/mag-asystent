@@ -243,3 +243,17 @@ test("zatrzask NIE NADPISUJE starszego, a zepsute pytanie nie zabiera reszty", a
     .get(zPolem) as { rozliczony_allegro_at: string }).rozliczony_allegro_at,
     "2026-08-05T10:00:00Z", "starszy zatrzask zostaje nietknięty");
 });
+
+test("przy dwóch zwrotach tego samego zamówienia operacje płatnicze nie rozliczają żadnego", () => {
+  /* Płatność jest jedna na zamówienie: obciążenie zwrotem nie mówi, któremu
+     zwrotowi się należało. Takie zamówienia rozstrzyga lustro zwrotów płatności. */
+  const d = stanowisko();
+  d.prepare(`INSERT INTO zamowienie_klienta(channel_account_id, external_id, platnosc_id, synced_at)
+    VALUES (1,'ord-dwa','pay-1','2026-09-22T08:00:00Z')`).run();
+  for (const ext of ["dwa-1", "dwa-2"]) {
+    d.prepare(`INSERT INTO zwrot_klienta(channel_account_id, external_id, order_id, created_at, synced_at)
+      VALUES (1,?,?,?,?)`).run(ext, "ord-dwa", "2026-08-20T08:00:00Z", "2026-09-22T08:00:00Z");
+  }
+  const jeden = zwrotZPlatnoscia(d, "jeden", "pay-2");
+  assert.deepEqual(zwrotyDoSprawdzeniaWyplaty(d, 1).map((z) => z.zwrotId), [jeden]);
+});

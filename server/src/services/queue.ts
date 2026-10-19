@@ -145,7 +145,7 @@ export function enqueueSetEan(
 export function enqueueSetZdjecie(
   twId: number,
   base: EnqueueBase,
-  audyt: { bajtow: number; tloUsuniete: boolean; zrodlo: "aparat" | "galeria" }
+  audyt: { bajtow: number; tloUsuniete: boolean; zrodlo: "aparat" | "galeria" | "panel" }
 ): number {
   const queueId = insert("set_zdjecie", { twId }, base);
   logEvent(

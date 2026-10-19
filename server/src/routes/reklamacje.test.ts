@@ -36,6 +36,7 @@ let app: FastifyInstance;
 let db: typeof import("../db/db.js").db;
 let createUser: typeof import("../services/users.js").createUser;
 let typPodgladu: typeof import("../services/typ-podgladu.js").typPodgladu;
+let typPodgladuOsi: typeof import("../services/typ-podgladu.js").typPodgladuOsi;
 let rozpoznajMime: typeof import("../adapters/zdjecia.sgt.js").rozpoznajMime;
 let reklamacja = 0;
 let zalacznik = 0;
@@ -43,7 +44,7 @@ let zalacznik = 0;
 before(async () => {
   ({ db } = await import("../db/db.js"));
   ({ createUser } = await import("../services/users.js"));
-  ({ typPodgladu } = await import("../services/typ-podgladu.js"));
+  ({ typPodgladu, typPodgladuOsi } = await import("../services/typ-podgladu.js"));
   ({ rozpoznajMime } = await import("../adapters/zdjecia.sgt.js"));
   app = await (await import("../index.js")).buildApp();
 });
@@ -382,23 +383,27 @@ test("odświeżenie NIE jest operacją uprzywilejowaną — to dociągnięcie cu
 test("podgląd rozstrzygają BAJTY, nie pole, którego Allegro nie przysyła", () => {
   /* `PostPurchaseIssueAttachment` ma dwa pola — `fileName` i `url` — więc
      bramki `SAFE` ze skrzynki nie da się tu powtórzyć. Powtarzamy jej SKUTEK:
-     na oś idą wyłącznie typy, które przeglądarka narysuje, a rozpoznaje je
+     na oś idą wyłącznie typy, które panel pokaże, a rozpoznaje je
      sygnatura pliku.
 
-     Przechodzą TRZY, bo tyle jest we wspólnej części tego, co Allegro przy
-     tym zasobie przyjmuje (png, gif, bmp, tiff, jpeg, pdf) i co rysuje
-     przeglądarka (`TYPY_PODGLADU`). */
-  const sygnatura = (b: number[]) => typPodgladu(rozpoznajMime(Buffer.from(b)));
+     Przechodzą obrazy z części wspólnej tego, co Allegro przy tym zasobie
+     przyjmuje (png, gif, bmp, tiff, jpeg, pdf) i co rysuje przeglądarka
+     (`TYPY_PODGLADU`), oraz PDF (`TYPY_DOKUMENTU`). */
+  const sygnatura = (b: number[]) => typPodgladuOsi(rozpoznajMime(Buffer.from(b)));
   assert.equal(sygnatura([0xff, 0xd8, 0xff, 0xe0]), "image/jpeg");
   assert.equal(sygnatura([0x89, 0x50, 0x4e, 0x47]), "image/png");
   assert.equal(sygnatura([0x47, 0x49, 0x46, 0x38]), "image/gif");
+  /* PDF to najczęstszy załącznik niebędący zdjęciem — paragon albo faktura.
+     Panel rysuje go przez pdf.js, ale do Copilota nie idzie: tam czyta się
+     `typPodgladu`, który PDF-a nie zna. */
+  assert.equal(sygnatura([0x25, 0x50, 0x44, 0x46, 0x2d]), "application/pdf");
+  assert.equal(typPodgladu(rozpoznajMime(Buffer.from("%PDF-1.7", "latin1"))), null,
+    "PDF nie idzie do Copilota");
 
   /* BMP i TIFF Allegro przyjmuje, a przeglądarki rysują je nierówno albo
      wcale — zostają przy pobieraniu i to jest odpowiedź, nie awaria. */
   assert.equal(sygnatura([0x42, 0x4d, 0x00, 0x00]), null, "BMP nie idzie na oś");
   assert.equal(sygnatura([0x49, 0x49, 0x2a, 0x00]), null, "TIFF nie idzie na oś");
-  /* PDF to najczęstszy załącznik niebędący zdjęciem — paragon albo faktura. */
-  assert.equal(sygnatura([0x25, 0x50, 0x44, 0x46]), null, "PDF nie idzie na oś");
   /* Plik nazwany `usterka.jpg`, który obrazem nie jest, dostaje 415: nazwa
      decyduje o UKŁADZIE, bajty o wydaniu. */
   assert.equal(sygnatura([0x3c, 0x73, 0x76, 0x67]), null, "SVG też nie — to dokument ze skryptem");
@@ -543,13 +548,61 @@ test("podgląd przez trasę: 200 z typem z SYGNATURY i długością, 415 gdy baj
   /* Podgląd nie zostawia śladu — to nie jest czynność agenta. */
   assert.equal(sladowPobrania(), 0);
 
-  /* Nazwa `paragon.pdf` obiecuje mało, ale i tak rozstrzygają bajty: plik
-     wykonywalny udający obraz dostaje 415 ze wskazaniem na sygnaturę. */
+  /* Nazwa `paragon.pdf` obiecuje PDF, ale rozstrzygają bajty: plik
+     wykonywalny bez sygnatury `%PDF-` dostaje 415 ze wskazaniem na nią. */
   mock.restoreAll();
   allegroOddaje({ status: 200, bajty: Buffer.from([0x4d, 0x5a, 0x90, 0, 3, 0, 0, 0]) });
   const exe = await app.inject({ method: "GET", url: podglad, headers: naglowki });
   assert.equal(exe.statusCode, 415);
   assert.match(exe.json().error, /sygnatura pliku/);
+});
+
+const PDF = Buffer.from("%PDF-1.7\n%\u00e2\u00e3\u00cf\u00d3\n1 0 obj\n", "latin1");
+
+test("PDF z sygnaturą: 200 jako application/pdf w piaskownicy CSP", async () => {
+  /* Paragon w PDF to dowód zakupu. Panel rysuje go przez pdf.js, a CSP
+     `sandbox` odbiera skryptowi pliku nasz origin przy wejściu paskiem. */
+  const { naglowki } = login("biuro", "Ala pdf");
+  tokenAllegro(true);
+  const podglad = `/api/obsluga/reklamacje/${reklamacja}/zalaczniki/${zalacznik}/podglad`;
+  allegroOddaje({ status: 200, bajty: PDF });
+  const r = await app.inject({ method: "GET", url: podglad, headers: naglowki });
+  assert.equal(r.statusCode, 200);
+  assert.equal(r.headers["content-type"], "application/pdf");
+  assert.equal(r.headers["x-content-type-options"], "nosniff");
+  assert.equal(r.headers["content-disposition"], "inline");
+  assert.equal(r.headers["content-security-policy"], "sandbox");
+  assert.equal(r.headers["etag"], `"rekl-zal-${zalacznik}"`);
+  assert.equal(r.headers["content-length"], String(PDF.length));
+  assert.equal(sladowPobrania(), 0, "podgląd PDF-a też nie zostawia śladu");
+});
+
+test("podgląd ponad 20 MiB dostaje 413 ze zdaniem, pobranie na dysk bez sufitu", async () => {
+  /* Podgląd wciąga plik sam, przy otwarciu sprawy. Za duży plik to odpowiedź
+     „tego nie wciągnę", nie awaria sieci — stąd 413, a nie 503. */
+  const { naglowki } = login("biuro", "Ala duży plik");
+  tokenAllegro(true);
+  const podglad = `/api/obsluga/reklamacje/${reklamacja}/zalaczniki/${zalacznik}/podglad`;
+  const duzy = Buffer.concat([PDF, Buffer.alloc(20 * 1024 * 1024)]);
+  allegroOddaje({ status: 200, bajty: duzy });
+  const r = await app.inject({ method: "GET", url: podglad, headers: naglowki });
+  assert.equal(r.statusCode, 413);
+  assert.match(r.json().error, /paragon\.pdf.*podgląd przyjmuje do 20 MB\. Pobierz go na dysk\./);
+
+  const p = await app.inject({
+    method: "GET", url: `/api/obsluga/reklamacje/${reklamacja}/zalaczniki/${zalacznik}`, headers: naglowki });
+  assert.equal(p.statusCode, 200, "pobranie na dysk nie ma sufitu");
+  assert.equal(p.rawPayload.length, duzy.length);
+});
+
+test("szczegół sprawy niesie `pdf` przy załączniku nazwanym .pdf", async () => {
+  /* Pole decyduje o UKŁADZIE: panel rysuje miniaturę zamiast samej nazwy. */
+  const { naglowki } = login("biuro", "Ala pole pdf");
+  const r = await app.inject({ method: "GET", url: `/api/obsluga/reklamacje/${reklamacja}`, headers: naglowki });
+  assert.equal(r.statusCode, 200);
+  const z = (r.json().zalaczniki as Array<{ id: number; pdf: boolean; podglad: boolean }>)
+    .find((x) => x.id === zalacznik);
+  assert.deepEqual({ pdf: z?.pdf, podglad: z?.podglad }, { pdf: true, podglad: false });
 });
 
 test("odmowa Allegro wraca jako 502 ze zdaniem, awaria sieci i brak konta jako 503", async () => {

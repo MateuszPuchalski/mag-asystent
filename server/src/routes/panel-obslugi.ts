@@ -75,6 +75,23 @@ export function problemZWersji(panel: string | null, serwer: string): string | n
     + "Przebuduj panel: `npm run build` w KORZENIU repo, nie w `server/`.";
 }
 
+/* Człon ścieżki zasobu: litera albo cyfra na początku, potem litery, cyfry,
+   kropka i myślnik. Bez kropki na początku, więc `..` nie wyjdzie z builda. */
+const CZLON_ZASOBU = /^\w[-.\w]*$/;
+
+/**
+ * Plik zasobu z `assets/` albo `null`, gdy nazwa nie przeszła białej listy.
+ *
+ * Jeden poziom podkatalogu jest dozwolony, bo pdf.js żąda katalogu na swoje
+ * dekodery obrazów skanu. Panel kładzie je w `assets/pdfjs-<wersja>/`, żeby
+ * roczna pamięć przeglądarki nie oddała starego dekodera nowej bibliotece.
+ */
+export function plikZasobu(dir: string, czlony: string[]): string | null {
+  if (czlony.length < 1 || czlony.length > 2 || !czlony.every((c) => CZLON_ZASOBU.test(c))) return null;
+  const plik = path.join(dir, "assets", ...czlony);
+  return fs.existsSync(plik) && fs.statSync(plik).isFile() ? plik : null;
+}
+
 const MIME: Record<string, string> = {
   ".js": "text/javascript; charset=utf-8", ".css": "text/css; charset=utf-8",
   ".svg": "image/svg+xml", ".png": "image/png", ".ico": "image/x-icon",
@@ -85,6 +102,9 @@ const MIME: Record<string, string> = {
   /* Barlow jedzie z panelem od 0.431.0 — wcześniej panel brał go z trasy
      starego biura. Bez typu przeglądarka odrzuca font podany jako strumień. */
   ".ttf": "font/ttf",
+  /* Dekodery skanów pdf.js. Biblioteka czyta je jako bajty, ale typ zgodny
+     z treścią nie kosztuje nic i nie myli narzędzi przeglądarki. */
+  ".wasm": "application/wasm",
 };
 
 /** Osobny frontend ma własny build, ale nadal serwuje go ten sam proces i origin. */
@@ -104,14 +124,17 @@ export async function panelObslugiRoutes(app: FastifyInstance) {
   /* Zasoby PRZED gwiazdką: trasa statyczna wygrywa z wieloznacznikiem, ale
      kolejność zapisu mówi czytelnikowi, że tak ma być. Nazwa pliku przechodzi
      przez białą listę, żeby `..` nie wyszło poza katalog builda. */
-  app.get<{ Params: { file: string } }>("/obsluga/assets/:file", async (req, reply) => {
-    if (!dir || !/^[-.\w]+$/.test(req.params.file)) return reply.code(404).send();
-    const file = path.join(dir, "assets", req.params.file);
-    if (!fs.existsSync(file)) return reply.code(404).send();
+  const zasob = (reply: FastifyReply, czlony: string[]) => {
+    const file = dir ? plikZasobu(dir, czlony) : null;
+    if (!file) return reply.code(404).send();
     return reply.type(MIME[path.extname(file)] ?? "application/octet-stream")
       .header("cache-control", "public,max-age=31536000,immutable")
       .send(fs.readFileSync(file));
-  });
+  };
+  app.get<{ Params: { file: string } }>("/obsluga/assets/:file",
+    async (req, reply) => zasob(reply, [req.params.file]));
+  app.get<{ Params: { podkatalog: string; file: string } }>("/obsluga/assets/:podkatalog/:file",
+    async (req, reply) => zasob(reply, [req.params.podkatalog, req.params.file]));
 
   /* Trasy ekranów obsługuje przeglądarka, ale wejście z paska adresu
      i odświeżenie idą do serwera. Do 0.146.0 stały tu dwie ścieżki wypisane

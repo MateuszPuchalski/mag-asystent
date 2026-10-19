@@ -8,6 +8,7 @@ import { enqueueSetEan, enqueueSetLocation, enqueueSetZdjecie } from "../service
 import {
   bajtyZeZdjecia,
   dodawanieWlaczone,
+  obrazDoZapisu,
   podglad,
   przypiszZadanie,
   usunPodglad,
@@ -449,7 +450,14 @@ export async function productRoutes(app: FastifyInstance) {
    */
   app.post<{
     Params: { twId: string };
-    Body: { podgladId?: string; zTlem?: boolean; zrodlo?: "aparat" | "galeria" };
+    /* `gotowy` przysyła panel: obraz złożony w przeglądarce z podglądu.
+       Kolektor go nie wysyła i jego droga zostaje bez zmian. */
+    Body: {
+      podgladId?: string;
+      zTlem?: boolean;
+      zrodlo?: "aparat" | "galeria" | "panel";
+      gotowy?: string;
+    };
   }>(
     "/api/products/:twId/zdjecie",
     async (req, reply) => {
@@ -469,14 +477,16 @@ export async function productRoutes(app: FastifyInstance) {
         });
       }
 
-      const zTlem = req.body?.zTlem === true || w.bezTla === null;
-      const obraz = zTlem ? w.oryginal : (w.bezTla as Buffer);
-      const mime = zTlem ? w.mime : "image/png";
+      const doZapisu = obrazDoZapisu(w, { zTlem: req.body?.zTlem === true, gotowy: req.body?.gotowy });
+      if (!doZapisu.ok) return reply.code(400).send({ error: doZapisu.error });
+      const { obraz, mime, tloUsuniete } = doZapisu;
+      const zTlem = !tloUsuniete;
 
-      /* Skąd wzięło się zdjęcie — aparat czy galeria. Wpływu na przetwarzanie
+      /* Skąd wzięło się zdjęcie — aparat, galeria czy panel biura. Wpływu na przetwarzanie
          nie ma żadnego; jest pierwszym pytaniem przy analizie „dlaczego te
          zdjęcia wychodzą źle", bo kadr z galerii bywa zrzutem ekranu. */
-      const zrodlo = req.body?.zrodlo === "galeria" ? "galeria" : "aparat";
+      const zrodlo =
+        req.body?.zrodlo === "galeria" || req.body?.zrodlo === "panel" ? req.body.zrodlo : "aparat";
       const autor = autorOperacji(req);
       const { etag, bajtow } = zapiszWlasne({
         twId,

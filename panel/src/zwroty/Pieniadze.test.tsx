@@ -4,7 +4,7 @@ import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router-dom";
 import { Pieniadze } from "./Pieniadze";
 import type { AkcjeKlawiszy } from "./klawisze";
-import type { StanZwrotuPieniedzy } from "../api/typy";
+import type { StanZwrotuPieniedzy, ZwrotPlatnosciAllegro } from "../api/typy";
 
 /* ── Pieniądze przy zwrocie (§25a, 0.190.0) ──────────────────────────────────
    Ten ekran jako pierwszy w panelu rusza cudze pieniądze, więc testy pilnują
@@ -16,7 +16,7 @@ const stan = (n: Partial<StanZwrotuPieniedzy> = {}): StanZwrotuPieniedzy => ({
   moznaZwrocic: true, moznaOdmowic: true, powod: null,
   kwotaGrosze: 6498, waluta: "PLN", oddane: null, odmowa: null,
   przelew: null, moznaZapisacPrzelew: false, powodPrzelewu: null,
-  dosylka: null, sledzicDosylke: false, ...n,
+  dosylka: null, sledzicDosylke: false, platnosci: [], ...n,
 });
 
 /* Router, bo zdanie o dosyłce prowadzi odnośnikiem do profilu klienta. */
@@ -357,5 +357,135 @@ describe("Pieniądze przy zwrocie", () => {
     rerender(<Pieniadze stan={poOdmowie()} trwa={false} blad="" onZwroc={vi.fn()} onOdmow={vi.fn()} />);
     expect(screen.queryByLabelText("Kod odmowy")).toBeNull();
     expect(screen.queryByRole("button", { name: /Wyślij odmowę/ })).toBeNull();
+  });
+  /* ── Wypłata z Allegro, jak w Sales Center ───────────────────────────────
+     Pasek „Oddano” mówi tylko, że zlecenie jest potwierdzone. Biuro chce
+     widzieć status, kwotę i to, co dokładnie wróciło klientowi. */
+  const wyplata = (n: Partial<ZwrotPlatnosciAllegro> = {}): ZwrotPlatnosciAllegro => ({
+    refundId: "r-1", paymentId: "p-1", orderId: "o-1", status: "SUCCESS", reason: "REFUND",
+    utworzonoAt: "2026-09-28T10:00:00Z", kwotaGrosze: 5498, waluta: "PLN", dostawaGrosze: 0,
+    pozycje: [], ...n });
+  const NAZWY = { "li-aaa111": "Sekator ogrodowy" };
+
+  it("SUCCESS: Wypłacone, kwota, data i pozycje z nazwą oraz sztukami", () => {
+    ekran({ nazwyPozycji: NAZWY, stan: stan({ platnosci: [wyplata({
+      pozycje: [{ id: "li-aaa111", type: "QUANTITY", quantity: 2, kwotaGrosze: null }] })] }) });
+    expect(screen.getByText("Wypłacone")).toBeInTheDocument();
+    expect(screen.getByText("54,98 PLN")).toBeInTheDocument();
+    expect(screen.getByText("28.09.2026")).toBeInTheDocument();
+    expect(screen.getByText("Sekator ogrodowy")).toBeInTheDocument();
+    expect(screen.getByText("2 szt.")).toBeInTheDocument();
+    expect(screen.queryByText("Dostawa")).toBeNull();
+  });
+
+  it("pozycja AMOUNT pokazuje kwotę, a bez nazwy — końcówkę id; dostawa osobnym wierszem", () => {
+    ekran({ stan: stan({ platnosci: [wyplata({ dostawaGrosze: 1200,
+      pozycje: [{ id: "li-zzz999999", type: "AMOUNT", quantity: null, kwotaGrosze: 4298 }] })] }) });
+    expect(screen.getByText("Pozycja zamówienia …999999")).toBeInTheDocument();
+    expect(screen.getByText("42,98 PLN")).toBeInTheDocument();
+    expect(screen.getByText("Dostawa")).toBeInTheDocument();
+    expect(screen.getByText("12,00 PLN")).toBeInTheDocument();
+  });
+
+  it("PARTIAL to wypłata częściowa, nie pełna", () => {
+    ekran({ stan: stan({ platnosci: [wyplata({ status: "PARTIAL" })] }) });
+    expect(screen.getByText("Wypłacone częściowo")).toBeInTheDocument();
+    expect(screen.queryByText("Wypłacone")).toBeNull();
+  });
+
+  it("NEW, VALIDATED i IN_PROGRESS to „W toku”; odrzucenie i anulowanie mają własne słowa", () => {
+    ekran({ stan: stan({ platnosci: [
+      wyplata({ refundId: "a", status: "NEW" }), wyplata({ refundId: "b", status: "VALIDATED" }),
+      wyplata({ refundId: "c", status: "IN_PROGRESS" }), wyplata({ refundId: "d", status: "CANCELED" }),
+      wyplata({ refundId: "e", status: "VALIDATE_FAILED" }), wyplata({ refundId: "f", status: "DZIWNY" })] }) });
+    expect(screen.getAllByText("W toku")).toHaveLength(3);
+    expect(screen.getByText("Anulowane")).toBeInTheDocument();
+    expect(screen.getByText("Odrzucone przez Allegro")).toBeInTheDocument();
+    expect(screen.getByText("DZIWNY")).toBeInTheDocument();
+  });
+
+  it("bez zwrotów płatności nie dodaje niczego — ani listy, ani komunikatu o braku", () => {
+    ekran({ stan: stan({ platnosci: [] }) });
+    expect(screen.queryByRole("list", { name: "Wypłaty z Allegro" })).toBeNull();
+    expect(screen.queryByText(/brak/i)).toBeNull();
+  });
+});
+
+/* „Sprawdź w Allegro”: lustro bywa starsze od Sales Center (zwrot GM9Q/2026
+   miał w Allegro 308 CZK, a panel mówił, że pieniądze się nie należą). */
+describe("Sprawdzenie w Allegro", () => {
+  const potwierdzone = { id: "r1", status: "SUCCESS", kiedy: null, potwierdzone: true };
+
+  it("klik woła onSprawdz, a przycisk jest drugorzędny", async () => {
+    const onSprawdz = vi.fn();
+    ekran({ onSprawdz });
+    const przycisk = screen.getByRole("button", { name: "Sprawdź w Allegro" });
+    await userEvent.click(przycisk);
+    expect(onSprawdz).toHaveBeenCalledTimes(1);
+    expect(przycisk.className).not.toBe(screen.getByRole("button", { name: /Oddaj pieniądze/ }).className);
+  });
+
+  it("stoi także przed werdyktem, gdy samo oddanie jest zamknięte", () => {
+    ekran({ onSprawdz: vi.fn(), przedWerdyktem: true,
+      stan: stan({ moznaZwrocic: false, powod: "Najpierw przyjmij zwrot." }) });
+    expect(screen.getByRole("button", { name: "Sprawdź w Allegro" })).toBeEnabled();
+  });
+
+  it("w trakcie żądania jest wyłączony i mówi „Sprawdzam…”", () => {
+    ekran({ onSprawdz: vi.fn(), sprawdzam: true });
+    expect(screen.getByRole("button", { name: "Sprawdzam…" })).toBeDisabled();
+  });
+
+  it("znika, gdy Allegro potwierdziło wypłatę", () => {
+    ekran({ onSprawdz: vi.fn(), stan: stan({ oddane: potwierdzone }) });
+    expect(screen.queryByRole("button", { name: /Sprawdź w Allegro/ })).toBeNull();
+  });
+
+  it("zostaje przy zleceniu, którego Allegro jeszcze nie potwierdziło", () => {
+    ekran({ onSprawdz: vi.fn(), stan: stan({ oddane: { ...potwierdzone, potwierdzone: false } }) });
+    expect(screen.getByRole("button", { name: "Sprawdź w Allegro" })).toBeInTheDocument();
+  });
+
+  it("bez wyniku nie ma linii statusu", () => {
+    ekran({ onSprawdz: vi.fn() });
+    expect(screen.queryByRole("status")).toBeNull();
+  });
+
+  it("zero zwrotów płatności: mówi, że pieniądze mogły pójść inną drogą", () => {
+    ekran({ onSprawdz: vi.fn(), wynikSprawdzenia: { znaleziono: 0, wyplacone: false } });
+    expect(screen.getByRole("status")).toHaveTextContent(
+      "Allegro nie zwraca zwrotu płatności dla tego zamówienia. Pieniądze mogły pójść inną drogą — sprawdź w Sales Center.");
+  });
+
+  it("wypłacone: Allegro potwierdza wypłatę", () => {
+    ekran({ onSprawdz: vi.fn(), wynikSprawdzenia: { znaleziono: 1, wyplacone: true } });
+    expect(screen.getByRole("status")).toHaveTextContent("Allegro potwierdza wypłatę.");
+  });
+
+  it("jest zwrot płatności, ale pieniądze jeszcze nie wyszły", () => {
+    ekran({ onSprawdz: vi.fn(), wynikSprawdzenia: { znaleziono: 2, wyplacone: false, udane: 0 } });
+    expect(screen.getByRole("status")).toHaveTextContent(
+      "Allegro ma zwrot płatności, ale pieniądze jeszcze nie wyszły — zobacz status poniżej.");
+  });
+
+  it("Allegro oddało pieniądze, a zwrot nie został dopasowany: mówi dlaczego", () => {
+    /* Obok listy „Wypłacone” zdanie „jeszcze nie wypłacony” wyglądało jak sprzeczność. */
+    ekran({ onSprawdz: vi.fn(), wynikSprawdzenia: {
+      znaleziono: 1, wyplacone: false, udane: 1,
+      powodBraku: "Allegro podaje powód NOT_COLLECTED, a zatrzask uznaje tylko zwrot towaru (REFUND)" } });
+    expect(screen.getByRole("status")).toHaveTextContent(
+      "Allegro oddało pieniądze, ale ten zwrot nie został dopasowany automatycznie: " +
+      "Allegro podaje powód NOT_COLLECTED, a zatrzask uznaje tylko zwrot towaru (REFUND).");
+  });
+
+  it("wypłata bez znanego powodu braku nie zgaduje", () => {
+    ekran({ onSprawdz: vi.fn(), wynikSprawdzenia: { znaleziono: 1, wyplacone: false, udane: 1 } });
+    expect(screen.getByRole("status")).toHaveTextContent(
+      "ale ten zwrot nie został dopasowany automatycznie: powód nieznany.");
+  });
+
+  it("błąd sprawdzenia stoi jak błąd innych akcji sekcji", () => {
+    ekran({ onSprawdz: vi.fn(), blad: "Allegro odpowiada zbyt wolno, spróbuj za chwilę." });
+    expect(screen.getByText("Allegro odpowiada zbyt wolno, spróbuj za chwilę.")).toBeInTheDocument();
   });
 });

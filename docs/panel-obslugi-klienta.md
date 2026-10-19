@@ -3168,6 +3168,37 @@ i `outbox.created_by` wskazujący konto automatu. Kolumna
 `decyzja_klasyfikacji.tryb` zostaje przy jednej wartości, bo przebudowa
 tabeli nie dodałaby do tego śladu nic.
 
+### 14.6g. Szkic sam szuka w kartotece (0.589.0)
+
+Decyzja właściciela z 19 października 2026. Fakty szkicu znały dotąd jeden
+towar: ten z oferty rozmowy. Klient pyta jednak często numerem OEM, nazwą
+części albo inną aukcją. Szkic odpowiadał wtedy z wiedzy modelu.
+
+**Narzędzia dopytania przy szkicu.** Szkic dostaje te same narzędzia, które
+ma dopytanie: `szukaj_towaru`, `karta_towaru`, `tresc_oferty` i nowe
+`oferty_towaru`. Ma najwyżej trzy rundy narzędzi i jedno żądanie końcowe bez
+nich, mniej niż dopytanie, bo szkic chodzi też taktem. Wszystkie czytają
+lokalny odczyt Subiekta i kopię ofert, nie piszą i nie wołają sieci.
+
+**Wynik narzędzia to fakt `N#`.** Model cytuje go jak `F#`, a walidacja
+szkicu traktuje go jak fakt. Numer z wyniku nie odrzuca szkicu. Numer
+zmyślony i `N#` spoza wyników odrzucają go jak dotąd.
+
+**Ceny sprzedaży i nasze oferty.** Karta towaru podaje cennik sklepu bez
+poziomu 0, bo poziom 0 to cena zakupu. `oferty_towaru` podaje link, tytuł
+i cenę naszych aktywnych aukcji z datą kopii. Cenę klientowi model podaje
+tylko z oferty, z linkiem. Kopia ofert zna tylko część aukcji i bywa sprzed
+doby. Gdy oferty nie znamy, cennik kartoteki trafia do zastrzeżeń dla agenta,
+nie do klienta.
+
+**Szkic z narzędziami nie wychodzi automatem.** Przepływ na żywo (§14.6f)
+dostał ósmy warunek. Ceny i linki z kartoteki idą do klienta dopiero po
+spojrzeniu człowieka.
+
+**Wyłącznik.** `COPILOT_SZKIC_NARZEDZIA=0` w `wertis.env` przywraca szkic
+z jednym wywołaniem. Dziennik `copilot_szkic` zapisuje nazwy użytych narzędzi
+i liczbę rund, bez treści.
+
 ### 14.7. Co działa: dane doboru z rozmowy (etap F, przyrost trzeci)
 
 > **Usunięte.** Dobór części i baza wiedzy wyszły z WERTIS w całości
@@ -6258,6 +6289,67 @@ Oba ekrany rysuje wspólny `reklamacje/Czat.tsx`, więc zmiana jest jedna.
 - **Zeszło z ekranu:** zwijanie starszych wiadomości, pasek „rozmowa jest
   niepełna”, bursztyn ostatniej wiadomości klienta, ikony i słowa ról oraz
   zwijanie długich treści.
+
+**PDF w czacie (0.582.0).** Prośba właściciela: PDF od klienta ma być widać
+w rozmowie. Kafel PDF-a pokazuje miniaturę pierwszej strony ze znaczkiem
+„PDF”. Klik otwiera cały dokument w oknie panelu, z licznikiem „Strona N z M”
+i przyciskiem „Pobierz”. Pasek nazwy dalej pobiera plik na dysk. To samo
+dotyczy dyskusji i skrzynki, gdzie miniatura stoi nad nazwą w karcie
+załącznika, tylko dla plików `SAFE`.
+
+- **O układzie mówi pole `pdf` z serwera,** podpowiedź z nazwy pliku, a w
+  skrzynce także z typu. Rozstrzygają bajty: plik bez sygnatury `%PDF-`
+  dostaje 415 i zostaje kaflem z nazwą.
+- **Bajty idą GET-em z trasy podglądu,** tej samej co dla zdjęć. Miniatura
+  i okno czytają jeden wpis zapytania, więc klik nie pobiera pliku drugi raz.
+- **Rysuje pdf.js w przeglądarce,** ładowany dopiero przy pierwszym PDF-ie,
+  w osobnym kawałku pakietu. Rysujemy samo płótno: bez warstwy tekstu,
+  adnotacji, formularzy, XFA i skryptów dokumentu. Bierzemy wersję `legacy`,
+  bo zwykła nie otwiera plików w Chromium sprzed kilku miesięcy.
+- **Skany mają dekodery obok panelu.** Obraz JBIG2 i JPEG2000 pdf.js czyta
+  modułami WASM z `assets/pdfjs-<wersja>/`. Bez nich skan paragonu wychodzi
+  białą stroną, bez żadnego błędu. Wersja w katalogu chroni przed starym
+  dekoderem w pamięci przeglądarki.
+- **Strony okna rysują się po kolei,** każda przy zbliżeniu do kadru. Długi
+  protokół serwisu nie zajmuje pamięci karty stronami, których nikt nie czyta.
+- **Porażka nie zostawia pustego prostokąta.** 404 i 415 dają kafel z nazwą.
+  Za duży plik (413) i PDF, którego pdf.js nie otworzy, mówią zdaniem bez
+  ponowienia. Awaria drogi mówi zdaniem z „Spróbuj ponownie”.
+
+### 25b.13. Kupiony towar z paragonu (0.585.0)
+
+Prośba właściciela: w reklamacji ma być widać, jaki produkt klient naprawdę
+kupił, z dokładnym symbolem z paragonu albo faktury zamówienia.
+
+**Skąd symbol.** Karta Produkt bierze symbol WYŁĄCZNIE z dokumentu sprzedaży
+w Subiekcie (FS albo PA), który wskazuje zamówienie. Serwer niesie je w polu
+`paragon` szczegółu reklamacji. Symbol z oferty, z mapowania i SKU Allegro
+z karty zeszły. Powód: oferta przepięta na inną dostawę wskazuje dziś inny
+towar niż ten, który wyjechał w paczce.
+
+- **Z dokumentem** stoi nagłówek „Paragon PA 1234/10/2026 · 03.10.2026”
+  albo „Faktura …” i pod nim WSZYSTKIE pozycje: symbol, nazwa, ilość. Kilka
+  dokumentów stoi po kolei, od najstarszego.
+- **Reklamowana pozycja** ma szare tło i napis „reklamowany”, nie bursztyn.
+  Wskazuje ją serwer, tylko gdy jest jednoznaczna. Najpierw odejmuje towary
+  innych ofert zamówienia, bo jedyny towar na paragonie bywa cudzy. Inaczej
+  nic nie świeci, a zdanie mówi, że dokument tego nie rozstrzyga.
+- **Usługa**, na przykład przesyłka, stoi wyciszona i bez kopiowania.
+- **Symbol kopiuje się kliknięciem** przez `ui/kopiuj.ts`, bo biuro pracuje
+  po zwykłym HTTP. Nazwa pozycji otwiera przekrój towaru.
+- **Bez dokumentu** stoi „Brak paragonu ani faktury w Subiekcie” i powód:
+  zakup starszy niż okno kopii (`DOK_SPRZEDAZ_DNI_WSTECZ`, domyślnie 90 dni),
+  dokument niewystawiony albo bez numeru zamówienia, albo reklamacja bez
+  zamówienia. Żadnego symbolu zastępczego.
+- **Stan, półka i oś cen** dotyczą tylko reklamowanej pozycji. Bez
+  jednoznacznego wskazania ich nie ma, bo cennik innego towaru z paragonu
+  prowadziłby werdykt w złą stronę.
+- **Nazwa i zdjęcie oferty zostają** nad dokumentem. To oferta, którą klient
+  widział w Allegro, a nie towar z paczki.
+
+Brak pola `paragon` znaczy, że serwer jeszcze nie odpowiedział. Karta wtedy
+milczy, zamiast mówić „brak paragonu”. Dyskusje tej karty nie mają.
+
 ### 25c.1. Czym jest dyskusja
 
 Rozmową posprzedażową, którą kupujący otwiera przy zamówieniu, gdy coś poszło

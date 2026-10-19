@@ -136,6 +136,8 @@ export type { PozycjaZamowienia, Zamowienie } from "./zamowienia.js";
 
 export interface WierszZwrotu {
   id: number;
+  /** Konto kanału zwrotu — „Zła paczka” wysyła je razem z numerem zamówienia. */
+  konto: number;
   externalId: string;
   numer: string | null;
   orderId: string | null;
@@ -186,6 +188,12 @@ export interface WierszZwrotu {
   kwotaGrosze: number | null;
   kwotaWariant: string | null;
   korektaNumer: string | null;
+  /**
+   * Zwrot zamknięty RĘCZNIE, bez korekty: kto, kiedy i dlaczego. `null`, gdy
+   * zamknęła go korekta albo wcale. Taki zwrot zostaje w zamkniętych, nawet
+   * jeśli pieniądze za niego jeszcze nie wyszły — to decyzja człowieka.
+   */
+  zamknietyRecznie: { kiedy: string; przez: string | null; powod: string | null } | null;
   /**
    * `subiekt` = automat znalazł dokument, `reczne` = człowiek przepisał,
    * `sfera` = ZW wystawił worker Sfery (0.349.0).
@@ -688,7 +696,14 @@ function zloz(
   }));
   const dni = dniDoTerminu(terminAt, teraz);
   const rejectionCode = (z.rejection_code as string) ?? null;
-  const czeka = pieniadzeCzekaja({
+  const zamknietyRecznie = z.zamkniecie_reczne_at
+    ? { kiedy: String(z.zamkniecie_reczne_at), przez: (z.zamkniecie_reczne_przez as string) ?? null,
+        powod: (z.zamkniecie_reczne_powod as string) ?? null }
+    : null;
+  /* Ręcznie zamknięty zwrot nie wraca do DO ZWROTU, choć pieniądze mogły
+     nie wyjść: zamknięcie jest decyzją człowieka, a kolejka, która ją
+     odwołuje sama, uczyłaby klikać „zamknij" w kółko. */
+  const czeka = !zamknietyRecznie && pieniadzeCzekaja({
     werdykt: (z.werdykt as string) ?? null, rejectionCode,
     kwotaGrosze: z.kwota_grosze == null ? null : Number(z.kwota_grosze),
     statusAllegro: (z.status_allegro as string) ?? null,
@@ -716,6 +731,7 @@ function zloz(
   const suma = sumaPozycji(pozycje);
   return {
     id: Number(z.id),
+    konto: Number(z.channel_account_id),
     externalId: String(z.external_id),
     numer: (z.reference_number as string) ?? null,
     orderId: (z.order_id as string) ?? null,
@@ -762,6 +778,7 @@ function zloz(
     kwotaGrosze: z.kwota_grosze == null ? null : Number(z.kwota_grosze),
     kwotaWariant: (z.kwota_wariant as string) ?? null,
     korektaNumer: (z.korekta_numer as string) ?? null,
+    zamknietyRecznie,
     korektaZrodlo: (z.korekta_zrodlo as string) ?? null,
     zw: z.zw_status == null ? null : {
       status: String(z.zw_status),

@@ -1,6 +1,7 @@
 import { config } from "../config.js";
 import { db as defaultDb, transaction, type Db } from "../db/db.js";
 import { logEvent } from "./events.js";
+import { czyPdfZNazwy } from "./typ-podgladu.js";
 import {
   TAGI_REKLAMACJI, tagiSprawy, tagiWszystkichSpraw, type TagSprawy,
 } from "./tagi-spraw.js";
@@ -15,6 +16,7 @@ import { ROZMOWA_ZAMOWIENIA, drogaZakupu, sprawyZakupu, type PrzystanekDrogi, ty
 import { stanZdjeciaOferty, type StanZdjeciaOferty } from "./zdjecia-ofert.js";
 import { STATUSY_KONCOWE } from "./statusy-spraw.js";
 import { ostatniaDostawa, type OstatniaDostawa } from "./ostatnia-dostawa.js";
+import { paragonReklamacji, type ParagonReklamacji } from "./paragon-reklamacji.js";
 import {
   dowodyReklamacji, uDostawcyReklamacji, type DowodReklamacji, type ReklamacjaUDostawcy,
 } from "./reklamacja-dowody.js";
@@ -237,6 +239,12 @@ export interface ZalacznikReklamacji {
    * nazwa kłamie, dostaje 415 i zostaje przy pobieraniu.
    */
   podglad: boolean;
+  /**
+   * Czy nazwa obiecuje PDF: panel rysuje wtedy miniaturę pierwszej strony.
+   * Ta sama PODPOWIEDŹ UKŁADU co `podglad`, z tego samego powodu: bez typu
+   * MIME o wydaniu rozstrzyga sygnatura `%PDF-` na trasie podglądu.
+   */
+  pdf: boolean;
 }
 
 /**
@@ -1159,6 +1167,7 @@ export function czatReklamacji(database: Db, reklamacjaId: number): WiadomoscRek
       .map((z) => ({
         id: Number(z.id), wiadomoscId: Number(z.wiadomosc_id), nazwa: String(z.nazwa ?? ""),
         podglad: czyObrazZNazwy(z.nazwa as string),
+        pdf: czyPdfZNazwy(z.nazwa as string),
       })),
   }));
 }
@@ -1171,6 +1180,7 @@ export function zalacznikiSprawy(database: Db, reklamacjaId: number): ZalacznikR
   ).all(reklamacjaId) as Wiersz[]).map((z) => ({
     id: Number(z.id), wiadomoscId: null, nazwa: String(z.nazwa ?? ""),
     podglad: czyObrazZNazwy(z.nazwa as string),
+    pdf: czyPdfZNazwy(z.nazwa as string),
   }));
 }
 
@@ -1212,6 +1222,12 @@ export interface SzczegolReklamacji {
   dowody: DowodReklamacji[];
   /** Reklamacja u dostawcy; `null`, dopóki biuro jej nie zgłosiło. */
   uDostawcy: ReklamacjaUDostawcy | null;
+  /**
+   * FS i PA zamówienia z Subiekta z pozycjami i sporną pozycją; bez dokumentu
+   * sam powód braku. Tylko w szczególe: kolejka czytałaby pozycje setek
+   * dokumentów, a symbol z dokumentu jest potrzebny przy jednej sprawie.
+   */
+  paragon: ParagonReklamacji;
 }
 
 /**
@@ -1343,10 +1359,10 @@ const slad = (w: Wiersz | undefined): SladHistorii | null => {
  * reklamacje na czterysta sprzedanych" i „trzy na cztery" to dwie różne
  * sprawy, więc odsetek byłby liczbą znacznie lepszą od samego licznika —
  * tyle że nie da się go policzyć uczciwie. Sprzedaż stoi w `sgt_faktura`,
- * a ta tabela niesie OKNO `DOK_SPRZEDAZ_DNI_WSTECZ` (domyślnie 60 dni);
+ * a ta tabela niesie OKNO `DOK_SPRZEDAZ_DNI_WSTECZ` (domyślnie 90 dni);
  * reklamacje sięgają lat. Iloraz dwóch liczb o różnych zakresach czasu jest
- * gorszy od braku ilorazu, bo wygląda na wynik. Odsetek wróci tu dopiero
- * z oknem sprzedaży obejmującym ten sam okres, co reklamacje.
+ * gorszy od braku ilorazu, bo wygląda na wynik. Odsetek w oknie sprzedaży
+ * liczy przekrój towaru (`przekroj-towaru.ts`), tu licznik zostaje sam.
  */
 export function historiaSprawy(
   database: Db, konto: number, pomin: number,
@@ -1440,13 +1456,22 @@ export function szczegolReklamacji(
     kartoteka = kartotekaOferty(database, konto, reklamacja.offerId,
       snap ? snap.sku : undefined);
   }
-  /* Licznik „ten towar" pyta o kartotekę, którą pokazuje kolumna dowodów:
-     paragon albo wskazanie człowieka, a bez nich powiązanie po SKU lub
-     z pamięci. Tę samą regułę ma `kartotekaKolumny` w panelu. Propozycja bez
-     `twId` (symbol zdublowany) zostaje brakiem i licznik milczy. */
-  const twIdTowaru = reklamacja.twId
-    ?? (kartoteka && (kartoteka.pewnosc === "sku" || kartoteka.pewnosc === "pamiec")
-      ? kartoteka.twId : null);
+  /* Kandydaci na sporną pozycję to mapowanie oferty i sygnatura z pozycji
+     zamówienia. Obie są tylko podpowiedzią: rozstrzyga dokument po
+     odejmowaniu, a symbol na ekran idzie wyłącznie z dokumentu. */
+  const paragon = paragonReklamacji(database, {
+    konto, orderId: reklamacja.orderId, offerId: reklamacja.offerId,
+    kupionoAt: reklamacja.kupionoAt,
+    kandydaci: [
+      w.tw_id == null ? null : Number(w.tw_id),
+      reklamacja.twZParagonu ? reklamacja.twId : null,
+    ],
+  }, teraz);
+  /* Towar sprawy to sporna pozycja paragonu i nic innego. Karta „Produkt"
+     w panelu rysuje stan i ceny z `paragon.spornaTwId`, więc licznik „ten
+     towar" i dostawa liczone z mapowania mówiłyby o innej rzeczy w tej samej
+     karcie. Bez spornej pozycji obu nie ma, bo towar sprawy byłby zgadnięty. */
+  const towarSprawy = paragon.spornaTwId;
 
   return {
     reklamacja,
@@ -1454,13 +1479,11 @@ export function szczegolReklamacji(
     zalaczniki: zalacznikiSprawy(database, id),
     zwroty, rozmowy, sprawy, droga, zamowienie, przesylka, kartoteka,
     karta: kartaSprawy(database, id),
-    historia: historiaSprawy(database, konto, id, twIdTowaru, reklamacja.kupujacyLogin),
-    /* Dostawa liczy się dla tej samej kartoteki co licznik: propozycja
-       niejednoznaczna nie wchodzi, bo dostawca podany do niej byłby
-       zgadywaniem. */
-    dostawa: ostatniaDostawa(database, twIdTowaru, reklamacja.kupionoAt),
+    historia: historiaSprawy(database, konto, id, towarSprawy, reklamacja.kupujacyLogin),
+    dostawa: ostatniaDostawa(database, towarSprawy, reklamacja.kupionoAt),
     dowody: dowodyReklamacji(database, id),
     uDostawcy: uDostawcyReklamacji(database, id),
+    paragon,
   };
 }
 

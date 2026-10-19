@@ -1,5 +1,6 @@
-import { MessageSquare, Scale, Undo2, MessagesSquare } from "lucide-react";
+import { MessageSquare, PackageX, Scale, Undo2, MessagesSquare } from "lucide-react";
 import type { PrzystanekDrogi, SprawaZakupu } from "../api/typy";
+import { adresPomylki } from "../api/pomylki";
 
 /* ── Spoiwo kolejek (`docs/obsluga-klienta-calosc.md`) ────────────────────────
    Słownik kolejek i składanie ich spraw w przystanki drogi klienta. Jeden
@@ -20,7 +21,15 @@ export const KOLEJKI = {
   dyskusja: { nazwa: "dyskusja", cel: "dyskusję", ikona: MessagesSquare, sciezka: "/obsluga/dyskusje" },
   reklamacja: { nazwa: "reklamacja", cel: "reklamację", ikona: Scale, sciezka: "/obsluga/reklamacje" },
   zwrot: { nazwa: "zwrot", cel: "zwrot", ikona: Undo2, sciezka: "/obsluga/zwroty" },
+  pomylka: { nazwa: "pomyłka", cel: "pomyłkę", ikona: PackageX, sciezka: "/obsluga/pomylki" },
 } as const;
+
+/**
+ * Adres sprawy z przystanku. Pomyłka nie ma własnej ścieżki: jej wiersz
+ * rozwija się na liście po `?id=`, a miesiąc z daty przystanku ustawia filtr.
+ */
+export const adresPrzystanku = (rodzaj: PrzystanekDrogi["rodzaj"], id: number, at: string) =>
+  rodzaj === "pomylka" ? adresPomylki(id, at) : `${KOLEJKI[rodzaj].sciezka}/${id}`;
 
 /** Dyskusja czy reklamacja — rozstrzyga kolumna `typ`, nigdy jedna plakietka. */
 const rodzajSprawy = (typ: string): "dyskusja" | "reklamacja" =>

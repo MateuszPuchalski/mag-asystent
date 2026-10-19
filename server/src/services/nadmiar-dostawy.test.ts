@@ -164,3 +164,18 @@ test("nadmiary() czyta, ale nie zapisuje", () => {
   );
   assert.equal(wyjatki().length, 0, "sam odczyt niczego nie zakłada");
 });
+
+// ── ponowne „cała reszta" po zgubionej odpowiedzi ────────────────────────────
+
+test("odłożenie całej reszty pozycji już odłożonej daje kod juz_odlozona i niczego nie dokłada", () => {
+  /* Audyt z 14 października 2026: odpowiedź na pierwsze odłożenie zginęła
+     w dziurze Wi-Fi, kolektor pokazywał pozycję jako nietkniętą, a komunikat
+     o ilości pchnął magazyniera do wpisania jej z ręki — druga partia wjechała
+     jako nadmiar, którego nie było. */
+  const l = linia(10, "done");
+  const r = D.putawayLine(l, "A01-02-03", "Jan z hali");
+  assert.ok("error" in r);
+  assert.equal(r.status, 409);
+  assert.equal(r.kod, "juz_odlozona");
+  assert.equal(stanLinii(l).qty, 10);
+});

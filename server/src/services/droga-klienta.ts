@@ -1,6 +1,7 @@
 import { db as defaultDb, type Db } from "../db/db.js";
 import { sprawaOtwarta } from "./statusy-spraw.js";
 import { statusRozmowy } from "./conversations.js";
+import { opisPomylki } from "./pomylki.js";
 
 /* ── Droga klienta przez cztery kolejki (`docs/obsluga-klienta-calosc.md`) ───
    Panel prowadzi CZTERY kolejki: skrzynkę, zwroty, reklamacje i dyskusje.
@@ -140,7 +141,7 @@ export function sprawyZakupu(
  * Kolejność przystanków JEST drogą i nic poza nią nie trzeba zapisywać.
  */
 export interface PrzystanekDrogi {
-  rodzaj: "rozmowa" | "dyskusja" | "reklamacja" | "zwrot";
+  rodzaj: "rozmowa" | "dyskusja" | "reklamacja" | "zwrot" | "pomylka";
   id: number;
   at: string;
   opis: string | null;
@@ -192,6 +193,18 @@ export function drogaZakupu(
     przystanki.push({
       rodzaj: "zwrot", id: Number(w.id), at: String(w.created_at),
       opis: tekst(w.reference_number),
+    });
+  }
+
+  /* Pomyłka wysyłkowa to nasz rejestr, ale stoi przy zamówieniu jak kolejka.
+     Wiązanie w drugą stronę niesie sama pomyłka: konto i numer zamówienia.
+     `at` to dzień zgłoszenia, bo godziny rejestr nie zna. */
+  for (const w of database.prepare(`
+    SELECT id, zgloszono, co_dostal, co_zamowil FROM pomylka_wysylki
+     WHERE zamowienie = ? AND konto = ?`).all(orderId, konto) as Wiersz[]) {
+    przystanki.push({
+      rodzaj: "pomylka", id: Number(w.id), at: String(w.zgloszono),
+      opis: opisPomylki(tekst(w.co_dostal), tekst(w.co_zamowil)),
     });
   }
 

@@ -521,7 +521,7 @@ async function pobierzMmZwrotow(
  * Filtr dokumentów sprzedaży — wydzielony, żeby dało się go sprawdzić testem
  * bez serwera MSSQL (ten sam powód co przy `budujFiltryDokumentow`).
  *
- * Okno jest DATĄ, nie listą identyfikatorów. Sześćdziesiąt dni sprzedaży to
+ * Okno jest DATĄ, nie listą identyfikatorów. Kilka tygodni sprzedaży to
  * dziesiątki tysięcy dokumentów, a `IN (id, id, …)` tej długości położyło
  * wdrożenie 0.53.0 błędem 8623 („query processor ran out of internal
  * resources") na przemian z timeoutem — import startowy jest twardym błędem,

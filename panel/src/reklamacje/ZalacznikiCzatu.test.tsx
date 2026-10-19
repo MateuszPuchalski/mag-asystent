@@ -34,7 +34,7 @@ const wiad = (zalaczniki: WiadomoscReklamacji["zalaczniki"]): WiadomoscReklamacj
   tresc: "Kosiarka przestała ciąć", utworzonoAt: "2026-09-06T10:01:00.000Z", zalaczniki,
 });
 const czat = (podglad: boolean) => render(<Czat sprawa={sprawa()} zalaczniki={[]}
-  czat={[wiad([{ id: 9, wiadomoscId: 1, nazwa: "usterka.jpg", podglad }])]} />);
+  czat={[wiad([{ id: 9, wiadomoscId: 1, nazwa: "usterka.jpg", podglad, pdf: false }])]} />);
 
 describe("Załączniki w czacie reklamacji", () => {
   it("hak reklamacji dostaje numer sprawy i załącznika; bez podglądu — `null`", () => {

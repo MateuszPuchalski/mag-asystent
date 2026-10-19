@@ -31,6 +31,7 @@ import { dostawcyRoutes } from "./routes/dostawcy.js";
 import { kartonRoutes } from "./routes/karton.js";
 import { allegroRoutes } from "./routes/allegro.js";
 import { zadaniaTerenoweRoutes } from "./routes/zadania-terenowe.js";
+import { pomylkiRoutes } from "./routes/pomylki.js";
 import { panelObslugiRoutes, problemPaneluObslugi, wersjaPaneluObslugi }
   from "./routes/panel-obslugi.js";
 import { skrzynkaRoutes } from "./routes/skrzynka.js";
@@ -42,6 +43,7 @@ import { tagiRoutes } from "./routes/tagi.js";
 import { ustawieniaRoutes } from "./routes/ustawienia.js";
 import { koszeRoutes } from "./routes/kosze.js";
 import { spoiwoRoutes } from "./routes/spoiwo.js";
+import { zdjeciaRoutes } from "./routes/zdjecia.js";
 import { konfiguracjaRoutes } from "./routes/konfiguracja.js";
 import { problemNieznanychKluczy } from "./konfiguracja-rejestr.js";
 import {
@@ -563,6 +565,7 @@ export async function buildApp(opcje: {
   });
 
   await app.register(productRoutes);
+  await app.register(zdjeciaRoutes);
   await app.register(queueRoutes);
   await app.register(przesuniecieRoutes);
   await app.register(deliveryRoutes);
@@ -590,6 +593,7 @@ export async function buildApp(opcje: {
   await app.register(zwrotyRoutes);
   await app.register(reklamacjeRoutes);
   await app.register(dyskusjeRoutes);
+  await app.register(pomylkiRoutes);
   await app.register(tagiRoutes);
   await app.register(ustawieniaRoutes);
   await app.register(aktualizacjaRoutes);

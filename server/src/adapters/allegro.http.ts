@@ -217,6 +217,34 @@ export function urlOperacjiPlatnosci(
 }
 
 /**
+ * Lista zwrotów płatności (`GET /payments/refunds`, `public.v1`).
+ *
+ * To jedyna końcówka, której rekord (`RefundDetails`) niesie ROZBICIE zwrotu
+ * pieniędzy na pozycje (`lineItems`), dostawę i kaucję — czyli to, co biuro
+ * widzi w Sales Center. Obiekt zwrotu klienta tego nie ma. Sonda pyta o nią,
+ * żeby sprawdzić na żywym koncie, czy trafiają tu także zwroty zrobione ręką
+ * w Sales Center; schemat tego nie rozstrzyga.
+ *
+ * `status` w zapytaniu ma INNY zestaw wartości niż w odpowiedzi, więc nie
+ * filtrujemy po nim: czytamy wszystko i mapujemy po stronie wołającego.
+ * `orderId` pusty daje listę całego konta.
+ */
+export function urlZwrotowPlatnosci(
+  apiUrl: string,
+  filtr: {
+    orderId?: string | null; paymentId?: string | null; refundId?: string | null;
+    od?: string | null; offset?: number;
+  } = {},
+): string {
+  const q = [`limit=100`, `offset=${Math.max(0, Math.trunc(filtr.offset ?? 0))}`];
+  if (filtr.orderId) q.push(`order.id=${encodeURIComponent(filtr.orderId)}`);
+  if (filtr.paymentId) q.push(`payment.id=${encodeURIComponent(filtr.paymentId)}`);
+  if (filtr.refundId) q.push(`id=${encodeURIComponent(filtr.refundId)}`);
+  if (filtr.od) q.push(`occurredAt.gte=${encodeURIComponent(filtr.od)}`);
+  return `${apiUrl}/payments/refunds?${q.join("&")}`;
+}
+
+/**
  * Numery przesyłek zamówienia (0.393.0).
  *
  * `GET /order/checkout-forms/{id}/shipments` — „list of parcel tracking
@@ -817,18 +845,30 @@ export async function pobierzZalacznik(
   if (opcje.maksBajtow !== undefined) {
     const zapowiedziane = Number(odp.headers.get("content-length") ?? NaN);
     if (Number.isFinite(zapowiedziane) && zapowiedziane > opcje.maksBajtow) {
-      throw new Error(
-        `Załącznik ma ${(zapowiedziane / 1024 / 1024).toFixed(1)} MB, ` +
-        `a przyjmujemy ${(opcje.maksBajtow / 1024 / 1024).toFixed(1)} MB`);
+      /* Nie czytamy treści, której nie przyjmiemy — zwalniamy połączenie. */
+      await odp.body?.cancel().catch(() => {});
+      throw new BladRozmiaruZalacznika(zapowiedziane, opcje.maksBajtow);
     }
   }
   const bajty = await odp.arrayBuffer();
   if (opcje.maksBajtow !== undefined && bajty.byteLength > opcje.maksBajtow) {
-    throw new Error(
-      `Załącznik ma ${(bajty.byteLength / 1024 / 1024).toFixed(1)} MB, ` +
-      `a przyjmujemy ${(opcje.maksBajtow / 1024 / 1024).toFixed(1)} MB`);
+    throw new BladRozmiaruZalacznika(bajty.byteLength, opcje.maksBajtow);
   }
   return bajty;
+}
+
+/**
+ * Załącznik większy niż sufit wołającego. Osobna klasa, bo to nie awaria.
+ *
+ * Allegro plik oddało, a sieć działa: to MY go nie przyjmujemy. Trasa
+ * podglądu odpowiada wtedy 413, nie 503, żeby panel nie pisał
+ * „sprawdź internet" przy pliku, który po prostu jest za duży.
+ */
+export class BladRozmiaruZalacznika extends Error {
+  constructor(public readonly bajtow: number, public readonly sufit: number) {
+    super(`Załącznik ma ${(bajtow / 1024 / 1024).toFixed(1)} MB, ` +
+      `a przyjmujemy ${(sufit / 1024 / 1024).toFixed(1)} MB`);
+  }
 }
 
 /* ── Załącznik CENTRUM WIADOMOŚCI: droga API z zapasem (przyrost „zdjęcia w rozmowach") ──

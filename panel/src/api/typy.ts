@@ -247,6 +247,9 @@ export type ZalacznikOsi = {
   /* Czy obraz rysuje się WPROST na osi (0.218.0). Liczy SERWER — panel nie
      zgaduje po `typ`, bo lista typów, które trasa podglądu odda, jest tam. */
   podglad: boolean;
+  /* Czy rysować miniaturę PDF-a. Też liczy serwer, z nazwy i typu, tylko dla
+     pliku `SAFE`. Rozstrzygają bajty: plik bez sygnatury PDF dostaje 415. */
+  pdf: boolean;
 };
 
 export type WpisOsi = {
@@ -350,6 +353,8 @@ export type OfertaWskazana = { ofertaId: string; autor: string };
    nie dociągnie treści — numer i odnośnik do panelu Allegro są od razu. */
 export type ZamowienieRozmowy = {
   externalId: string; link: string | null; pobrane: Zamowienie | null;
+  /** Konto kanału zamówienia — powód przy `Zwrot.konto`. */
+  konto?: number | null;
   /** Stan paczki z ostatniego sprawdzenia; `null`, dopóki zamówienia nie ma w bazie. */
   przesylka: StanPrzesylki | null;
 };
@@ -543,7 +548,8 @@ export interface DosylkaPrzesylki {
 
 /** Jeden przystanek drogi zakupu przez kolejki, z momentem wejścia. */
 export interface PrzystanekDrogi {
-  rodzaj: "rozmowa" | "dyskusja" | "reklamacja" | "zwrot";
+  /* `pomylka` to rejestr złych paczek, wiązany po numerze zamówienia jak zwrot. */
+  rodzaj: "rozmowa" | "dyskusja" | "reklamacja" | "zwrot" | "pomylka";
   id: number;
   at: string;
   opis: string | null;
@@ -1106,6 +1112,12 @@ export interface Zwrot {
   externalId: string;
   numer: string | null;
   orderId: string | null;
+  /**
+   * Konto kanału zamówienia. Numer zamówienia jest unikalny tylko na koncie,
+   * więc „Zła paczka” wysyła je, żeby pomyłka trafiła na drogę zakupu.
+   * Opcjonalne: starszy serwer go nie podaje.
+   */
+  konto?: number | null;
   utworzono: string;
   paczkaAt: string | null;
   /** Kiedy paczka DOTARŁA do nas — z trackingu przewoźnika (0.187.0). */
@@ -1126,6 +1138,11 @@ export interface Zwrot {
    * w DO ZWROTU także po korekcie — do dnia, w którym Allegro oddaje samo.
    */
   pieniadzeCzekaja?: boolean;
+  /**
+   * Niepuste = zwrot zamknięty ręcznie, bez korekty. Taki zwrot ma kubełek
+   * `zamkniety`, a zamknięty korektą ma tu `null`.
+   */
+  zamknietyRecznie: { kiedy: string; przez: string | null; powod: string | null } | null;
   sygnaly: Sygnal[];
   /**
    * Termin OBSŁUGI: siedem dni od paczki u nas (0.341.0).
@@ -1429,6 +1446,35 @@ export type StanZwrotuPieniedzy = {
   przelew: { kiedy: string; przez: string | null; referencja: string | null } | null;
   moznaZapisacPrzelew: boolean;
   powodPrzelewu: string | null;
+  /**
+   * Zwroty płatności z lustra Allegro, najnowszy pierwszy; puste, gdy lustro
+   * nic nie zna. Tak biuro widzi wypłatę w Sales Center: status, kwota
+   * i rozbicie na pozycje zamówienia.
+   */
+  platnosci: ZwrotPlatnosciAllegro[];
+};
+
+/** Jeden zwrot płatności z Allegro (`ZwrotPlatnosci` na serwerze). */
+export type ZwrotPlatnosciAllegro = {
+  refundId: string;
+  paymentId: string | null;
+  orderId: string | null;
+  /** Surowo: SUCCESS, PARTIAL, NEW, VALIDATED, IN_PROGRESS, CANCELED, VALIDATE_FAILED… */
+  status: string;
+  reason: string | null;
+  utworzonoAt: string;
+  kwotaGrosze: number | null;
+  waluta: string | null;
+  dostawaGrosze: number | null;
+  pozycje: Array<{
+    /** Identyfikator pozycji zamówienia (`lineItems[].id`). */
+    id: string;
+    type: "QUANTITY" | "AMOUNT";
+    quantity: number | null;
+    kwotaGrosze: number | null;
+    /** Nazwa z pozycji zamówienia; `null`, gdy zamówienia nie mamy. */
+    nazwa?: string | null;
+  }>;
 };
 
 /**
@@ -1641,6 +1687,8 @@ export interface ZalacznikReklamacji {
    * z powrotem na przycisk pobrania.
    */
   podglad: boolean;
+  /** Czy rysować miniaturę PDF-a — ta sama PODPOWIEDŹ z nazwy, rozstrzygają bajty (415). */
+  pdf: boolean;
 }
 
 export interface WiadomoscReklamacji {
@@ -1713,6 +1761,52 @@ export interface SzczegolReklamacji {
      go nie zna, a brak ma znaczyć „nie wiemy". */
   /** Ostatnia dostawa towaru; `null` = nie wiemy, skąd przyszła sztuka. */
   dostawa?: OstatniaDostawaReklamacji | null;
+  /* Opcjonalne, bo brak pola znaczy „serwer jeszcze nie powiedział", a nie
+     „dokumentu nie ma". Brak dokumentu niesie `paragon.brak`. */
+  /** Paragony i faktury zamówienia z Subiekta, ze wskazaniem reklamowanej pozycji. */
+  paragon?: ParagonReklamacji;
+}
+
+/**
+ * Dokumenty sprzedaży zamówienia z Subiekta — „co klient naprawdę kupił".
+ *
+ * Symbol bierze się WYŁĄCZNIE stąd. Decyzja właściciela: bez dokumentu karta
+ * mówi „brak paragonu", a nie symbol z oferty czy mapowania, bo oferta
+ * przepięta na inną dostawę wskazuje dziś inny towar niż ten z paczki.
+ */
+export interface ParagonReklamacji {
+  /** FS i PA tego zamówienia z okna kopii, od najstarszego. Korekty nie wchodzą. */
+  dokumenty: DokumentParagonu[];
+  /** Kartoteka spornej pozycji, gdy wskazana jednoznacznie; inaczej `null`. */
+  spornaTwId: number | null;
+  /** Dlaczego `dokumenty` są puste; `null`, gdy dokument jest. */
+  brak: null | "bez-zamowienia" | "poza-oknem" | "nie-znaleziono";
+  /** Ile dni wstecz serwer kopiuje dokumenty z Subiekta. */
+  oknoDni: number;
+}
+
+export interface DokumentParagonu {
+  dokId: number;
+  /** Pełny numer z Subiekta, np. „PA 1234/10/2026". */
+  numer: string;
+  typ: "FS" | "PA";
+  /** Dzień wystawienia, `YYYY-MM-DD`. */
+  data: string;
+  pozycje: PozycjaParagonu[];
+}
+
+export interface PozycjaParagonu {
+  twId: number;
+  /* `null`, gdy kartoteki nie ma w kopii Subiekta: pozycja dokumentu jest,
+     ale nie wiemy, jak się nazywa. Panel mówi to słowem, nie zgaduje. */
+  symbol: string | null;
+  nazwa: string | null;
+  /** Suma ilości tej kartoteki w dokumencie. */
+  ilosc: number;
+  /** Pozycja usługowa, np. przesyłka — nie jest towarem z paczki. */
+  usluga: boolean;
+  /** To jest reklamowany towar. */
+  sporna: boolean;
 }
 
 /**

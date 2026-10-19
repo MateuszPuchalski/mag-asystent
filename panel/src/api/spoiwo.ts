@@ -2,6 +2,7 @@ import { useMutation, useQuery, useQueryClient, type QueryClient } from "@tansta
 import { api } from "./klient";
 import { klucze } from "./rozmowy";
 import type { DosylkaSprawy, HistoriaKlienta, SprawaKlienta, WpisHistorii } from "./typy";
+import type { Pomylka } from "./pomylki";
 
 export type { DosylkaSprawy, NoweZdarzenie, SprawaKlienta, ZrodloNumeruDosylki } from "./typy";
 
@@ -65,6 +66,8 @@ export interface ProfilKlienta {
   otwarte: Array<{ rodzaj: RodzajSprawyKlienta; id: number; opis: string; od: string; stan: string; cel: string }>;
   zamowienia: Array<{
     id: string; kupionoAt: string | null; status: string | null; sumaGrosze: number | null;
+    /** Konto kanału zamówienia — powód przy `Zwrot.konto` w `typy.ts`. */
+    konto?: number | null;
     waluta: string | null; pozycje: Array<{ nazwa: string; ilosc: number; cenaGrosze: number }>;
     przesylka: string | null; link: string | null;
   }>;
@@ -92,6 +95,11 @@ export interface ProfilKlienta {
   } | null;
   /** Identyfikatory przewoźników znane z naszej bazy — lista w formularzu numeru dosyłki. */
   przewoznicy: string[];
+  /**
+   * Pomyłki wysyłkowe tego klienta — wiązanie zwrotne rejestru. Brak pola
+   * (starszy serwer) to „nie wiemy", nie „bez pomyłek".
+   */
+  pomylki?: Pomylka[];
 }
 
 const kluczProfilu = (login: string) => ["profil-klienta", login.toLowerCase()] as const;

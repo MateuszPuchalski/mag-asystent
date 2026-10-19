@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import type { PrzystanekDrogi, SprawaZakupu } from "../api/typy";
-import { inneSprawyZakupu, KOLEJKI } from "./Spoiwo";
+import { adresPrzystanku, inneSprawyZakupu, KOLEJKI } from "./Spoiwo";
 
 /* ── Spoiwo kolejek (`docs/obsluga-klienta-calosc.md`) ───────────────────────
    Słownik kolejek i składanie ich spraw w przystanki paska drogi. Testy
@@ -27,7 +27,7 @@ describe("inneSprawyZakupu", () => {
       sprawa({ id: 7, typ: "CLAIM" }), sprawa({ id: 9, typ: "DISPUTE", numer: null }),
     ], null);
     expect(inne.map((s) => `${s.rodzaj}-${s.id}`)).toEqual(["reklamacja-7", "dyskusja-9"]);
-    expect(Object.keys(KOLEJKI)).toEqual(["rozmowa", "dyskusja", "reklamacja", "zwrot"]);
+    expect(Object.keys(KOLEJKI)).toEqual(["rozmowa", "dyskusja", "reklamacja", "zwrot", "pomylka"]);
   });
 
   it("sprawa z drogi i z rodzeństwa staje raz, ze stanem, terminem i prowadzącym", () => {
@@ -59,5 +59,12 @@ describe("inneSprawyZakupu", () => {
   it("zamknięta sprawa niesie `otwarta: false`", () => {
     const [s] = inneSprawyZakupu([], [sprawa({ otwarta: false })], null);
     expect(s.otwarta).toBe(false);
+  });
+});
+
+describe("adresPrzystanku", () => {
+  it("pomyłka prowadzi do swojego wiersza na liście, z miesiącem; reszta do ścieżki sprawy", () => {
+    expect(adresPrzystanku("pomylka", 5, "2026-09-14")).toBe("/obsluga/pomylki?id=5&miesiac=2026-09");
+    expect(adresPrzystanku("zwrot", 8, "2026-09-14T10:00:00Z")).toBe("/obsluga/zwroty/8");
   });
 });

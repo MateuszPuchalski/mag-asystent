@@ -6,7 +6,7 @@ wersja bazy 1.8731.31.6933** — czyli dokładnie tej, którą ma firma (Subiekt
 poniżej jest cytatem ze struktury, a nie domysłem z innej wersji.
 
 To, czego dokumentacja **nie** zawiera (bo zależy od konkretnego podmiotu),
-zostało wyraźnie oznaczone `[WERYFIKUJ]` — takich rzeczy zostały trzydzieści dwie.
+zostało wyraźnie oznaczone `[WERYFIKUJ]` — takich rzeczy zostały trzydzieści trzy.
 Licznik obejmuje też `docs/allegro-ksztalt.md`: §8.2 projektu panelu kieruje
 tutaj znaczniki z mapowania Allegro, żeby lista czekających na sprawdzenie
 była jedna, a nie dwie.
@@ -67,6 +67,27 @@ Przesłanka z bazy firmy: w zbiorze dokumentów z niepustym `dok_DoDokId` jest
 i w podobnej skali, przy czterokrotnej przewadze paragonów nad fakturami.
 Znacznik zostaje, bo to nie dowód, że `ZW` wskazuje wtedy paragon zwracany —
 rozstrzygnie pierwszy zwrot przepuszczony przez automat.
+
+`[WERYFIKUJ]` **Która strona pary „faktura do paragonu" niesie odnośnik.**
+Zdanie wyżej mówi, że faktura wskazuje paragon. Liczby ze zrzutu dotyczą jednak
+paragonów i WZ, a nie faktur, więc kierunek nie jest zmierzony. Na tej parze
+stoi sprzedaż w przekroju towaru (`services/przekroj-towaru.ts`): faktura
+związana z paragonem z kopii nie dodaje sztuk drugi raz.
+
+Przekrój rozpoznaje parę w obie strony, więc pomyłka kierunku niczego nie psuje. Zostaje pytanie,
+czy odnośnik stoi na parze w ogóle. Gdy nie stoi, sprzedaż jest zawyżona
+o każdą fakturę do paragonu. Sprawdzi to jedno zapytanie na bazie firmy:
+
+```sql
+SELECT TOP 20 f.dok_NrPelny, f.dok_DoDokId, p.dok_NrPelny AS paragon, p.dok_DoDokId AS paragon_do
+FROM dok__Dokument f
+JOIN dok__Dokument p ON p.dok_Typ = 21
+  AND (p.dok_Id = f.dok_DoDokId OR p.dok_DoDokId = f.dok_Id)
+WHERE f.dok_Typ = 2 ORDER BY f.dok_DataWyst DESC
+```
+
+Puste przy znanej fakturze do paragonu znaczy, że odnośnika nie ma i przekrój
+liczy taką sprzedaż podwójnie.
 
 ## Numer obcy na dokumencie sprzedaży — arytmetyka, nie domysł
 
@@ -514,11 +535,11 @@ zapytaniami z tego rozdziału na bazie firmy (2026-08-08).
 
 | kolumna | typ | rola |
 |---|---|---|
-| `zd_Id` | `int` | klucz wiersza — **jedyne pewne kryterium porządku** |
+| `zd_Id` | `int` NOT NULL, bez IDENTITY | klucz wiersza — **jedyne pewne kryterium porządku** |
 | `zd_IdTowar` | `int` | klucz obcy do `tw__Towar` |
 | `zd_Zdjecie` | `image` | sam obraz |
 | `zd_Glowne` | `bit` | zdjęcie główne („Ustaw jako główną" w Subiekcie) |
-| `zd_CRC` | `int` | suma kontrolna treści |
+| `zd_CRC` | `int` NOT NULL | suma kontrolna treści |
 
 Konfiguracja, która z tego wynika:
 
@@ -545,6 +566,28 @@ niczego: przy dwóch zdjęciach bez flagi „główne" baza zwracałaby raz jedn
 drugie. Objawem nie byłby błąd, tylko skaczący ETag i kolektory ściągające
 obraz przy każdym wejściu na kartę. Porządek domyka dopiero `zd_Id`, a brak
 tego ustawienia zatrzymuje start serwera (walidacja w `config.ts`).
+
+### Jak dopisać wiersz zdjęcia
+
+Ustalone na bazie firmy po pierwszym nieudanym INSERT-cie (2026-10-16):
+
+- **`zd_Id` wydaje licznik Subiekta**, nie serwer SQL. Tabela `ins_ident`
+  ma kolumny `ido_nazwa`, `ido_wartosc` i `ido_minIdValue`. Wiersz
+  `tw_ZdjecieTw` miał `ido_wartosc` = 6281 przy `MAX(zd_Id)` = 6280, więc
+  wartość to NASTĘPNY wolny numer. Subiekt ma do tego procedurę
+  `spIdentyfikator @nazwa, @liczba, @wynik OUTPUT`. WERTIS jej nie woła, bo
+  nie wiadomo, który numer oddaje w `@wynik`. Czyta licznik i przesuwa go
+  sam, pod blokadą, w transakcji INSERT-u (`sfera.sql.ts`).
+- **`zd_CRC` jest NOT NULL**, choć domyślna wartość to `NULL`. WERTIS
+  wpisuje CRC32 bajtów obrazu jako `int` ze znakiem. Algorytmu Subiekta nie
+  sprawdzono — przy kartotece próbnej (DEPLOY §6) zobacz, czy zdjęcie się rysuje.
+- **Na tabeli stoją wyzwalacze** `zzz_rtnetSymSyncItemPicture*` i
+  `zzz_rtnetCT_Zdjecia_*`. To synchronizacja zewnętrznego programu. Odpala
+  się na naszym wierszu tak samo jak na wierszu Subiekta i tak ma być.
+
+Prawa konta: `GRANT INSERT ON dbo.tw_ZdjecieTw`, `GRANT SELECT ON
+dbo.ins_ident` i `GRANT UPDATE ON dbo.ins_ident (ido_wartosc)`. Nadaje je
+instalator z `-ZdjeciaZapis`.
 
 ### Czego przy okazji NIE ma
 

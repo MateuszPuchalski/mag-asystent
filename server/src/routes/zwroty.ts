@@ -36,6 +36,9 @@ import {
 import { paczkiKlienta } from "../services/zamowienia.js";
 import { powiazZaleglosci } from "../services/wiazania.js";
 import { kandydaciFaktury, wskazFakture } from "../services/faktury.js";
+import { otworzZwrotPoRecznymZamknieciu, zamknijZwrotRecznie } from "../services/zwrot-zamkniecie.js";
+import { SprawdzenieZwrotuBlad, sprawdzWszystkieZwrotyPlatnosci, sprawdzZwrotPlatnosci } from "../services/allegro-zwroty-platnosci.js";
+import { BladLimituAllegro } from "../adapters/allegro.js";
 import { dociagnijZwrotPoLiscie, synchronizujAllegroZwroty } from "../services/allegro-zwroty-sync.js";
 import { config } from "../config.js";
 import { logEvent } from "../services/events.js";
@@ -961,6 +964,75 @@ export async function zwrotyRoutes(app: FastifyInstance) {
           return reply.code(409).send({ error: e.message });
         }
         return reply.code(400).send({ error: (e as Error).message });
+      }
+    });
+
+  /* RĘCZNE ZAMKNIĘCIE ZWROTU. Tylko u nas: nic nie wychodzi do Allegro ani do
+     Subiekta, więc bez `autoryzuj()` — zamknięcie da się cofnąć jednym ruchem
+     (druga trasa), a nazwisko i powód zostają w dzienniku. Bramka roli stoi,
+     bo zwrot niesie dane sprawy klienta. */
+  app.post<{ Params: { id: string }; Body: { wersja?: number; powod?: string } }>(
+    "/api/obsluga/zwroty/:id/zamkniecie-reczne", async (req, reply) => {
+      const nie = odmowa(reply);
+      if (nie) return nie;
+      try {
+        return zamknijZwrotRecznie(db(), Number(req.params.id), Number(req.body?.wersja),
+          req.body?.powod ?? null, kto());
+      } catch (e) { return konflikt(reply, e); }
+    });
+
+  app.post<{ Params: { id: string }; Body: { wersja?: number } }>(
+    "/api/obsluga/zwroty/:id/zamkniecie-reczne/cofnij", async (req, reply) => {
+      const nie = odmowa(reply);
+      if (nie) return nie;
+      try {
+        return otworzZwrotPoRecznymZamknieciu(db(), Number(req.params.id),
+          Number(req.body?.wersja), kto());
+      } catch (e) { return konflikt(reply, e); }
+    });
+
+  /* MASOWE SPRAWDZENIE: te same zasady co przy jednym zwrocie, ale lista konta
+     od najstarszego zwrotu w pracy zamiast jednego zamówienia. Stoi PRZED trasą
+     z `:id`, żeby „sprawdz-wszystkie" nie wpadło pod parametr. */
+  app.post("/api/obsluga/zwroty/platnosci/sprawdz-wszystkie", async (_req, reply) => {
+    const nie = odmowa(reply);
+    if (nie) return nie;
+    if (!config.allegro.clientId) {
+      return reply.code(400).send({ error: "Konto Allegro nie jest sparowane" });
+    }
+    try {
+      return await sprawdzWszystkieZwrotyPlatnosci(db(), kto());
+    } catch (e) {
+      if (e instanceof BladLimituAllegro) {
+        return reply.code(429).send({ error: "Allegro prosi o chwilę przerwy — spróbuj za minutę." });
+      }
+      return reply.code(502).send({
+        error: `Allegro nie odpowiedziało: ${(e as Error).message}. Spróbuj jeszcze raz za chwilę.`,
+      });
+    }
+  });
+
+  /* SPRAWDZENIE ZWROTU PŁATNOŚCI NA ŻĄDANIE. POST, bo klik zapisuje wynik
+     w lustrze i w dzienniku — nie jest patrzeniem, więc nie łamie umowy, że
+     otwarcie ekranu niczego nie mutuje. Bez `autoryzuj()`: trasa tylko CZYTA
+     z Allegro i zapisuje to, co Allegro powiedziało, nie rusza pieniędzy. */
+  app.post<{ Params: { id: string } }>(
+    "/api/obsluga/zwroty/:id/platnosci/sprawdz", async (req, reply) => {
+      const nie = odmowa(reply);
+      if (nie) return nie;
+      if (!config.allegro.clientId) {
+        return reply.code(400).send({ error: "Konto Allegro nie jest sparowane" });
+      }
+      try {
+        return await sprawdzZwrotPlatnosci(db(), Number(req.params.id), kto());
+      } catch (e) {
+        if (e instanceof SprawdzenieZwrotuBlad) return reply.code(400).send({ error: e.message });
+        if (e instanceof BladLimituAllegro) {
+          return reply.code(429).send({ error: "Allegro prosi o chwilę przerwy — spróbuj za minutę." });
+        }
+        return reply.code(502).send({
+          error: `Allegro nie odpowiedziało: ${(e as Error).message}. Spróbuj jeszcze raz za chwilę.`,
+        });
       }
     });
 

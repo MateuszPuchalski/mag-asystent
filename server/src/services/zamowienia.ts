@@ -52,6 +52,8 @@ export interface PozycjaZamowienia {
 }
 
 export interface Zamowienie {
+  /** Konto kanału — numer zamówienia jest unikalny tylko na koncie, więc zapis po numerze go potrzebuje. */
+  konto: number;
   externalId: string;
   status: string | null;
   kupujacyLogin: string | null;
@@ -102,6 +104,7 @@ export function naZamowienie(
   zdjecie: (p: Wiersz) => StanZdjeciaOferty = () => "nieznane",
 ): Zamowienie {
   return {
+    konto: Number(zam.channel_account_id),
     externalId: String(zam.external_id),
     status: (zam.status as string) ?? null,
     kupujacyLogin: (zam.kupujacy_login as string) ?? null,

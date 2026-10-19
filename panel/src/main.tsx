@@ -3,7 +3,7 @@ import { createRoot } from "react-dom/client";
 import { BrowserRouter, Link, Navigate, Route, Routes, useLocation } from "react-router-dom";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { nowyKlientZapytan } from "./api/klient-zapytan";
-import { ClipboardList, Inbox, ListChecks, MessagesSquare, PanelLeftClose, PanelLeftOpen, ShieldQuestion, Truck, Undo2 } from "lucide-react";
+import { ClipboardList, ImagePlus, Inbox, ListChecks, MessagesSquare, PackageX, PanelLeftClose, PanelLeftOpen, ShieldQuestion, Truck, Undo2 } from "lucide-react";
 import logoBiale from "./assets/wertis-logo-biale.png";
 import { SESJA_WYGASLA, token, wyczyscToken } from "./api/klient";
 import { useJa, useWzmianki } from "./api/rozmowy";
@@ -17,6 +17,8 @@ import { Zwroty } from "./ekrany/Zwroty";
 import { Reklamacje } from "./ekrany/Reklamacje";
 import { Dyskusje } from "./ekrany/Dyskusje";
 import { Zadania } from "./ekrany/Zadania";
+import { Pomylki } from "./ekrany/Pomylki";
+import { useLicznikPomylek } from "./api/pomylki";
 import { SzukajIKlawisze } from "./nawigacja/Klawisze";
 import { WskaznikSynchronizacji } from "./nawigacja/Synchronizacja";
 import { PasekPolaczenia } from "./nawigacja/Polaczenie";
@@ -31,6 +33,7 @@ import { Kosze } from "./ekrany/Kosze";
 import { Dziennik } from "./ekrany/Dziennik";
 import { Analiza } from "./ekrany/Analiza";
 import { Stan } from "./ekrany/Stan";
+import { Zdjecia } from "./ekrany/Zdjecia";
 import { Protokol } from "./druk/Protokol";
 import "./index.css";
 import { CoNowego } from "./coNowego/CoNowego";
@@ -63,6 +66,10 @@ const ZAKLADKI = [
      dyskusja nie ma ani jednego. Wspólny ekran kazałby najpierw rozpoznać
      rodzaj sprawy, żeby wiedzieć, co się na nim da zrobić — blizna 0.121.0. */
   { do: "/obsluga/dyskusje", etykieta: "Dyskusje", ikona: <MessagesSquare size={16} />, korzen: false, kreska: false },
+  /* POMYŁKI OBOK KOLEJEK KLIENTA: zła paczka przychodzi zwrotem, rozmową
+     albo dyskusją i tam się ją rozpoznaje. Rejestr uzupełnia się codziennie,
+     więc stoi w zakładkach pracy, a nie w menu „Więcej". */
+  { do: "/obsluga/pomylki", etykieta: "Pomyłki", ikona: <PackageX size={16} />, korzen: false, kreska: false },
   { do: "/obsluga/zadania", etykieta: "Zadania", ikona: <ClipboardList size={16} />, korzen: false, kreska: false },
   /* DOSTAWY ZAKŁADKĄ (0.538.0), nie w menu „Więcej". Do 27 września
      2026 stały w dolnym rzędzie obok wglądu. Przyjęcie dostawy to praca
@@ -70,6 +77,9 @@ const ZAKLADKI = [
      KOSZY TU NIE MA od 0.438.0 — decyzją właściciela mieszkają w zakładce
      Zwroty, bo są dalszym ciągiem zwrotu. Powód przy `zwroty/Przelacznik.tsx`. */
   { do: "/obsluga/dostawy", etykieta: "Dostawy", ikona: <Truck size={16} />, korzen: false, kreska: true },
+  /* ZDJĘCIA OBOK DOSTAW: to też praca na kartotece Subiekta, nie na sprawie
+     klienta. Biuro robi je seriami, więc stoją w pracy, a nie w menu „Więcej”. */
+  { do: "/obsluga/zdjecia", etykieta: "Zdjęcia", ikona: <ImagePlus size={16} />, korzen: false, kreska: false },
 ];
 
 /* Licznik nieodhaczonych wzmianek stoi przy ZAKŁADCE, a nie na jej ekranie:
@@ -94,6 +104,13 @@ function LicznikDoZrobienia() {
   const wzmianki = useWzmianki().data?.nowe ?? 0;
   return <Licznik liczba={decyzje + wzmianki}
     opis={`do zrobienia: ${decyzje} do decyzji, ${wzmianki} wzmianek`} />;
+}
+
+/* Pomyłka założona sama przy odmowie wypłaty czeka na imiona z hali.
+   Licznik przy zakładce mówi o niej z każdego ekranu, jak przy decyzjach. */
+function LicznikPomylek() {
+  const ile = useLicznikPomylek().data?.doUzupelnienia ?? 0;
+  return <Licznik liczba={ile} opis={`pomyłki do uzupełnienia: ${ile}`} />;
 }
 
 function PasekBoczny({ wyloguj }: { wyloguj: () => void }) {
@@ -155,7 +172,8 @@ function PasekBoczny({ wyloguj }: { wyloguj: () => void }) {
             {/* Czerwony alarm dyskusji stoi przy zakładce na każdym ekranie,
                 także na reklamacjach, gdzie paska nad pracą nie ma. Powód
                 i barwa przy `nawigacja/AlarmDyskusji.tsx`. */}
-            {z.do === "/obsluga/dyskusje" && <LicznikAlarmuDyskusji />}</Link>
+            {z.do === "/obsluga/dyskusje" && <LicznikAlarmuDyskusji />}
+            {z.do === "/obsluga/pomylki" && <LicznikPomylek />}</Link>
         </React.Fragment>;
       })}
     </nav>
@@ -260,8 +278,9 @@ function Rama({ wyloguj }: { wyloguj: () => void }) {
         Pasek braku połączenia stoi NAD nim: awaria jest ważniejsza niż nowość. */}
     <PasekPolaczenia />
     {/* Dyskusja bez odpowiedzi grozi blokadą konta Allegro, więc alarm stoi
-        nad nowościami: nowość może poczekać, odpowiedź nie. Na reklamacjach
-        pasek milknie sam, a alarm niesie czerwony licznik zakładki „Dyskusje".
+        nad nowościami: nowość może poczekać, odpowiedź nie. Pasek pokazuje
+        się sam tylko na ekranach dyskusji, a na pozostałych alarm niesie
+        czerwony licznik zakładki „Dyskusje".
         Warunek mieszka w komponencie, bo tam sprawdza go test. */}
     <PasekAlarmuDyskusji />
     <CoNowego />
@@ -275,10 +294,14 @@ function Rama({ wyloguj }: { wyloguj: () => void }) {
       <Routes>
         <Route path="/obsluga/" element={<DoDecyzji />} />
         <Route path="/obsluga/zadania" element={<Zadania />} />
+        {/* Pomyłka nie ma własnej ścieżki: `?id=` rozwija jej wiersz na
+            liście, bo uzupełnia się ją w miejscu, obok sąsiednich. */}
+        <Route path="/obsluga/pomylki" element={<Pomylki />} />
         {/* Dostawa ma własny adres po numerze dokumentu z Subiekta — powód
             przy nagłówku `ekrany/Dostawy.tsx`. */}
         <Route path="/obsluga/dostawy" element={<Dostawy />} />
         <Route path="/obsluga/dostawy/:id" element={<Dostawy />} />
+        <Route path="/obsluga/zdjecia" element={<Zdjecia />} />
         {/* Rozmowa ma własny adres, więc odświeżenie strony jej nie gubi,
             a link do sprawy da się wkleić koledze. */}
         <Route path="/obsluga/skrzynka" element={<Skrzynka />} />

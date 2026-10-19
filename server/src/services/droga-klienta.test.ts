@@ -39,7 +39,7 @@ beforeEach(() => {
   const d = db();
   /* `klient_prowadzenie` PRZED `app_user`: sprawa klienta wskazuje
      prowadzącego kluczem obcym bez kaskady. */
-  for (const t of ["klient_prowadzenie", "reklamacja_klienta", "zwrot_klienta", "message", "conversation_event",
+  for (const t of ["klient_prowadzenie", "pomylka_wysylki", "reklamacja_klienta", "zwrot_klienta", "message", "conversation_event",
     "conversation", "channel_account", "events", "app_user"]) d.prepare(`DELETE FROM ${t}`).run();
 
   agent = Number(d.prepare(
@@ -345,4 +345,15 @@ test("rozmowy zamówienia tylko przez ROZMOWA_ZAMOWIENIA", () => {
     if (/related_order_id\s*(=|IN\s*\()/.test(tresc)) zle.push(plik);
   }
   assert.deepEqual(zle, []);
+});
+
+test("pomyłka wysyłkowa staje na drodze zakupu po koncie i numerze, ze zdaniem „Dostał X zamiast Y”", () => {
+  const wstaw = (k: number) => db().prepare(`INSERT INTO pomylka_wysylki(zgloszono,login,konto,zamowienie,co_zamowil,
+      co_dostal,zrodlo,utworzono_at,zmieniono_at) VALUES ('2026-10-19','kupiec',?,?,'nóż 46','nóż 40','recznie','x','x')`)
+    .run(k, ZAM);
+  wstaw(konto);
+  wstaw(obce);
+  const droga = drogaZakupu(db(), konto, ZAM);
+  assert.deepEqual(droga.map((p) => [p.rodzaj, p.at, p.opis]), [["pomylka", "2026-10-19", "Dostał nóż 40 zamiast nóż 46"]],
+    "pomyłka z cudzego konta nie wchodzi");
 });

@@ -434,6 +434,18 @@ fun DeliveryLinesScreen(graph: AppGraph) {
             graph.effects.flashSuccess("$code · ${line.sym}")
         } catch (e: Exception) {
             graph.feedback.beep(false)
+            /* „Już odłożona" znaczy, że poprzedni zapis ZADZIAŁAŁ, tylko jego
+               odpowiedź zginęła w dziurze Wi-Fi. Kafel dalej pokazuje pozycję
+               jako nietkniętą, więc ponowny skan kończyłby się tym samym
+               błędem — a wpisanie ilości z ręki odkłada partię drugi raz jako
+               nadmiar. Zdejmujemy zaznaczenie i czytamy listę od nowa. Kod, nie
+               treść: zdanie wolno poprawiać. */
+            if (e is ApiError && e.kod == "juz_odlozona") {
+                active = null
+                czesc = null
+                mismatch = null
+                reload++
+            }
             graph.effects.toast(e.message ?: "Błąd zapisu")
         } finally {
             busy = false

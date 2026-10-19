@@ -34,6 +34,7 @@ import { Produkt } from "../reklamacje/Produkt";
 import { Notatka } from "../reklamacje/Notatka";
 import { pasujeDoFrazy, rozbij } from "../sprawy/szukanie";
 import { klawiszZajety } from "../nawigacja/fokus";
+import { useKursorListy } from "../nawigacja/kursor";
 
 /* ── Ekran reklamacji: trzy kolumny ──────────────────────────────────────────
    Kolejka, sprawa i decyzja. Kolejka po lewej, bo od niej zaczyna się każda
@@ -247,14 +248,9 @@ export function Reklamacje() {
     ? (poTerminie ? "po_terminie" : "decyzja")
     : kubelek === "odpowiedz" ? "odpowiedz" : null;
 
-  /* Kursor chodzi po liście WIDOCZNEJ, nie po kubełku: przy filtrze strzałka
-     idzie do następnego wyniku, a nie do sprawy schowanej przed oczami. */
-  const idz = (o: number) => {
-    if (!widoczne.length) return;
-    const i = widoczne.findIndex((r) => r.id === wybrana);
-    const nast = widoczne[Math.min(widoczne.length - 1, Math.max(0, (i < 0 ? 0 : i) + o))];
-    if (nast) nawiguj(`/obsluga/reklamacje/${nast.id}`);
-  };
+  /* Po werdykcie sprawa schodzi z kubełka, a `j` ma otworzyć tę, która
+     stanęła na jej miejscu. Powód przy `nawigacja/kursor.ts`. */
+  const idz = useKursorListy(widoczne, wybrana, (r) => nawiguj(`/obsluga/reklamacje/${r.id}`));
 
   /* ── WEJŚCIE W SPRAWĘ JĄ ODŚWIEŻA ──────────────────────────────────────────
      Świadomy wyjątek od „zera zapisu przy patrzeniu”, decyzją właściciela.

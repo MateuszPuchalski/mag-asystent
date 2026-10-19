@@ -443,7 +443,12 @@ CREATE TABLE IF NOT EXISTS szkic_copilota (
   -- deklarowany tutaj staje się materiałem, z którego wolno cytować, i tym
   -- samym jest sprawdzalny: agent widzi go obok miniatury i rozstrzyga
   -- jednym spojrzeniem, czy model przeczytał tabliczkę, czy ją wymyślił.
-  odczyt_zdjec         TEXT NOT NULL DEFAULT '[]'
+  odczyt_zdjec         TEXT NOT NULL DEFAULT '[]',
+  -- ── NARZĘDZIA, PO KTÓRE SIĘGNĄŁ SZKIC ─────────────────────────────────
+  -- JSON: lista `{nazwa, argument, znakow}`, jak `copilot_pytanie.narzedzia`.
+  -- Niepusta lista zatrzymuje wysyłkę na żywo: ceny i linki wzięte przez
+  -- model z kartoteki nie idą do klienta bez spojrzenia człowieka.
+  narzedzia            TEXT NOT NULL DEFAULT '[]'
 );
 
 -- ── Identyfikatory części z opisów (§11.2, etap E3) ─────────────────────────
@@ -1605,6 +1610,14 @@ CREATE TABLE IF NOT EXISTS zwrot_klienta (
   -- przepisał numer. Bez CHECK: kolumna dochodzi migracją do istniejących baz,
   -- a ALTER TABLE w SQLite nie umie dołożyć ograniczenia.
   korekta_zrodlo TEXT,
+  -- Ręczne zamknięcie BEZ korekty: biuro uznaje sprawę za załatwioną poza tą
+  -- aplikacją (pieniądze oddane gdzie indziej, zwrot bez towaru, historia).
+  -- Zapisujemy też `zamkniety_at`, żeby reszta aplikacji widziała zwrot jako
+  -- zamknięty, a te kolumny mówią, że zamknął go CZŁOWIEK i dlaczego.
+  zamkniecie_reczne_at TEXT,
+  zamkniecie_reczne_przez TEXT,
+  zamkniecie_reczne_user_id INTEGER REFERENCES app_user(user_id),
+  zamkniecie_reczne_powod TEXT,
   zamkniety_at TEXT,
   -- Ocena towaru wraca z hali. `zadanie_terenowe` niesie ją w `wynik`;
   -- tu stoi samo powiązanie, żeby oś zwrotu miała po czym trafić do zadania.
@@ -1618,6 +1631,33 @@ CREATE TABLE IF NOT EXISTS zwrot_klienta (
 );
 CREATE INDEX IF NOT EXISTS ix_zwrot_klienta_termin
   ON zwrot_klienta(created_at);
+
+-- Lustro `GET /payments/refunds`: zwroty PŁATNOŚCI, czyli pieniądze, które
+-- naprawdę wyszły (albo nie) do kupującego, razem z rozbiciem na pozycje.
+-- Osobna tabela od `zwrot_klienta`, bo to inny byt Allegro: zwrot klienta
+-- mówi o towarze, zwrot płatności o pieniądzach, a jeden zwrot towaru może
+-- mieć kilka zwrotów płatności. Kolumny są kwotami i identyfikatorami;
+-- komentarza sprzedawcy nie trzymamy, bo bywa tam treść od ludzi.
+CREATE TABLE IF NOT EXISTS zwrot_platnosci (
+  channel_account_id INTEGER NOT NULL REFERENCES channel_account(id),
+  refund_id TEXT NOT NULL,
+  payment_id TEXT,
+  order_id TEXT,
+  -- Bez `CHECK`: lista statusów w odpowiedzi różni się od listy w filtrze,
+  -- a nieznana wartość ma przejść, nie wywrócić synchronizację.
+  status TEXT NOT NULL,
+  reason TEXT,
+  utworzono_at TEXT NOT NULL,
+  kwota_grosze INTEGER,
+  waluta TEXT,
+  dostawa_grosze INTEGER,
+  -- `lineItems` po normalizacji: [{id, type, quantity?, kwotaGrosze?}].
+  pozycje_json TEXT,
+  sprawdzono_at TEXT NOT NULL,
+  PRIMARY KEY (channel_account_id, refund_id)
+);
+CREATE INDEX IF NOT EXISTS ix_zwrot_platnosci_zamowienie
+  ON zwrot_platnosci(channel_account_id, order_id);
 
 CREATE TABLE IF NOT EXISTS zwrot_klienta_pozycja (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -2839,6 +2879,49 @@ CREATE TABLE IF NOT EXISTS klient_dosylka (
   problemow      INTEGER NOT NULL DEFAULT 0,  -- ile razy wszedł w ISSUE albo RETURNED; nie maleje
   PRIMARY KEY (sprawa_id, zamowienie)
 );
+
+-- Pomyłka wysyłkowa: klient dostał inny towar, niż zamówił. Biuro prowadziło
+-- ten rejestr w arkuszu, bo nikt poza nim nie wie, kto zbierał i kto pakował.
+-- Tu stoi tylko to, czego kolejki nie wiedzą: co przyszło zamiast czego, osoby
+-- i ich wina. Dosyłkę, powrót towaru i odmowę wypłaty czyta się przy odczycie
+-- z `klient_dosylka` i `zwrot_klienta` (services/pomylki.ts). Trzy kolumny
+-- ręczne obok nich to zapas dla sprzedaży poza Allegro, gdzie kolejki milczą.
+-- Osoby mają nazwę DLA OKA i id DLA MASZYNY, bez klucza do `app_user`:
+-- klucz blokowałby kasowanie kont (pułapka z `klient_prowadzenie`).
+-- Bez adresu i telefonu: tożsamością klienta jest login (docs/obsluga-klienta.md).
+-- Bez CHECK: poszerzenie słownika byłoby przebudową tabeli (blizna w schemacie).
+-- `id` trafia do dziennika zamiast loginu, bo `events` nie ma retencji.
+CREATE TABLE IF NOT EXISTS pomylka_wysylki (
+  id                INTEGER PRIMARY KEY AUTOINCREMENT,
+  zgloszono         TEXT NOT NULL,           -- RRRR-MM-DD, dzień lokalny zgłoszenia
+  login             TEXT NOT NULL COLLATE NOCASE,  -- login Allegro albo nazwa klienta z paragonu
+  konto             INTEGER,                 -- konto kanału; numer zamówienia jest unikalny na koncie
+  zamowienie        TEXT,                    -- Allegro checkoutForm.id; NULL dla paragonu
+  co_zamowil        TEXT,                    -- nazwa pozycji zamówienia albo wpis przy paragonie
+  co_dostal         TEXT,                    -- wpis agenta; NULL = do uzupełnienia
+  uwagi             TEXT,
+  zrodlo            TEXT NOT NULL,           -- 'odmowa' | 'dosylka' | 'recznie'
+  zbieral           TEXT,
+  zbieral_user_id   INTEGER,
+  pakowal           TEXT,
+  pakowal_user_id   INTEGER,
+  wina_zbierajacego INTEGER NOT NULL DEFAULT 0,
+  wina_pakujacego   INTEGER NOT NULL DEFAULT 0,
+  nowy_towar        TEXT,                    -- ręcznie: 'tak' | 'nie' | NULL
+  towar_wrocil      TEXT,                    -- ręcznie: RRRR-MM-DD | 'nie_wraca' | NULL
+  odmowa            TEXT,                    -- ręcznie: 'tak' | 'nie_trzeba' | NULL
+  zakonczono_at     TEXT,                    -- ręczne „Zakończ”; NULL = stan liczony
+  wersja            INTEGER NOT NULL DEFAULT 1,
+  utworzono_at      TEXT NOT NULL,
+  zmieniono_at      TEXT NOT NULL
+);
+-- Jedna pomyłka na zamówienie. Automat zakłada ją przy odmowie i przy dosyłce,
+-- a druga droga dla tego samego zamówienia ma trafić w istniejący wiersz.
+-- `ifnull` dlatego, że w UNIQUE dwa NULL-e są różne, a konto bywa nieznane.
+CREATE UNIQUE INDEX IF NOT EXISTS ux_pomylka_wysylki_zamowienie
+  ON pomylka_wysylki(ifnull(konto, 0), zamowienie) WHERE zamowienie IS NOT NULL;
+CREATE INDEX IF NOT EXISTS ix_pomylka_wysylki_konto_zam ON pomylka_wysylki(konto, zamowienie);
+CREATE INDEX IF NOT EXISTS ix_pomylka_wysylki_login ON pomylka_wysylki(login);
 
 -- ── Test na żywym Allegro (0.495.0) ─────────────────────────────────────────
 -- Raz dziennie serwer przechodzi te same drogi co produkcja, bez atrap, i zapisuje

@@ -8,6 +8,7 @@ import { chwilaUtc } from "../czas.js";
 import { db as defaultDb, transaction } from "../db/db.js";
 import { logEvent } from "./events.js";
 import { odpytajTracking, type StanPrzesylki } from "./allegro-tracking.js";
+import { zalozPomylkeZDosylki } from "./pomylki.js";
 import {
   DNI_KROKU_DOSYLKI, DOSYLKA_ZWROTU_SQL, jestKodemDosylki, OKNO_SLEDZENIA_MS, poDniachRoboczych,
   type KodDosylki,
@@ -45,8 +46,8 @@ import { przesylkiDosylkiSellasist } from "./sellasist-dosylka.js";
    Propozycja na profilu zostaje wyłącznie drogą ponowienia i kodów
    zsynchronizowanych z Allegro.
 
-   KIERUNEK IMPORTÓW JEST JEDEN. Ten plik importuje sprawę klienta
-   i tracking; `prowadzenie-klienta.ts`, `zwrot-pieniedzy.ts`,
+   KIERUNEK IMPORTÓW JEST JEDEN. Ten plik importuje sprawę klienta,
+   tracking i rejestr pomyłek; `prowadzenie-klienta.ts`, `zwrot-pieniedzy.ts`,
    `droga-klienta.ts` i `profil-klienta.ts` nie importują tego pliku —
    czytają `klient_dosylka` własnym SQL-em i zdaniem z `dosylka-opis.ts`.
    Pętla importów przy stałej liczonej w chwili ładowania bywa pustym
@@ -218,6 +219,7 @@ export function zalozDosylkeZOdmowy(
       w, login: l, krok, krokDo, autor, teraz, znane: w ? null : odciskTeraz(l, database), domyslny: true,
     });
     zapiszDosylke(database, zapis.id, z, teraz);
+    zalozPomylkeZDosylki(database, { login: z.login, konto: z.konto, zamowienie: z.zamowienie, kod: z.kod }, autor, teraz);
     if (w) wyrownajZnane(database, zapis.id, l);
     logEvent("klient_dosylka_zalozona", autor.name, null, { sprawa: zapis.id, zrodlo: "odmowa" }, autor.id, database);
     return {
@@ -275,6 +277,7 @@ export function zalozDosylkeZProfilu(
       autor, teraz, znane: w ? null : odciskTeraz(l, database), domyslny: true,
     });
     zapiszDosylke(database, zapis.id, z, teraz);
+    zalozPomylkeZDosylki(database, { login: z.login, konto: z.konto, zamowienie: z.zamowienie, kod: z.kod }, autor, teraz);
     potwierdzPoZapisie(database, zapis.id, l, autor, teraz, false);
     logEvent("klient_dosylka_zalozona", autor.name, null, { sprawa: zapis.id, zrodlo: "profil" }, autor.id, database);
   })();
@@ -350,6 +353,8 @@ export function wpiszNumerDosylki(
           sprawdzono_at = NULL, numer_at = excluded.numer_at, archiwalna = 0`)
         .run(id, konto, zamowienie, waybill, przewoznik, at, at);
     }
+    /* Bez kodu odmowy: czy to zły towar, rozstrzyga zwrot (`zalozPomylkeZDosylki`). */
+    zalozPomylkeZDosylki(database, { login: l, konto, zamowienie, kod: null }, autor, teraz);
     potwierdzPoZapisie(database, id, l, autor, teraz, true);
     /* Sam numer sprawy. Automat loguje wykrycie osobnym typem
        (`klient_dosylka_wykryta`), więc ten typ liczy wyłącznie ruch człowieka. */

@@ -50,7 +50,8 @@ export const ZDARZENIA: readonly string[] = [
   "location_mismatch", "location_removed", "location_set", "login", "login_failed",
   "logo_dostawcy_usuniecie", "logo_dostawcy_zapis", "magazyny_widocznosc", "manual_entry",
   "migawka_dnia", "notatka_odpowiedz_przeczytana", "obsluga.zalacznik.pobrany",
-  "oferta_komplet_ustalony", "privileged", "problem_raised", "problem_resolved",
+  "oferta_komplet_ustalony", "pomylka_dodana", "pomylka_wznowiona", "pomylka_zakonczona",
+  "pomylka_zalozona", "pomylka_zmieniona", "privileged", "problem_raised", "problem_resolved",
   "problem_wycofany", "przeplyw_na_zywo", "przeplyw_na_zywo_blad",
   "przeplyw_na_zywo_konto", "przeplyw_na_zywo_sufit", "przeplyw_propozycje", "przeplyw_werdykt",
   "przeplyw_wyslane_na_zywo", "przesuniecie", "przesylka_zapisana", "przyjecie_otwarte",
@@ -89,7 +90,7 @@ export const ZDARZENIA: readonly string[] = [
   "zwrot_przelew_cofniety", "zwrot_rabat_automat_blad", "zwrot_rabat_zgloszony",
   "zwrot_skan_dociagniecie", "zwrot_skladnik_outlet", "zwrot_werdykt_cofniety",
   "zwrot_werdykt_odrzucony",
-  "zwrot_werdykt_przyjety", "zwrot_wyplata_potwierdzona", "zwrot_zamowienia_kupujacego",
+  "zwrot_werdykt_przyjety", "zwrot_wyplata_potwierdzona", "zwrot_platnosci_sprawdzone", "zwrot_platnosci_sprawdzone_masowo", "zwrot_zamkniecie_reczne", "zwrot_zamkniecie_reczne_cofniete", "zwrot_zamowienia_kupujacego",
   "zwrot_zw_zlecony", "zwroty_rozliczone_skasowane", "zwroty_synchronizacja_reczna",
   "zwroty_wyczyszczone", "zwroty_zamowienia_reczne",
 ];

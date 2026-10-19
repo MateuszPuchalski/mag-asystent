@@ -145,9 +145,11 @@ describe("boczny pasek menu", () => {
     expect(bieznia).toContain("title={z.etykieta}");
   });
 
-  it("Dostawy są siódmą, ostatnią zakładką pracy, za kreską", () => {
+  it("za kreską stoi praca na kartotece: Dostawy, a po nich Zdjęcia jako ostatnia zakładka", () => {
     const zakladki = tsx.slice(tsx.indexOf("const ZAKLADKI"), tsx.indexOf("\n];", tsx.indexOf("const ZAKLADKI")));
-    expect(zakladki.match(/\{ do: "/g)).toHaveLength(7);
+    expect(zakladki.match(/\{ do: "/g)).toHaveLength(9);
     expect(zakladki).toMatch(/do: "\/obsluga\/dostawy".*kreska: true/);
+    expect(zakladki.indexOf('"/obsluga/zdjecia"')).toBeGreaterThan(zakladki.indexOf('"/obsluga/dostawy"'));
+    expect(zakladki).toMatch(/do: "\/obsluga\/zdjecia".*kreska: false/);
   });
 });

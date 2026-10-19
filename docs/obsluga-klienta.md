@@ -210,7 +210,8 @@ którym cytują je komentarze w kodzie.
 - **Załączniki: nazwa, typ i stan, bez pliku.** Nazwa bywa daną osobową
   (`faktura_Kowalski.pdf`); przy treści rozmowy w bazie nie zmienia to skali
   ryzyka. Pobranie idzie przez nasz serwer, bo token konta firmy nie opuszcza
-  maszyny. Pliku `UNSAFE` nie da się pobrać.
+  maszyny. Pliku `UNSAFE` nie da się pobrać. Podgląd na osi dostaje tylko
+  `SAFE`: obraz albo PDF rozpoznany po sygnaturze, jak w reklamacjach.
 - **Szkic i komentarze zostają u nas.** Szkic wychodzi WYŁĄCZNIE przez wysyłkę,
   na jawne kliknięcie agenta. Komentarz wewnętrzny ma osobną tabelę, a adapter
   Allegro czyta wyłącznie `message`.
@@ -263,6 +264,16 @@ z firmy nie wychodzi ani jeden znak. Klasyfikacja nie pisze do klienta.
   numery, dostępność dziś), treść oferty i rozpoznanie klasyfikatora. Nie
   idą: półka, rezerwacje, rozbicie na magazyny, pełny opis kartoteki, historia
   zakupów klienta ani jego adres.
+- **Szkic i dopytanie sięgają do kartoteki narzędziami.** Klient pyta często
+  o towar spoza oferty rozmowy, numerem albo nazwą. Model sam szuka wtedy
+  w lokalnym odczycie Subiekta, w szkicu najwyżej trzy rundy narzędzi. Narzędzia nie
+  piszą i nie wołają sieci. Wynik ma oznaczenie `N#` i przechodzi tę samą
+  walidację co fakty.
+- **Ceny sprzedaży i nasze oferty Allegro wychodzą, cena zakupu nie.**
+  Właściciel zdecydował 19 października, że Copilot podaje klientowi cenę
+  i link do naszej aukcji. Cennik sklepu i oferty to dane, które klient
+  i tak widzi. Poziom 0 cennika to cena zakupu i nie wychodzi nigdy. Pilnuje
+  tego test narzędzi (`copilot-narzedzia.test.ts`).
 - **Szkic nie staje się odpowiedzią sam.** Stoi w pustym polu jako tekst do
   poprawiania, nie zapisany; do klienta idzie po „Wyślij".
 
@@ -401,8 +412,12 @@ a ulica rozstrzyga to w jednym spojrzeniu.
   dostaje długość notatki i nazwę tagu, a `events` nie ma retencji.
 - **`PostPurchaseIssue` nie niesie** adresu, telefonu ani konta, więc kolumn
   na nie nie ma. Plików załączników nie trzymamy; pobranie idzie przez nasz
-  serwer. Na oś idą wyłącznie JPEG, PNG i GIF, rozpoznane po sygnaturze,
+  serwer. Na oś idą wyłącznie JPEG, PNG, GIF i PDF, rozpoznane po sygnaturze,
   z `nosniff`, bo załącznik nie ma pola `SAFE`. Hala reklamacji nie widzi.
+- **PDF na osi** rysuje pdf.js w przeglądarce, bez skryptów pliku. Odpowiedź
+  podglądu niesie `content-security-policy: sandbox`, więc wejście paskiem
+  nie daje skryptowi naszego origin. Podgląd przyjmuje do 20 MiB, większy
+  plik dostaje 413 i zostaje przy pobraniu. Do Copilota PDF nie idzie.
 - **Dowody biura** (`reklamacja_dowod`) to słowa BIURA o towarze: co widać na
   zdjęciu, czego brakuje i co ustaliliśmy. Zostaje treść do 2000 znaków,
   numer powiązanego zdjęcia klienta, imię i konto autora oraz czas. Danych
@@ -548,6 +563,33 @@ działania stoją w `docs/sellasist.md`.
   w treści. Dziennik `sellasist_notatka` niesie numer zamówienia, bez treści.
 - **Retencji nie ma**, jak przy zamówieniach Allegro. Zamówienie skasowane
   w Sellasist znika z lustra przy następnej jego zmianie.
+
+## Polityka danych pomyłek wysyłkowych
+
+Zakładka „Pomyłki” (`0.591.0`) zastępuje arkusz biura z pomyłkami w paczkach.
+Tabela `pomylka_wysylki` trzyma jeden wiersz na zamówienie.
+
+- **Zapisujemy** login kupującego jako klucz klienta, numer zamówienia
+  z kontem kanału, co zamówił i co dostał, krótką uwagę i datę zgłoszenia.
+  Nie ma adresu, telefonu ani nazwy odbiorcy. Uwaga to wolny tekst, więc
+  zakaz adresu jest regułą dla człowieka.
+- **Przy paragonie w miejscu loginu stoi nazwa klienta**, zwykle imię
+  i nazwisko, bo klient spoza Allegro nie ma innego klucza. Arkusz biura
+  trzymał ją tak samo. Panel prosi o najkrótszą nazwę, po której biuro
+  rozpozna klienta, bez adresu i telefonu.
+- **Nowy towar, powrót towaru i odmowę wypłaty czytamy z kolejek**: dosyłki
+  i zwrotu. Ręczny znacznik ma tylko sprzedaż poza Allegro, bo tam kolejki
+  nic nie wiedzą. Druga prawda o tym samym fakcie rozjechałaby się.
+- **Kto zbierał, kto pakował i kto zawinił to dane o NAS.** Imię i konto
+  z `app_user`, bez klucza obcego, bo ten blokowałby kasowanie kont. Przy
+  pojedynczej pomyłce widzi je całe biuro, jak w arkuszu.
+- **Zestawienie win na osobę widzi wyłącznie admin**, decyzją właściciela.
+  Dla reszty biura byłoby monitoringiem pracowniczym (art. 22² Kodeksu
+  pracy), tak jak zestawienie spraw w polityce sprawy klienta.
+- **Dziennik nie dostaje loginu ani opisu.** Zdarzenia pomyłek niosą jej
+  numer. Pomyłki nie wychodzą do Copilota, CSV, migawki ani raportu tygodnia.
+- **Retencji nie ma**, jak w sprawie klienta. O archiwizacji decyduje właściciel.
+  Kopia anonimizowana (`tools/anonimizuj-baze.mjs`) zamienia login i imiona.
 
 ## Co się nie zmienia
 

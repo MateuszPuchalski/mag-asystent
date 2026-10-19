@@ -5,6 +5,7 @@ import React from "react";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import type { Kubelek, Zwrot } from "../api/typy";
+import { atrapaZapisow } from "../test/zapisy";
 
 /* Ten plik istnieje przez usterkę znalezioną OKIEM, nie testem: przełączenie
    kubełka zmieniało listę, ale zostawiało kursor na zwrocie z poprzedniego
@@ -19,7 +20,7 @@ const zwrot = (id: number, kubelek: Kubelek, numer: string): Zwrot => ({
   sumaPozycjiGrosze: 4999, kwotaPelnaGrosze: null, waluta: "PLN",
   linkZwrotu: null, zamowienie: null, werdykt: null, werdyktPowod: null, kwotaGrosze: null,
   kwotaWariant: null, korektaNumer: null, korektaZrodlo: null, rejectionCode: null, wersja: 1, zrodlo: "allegro",
-  notatka: null, notatkaAt: null, notatkaPrzez: null, maPoprzedniaNotatke: false, kupujacyLogin: null, odbiorcaNazwa: null, przewoznik: null, rozmowy: [],
+  notatka: null, notatkaAt: null, notatkaPrzez: null, maPoprzedniaNotatke: false, kupujacyLogin: null, odbiorcaNazwa: null, przewoznik: null, rozmowy: [], zamknietyRecznie: null,
   faktura: { dokId: null, numer: null, typ: null, zrodlo: null, at: null, przez: null },
   pozycje: [{ id, zrodlo: "allegro", offerId: "1", ofertaZamowienia: null, ofertaZdjecie: "nieznane" as const, nazwa: "Sekator", ilosc: 1, cenaGrosze: 4999,
     waluta: "PLN", powod: null, powodKomentarz: null, ocena: kubelek === "zwrot" ? "stan" : null,
@@ -1313,7 +1314,7 @@ describe("Dosyłka pod odmową wypłaty", () => {
 
   it("otwarcie zwrotu z odmową i stanem dosyłki niczego nie zapisuje", async () => {
     scena.wolano = [];
-    scena.zwroty = dwaZwroty();
+    scena.zwroty = dwaZwroty().map((z) => ({ ...z, kupujacyLogin: "zielony" }));
     scena.szczegol = pieniadze(odmowa(), {
       dosylka: { opis: "Dosyłka w drodze (stan z 14:10)", login: "zielony", ton: null } });
     try {
@@ -1329,6 +1330,8 @@ describe("Dosyłka pod odmową wypłaty", () => {
       expect(within(pasek).getByRole("link", { name: /^Pytanie z .* — otwórz rozmowę/ }))
         .toHaveAttribute("href", "/obsluga/skrzynka/3");
       expect(odczyty.filter((u) => u.startsWith("/api/obsluga/droga/"))).toEqual(["/api/obsluga/droga/ord-6"]);
+      /* „Zła paczka” stoi przy drodze tego zakupu i niczego nie zapisuje, dopóki ktoś jej nie kliknie. */
+      expect(screen.getByRole("button", { name: "Zła paczka" })).toBeInTheDocument();
       expect(scena.wolano).toEqual([]);
       expect(zapisy).toEqual([]);
     } finally { sprzatnij(); }
@@ -1458,5 +1461,172 @@ describe("Dosyłka pod odmową wypłaty", () => {
       expect(await screen.findByRole("heading", { name: "ZK-6" })).toBeInTheDocument();
       expect(screen.getByText("Allegro nie przyjęło odmowy.")).toBeInTheDocument();
     } finally { sprzatnij(); }
+  });
+});
+
+describe("Sprawdzenie zwrotu płatności w Allegro", () => {
+  afterEach(() => { vi.unstubAllGlobals(); scena.zwroty = null; scena.szczegol = undefined; });
+  const stanPieniedzy = {
+    pieniadze: { moznaZwrocic: false, moznaOdmowic: true, powod: null, kwotaGrosze: 4999,
+      waluta: "PLN", oddane: null, odmowa: null, przelew: null, moznaZapisacPrzelew: false,
+      powodPrzelewu: null, dosylka: null, sledzicDosylke: false, platnosci: [] },
+  };
+  /* Przełącznik zwrotów odpytuje pominięte kosze; reszta GET-ów idzie przez mocki hooków. */
+  const odczyt = (url: string) => url === "/api/biuro/kosze/pominiete" ? { pominiete: [] } : undefined;
+  const otworz = () => {
+    scena.zwroty = [{ ...zwrot(6, "korekta", "ZK-6"), werdykt: "przyjety" as const, kwotaGrosze: 4999 }];
+    scena.szczegol = stanPieniedzy;
+    pokaz("/obsluga/zwroty/6");
+  };
+
+  it("otwarcie ekranu niczego nie zapisuje", async () => {
+    const zapisy = atrapaZapisow(odczyt);
+    otworz();
+    expect(await screen.findByRole("button", { name: "Sprawdź w Allegro" })).toBeInTheDocument();
+    expect(zapisy.wyslane).toEqual([]);
+  });
+
+  it("klik robi dokładnie jeden POST na właściwy adres i pokazuje wynik", async () => {
+    const zapisy = atrapaZapisow(odczyt, () => ({ status: 200,
+      cialo: { znaleziono: 1, wyplacone: true, platnosci: [] } }));
+    otworz();
+    await userEvent.click(await screen.findByRole("button", { name: "Sprawdź w Allegro" }));
+    expect(await screen.findByRole("status")).toHaveTextContent("Allegro potwierdza wypłatę.");
+    expect(zapisy.wyslane).toEqual(["POST /api/obsluga/zwroty/6/platnosci/sprawdz"]);
+  });
+
+  it("błąd serwera trafia pod przycisk", async () => {
+    atrapaZapisow(odczyt, () => ({ status: 429, cialo: { error: "Allegro ogranicza zapytania." } }));
+    otworz();
+    await userEvent.click(await screen.findByRole("button", { name: "Sprawdź w Allegro" }));
+    expect(await screen.findByText("Allegro ogranicza zapytania.")).toBeInTheDocument();
+  });
+});
+
+describe("Sprawdzenie WSZYSTKICH zwrotów w Allegro", () => {
+  afterEach(() => { vi.unstubAllGlobals(); });
+  const odczyt = (url: string) => url === "/api/biuro/kosze/pominiete" ? { pominiete: [] } : undefined;
+  const ADRES = "POST /api/obsluga/zwroty/platnosci/sprawdz-wszystkie";
+  const wynik = (nadpisz: Record<string, unknown> = {}) => ({
+    sprawdzonych: 383, zapisane: 12, zatrzasniete: 9, bezZwrotuPlatnosci: 0,
+    zPowodem: [], urwane: false, ...nadpisz });
+  const przycisk = () => screen.findByRole("button", { name: "Sprawdź wszystkie w Allegro" });
+
+  it("otwarcie ekranu niczego nie zapisuje", async () => {
+    const zapisy = atrapaZapisow(odczyt);
+    pokaz();
+    expect(await przycisk()).toBeInTheDocument();
+    expect(zapisy.wyslane).toEqual([]);
+  });
+
+  it("klik robi jeden POST bez ciała i zostawia podsumowanie na ekranie", async () => {
+    const zapisy = atrapaZapisow(odczyt, () => ({ status: 200, cialo: wynik() }));
+    pokaz();
+    await userEvent.click(await przycisk());
+    const status = await screen.findByRole("status");
+    expect(status).toHaveTextContent("Sprawdzono 383 zwrotów. Przypięto wypłatę z Allegro przy 9.");
+    expect(status).not.toHaveTextContent("Allegro nie zna zwrotu płatności");
+    expect(status).not.toHaveTextContent("Lista Allegro jest dłuższa");
+    expect(zapisy.wyslane).toEqual([ADRES]);
+    const init = vi.mocked(fetch).mock.calls.find((c) => (c[1] as RequestInit | undefined)?.method === "POST")?.[1] as RequestInit;
+    expect(init.body).toBeUndefined();
+  });
+
+  it("wynik przeżywa zmianę kubełka, a Zamknij go zdejmuje", async () => {
+    atrapaZapisow(odczyt, () => ({ status: 200, cialo: wynik() }));
+    pokaz();
+    await userEvent.click(await przycisk());
+    await screen.findByRole("status");
+    await userEvent.click(screen.getByRole("button", { name: /Do zwrotu/ }));
+    expect(screen.getByRole("status")).toHaveTextContent("Sprawdzono 383 zwrotów");
+    await userEvent.click(screen.getByRole("button", { name: "Zamknij" }));
+    expect(screen.queryByRole("status")).toBeNull();
+  });
+
+  it("pokazuje brak zwrotu płatności, powody wprost i urwaną listę", async () => {
+    atrapaZapisow(odczyt, () => ({ status: 200, cialo: wynik({
+      bezZwrotuPlatnosci: 4, urwane: true,
+      zPowodem: [{ powod: "kwota w Allegro różni się od naszej", ile: 3 }] }) }));
+    pokaz();
+    await userEvent.click(await przycisk());
+    const status = await screen.findByRole("status");
+    expect(status).toHaveTextContent("Allegro nie zna zwrotu płatności dla 4 zwrotów.");
+    expect(status).toHaveTextContent("3 zwrotów nie przypięto: kwota w Allegro różni się od naszej.");
+    expect(status).toHaveTextContent("Lista Allegro jest dłuższa, niż bierzemy naraz — kliknij jeszcze raz, żeby dojść dalej.");
+  });
+
+  it("zero sprawdzonych mówi, że nie ma czego sprawdzać", async () => {
+    atrapaZapisow(odczyt, () => ({ status: 200, cialo: wynik({ sprawdzonych: 0, zatrzasniete: 0 }) }));
+    pokaz();
+    await userEvent.click(await przycisk());
+    expect(await screen.findByRole("status")).toHaveTextContent("Nie ma zwrotów do sprawdzenia.");
+  });
+
+  it("błąd 429 pokazuje treść serwera", async () => {
+    atrapaZapisow(odczyt, () => ({ status: 429, cialo: { error: "Allegro ogranicza zapytania." } }));
+    pokaz();
+    await userEvent.click(await przycisk());
+    expect(await screen.findByText("Allegro ogranicza zapytania.")).toBeInTheDocument();
+    expect(screen.queryByRole("status")).toBeNull();
+  });
+});
+
+describe("Ręczne zamknięcie zwrotu", () => {
+  afterEach(() => { vi.unstubAllGlobals(); scena.zwroty = null; scena.szczegol = undefined; });
+  const odczyt = (url: string) => url === "/api/biuro/kosze/pominiete" ? { pominiete: [] } : undefined;
+  const ZAMKNIJ = "POST /api/obsluga/zwroty/6/zamkniecie-reczne";
+  const otworz = (z: Partial<Zwrot> = {}) => {
+    scena.zwroty = [{ ...zwrot(6, "zwrot", "ZR-6"), ...z }];
+    pokaz("/obsluga/zwroty/6");
+  };
+  const wyslaneCialo = () => JSON.parse(String((vi.mocked(fetch).mock.calls
+    .find((c) => (c[1] as RequestInit | undefined)?.method === "POST")?.[1] as RequestInit).body));
+
+  it("otwarcie ekranu niczego nie zapisuje", async () => {
+    const zapisy = atrapaZapisow(odczyt);
+    otworz();
+    expect(await screen.findByRole("button", { name: "Zamknij ręcznie" })).toBeInTheDocument();
+    expect(zapisy.wyslane).toEqual([]);
+  });
+
+  it("klik robi jeden POST na właściwy adres z wersją i powodem", async () => {
+    const zapisy = atrapaZapisow(odczyt, () => ({ status: 200,
+      cialo: { zamknietyAt: "2026-09-20T10:00:00Z", wersja: 2 } }));
+    otworz();
+    await userEvent.click(await screen.findByRole("button", { name: "Zamknij ręcznie" }));
+    await userEvent.type(screen.getByLabelText("Powód (opcjonalnie)"), "oddane przelewem");
+    await userEvent.click(screen.getByRole("button", { name: "Zamknij" }));
+    await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+    expect(zapisy.wyslane).toEqual([ZAMKNIJ]);
+    expect(wyslaneCialo()).toEqual({ wersja: 1, powod: "oddane przelewem" });
+  });
+
+  it("błąd 400 pokazuje treść serwera, a okno zostaje", async () => {
+    atrapaZapisow(odczyt, () => ({ status: 400,
+      cialo: { error: "Towar z tego zwrotu leży w koszyku czekającym na korektę." } }));
+    otworz();
+    await userEvent.click(await screen.findByRole("button", { name: "Zamknij ręcznie" }));
+    await userEvent.click(screen.getByRole("button", { name: "Zamknij" }));
+    expect(await within(screen.getByRole("dialog"))
+      .findByText("Towar z tego zwrotu leży w koszyku czekającym na korektę.")).toBeInTheDocument();
+  });
+
+  it("konflikt 409 pokazuje komunikat o zmianie zwrotu", async () => {
+    atrapaZapisow(odczyt, () => ({ status: 409,
+      cialo: { error: "Zwrot zmienił się w międzyczasie — odśwież i spróbuj ponownie.",
+        wersja: 5, przyslana: 1 } }));
+    otworz();
+    await userEvent.click(await screen.findByRole("button", { name: "Zamknij ręcznie" }));
+    await userEvent.click(screen.getByRole("button", { name: "Zamknij" }));
+    expect(await screen.findByText(/Zwrot zmienił się w międzyczasie/)).toBeInTheDocument();
+  });
+
+  it("zwrot zamknięty ręcznie: Otwórz ponownie to jeden POST z samą wersją", async () => {
+    const zapisy = atrapaZapisow(odczyt, () => ({ status: 200, cialo: { wersja: 3 } }));
+    otworz({ kubelek: "zamkniety", wersja: 2,
+      zamknietyRecznie: { kiedy: "2026-09-20T10:00:00Z", przez: "Ewa", powod: null } });
+    await userEvent.click(await screen.findByRole("button", { name: "Otwórz ponownie" }));
+    await waitFor(() => expect(zapisy.wyslane).toEqual([`${ZAMKNIJ}/cofnij`]));
+    expect(wyslaneCialo()).toEqual({ wersja: 2 });
   });
 });

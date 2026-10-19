@@ -311,14 +311,20 @@ export const config = {
     dokTypMM: 9,
     /**
      * Ile dni wstecz czytać dokumenty sprzedaży (FS/PA) do read-modelu
-     * `sgt_faktura` (0.174.0).
+     * `sgt_faktura`.
      *
-     * Zwrot z Allegro wraca zwykle w ustawowych czternastu dniach, ale paczka
-     * potrafi poleżeć w „do wyjaśnienia", a odstąpienie liczy się od
-     * DORĘCZENIA. Sześćdziesiąt dni to zapas nad tym oknem; wyżej rośnie już
-     * tylko koszt zapytania do bazy firmy.
+     * Kopia ma trzech czytelników. Zwrot z Allegro wraca zwykle w czternastu
+     * dniach, ale odstąpienie liczy się od DORĘCZENIA, a paczka potrafi
+     * poleżeć w „do wyjaśnienia". Paragon reklamacji sięga dalej, bo
+     * reklamacja przychodzi tygodnie po zakupie. Najdłużej patrzy przekrój
+     * towaru: dziewięćdziesiąt dni sprzedaży obok zwrotów z tego samego okna
+     * (`OKNO_PRZEKROJU_DNI`). Krótsza kopia skraca jego okno, więc
+     * dziewięćdziesiąt to najmniejsza wartość, przy której przekrój jest pełny.
+     *
+     * Import czyta całe okno przy każdym takcie, więc koszt rośnie z nim
+     * liniowo. Ile wierszy to daje, pokazuje `lastSync` w `/api/health`.
      */
-    fakturyDniWstecz: num(process.env.DOK_SPRZEDAZ_DNI_WSTECZ, 60, "DOK_SPRZEDAZ_DNI_WSTECZ"),
+    fakturyDniWstecz: num(process.env.DOK_SPRZEDAZ_DNI_WSTECZ, 90, "DOK_SPRZEDAZ_DNI_WSTECZ"),
     /**
      * Kolumna `dok__Dokument` z numerem obcym — tym, który integracja
      * sprzedażowa wpisuje na dokument.
@@ -877,12 +883,14 @@ export const config = {
     /**
      * [WERYFIKUJ] kolumna sumy kontrolnej (`zd_CRC` w `tw_ZdjecieTw`).
      *
-     * PUSTE ZNACZY „nie wpisujemy jej wcale" i to jest wartość domyślna.
-     * Algorytmu, którym Subiekt liczy tę sumę, repozytorium NIE ZNA — wpisanie
-     * własnej liczby byłoby zgadywaniem, a wynik zgadywania siedziałby w bazie
-     * firmy. Czy Subiekt znosi `NULL`, rozstrzyga kartoteka próbna (DEPLOY §6).
+     * Przy tabeli Subiekta domyślnie `zd_CRC`, bo tam kolumna jest NOT NULL
+     * i INSERT bez niej pada. Wpisujemy CRC32 obrazu (`sumaZdjecia`).
+     * Jawne puste `ZDJECIA_KOLUMNA_CRC=` znaczy „nie wpisujemy jej wcale" —
+     * dla innej tabeli zdjęć, w której ta kolumna dopuszcza NULL.
      */
-    kolumnaCrc: process.env.ZDJECIA_KOLUMNA_CRC ?? "",
+    kolumnaCrc:
+      process.env.ZDJECIA_KOLUMNA_CRC ??
+      ((process.env.ZDJECIA_TABELA ?? "") === "tw_ZdjecieTw" ? "zd_CRC" : ""),
     /**
      * Ile kilobajtów wolno przyjąć od kolektora.
      *
@@ -1126,6 +1134,14 @@ export const config = {
      * co szkic z taktu (`autoNaGodzine`).
      */
     szkicPoRozpoznaniu: process.env.COPILOT_SZKIC_PO_ROZPOZNANIU !== "0",
+    /**
+     * NARZĘDZIA KARTOTEKI PRZY SZKICU (decyzja właściciela z 19 października
+     * 2026). Szkic sięga do bazy tak jak dopytanie, bo klient pyta o towar
+     * spoza faktów, a odpowiedź leży obok. Włączone domyślnie, bo to odczyt
+     * lokalny bez nowych kosztów poza rundami modelu. `0` albo `false`
+     * wyłącza, gdy rundy okażą się za drogie.
+     */
+    szkicNarzedzia: !["0", "false"].includes(String(process.env.COPILOT_SZKIC_NARZEDZIA ?? "").trim().toLowerCase()),
     /**
      * Rytm krótszy niż przy szkicu, bo rozpoznanie ma stać przy wiadomości,
      * ZANIM agent ją otworzy — a jedno wywołanie trwa sekundę, nie kilka.

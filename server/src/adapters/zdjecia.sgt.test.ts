@@ -1,6 +1,13 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { budujZapytanieBlob, nazwaZeWzorca, rozpoznajMime, wybierzObraz } from "./zdjecia.sgt.js";
+import {
+  budujZapytanieBezZdjecia,
+  budujZapytanieBlob,
+  nazwaZeWzorca,
+  rozpoznajMime,
+  wybierzObraz,
+  wzorzecLike,
+} from "./zdjecia.sgt.js";
 
 /* ── Części czyste adaptera zdjęć ────────────────────────────────────────────
    Reszta modułu to wejście/wyjście, którego bez serwera MSSQL i bez udziału
@@ -71,6 +78,15 @@ test("gdy pierwszy JEST obrazem, dalszych nie ruszamy", () => {
   assert.equal(wybierzObraz([JPEG, PNG])?.bajty, JPEG);
 });
 
+test("PDF z zakładki „Opis” nie trafia na kolektor jako zdjęcie", () => {
+  /* `rozpoznajMime` zna PDF dla podglądu dokumentu na osi rozmowy. Kolektor
+     rysuje wyłącznie obrazy, więc PDF jest tu tym samym, co OLE: pomijamy. */
+  const PDF = Buffer.from("%PDF-1.7\n%\u00e2\u00e3", "latin1");
+  const JPEG = Buffer.from([0xff, 0xd8, 0xff, 0xe0, 0x00, 0x10, 0x4a, 0x46]);
+  assert.equal(wybierzObraz([PDF, JPEG])?.bajty, JPEG);
+  assert.equal(wybierzObraz([PDF]), null, "sam PDF to brak zdjęcia");
+});
+
 test("same śmieci to brak zdjęcia, nie błąd", () => {
   const RTF = Buffer.from([0x7b, 0x5c, 0x72, 0x74, 0x66, 0x31, 0x00, 0x00]);
   assert.equal(wybierzObraz([RTF, null, Buffer.alloc(0)]), null);
@@ -102,6 +118,14 @@ test("rozpoznaje formaty, które kolektor umie narysować", () => {
   assert.equal(rozpoznajMime(Buffer.from("RIFF\u0010\u0000\u0000\u0000WAVEfmt ", "latin1")), null);
 });
 
+test("PDF rozpoznaje po `%PDF-`, a nie po samym `%PDF`", () => {
+  /* Format dla podglądu dokumentu na osi. Myślnik należy do sygnatury:
+     bez niego cztery bajty bywają początkiem zwykłego tekstu. */
+  assert.equal(rozpoznajMime(Buffer.from("%PDF-1.4\n", "latin1")), "application/pdf");
+  assert.equal(rozpoznajMime(Buffer.from("%PDF", "latin1")), null);
+  assert.equal(rozpoznajMime(Buffer.from("%PDFx", "latin1")), null);
+});
+
 test("kontener OLE i RTF są ODRZUCANE, nie przepuszczane jako obraz", () => {
   // Zakładka „Opis" w Subiekcie to edytor RTF-owy; kolumna binarna może nieść
   // obiekt OLE z obrazem w środku. Wysłanie tego na kolektor daje pusty
@@ -123,4 +147,98 @@ test("symbol z kartoteki nie wyprowadza odczytu poza katalog", () => {
   // jest prawdziwy, więc ../ też może się kiedyś trafić
   assert.equal(nazwaZeWzorca("{symbol}.jpg", 1, "../../etc/passwd"), "passwd.jpg");
   assert.equal(nazwaZeWzorca("{symbol}.jpg", 1, "W43-0506(K)"), "W43-0506(K).jpg");
+});
+
+// ── Lista kartotek bez zdjęcia ──────────────────────────────────────────────
+
+test("osobna tabela zdjęć: brak to NOT EXISTS po kluczu obcym", () => {
+  const { strona, razem } = budujZapytanieBezZdjecia({
+    tabela: "tw_ZdjecieTw", kolumna: "zd_Zdjecie", klucz: "zd_IdTowar", zFiltrem: false,
+  });
+  assert.match(strona, /NOT EXISTS \(SELECT 1 FROM tw_ZdjecieTw z WITH \(NOLOCK\) WHERE z\.zd_IdTowar = t\.tw_Id\)/);
+  assert.match(strona, /t\.tw_Zablokowany = 0/);
+  /* Domyślnie stan malejąco. Porządek domyka tw_Id: symbol nie jest unikalny,
+     a stronicowanie bez pełnego porządku gubi i dubluje wiersze między stronami. */
+  assert.ok(
+    strona.endsWith("ORDER BY ISNULL(s.stan, 0) DESC, t.tw_Symbol, t.tw_Id OFFSET @offset ROWS FETCH NEXT @limit ROWS ONLY"),
+    strona
+  );
+  assert.match(razem, /^SELECT COUNT\(\*\) AS razem FROM tw__Towar t/);
+  assert.doesNotMatch(strona, /@q/);
+});
+
+/* Złączenie wprost z tw_Stan mnożyłoby wiersze towaru przez liczbę magazynów
+   i ten sam towar stałby na liście kilka razy. */
+test("stan to suma po magazynach z podzapytania, a licznik go nie złącza", () => {
+  const { strona, razem } = budujZapytanieBezZdjecia({
+    tabela: "tw_ZdjecieTw", kolumna: "zd_Zdjecie", klucz: "zd_IdTowar", zFiltrem: false,
+  });
+  assert.ok(strona.includes("ISNULL(s.stan, 0) AS stan"), strona);
+  assert.ok(
+    strona.includes("LEFT JOIN (SELECT st_TowId, SUM(st_Stan) AS stan FROM tw_Stan WITH (NOLOCK) GROUP BY st_TowId) s"),
+    strona
+  );
+  assert.ok(!razem.includes("tw_Stan"), razem);
+});
+
+test("każde sortowanie ma stały porządek domknięty tw_Id", () => {
+  const oczekiwane = {
+    stan: "ISNULL(s.stan, 0) DESC, t.tw_Symbol, t.tw_Id",
+    symbol: "t.tw_Symbol, t.tw_Id",
+    nazwa: "t.tw_Nazwa, t.tw_Id",
+    najnowsze: "t.tw_Id DESC",
+  } as const;
+  for (const [sortuj, porzadek] of Object.entries(oczekiwane)) {
+    const { strona } = budujZapytanieBezZdjecia({
+      tabela: "tw_ZdjecieTw", kolumna: "zd_Zdjecie", klucz: "zd_IdTowar", zFiltrem: false,
+      sortuj: sortuj as keyof typeof oczekiwane,
+    });
+    assert.ok(strona.includes(`ORDER BY ${porzadek} OFFSET`), strona);
+  }
+});
+
+test("filtr „na stanie” zawęża stronę i licznik tak samo", () => {
+  const z = budujZapytanieBezZdjecia({
+    tabela: "tw_ZdjecieTw", kolumna: "zd_Zdjecie", klucz: "zd_IdTowar", zFiltrem: false, naStanie: true,
+  });
+  const warunek = "EXISTS (SELECT 1 FROM tw_Stan st WITH (NOLOCK) WHERE st.st_TowId = t.tw_Id AND st.st_Stan > 0)";
+  assert.ok(z.strona.includes(warunek) && z.razem.includes(warunek));
+  const bez = budujZapytanieBezZdjecia({
+    tabela: "tw_ZdjecieTw", kolumna: "zd_Zdjecie", klucz: "zd_IdTowar", zFiltrem: false,
+  });
+  assert.ok(!bez.razem.includes("st_Stan > 0"));
+});
+
+test("zdjęcie w samej kartotece: brak to pusta kolumna", () => {
+  const { strona } = budujZapytanieBezZdjecia({ tabela: "", kolumna: "tw_Zdjecie", klucz: "tw_Id", zFiltrem: false });
+  assert.match(strona, /\(t\.tw_Zdjecie IS NULL OR DATALENGTH\(t\.tw_Zdjecie\) = 0\)/);
+  assert.doesNotMatch(strona, /NOT EXISTS/);
+});
+
+test("filtr szuka po symbolu, nazwie i EAN-ie, parametrem, w obu zapytaniach", () => {
+  const { strona, razem } = budujZapytanieBezZdjecia({
+    tabela: "tw_ZdjecieTw", kolumna: "zd_Zdjecie", klucz: "zd_IdTowar", zFiltrem: true,
+  });
+  for (const z of [strona, razem]) {
+    assert.match(z, /t\.tw_Symbol LIKE @q/);
+    assert.match(z, /t\.tw_Nazwa LIKE @q/);
+    assert.match(z, /t\.tw_PodstKodKresk LIKE @q ESCAPE '!'/);
+  }
+});
+
+test("nazwa z konfiguracji nie wstrzyknie SQL do listy braków", () => {
+  assert.throws(() =>
+    budujZapytanieBezZdjecia({ tabela: "x; DROP TABLE y", kolumna: "k", klucz: "id", zFiltrem: false })
+  );
+  assert.throws(() =>
+    budujZapytanieBezZdjecia({ tabela: "t", kolumna: "k", klucz: "id--", zFiltrem: false })
+  );
+});
+
+test("wieloznaczniki LIKE w tekście szukania są zwykłymi znakami", () => {
+  assert.equal(wzorzecLike("W43_05"), "%W43!_05%");
+  assert.equal(wzorzecLike("50%"), "%50!%%");
+  assert.equal(wzorzecLike("[A]"), "%![A]%");
+  assert.equal(wzorzecLike("Hej!"), "%Hej!!%");
+  assert.equal(wzorzecLike("a/b\\c"), "%a/b\\c%");
 });

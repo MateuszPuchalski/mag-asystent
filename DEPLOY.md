@@ -795,6 +795,7 @@ nietknięty.
 | `SELECT` | `tw_ZdjecieTw`, `vwPoziomyCen` (gdy są w bazie) | zdjęcia kartotek, nazwy poziomów cen |
 | `UPDATE` | `tw__Towar`: kolumna z `MSSQL_LOC_COLUMN` i `tw_PodstKodKresk` | lokalizacja, kod kreskowy z kolektora |
 | `INSERT` | `tw_ZdjecieTw` (tylko `-ZdjeciaZapis`) | zdjęcie dodane z kolektora (etap 2a) |
+| `SELECT`, `UPDATE (ido_wartosc)` | `ins_ident` (tylko `-ZdjeciaZapis`) | numer wiersza zdjęcia z licznika Subiekta |
 
 Aplikacja **nie ma innego prawa zapisu**. Kreator sprawdza obecność obiektów
 opcjonalnych, bo `GRANT` na nieistniejący obiekt przerywa cały skrypt. Nazwy
@@ -849,7 +850,7 @@ przed pierwszą pracą na produkcji:
 | `MAG_ID_ZWROTY` | magazyn, na który biuro wystawia MM ZWROTY (§6a) | lista przyjęć pusta, bez błędu |
 | `MAG_ID_ODP` | magazyn odpadu dla oceny „utylizacja" | brak wpisu wyłącza koszyk odpadu |
 | `MAG_ID_SERWIS` | magazyn na braki w dostawie | brak wpisu wyłącza przesunięcie braku |
-| `DOK_SPRZEDAZ_DNI_WSTECZ` | okno importu dokumentów sprzedaży (domyślnie 60) | starsza sprzedaż nie pokaże się przy zwrocie |
+| `DOK_SPRZEDAZ_DNI_WSTECZ` | okno importu dokumentów sprzedaży (domyślnie 90) | starsza sprzedaż nie pokaże się przy zwrocie ani w reklamacji; poniżej 90 przekrój towaru liczy krótsze okno |
 | `MSSQL_SPRZEDAZ_NR_ORYG_COLUMN` | kolumna z numerem obcym na dokumencie | dokument wskaże człowiek, nie automat |
 
 Każdy z tych odczytów DEGRADUJE, a nie przerywa importu, a `/api/health` mówi
@@ -904,7 +905,8 @@ Instrukcja: [`tlo-worker/README.md`](tlo-worker/README.md). Najpierw na KOPII ba
 > w `wertis-api.err.log`). Wycofanie: wyczyść klucz i zrestartuj usługę.
 
 Przy `subiekt` nadaj grant instalatorem z `-ZdjeciaZapis` albo w SSMS:
-`GRANT INSERT ON dbo.tw_ZdjecieTw TO wertis;`. Potem otwórz kartotekę próbną
+`GRANT INSERT ON dbo.tw_ZdjecieTw TO wertis;`, `GRANT SELECT ON dbo.ins_ident TO wertis;`
+i `GRANT UPDATE ON dbo.ins_ident (ido_wartosc) TO wertis;`. Potem otwórz kartotekę próbną
 w Subiekcie, zakładka „Opis": zdjęcie ma się rysować bez czarnego prostokąta.
 To **bramka**: przezroczystość i `zd_CRC` są `[WERYFIKUJ]`. Bez `wertis-tlo`
 zdjęcie zapisuje się z tłem. Bez grantu zostaje w bazie WERTIS, a

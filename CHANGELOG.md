@@ -10,6 +10,162 @@ z wersją monorepo" — i właśnie tak przestał być zgodny: `0.3.0` przetrwa�
 sześć zmergowanych zmian, w tym takie, które wymagały nowego uprawnienia SQL.
 Komentarz nie jest mechanizmem.
 
+## 0.591.0 — 19 października 2026
+
+**Pomyłki wysyłkowe zamiast arkusza.** Nowa zakładka „Pomyłki” w panelu
+obsługi. Odmowa wypłaty z powodu wysłania nowego towaru zakłada pomyłkę sama.
+Wystarczy kliknąć, co klient zamówił, wpisać, co dostał, i wskazać, kto
+zbierał i kto pakował. Drugie kliknięcie w imię oznacza winnego.
+
+**Reszta wypełnia się sama.** Wysłanie nowego towaru, powrót pomylonego
+towaru i odmowę w Allegro system bierze ze zwrotu i dosyłki. Pomyłka kończy
+się sama, gdy wszystko jest załatwione. Przycisk „Zła paczka” stoi przy
+zwrocie, rozmowie i w profilu klienta.
+
+Zestawienie win na osobę widzi tylko admin.
+
+## 0.590.0 — 19 października 2026
+
+**Towary bez zdjęcia według stanu.** Zakładka „Zdjęcia" pokazuje przy każdym
+towarze stan ze wszystkich magazynów i domyślnie układa listę od największego.
+Kolejność da się zmienić na symbol, nazwę albo najnowsze kartoteki, a „Tylko na
+stanie" chowa towary, których nie ma czym sfotografować.
+
+## 0.589.0 — 19 października 2026
+
+**Copilot sam sprawdza kartotekę, gdy pisze szkic odpowiedzi.** Klient pyta
+numerem OEM, nazwą części albo inną aukcją. Copilot znajduje wtedy nasz towar,
+jego dostępność, cenę i link do naszej oferty. Nie zgaduje już z własnej
+wiedzy.
+
+Szkic korzysta z tych samych narzędzi co dopytanie, w najwyżej trzech
+rundach. Narzędzia pokazują dodatkowo ceny sprzedaży z kartoteki (nigdy cenę
+zakupu) i nasze aktywne oferty Allegro towaru. Wynik narzędzia ma w szkicu
+własne oznaczenie `N#`. Walidacja numerów i faktów sprawdza go tak samo jak
+pozostałe fakty. Szkic, który użył narzędzi, nie wychodzi automatem w
+przepływie na żywo, tylko czeka na agenta. Przełącznik `COPILOT_SZKIC_NARZEDZIA=0` wraca do szkicu
+z jednym wywołaniem.
+
+## 0.588.2 — 19 października 2026
+
+Copilot czyta już zdjęcia zrobione aparatem telefonu, a nie tylko zrzuty
+ekranu. Próg na jedno zdjęcie wynosił 3,5 MB, a zwykłe zdjęcie z telefonu
+waży 3–6 MB. Takie zdjęcie odpadało, a szkic pisał, że nie udało się go
+pobrać. Próg wynosi teraz 7 MB, pod limitem dostawcy modelu: 10 MB po
+zakodowaniu. Plik ponad próg liczy się jako pominięty, nie jako błąd pobrania.
+
+## 0.588.1 — 16 października 2026
+
+**Zdjęcie dodane w WERTIS wchodzi do kartoteki Subiekta.** Zadanie
+„Zdjęcie · …" kończyło się błędem o pustym `zd_Id`. Numer wiersza bierze się
+teraz z licznika Subiekta (`ins_ident`), a `zd_CRC` dostaje CRC32 obrazu.
+Zadania, które już padły, wystarczy ponowić z kolejki.
+
+**[wymaga działania]** Konto SQL potrzebuje dwóch nowych praw do licznika
+numerów. Instalator z `-TylkoKonfiguracja -ZdjeciaZapis` albo w SSMS na bazie
+podmiotu: `GRANT SELECT ON dbo.ins_ident TO wertis;` i
+`GRANT UPDATE ON dbo.ins_ident (ido_wartosc) TO wertis;`.
+
+## 0.588.0 — 16 października 2026
+
+**Towary bez zdjęcia w panelu.** Nowa zakładka „Zdjęcia" pokazuje aktywne
+towary, które w Subiekcie nie mają żadnego zdjęcia. Plik przeciąga się albo
+wkleja, obraca i kadruje. Panel wycina tło, kładzie towar na białym kwadracie
+z marginesem i wyrównuje jasność. Po zatwierdzeniu zdjęcie trafia do Subiekta
+tą samą drogą co zdjęcie z kolektora.
+
+## 0.587.3 — 16 października 2026
+
+**Klawisz `j` w reklamacjach i dyskusjach nie przeskakuje już sprawy.** Po
+werdykcie albo odpowiedzi sprawa schodzi z listy, a następna staje na jej
+miejscu. Do tej pory `j` lądowało o jedną dalej i tę sprawę omijało.
+
+**Z dyskusji do synchronizacji jest jedno kliknięcie.** Zdanie „odświeżasz
+w reklamacjach” prowadzi teraz wprost do przycisku na ekranie reklamacji.
+Przycisk zostaje jeden, bo obie kolejki jadą jedną listą Allegro.
+
+Zwroty i dyskusje bez danych z serwera pokazują błąd przy liście, a liczniki
+kubełków nie udają zera. Lista skrótów pod `?` zgadza się z klawiszami
+zwrotów i nie obiecuje skrótów w koszach.
+
+## 0.587.2 — 15 października 2026
+
+**Pozycja, która już weszła, nie da się odłożyć drugi raz „z ręki".** Gdy odpowiedź na odłożenie zginęła w dziurze Wi-Fi, kolektor dalej pokazywał pozycję jako nietkniętą, a serwer odpowiadał komunikatem o ilości. Magazynier wpisywał wtedy ilość ręcznie i ta sama partia lądowała drugi raz jako nadmiar (audyt z 14 października: 30 szt. + 29 szt. przy fakturze na 30). Serwer odpowiada teraz „już odłożona w całości" z kodem `juz_odlozona`, a kolektor zdejmuje zaznaczenie i odświeża listę.
+
+## 0.587.1 — 14 października 2026
+
+Przy zamówieniu z kilkoma zwrotami klienta wypłata z Allegro nie zdejmowała z kolejki żadnego z nich. Teraz aplikacja przypisuje wypłatę po pozycjach: zwrot jest rozliczony, gdy zwrot płatności wymienia wszystkie jego pozycje, a inny zwrot tego zamówienia nie dzieli z nim pozycji. Zwrot całego zamówienia (anulowanie przez kupującego, nieodebrana paczka) rozlicza wszystkie jego zwroty.
+
+Gdy dopasowania nie da się zrobić pewnie, zwrot zostaje w kolejce, a „Sprawdź w Allegro” mówi dlaczego: dwa zwroty tej samej pozycji, pozycji nie da się przypiąć do zamówienia albo wypłata nie wymienia pozycji zwrotu. Dla takich zwrotów zostaje ręczne zamknięcie.
+
+Starsza droga przez operacje płatnicze nie rozlicza już zwrotów przy zamówieniach z kilkoma zwrotami: pierwsza wypłata zdejmowała wtedy z kolejki także drugi, niezapłacony zwrot.
+
+Zwroty już sprawdzone wymagają jednego kliknięcia „Sprawdź wszystkie w Allegro”.
+
+## 0.587.0 — 14 października 2026
+
+**Ręczne zamykanie zwrotów.** Zwrot, którego nic nie domknie (pieniądze oddane poza aplikacją, historia sprzed panelu), można zamknąć jednym kliknięciem, z krótkim powodem. Zamyka tylko u nas: nic nie idzie do Allegro ani do Subiekta. Zwrot schodzi z kolejki, także gdy pieniądze za niego jeszcze nie wyszły, a nazwisko i powód zostają w dzienniku i na osi zwrotu. Zamknięcie można cofnąć, wtedy zwrot wraca tam, gdzie stał.
+
+Nie zamknie zwrotu odrzuconego ani takiego, którego towar leży w koszyku czekającym na korektę.
+
+## 0.586.0 — 14 października 2026
+
+**Liczba sprzedanych w karcie towaru pochodzi z Subiekta.** Szuflada towaru
+liczy sprzedane sztuki z paragonów i faktur w Subiekcie, ze wszystkich
+kanałów, a nie z jednej oferty Allegro. Udział zwrotów porównuje wtedy ten
+sam towar. Serwer kopiuje dokumenty sprzedaży z 90 dni zamiast 60.
+
+## 0.585.0 — 14 października 2026
+
+**Reklamacja pokazuje, co klient naprawdę kupił.** Panel reklamacji bierze
+paragon albo fakturę zamówienia z Subiekta i pokazuje cały dokument, z
+wyróżnionym reklamowanym towarem i jego symbolem. Gdy dokumentu w Subiekcie
+nie ma, panel mówi „brak paragonu” zamiast zgadywać symbol z oferty.
+
+## 0.584.1 — 14 października 2026
+
+Zwrot, za który Allegro oddało pieniądze z powodem „anulowanie przez kupującego” albo „nieodebrane zamówienie”, dostaje potwierdzenie wypłaty tak samo jak zwrot towaru. Wcześniej takie zwroty zostawały w kolejce, choć kupujący miał już pieniądze. Reklamacje i pozostałe powody (nadpłata, zbyt niska kwota, brak produktu) nadal nie zamykają zwrotu, bo dotyczą innej sytuacji na tym samym zamówieniu.
+
+Zwroty już sprawdzone wymagają jednego kliknięcia „Sprawdź wszystkie w Allegro”.
+
+## 0.584.0 — 14 października 2026
+
+**„Sprawdź wszystkie w Allegro” na kolejce zwrotów.** Jedno kliknięcie sprawdza wszystkie zwroty w pracy w liście zwrotów płatności Allegro i przypina wypłaty tam, gdzie Allegro oddało pieniądze. Raport mówi, przy ilu zwrotach przypięto wypłatę, ilu Allegro nie zna i ile zwrotów nie przypięto mimo wypłaty, z powodem.
+
+## 0.583.2 — 14 października 2026
+
+**„Sprawdź w Allegro” przestało pisać „jeszcze nie w pełni wypłacony” obok wypłaconej kwoty.** Gdy Allegro oddało pieniądze, a zwrot nie został przypięty do wypłaty, panel mówi to wprost i podaje powód: inny powód zwrotu płatności niż zwrot towaru, wypłata sprzed zgłoszenia, odrzucony zwrot albo kilka zwrotów przy jednym zamówieniu.
+
+Ręcznie dodana paczka nieodebrana nie blokuje już przypięcia wypłaty do zwrotu z Allegro przy tym samym zamówieniu.
+
+## 0.583.1 — 14 października 2026
+
+Czerwony pasek „dyskusje czekają na odpowiedź dłużej niż 24 godz." pokazuje się teraz tylko na ekranach dyskusji. Na pozostałych ekranach alarm niesie czerwony licznik przy zakładce „Dyskusje".
+
+## 0.583.0 — 14 października 2026
+
+**Przycisk „Sprawdź w Allegro” przy zwrocie.** Gdy zwrot stoi w kolejce, a w Sales Center pieniądze są już oddane, jedno kliknięcie pyta Allegro o zwroty płatności tego zamówienia i od razu zapisuje wynik. Panel mówi wprost, czy Allegro potwierdza wypłatę, czy ma zwrot w toku, czy w ogóle nie zna zwrotu płatności dla tego zamówienia. Przy komunikacie „klient nie nadał paczki” pojawia się przypomnienie, żeby sprawdzić to przed odmową.
+
+Zatrzask wypłaty łączy teraz zwrot płatności z zamówieniem także po płatności, gdy rekord Allegro nie niesie numeru zamówienia.
+
+## 0.582.1 — 14 października 2026
+
+Na pasku drogi klienta „Zgłoszenie” jest teraz łączem do reklamacji, gdy ekran nie jest samą reklamacją. Wcześniej z rozmowy, zwrotu czy dyskusji nie dało się na nią kliknąć, bo jej kroki stały na pasku jako zwykły tekst.
+
+## 0.582.0 — 14 października 2026
+
+**PDF-y z czatu otwierają się na miejscu.** Załącznik PDF w reklamacji,
+dyskusji i skrzynce pokazuje miniaturę pierwszej strony, a klik otwiera cały
+dokument w panelu. Pobranie pliku działa jak dotąd.
+
+## 0.581.0 — 14 października 2026
+
+**Zwrot znika z kolejki, gdy Allegro potwierdzi wypłatę.** Serwer czyta teraz `GET /payments/refunds`, czyli zwroty płatności z kwotą, statusem i rozbiciem na pozycje, także te zrobione ręką w Sales Center. Zwrot klienta, za który wyszedł zwrot płatności ze statusem `SUCCESS`, dostaje potwierdzenie wypłaty bez pytania o każdą płatność osobno.
+
+Zatrzask jest ostrożny: pomija reklamacje, zwroty częściowe, przelewy sprzed zgłoszenia i zamówienia z dwoma zwrotami. **Wypłata z Allegro na ekranie zwrotu.** W sekcji pieniędzy widać każdy zwrot płatności: status słowami (wypłacone, częściowo, w toku, anulowane), kwotę, datę i rozbicie na produkty z liczbą sztuk albo kwotą oraz dostawę, tak jak w Sales Center.
+
+Sonda (`npm run sonda`) opisuje kształt tej końcówki.
+
 ## 0.580.0 — 13 października 2026
 
 **Droga klienta na każdym ekranie sprawy.** Pasek „Zakup, Doręczono, pytanie, zgłoszenie, rozmowa, decyzja, rozliczenie" widać teraz przy zwrocie, dyskusji, rozmowie w skrzynce i w profilu klienta, a nie tylko przy reklamacji. Inne sprawy tego samego zakupu stoją na pasku jako przystanki i prowadzą do swojej kolejki.

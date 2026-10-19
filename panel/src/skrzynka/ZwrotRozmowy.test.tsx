@@ -19,7 +19,7 @@ const zwrot = (n: Partial<Zwrot> = {}): Zwrot => ({
   werdykt: null, werdyktPowod: null, kwotaGrosze: null, kwotaWariant: null, korektaNumer: null, korektaZrodlo: null,
   rejectionCode: null, zrodlo: "allegro",
   notatka: null, notatkaAt: null, notatkaPrzez: null, maPoprzedniaNotatke: false, kupujacyLogin: "kupujacy_44", odbiorcaNazwa: null, przewoznik: null,
-  rozmowy: [], faktura: { dokId: null, numer: null, typ: null, dataWyst: null, zrodlo: null } as never,
+  rozmowy: [], zamknietyRecznie: null, faktura: { dokId: null, numer: null, typ: null, dataWyst: null, zrodlo: null } as never,
   wersja: 1,
   pozycje: [{
     id: 1, offerId: "oferta-9", nazwa: "Szarpak do NAC LS 46-450", ilosc: 1, cenaGrosze: 4599, waluta: "PLN",

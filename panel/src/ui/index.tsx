@@ -479,6 +479,19 @@ export const dataCyfrowa = (v: string | null | undefined) =>
     : "—";
 
 /**
+ * Miesiąc słownie — „październik 2026” z „2026-10”.
+ *
+ * Dla rejestru pomyłek, który biuro rozlicza miesiącami. Stoi tutaj, bo
+ * `Czas.test.ts` trzyma formaty dat w jednym pliku. Dzień pierwszy liczony
+ * lokalnie, żeby północ w UTC nie cofnęła miesiąca o jeden.
+ */
+export function miesiacSlownie(rrrrMm: string): string {
+  const [r, m] = rrrrMm.split("-").map(Number);
+  if (!r || !m) return rrrrMm;
+  return new Date(r, m - 1, 1).toLocaleDateString("pl", { month: "long", year: "numeric" });
+}
+
+/**
  * Chwila w wierszu listy — „15:32", „wczoraj", „04.10" albo „04.10.2025".
  *
  * Dla prawej krawędzi kolejki, którą oko przebiega w dół. Pełne „5.10.2026,
@@ -616,6 +629,29 @@ export function LoginKlienta({ login, className = "" }: { login: string; classNa
     <span className="sr-only">{
       stan === "zrobione" ? "Skopiowano login" : stan === "blad"
         ? "Nie udało się skopiować loginu" : "Kopiuj login"}</span>
+  </button>;
+}
+
+/**
+ * Symbol towaru z Subiekta, który kopiuje się kliknięciem.
+ *
+ * Symbol wpisuje się potem w Subiekcie albo w zamówieniu u dostawcy, a „14-31051"
+ * i „14-31015" przepisane z ekranu różnią się jedną zamianą cyfr. Klikalne jest
+ * całe słowo, jak przy loginie, bo większy cel to mniej chybień.
+ */
+export function SymbolTowaru({ symbol }: { symbol: string }) {
+  const { stan, kopiuj } = useKopiowanie(symbol);
+  return <button type="button" onClick={kopiuj}
+    title={stan === "blad" ? "Nie udało się skopiować" : `Kopiuj symbol: ${symbol}`}
+    className={`group inline-flex min-h-6 max-w-full items-center gap-1 rounded font-mono hover:bg-slate-200 ${
+      stan === "blad" ? "text-ranga-zle" : "text-slate-800"}`}>
+    <span className="break-all text-left">{symbol}</span>
+    {stan === "zrobione"
+      ? <Check size={12} className="shrink-0 text-ranga-ok" />
+      : <Copy size={12} className="shrink-0 text-slate-300 group-hover:text-slate-500" />}
+    <span className="sr-only">{
+      stan === "zrobione" ? "Skopiowano symbol" : stan === "blad"
+        ? "Nie udało się skopiować symbolu" : "Kopiuj symbol"}</span>
   </button>;
 }
 
