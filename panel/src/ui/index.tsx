@@ -479,6 +479,19 @@ export const dataCyfrowa = (v: string | null | undefined) =>
     : "—";
 
 /**
+ * Miesiąc słownie — „październik 2026” z „2026-10”.
+ *
+ * Dla rejestru pomyłek, który biuro rozlicza miesiącami. Stoi tutaj, bo
+ * `Czas.test.ts` trzyma formaty dat w jednym pliku. Dzień pierwszy liczony
+ * lokalnie, żeby północ w UTC nie cofnęła miesiąca o jeden.
+ */
+export function miesiacSlownie(rrrrMm: string): string {
+  const [r, m] = rrrrMm.split("-").map(Number);
+  if (!r || !m) return rrrrMm;
+  return new Date(r, m - 1, 1).toLocaleDateString("pl", { month: "long", year: "numeric" });
+}
+
+/**
  * Chwila w wierszu listy — „15:32", „wczoraj", „04.10" albo „04.10.2025".
  *
  * Dla prawej krawędzi kolejki, którą oko przebiega w dół. Pełne „5.10.2026,

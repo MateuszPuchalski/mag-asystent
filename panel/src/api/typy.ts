@@ -353,6 +353,8 @@ export type OfertaWskazana = { ofertaId: string; autor: string };
    nie dociągnie treści — numer i odnośnik do panelu Allegro są od razu. */
 export type ZamowienieRozmowy = {
   externalId: string; link: string | null; pobrane: Zamowienie | null;
+  /** Konto kanału zamówienia — powód przy `Zwrot.konto`. */
+  konto?: number | null;
   /** Stan paczki z ostatniego sprawdzenia; `null`, dopóki zamówienia nie ma w bazie. */
   przesylka: StanPrzesylki | null;
 };
@@ -539,7 +541,8 @@ export interface DosylkaPrzesylki {
 
 /** Jeden przystanek drogi zakupu przez kolejki, z momentem wejścia. */
 export interface PrzystanekDrogi {
-  rodzaj: "rozmowa" | "dyskusja" | "reklamacja" | "zwrot";
+  /* `pomylka` to rejestr złych paczek, wiązany po numerze zamówienia jak zwrot. */
+  rodzaj: "rozmowa" | "dyskusja" | "reklamacja" | "zwrot" | "pomylka";
   id: number;
   at: string;
   opis: string | null;
@@ -1101,6 +1104,12 @@ export interface Zwrot {
   externalId: string;
   numer: string | null;
   orderId: string | null;
+  /**
+   * Konto kanału zamówienia. Numer zamówienia jest unikalny tylko na koncie,
+   * więc „Zła paczka” wysyła je, żeby pomyłka trafiła na drogę zakupu.
+   * Opcjonalne: starszy serwer go nie podaje.
+   */
+  konto?: number | null;
   utworzono: string;
   paczkaAt: string | null;
   /** Kiedy paczka DOTARŁA do nas — z trackingu przewoźnika (0.187.0). */

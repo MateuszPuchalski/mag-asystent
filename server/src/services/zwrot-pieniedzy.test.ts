@@ -520,3 +520,43 @@ test("paczka nieodebrana oddaje pieniądze płatnością, ale odmówić nie ma c
     ZwrotPieniedzyConflict);
   assert.equal(wyslano, false, "żądanie nie wychodzi do Allegro");
 });
+
+/* ── Pomyłka wysyłkowa po odmowie ──────────────────────────────────────────
+   Odmowa „Wysłaliśmy nowy towar” zakłada pomyłkę. Porażka tego zapisu NIE
+   zamienia nieodwracalnej odmowy w błąd — wzór dosyłki z trasy odmowy. */
+
+test("odmowa NEW_ITEM_SENT zakłada pomyłkę, inny kod — nie", async () => {
+  const d = stanowisko();
+  const id = zwrotGotowy(d, { werdykt: null, kwota: null });
+  d.prepare("UPDATE zwrot_klienta SET kupujacy_login='kupiec_77' WHERE id=?").run(id);
+  await odmowZwrotuPieniedzy(d, id, "NEW_ITEM_SENT", null, 1, KTO, async () => ({}));
+  const p = d.prepare("SELECT login, zamowienie, zrodlo FROM pomylka_wysylki").all() as any[];
+  assert.deepEqual(p.map((x) => [x.login, x.zamowienie, x.zrodlo]), [["kupiec_77", "ord-1", "odmowa"]]);
+
+  const d2 = stanowisko();
+  const id2 = zwrotGotowy(d2, { werdykt: null, kwota: null });
+  d2.prepare("UPDATE zwrot_klienta SET kupujacy_login='kupiec_77' WHERE id=?").run(id2);
+  await odmowZwrotuPieniedzy(d2, id2, "ITEM_MISMATCH", null, 1, KTO, async () => ({}));
+  assert.equal((d2.prepare("SELECT count(*) n FROM pomylka_wysylki").get() as any).n, 0);
+});
+
+test("porażka zapisu pomyłki nie zamienia odmowy w błąd", async () => {
+  const d = stanowisko();
+  const id = zwrotGotowy(d, { werdykt: null, kwota: null });
+  d.prepare("UPDATE zwrot_klienta SET kupujacy_login='kupiec_77' WHERE id=?").run(id);
+  d.exec(`CREATE TEMP TRIGGER pomylka_pada BEFORE INSERT ON pomylka_wysylki
+    BEGIN SELECT RAISE(ABORT, 'rejestr pomyłek leży'); END`);
+  const blad = console.error;
+  const zalogowane: unknown[] = [];
+  console.error = (...a: unknown[]) => { zalogowane.push(a); };
+  try {
+    const wynik = await odmowZwrotuPieniedzy(d, id, "NEW_ITEM_SENT", null, 1, KTO, async () => ({}));
+    assert.deepEqual(wynik, { kod: "NEW_ITEM_SENT", wersja: 2 });
+  } finally {
+    console.error = blad;
+  }
+  assert.equal((d.prepare("SELECT odmowa_kod FROM zwrot_klienta WHERE id=?").get(id) as any).odmowa_kod,
+    "NEW_ITEM_SENT", "nieodwracalna odmowa jest zapisana");
+  assert.equal((d.prepare("SELECT count(*) n FROM pomylka_wysylki").get() as any).n, 0);
+  assert.equal(zalogowane.length, 1, "porażka trafia do logu serwera, nie znika po cichu");
+});

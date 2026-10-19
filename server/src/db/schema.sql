@@ -2875,6 +2875,49 @@ CREATE TABLE IF NOT EXISTS klient_dosylka (
   PRIMARY KEY (sprawa_id, zamowienie)
 );
 
+-- Pomyłka wysyłkowa: klient dostał inny towar, niż zamówił. Biuro prowadziło
+-- ten rejestr w arkuszu, bo nikt poza nim nie wie, kto zbierał i kto pakował.
+-- Tu stoi tylko to, czego kolejki nie wiedzą: co przyszło zamiast czego, osoby
+-- i ich wina. Dosyłkę, powrót towaru i odmowę wypłaty czyta się przy odczycie
+-- z `klient_dosylka` i `zwrot_klienta` (services/pomylki.ts). Trzy kolumny
+-- ręczne obok nich to zapas dla sprzedaży poza Allegro, gdzie kolejki milczą.
+-- Osoby mają nazwę DLA OKA i id DLA MASZYNY, bez klucza do `app_user`:
+-- klucz blokowałby kasowanie kont (pułapka z `klient_prowadzenie`).
+-- Bez adresu i telefonu: tożsamością klienta jest login (docs/obsluga-klienta.md).
+-- Bez CHECK: poszerzenie słownika byłoby przebudową tabeli (blizna w schemacie).
+-- `id` trafia do dziennika zamiast loginu, bo `events` nie ma retencji.
+CREATE TABLE IF NOT EXISTS pomylka_wysylki (
+  id                INTEGER PRIMARY KEY AUTOINCREMENT,
+  zgloszono         TEXT NOT NULL,           -- RRRR-MM-DD, dzień lokalny zgłoszenia
+  login             TEXT NOT NULL COLLATE NOCASE,  -- login Allegro albo nazwa klienta z paragonu
+  konto             INTEGER,                 -- konto kanału; numer zamówienia jest unikalny na koncie
+  zamowienie        TEXT,                    -- Allegro checkoutForm.id; NULL dla paragonu
+  co_zamowil        TEXT,                    -- nazwa pozycji zamówienia albo wpis przy paragonie
+  co_dostal         TEXT,                    -- wpis agenta; NULL = do uzupełnienia
+  uwagi             TEXT,
+  zrodlo            TEXT NOT NULL,           -- 'odmowa' | 'dosylka' | 'recznie'
+  zbieral           TEXT,
+  zbieral_user_id   INTEGER,
+  pakowal           TEXT,
+  pakowal_user_id   INTEGER,
+  wina_zbierajacego INTEGER NOT NULL DEFAULT 0,
+  wina_pakujacego   INTEGER NOT NULL DEFAULT 0,
+  nowy_towar        TEXT,                    -- ręcznie: 'tak' | 'nie' | NULL
+  towar_wrocil      TEXT,                    -- ręcznie: RRRR-MM-DD | 'nie_wraca' | NULL
+  odmowa            TEXT,                    -- ręcznie: 'tak' | 'nie_trzeba' | NULL
+  zakonczono_at     TEXT,                    -- ręczne „Zakończ”; NULL = stan liczony
+  wersja            INTEGER NOT NULL DEFAULT 1,
+  utworzono_at      TEXT NOT NULL,
+  zmieniono_at      TEXT NOT NULL
+);
+-- Jedna pomyłka na zamówienie. Automat zakłada ją przy odmowie i przy dosyłce,
+-- a druga droga dla tego samego zamówienia ma trafić w istniejący wiersz.
+-- `ifnull` dlatego, że w UNIQUE dwa NULL-e są różne, a konto bywa nieznane.
+CREATE UNIQUE INDEX IF NOT EXISTS ux_pomylka_wysylki_zamowienie
+  ON pomylka_wysylki(ifnull(konto, 0), zamowienie) WHERE zamowienie IS NOT NULL;
+CREATE INDEX IF NOT EXISTS ix_pomylka_wysylki_konto_zam ON pomylka_wysylki(konto, zamowienie);
+CREATE INDEX IF NOT EXISTS ix_pomylka_wysylki_login ON pomylka_wysylki(login);
+
 -- ── Test na żywym Allegro (0.495.0) ─────────────────────────────────────────
 -- Raz dziennie serwer przechodzi te same drogi co produkcja, bez atrap, i zapisuje
 -- tu WYNIK każdego kroku. Powód: przez 150 wydań Copilot „widział zdjęcia” tylko

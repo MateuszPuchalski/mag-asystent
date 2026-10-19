@@ -2,8 +2,10 @@ import React, { useEffect, useId, useRef, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import {
   AlertTriangle, BellDot, CalendarClock, ChevronDown, ChevronRight, ClipboardList, ExternalLink,
-  MessageSquare, MessagesSquare, Scale, ShoppingBag, StickyNote, Truck, Undo2, UserRound,
+  MessageSquare, MessagesSquare, PackageX, Scale, ShoppingBag, StickyNote, Truck, Undo2, UserRound,
 } from "lucide-react";
+import { adresPomylki, type Pomylka } from "../api/pomylki";
+import { ZlaPaczka } from "../pomylki/ZlaPaczka";
 import { useJa } from "../api/rozmowy";
 import {
   useCofnijNotatkeKlienta, useKrokSprawy, useNotatkaKlienta, useNumerDosylki, useProfilKlienta,
@@ -18,7 +20,7 @@ import { dzienZKalendarza, opisTerminu, terminyOdlozenia } from "../skrzynka/ter
 import { PRZEWOZNICY } from "../zwroty/Dowody";
 import { etykietaKodu } from "../zwroty/Pieniadze";
 import {
-  Blad, Karta, LoginKlienta, Przycisk, Pusto, Skopiuj, barwaTonu, czas, dataLokalna, dzien, dzienMiesiac, termin,
+  Blad, Karta, LoginKlienta, Przycisk, Pusto, Skopiuj, barwaTonu, czas, dataCyfrowa, dataLokalna, dzien, dzienMiesiac, termin,
 } from "../ui";
 
 /* ── PROFIL KLIENTA (24 września 2026) ───────────────────────────────────────
@@ -70,6 +72,7 @@ export function ProfilKlienta() {
     <div className="grid gap-4 lg:grid-cols-[minmax(0,3fr)_minmax(0,2fr)]">
       <div className="space-y-4">
         <Otwarte d={d} />
+        {d.pomylki && d.pomylki.length > 0 && <PomylkiKlienta pomylki={d.pomylki} />}
         <Zamowienia d={d} />
       </div>
       <div className="space-y-4">
@@ -596,6 +599,29 @@ function Otwarte({ d }: { d: Profil }) {
   </Karta>;
 }
 
+/* POMYŁKI WYSYŁKOWE KLIENTA — wiązanie zwrotne rejestru. Rejestr prowadzi na
+   profil po loginie, więc profil prowadzi do wiersza pomyłki. Sekcji nie ma,
+   gdy klient nie miał pomyłek: pusta karta przy każdym kliencie byłaby tłem. */
+function PomylkiKlienta({ pomylki }: { pomylki: Pomylka[] }) {
+  return <Karta className="overflow-hidden p-0" role="region" aria-label="Pomyłki wysyłkowe">
+    <div className="border-b border-slate-200 bg-slate-50 px-4 py-2"><b>Pomyłki wysyłkowe</b>
+      <span className="ml-2 text-sm text-slate-600">{pomylki.length}</span></div>
+    <ul>{pomylki.map((p) => <li key={p.id} className="border-t first:border-t-0">
+      <Link to={adresPomylki(p.id, p.zgloszono)} className="flex items-center gap-3 px-4 py-2 text-sm hover:bg-slate-50">
+        <PackageX size={15} className="shrink-0 text-slate-500" />
+        <span className="w-24 shrink-0 tabular-nums text-slate-700">{dataCyfrowa(p.zgloszono)}</span>
+        <span className="min-w-0 flex-1 truncate">{p.opis ?? "do uzupełnienia"}</span>
+        <span className="shrink-0 text-xs font-semibold text-slate-700">{STAN_POMYLKI[p.stan]}</span>
+        <ChevronRight size={15} className="shrink-0 text-slate-500" />
+      </Link>
+    </li>)}</ul>
+  </Karta>;
+}
+
+const STAN_POMYLKI: Record<Pomylka["stan"], string> = {
+  do_uzupelnienia: "do uzupełnienia", w_toku: "w toku", zakonczona: "zakończona",
+};
+
 /* Zamówienie rozwija się do pozycji i paczki. Zwinięte domyślnie: przy stałym
    kliencie lista ma kilkanaście zakupów, a pytanie dotyczy zwykle jednego. */
 function Zamowienia({ d }: { d: Profil }) {
@@ -631,9 +657,14 @@ function Zamowienia({ d }: { d: Profil }) {
                   <span className="shrink-0 tabular-nums">{zlote(p.cenaGrosze, z.waluta ?? "PLN")}</span>
                 </li>)}
               </ul>
-              {z.link && <a href={z.link} target="_blank" rel="noreferrer"
-                className="mt-1 inline-flex items-center gap-1 text-xs text-slate-600 underline hover:text-slate-900">
-                zamówienie {z.id} w Allegro<ExternalLink size={11} /></a>}
+              <div className="mt-1 flex flex-wrap items-center gap-3">
+                {z.link && <a href={z.link} target="_blank" rel="noreferrer"
+                  className="inline-flex items-center gap-1 text-xs text-slate-600 underline hover:text-slate-900">
+                  zamówienie {z.id} w Allegro<ExternalLink size={11} /></a>}
+                {/* Przy rozwiniętym zakupie, bo pomyłka dotyczy jednej paczki,
+                    a numer zamówienia agent ma tu pod ręką. */}
+                <ZlaPaczka login={d.login} zamowienie={z.id} konto={z.konto} />
+              </div>
             </div>}
           </li>;
         })}</ul>}

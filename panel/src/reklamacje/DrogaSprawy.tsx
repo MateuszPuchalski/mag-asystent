@@ -6,7 +6,7 @@ import { Link } from "react-router-dom";
 import type { Reklamacja, SzczegolReklamacji } from "../api/typy";
 import { zlote } from "../api/zwroty";
 import { STATUS_PACZKI } from "../skrzynka/statusy";
-import { inneSprawyZakupu, KOLEJKI, type InnaSprawaZakupu } from "../sprawy/Spoiwo";
+import { adresPrzystanku, inneSprawyZakupu, KOLEJKI, type InnaSprawaZakupu } from "../sprawy/Spoiwo";
 import { czas, dataCyfrowa, dniSlowo, dzienMiesiac, ile, kiedy, odmien, Skopiuj } from "../ui";
 import { PRZEWOZNICY } from "../zwroty/Dowody";
 import { rozstrzygniecie } from "./statusy";
@@ -336,7 +336,7 @@ function Dopisek({ k, dane, pytanie, bezNumerow, bezPrzesylki }: {
 function Przystanek({ sprawa, ostatni, przebyta, tutaj }: {
   sprawa: InnaSprawaZakupu; ostatni: boolean; przebyta: boolean; tutaj: boolean;
 }) {
-  const { nazwa, cel, ikona: Ikona, sciezka } = KOLEJKI[sprawa.rodzaj];
+  const { nazwa, cel, ikona: Ikona } = KOLEJKI[sprawa.rodzaj];
   if (tutaj) {
     /* Sprawa ekranu: kropka z pierścieniem jak bieżący krok, napis pogrubiony
        i słowo dla czytnika. Barwa sama nie niosłaby stanu (WCAG 1.4.1). */
@@ -363,7 +363,7 @@ function Przystanek({ sprawa, ostatni, przebyta, tutaj }: {
   const opis = opisPrzystanku(sprawa, nazwa, cel);
   const stan = stanPrzystanku(sprawa);
   return <li data-przystanek={sprawa.rodzaj} className="flex min-w-[88px] flex-[1_0_88px] flex-col">
-    <Link to={`${sciezka}/${sprawa.id}`} aria-label={opis} title={opis}
+    <Link to={adresPrzystanku(sprawa.rodzaj, sprawa.id, sprawa.at)} aria-label={opis} title={opis}
       className="flex flex-col gap-1.5 rounded text-sky-700 hover:text-sky-900 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sky-700">
       <span className="flex h-6 items-center" aria-hidden="true">
         {/* Koło o połowę mniejsze od kroku i w barwie łącza: to odnośnik

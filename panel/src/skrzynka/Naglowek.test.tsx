@@ -3,6 +3,7 @@ import React from "react";
 import { describe, expect, it, vi } from "vitest";
 import { render, screen } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { MemoryRouter } from "react-router-dom";
 import { Rozmowa as EkranRozmowy } from "./Rozmowa";
 import type { OsRozmowy, PropozycjaPrzeplywu, Rozmowa } from "../api/typy";
 import { atrapaZapisow } from "../test/zapisy";
@@ -112,8 +113,9 @@ describe("Brakujący zakup w ekranie rozmowy", () => {
 
   it("nie stoi przy rozmowie z zamówieniem", () => {
     const p = zPaskiem(4821);
-    render(<QueryClientProvider client={qc()}><EkranRozmowy {...p}
-      dane={{ ...p.dane, zamowienie: { externalId: "z" } } as unknown as OsRozmowy} /></QueryClientProvider>);
+    /* Router, bo karta zakupu z numerem niesie „Zła paczka”, a ta prowadzi do rejestru pomyłek. */
+    render(<QueryClientProvider client={qc()}><MemoryRouter><EkranRozmowy {...p}
+      dane={{ ...p.dane, zamowienie: { externalId: "z" } } as unknown as OsRozmowy} /></MemoryRouter></QueryClientProvider>);
     expect(screen.queryByRole("region", { name: "Rozmowa bez zamówienia" })).toBeNull();
   });
 

@@ -9,6 +9,7 @@ import { statusRozmowy } from "./conversations.js";
 import { sprawaKlienta, type SprawaKlienta } from "./prowadzenie-klienta.js";
 import { doreczonaDoZakonczenia, type KodDosylki } from "./dosylka-opis.js";
 import { odmowyBezDosylki } from "./odmowy-dosylki.js";
+import { pomylkiKlienta, type Pomylka } from "./pomylki.js";
 
 /* ── Profil klienta: wszystko, co z nim związane, w jednym widoku ────────────
    (24 września 2026, zgłoszenie właściciela). Historia klienta istniała od S2
@@ -56,6 +57,8 @@ export interface OtwartaSprawa {
 }
 
 export interface ZamowienieKlienta {
+  /** Konto kanału — numer zamówienia jest unikalny tylko na koncie. */
+  konto: number;
   id: string;
   kupionoAt: string | null;
   status: string | null;
@@ -119,6 +122,12 @@ export interface ProfilKlienta {
    * gdy formularza nie ma: sprawa bez dosyłek i bez propozycji.
    */
   przewoznicy: string[];
+  /**
+   * Pomyłki wysyłkowe klienta, najnowsze pierwsze — wiązanie zwrotne
+   * zakładki „Pomyłki”. Agent przed odpowiedzią widzi, że ten klient już
+   * raz dostał zły towar.
+   */
+  pomylki: Pomylka[];
 }
 
 type Wiersz = Record<string, unknown>;
@@ -166,9 +175,10 @@ export function profilKlienta(
   os.sort((a, b) => b.at.localeCompare(a.at));
 
   const zamowienia = (database.prepare(`
-    SELECT id, external_id, kupiono_at, status, suma_grosze, waluta
+    SELECT id, channel_account_id, external_id, kupiono_at, status, suma_grosze, waluta
       FROM zamowienie_klienta WHERE kupujacy_login = ? COLLATE NOCASE
      ORDER BY kupiono_at DESC`).all(q) as Wiersz[]).map((z): ZamowienieKlienta => ({
+    konto: Number(z.channel_account_id),
     id: String(z.external_id),
     kupionoAt: tekst(z.kupiono_at),
     status: tekst(z.status),
@@ -281,6 +291,7 @@ export function profilKlienta(
        albo po kliknięciu propozycji. Przegląd trzech tabel przy każdym
        otwarciu profilu bez dosyłki kosztowałby za nic. */
     przewoznicy: (sprawa?.dosylki.length ?? 0) > 0 || propozycja !== null ? przewoznicy(database) : [],
+    pomylki: pomylkiKlienta(q, database),
   };
 }
 

@@ -16,7 +16,7 @@ import {
   poczatekTerminu,
 } from "./zwroty.js";
 import { zamknijKosz } from "./kosze-zwrotow.js";
-import { paczkiKlienta } from "./zamowienia.js";
+import { paczkiKlienta, zamowienieRozmowy } from "./zamowienia.js";
 
 /* ── Strażnicy kolejki zwrotów (0.150.0) ─────────────────────────────────────
    Ekran ma zjadać klikanie, a nie je mnożyć. Trzy rzeczy to gwarantują
@@ -2352,4 +2352,10 @@ test("nienadana nie wygasa po 45 dniach jak rozliczona — dopiero po 90", () =>
   assert.equal(kubelekZwrotu(z, po50, 45), "zamkniety", "bez pola — dawne zachowanie");
   assert.equal(kubelekZwrotu({ ...z, nadana: false }, Date.parse("2026-11-05T08:00:00Z"), 45),
     "zamkniety", "sufit, żeby stara historia nie wróciła setkami");
+});
+
+test("zamówienie rozmowy niesie konto — „Zła paczka” zapisuje po koncie i numerze", () => {
+  const d = stanowisko();
+  zakup(d, "ord-1", "Jan_Kowalski", "2026-08-20T10:00:00Z");
+  assert.equal(zamowienieRozmowy(1, "ord-1", d)?.konto, 1);
 });

@@ -3,6 +3,7 @@ import { db as defaultDb, transaction, type Db } from "../db/db.js";
 import { dopasujPozycjeZamowienia } from "./dopasowanie-sku.js";
 import { logEvent } from "./events.js";
 import { iloscLiczona } from "./ilosc-zwrotu.js";
+import { zalozPomylkeZOdmowy } from "./pomylki.js";
 import { zwrotyPlatnosciZwrotu, type ZwrotPlatnosci } from "./allegro-zwroty-platnosci.js";
 import {
   DOSYLKA_ZWROTU_SQL, dosylkaSledzona, jestKodemDosylki, naDosylkeSprawy, opisZamrozonej, zycieWiersza,
@@ -584,6 +585,16 @@ export async function odmowZwrotuPieniedzy(
     logEvent("zwrot_pieniadze_odmowa", kto.name, null,
       { zwrotId, kod, powod: uzasadnienie || null }, kto.id, database);
   })();
+
+  /* Pomyłka wysyłkowa PO zapisie odmowy, poza jej transakcją. Odmowa w Allegro
+     już poszła i jest nieodwracalna, więc porażka rejestru nie ma prawa
+     zamienić jej w błąd — ten sam wzór co dosyłka w trasie odmowy. Agent
+     założy wtedy pomyłkę ręką, przyciskiem „Zła paczka”. */
+  try {
+    zalozPomylkeZOdmowy(database, zwrotId, kto, teraz);
+  } catch (e) {
+    console.error("[pomylki] założenie pomyłki po odmowie nie doszło:", e);
+  }
 
   return { kod, wersja: wersja + 1 };
 }

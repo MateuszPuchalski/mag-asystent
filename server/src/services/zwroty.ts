@@ -136,6 +136,8 @@ export type { PozycjaZamowienia, Zamowienie } from "./zamowienia.js";
 
 export interface WierszZwrotu {
   id: number;
+  /** Konto kanału zwrotu — „Zła paczka” wysyła je razem z numerem zamówienia. */
+  konto: number;
   externalId: string;
   numer: string | null;
   orderId: string | null;
@@ -729,6 +731,7 @@ function zloz(
   const suma = sumaPozycji(pozycje);
   return {
     id: Number(z.id),
+    konto: Number(z.channel_account_id),
     externalId: String(z.external_id),
     numer: (z.reference_number as string) ?? null,
     orderId: (z.order_id as string) ?? null,

@@ -27,6 +27,13 @@ idą przez `services/droga-klienta.ts` i pasek drogi klienta (`panel/src/sprawy/
 Ręczne wskazanie zamówienia rozmowy czyta każda strona z jednej relacji
 `ROZMOWA_ZAMOWIENIA` (test o tej nazwie w `droga-klienta.test.ts`).
 
+**Pomyłka wysyłkowa wisi na tym samym mostku.** `pomylka_wysylki` ma numer
+zamówienia z kontem, więc droga zakupu pokazuje ją jako przystanek, a profil
+klienta po loginie. Pomyłka zakłada się sama przy odmowie wypłaty kodem
+`NEW_ITEM_SENT` i przy dosyłce złego towaru. Agent dopisuje tylko to, czego
+kolejki nie wiedzą: co klient dostał, kto zbierał, kto pakował i kto zawinił.
+Stan pomyłki liczy się przy odczycie z dosyłki i zwrotu, nie z przepisanej kopii.
+
 **Problem z zakupem jest rozmową w skrzynce, nie piątą kolejką.** Od
 28 października 2026 Allegro zakłada nowe sprawy kupujących w Centrum
 Wiadomości zamiast w dyskusjach. Stare dyskusje zostają w swojej kolejce.
