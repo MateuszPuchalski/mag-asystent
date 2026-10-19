@@ -10,6 +10,14 @@ z wersją monorepo" — i właśnie tak przestał być zgodny: `0.3.0` przetrwa�
 sześć zmergowanych zmian, w tym takie, które wymagały nowego uprawnienia SQL.
 Komentarz nie jest mechanizmem.
 
+## 0.588.2 — 19 października 2026
+
+Copilot czyta już zdjęcia zrobione aparatem telefonu, a nie tylko zrzuty
+ekranu. Próg na jedno zdjęcie wynosił 3,5 MB, a zwykłe zdjęcie z telefonu
+waży 3–6 MB. Takie zdjęcie odpadało, a szkic pisał, że nie udało się go
+pobrać. Próg wynosi teraz 7 MB, pod limitem dostawcy modelu: 10 MB po
+zakodowaniu. Plik ponad próg liczy się jako pominięty, nie jako błąd pobrania.
+
 ## 0.588.1 — 16 października 2026
 
 **Zdjęcie dodane w WERTIS wchodzi do kartoteki Subiekta.** Zadanie
