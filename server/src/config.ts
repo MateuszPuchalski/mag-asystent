@@ -1297,12 +1297,10 @@ export function bledyKonfiguracji(c: Config = config): string[] {
     bledy.push(`AKTUALIZACJA_KANAREK=${a.kanarek} — oczekuję adresu, np. http://localhost:3002.`);
   }
 
-  /* Sellasist: połowa pary to literówka, nie wyłączenie. Konto bez klucza
-     (albo odwrotnie) milczałoby po cichu, a biuro czekałoby na numery. */
+  /* Sellasist: połowa pary to OSTRZEŻENIE (`ostrzezeniaKonfiguracji`), nie
+     błąd. Panel zapisuje jeden klucz naraz, więc błąd odrzuciłby pierwszy
+     z dwóch wpisów i pary nie dałoby się ustawić wcale. */
   const s = c.sellasist;
-  if (Boolean(s.konto) !== Boolean(s.apiKey)) {
-    bledy.push("SELLASIST_KONTO i SELLASIST_API_KEY idą w parze — ustaw oba albo żadnego.");
-  }
   if (s.konto && !/^[a-z0-9-]+$/.test(s.konto)) {
     bledy.push(`SELLASIST_KONTO=${bezpiecznaWartosc(s.konto)} — sama subdomena, np. firma z firma.sellasist.pl.`);
   }
@@ -1541,6 +1539,14 @@ export function ostrzezeniaKonfiguracji(c: Config = config): string[] {
     ostrzezenia.push(
       `${c.copilot.wycofane.join(", ")} w wertis.env nic już nie robi — dostawcę rozpoznawania wybiera ` +
         "sam TYPESAFE_API_KEY. Wpis można usunąć. Serwer działa dalej.",
+    );
+  }
+  /* Połowa pary Sellasist zostawia integrację wyłączoną (`sellasistWlaczony`
+     wymaga obu). Mówimy o tym przy starcie, bo biuro czekałoby na numery. */
+  if (Boolean(c.sellasist.konto) !== Boolean(c.sellasist.apiKey)) {
+    ostrzezenia.push(
+      `Sellasist wyłączony: brak ${c.sellasist.konto ? "SELLASIST_API_KEY" : "SELLASIST_KONTO"}. ` +
+        "Integracja ruszy po wpisaniu obu. Serwer działa dalej.",
     );
   }
   return ostrzezenia;
