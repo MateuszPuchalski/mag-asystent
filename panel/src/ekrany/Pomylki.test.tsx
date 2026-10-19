@@ -1,11 +1,11 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import React from "react";
 import { MemoryRouter } from "react-router-dom";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Pomylki } from "./Pomylki";
 import type { Pomylka } from "../api/pomylki";
-import { lista, odczytPomylek, pomylka } from "../test/pomylki";
+import { lista, odczytPomylek, pomylka, zlapane } from "../test/pomylki";
 
 /* Atrapa `fetch`, która trzyma ciała zapisów: test sprawdza, CO poszło na
    serwer po kliknięciu, a nie tylko, że coś poszło. Odpowiedź na zapis
@@ -55,6 +55,7 @@ const otworz = (adres = "/obsluga/pomylki") => {
   const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   render(<QueryClientProvider client={qc}><MemoryRouter initialEntries={[adres]}>
     <Pomylki /></MemoryRouter></QueryClientProvider>);
+  return qc;
 };
 
 afterEach(() => vi.unstubAllGlobals());
@@ -169,5 +170,78 @@ describe("rejestr pomyłek", () => {
       cialo: { login: "Pan Nowak", coZamowil: "Pompa", coDostal: null } });
     /* Nowa pomyłka staje rozwinięta, choć lista jej jeszcze nie zna. */
     expect(await screen.findByRole("group", { name: "Zbierał" })).toBeInTheDocument();
+  });
+});
+
+/* Odczyty ekranu z podaną odpowiedzią na złapane przy pakowaniu. Status
+   osobno, bo padnięta trasa ma dać błąd, a nie blok z zerami. */
+function atrapaZlapanych(cialo: unknown, status = 200) {
+  const odczyt = odczytPomylek([pomylka()]);
+  vi.stubGlobal("fetch", vi.fn(async (url: string) => {
+    if (url === "/api/pomylki/zlapane") return new Response(JSON.stringify(cialo), { status });
+    const c = odczyt(url);
+    return new Response(JSON.stringify(c ?? { error: "nieznany" }), { status: c === undefined ? 404 : 200 });
+  }));
+}
+
+const ZLAPANE = { name: "Złapane przy pakowaniu" } as const;
+
+describe("pomyłki złapane przy pakowaniu", () => {
+  it("wyłączona integracja nie rysuje niczego, nawet gdy serwer podał doby", async () => {
+    atrapaZlapanych(zlapane({ wlaczone: false }));
+    const qc = otworz();
+    await screen.findByText("jan_kowalski");
+    /* Odpowiedź musi dojść i przejść przez render. Inaczej brak bloku
+       znaczyłby tylko „jeszcze się wczytuje" i test przechodziłby zawsze. */
+    await waitFor(() => expect(qc.getQueryState(["pomylki-zlapane"])?.status).toBe("success"));
+    await act(() => new Promise((r) => setTimeout(r, 20)));
+    expect(screen.queryByRole("region", ZLAPANE)).toBeNull();
+    expect(screen.queryByText(/złapan/i)).toBeNull();
+  });
+
+  it("zdanie z okresem i liczbą, pod nim doby — bez osób i odrębnie od rejestru", async () => {
+    atrapaZlapanych(zlapane());
+    otworz();
+    const blok = await screen.findByRole("region", ZLAPANE);
+    expect(blok).toHaveTextContent(
+      "Od 17.10 do 19.10 pakowanie złapało 5 pomyłek zbierania, zanim paczka wyszła do klienta.");
+    expect(blok).toHaveTextContent("Rejestr niżej liczy pomyłki, które do klienta doszły.");
+    const doby = within(within(blok).getByRole("list", { name: "Złapane przy pakowaniu dzień po dniu" }))
+      .getAllByRole("listitem");
+    /* Czysta doba z Sellasist zostaje cyfrą: to dana, nie brak danych. */
+    expect(doby.map((d) => d.textContent)).toEqual(["17.10: 2", "18.10: 0", "19.10: 3"]);
+    expect(blok).not.toHaveTextContent(/Zbierał|Pakował|winn|Marek|Ewa/);
+    /* Podsumowanie miesiąca liczy rejestr i nie wchłania złapanych. */
+    expect(screen.getByRole("region", { name: "Podsumowanie miesiąca" })).toHaveTextContent("W miesiącu: 1 pomyłka");
+  });
+
+  /* Biernik, bo liczba jest dopełnieniem „złapało". Nastki biorą dopełniacz. */
+  it.each([
+    [[{ data: "2026-10-19", zlapanych: 1 }], "Dnia 19.10 pakowanie złapało 1 pomyłkę zbierania"],
+    [[{ data: "2026-10-18", zlapanych: 20 }, { data: "2026-10-19", zlapanych: 2 }], "złapało 22 pomyłki zbierania"],
+    [[{ data: "2026-10-18", zlapanych: 10 }, { data: "2026-10-19", zlapanych: 2 }], "złapało 12 pomyłek zbierania"],
+  ])("odmiana liczby: %j", async (dni, zdanie) => {
+    atrapaZlapanych(zlapane({ dni }));
+    otworz();
+    expect(await screen.findByRole("region", ZLAPANE)).toHaveTextContent(zdanie);
+  });
+
+  it("pusta lista dób mówi, że Sellasist nic nie podał — bez żadnej cyfry", async () => {
+    atrapaZlapanych(zlapane({ dni: [], razem: 0 }));
+    otworz();
+    const blok = await screen.findByRole("region", ZLAPANE);
+    expect(blok).toHaveTextContent("Sellasist nie podał jeszcze żadnego dnia");
+    expect(blok.textContent).not.toMatch(/\d/);
+    expect(within(blok).queryByRole("list")).toBeNull();
+  });
+
+  it("padnięte zapytanie pokazuje błąd zamiast bloku, nie zera", async () => {
+    atrapaZlapanych({ error: "Sellasist nie odpowiada" }, 500);
+    otworz();
+    expect(await screen.findByText("Nie udało się wczytać pomyłek złapanych przy pakowaniu: Sellasist nie odpowiada"))
+      .toBeInTheDocument();
+    expect(screen.queryByRole("region", ZLAPANE)).toBeNull();
+    /* Rejestr obok działa dalej: jedna padnięta trasa nie gasi ekranu. */
+    expect(screen.getByRole("link", { name: "jan_kowalski" })).toBeInTheDocument();
   });
 });

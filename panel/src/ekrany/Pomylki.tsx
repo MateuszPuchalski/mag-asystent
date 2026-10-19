@@ -1,10 +1,10 @@
 import React, { useEffect, useRef, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
-import { ChevronDown, ChevronLeft, ChevronRight, PackageX, Plus, ReceiptText } from "lucide-react";
+import { ChevronDown, ChevronLeft, ChevronRight, PackageCheck, PackageX, Plus, ReceiptText } from "lucide-react";
 import { Konflikt } from "../api/klient";
 import {
   pomylkaZKonfliktu, useNowaPomylka, useOsobyPomylek, usePomylki, usePozycjePomylki, useWznowPomylke,
-  useZakonczPomylke, useZmienPomylke, type FiltrPomylek, type OdpowiedzPomylek, type OsobaPomylki,
+  useZakonczPomylke, useZlapanePomylki, useZmienPomylke, type FiltrPomylek, type OdpowiedzPomylek, type OsobaPomylki,
   type Pomylka, type ZmianaPomylki,
 } from "../api/pomylki";
 import { etykietaKodu } from "../zwroty/Pieniadze";
@@ -151,6 +151,7 @@ export function Pomylki() {
     }} />}
 
     {lista.data && <Podsumowanie d={lista.data.podsumowanie} />}
+    <ZlapanePrzyPakowaniu />
 
     {lista.error && !lista.data
       ? <Blad>{(lista.error as Error).message}</Blad>
@@ -203,6 +204,57 @@ function Podsumowanie({ d }: { d: OdpowiedzPomylek["podsumowanie"] }) {
             title={`${o.nazwa}: zbierał ${o.zbieral}, pakował ${o.pakowal}, winny ${o.winny}`}>
             <b>{o.nazwa}</b> <span className="tabular-nums text-ranga-zle">{o.winny}×</span></span>)}
         </span>}
+  </Karta>;
+}
+
+/* Pomyłki zbierania złapane przy pakowaniu, czyli DOBRA wiadomość: paczka nie
+   wyszła z błędem, bo brak wyszedł przy pakowaniu. Stoją osobno od
+   podsumowania, bo rejestr niżej liczy pomyłki, które doszły do klienta.
+   Jedna liczba z obu mieszałaby złapane z przepuszczonymi.
+
+   BEZ OSÓB. Sellasist podaje sam status zamówienia, nie kto zbierał, więc
+   obok liczb nie stoi żadne imię ani nic, co by je sugerowało.
+
+   BRAK DANYCH TO NIE ZERO. Pusta lista dni znaczy, że Sellasist nie oddał
+   jeszcze żadnej doby. Padnięte zapytanie daje błąd zamiast bloku. Wyłączona
+   integracja nie rysuje nic, bo zdanie o niej nie pomaga w żadnej pracy. */
+function ZlapanePrzyPakowaniu() {
+  const z = useZlapanePomylki();
+  if (z.error && !z.data) {
+    return <Blad>Nie udało się wczytać pomyłek złapanych przy pakowaniu: {(z.error as Error).message}</Blad>;
+  }
+  if (!z.data?.wlaczone) return null;
+  const { dni, razem } = z.data;
+  const ikona = <PackageCheck size={16} className="shrink-0 text-ranga-ok" aria-hidden="true" />;
+  if (dni.length === 0) {
+    return <Karta className="flex items-center gap-2 px-4 py-2 text-sm" role="region" aria-label="Złapane przy pakowaniu">
+      {ikona}
+      <p className="text-slate-600">Pomyłki złapane przy pakowaniu: Sellasist nie podał jeszcze żadnego dnia.
+        Liczba pojawi się po pierwszej udanej synchronizacji.</p>
+    </Karta>;
+  }
+  const od = dzienMiesiac(dni[0].data), doDnia = dzienMiesiac(dni[dni.length - 1].data);
+  /* Okres stoi w zdaniu, bo doby nie idą za miesiącem wybranym nad rejestrem:
+     czternaście dni wstecz bywa na przełomie dwóch miesięcy. */
+  const okres = dni.length === 1 ? `Dnia ${od}` : `Od ${od} do ${doDnia}`;
+  return <Karta className="space-y-1 px-4 py-2 text-sm" role="region" aria-label="Złapane przy pakowaniu">
+    <p className="flex items-start gap-2">
+      {ikona}
+      {/* Biernik, bo liczba jest dopełnieniem „złapało": „1 pomyłkę", „2 pomyłki", „5 pomyłek". */}
+      <span>{okres} pakowanie złapało{" "}
+        <b className="tabular-nums">{ile(razem, "pomyłkę", "pomyłki", "pomyłek")} zbierania</b>, zanim paczka
+        wyszła do klienta. <span className="text-slate-600">Rejestr niżej liczy pomyłki, które do klienta doszły.</span></span>
+    </p>
+    {/* Dzień nad liczbą, nie obok: czternaście dni mieści się w jednym rzędzie.
+        Zero zostaje cyfrą, bo ta doba przyszła z Sellasist i naprawdę była
+        czysta. Jaśniejsze, żeby oko szło do dni z pomyłkami. */}
+    <ol aria-label="Złapane przy pakowaniu dzień po dniu" className="flex flex-wrap gap-x-3 gap-y-1 pl-6">
+      {dni.map((d) => <li key={d.data} className="flex flex-col items-center leading-tight" title={dataCyfrowa(d.data)}>
+        <span className="text-podpis text-slate-600">{dzienMiesiac(d.data)}</span>
+        <span className="sr-only">: </span>
+        <span className={`tabular-nums ${d.zlapanych > 0 ? "font-semibold" : "text-slate-600"}`}>{d.zlapanych}</span>
+      </li>)}
+    </ol>
   </Karta>;
 }
 
