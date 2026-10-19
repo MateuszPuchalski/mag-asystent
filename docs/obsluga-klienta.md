@@ -590,9 +590,9 @@ Tabela `pomylka_wysylki` trzyma jeden wiersz na zamówienie.
   numer. Pomyłki nie wychodzą do Copilota, CSV, migawki ani raportu tygodnia.
 - **Pomyłki złapane przy pakowaniu** (z Sellasist) to sam numer wpisu,
   zamówienie i chwila, bez pracownika. Zakładka pokazuje całemu biuru liczbę
-  na dobę, tak jak Strefa złota. Zastrzeżenie: doba z jedną osobą na
-  zbieraniu bywa liczbą tej osoby, bo biuro zna grafik. Gdy to za dużo,
-  blok można zawęzić do admina, jak zestawienie win.
+  na dobę, tak jak Strefa złota. Doba z jedną osobą na zbieraniu bywa liczbą
+  tej osoby, bo biuro zna grafik. Właściciel zostawił mimo to dobę całemu
+  biuru, decyzją z 19 października 2026.
 - **Retencji nie ma**, jak w sprawie klienta. O archiwizacji decyduje właściciel.
   Kopia anonimizowana (`tools/anonimizuj-baze.mjs`) zamienia login i imiona.
 
