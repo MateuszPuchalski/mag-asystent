@@ -130,6 +130,9 @@ beforeEach(() => {
     if (url === "/api/obsluga/eskalacja") return new Response(JSON.stringify({ miesiace: [] }));
     if (url === "/api/obsluga/copilot") return new Response(JSON.stringify({ wlaczony: false, powod: "wyłączony",
       model: "x", modelKlasyfikacji: "x", maxPartia: 20, autoKlasyfikacja: false, autoSzkic: false }));
+    /* Stan Sellasist ma własny test przy `analiza/Strefa.tsx`; tu liczy się skład. */
+    if (url === "/api/biuro/sellasist/stan") return new Response(JSON.stringify({ wlaczony: false,
+      ostatniaProbaAt: null, ostatniSukcesAt: null, blad: null, wKolejce: 0, dni: [] }));
     if (url === "/api/biuro/zbiorki/kandydaci") {
       return new Response(JSON.stringify({ okno: null, prog: 0, kandydaci: [], juzWStrefie: 0, bezReguly: 0 }));
     }

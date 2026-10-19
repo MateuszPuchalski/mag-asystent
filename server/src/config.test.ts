@@ -393,3 +393,26 @@ test("próg alarmu dyskusji ma domyślnie dobę i jest dodatni", () => {
   assert.equal(config.allegro.dyskusjeAlarmGodzin, 24);
   assert.ok(config.allegro.dyskusjeAlarmGodzin > 0);
 });
+
+test("Sellasist: połowa pary to ostrzeżenie, nie błąd — panel zapisuje jeden klucz naraz", () => {
+  const c = (s: Partial<typeof config.sellasist>) =>
+    ({ ...config, sellasist: { ...config.sellasist, ...s } } as typeof config);
+  assert.deepEqual(bledyKonfiguracji(c({ konto: "firma", apiKey: "" })), []);
+  assert.deepEqual(bledyKonfiguracji(c({ konto: "", apiKey: "tajny-klucz-sellasist" })), []);
+  assert.match(ostrzezeniaKonfiguracji(c({ konto: "firma", apiKey: "" })).join(" "), /brak SELLASIST_API_KEY/);
+  const bezKonta = ostrzezeniaKonfiguracji(c({ konto: "", apiKey: "tajny-klucz-sellasist" })).join(" ");
+  assert.match(bezKonta, /brak SELLASIST_KONTO/);
+  assert.ok(!bezKonta.includes("tajny"), "klucz nie trafia do ostrzeżenia");
+  assert.ok(!ostrzezeniaKonfiguracji(c({ konto: "firma", apiKey: "k" })).join(" ").includes("Sellasist"));
+});
+
+test("Sellasist: zła subdomena i zły numer statusu to błędy; klucz nie trafia do zdania", () => {
+  const z = (s: Partial<typeof config.sellasist>) =>
+    bledyKonfiguracji({ ...config, sellasist: { ...config.sellasist, ...s } } as typeof config);
+  assert.deepEqual(z({ konto: "", apiKey: "" }), []);
+  assert.deepEqual(z({ konto: "firma", apiKey: "tajny-klucz-sellasist" }), []);
+  const subdomena = z({ konto: "https://firma.sellasist.pl", apiKey: "tajny-klucz-sellasist" });
+  assert.equal(subdomena.length, 1);
+  assert.match(subdomena[0], /sama subdomena/);
+  assert.match(z({ konto: "firma", apiKey: "k", statusyZebrane: [5, Number.NaN] })[0], /SELLASIST_STATUSY_ZEBRANE/);
+});

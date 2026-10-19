@@ -133,6 +133,22 @@ export function polnocLokalna(data: string): string {
 }
 
 /**
+ * Stempel zegara magazynu `RRRR-MM-DD HH:MM:SS` jako ISO w UTC; `null`, gdy
+ * napis nie jest takim stemplem. Sellasist podaje daty bez strefy, w czasie
+ * konta, a baza trzyma UTC. Dwa przybliżenia z tego samego powodu co
+ * w `polnocLokalna`. Godzina, której nie ma (wiosenne 2:30), przesuwa się
+ * o godzinę, bo innego sensu nie ma.
+ */
+export function lokalnyNaUtc(stempel: string | null | undefined): string | null {
+  const m = /^(\d{4})-(\d{2})-(\d{2})[ T](\d{2}):(\d{2})(?::(\d{2}))?$/.exec(String(stempel ?? "").trim());
+  if (!m) return null;
+  const [r, mi, d, h, min, s] = m.slice(1).map((x) => Number(x ?? 0));
+  const zegar = Date.UTC(r, mi - 1, d, h, min, s);
+  if (!Number.isFinite(zegar)) return null;
+  return new Date(zegar - przesuniecieStrefy(zegar - przesuniecieStrefy(zegar))).toISOString();
+}
+
+/**
  * Tydzień ISO 8601 dnia `data`: etykieta `RRRR-Www` i jego poniedziałek.
  *
  * Rok tygodnia to rok jego czwartku, nie rok daty — 29 grudnia 2025 należy

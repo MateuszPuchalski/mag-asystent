@@ -679,6 +679,34 @@ export const config = {
   },
 
   /**
+   * Sellasist REST API — system, przez który przechodzą zamówienia firmy.
+   * Domyślnie WYŁĄCZONY: bez `SELLASIST_KONTO` i `SELLASIST_API_KEY` serwer
+   * nie wysyła tam ani jednego żądania. Klucz generuje się w Sellasist,
+   * w zakładce Integracje > Klucze API. Kształt API: `docs/sellasist/api.yaml`.
+   */
+  sellasist: {
+    /** Subdomena konta: `firma` z adresu `https://firma.sellasist.pl`. */
+    konto: (process.env.SELLASIST_KONTO ?? "").trim().toLowerCase(),
+    apiKey: (process.env.SELLASIST_API_KEY ?? "").trim(),
+    /** Host REST API; pusty bierze się z konta. Nadpisywalny dla testów. */
+    apiUrl: (process.env.SELLASIST_API_URL ?? "").trim(),
+    /**
+     * Takt lustra zamówień: dziennik zmian, potem szczegół zmienionych;
+     * 0 wyłącza ticker. Cztery minuty z sekundami, bo Allegro ma już minutę,
+     * trzy i pięć, a równy chór pętli to sygnatura maszyny (`services/takt.ts`).
+     */
+    syncMs: num(process.env.SELLASIST_SYNC_MS, 251_000, "SELLASIST_SYNC_MS"),
+    /**
+     * Identyfikatory statusów zamówienia, które u tej firmy znaczą „zebrane".
+     * Lista statusów jest per konto, więc w kodzie jej nie zgadujemy. Pusta
+     * lista: dniem zbiórki jest dzień pierwszej etykiety przewoźnika.
+     * Statusy konta wypisuje `npm --prefix server run sellasist:sonda`.
+     */
+    statusyZebrane: (process.env.SELLASIST_STATUSY_ZEBRANE ?? "")
+      .split(",").map((s) => s.trim()).filter((s) => s !== "").map(Number),
+  },
+
+  /**
    * Kartoteka demo dla `npm run seed`. Leżała pod `web/public/data`, bo
    * serwowała ją skasowana już PWA — po usunięciu aplikacji webowej to są
    * po prostu DANE SERWERA i mieszkają razem z nim.
@@ -1269,6 +1297,17 @@ export function bledyKonfiguracji(c: Config = config): string[] {
     bledy.push(`AKTUALIZACJA_KANAREK=${a.kanarek} — oczekuję adresu, np. http://localhost:3002.`);
   }
 
+  /* Sellasist: połowa pary to OSTRZEŻENIE (`ostrzezeniaKonfiguracji`), nie
+     błąd. Panel zapisuje jeden klucz naraz, więc błąd odrzuciłby pierwszy
+     z dwóch wpisów i pary nie dałoby się ustawić wcale. */
+  const s = c.sellasist;
+  if (s.konto && !/^[a-z0-9-]+$/.test(s.konto)) {
+    bledy.push(`SELLASIST_KONTO=${bezpiecznaWartosc(s.konto)} — sama subdomena, np. firma z firma.sellasist.pl.`);
+  }
+  if (s.statusyZebrane.some((n) => !Number.isInteger(n) || n <= 0)) {
+    bledy.push("SELLASIST_STATUSY_ZEBRANE — oczekuję numerów statusów po przecinku, np. 5,7.");
+  }
+
   /* Magazyn skutku rozstrzyga, którym trybem idzie dokument. Dwa te same id
      znaczą, że dostawa i kontener trafiają do tej samej zakładki — a to wygląda
      jak „brakuje dostaw", nie jak błąd konfiguracji. Reguła istniała dotąd
@@ -1500,6 +1539,14 @@ export function ostrzezeniaKonfiguracji(c: Config = config): string[] {
     ostrzezenia.push(
       `${c.copilot.wycofane.join(", ")} w wertis.env nic już nie robi — dostawcę rozpoznawania wybiera ` +
         "sam TYPESAFE_API_KEY. Wpis można usunąć. Serwer działa dalej.",
+    );
+  }
+  /* Połowa pary Sellasist zostawia integrację wyłączoną (`sellasistWlaczony`
+     wymaga obu). Mówimy o tym przy starcie, bo biuro czekałoby na numery. */
+  if (Boolean(c.sellasist.konto) !== Boolean(c.sellasist.apiKey)) {
+    ostrzezenia.push(
+      `Sellasist wyłączony: brak ${c.sellasist.konto ? "SELLASIST_API_KEY" : "SELLASIST_KONTO"}. ` +
+        "Integracja ruszy po wpisaniu obu. Serwer działa dalej.",
     );
   }
   return ostrzezenia;

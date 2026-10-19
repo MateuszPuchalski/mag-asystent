@@ -1,5 +1,6 @@
 import { config } from "../config.js";
 import { WERSJA } from "../wersja.js";
+import { BladLimitu } from "./limit.js";
 
 /* ── Allegro — wspólne kawałki połączenia ────────────────────────────────────
    Do 0.137.2 ten plik trzymał kontrakt adaptera i komplet typów domenowych
@@ -33,15 +34,7 @@ export function retryAfterMs(naglowek: string | null, terazMs: number): number |
  * ponawianie po odmowie to prosta droga do blokady konta albo adresu.
  * Ponowień nadal nie ma: błąd przerywa bieżącą pętlę jak każdy inny.
  */
-export class BladLimituAllegro extends Error {
-  constructor(
-    komunikat: string,
-    /** Ile poczekać wg nagłówka `Retry-After`; null = Allegro nie podało. */
-    public readonly poIluMs: number | null
-  ) {
-    super(komunikat);
-  }
-}
+export class BladLimituAllegro extends BladLimitu {}
 
 /**
  * Odmowa Allegro z zachowanym kodem HTTP.

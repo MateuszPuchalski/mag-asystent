@@ -1,13 +1,14 @@
+import type { DatabaseSync } from "node:sqlite";
 import { db } from "../db/db.js";
 import { parseAdres, pickingLoc } from "../locs.js";
 import { poziomyStrefy, wStrefieZlotej } from "./strefa-zlota.js";
 import { progGornych } from "./reslot.js";
 
 /* ── Zbiórki z systemu sprzedażowego → kandydaci do strefy złotej ────────────
-   CSV eksportowany z Sellasist (dziś wgrywany ręcznie w analizie panelu, docelowo
-   POST z integracji) niesie każdą pozycję koszyka z datą i symbolem. Z tego
-   liczy się częstość zbierania per kartoteka, a z niej — adnotacja „przenieś
-   do strefy złotej" na karcie towaru i ranking w panelu biura.
+   CSV eksportowany z Sellasist (wgrywany ręcznie w analizie panelu) albo lustro
+   zamówień Sellasist (`dopiszZbiorki`) niesie każdą pozycję koszyka z datą
+   i symbolem. Z tego liczy się częstość zbierania per kartoteka, a z niej —
+   adnotacja „przenieś do strefy złotej" na karcie towaru i ranking w panelu.
 
    Miara jest ta sama co w rocznym raporcie przeslotowania (services/reslot.ts):
    POBRANIA = LICZBA WYSTĄPIEŃ pozycji, nie suma sztuk. Indeks zbierany 400×
@@ -137,6 +138,43 @@ export function wierszeZbiorek(tekst: string): { wiersze: WierszZbiorki[]; odrzu
 
 // ── Import ──────────────────────────────────────────────────────────────────
 
+/**
+ * Kartoteka po symbolu (bez wielkości liter), zapasowo po EAN. Jedna reguła
+ * dla pliku i dla zbiórek z Sellasist: ta sama pozycja nie ma prawa trafić
+ * w różne kartoteki zależnie od tego, którą drogą przyszła.
+ */
+export function dopasowanieKartoteki(d: DatabaseSync): (symbol: string, ean: string) => number | null {
+  const towary = d
+    .prepare("SELECT tw_id, upper(symbol) AS sym, ean FROM sgt_towar")
+    .all() as Array<{ tw_id: number; sym: string; ean: string | null }>;
+  const poSymbolu = new Map<string, number>();
+  const poEan = new Map<string, number>();
+  for (const t of towary) {
+    if (t.sym) poSymbolu.set(t.sym, t.tw_id);
+    if (t.ean) poEan.set(t.ean, t.tw_id);
+  }
+  return (symbol, ean) => poSymbolu.get(symbol.toUpperCase()) ?? (ean ? poEan.get(ean) : undefined) ?? null;
+}
+
+/**
+ * Zbiórki z lustra Sellasist (`services/sellasist-sync.ts`). Bez progu
+ * dopasowań z importu pliku: ten próg łapie ZŁY PLIK, a tu pliku nie ma.
+ * Pozycja spoza kartoteki ląduje z `tw_id` NULL, tak jak z pliku, i nie
+ * liczy się do rankingu. `INSERT OR IGNORE` po `koszyk_id`: wiersz wgrany
+ * wcześniej z CSV wygrywa i nie dubluje się.
+ */
+export function dopiszZbiorki(d: DatabaseSync, wiersze: readonly WierszZbiorki[]): number {
+  if (wiersze.length === 0) return 0;
+  const kartoteka = dopasowanieKartoteki(d);
+  const ins = d.prepare("INSERT OR IGNORE INTO zbiorka(koszyk_id, tw_id, symbol_csv, data, ilosc) VALUES (?,?,?,?,?)");
+  let nowych = 0;
+  for (const w of wiersze) {
+    nowych += Number(ins.run(w.koszykId, kartoteka(w.symbol, w.ean), w.symbol, w.data, w.ilosc).changes);
+  }
+  if (nowych) zresetujKandydatow();
+  return nowych;
+}
+
 export interface WynikImportu {
   wierszy: number;
   nowych: number;
@@ -169,21 +207,12 @@ export function importujZbiorki(tekst: string): WynikImportu {
   }
 
   const d = db();
-  // mapowanie po symbolu (bez wielkości liter), zapasowo po EAN
-  const towary = d
-    .prepare("SELECT tw_id, upper(symbol) AS sym, ean FROM sgt_towar")
-    .all() as Array<{ tw_id: number; sym: string; ean: string | null }>;
-  const poSymbolu = new Map<string, number>();
-  const poEan = new Map<string, number>();
-  for (const t of towary) {
-    if (t.sym) poSymbolu.set(t.sym, t.tw_id);
-    if (t.ean) poEan.set(t.ean, t.tw_id);
-  }
+  const kartoteka = dopasowanieKartoteki(d);
 
   let dopasowanych = 0;
   const niedopasowane = new Map<string, number>();
   const doWstawienia = wiersze.map((w) => {
-    const twId = poSymbolu.get(w.symbol.toUpperCase()) ?? (w.ean ? poEan.get(w.ean) : undefined) ?? null;
+    const twId = kartoteka(w.symbol, w.ean);
     if (twId != null) dopasowanych++;
     else niedopasowane.set(w.symbol || "(pusty symbol)", (niedopasowane.get(w.symbol) ?? 0) + 1);
     return { ...w, twId };

@@ -23,6 +23,9 @@ import { magazynRoutes } from "./routes/magazyny.js";
 import { aktualizacjaRoutes } from "./routes/aktualizacja.js";
 import { biuroRoutes } from "./routes/biuro.js";
 import { zbiorkiRoutes } from "./routes/zbiorki.js";
+import { sellasistRoutes } from "./routes/sellasist.js";
+import { sellasistWlaczony } from "./adapters/sellasist.http.js";
+import { synchronizujSellasist } from "./services/sellasist-sync.js";
 import { lokalizacjeMasoweRoutes } from "./routes/lokalizacje-masowe.js";
 import { dostawcyRoutes } from "./routes/dostawcy.js";
 import { kartonRoutes } from "./routes/karton.js";
@@ -576,6 +579,7 @@ export async function buildApp(opcje: {
   await app.register(analizaRoutes);
   await app.register(biuroRoutes);
   await app.register(zbiorkiRoutes);
+  await app.register(sellasistRoutes);
   await app.register(lokalizacjeMasoweRoutes);
   await app.register(dostawcyRoutes);
   await app.register(koszeRoutes);
@@ -718,6 +722,16 @@ async function main() {
       const w = await sondujRzeczywistosc();
       const zle = w.kroki.filter((k) => k.wynik === "blad").map((k) => k.krok);
       if (zle.length) console.warn(`[sonda-rzeczywistosci] nie przeszło: ${zle.join(", ")}`);
+    });
+  }
+
+  /* Lustro zamówień Sellasist: niezależne od konta Allegro, bo zbiórki
+     i dzień pakowania nie potrzebują Allegro wcale. Bez klucza nie startuje
+     i nie wysyła ani jednego żądania. Powód i zakres: `services/sellasist-sync.ts`. */
+  if (sellasistWlaczony()) {
+    uruchomTakt("sellasist", config.sellasist.syncMs, async () => {
+      const w = await synchronizujSellasist();
+      if (w.zbiorek) console.log(`[sellasist] zmian: ${w.zmian}, pobranych: ${w.pobranych}, zbiórek: ${w.zbiorek}`);
     });
   }
 

@@ -530,13 +530,20 @@ export interface StanPrzesylki {
   dosylka?: DosylkaPrzesylki | null;
 }
 
+/**
+ * Skąd znamy numer dosyłki. `allegro` — stoi przy zamówieniu w Allegro;
+ * `sellasist` — automat znalazł go na etykiecie w Sellasist;
+ * `recznie` — wpisało go biuro.
+ */
+export type ZrodloNumeruDosylki = "allegro" | "sellasist" | "recznie";
+
 /** Los dosyłki: kod przewoźnika, doręczenie i skąd znamy jej numer. */
 export interface DosylkaPrzesylki {
   status: string | null;
   dostarczonoAt: string | null;
   maNumer: boolean;
-  /** `allegro` — numer stoi przy zamówieniu w Allegro; `recznie` — wpisało go biuro. */
-  zrodlo: "allegro" | "recznie" | null;
+  /** Skąd znamy numer dosyłki — `ZrodloNumeruDosylki` wyżej. */
+  zrodlo: ZrodloNumeruDosylki | null;
 }
 
 /** Jeden przystanek drogi zakupu przez kolejki, z momentem wejścia. */
@@ -790,7 +797,8 @@ export interface DosylkaSprawy {
   przewoznik: string | null;
   /** Przewoźnik PIERWSZEJ paczki tego zamówienia — domyślny wybór w formularzu numeru. */
   przewoznikZamowienia: string | null;
-  zrodlo: "allegro" | "recznie" | null;
+  /** `null`, dopóki numeru nie ma; panel czyta z tego „bez numeru” (`najwazniejszaDosylka`). */
+  zrodlo: ZrodloNumeruDosylki | null;
   status: string | null;
   dostarczonoAt: string | null;
   /** `null` znaczy „jeszcze nie pytaliśmy Allegro”, nie „nie ma przesyłki”. */

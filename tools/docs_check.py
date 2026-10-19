@@ -312,49 +312,56 @@ def sprawdz_licznik_weryfikuj() -> int:
 
 
 
-# ── Cudza specyfikacja Allegro ───────────────────────────────────────────────
-# `docs/allegro/swagger.yaml` to plik Allegro, nie nasz. Leży w repo, bo
-# `developer.allegro.pl` jest nieosiągalny z maszyny, na której pisze się kod,
-# a zgadywanie kształtu kosztowało już trzy wydania.
+# ── Cudze specyfikacje: Allegro i Sellasist ─────────────────────────────────
+# `docs/allegro/swagger.yaml` i `docs/sellasist/api.yaml` to pliki dostawców,
+# nie nasze. Leżą w repo, bo zgadywanie kształtu z pamięci kosztowało już
+# trzy wydania, a dokumentacja dostawcy bywa nieosiągalna z maszyny z kodem.
 #
 # Suma kontrolna nie jest tu zabezpieczeniem, tylko czujnikiem. Cudzy plik ma
-# ZOSTAĆ CUDZY: przy 40 tysiącach linii poprawka wsunięta w środek nie ma szans
-# zostać zauważona w przeglądzie zmian, a od tej chwili mapowanie stałoby
-# znowu na czymś wymyślonym — tyle że wyglądającym na dokumentację.
-SPEC_ALLEGRO = "docs/allegro/swagger.yaml"
-SPEC_README = "docs/allegro/README.md"
+# ZOSTAĆ CUDZY: przy kilkunastu tysiącach linii poprawka wsunięta w środek nie
+# ma szans zostać zauważona w przeglądzie zmian, a od tej chwili mapowanie
+# stałoby znowu na czymś wymyślonym — tyle że wyglądającym na dokumentację.
+SPECYFIKACJE = [
+    ("Allegro", "docs/allegro/swagger.yaml", "docs/allegro/README.md"),
+    ("Sellasist", "docs/sellasist/api.yaml", "docs/sellasist/README.md"),
+]
 SPEC_SUMA_RE = re.compile(r"`([0-9a-f]{64})`")
 
 
-def sprawdz_specyfikacje_allegro() -> int:
-    """Kopia specyfikacji zgadza się z sumą zapisaną obok niej."""
-    if not os.path.exists(SPEC_ALLEGRO):
-        print(f"BRAK PLIKU      {SPEC_ALLEGRO} — kopia specyfikacji Allegro zniknęła")
-        return 1
+def sprawdz_specyfikacje() -> int:
+    """Każda kopia specyfikacji zgadza się z sumą zapisaną obok niej."""
+    bad = 0
+    for nazwa, plik, readme in SPECYFIKACJE:
+        if not os.path.exists(plik):
+            print(f"BRAK PLIKU      {plik} — kopia specyfikacji {nazwa} zniknęła")
+            bad += 1
+            continue
 
-    m = SPEC_SUMA_RE.search(open(SPEC_README, encoding="utf-8").read())
-    if not m:
-        print(f"BRAK SUMY       {SPEC_README} nie podaje sha256 kopii specyfikacji")
-        return 1
+        m = SPEC_SUMA_RE.search(open(readme, encoding="utf-8").read())
+        if not m:
+            print(f"BRAK SUMY       {readme} nie podaje sha256 kopii specyfikacji")
+            bad += 1
+            continue
 
-    with open(SPEC_ALLEGRO, "rb") as f:
-        faktyczna = hashlib.sha256(f.read()).hexdigest()
-    if faktyczna != m.group(1):
-        print(
-            f"ZMIENIONA KOPIA {SPEC_ALLEGRO}: sha256 to {faktyczna},\n"
-            f"                a {SPEC_README} mówi {m.group(1)}.\n"
-            "                Cudzej specyfikacji się nie poprawia — jeśli to\n"
-            "                odświeżenie, zaktualizuj sumę i datę w README."
-        )
-        return 1
+        with open(plik, "rb") as f:
+            faktyczna = hashlib.sha256(f.read()).hexdigest()
+        if faktyczna != m.group(1):
+            print(
+                f"ZMIENIONA KOPIA {plik}: sha256 to {faktyczna},\n"
+                f"                a {readme} mówi {m.group(1)}.\n"
+                "                Cudzej specyfikacji się nie poprawia — jeśli to\n"
+                "                odświeżenie, zaktualizuj sumę i datę w README."
+            )
+            bad += 1
+            continue
 
-    print(f"specyfikacja Allegro: kopia zgodna z sumą w {SPEC_README}")
-    return 0
+        print(f"specyfikacja {nazwa}: kopia zgodna z sumą w {readme}")
+    return bad
 
 
 def main() -> int:
     bad = (sprawdz_wersje() + sprawdz_licznik_weryfikuj()
-           + sprawdz_specyfikacje_allegro() + sprawdz_znaczniki_konfliktu())
+           + sprawdz_specyfikacje() + sprawdz_znaczniki_konfliktu())
     for doc in DOCS:
         text = open(doc, encoding="utf-8").read()
         base = os.path.dirname(doc)

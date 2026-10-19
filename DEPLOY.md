@@ -1026,6 +1026,29 @@ biura: <https://ifconfig.me>. Ten sam adres w obu miejscach znaczy wspólne
 zapisuje kształt odpowiedzi Allegro, a `npm --prefix server run
 sonda:zalacznik` pokazuje drogę pobrania załącznika.
 
+### Sellasist (@wydanie)
+
+Integracja jest domyślnie wyłączona. Włącza ją para w `wertis.env`:
+
+```
+SELLASIST_KONTO=firma            # subdomena z https://firma.sellasist.pl
+SELLASIST_API_KEY=...            # Sellasist → Integracje → Klucze API
+```
+
+Po restarcie `wertis-api` uruchom na serwerze `npm --prefix server run
+sellasist:sonda`. Sonda niczego nie zmienia i odpowiada na cztery pytania:
+
+1. Czy `external_id` zamówień z Allegro to numer formularza zakupu (UUID).
+   Inny format znaczy, że wiązanie z zamówieniami Allegro nie zadziała.
+2. Czy daty przychodzą jako `RRRR-MM-DD HH:MM:SS` w czasie polskim.
+3. Czy `object_id` zmiany statusu w dzienniku to nowy status zamówienia.
+4. Jakie statusy ma konto. Numery statusu „zebrane" wpisz do
+   `SELLASIST_STATUSY_ZEBRANE`; bez nich dniem zbiórki jest dzień etykiety.
+
+Co robi integracja i czego nie robi: `docs/sellasist.md`. Pierwszy przebieg
+czyta dziennik zmian z dwóch dni, więc lustro dochodzi przez kilkadziesiąt
+minut. `SELLASIST_SYNC_MS=0` wyłącza lustro bez wyłączania reszty.
+
 ### Do sprawdzenia na własnej bazie i koncie ([WERYFIKUJ])
 
 1. **Kolumny przesunięcia MM:** magazyn docelowy w `dok_OdbiorcaId`, pozycje

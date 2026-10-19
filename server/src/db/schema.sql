@@ -2868,7 +2868,7 @@ CREATE TABLE IF NOT EXISTS klient_dosylka (
   zwrot_id       INTEGER REFERENCES zwrot_klienta(id) ON DELETE SET NULL,
   waybill        TEXT,                    -- NULL do wykrycia albo wpisania; do 64 znaków (opis pola w specyfikacji)
   przewoznik     TEXT,                    -- carrierId z Allegro; 'OTHER' nie jest pytany
-  zrodlo         TEXT,                    -- 'allegro' (wykryty przy zamówieniu) | 'recznie' (wpisany)
+  zrodlo         TEXT,                    -- 'allegro' (przy zamówieniu) | 'sellasist' (z etykiety) | 'recznie'
   status         TEXT,                    -- ostatni kod przewoźnika — wynik, nie historia
   dostarczono_at TEXT,                    -- pierwsze DELIVERED; COALESCE, nigdy nadpisane
   sprawdzono_at  TEXT,                    -- ostatnie pytanie do Allegro; NULL = jeszcze nigdy
@@ -2974,4 +2974,75 @@ CREATE TABLE IF NOT EXISTS pominiecia_dzien (
   kategoria  TEXT NOT NULL,          -- klucz słownika albo „bez rozpoznania”
   ile        INTEGER NOT NULL DEFAULT 0,
   PRIMARY KEY (dzien, kategoria)
+);
+
+-- ── Lustro zamówień Sellasist ───────────────────────────────────────────────
+-- Sellasist to system, przez który przechodzą zamówienia: statusy realizacji,
+-- koszyki, etykiety. Lustro trzyma z niego tylko to, czego potrzebują trzy
+-- odczyty: „czy wyjdzie dziś", zbiórki do strefy złotej i dzień pakowania.
+-- BEZ ADRESÓW, e-maila, NIP-u i telefonu: z kupującego wyłącznie login, jak
+-- z Allegro (zasada prywatności w CLAUDE.md). Mapowanie: adapters/sellasist.http.ts.
+CREATE TABLE IF NOT EXISTS sellasist_zamowienie (
+  id             INTEGER PRIMARY KEY,   -- numer zamówienia w Sellasist
+  external_id    TEXT,                  -- numer w źródle; dla Allegro formularz zakupu
+  kupujacy_login TEXT,                  -- login w serwisie źródła; jedyne pole kupującego
+  zrodlo         TEXT,                  -- `source`: allegro, ebay, …
+  status_id      INTEGER,
+  status_nazwa   TEXT,                  -- nazwa nadana przez firmę w Sellasist
+  status_at      TEXT,                  -- ostatnia zmiana statusu, ISO UTC
+  termin         TEXT,                  -- `deadline`: ISO UTC albo sam dzień RRRR-MM-DD
+  utworzono_at   TEXT,
+  skopiowane_z   INTEGER,               -- `copied_order_id` kopii; NULL = oryginał
+  zebrano_at     TEXT,                  -- wejście w status „zebrane" albo pierwsza etykieta
+  spakowano_at   TEXT,                  -- pierwsza etykieta przewoźnika
+  pobrano_at     TEXT NOT NULL          -- ostatni odczyt szczegółu
+);
+CREATE INDEX IF NOT EXISTS ix_sellasist_zamowienie_ext ON sellasist_zamowienie(external_id);
+CREATE INDEX IF NOT EXISTS ix_sellasist_zamowienie_spak ON sellasist_zamowienie(spakowano_at);
+
+-- Pozycje koszyka. `koszyk_id` to ten sam numer co „ID Koszyka" w eksporcie
+-- zbiórek, więc wiersz z API i wiersz z ręcznego CSV nie dublują się w `zbiorka`.
+CREATE TABLE IF NOT EXISTS sellasist_pozycja (
+  koszyk_id     INTEGER PRIMARY KEY,
+  zamowienie_id INTEGER NOT NULL REFERENCES sellasist_zamowienie(id) ON DELETE CASCADE,
+  symbol        TEXT,
+  ean           TEXT,
+  nazwa         TEXT,
+  ilosc         REAL NOT NULL DEFAULT 0,
+  brakuje       REAL NOT NULL DEFAULT 0   -- `quantityMissing`: brak do skompletowania
+);
+CREATE INDEX IF NOT EXISTS ix_sellasist_pozycja_zam ON sellasist_pozycja(zamowienie_id);
+
+-- Etykiety przewoźnika. Usługę daje szczegół zamówienia, datę lista
+-- przewozowa (`GET /ordersshipments`) — dlatego `utworzono_at` bywa puste,
+-- dopóki ticker nie dopyta.
+CREATE TABLE IF NOT EXISTS sellasist_przesylka (
+  zamowienie_id INTEGER NOT NULL REFERENCES sellasist_zamowienie(id) ON DELETE CASCADE,
+  waybill       TEXT NOT NULL,
+  usluga        TEXT,                   -- nazwa usługi z Sellasist
+  przewoznik    TEXT NOT NULL,          -- carrierId Allegro z nazwy; OTHER = nie śledzimy
+  utworzono_at  TEXT,
+  PRIMARY KEY (zamowienie_id, waybill)
+);
+
+-- Kolejka szczegółów do pobrania. Dziennik zmian przesuwa kursor od razu,
+-- a szczegóły idą partiami: setka zmian naraz nie ma prawa zabrać limitu
+-- zapytań ani zatrzymać kursora. `zebrano_at` przychodzi z dziennika, zanim
+-- zamówienie jest w lustrze.
+CREATE TABLE IF NOT EXISTS sellasist_do_pobrania (
+  zamowienie_id INTEGER PRIMARY KEY,
+  od            TEXT NOT NULL,
+  zebrano_at    TEXT,
+  proby         INTEGER NOT NULL DEFAULT 0
+);
+
+CREATE TABLE IF NOT EXISTS sellasist_sync_state (
+  id              INTEGER PRIMARY KEY CHECK (id = 1),
+  kursor_at       TEXT,                 -- data ostatniego wpisu dziennika, ISO UTC
+  kursor_id       INTEGER,              -- jego numer; wpisy z tą samą datą i niższym numerem już były
+  last_success_at TEXT,
+  pierwszy_sukces_at TEXT,              -- od tej doby liczby dzienne są pełne; wcześniej lustra nie było
+  last_attempt_at TEXT,
+  blad            TEXT,                 -- stałe zdanie ostatniej porażki, nigdy treść odpowiedzi
+  blad_kod        INTEGER
 );

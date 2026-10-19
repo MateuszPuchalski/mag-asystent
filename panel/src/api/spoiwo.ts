@@ -4,7 +4,7 @@ import { klucze } from "./rozmowy";
 import type { DosylkaSprawy, HistoriaKlienta, SprawaKlienta, WpisHistorii } from "./typy";
 import type { Pomylka } from "./pomylki";
 
-export type { DosylkaSprawy, NoweZdarzenie, SprawaKlienta } from "./typy";
+export type { DosylkaSprawy, NoweZdarzenie, SprawaKlienta, ZrodloNumeruDosylki } from "./typy";
 
 /* ── Ponad kolejkami (23 września 2026) ─────────────────────────────────────
    Kształty z `server/src/services/szukaj-wszedzie.ts` i `klient-historia.ts`.
@@ -254,10 +254,9 @@ export function useSledzDosylke(login: string) {
 
 /**
  * Numer dosyłki wpisany ręcznie z Sellasist. Automat szuka go w przesyłkach
- * zamówienia; to, że nowa etykieta z Sellasist tam trafia, jest
- * niezweryfikowane (`[WERYFIKUJ]` w `docs/allegro-ksztalt.md`). Gdy automat
- * numeru nie znajdzie, wpisuje go człowiek. Ten sam zapis poprawia numer
- * przekręcony przy przepisywaniu.
+ * zamówienia w Allegro i na etykietach w Sellasist, gdy integracja stoi.
+ * Gdy żadne z nich numeru nie zna, wpisuje go człowiek. Ten sam zapis
+ * poprawia numer przekręcony przy przepisywaniu.
  */
 export function useNumerDosylki(login: string) {
   const qc = useQueryClient();
@@ -296,4 +295,68 @@ export function najwazniejszaDosylka(dosylki: readonly DosylkaSprawy[] | undefin
     ?? lista.find((d) => d.dostarczonoAt === null)
     ?? lista[0]
     ?? null;
+}
+
+/* ── Zamówienie w Sellasist na profilu klienta — trasy z `routes/sellasist.ts` ──
+   Agent prowadzi sprawę tutaj, a magazyn pakuje w Sellasist. Wgląd odpowiada
+   na „czemu paczka jeszcze nie wyszła”, a notatka zastępuje telefon do hali.
+   Kształt to lustro `WidokSellasist` z `services/sellasist-notatki.ts`. */
+
+export interface WidokSellasist {
+  /** `false`: w `wertis.env` brak klucza Sellasist — sekcja nie ma czego pokazać. */
+  wlaczony: boolean;
+  /** `null`: Sellasist nie zna zamówienia albo nie dało się go zapytać (`notatkiBlad`). */
+  zamowienie: null | {
+    id: number;
+    /** `false`: zamówienie starsze niż lustro — stan nieznany, pola poniżej puste, nie zerowe. */
+    wLustrze: boolean;
+    /** Nazwa statusu nadana przez firmę w Sellasist — pokazujemy ją bez tłumaczenia. */
+    status: string | null;
+    statusAt: string | null;
+    zebranoAt: string | null;
+    /** Chwila pierwszej etykiety przewoźnika. */
+    spakowanoAt: string | null;
+    /** Stempel UTC albo sam dzień `RRRR-MM-DD`. */
+    termin: string | null;
+    przesylki: Array<{ waybill: string; usluga: string | null; utworzonoAt: string | null }>;
+    /** Pozycje, których według Sellasist brakuje do spakowania. */
+    braki: Array<{ nazwa: string; potrzeba: number; jest: number }>;
+    /** Numery kopii tego zamówienia w Sellasist — zwykle dosyłek. */
+    kopie: number[];
+  };
+  notatki: Array<{ data: string | null; tekst: string }>;
+  /** Stałe zdanie, gdy notatek nie udało się przeczytać; reszta widoku jest dobra. */
+  notatkiBlad: string | null;
+}
+
+const kluczSellasist = (zamowienie: string) => ["sellasist-zamowienie", zamowienie] as const;
+
+/**
+ * Wgląd w zamówienie Sellasist. Pobiera się dopiero po rozwinięciu zamówienia
+ * (`wlaczona`): notatki serwer czyta z Sellasist na żywo, a profil stałego
+ * klienta ma kilkanaście zakupów, z których pytanie dotyczy jednego.
+ */
+export function useSellasistZamowienia(zamowienie: string, wlaczona: boolean) {
+  return useQuery({
+    queryKey: kluczSellasist(zamowienie),
+    queryFn: () => api<WidokSellasist>(`/api/obsluga/sellasist/zamowienie/${encodeURIComponent(zamowienie)}`),
+    enabled: wlaczona,
+    retry: false,
+  });
+}
+
+/**
+ * Notatka do zamówienia w Sellasist. Odpowiedź to odświeżony widok, więc
+ * wpisuje się go wprost do pamięci zapytania — drugi odczyt z Sellasist
+ * kosztowałby limit zapytań i niczego nowego by nie powiedział. Podpis autora
+ * dokłada serwer, panel wysyła sam tekst.
+ */
+export function useNotatkaSellasist(zamowienie: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (tekst: string) =>
+      api<WidokSellasist>(`/api/obsluga/sellasist/zamowienie/${encodeURIComponent(zamowienie)}/notatka`,
+        { method: "POST", body: JSON.stringify({ tekst }) }),
+    onSuccess: (widok) => qc.setQueryData(kluczSellasist(zamowienie), widok),
+  });
 }

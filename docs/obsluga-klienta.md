@@ -536,6 +536,34 @@ Drugi przyrost S6 dokłada tabelę `klient_dosylka` z numerem przesyłki.
 - **Retencja idzie za sprawą** (kaskada). Ticker przestaje pytać po
   trzydziestu dniach, ale numeru nie kasuje, bo reklamacja dosyłki go wymaga.
 
+## Polityka danych Sellasist
+
+Lustro zamówień Sellasist (@wydanie) to tabele `sellasist_*`. Szczegóły
+działania stoją w `docs/sellasist.md`.
+
+- **Zapisujemy** numer zamówienia w Sellasist i w źródle, login kupującego
+  w serwisie źródła, źródło, status z nazwą nadaną przez firmę i terminy.
+  Do tego dzień zebrania i spakowania. Z koszyka: numer pozycji, symbol, EAN, nazwę
+  towaru, ilość i brak do skompletowania. Z etykiet: numer przesyłki, usługę
+  przewoźnika i datę wydruku.
+- **Login to jedyne pole kupującego.** Ten sam powód co przy Allegro: login
+  jest kluczem klienta. Adresu z faktury, adresu dostawy, e-maila, NIP-u
+  i telefonu mapowanie nie czyta wcale (`adapters/sellasist.http.ts`), więc
+  nie ma ich czym zapisać.
+- **Numer przesyłki leży tak jak numer dosyłki.** Wychodzi wyłącznie do
+  rozwiniętego zamówienia na profilu klienta
+  (`GET /api/obsluga/sellasist/zamowienie/:zamowienie`). Copilot dostaje
+  dzień etykiety i braki, bez numeru.
+- **Notatek z Sellasist nie zapisujemy.** Piszą je ludzie, więc bywa w nich
+  adres albo telefon. Profil czyta je na żywo przy rozwinięciu zamówienia.
+- **Bez pracownika.** Dziennik zmian Sellasist niesie `user_id`, a mapowanie
+  go odrzuca. Kto zebrał albo spakował paczkę, to monitoring pracowniczy
+  (art. 22² Kodeksu pracy); liczba paczek na dzień go nie potrzebuje.
+- **Notatka agenta to jedyny zapis do Sellasist.** Dostaje podpis autora
+  w treści. Dziennik `sellasist_notatka` niesie numer zamówienia, bez treści.
+- **Retencji nie ma**, jak przy zamówieniach Allegro. Zamówienie skasowane
+  w Sellasist znika z lustra przy następnej jego zmianie.
+
 ## Polityka danych pomyłek wysyłkowych
 
 Zakładka „Pomyłki” (`0.591.0`) zastępuje arkusz biura z pomyłkami w paczkach.

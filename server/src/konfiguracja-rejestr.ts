@@ -22,7 +22,7 @@
    więc nie powstaje druga kopia liczby.                                      */
 
 export type Grupa =
-  | "subiekt" | "magazyn" | "allegro" | "zwroty" | "copilot"
+  | "subiekt" | "magazyn" | "allegro" | "zwroty" | "sellasist" | "copilot"
   | "zdjecia" | "sfera" | "tlo" | "serwer";
 
 export const NAZWY_GRUP: Record<Grupa, string> = {
@@ -30,6 +30,7 @@ export const NAZWY_GRUP: Record<Grupa, string> = {
   magazyn: "Magazyny i dokumenty",
   allegro: "Allegro",
   zwroty: "Zwroty i reklamacje",
+  sellasist: "Sellasist",
   copilot: "Copilot",
   zdjecia: "Zdjęcia",
   sfera: "Worker Sfery",
@@ -245,6 +246,19 @@ export const KLUCZE: readonly Klucz[] = [
     opis: "Takt synchronizacji zwrotów w milisekundach; 0 wyłącza." },
   { klucz: "ALLEGRO_RABATY_SYNC_MS", grupa: "zwroty", kto: "zaawansowane",
     opis: "Takt wniosków o rabat w milisekundach; 0 wyłącza." },
+  { klucz: "SELLASIST_KONTO", grupa: "sellasist", kto: "wlasciciel", edycja: TEKST,
+    nazwa: "Konto Sellasist",
+    opis: "Subdomena konta Sellasist; puste wyłącza integrację." },
+  { klucz: "SELLASIST_API_KEY", grupa: "sellasist", kto: "wlasciciel", edycja: TEKST, tajny: true,
+    nazwa: "Klucz API Sellasist",
+    opis: "Klucz z zakładki Integracje > Klucze API w Sellasist." },
+  { klucz: "SELLASIST_STATUSY_ZEBRANE", grupa: "sellasist", kto: "wlasciciel", edycja: TEKST,
+    nazwa: "Statusy „zebrane” w Sellasist",
+    opis: "Numery statusów zamówienia, które znaczą „zebrane”; puste bierze dzień etykiety." },
+  { klucz: "SELLASIST_SYNC_MS", grupa: "sellasist", kto: "zaawansowane",
+    opis: "Takt lustra zamówień Sellasist w milisekundach; 0 wyłącza." },
+  { klucz: "SELLASIST_API_URL", grupa: "sellasist", kto: "dev",
+    opis: "Inny adres API Sellasist; tylko do testów." },
   { klucz: "ALLEGRO_DOSYLKI_SYNC_MS", grupa: "zwroty", kto: "zaawansowane",
     opis: "Takt wykrywania i śledzenia dosyłek w milisekundach; 0 wyłącza." },
   { klucz: "ALLEGRO_REKLAMACJE_SYNC_MS", grupa: "zwroty", kto: "zaawansowane",
