@@ -269,7 +269,27 @@ export interface TowarBezZdjecia {
   symbol: string;
   nazwa: string;
   ean: string | null;
+  /** Suma stanu ze wszystkich magazynów; 0, gdy towar nie ma wiersza w `tw_Stan`. */
+  stan: number;
 }
+
+/**
+ * Porządek listy braków. Biuro zaczyna zwykle od tego, co leży na półce
+ * i się sprzedaje, więc domyślnie wygrywa stan, nie alfabet.
+ */
+export const SORTOWANIA_BEZ_ZDJECIA = ["stan", "symbol", "nazwa", "najnowsze"] as const;
+export type SortBezZdjecia = (typeof SORTOWANIA_BEZ_ZDJECIA)[number];
+
+/* Klauzule z tej mapy, nigdy z wejścia: nazwa sortowania przychodzi
+   z adresu, a ORDER BY nie przyjmuje parametru. Każda domyka się `tw_Id`,
+   bo stronicowanie bez pełnego porządku gubi i dubluje wiersze. */
+const PORZADEK: Record<SortBezZdjecia, string> = {
+  stan: "ISNULL(s.stan, 0) DESC, t.tw_Symbol, t.tw_Id",
+  symbol: "t.tw_Symbol, t.tw_Id",
+  nazwa: "t.tw_Nazwa, t.tw_Id",
+  /* tw_Id rośnie z każdą nową kartoteką, więc to najświeższe towary. */
+  najnowsze: "t.tw_Id DESC",
+};
 
 /**
  * Warunek „ta kartoteka nie ma zdjęcia" dla skonfigurowanego źródła.
@@ -302,6 +322,9 @@ export function budujZapytanieBezZdjecia(opts: {
   kolumna: string;
   klucz: string;
   zFiltrem: boolean;
+  sortuj?: SortBezZdjecia;
+  /** Tylko towary, które gdziekolwiek leżą — reszty i tak nie ma czym sfotografować. */
+  naStanie?: boolean;
 }): { strona: string; razem: string } {
   const warunki = ["t.tw_Zablokowany = 0", warunekBrakuZdjecia(opts)];
   if (opts.zFiltrem) {
@@ -309,12 +332,23 @@ export function budujZapytanieBezZdjecia(opts: {
       "(t.tw_Symbol LIKE @q ESCAPE '!' OR t.tw_Nazwa LIKE @q ESCAPE '!' OR t.tw_PodstKodKresk LIKE @q ESCAPE '!')"
     );
   }
-  const skad = `FROM tw__Towar t WITH (NOLOCK) WHERE ${warunki.join(" AND ")}`;
+  if (opts.naStanie) {
+    warunki.push("EXISTS (SELECT 1 FROM tw_Stan st WITH (NOLOCK) WHERE st.st_TowId = t.tw_Id AND st.st_Stan > 0)");
+  }
+  const gdzie = `WHERE ${warunki.join(" AND ")}`;
+  /* Stan sumowany po magazynach w podzapytaniu: złączenie wprost z tw_Stan
+     mnożyłoby wiersze towaru przez liczbę magazynów. Licznik go nie
+     potrzebuje, więc liczy bez złączenia. */
+  const stan =
+    "LEFT JOIN (SELECT st_TowId, SUM(st_Stan) AS stan FROM tw_Stan WITH (NOLOCK) GROUP BY st_TowId) s " +
+    "ON s.st_TowId = t.tw_Id";
+  const porzadek = PORZADEK[opts.sortuj ?? "stan"] ?? PORZADEK.stan;
   return {
     strona:
-      `SELECT t.tw_Id AS twId, t.tw_Symbol AS symbol, t.tw_Nazwa AS nazwa, t.tw_PodstKodKresk AS ean ${skad} ` +
-      "ORDER BY t.tw_Symbol, t.tw_Id OFFSET @offset ROWS FETCH NEXT @limit ROWS ONLY",
-    razem: `SELECT COUNT(*) AS razem ${skad}`,
+      "SELECT t.tw_Id AS twId, t.tw_Symbol AS symbol, t.tw_Nazwa AS nazwa, " +
+      `t.tw_PodstKodKresk AS ean, ISNULL(s.stan, 0) AS stan FROM tw__Towar t WITH (NOLOCK) ${stan} ${gdzie} ` +
+      `ORDER BY ${porzadek} OFFSET @offset ROWS FETCH NEXT @limit ROWS ONLY`,
+    razem: `SELECT COUNT(*) AS razem FROM tw__Towar t WITH (NOLOCK) ${gdzie}`,
   };
 }
 
@@ -334,6 +368,8 @@ export async function towaryBezZdjecia(z: {
   q: string;
   limit: number;
   offset: number;
+  sortuj: SortBezZdjecia;
+  naStanie: boolean;
 }): Promise<{ razem: number; pozycje: TowarBezZdjecia[] }> {
   const c = config.zdjecia;
   const zapytania = budujZapytanieBezZdjecia({
@@ -341,6 +377,8 @@ export async function towaryBezZdjecia(z: {
     kolumna: c.kolumna,
     klucz: c.kolumnaKlucza,
     zFiltrem: z.q !== "",
+    sortuj: z.sortuj,
+    naStanie: z.naStanie,
   });
   const pool = await mssqlPool();
   const zapytanie = () => {
@@ -351,7 +389,9 @@ export async function towaryBezZdjecia(z: {
   const strona = await zapytanie()
     .input("offset", sql.Int, z.offset)
     .input("limit", sql.Int, z.limit)
-    .query<{ twId: number; symbol: string; nazwa: string; ean: string | null }>(zapytania.strona);
+    .query<{ twId: number; symbol: string; nazwa: string; ean: string | null; stan: number | null }>(
+      zapytania.strona
+    );
   const razem = await zapytanie().query<{ razem: number }>(zapytania.razem);
   return {
     razem: Number(razem.recordset[0]?.razem ?? 0),
@@ -360,6 +400,8 @@ export async function towaryBezZdjecia(z: {
       symbol: w.symbol,
       nazwa: w.nazwa,
       ean: w.ean && w.ean.trim() ? w.ean.trim() : null,
+      /* st_Stan to decimal, a sterownik oddaje go jako liczbę albo tekst. */
+      stan: Number(w.stan ?? 0) || 0,
     })),
   };
 }

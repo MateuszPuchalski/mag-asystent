@@ -1,6 +1,11 @@
 import { db } from "../db/db.js";
 import { config } from "../config.js";
-import { towaryBezZdjecia, type TowarBezZdjecia } from "../adapters/zdjecia.sgt.js";
+import {
+  SORTOWANIA_BEZ_ZDJECIA,
+  towaryBezZdjecia,
+  type SortBezZdjecia,
+  type TowarBezZdjecia,
+} from "../adapters/zdjecia.sgt.js";
 import { dodawanieWlaczone } from "./zdjecia-wlasne.js";
 
 /* ── Lista kartotek bez zdjęcia — ekran biura ────────────────────────────────
@@ -77,6 +82,8 @@ export async function listaBezZdjecia(zapytanie: {
   q?: unknown;
   limit?: unknown;
   offset?: unknown;
+  sortuj?: unknown;
+  naStanie?: unknown;
 }): Promise<ListaBezZdjecia> {
   const powod = powodWylaczenia();
   if (powod) return { wlaczone: false, powod, razem: 0, pozycje: [] };
@@ -84,8 +91,14 @@ export async function listaBezZdjecia(zapytanie: {
   const q = String(zapytanie.q ?? "").trim().slice(0, 100);
   const limit = calkowita(zapytanie.limit, LIMIT_DOMYSLNY, 1, LIMIT_MAX);
   const offset = calkowita(zapytanie.offset, 0, 0, Number.MAX_SAFE_INTEGER);
+  /* Nieznana nazwa wraca do domyślnej: stara zakładka w przeglądarce nie
+     może wywrócić ekranu błędem 400. */
+  const sortuj = (SORTOWANIA_BEZ_ZDJECIA as readonly string[]).includes(String(zapytanie.sortuj))
+    ? (zapytanie.sortuj as SortBezZdjecia)
+    : "stan";
+  const naStanie = zapytanie.naStanie === "1" || zapytanie.naStanie === "true";
 
-  const { razem, pozycje } = await zrodlo({ q, limit, offset });
+  const { razem, pozycje } = await zrodlo({ q, limit, offset, sortuj, naStanie });
   const czeka = oczekujace(pozycje.map((p) => p.twId));
   return {
     wlaczone: true,

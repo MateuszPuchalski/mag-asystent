@@ -13,6 +13,8 @@ export interface PozycjaBezZdjecia {
   symbol: string;
   nazwa: string;
   ean: string | null;
+  /** Suma stanu ze wszystkich magazynów Subiekta. */
+  stan: number;
   /** Zdjęcie już czeka w kolejce do Subiekta. */
   oczekuje: boolean;
 }
@@ -27,10 +29,14 @@ export interface ListaBezZdjecia {
 
 export const NA_STRONIE = 50;
 
-export function useBezZdjecia(q: string, offset: number) {
-  const p = new URLSearchParams({ q, limit: String(NA_STRONIE), offset: String(offset) });
+/** Porządek listy; nazwy idą do serwera, który zna tylko te cztery. */
+export type SortBezZdjecia = "stan" | "symbol" | "nazwa" | "najnowsze";
+
+export function useBezZdjecia(q: string, offset: number, sortuj: SortBezZdjecia = "stan", naStanie = false) {
+  const p = new URLSearchParams({ q, limit: String(NA_STRONIE), offset: String(offset), sortuj });
+  if (naStanie) p.set("naStanie", "1");
   return useQuery({
-    queryKey: ["zdjecia", "bez-zdjecia", q, offset],
+    queryKey: ["zdjecia", "bez-zdjecia", q, offset, sortuj, naStanie],
     queryFn: () => api<ListaBezZdjecia>(`/api/zdjecia/bez-zdjecia?${p}`),
     /* Poprzednia strona zostaje na ekranie, dopóki nie przyjdzie następna.
        Pusta lista na ułamek sekundy przesuwałaby wiersze pod kursorem. */

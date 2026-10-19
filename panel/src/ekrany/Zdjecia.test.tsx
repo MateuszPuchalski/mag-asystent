@@ -25,7 +25,7 @@ vi.mock("../zdjecia/obraz", () => ({
 }));
 
 const poz = (twId: number, symbol: string, nazwa: string, oczekuje = false): PozycjaBezZdjecia =>
-  ({ twId, symbol, nazwa, ean: `59000000000${twId}`, oczekuje });
+  ({ twId, symbol, nazwa, ean: `59000000000${twId}`, stan: twId === 3 ? 0 : twId * 2.5, oczekuje });
 
 const LISTA: ListaBezZdjecia = {
   wlaczone: true, razem: 3,
@@ -70,6 +70,27 @@ describe("Zdjęcia", () => {
     expect(screen.getByText("3 towary bez zdjęcia")).toBeInTheDocument();
     expect(stan.wyslane).toEqual([]);
     expect(stan.nieznane).toEqual([]);
+  });
+
+  /* Kolejność i filtr to tylko inne pytanie o listę: GET z nowymi
+     parametrami, od pierwszej strony, bez żadnego zapisu. */
+  it("kolejność i „tylko na stanie” pytają serwer od nowa i niczego nie zapisują", async () => {
+    const stan = atrapa();
+    const u = userEvent.setup();
+    pokaz();
+    await screen.findByRole("heading", { name: "Sekator kowadełkowy" });
+    expect(screen.getByText("stan 2,5")).toBeInTheDocument();
+    expect(screen.getByText("stan 0")).toBeInTheDocument();
+    const adresy = () => vi.mocked(fetch).mock.calls.map(([adres]) => String(adres))
+      .filter((a) => a.startsWith("/api/zdjecia/bez-zdjecia"));
+    expect(adresy()[0]).toContain("sortuj=stan");
+
+    await u.selectOptions(screen.getByLabelText("Kolejność"), "nazwa");
+    await waitFor(() => expect(adresy().at(-1)).toContain("sortuj=nazwa"));
+    await u.click(screen.getByLabelText("Tylko na stanie"));
+    await waitFor(() => expect(adresy().at(-1)).toContain("naStanie=1"));
+    expect(adresy().at(-1)).toContain("offset=0");
+    expect(stan.wyslane).toEqual([]);
   });
 
   it("wyłączona funkcja: zdanie z serwera, bez edytora", async () => {
