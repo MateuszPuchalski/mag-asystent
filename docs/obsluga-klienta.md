@@ -538,7 +538,7 @@ Drugi przyrost S6 dokłada tabelę `klient_dosylka` z numerem przesyłki.
 
 ## Polityka danych Sellasist
 
-Lustro zamówień Sellasist (@wydanie) to tabele `sellasist_*`. Szczegóły
+Lustro zamówień Sellasist (0.592.0) to tabele `sellasist_*`. Szczegóły
 działania stoją w `docs/sellasist.md`.
 
 - **Zapisujemy** numer zamówienia w Sellasist i w źródle, login kupującego

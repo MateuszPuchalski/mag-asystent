@@ -2,7 +2,7 @@
 
 Przez Sellasist przechodzą wszystkie zamówienia firmy. Tam powstają statusy
 realizacji, koszyki i etykiety przewoźnika. WERTIS czyta z niego cztery rzeczy
-i pisze jedną. Integracja weszła w @wydanie. Włączenie opisuje DEPLOY.md,
+i pisze jedną. Integracja weszła w 0.592.0. Włączenie opisuje DEPLOY.md,
 w sekcji „Sellasist".
 
 Kształt API czytamy z pliku `docs/sellasist/api.yaml`, nie z pamięci. To ta

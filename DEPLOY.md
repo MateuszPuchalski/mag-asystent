@@ -1026,7 +1026,7 @@ biura: <https://ifconfig.me>. Ten sam adres w obu miejscach znaczy wspólne
 zapisuje kształt odpowiedzi Allegro, a `npm --prefix server run
 sonda:zalacznik` pokazuje drogę pobrania załącznika.
 
-### Sellasist (@wydanie)
+### Sellasist (0.592.0)
 
 Integracja jest domyślnie wyłączona. Włącza ją para w `wertis.env`:
 
