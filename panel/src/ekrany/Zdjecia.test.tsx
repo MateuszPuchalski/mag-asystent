@@ -5,7 +5,7 @@ import React from "react";
 import { MemoryRouter } from "react-router-dom";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { atrapaZapisow } from "../test/zapisy";
-import { Zdjecia, nastepnyWolny } from "./Zdjecia";
+import { Zdjecia, nastepnyWolny, sasiad } from "./Zdjecia";
 import type { ListaBezZdjecia, PozycjaBezZdjecia } from "../api/zdjecia";
 
 /* ── Ekran „Zdjęcia” ──────────────────────────────────────────────────────
@@ -79,7 +79,8 @@ describe("Zdjęcia", () => {
     const u = userEvent.setup();
     pokaz();
     await screen.findByRole("heading", { name: "Sekator kowadełkowy" });
-    expect(screen.getByText("stan 2,5")).toBeInTheDocument();
+    /* Stan sekatora stoi na liście i w nagłówku edytora. */
+    expect(screen.getAllByText("stan 2,5")).toHaveLength(2);
     expect(screen.getByText("stan 0")).toBeInTheDocument();
     const adresy = () => vi.mocked(fetch).mock.calls.map(([adres]) => String(adres))
       .filter((a) => a.startsWith("/api/zdjecia/bez-zdjecia"));
@@ -110,37 +111,56 @@ describe("Zdjęcia", () => {
     expect(within(wiersz).getByText("w kolejce")).toBeInTheDocument();
   });
 
-  it("plik → podgląd → zatwierdzenie wysyła gotowe zdjęcie i przechodzi do następnego wolnego towaru", async () => {
+  /* Domyślnie bez białego kwadratu, decyzją właściciela: serwer zapisuje
+     wycięcie sam, a przeglądarka nie składa i nie wysyła gotowego pliku. */
+  it("plik → podgląd → zatwierdzenie bez białego kwadratu i przejście do następnego wolnego towaru", async () => {
     const stan = atrapa();
     const u = userEvent.setup();
     pokaz();
     await screen.findByRole("heading", { name: "Sekator kowadełkowy" });
     await u.upload(screen.getByLabelText(/Upuść zdjęcie/), new File(["x"], "sekator.jpg", { type: "image/jpeg" }));
-    await u.click(await screen.findByRole("button", { name: "Usuń tło i pokaż podgląd" }));
+    await u.click(await screen.findByRole("button", { name: /^Usuń tło i pokaż podgląd/ }));
     expect(await screen.findByRole("img", { name: "Gotowe zdjęcie towaru" })).toBeInTheDocument();
     expect(cialo("/api/products/1/zdjecie/wstepne")).toEqual({ zdjecie: "V1lTTEFOWQ==" });
-    expect(screen.getByLabelText("Usuń tło")).toBeChecked();
+    expect(screen.getByLabelText(/^Usuń tło/)).toBeChecked();
+    expect(screen.getByLabelText(/^Białe tło i kwadrat/)).not.toBeChecked();
 
-    await u.click(screen.getByRole("button", { name: "Zatwierdź" }));
+    await u.click(screen.getByRole("button", { name: /^Zatwierdź/ }));
     /* Konewka czeka w kolejce, więc następny wolny to grabie. */
     expect(await screen.findByRole("heading", { name: "Grabie metalowe" })).toBeInTheDocument();
-    expect(cialo("/api/products/1/zdjecie")).toEqual({ podgladId: "p-77", zTlem: false, zrodlo: "panel", gotowy: "R09UT1dZ" });
+    expect(cialo("/api/products/1/zdjecie")).toEqual({ podgladId: "p-77", zTlem: false, zrodlo: "panel" });
     expect(screen.getByRole("status")).toHaveTextContent("Zapisano zdjęcie SEK-1");
     /* Zatwierdzony podgląd zużył serwer — porzucanie go byłoby zbędnym zapisem. */
     expect(stan.wyslane).toEqual(["POST /api/products/1/zdjecie/wstepne", "POST /api/products/1/zdjecie"]);
   });
 
-  it("bez „Białe tło i kwadrat” serwer składa zdjęcie sam, a zostawione tło idzie jako zTlem", async () => {
+  /* Wybór białego kwadratu przeżywa przejście do następnego towaru: przy pracy
+     seryjnej agent ustawia go raz, nie przy każdym zdjęciu. */
+  it("włączony biały kwadrat wysyła gotowy plik i zostaje włączony przy następnym towarze", async () => {
+    atrapa();
+    const u = userEvent.setup();
+    pokaz();
+    await screen.findByRole("heading", { name: "Sekator kowadełkowy" });
+    await u.upload(screen.getByLabelText(/Upuść zdjęcie/), new File(["x"], "s.jpg", { type: "image/jpeg" }));
+    await u.click(await screen.findByRole("button", { name: /^Usuń tło i pokaż podgląd/ }));
+    await screen.findByRole("img", { name: "Gotowe zdjęcie towaru" });
+    await u.click(screen.getByLabelText(/^Białe tło i kwadrat/));
+    await waitFor(() => expect(screen.getByRole("button", { name: /^Zatwierdź/ })).toBeEnabled());
+    await u.click(screen.getByRole("button", { name: /^Zatwierdź/ }));
+    await screen.findByRole("heading", { name: "Grabie metalowe" });
+    expect(cialo("/api/products/1/zdjecie")).toEqual({ podgladId: "p-77", zTlem: false, zrodlo: "panel", gotowy: "R09UT1dZ" });
+  });
+
+  it("zostawione tło idzie jako zTlem, bez gotowego pliku", async () => {
     atrapa();
     const u = userEvent.setup();
     pokaz();
     await screen.findByRole("heading", { name: "Sekator kowadełkowy" });
     await u.upload(screen.getByLabelText(/Upuść zdjęcie/), new File(["x"], "s.png", { type: "image/png" }));
-    await u.click(await screen.findByRole("button", { name: "Usuń tło i pokaż podgląd" }));
+    await u.click(await screen.findByRole("button", { name: /^Usuń tło i pokaż podgląd/ }));
     await screen.findByRole("img", { name: "Gotowe zdjęcie towaru" });
-    await u.click(screen.getByLabelText("Usuń tło"));
-    await u.click(screen.getByLabelText("Białe tło i kwadrat"));
-    await u.click(screen.getByRole("button", { name: "Zatwierdź" }));
+    await u.click(screen.getByLabelText(/^Usuń tło/));
+    await u.click(screen.getByRole("button", { name: /^Zatwierdź/ }));
     await screen.findByRole("heading", { name: "Grabie metalowe" });
     expect(cialo("/api/products/1/zdjecie")).toEqual({ podgladId: "p-77", zTlem: true, zrodlo: "panel" });
   });
@@ -151,10 +171,10 @@ describe("Zdjęcia", () => {
     pokaz();
     await screen.findByRole("heading", { name: "Sekator kowadełkowy" });
     await u.upload(screen.getByLabelText(/Upuść zdjęcie/), new File(["x"], "s.jpg", { type: "image/jpeg" }));
-    await u.click(await screen.findByRole("button", { name: "Usuń tło i pokaż podgląd" }));
+    await u.click(await screen.findByRole("button", { name: /^Usuń tło i pokaż podgląd/ }));
     await screen.findByRole("img", { name: "Gotowe zdjęcie towaru" });
-    await u.click(screen.getByRole("button", { name: "Jeszcze raz" }));
-    expect(await screen.findByRole("button", { name: "Usuń tło i pokaż podgląd" })).toBeInTheDocument();
+    await u.click(screen.getByRole("button", { name: /^Jeszcze raz/ }));
+    expect(await screen.findByRole("button", { name: /^Usuń tło i pokaż podgląd/ })).toBeInTheDocument();
     await waitFor(() => expect(stan.wyslane).toContain("DELETE /api/products/1/zdjecie/wstepne/p-77"));
   });
 
@@ -165,14 +185,66 @@ describe("Zdjęcia", () => {
     pokaz();
     await screen.findByRole("heading", { name: "Sekator kowadełkowy" });
     await u.upload(screen.getByLabelText(/Upuść zdjęcie/), new File(["x"], "s.jpg", { type: "image/jpeg" }));
-    await u.click(await screen.findByRole("button", { name: "Usuń tło i pokaż podgląd" }));
+    await u.click(await screen.findByRole("button", { name: /^Usuń tło i pokaż podgląd/ }));
     await screen.findByRole("img", { name: "Gotowe zdjęcie towaru" });
-    await u.click(screen.getByRole("button", { name: "Zatwierdź" }));
+    await u.click(screen.getByLabelText(/^Białe tło i kwadrat/));
+    await waitFor(() => expect(screen.getByRole("button", { name: /^Zatwierdź/ })).toBeEnabled());
+    await u.click(screen.getByRole("button", { name: /^Zatwierdź/ }));
     expect(await screen.findByText(/za duże \(600 KB/)).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "Sekator kowadełkowy" })).toBeInTheDocument();
-    await u.click(screen.getByLabelText("Białe tło i kwadrat"));
-    expect(screen.getByRole("button", { name: "Zatwierdź" })).toBeEnabled();
+    await u.click(screen.getByLabelText(/^Białe tło i kwadrat/));
+    expect(screen.getByRole("button", { name: /^Zatwierdź/ })).toBeEnabled();
     expect(stan.wyslane.filter((w) => w.startsWith("DELETE"))).toEqual([]);
+  });
+
+  /* Praca seryjna z klawiatury: Enter prowadzi przez oba kroki, litery
+     przełączają, a j przechodzi dalej bez zapisu. */
+  it("klawiatura: Enter → podgląd, B przełącza kwadrat, Enter zatwierdza", async () => {
+    atrapa();
+    const u = userEvent.setup();
+    pokaz();
+    await screen.findByRole("heading", { name: "Sekator kowadełkowy" });
+    await u.upload(screen.getByLabelText(/Upuść zdjęcie/), new File(["x"], "s.jpg", { type: "image/jpeg" }));
+    await screen.findByRole("button", { name: /^Usuń tło i pokaż podgląd/ });
+    (document.activeElement as HTMLElement | null)?.blur();
+    await u.keyboard("{Enter}");
+    await screen.findByRole("img", { name: "Gotowe zdjęcie towaru" });
+    await u.keyboard("b");
+    expect(screen.getByLabelText(/^Białe tło i kwadrat/)).toBeChecked();
+    await waitFor(() => expect(screen.getByRole("button", { name: /^Zatwierdź/ })).toBeEnabled());
+    await u.keyboard("{Enter}");
+    await screen.findByRole("heading", { name: "Grabie metalowe" });
+    expect(cialo("/api/products/1/zdjecie")).toMatchObject({ gotowy: "R09UT1dZ" });
+  });
+
+  it("klawiatura: Esc w podglądzie to „Jeszcze raz”", async () => {
+    const stan = atrapa();
+    const u = userEvent.setup();
+    pokaz();
+    await screen.findByRole("heading", { name: "Sekator kowadełkowy" });
+    await u.upload(screen.getByLabelText(/Upuść zdjęcie/), new File(["x"], "s.jpg", { type: "image/jpeg" }));
+    await u.click(await screen.findByRole("button", { name: /^Usuń tło i pokaż podgląd/ }));
+    await screen.findByRole("img", { name: "Gotowe zdjęcie towaru" });
+    await u.keyboard("{Escape}");
+    expect(await screen.findByRole("button", { name: /^Usuń tło i pokaż podgląd/ })).toBeInTheDocument();
+    await waitFor(() => expect(stan.wyslane).toContain("DELETE /api/products/1/zdjecie/wstepne/p-77"));
+  });
+
+  it("j / k i „Pomiń” chodzą po wolnych towarach bez żadnego zapisu", async () => {
+    const stan = atrapa();
+    const u = userEvent.setup();
+    pokaz();
+    await screen.findByRole("heading", { name: "Sekator kowadełkowy" });
+    await u.keyboard("j");
+    expect(await screen.findByRole("heading", { name: "Grabie metalowe" })).toBeInTheDocument();
+    await u.keyboard("k");
+    expect(await screen.findByRole("heading", { name: "Sekator kowadełkowy" })).toBeInTheDocument();
+    await u.click(screen.getByRole("button", { name: /^Pomiń/ }));
+    expect(await screen.findByRole("heading", { name: "Grabie metalowe" })).toBeInTheDocument();
+    /* Litera w polu szukania to pisanie, nie ruch po liście. */
+    await u.type(screen.getByLabelText("Szukaj towaru bez zdjęcia"), "j");
+    expect(screen.getByRole("heading", { name: "Grabie metalowe" })).toBeInTheDocument();
+    expect(stan.wyslane).toEqual([]);
   });
 
   it("awaria bazy Subiekta (503) to błąd z ponowieniem, nie wyłączona funkcja", async () => {
@@ -211,5 +283,20 @@ describe("następny wolny towar", () => {
   it("na końcu listy wraca na górę, a bez wolnych oddaje null", () => {
     expect(nastepnyWolny(L, 4, new Set())?.twId).toBe(1);
     expect(nastepnyWolny(L, 4, new Set([1, 3]))).toBeNull();
+  });
+});
+
+describe("sąsiad dla j / k", () => {
+  const L = [poz(1, "A", "a"), poz(2, "B", "b", true), poz(3, "C", "c"), poz(4, "D", "d")];
+  it("przeskakuje kolejkę i zrobione, a na krańcach stoi", () => {
+    expect(sasiad(L, 1, 1, new Set())?.twId).toBe(3);
+    expect(sasiad(L, 3, -1, new Set())?.twId).toBe(1);
+    expect(sasiad(L, 1, 1, new Set([3]))?.twId).toBe(4);
+    expect(sasiad(L, 4, 1, new Set())).toBeNull();
+    expect(sasiad(L, 1, -1, new Set())).toBeNull();
+  });
+  it("bez wybranego zaczyna od pierwszego albo ostatniego wolnego", () => {
+    expect(sasiad(L, null, 1, new Set())?.twId).toBe(1);
+    expect(sasiad(L, null, -1, new Set())?.twId).toBe(4);
   });
 });
