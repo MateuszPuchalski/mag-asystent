@@ -26,15 +26,18 @@ export const WZORCE_ODPOWIEDZI: Record<Kategoria, string> = {
     "podaj stan zamówienia i przesyłki z faktów (status, przewoźnik, numer listu); "
     + "przed nadaniem odpowiedz według werdyktu faktu o realizacji: gdy paczka wychodzi dziś, "
     + "napisz, że wyślemy ją dziś; gdy werdykt podaje termin nadania, podaj go; "
-    + "gdy żadnego z tych faktów nie ma, napisz, że sprawdzamy, bez daty; o maszynę ani część nie pytaj",
+    + "gdy żadnego z tych faktów nie ma, napisz, że sprawdzamy, bez daty; o maszynę ani część nie pytaj; "
+    + "gdy fakt o przesyłce ma WERDYKT, zrób to, co mówi",
   DELIVERY_DELAY:
     "powiedz, gdzie jest paczka według faktu o przesyłce, i krótko przeproś za zwłokę; "
     + "daty doręczenia nie obiecuj i nie obwiniaj przewoźnika z siebie; "
     + "gdy paczka stoi bez ruchu, napisz, że sprawdzimy to u przewoźnika; "
-    + "gdy paczka nie jest jeszcze nadana, odpowiedz według werdyktu faktu o realizacji",
+    + "gdy paczka nie jest jeszcze nadana, odpowiedz według werdyktu faktu o realizacji; "
+    + "gdy fakt o przesyłce ma WERDYKT, zrób to, co mówi",
   DELIVERY_LOST:
     "zaginięcia nie potwierdzaj z siebie — podaj ostatni stan przesyłki z faktów "
-    + "i napisz, że wyjaśniamy to z przewoźnikiem; ponownej wysyłki ani zwrotu pieniędzy nie obiecuj",
+    + "i napisz, że wyjaśniamy to z przewoźnikiem; ponownej wysyłki ani zwrotu pieniędzy nie obiecuj; "
+    + "gdy fakt o przesyłce ma WERDYKT, zrób to, co mówi, zamiast wyjaśniania z przewoźnikiem",
   DELIVERY_DAMAGED:
     "przeproś i poproś o zdjęcia paczki oraz uszkodzonej części, jeśli ich nie ma w rozmowie, "
     + "a także o protokół szkody, gdy był spisany przy kurierze; wymiany ani zwrotu pieniędzy nie obiecuj",

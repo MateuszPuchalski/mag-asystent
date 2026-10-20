@@ -25,3 +25,9 @@ test("pytanie o paczkę nie każe pytać o maszynę; spoza słownika nie ma wzor
   assert.equal(wzorzecOdpowiedzi("dobor"), null);
   assert.equal(wzorzecOdpowiedzi("toString"), null);
 });
+
+test("wzorce o przesyłce oddają pierwszeństwo werdyktowi faktu o przesyłce", () => {
+  for (const k of ["ORDER_STATUS", "DELIVERY_DELAY", "DELIVERY_LOST"] as const) {
+    assert.match(WZORCE_ODPOWIEDZI[k], /gdy fakt o przesyłce ma WERDYKT, zrób to, co mówi/, k);
+  }
+});
