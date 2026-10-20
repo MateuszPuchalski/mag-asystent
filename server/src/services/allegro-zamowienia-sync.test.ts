@@ -103,11 +103,14 @@ test("zamówienie Allegro w braku z kompletacji w Sellasist też idzie do pobran
   const d = stanowisko();
   const z = d.prepare(`INSERT INTO sellasist_zamowienie(id, external_id, zrodlo, status_id, status_at,
       skopiowane_z, pobrano_at) VALUES (?,?,?,?,'2026-08-30T08:00:00Z',?,'x')`);
-  z.run(1, "ord-brak", "allegro", 12, null);
-  z.run(2, "ord-inny-status", "allegro", 13, null);
-  z.run(3, "ord-kopia", "allegro", 12, 1);
-  z.run(4, "emag-5", "emag", 12, null);
-  assert.deepEqual(brakujaceZamowienia(d, KONTO, 10, new Date(), false, [12]), ["ord-brak"]);
+  const u = (n: number) => `29a1c2b0-0000-11ef-9a00-${String(n).padStart(12, "0")}`;
+  z.run(1, u(1), "allegro", 12, null);
+  z.run(2, u(2), "allegro", 13, null);
+  z.run(3, u(3), "allegro", 12, 1);
+  z.run(4, u(4), "emag", 12, null);
+  /* Allegro odpowiada na numer spoza kształtu UUID 422, bez negatywu — wracałby co przebieg. */
+  z.run(5, "ALG-5", "allegro", 12, null);
+  assert.deepEqual(brakujaceZamowienia(d, KONTO, 10, new Date(), false, [12]), [u(1)]);
   assert.deepEqual(brakujaceZamowienia(d, KONTO, 10, new Date(), false, []), [], "bez statusu braku nic");
 });
 

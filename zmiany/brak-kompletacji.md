@@ -11,8 +11,11 @@ i 15:00 przy InPost. Wejście w brak po tej godzinie staje od razu.
 Wiersz mówi, czego brakuje i co jeszcze jest w zamówieniu, i prowadzi na
 profil klienta. Obok stoi odnośnik do zamówienia w Allegro, gdzie biuro pisze
 do klienta. Przycisk „Klient powiadomiony” zamyka wiersz, choć zamówienie
-zostaje w statusie braku.
+zostaje w statusie braku. Stawia przy tym krok w sprawie klienta na następny
+dzień roboczy, więc odpowiedź klienta nie zginie.
 
 **[wymaga działania]** W panelu: Ustawienia → Konfiguracja, grupa Sellasist.
 Wpisz w `SELLASIST_STATUSY_BRAK` numer statusu „Brak podczas kompletacji”
-(u nas 12). Godziny graniczne mają już domyślne 12 i 15.
+(u nas 12). Godziny graniczne mają już domyślne 12 i 15. Pierwszego dnia
+staną naraz wszystkie zamówienia, które już czekają w braku, także InPost
+z godziną kuriera. Lustro zna metodę dostawy dopiero po ich następnej zmianie.

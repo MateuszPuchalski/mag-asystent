@@ -28,13 +28,24 @@ before(async () => {
   B = await import("./brak-kompletacji.js");
 });
 
+let autor = { id: 0, name: "Ola" };
+
 beforeEach(() => {
   for (const t of ["sellasist_pozycja", "sellasist_przesylka", "sellasist_zamowienie", "sellasist_brak_powiadomiony",
-    "events"]) db().exec(`DELETE FROM ${t}`);
+    "events", "klient_prowadzenie", "zamowienie_klienta", "channel_account", "app_user"]) db().exec(`DELETE FROM ${t}`);
+  const konto = Number(db().prepare("INSERT INTO channel_account(channel, external_account_id) VALUES ('allegro','b')")
+    .run().lastInsertRowid);
+  /* Profil i sprawa znają klienta z zamówienia Allegro, nie z lustra Sellasist. */
+  db().prepare(`INSERT INTO zamowienie_klienta(channel_account_id, external_id, kupujacy_login, synced_at)
+    VALUES (?, ?, 'Ogrodnik_77', 'x')`).run(konto, uuid(1));
+  autor = { id: Number(db().prepare("INSERT INTO app_user(login, name, role) VALUES ('ola', 'Ola', 'biuro')")
+    .run().lastInsertRowid), name: "Ola" };
 });
 
+const uuid = (n: number) => `29a1c2b0-0000-11ef-9a00-${String(n).padStart(12, "0")}`;
+
 function zamowienie(id: number, n: Partial<Record<string, unknown>> = {}) {
-  const w = { external_id: `allegro-${id}`, kupujacy_login: "Ogrodnik_77", zrodlo: "allegro", status_id: 12,
+  const w = { external_id: uuid(id), kupujacy_login: "Ogrodnik_77", zrodlo: "allegro", status_id: 12,
     status_at: RANO, dostawa: "Allegro Kurier DPD", skopiowane_z: null, ...n };
   db().prepare(`INSERT INTO sellasist_zamowienie(id, external_id, kupujacy_login, zrodlo, status_id, status_at,
       dostawa, skopiowane_z, pobrano_at) VALUES (?,?,?,?,?,?,?,?,'x')`)
@@ -64,7 +75,7 @@ test("przed godziną graniczną wiersza nie ma, po niej jest z brakami i resztą
   pozycja(1, 11, "Nóż do kosiarki", 1, 0);
   assert.deepEqual(B.brakiPoTerminie(db(), o("2026-10-20T09:59:00.000Z"), U), []);
   assert.deepEqual(B.brakiPoTerminie(db(), o("2026-10-20T10:00:00.000Z"), U), [{
-    zamowienieId: 1, externalId: "allegro-1", login: "Ogrodnik_77", statusAt: RANO,
+    zamowienieId: 1, externalId: uuid(1), login: "Ogrodnik_77", statusAt: RANO,
     terminAt: "2026-10-20T10:00:00.000Z", inpost: false,
     braki: [{ nazwa: "Pasek klinowy", potrzeba: 2, jest: 0 }], reszta: ["Nóż do kosiarki ×1"],
   }]);
@@ -87,20 +98,29 @@ test("tylko oryginały z Allegro w statusie braku; bez ustawienia nic", () => {
   zamowienie(2, { zrodlo: "emag" });
   zamowienie(3, { skopiowane_z: 1 });
   zamowienie(4, { status_id: 13 });
+  zamowienie(5, { external_id: "ALG-5" });
   const po = o("2026-10-20T11:00:00.000Z");
   assert.deepEqual(B.brakiPoTerminie(db(), po, U).map((b) => b.zamowienieId), [1]);
   assert.deepEqual(B.brakiPoTerminie(db(), po, { ...U, statusyBrak: [] }), []);
 });
 
-test("„Klient powiadomiony” gasi to wejście w brak; ponowny brak wraca", () => {
+test("„Klient powiadomiony” stawia krok w sprawie klienta i gasi to wejście w brak; ponowny brak wraca", () => {
   zamowienie(1);
   const po = o("2026-10-20T11:00:00.000Z");
-  const autor = { id: 7, name: "Ola" };
-  B.oznaczPowiadomiony(db(), 1, RANO, autor, po, [12]);
+  const w = B.oznaczPowiadomiony(db(), 1, RANO, autor, po, [12]);
+  assert.deepEqual(w, { zalozona: true, login: "Ogrodnik_77",
+    krok: "Brak z kompletacji przy zamówieniu 29a1c2b0: czekamy na decyzję klienta",
+    krokDo: w.krokDo, zastapil: null });
+  assert.ok(Date.parse(w.krokDo) > po.getTime(), "termin to następny dzień roboczy");
+  const sprawa = db().prepare("SELECT krok, prowadzi_user_id FROM klient_prowadzenie WHERE login = 'Ogrodnik_77'")
+    .get() as { krok: string; prowadzi_user_id: number };
+  assert.equal(sprawa.krok, w.krok, "sprawa na profilu i w „Moje” mówi, że czekamy na klienta");
+  assert.equal(sprawa.prowadzi_user_id, autor.id);
   B.oznaczPowiadomiony(db(), 1, RANO, autor, po, [12]);
   assert.deepEqual(B.brakiPoTerminie(db(), po, U), []);
-  const zdarzenia = db().prepare("SELECT type, payload FROM events").all() as Array<{ type: string; payload: string }>;
-  assert.deepEqual(zdarzenia.map((z) => z.type), ["sellasist_brak_powiadomiony"], "drugie kliknięcie bez wpisu");
+  const zdarzenia = db().prepare("SELECT type, payload FROM events WHERE type = 'sellasist_brak_powiadomiony'")
+    .all() as Array<{ type: string; payload: string }>;
+  assert.equal(zdarzenia.length, 1, "drugie kliknięcie bez wpisu");
   assert.ok(!zdarzenia[0].payload.includes("Ogrodnik"), "do dziennika idzie numer, nie login");
   db().prepare("UPDATE sellasist_zamowienie SET status_at = '2026-10-21T06:00:00.000Z' WHERE id = 1").run();
   assert.deepEqual(B.brakiPoTerminie(db(), o("2026-10-21T10:30:00.000Z"), U).map((b) => b.zamowienieId), [1]);
@@ -108,7 +128,6 @@ test("„Klient powiadomiony” gasi to wejście w brak; ponowny brak wraca", ()
 
 test("przycisk przy zmienionym zamówieniu to 409, przy nieznanym 404", () => {
   zamowienie(1);
-  const autor = { id: 7, name: "Ola" };
   assert.throws(() => B.oznaczPowiadomiony(db(), 99, RANO, autor, new Date(), [12]),
     (e: unknown) => e instanceof B.BladBraku && e.kod === 404);
   assert.throws(() => B.oznaczPowiadomiony(db(), 1, "2026-10-19T06:30:00.000Z", autor, new Date(), [12]),
@@ -116,5 +135,12 @@ test("przycisk przy zmienionym zamówieniu to 409, przy nieznanym 404", () => {
   db().prepare("UPDATE sellasist_zamowienie SET status_id = 43 WHERE id = 1").run();
   assert.throws(() => B.oznaczPowiadomiony(db(), 1, RANO, autor, new Date(), [12]),
     (e: unknown) => e instanceof B.BladBraku && e.kod === 409, "towar się znalazł");
+  assert.equal((db().prepare("SELECT COUNT(*) AS n FROM sellasist_brak_powiadomiony").get() as { n: number }).n, 0);
+});
+
+test("klient nieznany WERTIS: 409 bez zapisu, bo powiadomienie bez kroku zgubiłoby sprawę", () => {
+  zamowienie(1, { kupujacy_login: "Nowy_Kupiec" });
+  assert.throws(() => B.oznaczPowiadomiony(db(), 1, RANO, autor, new Date(), [12]),
+    (e: unknown) => e instanceof B.BladBraku && e.kod === 409 && /nie zna jeszcze/.test(e.message));
   assert.equal((db().prepare("SELECT COUNT(*) AS n FROM sellasist_brak_powiadomiony").get() as { n: number }).n, 0);
 });

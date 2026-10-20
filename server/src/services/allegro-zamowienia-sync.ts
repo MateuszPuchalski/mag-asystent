@@ -173,16 +173,20 @@ export function brakujaceZamowienia(
          przypadkiem istniał zwrot albo wiadomość. Bez zamówienia nie ma daty
          zakupu, więc Copilot wypisywał ją w liście braków.
 
-         Sortowanie malejące po dacie zostaje wspólne dla wszystkich trzech
+         Sortowanie malejące po dacie zostaje wspólne dla wszystkich czterech
          źródeł, a sufit przebiegu chroni limit 429 tak samo jak dotąd:
          reklamacje konkurują o ten sam budżet, nie dostają własnego.
 
          Backticków tu nie ma świadomie — blok stoi w literale szablonowym. */
       SELECT order_id, channel_account_id, otwarto_at FROM reklamacja_klienta
       UNION ALL
+      /* Tylko kształt UUID: Allegro odpowiada na inny numer 422, a negatyw
+         zapisujemy wyłącznie przy 404, więc zły numer wracałby co przebieg. */
       SELECT external_id, ?, status_at FROM sellasist_zamowienie
        WHERE status_id IN (SELECT value FROM json_each(?)) AND skopiowane_z IS NULL
          AND lower(ifnull(zrodlo, '')) LIKE 'allegro%'
+         AND lower(external_id) GLOB '[0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f]-*'
+         AND length(external_id) = 36
     ) z
     LEFT JOIN zamowienie_klienta k
       ON k.channel_account_id = z.channel_account_id AND k.external_id = z.id

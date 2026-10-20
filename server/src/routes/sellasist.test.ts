@@ -82,6 +82,10 @@ test("„Klient powiadomiony”: bramka biura, 400, 404, 409 przy zmienionym sta
   const statusAt = "2026-10-20T06:30:00.000Z";
   db().prepare(`INSERT INTO sellasist_zamowienie(id, external_id, kupujacy_login, zrodlo, status_id, status_at, pobrano_at)
       VALUES (601, 'ord-601', 'Ogrodnik_77', 'allegro', 12, ?, 'x')`).run(statusAt);
+  const konto = Number(db().prepare("INSERT INTO channel_account(channel, external_account_id) VALUES ('allegro','t')")
+    .run().lastInsertRowid);
+  db().prepare(`INSERT INTO zamowienie_klienta(channel_account_id, external_id, kupujacy_login, synced_at)
+      VALUES (?, 'ord-601', 'Ogrodnik_77', 'x')`).run(konto);
   const biuro = login("biuro", "Ola B");
   const hala = login("magazynier", "Hala B");
   try {
@@ -95,7 +99,7 @@ test("„Klient powiadomiony”: bramka biura, 400, 404, 409 przy zmienionym sta
     assert.equal(stary.statusCode, 409);
     const ok = await app.inject({ method: "POST", url, headers: biuro, payload: { statusAt } });
     assert.equal(ok.statusCode, 200);
-    assert.deepEqual(ok.json(), { ok: true });
+    assert.equal(ok.json().krok, "Brak z kompletacji przy zamówieniu ord-601: czekamy na decyzję klienta");
   } finally {
     config.sellasist.statusyBrak = bylo;
   }

@@ -107,8 +107,9 @@ z 19 października 2026.
 
 **Brak z kompletacji.** Status 12 „Brak podczas kompletacji" znaczy, że
 magazyn szuka towaru, którego nie było na półce. Czasem go znajdzie, czasem
-nie. Reguła właściciela z 19 października 2026: zamówienie, które o 12:00 dalej
-stoi w braku, nie zdąży na kuriera, a przy InPoście ta sama granica to 15:00.
+nie. Reguła właściciela z 19 października 2026 brzmi tak. Zamówienie, które
+o 12:00 dalej stoi w braku, nie zdąży na kuriera, a przy InPoście ta sama
+granica to 15:00.
 Wejście w brak po tej godzinie staje od razu, bo kurier już pojechał.
 
 Biuro dostaje wtedy wiersz w „Do zrobienia": czego brakuje, co jeszcze jest
@@ -119,6 +120,9 @@ pieniędzy za niego.
 
 Zamówienie zostaje w Sellasist w braku, gdy biuro czeka na odpowiedź klienta.
 Wiersz gasi więc przycisk „Klient powiadomiony" albo wyjście ze statusu.
+Przycisk stawia też krok w sprawie klienta z terminem na następny dzień
+roboczy, więc sprawa stoi na profilu i w „Moje", aż klient wybierze drogę.
+Lustro, które stoi, daje jeden pilny wiersz, bo nowych braków wtedy nie widać.
 Przewoźnika mówi metoda dostawy (`shipment.name`), a bez niej etykieta.
 Nieznany przewoźnik dostaje wcześniejszą godzinę. Na razie tylko zamówienia
 z Allegro, bo tylko tam WERTIS zna klienta po loginie.

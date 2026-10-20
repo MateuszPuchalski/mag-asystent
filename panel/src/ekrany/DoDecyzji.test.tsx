@@ -45,7 +45,9 @@ let ciala: Array<{ body: unknown; typ: string | null }> = [];
 /* Krok, który założenie dosyłki zastąpiło — odpowiedź serwera trasy zwrotu. */
 let zastapil: string | null = null;
 /* Odpowiedź trasy „Klient powiadomiony” — test konfliktu podmienia ją na 409. */
-let odpowiedzBraku: { status: number; body: unknown } = { status: 200, body: { ok: true } };
+const KROK_BRAKU = { zalozona: true, login: "Ogrodnik_77", krokDo: "2026-10-21T06:00:00.000Z",
+  krok: "Brak z kompletacji przy zamówieniu 29a1c2b0: czekamy na decyzję klienta", zastapil: null };
+let odpowiedzBraku: { status: number; body: unknown } = { status: 200, body: KROK_BRAKU };
 
 beforeEach(() => {
   wyslane = [];
@@ -54,7 +56,7 @@ beforeEach(() => {
   pozycje = POZYCJE;
   ciala = [];
   zastapil = null;
-  odpowiedzBraku = { status: 200, body: { ok: true } };
+  odpowiedzBraku = { status: 200, body: KROK_BRAKU };
   localStorage.clear();
   localStorage.setItem("wertis-panel-token", "tok-biura");
   vi.stubGlobal("fetch", vi.fn(async (url: string, init?: RequestInit) => {
@@ -367,6 +369,15 @@ describe("BRAK Z KOMPLETACJI", () => {
     expect(ciala).toHaveLength(1);
     expect(JSON.parse(String(ciala[0]!.body))).toEqual({ statusAt: "2026-10-20T08:15:00.000Z" });
     expect(ciala[0]!.typ).toBe("application/json");
+  });
+
+  it("krok braku, który zastąpił krok ustawiony ręką, zostaje zdaniem po zejściu wiersza", async () => {
+    odpowiedzBraku = { status: 200, body: { ...KROK_BRAKU, zastapil: "Oddzwonić w sprawie faktury" } };
+    pozycje = [BRAK, ...POZYCJE];
+    pokaz();
+    await userEvent.click(await screen.findByRole("button", { name: `Klient powiadomiony — ${BRAK.co}` }));
+    expect(await screen.findByText(
+      `Krok sprawy klienta Ogrodnik_77: „${KROK_BRAKU.krok}” zamiast „Oddzwonić w sprawie faktury”`)).toBeInTheDocument();
   });
 
   it("409 mówi w wierszu, czemu nie zapisano, a wiersz zostaje", async () => {

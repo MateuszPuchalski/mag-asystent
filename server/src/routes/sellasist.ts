@@ -61,11 +61,10 @@ export async function sellasistRoutes(app: FastifyInstance) {
       }
       const s = sesjaZadania()!;
       try {
-        oznaczPowiadomiony(db(), id, req.body.statusAt, { id: s.user.userId, name: s.user.name });
+        return oznaczPowiadomiony(db(), id, req.body.statusAt, { id: s.user.userId, name: s.user.name });
       } catch (e) {
         if (e instanceof BladBraku) return reply.code(e.kod).send({ error: e.message });
         throw e;
       }
-      return { ok: true };
     });
 }

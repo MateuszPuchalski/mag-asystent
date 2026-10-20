@@ -1,5 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "./klient";
+import type { DosylkaZalozona } from "./typy";
 
 /* ── DO DECYZJI (0.435.0) ──────────────────────────────────────────────────
    Kształt z `server/src/services/do-decyzji.ts` — tam stoi całe uzasadnienie:
@@ -9,7 +10,7 @@ export type Obszar = "magazyn" | "obsluga";
 
 export type ZrodloDecyzji =
   | "dostawy" | "odpowiedzi" | "kosze" | "zapisy" | "kody" | "allegro"
-  | "reklamacje" | "zwroty" | "skrzynka" | "dyskusje" | "sonda" | "zadania" | "dosylki" | "braki";
+  | "reklamacje" | "zwroty" | "skrzynka" | "dyskusje" | "sonda" | "zadania" | "dosylki" | "braki" | "sellasist";
 
 /** Adres w panelu — od 0.441.0 każdy wiersz prowadzi do ekranu panelu. */
 export type CelDecyzji = { panel: string };
@@ -52,6 +53,9 @@ export function useDoDecyzji() {
 /**
  * „Klient powiadomiony” przy braku z kompletacji — trasa z `routes/sellasist.ts`.
  *
+ * Serwer stawia przy tym krok w sprawie klienta i oddaje go w kształcie
+ * „Śledź dosyłkę”, więc ekran mówi o zastąpionym kroku tym samym zdaniem.
+ *
  * Hak mieszka przy liście, nie przy wglądzie Sellasist na profilu. Wołającym
  * jest tylko ten wiersz, a skutek widać tylko na tej liście. `statusAt` to
  * wejście w status, które ekran widział. Nowsze wejście serwer odrzuca 409,
@@ -67,7 +71,7 @@ export function useKlientPowiadomiony() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (v: { zamowienieId: number; statusAt: string }) =>
-      api<{ ok: true }>(`/api/obsluga/sellasist/braki/${v.zamowienieId}/powiadomiony`,
+      api<DosylkaZalozona>(`/api/obsluga/sellasist/braki/${v.zamowienieId}/powiadomiony`,
         { method: "POST", body: JSON.stringify({ statusAt: v.statusAt }) }),
     onSuccess: () => qc.invalidateQueries({ queryKey: ["do-decyzji"] }),
   });

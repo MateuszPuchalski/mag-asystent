@@ -21,6 +21,7 @@ import { odmowyBezDosylki } from "./odmowy-dosylki.js";
 import { brakiPoTerminie } from "./brak-kompletacji.js";
 import { linkZamowienia } from "./allegro-linki.js";
 import { sellasistWlaczony } from "../adapters/sellasist.http.js";
+import { stanSellasist } from "./sellasist-sync.js";
 
 /* ── DO DECYZJI — jedna lista tego, co czeka na biuro (`docs/obsluga-klienta.md` §7) ──
    Cel biura zapisany przy decyzji o jednym froncie: biuro rozstrzyga to,
@@ -38,6 +39,10 @@ import { sellasistWlaczony } from "../adapters/sellasist.http.js";
    „załatwione" — gaśnie, gdy zgaśnie przyczyna. Pilnuje tego test: w tym
    pliku nie ma `CREATE TABLE` ani zapisu, a odczyt nie zmienia bazy.
 
+   Wiersz z przyciskiem gaśnie zapisem w SWOIM źródle, nie tutaj. „Śledź
+   dosyłkę” zakłada dosyłkę, a „Klient powiadomiony” zapisuje powiadomienie
+   i krok w sprawie klienta. Sama lista dalej nie ma ani tabeli, ani zapisu.
+
    KOLEJKI KLIENTA JADĄ LICZBĄ, NIE WIERSZAMI. Reklamacja czy rozmowa ma
    własny ekran z kolejką i dowodami, a trzydzieści rozmów przepisanych tutaj
    zrobiłoby z tej listy drugą skrzynkę. Jeden wiersz na kolejkę mówi „tam
@@ -53,7 +58,7 @@ export type Obszar = "magazyn" | "obsluga";
 
 export type ZrodloDecyzji =
   | "dostawy" | "odpowiedzi" | "kosze" | "zapisy" | "kody" | "allegro"
-  | "reklamacje" | "zwroty" | "skrzynka" | "dyskusje" | "sonda" | "zadania" | "dosylki" | "braki";
+  | "reklamacje" | "zwroty" | "skrzynka" | "dyskusje" | "sonda" | "zadania" | "dosylki" | "braki" | "sellasist";
 
 /**
  * Dokąd prowadzi wiersz — adres w panelu. Do 0.441.0 był tu też wariant
@@ -415,8 +420,8 @@ function dosylkiBezSledzenia(teraz: number): PozycjaDecyzji[] {
  *
  * Biuro pisze do klienta w Allegro, bo WERTIS nie zakłada nowego wątku. Wiersz
  * prowadzi więc na profil klienta, a obok niesie odnośnik do zamówienia
- * w Allegro i przycisk „Klient powiadomiony”. Przycisk tylko rejestruje list
- * wysłany gdzie indziej, tak jak „Śledź dosyłkę” rejestruje odmowę.
+ * w Allegro i przycisk „Klient powiadomiony”. Przycisk rejestruje list wysłany
+ * gdzie indziej i stawia krok w sprawie klienta, jak „Śledź dosyłkę”.
  *
  * Pilny zawsze: godzina graniczna już minęła, a klient czeka na paczkę.
  * Zatrzymane lustro nie daje wierszy, bo jego status bywa już nieprawdą.
@@ -428,11 +433,16 @@ function brakiZKompletacji(teraz: number): PozycjaDecyzji[] {
     const brak = b.braki.length
       ? b.braki.map((x) => `${x.nazwa} (potrzeba ${x.potrzeba}, jest ${x.jest})`).join(", ")
       : "pozycji Sellasist nie wskazał";
+    /* Bez pozycji w lustrze nie wiemy, co jeszcze jest w zamówieniu, więc nie
+       mówimy „nic więcej”. Brak danych to nie zero. */
+    const szczegol = b.reszta.length ? `W zamówieniu też: ${b.reszta.join(", ")}`
+      : b.braki.length ? "Innych pozycji w zamówieniu nie ma"
+        : "Pozycji zamówienia lustro nie zna — sprawdź w Sellasist";
     return {
       klucz: `brak:${b.zamowienieId}:${b.statusAt}`, obszar: "obsluga" as const, zrodlo: "braki" as const,
       pytanie: "Towaru nie znaleziono — napisać do klienta?",
       co: `${b.login}: brak ${brak} przy zamówieniu ${b.externalId.slice(0, 8)}`,
-      szczegol: b.reszta.length ? `W zamówieniu też: ${b.reszta.join(", ")}` : "Innych pozycji w zamówieniu nie ma",
+      szczegol,
       od: b.terminAt,
       pilne: true,
       cel: { panel: `/obsluga/klient/${encodeURIComponent(b.login)}` },
@@ -440,6 +450,33 @@ function brakiZKompletacji(teraz: number): PozycjaDecyzji[] {
         allegro: linkZamowienia(b.externalId) },
     };
   });
+}
+
+/** Ile lustro Sellasist może milczeć, zanim lista braków przestaje być prawdą. */
+const LUSTRO_STOI_MS = 30 * 60_000;
+
+/**
+ * Lustro Sellasist, które stoi, przy ustawionym statusie braku.
+ *
+ * Wiersze braków liczą się z lustra. Gdy ono stoi, nowy brak nie pojawi się
+ * wcale, a pusta lista znaczyłaby „braków nie ma”. Brak danych to nie zero,
+ * więc lista mówi wprost, że nowych braków teraz nie widać.
+ */
+function lustroSellasist(teraz: number): PozycjaDecyzji[] {
+  const s = config.sellasist;
+  if (!sellasistWlaczony() || s.syncMs <= 0 || s.statusyBrak.length === 0) return [];
+  const st = stanSellasist(db(), true, new Date(teraz));
+  const sukces = st.ostatniSukcesAt ? Date.parse(st.ostatniSukcesAt) : null;
+  const stoi = sukces === null ? st.blad !== null : teraz - sukces > LUSTRO_STOI_MS;
+  if (!stoi) return [];
+  return [{
+    klucz: "sellasist-lustro", obszar: "obsluga", zrodlo: "sellasist",
+    pytanie: "Lustro Sellasist stoi — sprawdzić integrację?",
+    co: `${st.blad ? `${st.blad} ` : ""}Nowych braków z kompletacji lista teraz nie pokaże.`,
+    od: st.ostatniSukcesAt,
+    pilne: true,
+    cel: { panel: "/obsluga/analiza" },
+  }];
 }
 
 /**
@@ -454,7 +491,7 @@ export function doDecyzji(teraz = Date.now()): DoDecyzji {
   const pozycje = [
     ...kontoAllegro(), ...zapisyWBledzie(), ...dostawyZWyjatkiem(), ...odpowiedziHali(),
     ...kosze(), ...odeslaneZadania(), ...kodyKreskowe(), ...kolejkiKlienta(teraz),
-    ...dosylkiBezSledzenia(teraz), ...brakiZKompletacji(teraz), ...sonda(),
+    ...dosylkiBezSledzenia(teraz), ...brakiZKompletacji(teraz), ...lustroSellasist(teraz), ...sonda(),
   ].sort((a, b) =>
     Number(b.pilne) - Number(a.pilne)
     || Number(a.od == null) - Number(b.od == null)

@@ -2,7 +2,11 @@ import type { DatabaseSync } from "node:sqlite";
 import { config, type Config } from "../config.js";
 import { dataLokalna, lokalnyNaUtc } from "../czas.js";
 import { transaction } from "../db/db.js";
+import { poDniachRoboczych } from "./dosylka-opis.js";
 import { logEvent } from "./events.js";
+import {
+  BrakKlienta, loginZAllegro, odciskTeraz, wierszSprawy, wyrownajZnane, zapiszKrokSprawy,
+} from "./prowadzenie-klienta.js";
 
 /* ── Brak z kompletacji po godzinie granicznej ───────────────────────────────
    Magazyn nie znalazł towaru na półce i zamówienie stoi w Sellasist w statusie
@@ -24,6 +28,10 @@ import { logEvent } from "./events.js";
    kliknie „Klient powiadomiony”. Biuro zostawia zamówienie w braku, gdy czeka
    na odpowiedź klienta, więc sam status nie wystarcza. Kliknięcie trzyma
    wejście w status, więc ponowny brak tego samego zamówienia wraca.
+
+   KLIKNIĘCIE STAWIA KROK W SPRAWIE KLIENTA, jak „Śledź dosyłkę”. Po liście
+   klient ma wybrać drogę, a zamówienie dalej stoi w braku. Bez kroku z terminem
+   nikt by o nim nie pamiętał, a profil nie wiedziałby, że sprawa trwa.
 
    TYLKO ZAMÓWIENIA Z ALLEGRO. Tam agent pisze do kupującego, a WERTIS zna
    klienta po loginie. Kopie zamówień odpadają, jak w „czy wyjdzie dziś”. */
@@ -56,6 +64,16 @@ export class BladBraku extends Error {
 /** InPost po nazwie metody dostawy albo po etykiecie przewoźnika. */
 const INPOST = /inpost|paczkomat/i;
 
+/* Numer formularza zakupu Allegro to UUID. Inny kształt nie prowadzi ani do
+   zamówienia w Allegro, ani do klienta, więc wiersza z nim nie stawiamy. */
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+/** Termin kroku po liście do klienta: następny dzień roboczy, rano. Tyle zwykle czeka się na odpowiedź. */
+export const DNI_KROKU_BRAKU = 1;
+
+/** Wynik kliknięcia — ten sam kształt co „Śledź dosyłkę”, bo panel mówi o zastąpionym kroku tym samym zdaniem. */
+export interface WynikPowiadomienia { zalozona: true; login: string; krok: string; krokDo: string; zastapil: string | null }
+
 /** Godzina graniczna wejścia w brak, ISO UTC. Późniejsze wejście staje od razu. */
 export function terminBraku(statusAt: string, inpost: boolean, u: UstawieniaBraku): string {
   const godzina = inpost ? u.brakGodzinaInpost : u.brakGodzina;
@@ -80,7 +98,7 @@ export function brakiPoTerminie(
     ORDER BY z.status_at, z.id`).all(JSON.stringify(u.statusyBrak)) as Wiersz[];
   const pozycje = database.prepare(`SELECT nazwa, symbol, ilosc, brakuje FROM sellasist_pozycja
       WHERE zamowienie_id = ? ORDER BY koszyk_id`);
-  return wiersze.flatMap((w): BrakKompletacji[] => {
+  return wiersze.filter((w) => UUID.test(String(w.external_id))).flatMap((w): BrakKompletacji[] => {
     const statusAt = String(w.status_at);
     const inpost = INPOST.test(String(w.dostawa ?? "")) || Number(w.etykieta_inpost) === 1;
     const terminAt = terminBraku(statusAt, inpost, u);
@@ -104,23 +122,48 @@ export function brakiPoTerminie(
  * Panel podaje wejście w status, które widział. Inne wejście albo inny status
  * to 409: ekran pokazywał stan, którego już nie ma, a kliknięcie dotyczyło
  * tamtego braku. Drugie kliknięcie tego samego wejścia niczego nie zmienia.
+ *
+ * Klient nieznany WERTIS to też 409, bez zapisu. Zamówienie dociąga się
+ * z Allegro w kilka minut, a powiadomienie bez kroku zgubiłoby sprawę.
  */
 export function oznaczPowiadomiony(
   database: DatabaseSync, zamowienieId: number, statusAt: unknown, autor: Autor, teraz = new Date(),
   statusyBrak: readonly number[] = config.sellasist.statusyBrak,
-): void {
-  const z = database.prepare("SELECT status_id, status_at FROM sellasist_zamowienie WHERE id = ?")
-    .get(zamowienieId) as Wiersz | undefined;
+): WynikPowiadomienia {
+  const z = database.prepare(`SELECT status_id, status_at, external_id, kupujacy_login FROM sellasist_zamowienie
+      WHERE id = ?`).get(zamowienieId) as Wiersz | undefined;
   if (!z) throw new BladBraku("Nie ma takiego zamówienia w lustrze Sellasist", 404);
   if (z.status_id == null || !statusyBrak.includes(Number(z.status_id)) || z.status_at !== statusAt) {
     throw new BladBraku("Zamówienie zmieniło status w Sellasist — lista pokaże stan bieżący", 409);
   }
-  transaction(database, () => {
-    const r = database.prepare(`INSERT OR IGNORE INTO sellasist_brak_powiadomiony(zamowienie_id, status_at, at)
-        VALUES (?,?,?)`).run(zamowienieId, String(z.status_at), teraz.toISOString());
-    if (Number(r.changes) > 0) {
-      logEvent("sellasist_brak_powiadomiony", autor.name, null, { zamowienieSellasist: zamowienieId }, autor.id,
-        database);
+  let login: string;
+  try {
+    login = loginZAllegro(database, String(z.kupujacy_login ?? ""));
+  } catch (e) {
+    if (e instanceof BrakKlienta) {
+      throw new BladBraku("WERTIS nie zna jeszcze tego klienta z Allegro — spróbuj za kilka minut", 409);
     }
+    throw e;
+  }
+  const krok = `Brak z kompletacji przy zamówieniu ${String(z.external_id).slice(0, 8)}: czekamy na decyzję klienta`;
+  const krokDo = poDniachRoboczych(teraz, DNI_KROKU_BRAKU).toISOString();
+  return transaction(database, (): WynikPowiadomienia => {
+    const juz = database.prepare("SELECT 1 FROM sellasist_brak_powiadomiony WHERE zamowienie_id = ? AND status_at = ?")
+      .get(zamowienieId, String(z.status_at));
+    if (juz) return { zalozona: true, login, krok, krokDo, zastapil: null };
+    const w = wierszSprawy(database, login);
+    const zapis = zapiszKrokSprawy(database, {
+      w, login, krok, krokDo, autor, teraz, znane: w ? null : odciskTeraz(login, database), domyslny: true,
+    });
+    if (w) wyrownajZnane(database, zapis.id, login);
+    database.prepare(`INSERT INTO sellasist_brak_powiadomiony(zamowienie_id, status_at, at) VALUES (?,?,?)`)
+      .run(zamowienieId, String(z.status_at), teraz.toISOString());
+    logEvent("sellasist_brak_powiadomiony", autor.name, null, { zamowienieSellasist: zamowienieId, sprawa: zapis.id },
+      autor.id, database);
+    return {
+      zalozona: true, login: w ? String(w.login) : login, krok, krokDo,
+      /* Zakończona sprawa nie miała biegnącego kroku, więc niczego nie zastąpiono. */
+      zastapil: zapis.wToku && zapis.poprzedniKrok !== krok ? zapis.poprzedniKrok : null,
+    };
   })();
 }

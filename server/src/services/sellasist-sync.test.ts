@@ -90,6 +90,20 @@ test("pierwszy przebieg: dziennik dwa dni wstecz, szczegół do lustra bez adres
   assert.deepEqual({ ...s }, { kursor_at: "2026-10-13T07:00:00.000Z", kursor_id: 5, blad: null });
 });
 
+/* Przewoźnik przed etykietą stoi w metodzie dostawy; bez niej InPost dostałby
+   godzinę graniczną kuriera. Punkt odbioru to adres, więc nie przechodzi. */
+test("metoda dostawy trafia do lustra i aktualizuje się przy kolejnej zmianie, bez punktu odbioru", async () => {
+  const z = (nazwa: string) => zamowienie(100, { shipment: { name: nazwa, pickup_point: "Kraków, ul. Długa 15 (KRA12M)" } });
+  await przebieg(atrapa({ "/orders_logs": [{ id: 5, order_id: 100, operation_tag: "order_edit",
+    date: "2026-10-13 09:00:00" }], "/orders/100": z("InPost Paczkomat 24/7") }).query);
+  const dostawa = () => db().prepare("SELECT * FROM sellasist_zamowienie WHERE id = 100").get() as Record<string, unknown>;
+  assert.equal(dostawa().dostawa, "InPost Paczkomat 24/7");
+  assert.ok(!JSON.stringify(dostawa()).includes("Długa"));
+  await przebieg(atrapa({ "/orders_logs": [{ id: 6, order_id: 100, operation_tag: "order_edit",
+    date: "2026-10-13 09:30:00" }], "/orders/100": z("Kurier DPD") }).query);
+  assert.equal(dostawa().dostawa, "Kurier DPD");
+});
+
 test("kursor: wpis z tej samej sekundy i niższym numerem nie wraca do kolejki", async () => {
   db().prepare("INSERT INTO sellasist_sync_state(id, kursor_at, kursor_id) VALUES (1, ?, 5)")
     .run("2026-10-13T07:00:00.000Z");

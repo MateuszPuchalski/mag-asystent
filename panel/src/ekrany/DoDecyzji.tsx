@@ -35,9 +35,9 @@ import { Wzmianki } from "./Wzmianki";
    mówi, co zastąpił.
 
    Drugi: „Klient powiadomiony” przy braku z kompletacji. List do klienta
-   biuro pisze w Allegro, bo WERTIS nie zakłada tam wątku. Przycisk tylko
-   rejestruje list wysłany gdzie indziej. Sam status go nie zastąpi, bo
-   zamówienie czeka w statusie braku na odpowiedź klienta. */
+   biuro pisze w Allegro, bo WERTIS nie zakłada tam wątku. Przycisk rejestruje
+   list i stawia krok w sprawie klienta: czekamy na jego wybór. Sam status go
+   nie zastąpi, bo zamówienie czeka w statusie braku na odpowiedź klienta. */
 
 const IKONY: Record<ZrodloDecyzji, React.ComponentType<{ size?: number; className?: string }>> = {
   dostawy: Truck, odpowiedzi: MessageSquareReply, kosze: Package, zapisy: AlertTriangle,
@@ -47,13 +47,15 @@ const IKONY: Record<ZrodloDecyzji, React.ComponentType<{ size?: number; classNam
   zadania: ClipboardList,
   dosylki: PackageSearch,
   braki: PackageX,
+  /* Lustro Sellasist, które stoi przy ustawionym statusie braku. */
+  sellasist: PlugZap,
 };
 
 const NAZWY: Record<ZrodloDecyzji, string> = {
   dostawy: "Dostawy", odpowiedzi: "Odpowiedź z hali", kosze: "Kosze", zapisy: "Zapis do Subiekta",
   kody: "Kody kreskowe", allegro: "Konto Allegro", reklamacje: "Reklamacje", zwroty: "Zwroty",
   skrzynka: "Skrzynka", dyskusje: "Dyskusje", sonda: "Test na żywo", zadania: "Zadanie hali",
-  dosylki: "Dosyłka", braki: "Brak z kompletacji",
+  dosylki: "Dosyłka", braki: "Brak z kompletacji", sellasist: "Sellasist",
 };
 
 /* Podpowiedź pod nagłówkiem grupy, raz na grupę jak pytanie. Przy braku
@@ -129,7 +131,7 @@ function Szczegol({ tekst }: { tekst: string }) {
 }
 
 function Wiersz({ p, onZalozona }: { p: PozycjaDecyzji; onZalozona: (w: DosylkaZalozona) => void }) {
-  if (p.akcja?.rodzaj === "brak_powiadomiony") return <WierszBraku p={p} akcja={p.akcja} />;
+  if (p.akcja?.rodzaj === "brak_powiadomiony") return <WierszBraku p={p} akcja={p.akcja} onZalozona={onZalozona} />;
   /* Wcięcie pod tekstem pytania, nie pod ikoną: oko zjeżdża z pytania
      prosto na sprawy, które ono obejmuje. */
   const tresc = <>
@@ -188,8 +190,9 @@ function WierszDosylki({ p, zwrotId, tresc, onZalozona }: {
  * Opis braku się nie ucina. Nazwa brakującego towaru rozstrzyga, którą drogę
  * wybrać, a ucięta kazałaby otworzyć profil tylko po to, żeby ją doczytać.
  */
-function WierszBraku({ p, akcja }: {
+function WierszBraku({ p, akcja, onZalozona }: {
   p: PozycjaDecyzji; akcja: Extract<AkcjaDecyzji, { rodzaj: "brak_powiadomiony" }>;
+  onZalozona: (w: DosylkaZalozona) => void;
 }) {
   const powiadom = useKlientPowiadomiony();
   return <li>
@@ -207,7 +210,8 @@ function WierszBraku({ p, akcja }: {
         Zamówienie w Allegro<ExternalLink size={12} aria-hidden /></a>}
       <Przycisk className="shrink-0 text-xs" disabled={powiadom.isPending} aria-busy={powiadom.isPending}
         aria-label={`Klient powiadomiony — ${p.co}`}
-        onClick={() => powiadom.mutate({ zamowienieId: akcja.zamowienieId, statusAt: akcja.statusAt })}>
+        onClick={() => powiadom.mutate({ zamowienieId: akcja.zamowienieId, statusAt: akcja.statusAt },
+          { onSuccess: onZalozona })}>
         {powiadom.isPending ? "Zapisuję…" : "Klient powiadomiony"}</Przycisk>
     </div>
     {p.szczegol && <Szczegol tekst={p.szczegol} />}
