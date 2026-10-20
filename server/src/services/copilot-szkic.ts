@@ -30,8 +30,8 @@ import {
   przygotujZdjeciaRozmowy, spisZdjec, type Pobieracz, type WynikZdjec, type ZdjecieZBramki,
 } from "./copilot-zdjecia.js";
 import { faktZwrotu, zdarzeniaZwrotowRozmowy } from "./zwrot-na-osi.js";
-import { ocenRealizacji, stanRealizacji } from "./realizacja-zamowienia.js";
-import { odswiezZamowienie } from "./allegro-zamowienia-sync.js";
+import { ocenRealizacji, realizacjaBezAllegro, realizacjaSellasist, stanRealizacji } from "./realizacja-zamowienia.js";
+import { dociagnijZamowienie, odswiezZamowienie } from "./allegro-zamowienia-sync.js";
 import { werdyktOdrzucenia } from "./przeplyw-kategorii.js";
 import { glosAllegro } from "./glos-allegro.js";
 import {
@@ -658,6 +658,13 @@ export function kontekstSzkicu(
     idZam, paczka.waybill !== null || paczka.dostarczonoAt !== null, subiekt, db());
   const ocena = realizacja ? ocenRealizacji(realizacja, teraz) : null;
   if (ocena) dodaj("realizacja", ocena.zdanie);
+  /* Zamówienie, którego Allegro nie oddało przed szkicem. Lustro Sellasist
+     zna stan magazynu, więc szkic wie przynajmniej, o które zamówienie chodzi
+     i co się z nim dzieje. */
+  if (numerZam && idZam === null) {
+    const sa = realizacjaSellasist(db(), numerZam.externalId, undefined, teraz);
+    if (sa) dodaj("realizacja", realizacjaBezAllegro(sa, teraz));
+  }
   const zdanieZ = faktZwrotu(zdarzeniaZwrotowRozmowy(db(), conversationId));
   if (zdanieZ) dodaj("zwrot", zdanieZ);
 
@@ -748,14 +755,22 @@ export async function odswiezPrzesylke(
  * Zamówienie rozmowy od nowa przed szkicem — płatność i termin nadania
  * zmieniają się po pierwszym pobraniu. Ta sama bramka co przy przesyłce:
  * bez konta Allegro i bez wstrzykniętych zależności nie pytamy nikogo.
+ *
+ * Zamówienie, którego jeszcze nie ma, dociągamy. Automat układa szkic zaraz
+ * po wiadomości, a ticker zamówień przychodzi później; bez tego szkic nie
+ * miał ani realizacji, ani przesyłki.
  */
 async function odswiezZamowienieRozmowy(
   conversationId: number, deps: PrzesylkaDeps | undefined, teraz: number,
 ): Promise<void> {
   if (!deps && !config.allegro.clientId) return;
   const numer = numerZamowieniaRozmowy(conversationId);
-  const id = numer ? idZamowienia(db(), numer.konto, numer.externalId) : null;
-  if (id === null) return;
+  if (!numer) return;
+  const id = idZamowienia(db(), numer.konto, numer.externalId);
+  if (id === null) {
+    await dociagnijZamowienie(db(), numer.konto, numer.externalId, deps, teraz).catch(() => undefined);
+    return;
+  }
   await odswiezZamowienie(db(), id, deps, teraz).catch(() => undefined);
 }
 

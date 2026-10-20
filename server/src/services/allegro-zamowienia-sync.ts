@@ -306,6 +306,28 @@ export async function odswiezZamowienie(
 }
 
 /**
+ * Zamówienie, którego jeszcze nie mamy, przed szkicem odpowiedzi.
+ *
+ * Ticker dociąga zamówienie z wiadomości w swoim takcie, a automat układa
+ * szkic zaraz po wiadomości. Pierwszy szkic na „kiedy nadacie?” nie znał więc
+ * zamówienia wcale i odpisywał „sprawdzamy”. Jedno żądanie, wołane wyłącznie
+ * z ułożenia szkicu. Odmowa albo cudza odpowiedź zostawia milczenie, jak
+ * przy odświeżeniu.
+ */
+export async function dociagnijZamowienie(
+  database: Db, konto: number, externalId: string,
+  deps: { query?: (url: string) => Promise<unknown | null>; apiUrl?: string } = {},
+  teraz = Date.now(),
+): Promise<void> {
+  const query = deps.query ?? zapytajAllegro;
+  const body = await query(urlZamowienia(deps.apiUrl ?? config.allegro.apiUrl, externalId))
+    .catch(() => null) as Zamowienie | null;
+  if (!body || body.id !== externalId) return;
+  const at = new Date(teraz).toISOString();
+  transaction(database, () => zapisz(database, body, konto, at))();
+}
+
+/**
  * Czy uchwyt może być loginem Allegro.
  *
  * Login nie ma spacji, więc „Jan Kowalski" z naklejki nie pojedzie do Allegro
