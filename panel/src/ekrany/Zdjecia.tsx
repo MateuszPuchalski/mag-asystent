@@ -91,9 +91,6 @@ export function Zdjecia() {
   const [wybrany, setWybrany] = useState<PozycjaBezZdjecia | null>(null);
   const [zrobione, setZrobione] = useState<ReadonlySet<number>>(() => new Set());
   const [ostatni, setOstatni] = useState("");
-  /* Domyślnie wyłączone, decyzją właściciela. Stan żyje tu, nie w edytorze,
-     więc przeżywa przejście do następnego towaru. */
-  const [bialeKwadrat, setBialeKwadrat] = useState(false);
 
   const pozycje = lista.data?.pozycje ?? [];
   /* Pierwszy wolny towar wybiera się sam. Wybór nie jest zapisem, a oszczędza
@@ -205,7 +202,6 @@ export function Zdjecia() {
         {wybrany
           /* Klucz po towarze: nowy towar to świeży edytor, a stary porzuca swój podgląd. */
           ? <Edytor key={wybrany.twId} towar={wybrany} onZapisano={zapisano(wybrany)}
-              bialeKwadrat={bialeKwadrat} onBialeKwadrat={setBialeKwadrat}
               onPomin={pomin(wybrany)} />
           : <Pusto ikona={ImagePlus}>{pozycje.length ? "Wybierz towar z listy." : "Nie ma towaru do zdjęcia."}</Pusto>}
       </Karta>

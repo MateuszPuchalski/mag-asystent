@@ -9,7 +9,7 @@ import { klawiszZajety, oknoModalne } from "../nawigacja/fokus";
 import { Klawisz } from "../nawigacja/Klawisz";
 import { Blad, NaglowekSekcji, Przycisk, SymbolTowaru } from "../ui";
 import { doWyslania, podgladEdycji, wczytajPlik, zlozGotowy, type Plik, type Zrodlo } from "./obraz";
-import { kadrZPrzeciagniecia, obroc, type Kadr, type Obrot, type Punkt } from "./obrobka";
+import { bajtyBase64, kadrZPrzeciagniecia, obroc, type Kadr, type Obrot, type Punkt } from "./obrobka";
 
 /* ── EDYTOR ZDJĘCIA JEDNEGO TOWARU ─────────────────────────────────────────
    Trzy kroki w jednej kolumnie: zdjęcie, poprawki, podgląd po usunięciu tła.
@@ -17,15 +17,17 @@ import { kadrZPrzeciagniecia, obroc, type Kadr, type Obrot, type Punkt } from ".
    Typowy towar to: wklej, Enter (usuń tło), Enter (zatwierdź). Ręka nie
    schodzi z klawiatury, a każdy przełącznik ma swoją literę.
 
-   „Białe tło i kwadrat” jest domyślnie wyłączone, decyzją właściciela.
-   Wybór trzyma ekran, nie edytor: przy pracy seryjnej agent ustawia go
-   raz, a nie przy każdym towarze.
+   Do Subiekta idzie ZAWSZE biały kwadrat w JPEG-u, decyzją właściciela:
+   zdjęcie ma być kwadratowe i ważyć jak najmniej. Przezroczystość wymaga
+   PNG, kilka razy cięższego, więc wycięty towar dostaje białe tło.
 
    Podgląd żyje na serwerze. Porzucamy go, gdy agent wybiera inne zdjęcie,
    inny towar albo wychodzi z ekranu — inaczej plik czekałby kwadrans
    na wygaśnięcie. */
 
 const LICZBA = new Intl.NumberFormat("pl-PL", { maximumFractionDigits: 3 });
+
+const kilobajty = (n: number) => `${Math.max(1, Math.round(n / 1024))} kB`;
 
 const opis = (e: unknown) => (e instanceof Error ? e.message : String(e));
 
@@ -88,13 +90,11 @@ function Kadrowanie({ adres, kadr, onKadr }: { adres: string; kadr: Kadr | null;
   </div>;
 }
 
-export function Edytor({ towar, onZapisano, onPomin, bialeKwadrat, onBialeKwadrat }: {
+export function Edytor({ towar, onZapisano, onPomin }: {
   towar: PozycjaBezZdjecia;
   onZapisano: (w: ZapisanieZdjecia) => void;
   /** Następny towar bez zapisu — gdy tego nie ma pod ręką. */
   onPomin?: () => void;
-  bialeKwadrat: boolean;
-  onBialeKwadrat: (v: boolean) => void;
 }) {
   const { twId } = towar;
   const wstepne = useWstepneZdjecie();
@@ -171,7 +171,7 @@ export function Edytor({ towar, onZapisano, onPomin, bialeKwadrat, onBialeKwadra
   const zTla = podglad !== null && usunTlo && podglad.dane.tlo === "usuniete";
 
   useEffect(() => {
-    if (!podglad || !bialeKwadrat) { setGotowy(null); return; }
+    if (!podglad) { setGotowy(null); return; }
     let zywy = true;
     setGotowy(undefined);
     const [b64, mime] = zTla ? [podglad.dane.png, podglad.dane.mime] : [podglad.wyslany.base64, "image/jpeg"];
@@ -179,7 +179,7 @@ export function Edytor({ towar, onZapisano, onPomin, bialeKwadrat, onBialeKwadra
       (p) => { if (zywy) setGotowy(p); },
       (e) => { if (zywy) { setGotowy(null); setBlad(opis(e)); } });
     return () => { zywy = false; };
-  }, [podglad, bialeKwadrat, zTla]);
+  }, [podglad, zTla]);
 
   const przygotuj = async () => {
     if (!zrodlo) return;
@@ -216,9 +216,9 @@ export function Edytor({ towar, onZapisano, onPomin, bialeKwadrat, onBialeKwadra
     setBlad("");
     zapisz.mutate({
       twId, podgladId: podglad.dane.podgladId, zTlem: !zTla,
-      /* Bez „Białe tło i kwadrat” serwer zapisuje sam: wycięcie albo wysłany
-         obraz, zależnie od `zTlem`. Gotowy plik z przeglądarki byłby tu kopią. */
-      gotowy: bialeKwadrat ? gotowy?.base64 : undefined,
+      /* Zawsze gotowy kwadrat z przeglądarki: serwer nie ma czym składać
+         obrazu, a `zTlem` mówi już tylko, z czego kwadrat powstał. */
+      gotowy: gotowy?.base64,
     }, {
       onSuccess: (w) => { doPorzucenia.current = null; onZapisano(w); },
       onError: (e) => {
@@ -241,7 +241,7 @@ export function Edytor({ towar, onZapisano, onPomin, bialeKwadrat, onBialeKwadra
 
   const wylaczone = wstepne.error instanceof Konflikt || zapisz.error instanceof Konflikt;
   const mozePrzygotowac = !!zrodlo && !podglad && !przygotowuje && !wylaczone && !!edycja && "adres" in edycja;
-  const mozeZatwierdzic = !!podglad && !zapisz.isPending && !(bialeKwadrat && !gotowy) && !wylaczone;
+  const mozeZatwierdzic = !!podglad && !zapisz.isPending && !!gotowy && !wylaczone;
   const obrocW = (kierunek: 1 | -1) => { setObrot((o) => obroc(o, kierunek)); setKadr(null); };
 
   /* Klawisze czyta ref, bo słuchacz okna wstaje raz, a stan zmienia się
@@ -268,7 +268,6 @@ export function Edytor({ towar, onZapisano, onPomin, bialeKwadrat, onBialeKwadra
       else if (k === "w") setWyrownaj((v) => !v);
     } else if (podglad) {
       if (k === "t" && podglad.dane.tlo === "usuniete") setUsunTlo(!zTla);
-      else if (k === "b") onBialeKwadrat(!bialeKwadrat);
     }
   };
   useEffect(() => {
@@ -276,9 +275,7 @@ export function Edytor({ towar, onZapisano, onPomin, bialeKwadrat, onBialeKwadra
     window.addEventListener("keydown", sluchaj);
     return () => window.removeEventListener("keydown", sluchaj);
   }, []);
-  const poAdres = !podglad ? null
-    : bialeKwadrat ? gotowy?.adres ?? null
-      : zTla ? `data:${podglad.dane.mime};base64,${podglad.dane.png}` : podglad.wyslany.adres;
+  const poAdres = gotowy?.adres ?? null;
 
   return <div className="flex min-h-0 flex-1 flex-col">
     <header className="shrink-0 border-b border-slate-200 p-4">
@@ -353,9 +350,9 @@ export function Edytor({ towar, onZapisano, onPomin, bialeKwadrat, onBialeKwadra
             <Przelacznik zaznaczony={zTla} onZmiana={setUsunTlo} wylaczony={podglad.dane.tlo !== "usuniete"}
               tytul={podglad.dane.tlo !== "usuniete" ? "Tła nie udało się usunąć, więc nie ma czego włączyć." : undefined}>
               Usuń tło <Klawisz>T</Klawisz></Przelacznik>
-            <Przelacznik zaznaczony={bialeKwadrat} onZmiana={onBialeKwadrat}
-              tytul="Biel pod towarem, przycięcie do towaru i kwadrat z marginesem.">
-              Białe tło i kwadrat <Klawisz>B</Klawisz></Przelacznik>
+            {/* Waga i bok mówią wprost, co trafi do kartoteki. */}
+            {gotowy && <span className="text-sm tabular-nums text-slate-600">
+              JPEG {gotowy.bok ? `${gotowy.bok} × ${gotowy.bok} px, ` : ""}{kilobajty(bajtyBase64(gotowy.base64))}</span>}
           </div>
           <div className="flex flex-wrap items-center gap-2 border-t border-slate-200 pt-4">
             <Przycisk wariant="glowny" onClick={zatwierdz} disabled={!mozeZatwierdzic}>

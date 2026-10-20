@@ -83,7 +83,6 @@ export const SKROTY: ReadonlyArray<SekcjaSkrotow> = [
     ["L P", "obróć w lewo / w prawo"],
     ["W", "wyrównaj kolory"],
     ["T", "usuń tło (w podglądzie)"],
-    ["B", "białe tło i kwadrat (w podglądzie)"],
   ] },
   /* Pełna lista klawiszy ekranu zwrotów, także tych, które pasek nad
      zwrotem pokazuje tylko przy pasującym stanie. Kompletności pilnuje test

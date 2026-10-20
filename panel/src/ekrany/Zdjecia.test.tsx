@@ -21,7 +21,7 @@ vi.mock("../zdjecia/obraz", () => ({
   wczytajPlik: vi.fn(async () => ({ kanwa: {}, szer: 100, wys: 80 })),
   podgladEdycji: vi.fn(() => ({ adres: "data:image/jpeg;base64,RURZQ0pB", szer: 100, wys: 80 })),
   doWyslania: vi.fn(async () => ({ base64: "V1lTTEFOWQ==", adres: "data:image/jpeg;base64,V1lTTEFOWQ==" })),
-  zlozGotowy: vi.fn(async () => ({ base64: "R09UT1dZ", adres: "data:image/jpeg;base64,R09UT1dZ" })),
+  zlozGotowy: vi.fn(async () => ({ base64: "R09UT1dZ", adres: "data:image/jpeg;base64,R09UT1dZ", bok: 800 })),
 }));
 
 const poz = (twId: number, symbol: string, nazwa: string, oczekuje = false): PozycjaBezZdjecia =>
@@ -114,9 +114,9 @@ describe("Zdjęcia", () => {
     expect(within(wiersz).getByText("w kolejce")).toBeInTheDocument();
   });
 
-  /* Domyślnie bez białego kwadratu, decyzją właściciela: serwer zapisuje
-     wycięcie sam, a przeglądarka nie składa i nie wysyła gotowego pliku. */
-  it("plik → podgląd → zatwierdzenie bez białego kwadratu i przejście do następnego wolnego towaru", async () => {
+  /* Do Subiekta idzie zawsze biały kwadrat w JPEG-u, decyzją właściciela:
+     kwadratowy i jak najlżejszy. Gotowy plik składa przeglądarka. */
+  it("plik → podgląd → zatwierdzenie wysyła biały kwadrat i przechodzi do następnego wolnego towaru", async () => {
     const stan = atrapa();
     const u = userEvent.setup();
     pokaz();
@@ -126,35 +126,19 @@ describe("Zdjęcia", () => {
     expect(await screen.findByRole("img", { name: "Gotowe zdjęcie towaru" })).toBeInTheDocument();
     expect(cialo("/api/products/1/zdjecie/wstepne")).toEqual({ zdjecie: "V1lTTEFOWQ==" });
     expect(screen.getByLabelText(/^Usuń tło/)).toBeChecked();
-    expect(screen.getByLabelText(/^Białe tło i kwadrat/)).not.toBeChecked();
+    expect(screen.queryByLabelText(/Białe tło/)).not.toBeInTheDocument();
+    expect(screen.getByText(/JPEG 800 × 800 px, 1 kB/)).toBeInTheDocument();
 
     await u.click(screen.getByRole("button", { name: /^Zatwierdź/ }));
     /* Konewka czeka w kolejce, więc następny wolny to grabie. */
     expect(await screen.findByRole("heading", { name: "Grabie metalowe" })).toBeInTheDocument();
-    expect(cialo("/api/products/1/zdjecie")).toEqual({ podgladId: "p-77", zTlem: false, zrodlo: "panel" });
+    expect(cialo("/api/products/1/zdjecie")).toEqual({ podgladId: "p-77", zTlem: false, zrodlo: "panel", gotowy: "R09UT1dZ" });
     expect(screen.getByRole("status")).toHaveTextContent("Zapisano zdjęcie SEK-1");
     /* Zatwierdzony podgląd zużył serwer — porzucanie go byłoby zbędnym zapisem. */
     expect(stan.wyslane).toEqual(["POST /api/products/1/zdjecie/wstepne", "POST /api/products/1/zdjecie"]);
   });
 
-  /* Wybór białego kwadratu przeżywa przejście do następnego towaru: przy pracy
-     seryjnej agent ustawia go raz, nie przy każdym zdjęciu. */
-  it("włączony biały kwadrat wysyła gotowy plik i zostaje włączony przy następnym towarze", async () => {
-    atrapa();
-    const u = userEvent.setup();
-    pokaz();
-    await screen.findByRole("heading", { name: "Sekator kowadełkowy" });
-    await u.upload(screen.getByLabelText(/Upuść zdjęcie/), new File(["x"], "s.jpg", { type: "image/jpeg" }));
-    await u.click(await screen.findByRole("button", { name: /^Usuń tło i pokaż podgląd/ }));
-    await screen.findByRole("img", { name: "Gotowe zdjęcie towaru" });
-    await u.click(screen.getByLabelText(/^Białe tło i kwadrat/));
-    await waitFor(() => expect(screen.getByRole("button", { name: /^Zatwierdź/ })).toBeEnabled());
-    await u.click(screen.getByRole("button", { name: /^Zatwierdź/ }));
-    await screen.findByRole("heading", { name: "Grabie metalowe" });
-    expect(cialo("/api/products/1/zdjecie")).toEqual({ podgladId: "p-77", zTlem: false, zrodlo: "panel", gotowy: "R09UT1dZ" });
-  });
-
-  it("zostawione tło idzie jako zTlem, bez gotowego pliku", async () => {
+  it("zostawione tło też idzie jako biały kwadrat, z zTlem", async () => {
     atrapa();
     const u = userEvent.setup();
     pokaz();
@@ -163,9 +147,10 @@ describe("Zdjęcia", () => {
     await u.click(await screen.findByRole("button", { name: /^Usuń tło i pokaż podgląd/ }));
     await screen.findByRole("img", { name: "Gotowe zdjęcie towaru" });
     await u.click(screen.getByLabelText(/^Usuń tło/));
+    await waitFor(() => expect(screen.getByRole("button", { name: /^Zatwierdź/ })).toBeEnabled());
     await u.click(screen.getByRole("button", { name: /^Zatwierdź/ }));
     await screen.findByRole("heading", { name: "Grabie metalowe" });
-    expect(cialo("/api/products/1/zdjecie")).toEqual({ podgladId: "p-77", zTlem: true, zrodlo: "panel" });
+    expect(cialo("/api/products/1/zdjecie")).toEqual({ podgladId: "p-77", zTlem: true, zrodlo: "panel", gotowy: "R09UT1dZ" });
   });
 
   it("„Jeszcze raz” porzuca podgląd na serwerze i wraca do poprawek", async () => {
@@ -190,19 +175,16 @@ describe("Zdjęcia", () => {
     await u.upload(screen.getByLabelText(/Upuść zdjęcie/), new File(["x"], "s.jpg", { type: "image/jpeg" }));
     await u.click(await screen.findByRole("button", { name: /^Usuń tło i pokaż podgląd/ }));
     await screen.findByRole("img", { name: "Gotowe zdjęcie towaru" });
-    await u.click(screen.getByLabelText(/^Białe tło i kwadrat/));
-    await waitFor(() => expect(screen.getByRole("button", { name: /^Zatwierdź/ })).toBeEnabled());
     await u.click(screen.getByRole("button", { name: /^Zatwierdź/ }));
     expect(await screen.findByText(/za duże \(600 KB/)).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "Sekator kowadełkowy" })).toBeInTheDocument();
-    await u.click(screen.getByLabelText(/^Białe tło i kwadrat/));
     expect(screen.getByRole("button", { name: /^Zatwierdź/ })).toBeEnabled();
     expect(stan.wyslane.filter((w) => w.startsWith("DELETE"))).toEqual([]);
   });
 
-  /* Praca seryjna z klawiatury: Enter prowadzi przez oba kroki, litery
-     przełączają, a j przechodzi dalej bez zapisu. */
-  it("klawiatura: Enter → podgląd, B przełącza kwadrat, Enter zatwierdza", async () => {
+  /* Praca seryjna z klawiatury: Enter prowadzi przez oba kroki, a j przechodzi
+     dalej bez zapisu. */
+  it("klawiatura: Enter → podgląd, Enter zatwierdza", async () => {
     atrapa();
     const u = userEvent.setup();
     pokaz();
@@ -212,8 +194,6 @@ describe("Zdjęcia", () => {
     (document.activeElement as HTMLElement | null)?.blur();
     await u.keyboard("{Enter}");
     await screen.findByRole("img", { name: "Gotowe zdjęcie towaru" });
-    await u.keyboard("b");
-    expect(screen.getByLabelText(/^Białe tło i kwadrat/)).toBeChecked();
     await waitFor(() => expect(screen.getByRole("button", { name: /^Zatwierdź/ })).toBeEnabled());
     await u.keyboard("{Enter}");
     await screen.findByRole("heading", { name: "Grabie metalowe" });
