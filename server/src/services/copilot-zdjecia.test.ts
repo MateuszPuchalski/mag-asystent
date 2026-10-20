@@ -6,7 +6,7 @@ import { migrate } from "../db/db.js";
 import { BladRozmiaruZalacznika } from "../adapters/allegro.http.js";
 import {
   kandydaciRozmowy, przygotujZdjecia, przygotujZdjeciaRozmowy, spisZdjec,
-  SUFIT_SZTUK_ROZMOWY, SUFIT_ZDJEC,
+  SUFIT_SZTUK_DOPYTANIA, SUFIT_SZTUK_ROZMOWY, SUFIT_ZDJEC,
 } from "./copilot-zdjecia.js";
 
 /* ── Zdjęcia dla Copilota (0.283.0) ──────────────────────────────────────────
@@ -263,6 +263,29 @@ test("rozmowa: sufit SZTUK zostawia NAJNOWSZE i mówi, ile zostało poza", async
   assert.ok(spisZdjec(w).includes("Starszych zdjęć nie pokazano: 2"));
   /* Za pominięte NIE PŁACIMY transferem: sufit sztuk działa przed pobraniem. */
   assert.equal(p.wywolania.length, SUFIT_SZTUK_ROZMOWY);
+});
+
+test("rozmowa: sufit SZTUK przychodzi z parametru, a domyślny to sufit szkicu", async () => {
+  /* Dopytanie podaje własny sufit, szkic bierze domyślny. Ten test pilnuje,
+     że parametr naprawdę dociera do bramki, a nie tylko stoi w podpisie. */
+  const { d, id, wiadomosc, zalacznik } = rozmowa();
+  const mapa: Record<string, Buffer> = {};
+  for (let i = 1; i <= SUFIT_SZTUK_DOPYTANIA + 2; i += 1) {
+    zalacznik(wiadomosc("incoming"), `z${i}.png`);
+    mapa[`z${i}.png`] = PNG;
+  }
+  assert.ok(SUFIT_SZTUK_DOPYTANIA > SUFIT_SZTUK_ROZMOWY, "dopytanie ma widzieć więcej niż szkic");
+
+  for (const sufit of [1, SUFIT_SZTUK_ROZMOWY, SUFIT_SZTUK_DOPYTANIA]) {
+    const p = pobieracz(mapa);
+    const w = await przygotujZdjeciaRozmowy(d, id, p.pobierz, sufit);
+    assert.equal(w.zdjecia.length, sufit);
+    assert.equal(w.ponadLimit, SUFIT_SZTUK_DOPYTANIA + 2 - sufit);
+    assert.equal(p.wywolania.length, sufit, "za pominięte nie płacimy transferem");
+  }
+
+  const domyslny = await przygotujZdjeciaRozmowy(d, id, pobieracz(mapa).pobierz);
+  assert.equal(domyslny.zdjecia.length, SUFIT_SZTUK_ROZMOWY);
 });
 
 test("rozmowa: dwa powody pominięcia mają dwa liczniki i dwa zdania", async () => {

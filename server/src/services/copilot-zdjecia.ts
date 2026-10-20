@@ -70,6 +70,19 @@ export const SUFIT_ZDJEC = { naSztuke: 7_000_000, lacznie: 20_000_000 } as const
  */
 export const SUFIT_SZTUK_ROZMOWY = 4;
 
+/**
+ * Sufit sztuk DOPYTANIA — wyższy, bo dopytanie uruchamia człowiek.
+ *
+ * Agent klika i płaci za jedno pytanie, a `SUFIT_PYTAN` ogranicza ich liczbę
+ * na rozmowę. Hamulec z taktu nie ma tu czego hamować. Agent pyta zwykle
+ * o konkretne zdjęcie, a to bywa najstarsze: klient przysłał pięć i odpadła
+ * kartka z wymiarami, o którą agent pytał.
+ *
+ * Osiem, nie bez sufitu: przy ośmiu zdjęciach z telefonu i tak decyduje
+ * sufit bajtów (`SUFIT_ZDJEC.lacznie`), a spis mówi, ile zostało poza.
+ */
+export const SUFIT_SZTUK_DOPYTANIA = 8;
+
 export interface ZdjecieZBramki {
   readonly numer: string;
   readonly typ: TypModelu;
@@ -278,15 +291,17 @@ export const pobierzZdjecieRozmowy: Pobieracz = async (url, opcje) =>
  *
  * Różnice od ścieżki sprawy są dwie i obie stoją wyżej przy swoich stałych:
  * inne źródło załączników (`kandydaciRozmowy`) i sufit sztuk, bo tę ścieżkę
- * potrafi uruchomić takt bez udziału człowieka.
+ * potrafi uruchomić takt bez udziału człowieka. Domyślny sufit jest więc
+ * sufitem szkicu, a wyższy podaje tylko dopytanie (`SUFIT_SZTUK_DOPYTANIA`).
  *
  * Tak samo jak tam: potknięcie nie wywraca szkicu. Szkic bez zdjęć jest tym,
  * czym był do tego wydania, a szkicu nie ma dopiero wtedy, gdy padnie model.
  */
 export async function przygotujZdjeciaRozmowy(
   database: DatabaseSync, conversationId: number, pobierz: Pobieracz = pobierzZdjecieRozmowy,
+  sufitSztuk: number = SUFIT_SZTUK_ROZMOWY,
 ): Promise<WynikZdjec> {
-  return przezBramke(kandydaciRozmowy(database, conversationId), pobierz, SUFIT_SZTUK_ROZMOWY);
+  return przezBramke(kandydaciRozmowy(database, conversationId), pobierz, sufitSztuk);
 }
 
 /**

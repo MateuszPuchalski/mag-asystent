@@ -441,7 +441,8 @@ test("dopytanie: schemat ma notkę, jej twierdzenia i szkic, który bywa null", 
   const pola = p.output_config.format.schema.properties;
   assert.deepEqual(Object.keys(pola).sort(), ["odpowiedz", "szkic", "twierdzenia"]);
   assert.ok(pola.szkic!.anyOf?.some((w) => w.type === "null"), "czyste pytanie nie ma wersji");
-  assert.equal(p.max_tokens, 8000, "wyjście niesie cały szkic, a myślenie liczy się do sufitu");
+  assert.equal(p.max_tokens, 10000,
+    "wyjście niesie cały szkic z odczytem do ośmiu zdjęć, a myślenie liczy się do sufitu");
 });
 
 test("dopytanie: instrukcja poprawia szkic i niesie instrukcję szkicu bajt w bajt", async () => {

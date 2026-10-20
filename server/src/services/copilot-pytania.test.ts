@@ -175,6 +175,26 @@ test("model widzi szkic i poprzednie wymiany, bo pyta się O NIE", async () => {
   assert.equal(k.pytanie, "Pytanie drugie");
 });
 
+test("dopytanie przy sześciu zdjęciach widzi wszystkie sześć, z najstarszym", async () => {
+  /* Klient przysłał pięć zdjęć, a szkic bierze cztery najnowsze. Odpadła
+     najstarsza kartka z wymiarami i agent pytał właśnie o nią. Dopytanie
+     klika człowiek, więc ma własny, wyższy sufit. */
+  const m = db().prepare("SELECT id FROM message WHERE conversation_id=?").get(rozmowa) as { id: number };
+  const ins = db().prepare(`INSERT INTO message_attachment(message_id,file_name,mime_type,url,status)
+    VALUES (?,?,'image/png',?,'SAFE')`);
+  for (let i = 1; i <= 6; i += 1) ins.run(m.id, `z${i}.png`, `https://allegro.pl/plik/z${i}.png`);
+  const png = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
+  const pobierzZdjecie = async () => png.buffer.slice(png.byteOffset, png.byteOffset + png.byteLength) as ArrayBuffer;
+
+  const n = nadawca();
+  await Q.zadajPytanie(rozmowa, "Jakie wymiary są na kartce?", KTO(), n.nadaj, subiekt, { pobierzZdjecie });
+
+  const k = n.widziane.ostatni!;
+  assert.equal(k.zdjecia.length, 6);
+  assert.ok(String(k.fakty).includes("[Z1] plik: z1.png"), "najstarsze zdjęcie też jedzie");
+  assert.ok(!String(k.fakty).includes("Starszych zdjęć nie pokazano"));
+});
+
 test("wątek do modelu jest ZAMASKOWANY, tak samo jak przy szkicu", async () => {
   const n = nadawca();
   await Q.zadajPytanie(rozmowa, "Co z tym telefonem?", KTO(), n.nadaj, subiekt);

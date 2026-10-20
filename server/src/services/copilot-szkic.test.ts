@@ -495,6 +495,18 @@ test("zdjęcie z rozmowy jedzie do modelu, a jego spis stoi w FAKTACH", async ()
   assert.ok(s.widziane.fakty.includes("[Z1] plik: tabliczka.png"));
 });
 
+test("szkic przy sześciu zdjęciach bierze cztery: wyższy sufit ma tylko dopytanie", async () => {
+  /* Szkic potrafi uruchomić takt bez człowieka, więc zostaje przy hamulcu
+     kosztów. Gdyby dopytanie i szkic dzieliły jedną stałą, podniesienie jej
+     dla agenta podniosłoby rachunek taktu po cichu. */
+  for (let i = 1; i <= 6; i += 1) powieszZdjecie(`z${i}.png`);
+  const s = szpieg();
+  await S.ulozSzkic(rozmowa, KTO(), s.nadaj, subiekt, new Date(), pobierzPng);
+
+  assert.equal(s.widziane.zdjecia.length, 4);
+  assert.ok(s.widziane.fakty.includes("Starszych zdjęć nie pokazano: 2"));
+});
+
 test("rozmowa bez zdjęć nie wychodzi po bajty i dostaje pusty spis", async () => {
   const s = szpieg();
   let pobran = 0;

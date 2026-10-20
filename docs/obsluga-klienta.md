@@ -293,6 +293,10 @@ i wychodzi w całości. Przy szkicu z taktu nikt tego nie klika; właściciel,
 pytany wprost, wybrał obie ścieżki. Kod wymusza trzy zawężenia: tylko `SAFE`,
 tylko przychodzące i sufit sztuk (`SUFIT_SZTUK_ROZMOWY`, dziś cztery, idą
 najnowsze). Sufit jest, bo tę ścieżkę uruchamia takt, nie człowiek.
+Dopytanie Copilota ma sufit osiem (`SUFIT_SZTUK_DOPYTANIA`), bo uruchamia je
+agent kliknięciem i płaci za jedno pytanie. Szkic z taktu, szkic na kliknięcie
+i szkic przed pracą zostają przy czterech. W obu ścieżkach spis zdjęć mówi
+modelowi, ile starszych zostało poza.
 
 Wraca `szkic_copilota.odczyt_zdjec`, bez którego odsiew numerów odrzucałby
 każdy numer odczytany ze zdjęcia. Twierdzenia ze zdjęcia mają źródło
