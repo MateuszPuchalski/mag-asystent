@@ -1,5 +1,6 @@
-import React, { useState } from "react";
+import React, { useRef, useState } from "react";
 import { Paperclip, Play } from "lucide-react";
+import { useWGalerii } from "./Galeria";
 import { Powiekszenie } from "./Powiekszenie";
 import { PodgladPdf } from "./ZalacznikPdf";
 
@@ -94,6 +95,9 @@ export function KartaZalacznika({ nazwa, podglad, obraz, pobierz, powodBrakuPobr
   const [powiekszone, setPowiekszone] = useState(false);
   const [bladPobrania, setBladPobrania] = useState<string | null>(null);
   const { url, blad, ponow } = obraz;
+  /* Haki przed rozwidleniem na PDF: liczba wołań nie może zależeć od pliku. */
+  const miejsce = useRef<HTMLLIElement>(null);
+  const doGalerii = useWGalerii(pdf ? null : url, nazwa, miejsce);
 
   if (pdf) return <PodgladPdf sciezka={pdf} nazwa={nazwa} pobierz={pobierz} szerokosc={MINIATURA_KARTY}>
     {(w) => <li className="max-w-full">
@@ -113,7 +117,7 @@ export function KartaZalacznika({ nazwa, podglad, obraz, pobierz, powodBrakuPobr
     </li>}
   </PodgladPdf>;
 
-  return <li className="max-w-full">
+  return <li ref={miejsce} className="max-w-full">
     {/* Stałe miejsce PRZED pobraniem: bez ramki oś skakała przy doładowaniu,
         a przy porażce nie zostawało nic — agent widział samą nazwę pliku
         i nie miał jak zgadnąć, że zdjęcie w ogóle było spodziewane. */}
@@ -124,7 +128,7 @@ export function KartaZalacznika({ nazwa, podglad, obraz, pobierz, powodBrakuPobr
         i rozpychałoby oś na cały ekran. Przycisk, bo obraz jest też wejściem
         do powiększenia — a `Powiekszenie` montuje się WYŁĄCZNIE z adresem,
         żeby nigdy nie powiedziało „Ta kartoteka nie ma zdjęcia". */}
-    {url && <button type="button" onClick={() => setPowiekszone(true)}
+    {url && <button type="button" onClick={doGalerii ?? (() => setPowiekszone(true))}
       title={`${nazwa} — kliknij, żeby powiększyć`} aria-label={`Powiększ: ${nazwa}`}
       className="mb-1 block rounded focus:outline-none focus:ring-2 focus:ring-slate-400">
       <img src={url} alt={nazwa} loading="lazy"
@@ -174,6 +178,8 @@ export function KafelZalacznika({ nazwa, podglad, obraz, pobierz, pdf = null }: 
   const [bladPobrania, setBladPobrania] = useState<string | null>(null);
   const { url, blad, ponow } = obraz;
   const film = FILM.test(nazwa);
+  const miejsce = useRef<HTMLLIElement>(null);
+  const doGalerii = useWGalerii(pdf || film ? null : url, nazwa, miejsce);
   const pobieraj = () => {
     setBladPobrania(null);
     pobierz().catch((e: unknown) =>
@@ -205,10 +211,10 @@ export function KafelZalacznika({ nazwa, podglad, obraz, pobierz, pdf = null }: 
     </li>}
   </PodgladPdf>;
 
-  return <li className="flex max-w-56 flex-col gap-1">
+  return <li ref={miejsce} className="flex max-w-56 flex-col gap-1">
     <div className={`relative h-[84px] w-28 overflow-hidden rounded-lg ${
       film ? "bg-slate-700" : "border border-slate-200 bg-white"}`}>
-      {url && !film && <button type="button" onClick={() => setPowiekszone(true)}
+      {url && !film && <button type="button" onClick={doGalerii ?? (() => setPowiekszone(true))}
         aria-label={`Powiększ: ${nazwa}`} title={`${nazwa} — kliknij, żeby powiększyć`}
         className="block h-full w-full focus:outline-none focus:ring-2 focus:ring-inset focus:ring-slate-400">
         <img src={url} alt={nazwa} loading="lazy" className="h-full w-full object-cover" />

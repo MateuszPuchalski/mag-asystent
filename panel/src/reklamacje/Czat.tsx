@@ -7,6 +7,7 @@ import type { WiadomoscReklamacji, ZalacznikReklamacji } from "../api/typy";
 import { pobierzZalacznik } from "../api/reklamacje";
 import { sciezkaPodgladuReklamacji, useZdjecieZalacznikaReklamacji } from "../towar/useZdjecie";
 import { KafelZalacznika } from "../towar/Zalacznik";
+import { Galeria } from "../towar/Galeria";
 import { dniSlowo, dzienMiesiac, godzina, ile, odmien, Pusto } from "../ui";
 import { kopiujDoSchowka } from "../ui/kopiuj";
 import { PLAKIETKA_PRZESYLKI, type ZdarzeniePrzesylki } from "./przesylki";
@@ -564,7 +565,9 @@ export function Czat({ sprawa, czat, zalaczniki, edytor, zdarzenia = [], tytul =
     </Dymek>;
   });
 
-  return <div className="flex min-h-0 flex-1 flex-col">
+  /* Jedna galeria na całą rozmowę: strzałka w powiększeniu idzie po
+     zdjęciach wszystkich wiadomości, w kolejności czytania. */
+  return <Galeria><div className="flex min-h-0 flex-1 flex-col">
     {/* Nagłówek stoi poza przewijaniem: mówi, czym jest pas pod nim, i czy
         Allegro przyjmie jeszcze wiadomość, zanim agent zacznie pisać. */}
     <div className="flex shrink-0 flex-wrap items-center justify-between gap-x-3 gap-y-1 px-5 py-3.5">
@@ -596,5 +599,5 @@ export function Czat({ sprawa, czat, zalaczniki, edytor, zdarzenia = [], tytul =
       {edytor}
       <div ref={koniec} aria-hidden="true" />
     </div>
-  </div>;
+  </div></Galeria>;
 }

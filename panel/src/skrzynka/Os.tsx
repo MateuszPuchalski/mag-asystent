@@ -7,6 +7,7 @@ import { pobierzPlik } from "../api/klient";
 import { sciezkaPodgladuSkrzynki, useZdjecieZalacznika } from "../towar/useZdjecie";
 import { Kafel } from "../towar/Kafel";
 import { KartaZalacznika, ListaZalacznikow } from "../towar/Zalacznik";
+import { Galeria } from "../towar/Galeria";
 import { PrzypietePytanie } from "./PrzypietePytanie";
 import { NAZWA_ZDARZENIA_ZWROTU } from "../zwroty/Os";
 import { DlugiTekst, KLASA_PRZELACZNIKA, useRozwiniecie } from "./DlugiTekst";
@@ -312,7 +313,9 @@ export function Os({
      czytelna przy każdej wysokości edytora — to ona jest powodem ekranu.
      Od 0.495.0 edytor stoi W tej liście (`koniec`), więc go nie ściska;
      próg zostaje dla bloków nad osią, które dalej są `shrink-0`. */
-  return <div className="flex min-h-0 flex-1 flex-col">
+  /* Jedna galeria na całą rozmowę: strzałka w powiększeniu idzie po
+     zdjęciach wszystkich wiadomości, w kolejności czytania. */
+  return <Galeria><div className="flex min-h-0 flex-1 flex-col">
   <div ref={listaRef}
     onScroll={() => { const el = listaRef.current; if (el) naDole.current = dogonicDol(el); }}
     className="min-h-40 flex-1 space-y-3 overflow-y-auto p-4">
@@ -457,7 +460,7 @@ export function Os({
         odpowiada na „na co odpowiadam", a to jest ostatnia myśl przed pisaniem. */}
     {pytanie && !pytanieWKadrze
       && <PrzypietePytanie wpis={pytanie} onPokaz={() => skocz(pytanie.id)} />}
-  </div>;
+  </div></Galeria>;
 }
 
 /* ── ZDARZENIA SPRAWY ZESZŁY Z OSI DO JEDNEGO PASKA (0.243.0) ────────────────

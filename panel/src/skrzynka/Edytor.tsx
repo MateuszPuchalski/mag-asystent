@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState } from "react";
 import { ChevronDown, Eraser, Lock, MessageSquare, Send, Undo2 } from "lucide-react";
 import { Przycisk } from "../ui";
-import { PrzyciskZalacznika, ZalacznikiWysylki } from "./ZalacznikiWysylki";
+import { obrazZeSchowka, PrzyciskZalacznika, ZalacznikiWysylki } from "./ZalacznikiWysylki";
 import { KartaSzkicu, PasekSzkicu, PrzyciskSzkicu, UwagiSzkicu,
   type PropsSzkicuCopilota } from "./SzkicCopilota";
 import type { ZalacznikSzkicu } from "../api/rozmowy";
@@ -437,6 +437,15 @@ export function Edytor({
               if (mozeWyslac) {
                 if (e.shiftKey && onWyslijIZakoncz) onWyslijIZakoncz(); else onWyslij();
               }
+            }}
+            /* Obraz ze schowka idzie tą samą drogą co plik ze spinacza i pod
+               tą samą blokadą: cudza rozmowa, wysyłka i trwające wgrywanie. */
+            onPaste={(e) => {
+              if (!onDodajZalacznik) return;
+              const plik = obrazZeSchowka(e.clipboardData);
+              if (!plik) return;
+              e.preventDefault();
+              if (!cudza && !wysyla && !dodajeZalacznik) onDodajZalacznik(plik);
             }}
             /* Podpowiedź Entera tylko wtedy, gdy Enter prowadzi do pola —
                w samym polu robi nową linię (dekalog p. 2, `nawigacja/fokus.ts`). */
