@@ -227,6 +227,45 @@ test("ułożenie szkicu odświeża stare zamówienie, zanim złoży fakty", asyn
   assert.match(fakty, /wyślemy ją dziś/);
 });
 
+test("ułożenie szkicu dociąga zamówienie, którego WERTIS jeszcze nie znał", async () => {
+  /* Automat układa szkic zaraz po wiadomości, a ticker zamówień przychodzi
+     później. Bez dociągnięcia szkic na „kiedy nadacie?” nie znał zamówienia. */
+  db().prepare("UPDATE message SET related_order_id='ord-9' WHERE id=?").run(pytanie);
+  const wolane: string[] = [];
+  let fakty = "";
+  await S.ulozSzkic(rozmowa, KTO(), async (w, f, z) => { fakty = String(f); return nadawca()(w, f, z); },
+    subiekt, new Date("2026-10-06T08:00:00Z"), undefined, {
+      apiUrl: "https://api.test", teraz: () => "2026-10-06T08:00:00Z",
+      query: async (url) => {
+        wolane.push(url);
+        if (url.endsWith("/order/checkout-forms/ord-9")) {
+          return { id: "ord-9", status: "READY_FOR_PROCESSING",
+            delivery: { time: { dispatch: { to: "2026-10-06T15:00:00Z" } } }, lineItems: [] };
+        }
+        return { shipments: [] };
+      },
+    });
+  assert.ok(wolane.some((u) => u.endsWith("/order/checkout-forms/ord-9")), "zamówienia nie dociągnięto");
+  assert.ok(db().prepare("SELECT 1 FROM zamowienie_klienta WHERE external_id='ord-9'").get(), "zamówienie zapisane");
+  assert.match(fakty, /wyślemy ją dziś/);
+});
+
+test("zamówienie, którego Allegro nie oddało, dostaje fakt z lustra Sellasist bez obietnicy dnia", () => {
+  db().prepare("UPDATE message SET related_order_id='ord-8' WHERE id=?").run(pytanie);
+  db().exec("DELETE FROM sellasist_pozycja; DELETE FROM sellasist_zamowienie");
+  db().prepare(`INSERT INTO sellasist_zamowienie(id, external_id, status_id, status_nazwa, spakowano_at, pobrano_at)
+    VALUES (77, 'ord-8', 15, 'Spakowane', '2026-10-06T06:07:00.000Z', 'x')`).run();
+  try {
+    const k = S.kontekstSzkicu(rozmowa, subiekt, new Date("2026-10-06T08:00:00Z"));
+    const fakt = k.fakty.find((f) => f.rodzaj === "realizacja");
+    assert.ok(fakt, "brak faktu o realizacji");
+    assert.match(fakt.zdanie, /^Realizacja zamówienia: szczegółów zamówienia z Allegro jeszcze nie mamy; status w Sellasist:/);
+    assert.match(fakt.zdanie, /Spakowane; etykieta przewoźnika wydrukowana w Sellasist dziś\. WERDYKT: nie obiecuj wysyłki dziś/);
+  } finally {
+    db().exec("DELETE FROM sellasist_zamowienie");
+  }
+});
+
 /* ── Linki do naszych aktywnych aukcji (0.270.0) ─────────────────────────── */
 
 test("link do NASZEJ oferty wchodzi do faktów, z numeracją biegnącą dalej", () => {

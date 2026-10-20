@@ -4,7 +4,7 @@ import fs from "node:fs";
 import { DatabaseSync } from "node:sqlite";
 import { migrate, type Db } from "../db/db.js";
 import {
-  brakujaceZamowienia, pobierzZamowieniaKupujacego, uzupelnijZamowienia, wygladaNaLogin,
+  brakujaceZamowienia, dociagnijZamowienie, pobierzZamowieniaKupujacego, uzupelnijZamowienia, wygladaNaLogin,
 } from "./allegro-zamowienia-sync.js";
 import { paczkiKlienta } from "./zamowienia.js";
 import { BladLimituAllegro, BladOdpowiedziAllegro } from "../adapters/allegro.js";
@@ -602,4 +602,20 @@ test("login bez pseudonimu pyta małą literą, a przy pustej odpowiedzi wielką
     }) as never,
   });
   assert.equal(pytania2.length, 1, "trafienie za pierwszym razem kończy pytania");
+});
+
+/* Szkic układa się zaraz po wiadomości, przed tickerem zamówień. Jedno
+   żądanie dociąga brakujące zamówienie; cudza odpowiedź i odmowa nic nie piszą. */
+test("dociągnięcie przed szkicem zapisuje brakujące zamówienie, cudze i odmowę pomija", async () => {
+  const d = stanowisko();
+  const ile = () => (d.prepare("SELECT COUNT(*) AS n FROM zamowienie_klienta").get() as { n: number }).n;
+  await dociagnijZamowienie(d, KONTO, "ord-5", { apiUrl: "https://api.test", query: async () => zamowienie("ord-6") });
+  await dociagnijZamowienie(d, KONTO, "ord-5", { apiUrl: "https://api.test", query: async () => { throw new Error("429"); } });
+  await dociagnijZamowienie(d, KONTO, "ord-5", { apiUrl: "https://api.test", query: async () => null });
+  assert.equal(ile(), 0);
+  const wolane: string[] = [];
+  await dociagnijZamowienie(d, KONTO, "ord-5", { apiUrl: "https://api.test",
+    query: async (url) => { wolane.push(url); return zamowienie("ord-5"); } });
+  assert.deepEqual(wolane, ["https://api.test/order/checkout-forms/ord-5"]);
+  assert.equal(ile(), 1);
 });

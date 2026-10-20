@@ -168,6 +168,28 @@ export function ocenRealizacji(s: StanRealizacji, teraz: Date): OcenaRealizacji 
 }
 
 /**
+ * Zamówienie znane tylko z lustra Sellasist, bez szczegółów z Allegro.
+ *
+ * Allegro nie oddało zamówienia przed szkicem, a magazyn wie, co z paczką.
+ * Bez tego zdania szkic pisał, że nie wie, którego zamówienia dotyczy pytanie.
+ * Dnia wysyłki werdykt nie obiecuje: płatności i terminu nadania nie znamy,
+ * a etykietę drukuje się też przed zbieraniem.
+ */
+export function realizacjaBezAllegro(sa: RealizacjaSellasist, teraz: Date): string {
+  const dzis = dataLokalna(teraz.toISOString());
+  const czesci = ["szczegółów zamówienia z Allegro jeszcze nie mamy"];
+  if (sa.status) czesci.push(`status w Sellasist: ${sa.status}`);
+  const etykieta = sa.etykietaAt ? dataLokalna(sa.etykietaAt) : null;
+  if (etykieta) czesci.push(`etykieta przewoźnika wydrukowana w Sellasist ${etykieta === dzis ? "dziś" : etykieta}`);
+  if (sa.braki.length) {
+    czesci.push(`brak do skompletowania według Sellasist: ${sa.braki.map((b) => `${b.nazwa} (potrzeba ${b.potrzeba}, `
+      + `jest ${b.jest})`).join(", ")}`);
+  }
+  return `Realizacja zamówienia: ${czesci.join("; ")}. WERDYKT: nie obiecuj wysyłki dziś `
+    + "(brak danych z Allegro); opisz stan z tego faktu bez daty i napisz, że potwierdzimy termin nadania";
+}
+
+/**
  * Oryginał zamówienia z lustra Sellasist. Kopia (dosyłka) odpada: pytanie
  * „czy wyjdzie dziś" dotyczy zamówienia klienta, a nie drugiej paczki.
  *
