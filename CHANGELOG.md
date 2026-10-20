@@ -10,6 +10,14 @@ z wersją monorepo" — i właśnie tak przestał być zgodny: `0.3.0` przetrwa�
 sześć zmergowanych zmian, w tym takie, które wymagały nowego uprawnienia SQL.
 Komentarz nie jest mechanizmem.
 
+## 0.596.1 — 20 października 2026
+
+Dopytanie Copilota w skrzynce bierze do ośmiu zdjęć rozmowy zamiast czterech,
+bo uruchamia je agent kliknięciem. Odpadała najstarsza kartka z wymiarami,
+o którą agent pytał. Szkice z taktu, na kliknięcie i przed pracą zostają przy
+czterech. Sufit odpowiedzi dopytania rośnie do 10000 tokenów, bo odczyt ma wpis
+na każde zdjęcie.
+
 ## 0.596.0 — 20 października 2026
 
 **Copilot poprawia szkic, zamiast mówić, co poprawić.** Polecenie w „Dopytaj
