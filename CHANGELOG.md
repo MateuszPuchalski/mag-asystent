@@ -10,6 +10,16 @@ z wersją monorepo" — i właśnie tak przestał być zgodny: `0.3.0` przetrwa�
 sześć zmergowanych zmian, w tym takie, które wymagały nowego uprawnienia SQL.
 Komentarz nie jest mechanizmem.
 
+## 0.597.0 — 20 października 2026
+
+**Szkic Copilota podaje link do naszej aukcji także dla towaru spoza oferty
+rozmowy.** Gdy Copilot znajdzie w kartotece pasującą część, sprawdza w Allegro,
+czy mamy na nią aktywną aukcję, i wstawia klientowi jej adres.
+
+**Copilot widzi nasze zamienniki.** Zamiennik zapisany w opisie kartoteki, np.
+„S11103” przy łańcuchu MF381356, wraca jako nasza kartoteka ze stanem. Szukanie
+łańcuchów traktuje „3/8”, „3/8lp” i „3/8P” jako ten sam podział.
+
 ## 0.596.1 — 20 października 2026
 
 Dopytanie Copilota w skrzynce bierze do ośmiu zdjęć rozmowy zamiast czterech,

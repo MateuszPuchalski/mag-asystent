@@ -3227,7 +3227,7 @@ ma dopytanie: `szukaj_towaru`, `karta_towaru`, `tresc_oferty` i nowe
 `oferty_towaru`. Ma najwyżej trzy rundy narzędzi i jedno żądanie końcowe bez
 nich, mniej niż dopytanie, bo szkic chodzi też taktem. Wszystkie czytają
 lokalny odczyt Subiekta i kopię ofert i nie piszą do danych sprawy. Jedyny
-odczyt sieciowy dołożyło @wydanie, opis niżej.
+odczyt sieciowy dołożyło 0.597.0, opis niżej.
 
 **Wynik narzędzia to fakt `N#`.** Model cytuje go jak `F#`, a walidacja
 szkicu traktuje go jak fakt. Numer z wyniku nie odrzuca szkicu. Numer
@@ -3248,7 +3248,7 @@ spojrzeniu człowieka.
 z jednym wywołaniem. Dziennik `copilot_szkic` zapisuje nazwy użytych narzędzi
 i liczbę rund, bez treści.
 
-**Link na żywo, zamienniki z opisu i podział łańcucha (@wydanie).** Decyzja
+**Link na żywo, zamienniki z opisu i podział łańcucha (0.597.0).** Decyzja
 właściciela z 20 października 2026, po szkicu o łańcuch do Stihl MS 231.
 Klient kupił łańcuch 50 ogniw, a potrzebował 56. Szkic znalazł MF381356, ale
 napisał agentowi, że aktywnej aukcji nie ma. Nasza aukcja istniała: kartoteka
