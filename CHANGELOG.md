@@ -10,6 +10,21 @@ z wersją monorepo" — i właśnie tak przestał być zgodny: `0.3.0` przetrwa�
 sześć zmergowanych zmian, w tym takie, które wymagały nowego uprawnienia SQL.
 Komentarz nie jest mechanizmem.
 
+## 0.598.0 — 20 października 2026
+
+**Zdjęcie do odpowiedzi wkleisz Ctrl+V.** Zrzut ekranu albo obraz skopiowany
+z przeglądarki wklejony w pole odpowiedzi dołącza się jak plik ze spinacza.
+Działa w skrzynce, reklamacjach i dyskusjach. Skopiowany tekst wkleja się
+jak dotąd.
+
+**Zdjęcia klienta przełączasz w powiększeniu.** Strzałki ← → albo przyciski
+po bokach przechodzą po wszystkich zdjęciach rozmowy, a licznik mówi, które
+to z ilu.
+
+**Lupa w powiększeniu zdjęcia.** Przycisk „Lupa” włącza okrąg, który pod
+kursorem przybliża zdjęcie trzykrotnie. Pęknięcie albo gwint widać bez
+pobierania pliku.
+
 ## 0.597.2 — 20 października 2026
 
 **Pierwszy szkic zna zamówienie.** Automat układa szkic zaraz po wiadomości,
