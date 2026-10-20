@@ -1,6 +1,6 @@
 import {
-  JAKOSCI_GOTOWEGO, JAKOSCI_WYSYLKI, LIMIT_BAJTOW, MAKS_BOKU_WYSYLKI, kadrWPikselach, kwadratWokol,
-  ramkaAlfy, wymiaryWLimicie, wyrownajPoziomy, zakodujWLimicie, type Kadr, type Obrot,
+  CEL_BAJTOW_GOTOWEGO, JAKOSCI_GOTOWEGO, JAKOSCI_WYSYLKI, LIMIT_BAJTOW, MAKS_BOKU_WYSYLKI, kadrWPikselach, kwadratWokol,
+  ramkaAlfy, wymiaryWLimicie, wyrownajPoziomy, zakodujJakNajlzej, zakodujWLimicie, type Kadr, type Obrot,
 } from "./obrobka";
 
 /* ── RYSOWANIE NA PŁÓTNIE ──────────────────────────────────────────────────
@@ -12,7 +12,7 @@ import {
 export interface Zrodlo { kanwa: HTMLCanvasElement; szer: number; wys: number }
 
 /** Gotowy plik: base64 do wysyłki i adres `data:` do podglądu. */
-export interface Plik { base64: string; adres: string }
+export interface Plik { base64: string; adres: string; /** Bok gotowego kwadratu w pikselach. */ bok?: number }
 
 const BRAK_PLOTNA = "Przeglądarka nie rysuje obrazów. Otwórz panel w Chrome albo w Edge.";
 
@@ -116,7 +116,8 @@ export async function zlozGotowy(base64: string, mime: string): Promise<Plik> {
   ctx.fillRect(0, 0, g.bok, g.bok);
   ctx.imageSmoothingQuality = "high";
   ctx.drawImage(zr, ramka.x, ramka.y, ramka.szer, ramka.wys, g.x, g.y, g.szer, g.wys);
-  const w = await zakodujWLimicie((q) => base64ZAdresu(c.toDataURL("image/jpeg", q)), LIMIT_BAJTOW, JAKOSCI_GOTOWEGO);
-  if (!w.miesciSie) throw new Error("Gotowe zdjęcie jest za duże nawet po kompresji. Wyłącz „Białe tło i kwadrat”.");
-  return { base64: w.base64, adres: `data:image/jpeg;base64,${w.base64}` };
+  const w = await zakodujJakNajlzej((q) => base64ZAdresu(c.toDataURL("image/jpeg", q)),
+    CEL_BAJTOW_GOTOWEGO, LIMIT_BAJTOW, JAKOSCI_GOTOWEGO);
+  if (!w.miesciSie) throw new Error("Gotowe zdjęcie jest za duże nawet po kompresji. Wykadruj ciaśniej sam towar.");
+  return { base64: w.base64, adres: `data:image/jpeg;base64,${w.base64}`, bok: g.bok };
 }

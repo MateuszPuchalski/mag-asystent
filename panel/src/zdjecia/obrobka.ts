@@ -10,8 +10,8 @@ export const PROG_ALFY = 8;
 /** Dłuższy bok zdjęcia wysyłanego do usuwania tła. Więcej nie poprawia wycięcia, a wydłuża wysyłkę. */
 export const MAKS_BOKU_WYSYLKI = 1600;
 
-/** Dłuższy bok gotowego kwadratu. Tyle pokazuje karta towaru w Subiekcie i na fakturze. */
-export const MAKS_BOKU_GOTOWEGO = 1024;
+/** Bok gotowego kwadratu, decyzją właściciela. Wystarcza karcie towaru i wydrukowi, a plik jest lżejszy niż przy 1024. */
+export const MAKS_BOKU_GOTOWEGO = 800;
 
 /** Margines wokół towaru w kwadracie, jako część dłuższego boku treści. */
 export const MARGINES_KWADRATU = 0.05;
@@ -22,7 +22,12 @@ export const LIMIT_BAJTOW = 500 * 1024;
 /* Jakość schodzi krokami, a nie bisekcją. Pięć prób to pięć kodowań płótna,
    czyli ułamek sekundy, a krok 0,1 jest najmniejszym, który widać w pliku. */
 export const JAKOSCI_WYSYLKI = [0.85, 0.75, 0.65, 0.55, 0.45] as const;
-export const JAKOSCI_GOTOWEGO = [0.88, 0.8, 0.7, 0.6, 0.5] as const;
+/* Gotowe zdjęcie ma ważyć jak najmniej, decyzją właściciela. Dolna jakość
+   0,52 to granica, poniżej której na białym tle widać kostki JPEG-a. */
+export const JAKOSCI_GOTOWEGO = [0.82, 0.75, 0.68, 0.6, 0.52] as const;
+
+/** Waga, do której schodzimy z jakością. Kwadrat 800 px na białym zwykle mieści się w niej przy 0,7. */
+export const CEL_BAJTOW_GOTOWEGO = 60 * 1024;
 
 /* ── POZIOMY: ŁAGODNE ROZCIĄGNIĘCIE KANAŁÓW ─────────────────────────────────
    Zdjęcie z biurka ma szarą biel i zgaszoną czerń, bo robi je telefon pod
@@ -210,6 +215,18 @@ export async function zakodujWLimicie(koduj: (jakosc: number) => string | Promis
     if (bajtow <= limit) return { ...ostatni, miesciSie: true };
   }
   return { ...ostatni, miesciSie: false };
+}
+
+/**
+ * Najlżejszy plik, który jeszcze dobrze wygląda: pierwsza jakość mieszcząca
+ * się w `cel`. Gdy żadna się nie mieści, bierze ostatnią, czyli najlżejszą
+ * próbę. `miesciSie: false` znaczy wtedy tylko, że ta przekracza twardy `limit`.
+ */
+export async function zakodujJakNajlzej(koduj: (jakosc: number) => string | Promise<string>,
+  cel: number, limit: number, jakosci: readonly number[]):
+  Promise<{ base64: string; jakosc: number; bajtow: number; miesciSie: boolean }> {
+  const w = await zakodujWLimicie(koduj, cel, jakosci);
+  return w.miesciSie ? w : { ...w, miesciSie: w.bajtow <= limit };
 }
 
 /* ── OBRÓT ──────────────────────────────────────────────────────────────── */

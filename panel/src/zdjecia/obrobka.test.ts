@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   LIMIT_BAJTOW, MAKS_PRZESUNIECIA, bajtyBase64, kadrWPikselach, kadrZPrzeciagniecia, kwadratWokol,
-  obroc, percentyleKanalow, ramkaAlfy, tablicaPoziomow, wymiaryWLimicie, wyrownajPoziomy, zakodujWLimicie,
+  obroc, percentyleKanalow, ramkaAlfy, tablicaPoziomow, wymiaryWLimicie, wyrownajPoziomy, zakodujJakNajlzej, zakodujWLimicie,
 } from "./obrobka";
 
 /* Rachunek obróbki na tablicach pikseli, bez płótna. Powód podziału stoi
@@ -100,14 +100,14 @@ describe("kwadrat", () => {
     expect(g).toMatchObject({ szer: 400, wys: 200, x: 20, y: 120 });
   });
 
-  it("towar większy: bok przycięty do 1024, treść zmniejszona proporcjonalnie i wyśrodkowana", () => {
+  it("towar większy: bok przycięty do 800, treść zmniejszona proporcjonalnie i wyśrodkowana", () => {
     const g = kwadratWokol(1500, 3000);
-    expect(g.bok).toBe(1024);
-    expect(g.wys).toBe(Math.round(3000 * 1024 / 3300));
-    expect(g.szer).toBe(Math.round(1500 * 1024 / 3300));
-    expect(g.x * 2 + g.szer).toBeLessThanOrEqual(1024);
-    expect(Math.abs(g.x * 2 + g.szer - 1024)).toBeLessThanOrEqual(1);
-    expect(g.y).toBe(Math.floor((1024 - g.wys) / 2));
+    expect(g.bok).toBe(800);
+    expect(g.wys).toBe(Math.round(3000 * 800 / 3300));
+    expect(g.szer).toBe(Math.round(1500 * 800 / 3300));
+    expect(g.x * 2 + g.szer).toBeLessThanOrEqual(800);
+    expect(Math.abs(g.x * 2 + g.szer - 800)).toBeLessThanOrEqual(1);
+    expect(g.y).toBe(Math.floor((800 - g.wys) / 2));
   });
 
   it("wymiary w limicie nie powiększają i trzymają proporcję", () => {
@@ -145,6 +145,16 @@ describe("jakość pliku", () => {
     const w = await zakodujWLimicie(koduj, 500, [0.85, 0.75, 0.65, 0.55]);
     expect(w).toMatchObject({ miesciSie: true, jakosc: 0.65 });
     expect(proby).toEqual([0.85, 0.75, 0.65]);
+  });
+
+  /* Gotowe zdjęcie ma ważyć jak najmniej: stajemy na pierwszej jakości
+     w celu, a bez trafienia bierzemy najlżejszą próbę, byle w limicie serwera. */
+  it("jak najlżej: pierwsza jakość w celu, inaczej najlżejsza próba w limicie", async () => {
+    /* Atrapa: 1000 znaków base64 na jakość 1, czyli 0,68 → 510 B, a 0,6 → 450 B. */
+    const koduj = (q: number) => "A".repeat(Math.round(q * 1000));
+    expect(await zakodujJakNajlzej(koduj, 520, 900, [0.82, 0.75, 0.68, 0.6])).toMatchObject({ jakosc: 0.68, miesciSie: true });
+    expect(await zakodujJakNajlzej(koduj, 100, 900, [0.82, 0.6])).toMatchObject({ jakosc: 0.6, miesciSie: true });
+    expect(await zakodujJakNajlzej(koduj, 100, 400, [0.82, 0.6])).toMatchObject({ jakosc: 0.6, miesciSie: false });
   });
 
   it("przyznaje, gdy nawet najniższa jakość nie wystarcza", async () => {
