@@ -249,7 +249,7 @@ function atrapaNarzedzi() {
       input_schema: { type: "object", properties: { zapytanie: { type: "string", description: "s" } },
         required: ["zapytanie"], additionalProperties: false },
     }],
-    wykonaj(nazwa, wejscie) {
+    async wykonaj(nazwa, wejscie) {
       wywolania.push({ nazwa, wejscie });
       return { wynik: "Kartoteka GAZ-1: gaźnik" as WynikNarzedzia, blad: false };
     },
@@ -296,6 +296,45 @@ test("dopytanie: wynik narzędzia wraca do modelu, a wstęp przed wywołaniem ni
     assert.deepEqual(wyniki.map((w) => [w.type, w.tool_use_id, w.is_error]), [["tool_result", "tu_1", false]]);
     assert.ok(Array.isArray(zadania[0]!.tools), "pierwsza runda niesie narzędzia");
     assert.equal(zadania[0]!.tool_choice, undefined, "model sam decyduje, czy sięgnąć");
+  } finally {
+    _ustawKlienta(null);
+  }
+});
+
+/* Narzędzie z odczytem Allegro odpowiada dopiero po żądaniu. Pętla bez
+   `await` wysłałaby modelowi obietnicę zamiast treści, a numery N# rozjechałyby
+   się z kolejnością wywołań. */
+test("dopytanie: wynik narzędzia asynchronicznego trafia do następnej rundy, po kolei", async () => {
+  const kolejnosc: string[] = [];
+  const zestaw: ZestawNarzedzi = {
+    definicje: atrapaNarzedzi().zestaw.definicje,
+    async wykonaj(_nazwa, wejscie) {
+      const q = String((wejscie as { zapytanie: string }).zapytanie);
+      /* Pierwsze wywołanie wolniejsze: równoległe wykonanie odwróciłoby kolejność. */
+      await new Promise((r) => setTimeout(r, q === "A" ? 30 : 1));
+      kolejnosc.push(q);
+      return { wynik: `Oferta ${q}: https://allegro.pl/oferta/1${q === "A" ? 1 : 2}` as WynikNarzedzia, blad: false };
+    },
+  };
+  const zadania = klientSekwencja([
+    () => ({
+      stop_reason: "tool_use", model: "claude-opus-5", usage: zuzycieRundy,
+      content: [
+        { type: "tool_use", id: "tu_a", name: "karta_towaru", input: { zapytanie: "A" } },
+        { type: "tool_use", id: "tu_b", name: "karta_towaru", input: { zapytanie: "B" } },
+      ],
+    }),
+    () => ({ stop_reason: "end_turn", model: "claude-opus-5", usage: zuzycieRundy,
+      content: [{ type: "text", text: ODPOWIEDZ }] }),
+  ]);
+  try {
+    await nadawcaPytaniaAnthropic(kontekstPytania(zestaw));
+    assert.deepEqual(kolejnosc, ["A", "B"], "wywołania idą po kolei, nie naraz");
+    const druga = zadania[1]!.messages as Array<{ role: string; content: unknown }>;
+    const wyniki = druga[2]!.content as Array<Record<string, unknown>>;
+    assert.deepEqual(wyniki.map((w) => [w.tool_use_id, typeof w.content]), [["tu_a", "string"], ["tu_b", "string"]]);
+    assert.ok(String(wyniki[0]!.content).includes("https://allegro.pl/oferta/11"), String(wyniki[0]!.content));
+    assert.ok(String(wyniki[1]!.content).includes("https://allegro.pl/oferta/12"), String(wyniki[1]!.content));
   } finally {
     _ustawKlienta(null);
   }

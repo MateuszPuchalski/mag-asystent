@@ -941,8 +941,9 @@ export async function ulozSzkic(
   }
 
   /* NARZĘDZIA KARTOTEKI (decyzja właściciela z 19 października 2026): szkic
-     sięga do bazy jak dopytanie. Tylko odczyt lokalny, granica stoi
-     w `copilot-narzedzia`. Przełącznik zostaje, bo każda runda to żądanie. */
+     sięga do bazy jak dopytanie. Bez zapisu do sprawy, a jedyny odczyt
+     sieciowy to link oferty po sygnaturze; granica stoi w `copilot-narzedzia`.
+     Przełącznik zostaje, bo każda runda to żądanie. */
   const narzedzia = config.copilot.szkicNarzedzia ? zestawNarzedzi(subiekt) : undefined;
   let odp: OdpowiedzSzkicu;
   try {

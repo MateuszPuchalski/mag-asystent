@@ -821,19 +821,20 @@ async function rozmowaZNarzedziami<T>(o: {
         wiadomosci.push({ role: "assistant", content: odp.content });
         /* Wszystkie wyniki w JEDNEJ wiadomości: rozbite na kilka uczą model,
            że nie wolno mu wołać narzędzi równolegle. */
-        wiadomosci.push({
-          role: "user",
-          content: wywolania.map((w) => {
-            const { wynik, blad } = zestaw.wykonaj(w.name, w.input);
-            const argument = String((w.input as { zapytanie?: unknown } | null)?.zapytanie ?? "").slice(0, 120);
-            /* Numer N# biegnie przez całą rozmowę, jak F# przez fakty. Na nim
-               model opiera odwołanie, a serwis sprawdza, czy takie wywołanie było. */
-            const id = `N${wyniki.length + 1}`;
-            uzyte.push({ nazwa: w.name, argument, znakow: wynik.length });
-            wyniki.push({ id, nazwa: w.name, argument, tresc: String(wynik) });
-            return { type: "tool_result" as const, tool_use_id: w.id, content: o.numerujWyniki ? `[${id}] ${String(wynik)}` : String(wynik), is_error: blad };
-          }),
-        });
+        /* Po kolei, nie równolegle: numer N# idzie za kolejnością wywołań,
+           a narzędzie z odczytem Allegro nie ma wysyłać serii naraz. */
+        const tresciWynikow: Anthropic.ToolResultBlockParam[] = [];
+        for (const w of wywolania) {
+          const { wynik, blad } = await zestaw.wykonaj(w.name, w.input);
+          const argument = String((w.input as { zapytanie?: unknown } | null)?.zapytanie ?? "").slice(0, 120);
+          /* Numer N# biegnie przez całą rozmowę, jak F# przez fakty. Na nim
+             model opiera odwołanie, a serwis sprawdza, czy takie wywołanie było. */
+          const id = `N${wyniki.length + 1}`;
+          uzyte.push({ nazwa: w.name, argument, znakow: wynik.length });
+          wyniki.push({ id, nazwa: w.name, argument, tresc: String(wynik) });
+          tresciWynikow.push({ type: "tool_result" as const, tool_use_id: w.id, content: o.numerujWyniki ? `[${id}] ${String(wynik)}` : String(wynik), is_error: blad });
+        }
+        wiadomosci.push({ role: "user", content: tresciWynikow });
         continue;
       }
 

@@ -3226,7 +3226,8 @@ części albo inną aukcją. Szkic odpowiadał wtedy z wiedzy modelu.
 ma dopytanie: `szukaj_towaru`, `karta_towaru`, `tresc_oferty` i nowe
 `oferty_towaru`. Ma najwyżej trzy rundy narzędzi i jedno żądanie końcowe bez
 nich, mniej niż dopytanie, bo szkic chodzi też taktem. Wszystkie czytają
-lokalny odczyt Subiekta i kopię ofert, nie piszą i nie wołają sieci.
+lokalny odczyt Subiekta i kopię ofert i nie piszą do danych sprawy. Jedyny
+odczyt sieciowy dołożyło @wydanie, opis niżej.
 
 **Wynik narzędzia to fakt `N#`.** Model cytuje go jak `F#`, a walidacja
 szkicu traktuje go jak fakt. Numer z wyniku nie odrzuca szkicu. Numer
@@ -3246,6 +3247,30 @@ spojrzeniu człowieka.
 **Wyłącznik.** `COPILOT_SZKIC_NARZEDZIA=0` w `wertis.env` przywraca szkic
 z jednym wywołaniem. Dziennik `copilot_szkic` zapisuje nazwy użytych narzędzi
 i liczbę rund, bez treści.
+
+**Link na żywo, zamienniki z opisu i podział łańcucha (@wydanie).** Decyzja
+właściciela z 20 października 2026, po szkicu o łańcuch do Stihl MS 231.
+Klient kupił łańcuch 50 ogniw, a potrzebował 56. Szkic znalazł MF381356, ale
+napisał agentowi, że aktywnej aukcji nie ma. Nasza aukcja istniała: kartoteka
+11103, „3/8lp”, z tym samym EAN-em co oferta.
+
+Zawiodły dwie rzeczy. Kopia ofert zna tylko aukcje, pod którymi ktoś pisał.
+Opis MF381356 wskazuje zamiennik jako „S11103”, a nie naszym symbolem.
+
+- `oferty_towaru` przy pustej kopii pyta Allegro po sygnaturze, jednym
+  żądaniem, tą samą funkcją co fakty szkicu. Wynik niesie link, tytuł, cenę
+  i dopisek „stan z Allegro teraz”. Ten sam symbol w jednym szkicu pytamy raz.
+- Błąd, limit i brak konta dają dawne zdanie: kopia nie zna oferty, co nie
+  znaczy, że jej nie ma.
+- Narzędzia dalej nie piszą do danych sprawy. Skutkiem ubocznym odczytu jest
+  snapshot znalezionej oferty, zapisany przez jedynego pisarza tej tabeli.
+- `karta_towaru` rozwiązuje numery z opisu na nasze kartoteki: symbol wprost,
+  symbol po zdjęciu jednoliterowego przedrostka albo wspólny numer części.
+  Trafienie musi mieć to samo pierwsze słowo nazwy, czyli ten sam rodzaj
+  towaru.
+- `szukaj_towaru` traktuje zapisy „3/8”, „3/8''”, „3/8lp” i „3/8P” jako jedno
+  szukanie. Wynik zostawia pełne nazwy i ostrzega, że pełny 3/8 i 3/8 LP
+  (Picco) to różne łańcuchy.
 
 ### 14.7. Co działa: dane doboru z rozmowy (etap F, przyrost trzeci)
 

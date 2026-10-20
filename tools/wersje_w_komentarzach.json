@@ -552,8 +552,6 @@
  "server/src/services/copilot-koszt.ts": 1,
  "server/src/services/copilot-maskowanie.test.ts": 1,
  "server/src/services/copilot-maskowanie.ts": 2,
- "server/src/services/copilot-narzedzia.test.ts": 1,
- "server/src/services/copilot-narzedzia.ts": 1,
  "server/src/services/copilot-pytania.test.ts": 1,
  "server/src/services/copilot-reklamacja.test.ts": 4,
  "server/src/services/copilot-reklamacja.ts": 12,
