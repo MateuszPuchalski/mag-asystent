@@ -119,6 +119,38 @@ test("porcja jest ograniczona, a odpowiedź ląduje w snapshocie ofert", async (
   d.close();
 });
 
+test("zła kwota jednej oferty nie wywraca reszty — link zostaje, ceny nie ma", async () => {
+  /* Swagger każe `amount` być łańcuchem (`Price.required`), ale błąd zapisu
+     snapshotu leciał w górę aż do `ulozSzkic` i `zadajPytanie`. Jedna oferta
+     o obcym kształcie kosztowała cały szkic, a nagłówek obiecuje co innego. */
+  const d = baza();
+  const ostrzezenia: string[] = [];
+  const warn = console.warn;
+  console.warn = (...a: unknown[]) => { ostrzezenia.push(a.map(String).join(" ")); };
+  try {
+    const wynik = await ofertyPoSygnaturze(["A-1", "B-2", "C-3"], {
+      database: d, apiUrl: "https://api.test", accountId: "konto-1",
+      query: async () => ({ offers: [
+        { ...oferta("1", "A-1"), sellingMode: { price: { amount: "abc", currency: "PLN" } } },
+        { ...oferta("2", "B-2"), sellingMode: { price: { amount: { value: 49.9 }, currency: "PLN" } } },
+        oferta("3", "C-3"),
+      ] }),
+    });
+    assert.equal(wynik.size, 3, "zła cena to brak ceny, nie brak linku");
+    assert.match(wynik.get("a1")!.link, /1$/);
+    assert.equal(wynik.get("a1")!.cenaGrosze, null);
+    assert.equal(wynik.get("b2")!.cenaGrosze, null);
+    assert.equal(wynik.get("c3")!.cenaGrosze, 4990);
+    const zapisane = d.prepare("SELECT external_id FROM offer_snapshot ORDER BY external_id")
+      .all().map((w) => (w as { external_id: string }).external_id);
+    assert.deepEqual(zapisane, ["3"], "dobra oferta trafia do snapshotu mimo złych obok");
+    assert.equal(ostrzezenia.filter((o) => o.includes("[oferty-po-sygnaturze]")).length, 2);
+  } finally {
+    console.warn = warn;
+    d.close();
+  }
+});
+
 test("link niesie cenę z tej samej odpowiedzi, a brak kwoty to brak ceny", async () => {
   /* Narzędzie `oferty_towaru` podaje klientowi link razem z ceną, a cena
      przyszła w tej samej odpowiedzi, więc nie płacimy za nią drugim żądaniem. */

@@ -58,12 +58,18 @@ export interface LinkDoOferty {
 }
 
 /**
- * Cena z odpowiedzi, którą i tak mamy, więc bez drugiego żądania. Kształt
- * kwoty sprawdził już zapis snapshotu. Brak albo zero znaczy „nie wiemy”.
+ * Cena z odpowiedzi, którą i tak mamy, więc bez drugiego żądania. Brak,
+ * zero albo kwota w obcym kształcie znaczy „nie wiemy”. Obcy kształt łapiemy
+ * tu osobno, bo link bez ceny dalej jest wart podania klientowi.
  */
 function cenaOferty(o: Oferta): { cenaGrosze: number | null; waluta: string | null } {
   const kwota = o.sellingMode?.price;
-  const grosze = kwota?.amount == null ? null : naGrosze(kwota.amount);
+  let grosze: number | null = null;
+  try {
+    grosze = kwota?.amount == null ? null : naGrosze(kwota.amount);
+  } catch {
+    /* Ostrzeżenie dał już zapis snapshotu tej samej oferty. */
+  }
   return { cenaGrosze: grosze != null && grosze > 0 ? grosze : null, waluta: kwota?.currency ?? null };
 }
 
@@ -119,12 +125,22 @@ export async function ofertyPoSygnaturze(
   /* Skoro i tak zapytaliśmy, snapshot zapisujemy — to ten sam kształt
      odpowiedzi, którym żywi się `offer_snapshot`, a przy okazji rozmowa pod
      tą ofertą dostaje tytuł bez osobnego żądania. Jeden pisarz na tabelę:
-     `zapiszSnapshotOferty`. */
+     `zapiszSnapshotOferty`.
+
+     Każda oferta osobno w try/catch, bo pisarz rzuca na kwocie spoza
+     schematu `Price`. Snapshot jest tu produktem ubocznym, więc jego błąd
+     nie może zabrać innym ofertom zapisu ani szkicowi linków. Rzut pada
+     przy liczeniu argumentów, zanim ruszy INSERT, więc transakcja zostaje
+     czysta. */
   transaction(database, () => {
     const konto = kontoKanalu(database, deps.accountId ?? config.allegro.clientId);
     for (const o of oferty) {
       if (!o.id) continue;
-      zapiszSnapshotOferty(database, o, konto, at);
+      try {
+        zapiszSnapshotOferty(database, o, konto, at);
+      } catch (e) {
+        console.warn(`[oferty-po-sygnaturze] oferta ${o.id}: ${e instanceof Error ? e.message : e}`);
+      }
     }
   })();
 
