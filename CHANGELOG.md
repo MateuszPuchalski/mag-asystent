@@ -10,6 +10,14 @@ z wersją monorepo" — i właśnie tak przestał być zgodny: `0.3.0` przetrwa�
 sześć zmergowanych zmian, w tym takie, które wymagały nowego uprawnienia SQL.
 Komentarz nie jest mechanizmem.
 
+## 0.599.0 — 20 października 2026
+
+**Najpierw zdjęcia tego, co się sprzedaje.** Zakładka „Zdjęcia" układa
+listę domyślnie od towarów najczęściej sprzedawanych w ostatnich 30 dniach.
+Przy każdym stoi liczba sprzedanych sztuk i stan. Pole „Sprzedane w 30 dni"
+zostawia tylko towary, które w tym czasie zeszły. Sprzedaż liczy się z faktur
+i paragonów, a faktura do paragonu nie dodaje sztuk drugi raz.
+
 ## 0.598.0 — 20 października 2026
 
 **Zdjęcie do odpowiedzi wkleisz Ctrl+V.** Zrzut ekranu albo obraz skopiowany
