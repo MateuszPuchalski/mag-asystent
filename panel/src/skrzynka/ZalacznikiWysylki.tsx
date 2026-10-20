@@ -22,6 +22,22 @@ import type { ZalacznikSzkicu } from "../api/rozmowy";
 /** Typy, które Allegro przyjmuje przy wiadomości — lustro `TYPY_ZALACZNIKA`. */
 const PRZYJMOWANE = "image/png,image/gif,image/bmp,image/tiff,image/jpeg,application/pdf";
 
+/**
+ * Obraz ze schowka do dołączenia albo `null`, gdy wklejenie należy do tekstu.
+ *
+ * Zrzut ekranu wkleja się szybciej, niż zapisuje do pliku i wybiera spinaczem,
+ * a pytanie o część klient zadaje zwykle właśnie zrzutem ze sklepu.
+ *
+ * TEKST WYGRYWA Z OBRAZEM. Word i Excel kładą do schowka obok tekstu także
+ * jego obrazek, a agent kopiujący akapit chce akapit, nie zdjęcie akapitu.
+ * Obraz skopiowany z przeglądarki zwykłego tekstu nie niesie.
+ */
+export function obrazZeSchowka(dane: DataTransfer | null): File | null {
+  if (!dane || dane.getData("text/plain") !== "") return null;
+  const element = [...dane.items].find((i) => i.kind === "file" && i.type.startsWith("image/"));
+  return element?.getAsFile() ?? null;
+}
+
 /** Rozmiar po ludzku. Bajty przy pliku 2,4 MB nie mówią nic. */
 export function poLudzku(bajtow: number): string {
   if (bajtow < 1024) return `${bajtow} B`;
