@@ -10,6 +10,30 @@ z wersją monorepo" — i właśnie tak przestał być zgodny: `0.3.0` przetrwa�
 sześć zmergowanych zmian, w tym takie, które wymagały nowego uprawnienia SQL.
 Komentarz nie jest mechanizmem.
 
+## 0.595.0 — 20 października 2026
+
+**Brak z kompletacji do decyzji biura.** Zamówienie z Allegro, które po
+godzinie granicznej dalej stoi w statusie „Brak podczas kompletacji”, staje
+w „Do zrobienia”. Godzina graniczna to 12:00 przy kurierze innym niż InPost
+i 15:00 przy InPost. Wejście w brak po tej godzinie staje od razu.
+
+Wiersz mówi, czego brakuje i co jeszcze jest w zamówieniu, i prowadzi na
+profil klienta. Obok stoi odnośnik do zamówienia w Allegro, gdzie biuro pisze
+do klienta. Przycisk „Klient powiadomiony” zamyka wiersz, choć zamówienie
+zostaje w statusie braku. Stawia przy tym krok w sprawie klienta na następny
+dzień roboczy, więc odpowiedź klienta nie zginie.
+
+**[wymaga działania]** W panelu: Ustawienia → Konfiguracja, grupa Sellasist.
+Wpisz w `SELLASIST_STATUSY_BRAK` numer statusu „Brak podczas kompletacji”
+(u nas 12). Godziny graniczne mają już domyślne 12 i 15. Pierwszego dnia
+staną naraz wszystkie zamówienia, które już czekają w braku, także InPost
+z godziną kuriera. Lustro zna metodę dostawy dopiero po ich następnej zmianie.
+
+**Nieodebrana paczka w szkicu odpowiedzi.** Gdy przesyłka wraca albo wróciła
+do nadawcy, a klient prosi o ponowne nadanie, szkic Copilota prosi go
+o złożenie zamówienia jeszcze raz. Ponownej wysyłki ani zwrotu pieniędzy
+za pierwsze zamówienie nie obiecuje.
+
 ## 0.594.0 — 19 października 2026
 
 **Pomyłki złapane przy pakowaniu.** Zakładka „Pomyłki” pokazuje, ile pomyłek
