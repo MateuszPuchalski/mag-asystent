@@ -3,6 +3,7 @@ import path from "node:path";
 import sql from "mssql";
 import { mssqlPool, assertSafeColumn } from "../db/mssql.js";
 import { config } from "../config.js";
+import { brakKolumnyKorekty } from "./subiekt.mssql.js";
 
 /* ── Zdjęcie kartoteki ze źródła — KAŻDA nazwa tabeli i kolumny to [WERYFIKUJ] ─
    Repozytorium NIE WIE, gdzie Subiekt GT trzyma obraz z zakładki „Opis":
@@ -271,19 +272,27 @@ export interface TowarBezZdjecia {
   ean: string | null;
   /** Suma stanu ze wszystkich magazynów; 0, gdy towar nie ma wiersza w `tw_Stan`. */
   stan: number;
+  /** Sztuki sprzedane na FS i PA w ostatnich `DNI_SPRZEDAZY` dniach. */
+  sprzedaz: number;
 }
 
+/** Okno sprzedaży listy braków. Miesiąc pokazuje, co schodzi teraz, a nie w sezonie sprzed roku. */
+export const DNI_SPRZEDAZY = 30;
+
 /**
- * Porządek listy braków. Biuro zaczyna zwykle od tego, co leży na półce
- * i się sprzedaje, więc domyślnie wygrywa stan, nie alfabet.
+ * Porządek listy braków. Domyślnie wygrywa sprzedaż: zdjęcie towaru, który
+ * schodzi co dzień, pracuje na każdej ofercie, a leżącego — na żadnej.
  */
-export const SORTOWANIA_BEZ_ZDJECIA = ["stan", "symbol", "nazwa", "najnowsze"] as const;
+export const SORTOWANIA_BEZ_ZDJECIA = ["sprzedaz", "stan", "symbol", "nazwa", "najnowsze"] as const;
 export type SortBezZdjecia = (typeof SORTOWANIA_BEZ_ZDJECIA)[number];
 
 /* Klauzule z tej mapy, nigdy z wejścia: nazwa sortowania przychodzi
    z adresu, a ORDER BY nie przyjmuje parametru. Każda domyka się `tw_Id`,
    bo stronicowanie bez pełnego porządku gubi i dubluje wiersze. */
 const PORZADEK: Record<SortBezZdjecia, string> = {
+  /* Remis w sprzedaży rozstrzyga stan: z dwóch równie chodliwych pierwszy
+     ten, którego więcej leży na półce. */
+  sprzedaz: "ISNULL(sp.sprzedaz, 0) DESC, ISNULL(s.stan, 0) DESC, t.tw_Symbol, t.tw_Id",
   stan: "ISNULL(s.stan, 0) DESC, t.tw_Symbol, t.tw_Id",
   symbol: "t.tw_Symbol, t.tw_Id",
   nazwa: "t.tw_Nazwa, t.tw_Id",
@@ -309,6 +318,34 @@ function warunekBrakuZdjecia(opts: { tabela: string; kolumna: string; klucz: str
 }
 
 /**
+ * Pozycje sprzedaży z okna: FS i PA od `@odSprzedazy`, bez faktury do paragonu.
+ *
+ * Ta sama reguła co sprzedaż w przekroju towaru (`services/przekroj-towaru.ts`):
+ * paragon wydał towar, a faktura do niego dodałaby te sztuki drugi raz. Parę
+ * rozpoznajemy w obie strony, bo kierunek odnośnika jest `[WERYFIKUJ]`
+ * (docs/subiekt-gt-struktura.md). Bez kolumny odnośnika para nie istnieje
+ * i sprzedaż jest zawyżona o faktury do paragonów — jak w przekroju.
+ *
+ * Pozycje wiszą na `ob_DokHanId`: FS i PA są dokumentami handlowymi.
+ */
+export function zrodloSprzedazy(opts: { fs: number; pa: number; odnosnik?: string }): string {
+  const fs = Number(opts.fs);
+  const pa = Number(opts.pa);
+  let warunek = `d.dok_Typ IN (${fs}, ${pa}) AND d.dok_DataWyst >= @odSprzedazy`;
+  if (opts.odnosnik) {
+    const o = assertSafeColumn(opts.odnosnik);
+    warunek +=
+      ` AND NOT (d.dok_Typ = ${fs} AND (` +
+      `EXISTS (SELECT 1 FROM dok__Dokument pa WITH (NOLOCK) WHERE pa.dok_Id = d.${o} AND pa.dok_Typ = ${pa}) OR ` +
+      `EXISTS (SELECT 1 FROM dok__Dokument pa WITH (NOLOCK) WHERE pa.${o} = d.dok_Id AND pa.dok_Typ = ${pa})))`;
+  }
+  return (
+    "FROM dok_Pozycja p WITH (NOLOCK) JOIN dok__Dokument d WITH (NOLOCK) ON d.dok_Id = p.ob_DokHanId " +
+    `WHERE ${warunek}`
+  );
+}
+
+/**
  * Dwa zapytania: strona i liczba wszystkich. Osobno, bo `COUNT(*) OVER()`
  * na pustej stronie nie zwraca nic i panel straciłby licznik przy przewinięciu.
  *
@@ -325,7 +362,12 @@ export function budujZapytanieBezZdjecia(opts: {
   sortuj?: SortBezZdjecia;
   /** Tylko towary, które gdziekolwiek leżą — reszty i tak nie ma czym sfotografować. */
   naStanie?: boolean;
+  /** Tylko towary sprzedane w oknie `DNI_SPRZEDAZY`. */
+  sprzedane?: boolean;
+  /** Kody dokumentów sprzedaży i kolumna odnośnika faktury do paragonu. */
+  sprzedaz?: { fs: number; pa: number; odnosnik?: string };
 }): { strona: string; razem: string } {
+  const zrodlo = zrodloSprzedazy(opts.sprzedaz ?? { fs: 2, pa: 21 });
   const warunki = ["t.tw_Zablokowany = 0", warunekBrakuZdjecia(opts)];
   if (opts.zFiltrem) {
     warunki.push(
@@ -335,6 +377,9 @@ export function budujZapytanieBezZdjecia(opts: {
   if (opts.naStanie) {
     warunki.push("EXISTS (SELECT 1 FROM tw_Stan st WITH (NOLOCK) WHERE st.st_TowId = t.tw_Id AND st.st_Stan > 0)");
   }
+  if (opts.sprzedane) {
+    warunki.push(`EXISTS (SELECT 1 ${zrodlo} AND p.ob_TowId = t.tw_Id AND p.ob_IloscMag > 0)`);
+  }
   const gdzie = `WHERE ${warunki.join(" AND ")}`;
   /* Stan sumowany po magazynach w podzapytaniu: złączenie wprost z tw_Stan
      mnożyłoby wiersze towaru przez liczbę magazynów. Licznik go nie
@@ -342,11 +387,17 @@ export function budujZapytanieBezZdjecia(opts: {
   const stan =
     "LEFT JOIN (SELECT st_TowId, SUM(st_Stan) AS stan FROM tw_Stan WITH (NOLOCK) GROUP BY st_TowId) s " +
     "ON s.st_TowId = t.tw_Id";
-  const porzadek = PORZADEK[opts.sortuj ?? "stan"] ?? PORZADEK.stan;
+  /* Sprzedaż tak samo: suma w podzapytaniu, żeby pozycje wielu dokumentów
+     nie mnożyły wierszy towaru. */
+  const sprzedaz =
+    `LEFT JOIN (SELECT p.ob_TowId, SUM(p.ob_IloscMag) AS sprzedaz ${zrodlo} GROUP BY p.ob_TowId) sp ` +
+    "ON sp.ob_TowId = t.tw_Id";
+  const porzadek = PORZADEK[opts.sortuj ?? "sprzedaz"] ?? PORZADEK.sprzedaz;
   return {
     strona:
       "SELECT t.tw_Id AS twId, t.tw_Symbol AS symbol, t.tw_Nazwa AS nazwa, " +
-      `t.tw_PodstKodKresk AS ean, ISNULL(s.stan, 0) AS stan FROM tw__Towar t WITH (NOLOCK) ${stan} ${gdzie} ` +
+      "t.tw_PodstKodKresk AS ean, ISNULL(s.stan, 0) AS stan, ISNULL(sp.sprzedaz, 0) AS sprzedaz " +
+      `FROM tw__Towar t WITH (NOLOCK) ${stan} ${sprzedaz} ${gdzie} ` +
       `ORDER BY ${porzadek} OFFSET @offset ROWS FETCH NEXT @limit ROWS ONLY`,
     razem: `SELECT COUNT(*) AS razem FROM tw__Towar t WITH (NOLOCK) ${gdzie}`,
   };
@@ -370,8 +421,13 @@ export async function towaryBezZdjecia(z: {
   offset: number;
   sortuj: SortBezZdjecia;
   naStanie: boolean;
+  sprzedane: boolean;
 }): Promise<{ razem: number; pozycje: TowarBezZdjecia[] }> {
   const c = config.zdjecia;
+  const m = config.mssql;
+  /* Odnośnik bierzemy tylko wtedy, gdy import faktur go znalazł. Kolumna,
+     której nie ma, wywróciłaby całą listę błędem 207. */
+  const odnosnik = m.korektaColumn && !brakKolumnyKorekty ? m.korektaColumn : undefined;
   const zapytania = budujZapytanieBezZdjecia({
     tabela: c.tabela,
     kolumna: c.kolumna,
@@ -379,17 +435,20 @@ export async function towaryBezZdjecia(z: {
     zFiltrem: z.q !== "",
     sortuj: z.sortuj,
     naStanie: z.naStanie,
+    sprzedane: z.sprzedane,
+    sprzedaz: { fs: m.dokTypFS, pa: m.dokTypPA, odnosnik },
   });
+  const od = new Date(Date.now() - DNI_SPRZEDAZY * 86400_000).toISOString().slice(0, 10);
   const pool = await mssqlPool();
   const zapytanie = () => {
-    const r = pool.request();
+    const r = pool.request().input("odSprzedazy", sql.VarChar(10), od);
     if (z.q !== "") r.input("q", sql.NVarChar(200), wzorzecLike(z.q));
     return r;
   };
   const strona = await zapytanie()
     .input("offset", sql.Int, z.offset)
     .input("limit", sql.Int, z.limit)
-    .query<{ twId: number; symbol: string; nazwa: string; ean: string | null; stan: number | null }>(
+    .query<{ twId: number; symbol: string; nazwa: string; ean: string | null; stan: number | null; sprzedaz: number | null }>(
       zapytania.strona
     );
   const razem = await zapytanie().query<{ razem: number }>(zapytania.razem);
@@ -402,6 +461,7 @@ export async function towaryBezZdjecia(z: {
       ean: w.ean && w.ean.trim() ? w.ean.trim() : null,
       /* st_Stan to decimal, a sterownik oddaje go jako liczbę albo tekst. */
       stan: Number(w.stan ?? 0) || 0,
+      sprzedaz: Number(w.sprzedaz ?? 0) || 0,
     })),
   };
 }

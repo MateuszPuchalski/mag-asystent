@@ -21,7 +21,7 @@ function odmowa(reply: FastifyReply) {
 }
 
 export async function zdjeciaRoutes(app: FastifyInstance) {
-  app.get<{ Querystring: { q?: string; limit?: string; offset?: string; sortuj?: string; naStanie?: string } }>(
+  app.get<{ Querystring: { q?: string; limit?: string; offset?: string; sortuj?: string; naStanie?: string; sprzedane?: string } }>(
     "/api/zdjecia/bez-zdjecia",
     async (req, reply) => {
       const nie = odmowa(reply); if (nie) return nie;

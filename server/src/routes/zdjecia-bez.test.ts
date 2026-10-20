@@ -37,11 +37,11 @@ let ustawZrodlo: (fn: Zrodlo) => void;
 
 /** Udawana kartoteka Subiekta: to, co zwróciłby SELECT po filtrze. */
 const KARTOTEKA = [
-  { twId: 1, symbol: "A-01", nazwa: "Kosa", ean: "590123", stan: 4 },
-  { twId: 2, symbol: "B-02", nazwa: "Grabie", ean: null, stan: 0 },
-  { twId: 3, symbol: "C-03", nazwa: "Sekator", ean: "590777", stan: 12.5 },
+  { twId: 1, symbol: "A-01", nazwa: "Kosa", ean: "590123", stan: 4, sprzedaz: 7 },
+  { twId: 2, symbol: "B-02", nazwa: "Grabie", ean: null, stan: 0, sprzedaz: 0 },
+  { twId: 3, symbol: "C-03", nazwa: "Sekator", ean: "590777", stan: 12.5, sprzedaz: 2 },
 ];
-let wywolania: Array<{ q: string; limit: number; offset: number; sortuj: string; naStanie: boolean }> = [];
+let wywolania: Array<{ q: string; limit: number; offset: number; sortuj: string; naStanie: boolean; sprzedane: boolean }> = [];
 
 before(async () => {
   ({ db } = await import("../db/db.js"));
@@ -97,12 +97,12 @@ test("biuro dostaje stronę w kształcie kontraktu", async () => {
     wlaczone: true,
     razem: 3,
     pozycje: [
-      { twId: 1, symbol: "A-01", nazwa: "Kosa", ean: "590123", stan: 4, oczekuje: false },
-      { twId: 2, symbol: "B-02", nazwa: "Grabie", ean: null, stan: 0, oczekuje: false },
-      { twId: 3, symbol: "C-03", nazwa: "Sekator", ean: "590777", stan: 12.5, oczekuje: false },
+      { twId: 1, symbol: "A-01", nazwa: "Kosa", ean: "590123", stan: 4, sprzedaz: 7, oczekuje: false },
+      { twId: 2, symbol: "B-02", nazwa: "Grabie", ean: null, stan: 0, sprzedaz: 0, oczekuje: false },
+      { twId: 3, symbol: "C-03", nazwa: "Sekator", ean: "590777", stan: 12.5, sprzedaz: 2, oczekuje: false },
     ],
   });
-  assert.deepEqual(wywolania, [{ q: "", limit: 50, offset: 0, sortuj: "stan", naStanie: false }]);
+  assert.deepEqual(wywolania, [{ q: "", limit: 50, offset: 0, sortuj: "sprzedaz", naStanie: false, sprzedane: false }]);
 });
 
 test("admin też widzi listę — rola z ROLE_BIUROWE, nie z palca", async () => {
@@ -122,20 +122,23 @@ test("q filtruje i dochodzi do źródła przycięte", async () => {
   assert.equal(wywolania[0].q, "sekator");
 });
 
-/* Domyślnie stan: biuro zaczyna od tego, co leży na półce. Nieznana nazwa
-   ze starej zakładki wraca do domyślnej zamiast wywracać ekran. */
+/* Domyślnie sprzedaż: zdjęcie chodliwego towaru pracuje na każdej ofercie.
+   Nieznana nazwa ze starej zakładki wraca do domyślnej zamiast wywracać ekran. */
 test("sortowanie i filtr stanu dochodzą do źródła, śmieci dają domyślne", async () => {
   const h = sesja("biuro");
-  for (const s of ["stan", "symbol", "nazwa", "najnowsze", "DROP", ""]) {
+  for (const s of ["sprzedaz", "stan", "symbol", "nazwa", "najnowsze", "DROP", ""]) {
     await lista(h, `?sortuj=${s}`);
   }
   await lista(h, "?naStanie=1");
   await lista(h, "?naStanie=0");
   assert.deepEqual(
     wywolania.map((w) => w.sortuj),
-    ["stan", "symbol", "nazwa", "najnowsze", "stan", "stan", "stan", "stan"]
+    ["sprzedaz", "stan", "symbol", "nazwa", "najnowsze", "sprzedaz", "sprzedaz", "sprzedaz", "sprzedaz"]
   );
   assert.deepEqual(wywolania.slice(-2).map((w) => w.naStanie), [true, false]);
+  await lista(h, "?sprzedane=1");
+  await lista(h, "?sprzedane=tak");
+  assert.deepEqual(wywolania.slice(-2).map((w) => w.sprzedane), [true, false]);
 });
 
 test("limit przycięty do 1..200, śmieci dają wartości domyślne", async () => {
@@ -144,9 +147,9 @@ test("limit przycięty do 1..200, śmieci dają wartości domyślne", async () =
   await lista(h, "?limit=0&offset=-4");
   await lista(h, "?limit=abc&offset=xyz");
   assert.deepEqual(wywolania, [
-    { q: "", limit: 200, offset: 1, sortuj: "stan", naStanie: false },
-    { q: "", limit: 1, offset: 0, sortuj: "stan", naStanie: false },
-    { q: "", limit: 50, offset: 0, sortuj: "stan", naStanie: false },
+    { q: "", limit: 200, offset: 1, sortuj: "sprzedaz", naStanie: false, sprzedane: false },
+    { q: "", limit: 1, offset: 0, sortuj: "sprzedaz", naStanie: false, sprzedane: false },
+    { q: "", limit: 50, offset: 0, sortuj: "sprzedaz", naStanie: false, sprzedane: false },
   ]);
 });
 

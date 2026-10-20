@@ -286,7 +286,8 @@ export function Edytor({ towar, onZapisano, onPomin, bialeKwadrat, onBialeKwadra
         <SymbolTowaru symbol={towar.symbol} />
         {towar.ean && <span className="font-mono text-slate-600">EAN {towar.ean}</span>}
         {/* Stan mówi, czy towar w ogóle jest do sfotografowania na półce. */}
-        <span className="tabular-nums text-slate-600">stan {LICZBA.format(towar.stan)}</span>
+        <span className="tabular-nums text-slate-600">
+          sprzedano {LICZBA.format(towar.sprzedaz)} w 30 dni · stan {LICZBA.format(towar.stan)}</span>
         {onPomin && <Przycisk className="ml-auto" onClick={onPomin}
           title="Następny towar bez zdjęcia — nic się nie zapisuje">
           <SkipForward size={16} />Pomiń <Klawisz>j</Klawisz></Przycisk>}
