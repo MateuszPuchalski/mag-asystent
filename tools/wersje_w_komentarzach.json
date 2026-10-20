@@ -79,7 +79,7 @@
  "panel/src/analiza/liczby.ts": 1,
  "panel/src/analiza/porownanie.ts": 1,
  "panel/src/api/copilot.ts": 2,
- "panel/src/api/decyzje.ts": 3,
+ "panel/src/api/decyzje.ts": 2,
  "panel/src/api/dostawy.ts": 1,
  "panel/src/api/dyskusje.ts": 1,
  "panel/src/api/klient-zapytan.test.ts": 1,

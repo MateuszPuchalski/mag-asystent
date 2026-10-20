@@ -3,9 +3,11 @@ import { Link } from "react-router-dom";
 import {
   AlertTriangle, Barcode, ChevronRight, CircleCheck, Inbox, ListChecks, MessageSquareReply,
   FlaskConical, MessagesSquare, Package, PackageSearch, PlugZap, ShieldQuestion, Truck, Undo2,
-  ClipboardList, AtSign, Briefcase,
+  ClipboardList, AtSign, Briefcase, PackageX, ExternalLink,
 } from "lucide-react";
-import { useDoDecyzji, type Obszar, type PozycjaDecyzji, type ZrodloDecyzji } from "../api/decyzje";
+import {
+  useDoDecyzji, useKlientPowiadomiony, type AkcjaDecyzji, type Obszar, type PozycjaDecyzji, type ZrodloDecyzji,
+} from "../api/decyzje";
 import { useMojeSprawy, useWzmianki } from "../api/rozmowy";
 import { useSledzDosylkeZwrotu } from "../api/zwroty";
 import type { DosylkaZalozona } from "../api/typy";
@@ -24,13 +26,18 @@ import { Wzmianki } from "./Wzmianki";
    kazałby decydować bez dowodów — a to jest dokładnie to, czego biuro
    robić nie powinno. Ta sama zasada co w „Moje".
 
-   JEDEN WYJĄTEK (0.541.0, decyzja właściciela z 27 września 2026): „Śledź
-   dosyłkę” przy odmowie złożonej w panelu Allegro. Decyzja już zapadła —
+   DWA WYJĄTKI. Pierwszy (0.541.0, decyzja właściciela z 27 września 2026):
+   „Śledź dosyłkę” przy odmowie złożonej w panelu Allegro. Decyzja już zapadła —
    biuro odmówiło kodem „Wysłaliśmy nowy towar” — a przycisk ją rejestruje
    w sprawie klienta. Dowodów do tego nie trzeba, a wiersz prowadzący na
    zwrot kosztowałby drugie kliknięcie za nic. Jeden skutek nie jest samą
    rejestracją: krok „dosłać” zastępuje krok ustawiony ręką, więc ekran
-   mówi, co zastąpił. */
+   mówi, co zastąpił.
+
+   Drugi: „Klient powiadomiony” przy braku z kompletacji. List do klienta
+   biuro pisze w Allegro, bo WERTIS nie zakłada tam wątku. Przycisk tylko
+   rejestruje list wysłany gdzie indziej. Sam status go nie zastąpi, bo
+   zamówienie czeka w statusie braku na odpowiedź klienta. */
 
 const IKONY: Record<ZrodloDecyzji, React.ComponentType<{ size?: number; className?: string }>> = {
   dostawy: Truck, odpowiedzi: MessageSquareReply, kosze: Package, zapisy: AlertTriangle,
@@ -39,13 +46,23 @@ const IKONY: Record<ZrodloDecyzji, React.ComponentType<{ size?: number; classNam
   /* Zadanie odesłane przez halę (0.502.0) — `odeslaneZadania` w `do-decyzji.ts`. */
   zadania: ClipboardList,
   dosylki: PackageSearch,
+  braki: PackageX,
 };
 
 const NAZWY: Record<ZrodloDecyzji, string> = {
   dostawy: "Dostawy", odpowiedzi: "Odpowiedź z hali", kosze: "Kosze", zapisy: "Zapis do Subiekta",
   kody: "Kody kreskowe", allegro: "Konto Allegro", reklamacje: "Reklamacje", zwroty: "Zwroty",
   skrzynka: "Skrzynka", dyskusje: "Dyskusje", sonda: "Test na żywo", zadania: "Zadanie hali",
-  dosylki: "Dosyłka",
+  dosylki: "Dosyłka", braki: "Brak z kompletacji",
+};
+
+/* Podpowiedź pod nagłówkiem grupy, raz na grupę jak pytanie. Przy braku
+   z kompletacji drogi są trzy, a wybiera człowiek, bo o tym, co nieistotne,
+   mówi cel zakupu klienta. Przycisków na trzy drogi tu nie ma: każdą
+   załatwia się w Allegro, a lista ma tylko przypomnieć, z czego wybierać. */
+const PODPOWIEDZI: Partial<Record<ZrodloDecyzji, string>> = {
+  braki: "Do wyboru: anulować zamówienie, zapytać o wysyłkę niepełnej paczki albo wysłać bez nieistotnego "
+    + "towaru i zwrócić za niego pieniądze.",
 };
 
 type Filtr = "wszystko" | Obszar;
@@ -93,6 +110,7 @@ export function grupujPoPytaniu(pozycje: PozycjaDecyzji[]): PozycjaDecyzji[][] {
 function Grupa({ pozycje, onZalozona }: { pozycje: PozycjaDecyzji[]; onZalozona: (w: DosylkaZalozona) => void }) {
   const [pierwsza] = pozycje;
   const Ikona = IKONY[pierwsza!.zrodlo];
+  const podpowiedz = PODPOWIEDZI[pierwsza!.zrodlo];
   return <li className="border-t border-slate-200 first:border-t-0">
     <h4 className="flex flex-wrap items-center gap-x-3 gap-y-1 px-4 pb-1 pt-3">
       <span className="grid h-7 w-7 shrink-0 place-items-center rounded-lg bg-slate-100 text-slate-600">
@@ -100,11 +118,18 @@ function Grupa({ pozycje, onZalozona }: { pozycje: PozycjaDecyzji[]; onZalozona:
       <b>{pierwsza!.pytanie}</b>
       <span className="text-sm text-slate-600">{NAZWY[pierwsza!.zrodlo]} · {pozycje.length}</span>
     </h4>
+    {podpowiedz && <p className="pb-1 pl-14 pr-4 text-xs text-slate-600">{podpowiedz}</p>}
     <ul className="pb-1.5">{pozycje.map((p) => <Wiersz key={p.klucz} p={p} onZalozona={onZalozona} />)}</ul>
   </li>;
 }
 
+/** Druga linijka wiersza, poza odnośnikiem: nazwa odnośnika i tak jej nie niesie. */
+function Szczegol({ tekst }: { tekst: string }) {
+  return <p className="pb-1.5 pl-14 pr-4 text-xs text-slate-600">{tekst}</p>;
+}
+
 function Wiersz({ p, onZalozona }: { p: PozycjaDecyzji; onZalozona: (w: DosylkaZalozona) => void }) {
+  if (p.akcja?.rodzaj === "brak_powiadomiony") return <WierszBraku p={p} akcja={p.akcja} />;
   /* Wcięcie pod tekstem pytania, nie pod ikoną: oko zjeżdża z pytania
      prosto na sprawy, które ono obejmuje. */
   const tresc = <>
@@ -120,6 +145,7 @@ function Wiersz({ p, onZalozona }: { p: PozycjaDecyzji; onZalozona: (w: DosylkaZ
     <Link to={p.cel.panel} aria-label={`${p.pytanie} — ${p.co}`}
       className="flex items-center gap-3 py-1.5 pl-14 pr-4 hover:bg-slate-50">{tresc}
       <ChevronRight size={18} className="shrink-0 text-slate-600" aria-hidden /></Link>
+    {p.szczegol && <Szczegol tekst={p.szczegol} />}
   </li>;
 }
 
@@ -146,8 +172,47 @@ function WierszDosylki({ p, zwrotId, tresc, onZalozona }: {
         onClick={() => sledz.mutate({ id: zwrotId }, { onSuccess: onZalozona })}>
         {sledz.isPending ? "Zakładam…" : "Śledź dosyłkę"}</Przycisk>
     </div>
+    {p.szczegol && <Szczegol tekst={p.szczegol} />}
     {sledz.error && <p role="alert" className="pb-2 pl-14 pr-4 text-xs font-semibold text-ranga-zle">
       Śledzenia dosyłki nie założono — {(sledz.error as Error).message}</p>}
+  </li>;
+}
+
+/**
+ * Wiersz braku z kompletacji: profil klienta, zamówienie w Allegro i „Klient powiadomiony”.
+ *
+ * Kolejność idzie za pracą agenta. Profil mówi, kim jest klient, Allegro to
+ * miejsce listu, a przycisk zamyka wiersz po wysłaniu. Przycisk stoi obok
+ * odnośnika z tego samego powodu co przy dosyłce.
+ *
+ * Opis braku się nie ucina. Nazwa brakującego towaru rozstrzyga, którą drogę
+ * wybrać, a ucięta kazałaby otworzyć profil tylko po to, żeby ją doczytać.
+ */
+function WierszBraku({ p, akcja }: {
+  p: PozycjaDecyzji; akcja: Extract<AkcjaDecyzji, { rodzaj: "brak_powiadomiony" }>;
+}) {
+  const powiadom = useKlientPowiadomiony();
+  return <li>
+    <div className="flex items-center gap-3 pr-4 hover:bg-slate-50">
+      <Link to={p.cel.panel} aria-label={`${p.pytanie} — ${p.co}`}
+        className="flex min-w-0 flex-1 items-center gap-3 py-1.5 pl-14">
+        <span className="min-w-0 flex-1 text-sm">{p.co}</span>
+        <Wiek p={p} />
+      </Link>
+      {/* Bez adresu w konfiguracji odnośnika nie ma wcale. Martwy odnośnik
+          kazałby szukać zamówienia w Allegro ręcznie, a wyglądałby na gotowy. */}
+      {akcja.allegro && <a href={akcja.allegro} target="_blank" rel="noopener noreferrer"
+        aria-label={`Zamówienie w Allegro — ${p.co}`}
+        className="inline-flex shrink-0 items-center gap-1 text-xs font-semibold text-slate-600 hover:text-slate-900">
+        Zamówienie w Allegro<ExternalLink size={12} aria-hidden /></a>}
+      <Przycisk className="shrink-0 text-xs" disabled={powiadom.isPending} aria-busy={powiadom.isPending}
+        aria-label={`Klient powiadomiony — ${p.co}`}
+        onClick={() => powiadom.mutate({ zamowienieId: akcja.zamowienieId, statusAt: akcja.statusAt })}>
+        {powiadom.isPending ? "Zapisuję…" : "Klient powiadomiony"}</Przycisk>
+    </div>
+    {p.szczegol && <Szczegol tekst={p.szczegol} />}
+    {powiadom.error && <p role="alert" className="pb-2 pl-14 pr-4 text-xs font-semibold text-ranga-zle">
+      Powiadomienia nie zapisano — {(powiadom.error as Error).message}</p>}
   </li>;
 }
 

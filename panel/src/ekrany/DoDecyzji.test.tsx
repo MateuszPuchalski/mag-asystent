@@ -44,6 +44,8 @@ let pozycje: PozycjaDecyzji[] = POZYCJE;
 let ciala: Array<{ body: unknown; typ: string | null }> = [];
 /* Krok, który założenie dosyłki zastąpiło — odpowiedź serwera trasy zwrotu. */
 let zastapil: string | null = null;
+/* Odpowiedź trasy „Klient powiadomiony” — test konfliktu podmienia ją na 409. */
+let odpowiedzBraku: { status: number; body: unknown } = { status: 200, body: { ok: true } };
 
 beforeEach(() => {
   wyslane = [];
@@ -52,6 +54,7 @@ beforeEach(() => {
   pozycje = POZYCJE;
   ciala = [];
   zastapil = null;
+  odpowiedzBraku = { status: 200, body: { ok: true } };
   localStorage.clear();
   localStorage.setItem("wertis-panel-token", "tok-biura");
   vi.stubGlobal("fetch", vi.fn(async (url: string, init?: RequestInit) => {
@@ -67,6 +70,10 @@ beforeEach(() => {
       pozycje = POZYCJE;
       return new Response(JSON.stringify({ zalozona: true, login: "Kowalski_Jan",
         krokDo: "2026-10-01T06:00:00Z", krok: "Dosłać nowy towar (etykieta w Sellasist)", zastapil }));
+    }
+    if (url === "/api/obsluga/sellasist/braki/41/powiadomiony") {
+      if (odpowiedzBraku.status === 200) pozycje = POZYCJE;
+      return new Response(JSON.stringify(odpowiedzBraku.body), { status: odpowiedzBraku.status });
     }
     if (url === "/api/obsluga/moje") return new Response(JSON.stringify({ sprawy: [], lista: moje }));
     if (url === "/api/obsluga/wzmianki") {
@@ -283,5 +290,110 @@ describe("DO ZROBIENIA — trzy sekcje na jednym ekranie", () => {
     expect(screen.queryByText(/najpilniejsze pierwsze/)).toBeNull();
     expect(screen.getAllByRole("heading", { level: 3 }).map((h) => h.textContent))
       .toEqual(["Wspomniano o mnie · 1", "Moje sprawy · 1", "Do decyzji biura · 3"]);
+  });
+});
+
+/* ── Brak z kompletacji po godzinie granicznej ───────────────────────────────
+   Magazyn nie znalazł towaru, a kurier odjeżdża. Biuro pisze do klienta
+   w Allegro, bo WERTIS nie zakłada tam wątku, i odhacza list przyciskiem.
+   Wiersz prowadzi na profil klienta, bo ekran obsługi wiąże się z profilem.
+   Otwarcie dalej niczego nie zapisuje; zapisuje dopiero kliknięcie. */
+describe("BRAK Z KOMPLETACJI", () => {
+  const PYTANIE = "Towaru nie znaleziono — napisać do klienta?";
+  const ALLEGRO = "https://salescenter.allegro.com/orders/29a1c2b0-5f1e-11ef-9b6a-0242ac120002";
+  const BRAK: PozycjaDecyzji = { klucz: "brak:41:2026-10-20T08:15:00.000Z", obszar: "obsluga", zrodlo: "braki",
+    pytanie: PYTANIE, co: "Ogrodnik_77: brak Pasek klinowy (potrzeba 2, jest 0) przy zamówieniu 29a1c2b0",
+    szczegol: "W zamówieniu też: Nóż do kosiarki ×1, Szpula ×2",
+    od: "2026-10-20T10:00:00.000Z", pilne: true, cel: { panel: "/obsluga/klient/Ogrodnik_77" },
+    akcja: { rodzaj: "brak_powiadomiony", zamowienieId: 41, statusAt: "2026-10-20T08:15:00.000Z", allegro: ALLEGRO } };
+  /* Bez konfiguracji adresu Allegro serwer daje `allegro: null`. */
+  const BRAK_BEZ_ADRESU: PozycjaDecyzji = { ...BRAK, klucz: "brak:42:2026-10-20T09:40:00.000Z",
+    co: "Zielony_Ogrod: brak Sekator (potrzeba 1, jest 0) przy zamówieniu 7c3d1e90",
+    szczegol: "Innych pozycji w zamówieniu nie ma", cel: { panel: "/obsluga/klient/Zielony_Ogrod" },
+    akcja: { rodzaj: "brak_powiadomiony", zamowienieId: 42, statusAt: "2026-10-20T09:40:00.000Z", allegro: null } };
+
+  it("wiersz prowadzi na profil klienta i niesie resztę zamówienia; otwarcie niczego nie zapisuje", async () => {
+    pozycje = [BRAK, BRAK_BEZ_ADRESU, ...POZYCJE];
+    pokaz();
+    const profil = await screen.findByRole("link", { name: `${PYTANIE} — ${BRAK.co}` });
+    expect(profil).toHaveAttribute("href", "/obsluga/klient/Ogrodnik_77");
+    expect(screen.getByRole("link", { name: `${PYTANIE} — ${BRAK_BEZ_ADRESU.co}` }))
+      .toHaveAttribute("href", "/obsluga/klient/Zielony_Ogrod");
+    /* Reszta zamówienia stoi POZA odnośnikiem: jego nazwa jej nie niesie,
+       a czytnik ekranu ma ją przeczytać. */
+    const reszta = screen.getByText("W zamówieniu też: Nóż do kosiarki ×1, Szpula ×2");
+    expect(reszta.closest("a")).toBeNull();
+    expect(screen.getByText("Innych pozycji w zamówieniu nie ma")).toBeInTheDocument();
+    expect(wyslane).toEqual([]);
+  });
+
+  it("podpowiedź trzech dróg stoi raz na grupę, pod jej nagłówkiem", async () => {
+    pozycje = [BRAK, BRAK_BEZ_ADRESU, ...POZYCJE];
+    pokaz();
+    await screen.findByText(BRAK.co);
+    const decyzje = screen.getByRole("region", { name: "Do decyzji biura" });
+    expect(within(decyzje).getAllByRole("heading", { level: 4 })[0]).toHaveTextContent(
+      `${PYTANIE}Brak z kompletacji · 2`);
+    const podpowiedzi = within(decyzje).getAllByText(/^Do wyboru: anulować zamówienie/);
+    expect(podpowiedzi).toHaveLength(1);
+    expect(podpowiedzi[0]).toHaveTextContent("zapytać o wysyłkę niepełnej paczki");
+    expect(podpowiedzi[0]).toHaveTextContent("zwrócić za niego pieniądze");
+    /* Inne grupy podpowiedzi nie dostają. */
+    const reklamacje = within(decyzje).getByText("Reklamacje · 1").closest("li") as HTMLElement;
+    expect(within(reklamacje).queryByText(/^Do wyboru:/)).toBeNull();
+  });
+
+  it("zamówienie w Allegro otwiera się w nowej karcie i tylko wtedy, gdy jest adres", async () => {
+    pozycje = [BRAK, BRAK_BEZ_ADRESU, ...POZYCJE];
+    pokaz();
+    const allegro = await screen.findByRole("link", { name: `Zamówienie w Allegro — ${BRAK.co}` });
+    expect(allegro).toHaveAttribute("href", ALLEGRO);
+    expect(allegro).toHaveAttribute("target", "_blank");
+    expect(allegro).toHaveAttribute("rel", "noopener noreferrer");
+    expect(screen.queryByRole("link", { name: /^Zamówienie w Allegro — Zielony_Ogrod/ })).toBeNull();
+    /* Przycisk stoi przy obu, bo list da się wysłać i bez naszego odnośnika. */
+    expect(screen.getByRole("button", { name: `Klient powiadomiony — ${BRAK.co}` })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: `Klient powiadomiony — ${BRAK_BEZ_ADRESU.co}` })).toBeInTheDocument();
+    expect(wyslane).toEqual([]);
+  });
+
+  it("„Klient powiadomiony” wysyła jeden POST z wejściem w status, a wiersz schodzi", async () => {
+    pozycje = [BRAK, ...POZYCJE];
+    pokaz();
+    await userEvent.click(await screen.findByRole("button", { name: `Klient powiadomiony — ${BRAK.co}` }));
+    await vi.waitFor(() => expect(screen.queryByText(PYTANIE)).toBeNull());
+    expect(wyslane).toEqual(["POST /api/obsluga/sellasist/braki/41/powiadomiony"]);
+    /* Wejście w status wraca bez zmian: po nim serwer poznaje, o który brak chodzi. */
+    expect(ciala).toHaveLength(1);
+    expect(JSON.parse(String(ciala[0]!.body))).toEqual({ statusAt: "2026-10-20T08:15:00.000Z" });
+    expect(ciala[0]!.typ).toBe("application/json");
+  });
+
+  it("409 mówi w wierszu, czemu nie zapisano, a wiersz zostaje", async () => {
+    odpowiedzBraku = { status: 409,
+      body: { error: "Zamówienie zmieniło status w Sellasist — lista pokaże stan bieżący" } };
+    pozycje = [BRAK, ...POZYCJE];
+    pokaz();
+    const przycisk = await screen.findByRole("button", { name: `Klient powiadomiony — ${BRAK.co}` });
+    await userEvent.click(przycisk);
+    const alarm = await screen.findByRole("alert");
+    expect(alarm).toHaveTextContent(
+      "Powiadomienia nie zapisano — Zamówienie zmieniło status w Sellasist — lista pokaże stan bieżący");
+    expect(alarm.closest("li")).toBe(przycisk.closest("li"));
+    expect(screen.getByText(BRAK.co)).toBeInTheDocument();
+    expect(przycisk).toBeEnabled();
+    expect(wyslane).toEqual(["POST /api/obsluga/sellasist/braki/41/powiadomiony"]);
+  });
+
+  it("szczegół stoi też pod zwykłym wierszem, a wiersz bez niego się nie zmienia", async () => {
+    const zSzczegolem: PozycjaDecyzji = { ...POZYCJE[2]!, szczegol: "Najstarsza czeka od piątku" };
+    pozycje = [POZYCJE[0]!, POZYCJE[1]!, zSzczegolem];
+    pokaz();
+    const szczegol = await screen.findByText("Najstarsza czeka od piątku");
+    expect(szczegol.closest("a")).toBeNull();
+    expect(szczegol.closest("li")).toBe(screen.getByRole("link", { name: /^Uznać czy odrzucić\?/ }).closest("li"));
+    const zapis = screen.getByRole("link", { name: /^Ponowić czy anulować/ }).closest("li") as HTMLElement;
+    expect(zapis.querySelectorAll("p")).toHaveLength(0);
+    expect(wyslane).toEqual([]);
   });
 });
