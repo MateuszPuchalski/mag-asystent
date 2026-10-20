@@ -230,6 +230,14 @@ export function migrate(database: DatabaseSync) {
      widzieć, CO sprawdzono, zanim uwierzy odpowiedzi. Stare wymiany mają
      pustą listę i to jest o nich prawda: modele wtedy narzędzi nie miały. */
   addColumn("copilot_pytanie", "narzedzia", "TEXT NOT NULL DEFAULT '[]'");
+  /* Poprawka szkicu z dopytania — patrz `copilot_pytanie` w `schema.sql`.
+     Stare wymiany mają NULL i puste listy, i to jest o nich prawda: model
+     wtedy tylko odpowiadał, szkicu nie poprawiał. */
+  addColumn("copilot_pytanie", "szkic_przed", "TEXT");
+  addColumn("copilot_pytanie", "szkic_po", "TEXT");
+  addColumn("copilot_pytanie", "szkic_odrzucony", "TEXT");
+  addColumn("copilot_pytanie", "szkic_twierdzenia", "TEXT NOT NULL DEFAULT '[]'");
+  addColumn("copilot_pytanie", "szkic_zastrzezenia", "TEXT NOT NULL DEFAULT '[]'");
   /* Zapytania do wyszukiwarki w księdze Copilota. Dziś nikt ich nie zleca,
      ale stare wiersze je niosą, a pomiar kosztów liczy je do rachunku. */
   addColumn("copilot_wywolanie", "wyszukiwania", "INTEGER NOT NULL DEFAULT 0");

@@ -173,3 +173,64 @@ test("wątek podpisuje doradcę Allegro własną etykietą, nie KLIENT", () => {
   ], null));
   assert.equal(t, "KLIENT: Gaźnik nie pasuje\nMY: Prosimy o zdjęcie\nALLEGRO: Sprzedawco, prosimy o stanowisko");
 });
+
+/* ── Maskowanie odwracalne: szkic z pola agenta ─────────────────────────────
+   Dopytanie poprawia tekst z pola i oddaje go CAŁY. Do dostawcy idzie maska,
+   z powrotem do pola wartości. Pilnujemy czterech rzeczy: różne wartości nie
+   zlewają się pod jednym znacznikiem, maska jest czysta dla asercji, wydane
+   znaczniki wracają, a znacznik, którego nie wydaliśmy, nie wraca nigdy. */
+import { zamaskujOdwracalnie } from "./copilot-maskowanie.js";
+
+test("odwracalne: różne wartości dostają różne numery, powtórzona ten sam", () => {
+  /* Dwa numery części o kształcie telefonu: pod jednym gołym `[telefon]` nie
+     dałoby się ich rozdzielić bez zgadywania. */
+  const m = zamaskujOdwracalnie(
+    "Pasuje 601234567 albo 602345678. Jeszcze raz: 601234567. Pisz na jan@example.com", null);
+  const t = String(m.tresc);
+  assert.equal(t, "Pasuje [telefon 1] albo [telefon 2]. Jeszcze raz: [telefon 1]. Pisz na [e-mail 1]");
+  assert.equal(zostalyDaneOsobowe(t), false, "numerowane znaczniki nie łapią się na wzorce");
+});
+
+test("odwracalne: maska przechodzi asercję, a odmaskowanie oddaje oryginał znak w znak", () => {
+  const oryginal = "Dzień dobry zielony_ogrod,\n\nwyślemy na ul. Polna 7, 62-030 Luboń.\n"
+    + "Telefon 601 234 567, konto PL61 1090 1014 0000 0712 1981 2874, mail a.b@example.com.";
+  const m = zamaskujOdwracalnie(oryginal, "zielony_ogrod");
+  const t = String(m.tresc);
+  assert.equal(zostalyDaneOsobowe(t), false);
+  for (const nie of ["zielony_ogrod", "Polna", "601 234 567", "1090", "example.com"]) {
+    assert.equal(t.includes(nie), false, `wyszło „${nie}": ${t}`);
+  }
+  assert.match(t, /\[login\]/);
+  assert.deepEqual(m.odmaskuj(t), { tresc: oryginal, obce: [] });
+});
+
+test("odwracalne: login zapisany inną wielkością wraca w pierwszej pisowni, krótki nie znika", () => {
+  const m = zamaskujOdwracalnie("Witaj Zielony_Ogrod, tu zielony_ogrod", "zielony_ogrod");
+  assert.equal(String(m.tresc), "Witaj [login], tu [login]");
+  assert.equal(m.odmaskuj("Dziękujemy [login]").tresc, "Dziękujemy Zielony_Ogrod");
+  assert.equal(String(zamaskujOdwracalnie("tabela", "ab").tresc), "tabela", "próg trzech znaków jak w `bezLoginu`");
+});
+
+test("odwracalne: znacznik, którego nie wydaliśmy, nie wraca i trafia do `obce`", () => {
+  const m = zamaskujOdwracalnie("Oddzwonimy na 601 234 567.", null);
+  const w = m.odmaskuj("Oddzwonimy na [telefon 1] albo [telefon] lub [telefon 9]. "
+    + "Adres [adres 1], mail [e-mail 2], konto [konto 1], dla [login].");
+  assert.ok(w.tresc.startsWith("Oddzwonimy na 601 234 567 albo [telefon]"), w.tresc);
+  assert.deepEqual(w.obce,
+    ["[telefon]", "[telefon 9]", "[adres 1]", "[e-mail 2]", "[konto 1]", "[login]"],
+    "goły, nieznany numer i login, którego w polu nie było");
+});
+
+test("odwracalne: znacznik wpisany ręcznie przed maskowaniem zostaje sobą i nie dostaje cudzej wartości", () => {
+  const m = zamaskujOdwracalnie("Klient podał [telefon 1], drugi to 601 234 567", null);
+  assert.equal(String(m.tresc), "Klient podał [telefon 1], drugi to [telefon 2]");
+  assert.deepEqual(m.odmaskuj(String(m.tresc)),
+    { tresc: "Klient podał [telefon 1], drugi to 601 234 567", obce: [] });
+});
+
+test("odwracalne: linia adresowa z e-mailem w środku odmaskowuje się jednym przebiegiem", () => {
+  const oryginal = "ul. Lipowa 12, kontakt jan@example.com";
+  const m = zamaskujOdwracalnie(oryginal, null);
+  assert.equal(String(m.tresc), "[adres 1]");
+  assert.deepEqual(m.odmaskuj("[adres 1]"), { tresc: oryginal, obce: [] });
+});

@@ -1707,7 +1707,8 @@ Trzy rzeczy, których szablon NIE robi:
 Zdjęty szablon idzie do archiwum, nie do kosza (§25a.5): wisi przy nim
 historia tego, co wysłaliśmy klientom.
 
-Nie ma podglądu ani historii wersji szkicu.
+Historia wersji szkicu powstaje wyłącznie z poprawek Copilota w dopytaniu
+(§14.6, „Dopytanie poprawia szkic"). Ręcznych zmian agenta nie wersjonujemy.
 
 **Szkic Copilota nie wchodzi do pola sam (0.231.0).** Propozycja stoi w karcie
 pod polem, a do szkicu agenta trafia jednym przyciskiem. Od 22 września 2026
@@ -2826,21 +2827,20 @@ rozmowy z modelem, możliwość dopytania, rozwiania wątpliwości". Agent czyta
 szkic, rodzi mu się wątpliwość i pyta pod nim: „czy ten nóż na pewno pasuje
 do 46 cm i skąd to wiesz?".
 
-**Odpowiedź idzie do AGENTA i nie ma stąd drogi do klienta.** To jest cała
+**Notka idzie do AGENTA i nie ma stąd drogi do klienta.** To jest cała
 architektura tej funkcji, nie zastrzeżenie na marginesie. Szkic ma swoje sita:
 numer spoza faktów go wywraca, fakt spoza listy go wywraca. Stoją tam, bo
 tamten tekst idzie do klienta.
 
-Odpowiedź na dopytanie nie idzie nigdzie. Gdyby przepuścić ją przez sita
+Notka z dopytania nie idzie nigdzie. Gdyby przepuścić ją przez sita
 szkicu, model nie mógłby napisać „numeru 17211-ZL8-023 nie mamy w kartotece",
 bo ten numer nie stoi w faktach. **Zdanie, którego agent najbardziej
 potrzebuje, wywracałoby własną odpowiedź.**
 
-Z tego wynika kształt ekranu. Odpowiedź **nie ma przycisku „wstaw"**, choć
-szkic ma trzy. Przycisk wstawiania byłby obejściem wszystkich sit jednym
-kliknięciem. Kto chce mieć z wymiany wiadomość, układa szkic od nowa, a wtedy
-wymiana jest częścią materiału i szkic przechodzi przez wszystko, co zwykle.
-Jedna droga do klienta, ta sama co była.
+Z tego wynika kształt ekranu. Notka **nie ma przycisku „wstaw"**. Przycisk
+wstawiania byłby obejściem wszystkich sit jednym kliknięciem. Przycisk ma
+wyłącznie nowa wersja szkicu, bo ona przechodzi przez wszystkie sita szkicu
+(niżej, „Dopytanie poprawia szkic"). Jedna droga do klienta, ta sama co była.
 
 Co zostaje z dyscypliny: `twierdzenia` w tym samym kształcie co przy szkicu,
 z tym samym sufitem pewności na źródło, i to samo okno „Skąd to wiem" przy
@@ -2848,7 +2848,7 @@ każdej odpowiedzi. Odpowiedź „fakty tego nie rozstrzygają" jest najcenniejs
 dokładnie wtedy, gdy widać, czego zabrakło.
 
 Model dostaje ten sam materiał co szkic — fakty, wątek, zdjęcia — plus
-aktualny szkic i poprzednie wymiany. Dopytanie, które widzi INNY materiał niż
+tekst z pola i poprzednie wymiany. Dopytanie, które widzi INNY materiał niż
 szkic, jest dopytaniem o coś innego.
 
 Hamulec jest jeden: sufit dopytań na rozmowę. Reszty nie ma i to ten sam
@@ -2860,6 +2860,53 @@ jasna, fakty jej nie rozstrzygną i trzeba zapytać klienta.
 Nieudane wywołanie **nie zostawia wymiany**, ale zostawia ślad w księdze
 kosztów. Wiersz to wymiana, nie tura: pytanie bez odpowiedzi to ślad po
 nieudanym żądaniu, a nie rozmowa.
+
+**Dopytanie poprawia szkic (@wydanie).** Właściciel pokazał zrzut: agent
+napisał „dodaj tą drugą wersję gaźnika", a Copilot odpisał akapitem, co
+dopisać i gdzie. Właściciel: dopytanie ma edytować szkic, pokazać, co było
+edytowane, i tworzyć historię edycji, a nie mówić, co edytować.
+
+Cztery decyzje właściciela z tej samej rozmowy:
+
+- **Copilot poprawia tekst z POLA**, razem z ręcznymi zmianami agenta. Przy
+  pustym polu poprawia szkic Copilota. Tekst z pola idzie do dostawcy
+  zamaskowany, jak nasze wysłane wiadomości (polityka danych skrzynki).
+- **Model sam rozpoznaje polecenie i pytanie.** „Dodaj", „zamień", „skróć"
+  dają nową wersję i krótką notkę, co zmienił. „Skąd to wiesz?" daje samą
+  odpowiedź.
+- **Nowa wersja wchodzi od razu do pola**, z paskiem „Cofnij". Gdy agent pisał
+  w polu w trakcie, pole zostaje, a wersja czeka z „Wstaw do odpowiedzi".
+- **Historia stoi na serwerze**, w `copilot_pytanie`: tekst sprzed poprawki
+  i po niej. Cały zespół widzi te same wersje.
+
+Wersja przechodzi przez te same sita co szkic, wspólną funkcją `sitaSzkicu`.
+Materiałem jest też tekst z pola i polecenie agenta: za numer, który agent
+sam wpisał, odpowiada agent. Nowy numer od modelu musi mieć źródło. Odrzucona
+poprawka zostawia notkę i zdanie, dlaczego szkic został bez zmian.
+
+**Pole zmienia się na ruch agenta, nie obok niego.** Reguła z 0.500.0 zostaje:
+podmiana następuje tylko wtedy, gdy pole wciąż trzyma tekst wysłany do
+Copilota. „Cofnij" oddaje tekst sprzed poprawki, ale tylko w tej samej
+rozmowie i przy nietkniętym polu.
+
+**Co zmienił, widać słowami.** Każda wymiana z wersją pokazuje różnicę:
+dodane słowa na zielono, usunięte przekreślone na czerwono, z etykietą dla
+czytnika ekranu. Starsza wersja ma „Przywróć tę wersję". Ręczne zmiany agenta
+między poprawkami nie są wersją, ale widać je jako „Twoje zmiany przed
+poprawką".
+
+**Tarcie przed wysyłką liczy się z wersji w polu.** „Wyślij bez zmian" i lista
+„do sprawdzenia" biorą twierdzenia tej wersji Copilota, którą pole trzyma.
+Poprawka Copilota to dalej tekst modelu, którego człowiek jeszcze nie czytał.
+
+**Automat wysyłki stoi po dopytaniu.** Rozmowa z wymianą nowszą niż szkic nie
+wychodzi automatem. Liczy się każda wymiana, także odrzucona poprawka i samo
+pytanie: agent szkicowi nie ufa albo go zmienia. Automat wysłałby wtedy stary
+szkic z `szkic_copilota`.
+
+Cena jest jawna. Każde dopytanie niesie dłuższą instrukcję, bo zawiera
+reguły szkicu. Sufit dopytań na rozmowę zostaje ten sam, a poprawki zużywają
+go szybciej. Pomiar losu szkicu przy wysyłce dalej porównuje z oryginałem.
 
 **Rachunek stoi w osobnym oknie, nie w tekście.** Klient ma dostać gładką
 odpowiedź, agent — to, na czym ona stoi. Okno „Skąd to wiem"
@@ -7102,7 +7149,8 @@ stoi. W tym repo zdarzyło się to już dwa razy.
 | Karta Copilota bez ścisku (§14.6) | **działa** od 0.342.0 | `skrzynka/Zwijka.tsx` jako jedno zwijanie dla trzech bloków; szkic bez własnego przewijania, trzy paski scalone w jeden, licznik znaków w nagłówku |
 | Dane wejściowe wchodzą same (§11.2) | **działa** od 0.341.0 | `copilot-szkic.ts`: wpis w puste pola przed zapisem szkicu, podpis `automat (szkic)`; zmiana wersji doboru budzi takt `copilot-auto-szkic` |
 | Wiedza z ofert bez kolejki (§11.3) | **usunięte** w 0.565.0 | `wiedza-z-oferty.ts`: klucz składany przy zbieraniu z trzech źródeł deterministycznych, podpis `automat (oferta)`; bez rozpoznanej marki wiersz zostaje w kolejce |
-| Dopytanie Copilota (§14.6) | **działa** od 0.332.0 | `services/copilot-pytania.ts`, tabela `copilot_pytanie`, siódma trasa zapisu Copilota, blok `skrzynka/Dopytanie.tsx`; odpowiedź dla agenta, bez przycisku wstawiania, sufit dopytań na rozmowę |
+| Dopytanie Copilota (§14.6) | **działa** od 0.332.0 | `services/copilot-pytania.ts`, tabela `copilot_pytanie`, siódma trasa zapisu Copilota, blok `skrzynka/Dopytanie.tsx`; notka dla agenta bez przycisku wstawiania, sufit dopytań na rozmowę |
+| Dopytanie poprawia szkic (§14.6) | **działa** od @wydanie | `zadajPytanie` z tekstem pola, `sitaSzkicu`, `zamaskujOdwracalnie`; wersje w `copilot_pytanie`, różnica w `skrzynka/RoznicaSzkicu.tsx`, „Cofnij" w `ekrany/Skrzynka.tsx` |
 | Link do naszej oferty w szkicu (§14.6) | **działa** od 0.270.0 | `services/allegro-oferty-po-sygnaturze.ts`, `urlOfertPoSygnaturze`: jedno żądanie `external.id` na komplet kandydatów, tylko `ACTIVE`; fakt `oferta_link`, reguły 7d i 7e instrukcji |
 | Miary doboru w analizie | **usunięte** w 0.565.0 | `GET /api/obsluga/miary-doboru`, `services/miary-doboru.ts`, `analiza/MiaryDoboru.tsx`: ostatni wynik każdej rozmowy i podstawa wybranej części z księgi zdarzeń |
 | Ekran przegranego przejęcia (§6.2) | **działa** od 0.147.0 | `skrzynka/KonfliktPrzejecia.tsx` |

@@ -20,6 +20,7 @@ import {
 import { Rozmowa } from "../skrzynka/Rozmowa";
 import { Kontekst } from "../skrzynka/Kontekst";
 import { ostatniaKupujacego, szkicNaStartRozmowy } from "../skrzynka/SzkicCopilota";
+import { wersjaWPolu, wersjeSzkicu } from "../skrzynka/wersjeSzkicu";
 import { AlarmSynchronizacji } from "../skrzynka/AlarmSynchronizacji";
 import type { SzczegolyKonfliktu, SzczegolyWysylki } from "../api/typy";
 import { DialogKonfliktu } from "../skrzynka/DialogKonfliktu";
@@ -505,9 +506,36 @@ export function Skrzynka() {
     ocenSzkic.mutate({ rozmowaId: rozmowa.data.rozmowa.id, ocena: "odrzucony" });
     /* Odrzucony szkic schodzi też z pola — ale tylko NIETKNIĘTY. Tekst, który
        agent zaczął poprawiać, jest już jego pracą i odrzucenie propozycji
-       nie ma prawa go skasować. */
-    if (zCopilota && szkic === rozmowa.data.szkicCopilota?.tresc) ustawSzkic("");
+       nie ma prawa go skasować. Nietknięta jest każda wersja Copilota, także
+       poprawka z dopytania: odrzuca się szkic razem z jego historią. */
+    if (zCopilota && wersjaWPolu(wersjeSzkicu(rozmowa.data.szkicCopilota, wymiany.data ?? []), szkic)) {
+      ustawSzkic("");
+    }
     setZCopilota(false);
+  }
+
+  /* ── WERSJA COPILOTA DO POLA, Z COFNIĘCIEM ──────────────────────────────
+     Poprawka z dopytania wchodzi do pola sama, bo agent właśnie o nią
+     poprosił. Ten sam kształt co „Wstaw do odpowiedzi” przy szkicu: stan
+     ekranu, nie zapis. Pasek „Cofnij” oddaje tekst sprzed wstawienia.
+
+     Cofnięcie działa tylko w tej samej rozmowie i przy nietkniętym polu.
+     W innej rozmowie wpisałoby stary tekst w cudzy wątek, a po dalszym
+     pisaniu skasowałoby to, co agent dopisał. `id` przychodzi z chwili
+     kliknięcia, bo odpowiedź modelu wraca po kilku sekundach. */
+  const zCopilotaTeraz = useRef(zCopilota);
+  zCopilotaTeraz.current = zCopilota;
+  function wstawWersje(tresc: string, id: number, opis: string) {
+    const poprzedni = szkicTeraz.current;
+    const poprzedniZCopilota = zCopilotaTeraz.current;
+    const ustaw = (v: string) => { setSzkic(v); zapamietajSzkic(PAMIEC_ODPOWIEDZI, id, v); };
+    ustaw(tresc);
+    setZCopilota(true);
+    setDoCofniecia({ klucz: Date.now(), opis, cofnij: () => {
+      if (wybranaIdTeraz.current !== id || szkicTeraz.current !== tresc) return;
+      ustaw(poprzedni);
+      setZCopilota(poprzedniZCopilota);
+    } });
   }
 
   /* ── E I R PRZY KARCIE SZKICU (23 września 2026) ────────────────────────
@@ -702,17 +730,36 @@ export function Skrzynka() {
            liczy już wysyłka (`szkic_los`), nie to kliknięcie. */
         onPopraw: poprawSzkicem,
         onOdrzuc: odrzucSzkic,
-        /* DOPYTANIE (0.332.0). Bez `onSuccess` czyszczącego szkic czy oś:
-           odpowiedź czyta agent, a do klienta nie idzie stąd nic. */
+        /* ── DOPYTANIE: POLECENIE POPRAWIA TEKST Z POLA ─────────────────────
+           Do modelu idzie pole w chwili kliknięcia, z ręcznymi zmianami
+           agenta. Nowa wersja wchodzi do pola tylko wtedy, gdy agent jest
+           w tej samej rozmowie i nie pisał w trakcie. Pisanie w trakcie to
+           nowsza decyzja niż polecenie sprzed kilku sekund, więc pole
+           zostaje, a wersja czeka w wymianie z „Wstaw do odpowiedzi”. */
         dopytanie: {
           wymiany: wymiany.data ?? [],
           blad: bladPytania,
           pracuje: zadajPytanie.isPending,
           limitZnakow: LIMIT_PYTANIA,
-          onPytaj: (pytanie: string) => rozmowa.data && zadajPytanie.mutate(
-            { rozmowaId: rozmowa.data.rozmowa.id, pytanie },
-            { onError: (e) => setBladPytania((e as Error).message),
-              onSuccess: () => setBladPytania(null) }),
+          pole: szkic,
+          onWstaw: (t: string) => {
+            if (rozmowa.data) wstawWersje(t, rozmowa.data.rozmowa.id, "Wstawiono wersję Copilota");
+          },
+          onPytaj: (pytanie: string) => {
+            if (!rozmowa.data) return;
+            const id = rozmowa.data.rozmowa.id;
+            const wyslany = szkicTeraz.current;
+            zadajPytanie.mutate({ rozmowaId: id, pytanie, szkic: wyslany }, {
+              onError: (e) => setBladPytania((e as Error).message),
+              onSuccess: (r) => {
+                setBladPytania(null);
+                const po = r.wymiana.szkicPo;
+                if (po && wybranaIdTeraz.current === id && szkicTeraz.current === wyslany) {
+                  wstawWersje(po, id, "Copilot poprawił szkic");
+                }
+              },
+            });
+          },
         },
       }}
       zalaczniki={zalaczniki.data?.zalaczniki ?? []}

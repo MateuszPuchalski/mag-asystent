@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { act, cleanup, render, screen, waitFor } from "@testing-library/react";
+import { act, cleanup, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import React from "react";
 import { MemoryRouter, Route, Routes, useLocation } from "react-router-dom";
@@ -56,14 +56,33 @@ let rozmowy = [wiersz(1), wiersz(2), wiersz(3)];
 let dane: Record<number, ReturnType<typeof szczegoly>> = {};
 /* Wysyłka, która nie wraca — tak wygląda chwila, w której Allegro odpowiada. */
 let wysylkaWisi = false;
+/* Dopytanie: wymiany zapisane „na serwerze” i odpowiedzi modelu wstrzymane
+   do ręcznego zwolnienia — tak wygląda kilka sekund pracy modelu. */
+let wymiany: Record<number, unknown[]> = {};
+let wstrzymajPytanie = false;
+let zwolnijPytanie: Array<() => void> = [];
 
-function odpowiedz(url: string, metoda: string): Response {
+/** Polecenie poprawia tekst, który przyszedł z pola: dopisuje podpis. */
+function odpowiedzPytania(body: string | null, json: (v: unknown) => Response): Response {
+  const v = JSON.parse(body ?? "{}") as { rozmowaId: number; pytanie: string; szkic: string };
+  const lista = (wymiany[v.rozmowaId] ??= []);
+  const wymiana = { id: 100 + lista.length, pytanie: v.pytanie, odpowiedz: "Dopisałem podpis.",
+    twierdzenia: [], model: "m", at: "2026-09-26T08:05:00.000Z", przez: "A. Lewandowska",
+    szkicPrzed: v.szkic, szkicPo: `${v.szkic} Pozdrawiamy.`, szkicTwierdzenia: [],
+    szkicZastrzezenia: [], szkicOdrzucony: null };
+  const gotowa = () => { lista.push(wymiana); return json({ wymiana }); };
+  if (!wstrzymajPytanie) return gotowa();
+  return new Promise<Response>((r) => { zwolnijPytanie.push(() => r(gotowa())); }) as never;
+}
+
+function odpowiedz(url: string, metoda: string, body: string | null = null): Response {
   const json = (v: unknown) => new Response(JSON.stringify(v));
   if (url === "/api/conversations/events") return new Response(new ReadableStream({ start() {} }));
   if (metoda !== "GET") {
     if (url.endsWith("/send")) {
       return wysylkaWisi ? (new Promise<never>(() => {}) as never) : json({ status: "sent" });
     }
+    if (url === "/api/obsluga/copilot/pytanie") return odpowiedzPytania(body, json);
     return json({ ok: true });
   }
   if (url === "/api/auth/me") return json({ user: { userId: 7, name: "A. Lewandowska", role: "biuro" } });
@@ -82,7 +101,8 @@ function odpowiedz(url: string, metoda: string): Response {
   if (url === "/api/obsluga/copilot") return json({ wlaczony: false, powod: "wyłączony" });
   if (url === "/api/health") return json({ allegroInbox: { status: "current", alarm: false } });
   if (url === "/api/users") return json({ users: [] });
-  if (url.includes("/copilot/pytania/")) return json([]);
+  const pytania = /\/copilot\/pytania\/(\d+)$/.exec(url)?.[1];
+  if (pytania) return json(wymiany[Number(pytania)] ?? []);
   if (url.endsWith("/zalaczniki")) return json({ zalaczniki: [] });
   return json({});
 }
@@ -91,11 +111,13 @@ beforeEach(() => {
   zadania = []; wysylkaWisi = false;
   rozmowy = [wiersz(1), wiersz(2), wiersz(3)];
   dane = {};
+  wymiany = {}; wstrzymajPytanie = false; zwolnijPytanie = [];
   localStorage.setItem("wertis-panel-token", "t");
   vi.stubGlobal("fetch", vi.fn(async (url: string, init?: RequestInit) => {
     const metoda = init?.method ?? "GET";
-    zadania.push({ metoda, url, body: (init?.body as string) ?? null });
-    return odpowiedz(url, metoda);
+    const body = (init?.body as string) ?? null;
+    zadania.push({ metoda, url, body });
+    return odpowiedz(url, metoda, body);
   }));
 });
 /* Sprzątanie PRZED zdjęciem atrapy `fetch`: odmontowanie ekranu zgłasza
@@ -321,5 +343,62 @@ describe("EKRAN SKRZYNKI: pętla pracy", () => {
        „Cofnij” zawróciło bez ruchu, jest pominięciem i tak ma być liczona. */
     await waitFor(() => expect(adres()).toBe("/obsluga/skrzynka/1"));
     await waitFor(() => expect(zadania.filter((z) => z.url === "/api/obsluga/pominiecie")).toHaveLength(1));
+  });
+});
+
+/* ── Dopytanie poprawia szkic w polu ─────────────────────────────────────────
+   Polecenie idzie do modelu RAZEM z tekstem pola, a nowa wersja wraca do
+   pola sama, z paskiem „Cofnij”. Wyjątek: agent pisał w trakcie. Wtedy pole
+   zostaje, bo pisanie jest nowszą decyzją niż polecenie sprzed chwili.     */
+describe("EKRAN SKRZYNKI: dopytanie poprawia szkic", () => {
+  const SKLEJONY = "Dzień dobry, odpowiedź 1. Dopisek.";
+
+  async function polecenie(u: ReturnType<typeof userEvent.setup>, tresc: string) {
+    await u.click(screen.getByRole("button", { name: /Dopytaj Copilota/ }));
+    await u.type(screen.getByRole("textbox", { name: /pytanie do Copilota/ }), tresc);
+    await u.click(screen.getByRole("button", { name: "Zapytaj" }));
+  }
+
+  it("polecenie niesie tekst pola, nowa wersja wchodzi do pola, a „Cofnij” oddaje poprzedni", async () => {
+    const u = userEvent.setup();
+    dane[1] = szczegoly(1, { szkicCopilota: SZKIC(1) });
+    pokaz("/obsluga/skrzynka/1");
+    const p = await pole();
+    await u.type(p, " Dopisek.");
+    await polecenie(u, "dodaj podpis");
+
+    await waitFor(() => expect(p).toHaveValue(`${SKLEJONY} Pozdrawiamy.`));
+    const wyslane = zadania.find((z) => z.url === "/api/obsluga/copilot/pytanie");
+    expect(JSON.parse(wyslane!.body!)).toEqual({ rozmowaId: 1, pytanie: "dodaj podpis", szkic: SKLEJONY });
+    /* Wersja z różnicą stoi w wymianie i mówi, że jest w polu. */
+    const wersja = await screen.findByRole("group", { name: "Wersja 2" });
+    expect(within(wersja).getByText("w polu")).toBeInTheDocument();
+    expect(wersja.querySelector("ins")).toHaveTextContent("Pozdrawiamy.");
+
+    expect(screen.getByText("Copilot poprawił szkic")).toBeInTheDocument();
+    await u.click(screen.getByRole("button", { name: "Cofnij" }));
+    expect(p).toHaveValue(SKLEJONY);
+  });
+
+  it("agent pisał w trakcie — pole zostaje, a wersja czeka z „Wstaw do odpowiedzi”", async () => {
+    const u = userEvent.setup();
+    wstrzymajPytanie = true;
+    dane[1] = szczegoly(1, { szkicCopilota: SZKIC(1) });
+    pokaz("/obsluga/skrzynka/1");
+    const p = await pole();
+    await u.type(p, " Dopisek.");
+    await polecenie(u, "dodaj podpis");
+    await waitFor(() => expect(zwolnijPytanie).toHaveLength(1));
+    await u.type(p, " Jeszcze.");
+    await act(async () => { zwolnijPytanie[0](); });
+
+    const wersja = await screen.findByRole("group", { name: "Wersja 2" });
+    expect(p).toHaveValue(`${SKLEJONY} Jeszcze.`);
+    expect(screen.queryByText("Copilot poprawił szkic")).not.toBeInTheDocument();
+    /* Wstawienie z wymiany to też droga z cofnięciem. */
+    await u.click(within(wersja).getByRole("button", { name: /Wstaw do odpowiedzi/ }));
+    expect(p).toHaveValue(`${SKLEJONY} Pozdrawiamy.`);
+    await u.click(screen.getByRole("button", { name: "Cofnij" }));
+    expect(p).toHaveValue(`${SKLEJONY} Jeszcze.`);
   });
 });

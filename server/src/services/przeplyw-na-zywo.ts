@@ -31,6 +31,9 @@ import { biezacaDecyzja, kategorieNaZywo } from "./przeplyw-kategorii.js";
    Ten stan nie mija sam, więc propozycja wypada z kandydatów od razu,
    a karta mówi agentowi, dlaczego automat jej nie wysłał.
 
+   DZIEWIĄTY WARUNEK, szkic bez dopytania, to ciche pominięcie jak pierwsze
+   siedem. Mija sam, gdy ktoś ułoży szkic od nowa.
+
    BŁĄD NIE JEST PONAWIANY. Wysyłka, która padła, zapisuje powód przy
    propozycji i wypada z kandydatów. Ponowienie co takt szłoby na koszt
    klienta, a po niejednoznacznym timeoucie §8.5 zabrania go w ogóle. */
@@ -79,8 +82,8 @@ export interface WynikNaZywo {
 }
 
 /** Powody pominięcia, w kolejności warunków. Klucze idą do dziennika. */
-type Powod = "decyzja" | "odpisano" | "szkic" | "narzedzia" | "agentPisze" | "przydzial" | "obecnosc"
-  | "konflikt";
+type Powod = "decyzja" | "odpisano" | "szkic" | "narzedzia" | "poprawka" | "agentPisze" | "przydzial"
+  | "obecnosc" | "konflikt";
 
 /** Powód przy propozycji, gdy szkic sięgał do bazy. Karta pokazuje go po „Automat nie wysłał:”. */
 export const POWOD_NARZEDZIA = "szkic sięgał do kartoteki, sprawdź ceny i linki przed wysłaniem";
@@ -174,6 +177,22 @@ export async function wyslijNaZywo(rozmowyId: number[], deps: NaZywoDeps = {}): 
       oznaczNarzedzia(database, p);
       continue;
     }
+
+    /* 9. Agent dopytuje Copilota o ten szkic. Liczy się KAŻDA wymiana, nie
+          tylko przyjęta wersja: odrzucona poprawka i polecenie, któremu
+          model odmówił, wyglądają w bazie jak pytanie, a każde z nich znaczy,
+          że agent szkicowi nie ufa albo go zmienia. Nowa wersja żyje w polu
+          agenta, a `szkic_copilota` zostaje stary, więc automat wysłałby
+          klientowi tekst, który agent właśnie kwestionuje. Liczy się wymiana
+          nie starsza niż szkic: szkic ułożony od nowa zaczyna sprawę od
+          początku. Porównanie przez `julianday`, bo
+          znacznik bywa z milisekundami albo bez, a jako tekst „…00.000Z"
+          stoi przed „…00Z" z tej samej sekundy. */
+    const poprawiany = database.prepare(`SELECT 1 FROM copilot_pytanie p
+        JOIN szkic_copilota s ON s.conversation_id = p.conversation_id
+       WHERE p.conversation_id = ? AND julianday(p.at) >= julianday(s.at)
+       LIMIT 1`).get(rozmowa);
+    if (poprawiany) { pomin("poprawka"); continue; }
 
     /* 4. Agent coś pisze albo dołożył plik. Wysyłka zabrałaby jego załącznik
           do odpowiedzi automatu i skasowała mu szkic. */

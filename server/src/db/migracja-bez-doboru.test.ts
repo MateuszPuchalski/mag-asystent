@@ -136,13 +136,8 @@ test("druga migracja niczego nie rusza, a świeża baza nie zakłada spalonych n
   swieza.close();
 });
 
-test("baza ze świeżej instalacji, z komentarzem przed ostatnią kolumną, wstaje", () => {
-  /* Tak wyglądał `schema.sql` przed kasatą: komentarz `--` tuż przed ostatnią
-     kolumną. SQLite nie umie jej wtedy zdjąć („incomplete input"), a wywrócony
-     start cofał aktualizację i blokował każde następne wydanie. Kolumna ma
-     zostać, a migracja przejść. */
-  const d = new DatabaseSync(":memory:");
-  d.exec(schema);
+/** `copilot_pytanie` ze świeżej instalacji sprzed kasaty: komentarz `--` tuż przed `pasowania`. */
+function pytanieZKomentarzem(d: DatabaseSync, dodatkowe = "") {
   d.exec(`DROP TABLE copilot_pytanie`);
   d.exec(`CREATE TABLE copilot_pytanie (
   id              INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -155,10 +150,44 @@ test("baza ze świeżej instalacji, z komentarzem przed ostatnią kolumną, wsta
   przez           TEXT NOT NULL,
   przez_user_id   INTEGER REFERENCES app_user(user_id),
   -- Narzędzia, po które model sięgnął: [{nazwa, argument, znakow}].
-  narzedzia       TEXT NOT NULL DEFAULT '[]',
+  narzedzia       TEXT NOT NULL DEFAULT '[]',${dodatkowe}
   -- Pasowania z sieci po sicie: [{twId, symbol, marka, model, url, cytat, …}].
   pasowania       TEXT NOT NULL DEFAULT '[]'
 )`);
+}
+
+/* Kolumny poprawki szkicu przed `pasowania`, więc ta dalej jest ostatnia. */
+const POPRAWKA_PRZED = `
+  szkic_przed TEXT, szkic_po TEXT, szkic_odrzucony TEXT,
+  szkic_twierdzenia TEXT NOT NULL DEFAULT '[]', szkic_zastrzezenia TEXT NOT NULL DEFAULT '[]',`;
+
+test("baza ze świeżej instalacji, z komentarzem przed ostatnią kolumną, wstaje", (t) => {
+  /* Tak wyglądał `schema.sql` przed kasatą: komentarz `--` tuż przed ostatnią
+     kolumną. SQLite nie umie jej wtedy zdjąć („incomplete input"), a wywrócony
+     start cofał aktualizację i blokował każde następne wydanie. Kolumna ma
+     zostać, a migracja przejść.
+
+     Kolumny poprawki szkicu dochodzą dziś PRZED kasatą i stają za
+     `pasowania`. Żeby sprawdzić gałąź „kolumna zostaje", stoją tu już przed
+     nią, więc `pasowania` dalej jest ostatnia z komentarzem nad sobą.
+
+     Nowszy SQLite zdejmuje taką kolumnę bez błędu i tej gałęzi nie da się
+     na nim wywołać. Próba na tym samym kształcie mówi, który SQLite mamy,
+     zamiast zgadywać z wersji Node. */
+  const probna = new DatabaseSync(":memory:");
+  probna.exec(schema);
+  pytanieZKomentarzem(probna, POPRAWKA_PRZED);
+  let zdejmuje = true;
+  try { probna.exec("ALTER TABLE copilot_pytanie DROP COLUMN pasowania"); } catch { zdejmuje = false; }
+  probna.close();
+  if (zdejmuje) {
+    t.skip("ten SQLite zdejmuje kolumnę z komentarzem nad sobą, więc gałąź „zostaje” jest tu nieosiągalna");
+    return;
+  }
+
+  const d = new DatabaseSync(":memory:");
+  d.exec(schema);
+  pytanieZKomentarzem(d, POPRAWKA_PRZED);
   const ostrzezenia: string[] = [];
   const warn = console.warn;
   console.warn = (m: string) => { ostrzezenia.push(m); };
@@ -168,4 +197,26 @@ test("baza ze świeżej instalacji, z komentarzem przed ostatnią kolumną, wsta
   assert.ok(kolumny(d, "copilot_pytanie").includes("pasowania"), "kolumna zostaje, start nie pada");
   assert.ok(ostrzezenia.some((m) => m.includes("copilot_pytanie.pasowania")), "zostawienie mówi o sobie");
   assert.doesNotThrow(() => migrate(d), "druga migracja też przechodzi");
+});
+
+test("baza ze świeżej instalacji: kolumny poprawki szkicu stają za `pasowania`, a start wstaje", () => {
+  /* Prawdziwa baza z tamtej instalacji. `addColumn` dokleja kolumny poprawki
+     szkicu na koniec, więc `pasowania` przestaje być ostatnia. Czy SQLite ją
+     wtedy zdejmie, zależy od jego wersji, a obie drogi są dobre. Schemat po
+     obu krokach ma się dać czytać i rozszerzać dalej. */
+  const d = new DatabaseSync(":memory:");
+  d.exec(schema);
+  pytanieZKomentarzem(d);
+  const warn = console.warn;
+  console.warn = () => {};
+  try {
+    assert.doesNotThrow(() => migrate(d));
+  } finally { console.warn = warn; }
+  const k = kolumny(d, "copilot_pytanie");
+  for (const nowa of ["szkic_przed", "szkic_po", "szkic_odrzucony", "szkic_twierdzenia", "szkic_zastrzezenia"]) {
+    assert.ok(k.includes(nowa), `brak ${nowa}`);
+  }
+  assert.doesNotThrow(() => migrate(d), "druga migracja też przechodzi");
+  assert.doesNotThrow(() => d.exec("ALTER TABLE copilot_pytanie ADD COLUMN nastepna TEXT"),
+    "następne wydanie dołoży kolumnę bez „incomplete input”");
 });

@@ -27,13 +27,14 @@ import { ROLE_BIUROWE } from "../services/users.js";
    policzyć, CZY Copilot jest dobry — czyli nie da się podjąć decyzji
    „zejdź na tańszy model", dla której cały pomiar powstał.
 
-   Dopytanie (0.332.0): agent pyta o szkic, model odpowiada JEMU.
-   Osobna od trasy szkicu, choć obie wołają model o tej samej rozmowie, bo
-   robi rzecz przeciwną: tamta produkuje tekst DLA KLIENTA i przepuszcza go
-   przez sita (numery spoza faktów, fakty spoza listy), ta produkuje tekst
-   DLA AGENTA i celowo tych sit nie ma. Wspólna trasa musiałaby wybrać jedno
-   zachowanie dla obu — a wtedy albo szkic przestałby być sprawdzany, albo
-   dopytanie przestałoby umieć powiedzieć „tego numeru u nas nie ma".
+   Dopytanie: agent pyta o szkic albo każe go zmienić, a model odpowiada
+   JEMU notką i, przy poleceniu, oddaje nową wersję tekstu z pola. Osobna od
+   trasy szkicu, choć obie wołają model o tej samej rozmowie. Notka jest
+   tekstem DLA AGENTA i celowo nie ma sit, żeby umiała powiedzieć „tego
+   numeru u nas nie ma". Nowa wersja idzie przez te same sita co szkic,
+   ale zostaje w polu agenta i nie rusza propozycji Copilota, na której stoi
+   automat wysyłki. Wspólna trasa musiałaby zapisać wynik w jednym z tych
+   dwóch miejsc, a każde jest złe dla drugiego zadania.
 
    Szkic dostał WŁASNĄ trasę, choć 0.191.0 obiecywało przycisk w rozmowie bez
    nowej trasy: tamta obietnica dotyczyła klasyfikacji jednej rozmowy (lista
@@ -218,11 +219,13 @@ export async function copilotRoutes(app: FastifyInstance) {
     });
 
   /**
-   * Dopytanie o szkic (0.332.0). Jedno pytanie na kliknięcie, odpowiedź dla
-   * agenta. Kliknięcie jest hamulcem samo w sobie, jak przy szkicu; sufit
-   * pytań na rozmowę chroni przed pętlą, nie przed wydatkiem.
+   * Dopytanie o szkic albo polecenie zmiany. Jedno na kliknięcie: notka dla
+   * agenta i, gdy agent o to prosi, nowa wersja tekstu z pola po sitach
+   * szkicu. `szkic` to tekst, który agent ma teraz w polu; puste pole znaczy
+   * „poprawiaj szkic Copilota". Kliknięcie jest hamulcem samo w sobie, jak
+   * przy szkicu; sufit pytań na rozmowę chroni przed pętlą, nie przed wydatkiem.
    */
-  app.post<{ Body: { rozmowaId?: number; pytanie?: string } }>(
+  app.post<{ Body: { rozmowaId?: number; pytanie?: string; szkic?: string } }>(
     "/api/obsluga/copilot/pytanie", async (req, reply) => {
       const nie = odmowa(reply);
       if (nie) return nie;
@@ -230,10 +233,12 @@ export async function copilotRoutes(app: FastifyInstance) {
       if (powod) return reply.code(400).send({ error: powod });
       const rozmowaId = Number(req.body?.rozmowaId);
       if (!Number.isInteger(rozmowaId)) return reply.code(400).send({ error: "Nie podano rozmowy" });
+      const szkic = req.body?.szkic;
       try {
         return {
           wymiana: await zadajPytanie(
-            rozmowaId, String(req.body?.pytanie ?? ""), kto(), nadawcaPytaniaAnthropic, subiekt),
+            rozmowaId, String(req.body?.pytanie ?? ""), kto(), nadawcaPytaniaAnthropic, subiekt,
+            { szkic: typeof szkic === "string" ? szkic : null }),
         };
       } catch (e) {
         const dostawcy = e instanceof BladLimituCopilota || e instanceof BladKluczaCopilota

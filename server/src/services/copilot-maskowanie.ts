@@ -109,6 +109,104 @@ export function zamaskuj(tresc: string, login: string | null): TrescBezpieczna {
   return out as TrescBezpieczna;
 }
 
+/* ── MASKOWANIE ODWRACALNE: SZKIC Z POLA AGENTA ─────────────────────────────
+   „Dopytaj Copilota" poprawia tekst, który agent ma w polu odpowiedzi,
+   i oddaje go CAŁY. Ten tekst niesie to samo, co nasze wychodzące w wątku:
+   agent przepisuje klientowi jego adres albo telefon. Do dostawcy idzie więc
+   zamaskowany jak wątek, ale wrócić musi z wartościami, bo trafia z powrotem
+   do pola, a stamtąd do klienta.
+
+   KAŻDA RÓŻNA WARTOŚĆ DOSTAJE WŁASNY NUMER, bo wzorce łapią też nasze numery
+   części: dziewięć cyfr bez „nr" czy „OEM" to dla nich telefon, a „46-450
+   Husqvarna" to kod z miastem. Szkic z dwoma takimi numerami pod jednym gołym
+   `[telefon]` nie dałby się odmaskować bez zgadywania, który był który.
+
+   Znacznik, którego nie wydaliśmy, oznacza daną, której model nie widział.
+   `odmaskuj` go nie zgaduje: zwraca go w `obce`, a serwis odrzuca wersję. */
+
+/**
+ * Kształt znacznika danych, także cudzego: goły `[telefon]` z wątku, numer,
+ * którego nie wydaliśmy, i dopisek w rodzaju `[telefon klienta]`.
+ */
+const ZNACZNIK_DANYCH = /\[(?:telefon|e-mail|email|adres|konto|login)\b[^\]\n]{0,20}\]/gi;
+
+/** Klucz znacznika: model bywa zmienia wielkość liter albo odstęp, a to ten sam znacznik. */
+const kluczZnacznika = (z: string) => z.toLowerCase().replace(/\s+/g, " ");
+
+export interface MaskaOdwracalna {
+  tresc: TrescBezpieczna;
+  /**
+   * Wydane znaczniki z powrotem na wartości. Każdy inny znacznik danych
+   * zostaje w tekście i trafia do `obce`: tej wartości model nie widział.
+   */
+  odmaskuj(s: string): { tresc: string; obce: string[] };
+}
+
+/**
+ * Maskowanie z pamięcią: te same wzorce w tej samej kolejności co `zamaskuj`,
+ * ale każda różna wartość dostaje numerowany znacznik, a powtórzona ten sam.
+ */
+export function zamaskujOdwracalnie(tresc: string, login: string | null): MaskaOdwracalna {
+  /* Klucz znacznika → oryginał. Znacznik stojący w tekście JUŻ PRZED
+     maskowaniem jest tekstem, nie daną, więc wraca sam za siebie, a numeracja
+     go omija. Inaczej `[telefon 1]` wpisany ręcznie dostałby cudzą wartość. */
+  const wartosci = new Map<string, string>();
+  for (const z of tresc.match(ZNACZNIK_DANYCH) ?? []) wartosci.set(kluczZnacznika(z), z);
+  const wydane = new Map<string, string>();
+  const licznik = new Map<string, number>();
+
+  /* Linia adresowa zjada resztę linii, a w niej bywa wydany już znacznik
+     e-maila. Wartość zapisujemy więc w pełni rozwiniętą: odmaskowanie ma być
+     jednym przebiegiem, a ta sama wartość ma dostać ten sam numer. */
+  const rozwin = (s: string) => s.replace(ZNACZNIK_DANYCH, (z) => wartosci.get(kluczZnacznika(z)) ?? z);
+  const wydaj = (nazwa: string, trafienie: string): string => {
+    const oryginal = rozwin(trafienie);
+    const k = `${nazwa}\u0000${oryginal}`;
+    const jest = wydane.get(k);
+    if (jest) return jest;
+    let n = licznik.get(nazwa) ?? 0;
+    let znacznik: string;
+    do { n += 1; znacznik = `[${nazwa} ${n}]`; } while (wartosci.has(kluczZnacznika(znacznik)));
+    licznik.set(nazwa, n);
+    wartosci.set(kluczZnacznika(znacznik), oryginal);
+    wydane.set(k, znacznik);
+    return znacznik;
+  };
+
+  let out = tresc;
+  for (const w of WZORCE) out = out.replace(w.re, (m) => wydaj(w.nazwa, m));
+
+  /* Login jak w `bezLoginu`, z tym samym progiem trzech znaków, ale omija
+     wydane znaczniki: login „adres" nie ma prawa rozciąć `[adres 1]`.
+     `[login]` wraca do pierwszej spotkanej pisowni; gdy loginu w tekście nie
+     było, znacznik jest cudzy, bo model wziął go z wątku, nie z pola. */
+  const l = (login ?? "").trim();
+  if (l.length >= 3) {
+    const esc = l.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    let pierwszy = null as string | null;
+    out = out.replace(new RegExp(`(${ZNACZNIK_DANYCH.source})|${esc}`, "gi"), (m, znacznik?: string) => {
+      if (znacznik) return m;
+      pierwszy ??= m;
+      return "[login]";
+    });
+    if (pierwszy !== null) wartosci.set("[login]", pierwszy);
+  }
+
+  return {
+    tresc: out as TrescBezpieczna,
+    odmaskuj(s: string) {
+      const obce: string[] = [];
+      const t = s.replace(ZNACZNIK_DANYCH, (z) => {
+        const w = wartosci.get(kluczZnacznika(z));
+        if (w !== undefined) return w;
+        if (!obce.includes(z)) obce.push(z);
+        return z;
+      });
+      return { tresc: t, obce };
+    },
+  };
+}
+
 /**
  * Jedna wiadomość wątku do zamaskowania — kierunek i treść BEZ stopki.
  * `odAllegro` — doradca albo komunikat Allegro w Problemie z zakupem

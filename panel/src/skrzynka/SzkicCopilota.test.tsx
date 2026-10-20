@@ -283,6 +283,53 @@ describe("Szkic Copilota w edytorze", () => {
   });
 });
 
+/* ── Wersje z dopytania w polu ───────────────────────────────────────────────
+   Poprawka Copilota to dalej tekst modelu. Tarcie przy wysyłce i rachunek
+   pod polem biorą się z tej wersji, która w polu stoi, nie z oryginału.   */
+describe("wersja z dopytania w polu", () => {
+  const model = (teza: string) => ({ teza, zrodlo: "model" as const, odwolanie: null,
+    pewnosc: "prawdopodobne" as const, obnizona: false });
+  const z = szkic({ twierdzenia: [model("Nóż pasuje do WYZ18H")], zastrzezenia: ["brak tabliczki"] });
+  const PO = `${z.tresc} Druga wersja gaźnika: W09-0212.`;
+  const wymiana = {
+    id: 5, pytanie: "dodaj drugą wersję gaźnika", odpowiedz: "Dopisałem drugą wersję.", twierdzenia: [],
+    model: "m", at: "2026-09-07T10:05:00Z", przez: "A. Lewandowska",
+    szkicPrzed: z.tresc, szkicPo: PO, szkicTwierdzenia: [model("Druga wersja to W09-0212")],
+    szkicZastrzezenia: ["brak numeru seryjnego"], szkicOdrzucony: null,
+  };
+  const dopytanie = (pole: string) => ({ wymiany: [wymiana], blad: null, pracuje: false,
+    onPytaj: vi.fn(), limitZnakow: 600, pole, onWstaw: vi.fn() });
+
+  it("pole równe poprawce: „Wyślij bez zmian” z twierdzeniami tej wersji, uwagi i rachunek też jej", () => {
+    edytor(copilot({ szkic: z, wPolu: true, maSzkicAgenta: true, dopytanie: dopytanie(PO) }), { szkic: PO });
+    expect(screen.getByRole("button", { name: /Wyślij bez zmian/ })).toBeInTheDocument();
+    const lista = screen.getByRole("region", { name: "Do sprawdzenia przed wysłaniem" });
+    expect(lista).toHaveTextContent("Druga wersja to W09-0212");
+    expect(lista).not.toHaveTextContent("WYZ18H");
+    expect(screen.getByLabelText("Czego model nie znalazł w faktach")).toHaveTextContent("brak numeru seryjnego");
+    /* Pierwszy rachunek to karta pod polem; drugi stoi przy wersji w dopytaniu. */
+    expect(screen.getAllByLabelText("Twierdzenia szkicu ze źródłem")[0])
+      .toHaveTextContent("Druga wersja to W09-0212");
+    expect(screen.getAllByLabelText("Twierdzenia szkicu ze źródłem")[0]).not.toHaveTextContent("WYZ18H");
+  });
+
+  it("pole równe oryginałowi przy nowszej wersji: twierdzenia oryginału", () => {
+    edytor(copilot({ szkic: z, wPolu: true, maSzkicAgenta: true, dopytanie: dopytanie(z.tresc) }),
+      { szkic: z.tresc });
+    const lista = screen.getByRole("region", { name: "Do sprawdzenia przed wysłaniem" });
+    expect(lista).toHaveTextContent("WYZ18H");
+    expect(lista).not.toHaveTextContent("W09-0212");
+    expect(screen.getByLabelText("Czego model nie znalazł w faktach")).toHaveTextContent("brak tabliczki");
+  });
+
+  it("poprawka ręczna znosi tarcie, a rachunek zostaje przy najnowszej wersji", () => {
+    const tekst = `${PO} Pozdrawiamy.`;
+    edytor(copilot({ szkic: z, wPolu: true, maSzkicAgenta: true, dopytanie: dopytanie(tekst) }), { szkic: tekst });
+    expect(screen.getByRole("button", { name: /Wyślij do klienta/ })).toBeInTheDocument();
+    expect(screen.getByLabelText("Czego model nie znalazł w faktach")).toHaveTextContent("brak numeru seryjnego");
+  });
+});
+
 /* ── Świeżość szkicu w Problemie z zakupem ──────────────────────────────────
    Szkic odpowiada KUPUJĄCEMU i serwer zapisuje go pod jego wiadomością.
    Licząc świeżość od każdej przychodzącej, karta mówiłaby „nieświeży” po
