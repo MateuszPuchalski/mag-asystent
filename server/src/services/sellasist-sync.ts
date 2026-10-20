@@ -101,15 +101,17 @@ function zapiszZamowienie(
   const zebranoStatusem = z.statusId !== null && statusyZebrane.includes(z.statusId) ? z.statusAt ?? at : null;
   transaction(database, () => {
     database.prepare(`INSERT INTO sellasist_zamowienie(id, external_id, kupujacy_login, zrodlo, status_id,
-        status_nazwa, status_at, termin, utworzono_at, skopiowane_z, zebrano_at, spakowano_at, pobrano_at)
-      VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)
+        status_nazwa, status_at, dostawa, termin, utworzono_at, skopiowane_z, zebrano_at, spakowano_at, pobrano_at)
+      VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)
       ON CONFLICT(id) DO UPDATE SET external_id = excluded.external_id, kupujacy_login = excluded.kupujacy_login,
         zrodlo = excluded.zrodlo, status_id = excluded.status_id, status_nazwa = excluded.status_nazwa,
-        status_at = excluded.status_at, termin = excluded.termin, utworzono_at = excluded.utworzono_at,
+        status_at = excluded.status_at, dostawa = excluded.dostawa, termin = excluded.termin,
+        utworzono_at = excluded.utworzono_at,
         skopiowane_z = excluded.skopiowane_z,
         zebrano_at = ${WCZESNIEJSZA("zebrano_at")}, spakowano_at = ${WCZESNIEJSZA("spakowano_at")},
         pobrano_at = excluded.pobrano_at`)
-      .run(z.id, z.externalId, z.login, z.zrodlo, z.statusId, z.statusNazwa, z.statusAt, z.termin, z.utworzonoAt,
+      .run(z.id, z.externalId, z.login, z.zrodlo, z.statusId, z.statusNazwa, z.statusAt, z.dostawa, z.termin,
+        z.utworzonoAt,
         z.skopiowaneZ, zebranoZDziennika ?? zebranoStatusem ?? pierwszaEtykieta, pierwszaEtykieta, at);
     database.prepare("DELETE FROM sellasist_pozycja WHERE zamowienie_id = ?").run(z.id);
     const poz = database.prepare(`INSERT OR REPLACE INTO sellasist_pozycja(koszyk_id, zamowienie_id, symbol, ean,

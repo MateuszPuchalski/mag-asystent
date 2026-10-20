@@ -228,6 +228,14 @@ function zdanieDosylki(d: DosylkaZamowienia): string {
     + (d.zrodlo === "allegro" ? ", jej numer też stoi przy zamówieniu w Allegro" : "");
 }
 
+/* PACZKA WRACA DO NADAWCY, bo klient zwykle jej nie odebrał. Decyzja
+   właściciela z 20 października 2026: prosimy wtedy o złożenie zamówienia
+   jeszcze raz, a ponownego nadania nie obiecujemy. Werdykt stoi w fakcie,
+   nie we wzorcu kategorii, bo taką prośbę rozpoznanie bierze czasem za
+   zaginięcie. Zwrot pieniędzy za pierwsze zamówienie rozlicza człowiek. */
+const WERDYKT_POWROTU = "WERDYKT: paczka wraca do nas; ponownego nadania nie obiecuj; gdy klient chce dostać"
+  + " towar, poproś, żeby złożył zamówienie jeszcze raz; zwrotu pieniędzy za to zamówienie nie obiecuj";
+
 /** Zdanie faktu o paczce; `null`, gdy nigdy nie pytaliśmy — milczenie zamiast zgadywania. */
 export function zdaniePrzesylki(s: StanPrzesylkiZamowienia): string | null {
   /* Dosyłkę znamy z własnej bazy, więc mówimy o niej także wtedy, gdy o
@@ -243,8 +251,9 @@ export function zdaniePrzesylki(s: StanPrzesylkiZamowienia): string | null {
     ? `doręczona ${s.dostarczonoAt.slice(0, 10)}`
     : s.status ? (STATUS_DLA_KLIENTA[s.status] ?? `ostatni status przewoźnika ${s.status}`)
       : "przewoźnik nie podał jeszcze statusu";
+  const werdykt = !s.dostarczonoAt && s.status === "RETURNED" ? `. ${WERDYKT_POWROTU}` : "";
   return `Przesyłka zamówienia: ${stan}; przewoźnik ${s.przewoznik ?? "nieznany"}; numer przesyłki`
-    + ` klient widzi w Allegro przy zamówieniu ${kiedy}${dosylka}`;
+    + ` klient widzi w Allegro przy zamówieniu ${kiedy}${dosylka}${werdykt}`;
 }
 
 /**

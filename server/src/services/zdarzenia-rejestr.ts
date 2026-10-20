@@ -73,7 +73,7 @@ export const ZDARZENIA: readonly string[] = [
   "rozmowa_wysylka_niepewna", "rozmowa_wysylka_proba", "rozmowa_wysylka_uzgodniona",
   "rozmowa_zalacznik_dodany", "rozmowa_zalacznik_zdjety", "rozmowa_zakonczenie_cofniete",
   "rozmowa_zamowienie_wskazane", "rozmowa_zwolniona", "scan", "scan_timing", "search",
-  "sellasist_notatka",
+  "sellasist_brak_powiadomiony", "sellasist_notatka",
   "siec_przerwa", "skrzynka_synchronizacja_reczna", "sprawa_tag_nazwa", "sprawa_tag_przypiety",
   "sprawa_tag_utworzony", "sprawa_tag_wlaczony", "sprawa_tag_wylaczony", "sprawa_tag_zdjety",
   "strefa_zapis", "user_active_changed", "user_created", "user_haslo_changed",
