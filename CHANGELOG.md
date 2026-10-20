@@ -10,6 +10,14 @@ z wersją monorepo" — i właśnie tak przestał być zgodny: `0.3.0` przetrwa�
 sześć zmergowanych zmian, w tym takie, które wymagały nowego uprawnienia SQL.
 Komentarz nie jest mechanizmem.
 
+## 0.597.2 — 20 października 2026
+
+**Pierwszy szkic zna zamówienie.** Automat układa szkic zaraz po wiadomości,
+a zamówienie z Allegro dochodziło dopiero w takcie synchronizacji. Szkic na
+„kiedy nadacie?” nie znał wtedy zamówienia wcale i odpisywał „sprawdzamy”.
+Teraz dociąga zamówienie przed szkicem. Gdy Allegro nie odpowie, szkic dostaje
+przynajmniej stan zamówienia z Sellasist.
+
 ## 0.597.1 — 20 października 2026
 
 Oferta z Allegro z kwotą w obcym kształcie nie przerywa już szkicu ani
