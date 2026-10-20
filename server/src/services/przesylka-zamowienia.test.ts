@@ -215,3 +215,18 @@ test("dosyłki zakończonej sprawy albo spoza okna nie ma w nakładce, chyba że
   db().prepare("UPDATE klient_dosylka SET status = 'DELIVERED', dostarczono_at = '2026-09-19T10:00:00Z'").run();
   assert.equal(Z.stanPrzesylkiKrotko(przesylkaZamowienia(db(), zamowienie, CHWILA)), "dosyłka: doręczona 2026-09-19");
 });
+
+/* Decyzja właściciela: paczka nieodebrana wraca do nas, a klient prosi
+   o ponowne nadanie — prosimy o nowe zamówienie. Werdykt stoi w fakcie, bo
+   rozpoznanie bierze taką prośbę czasem za zaginięcie. */
+test("paczka wraca do nadawcy: fakt niesie werdykt o nowym zamówieniu, doręczona go nie ma", () => {
+  const s = { waybill: "W-1", przewoznik: "INPOST", status: "RETURNED", dostarczonoAt: null,
+    sprawdzonoAt: "2026-10-20T06:44:00Z" };
+  const zdanie = Z.zdaniePrzesylki(s)!;
+  assert.match(zdanie, /^Przesyłka zamówienia: wraca albo wróciła do nadawcy; przewoźnik INPOST/);
+  assert.match(zdanie, /\. WERDYKT: paczka wraca do nas; ponownego nadania nie obiecuj; .*złożył zamówienie jeszcze raz/);
+  assert.match(zdanie, /zwrotu pieniędzy za to zamówienie nie obiecuj$/);
+  assert.doesNotMatch(zdanie, /W-1/, "numer przesyłki nie idzie do modelu");
+  assert.doesNotMatch(Z.zdaniePrzesylki({ ...s, status: "IN_TRANSIT" })!, /WERDYKT/);
+  assert.doesNotMatch(Z.zdaniePrzesylki({ ...s, dostarczonoAt: "2026-10-19T10:00:00Z" })!, /WERDYKT/);
+});

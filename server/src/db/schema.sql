@@ -2990,6 +2990,7 @@ CREATE TABLE IF NOT EXISTS sellasist_zamowienie (
   status_id      INTEGER,
   status_nazwa   TEXT,                  -- nazwa nadana przez firmę w Sellasist
   status_at      TEXT,                  -- ostatnia zmiana statusu, ISO UTC
+  dostawa        TEXT,                  -- nazwa metody dostawy, np. „InPost Paczkomat 24/7"; bez punktu odbioru
   termin         TEXT,                  -- `deadline`: ISO UTC albo sam dzień RRRR-MM-DD
   utworzono_at   TEXT,
   skopiowane_z   INTEGER,               -- `copied_order_id` kopii; NULL = oryginał
@@ -3046,6 +3047,16 @@ CREATE TABLE IF NOT EXISTS sellasist_pomylka_zlapana (
   at            TEXT NOT NULL           -- chwila wejścia w status, ISO UTC
 );
 CREATE INDEX IF NOT EXISTS ix_sellasist_pomylka_at ON sellasist_pomylka_zlapana(at);
+
+-- Brak z kompletacji, o którym biuro już powiadomiło klienta. Kluczem jest
+-- wejście w status (`status_at`): zamówienie, które wróci do braku później,
+-- staje w „Do zrobienia" od nowa. Kto kliknął, mówi dziennik zdarzeń.
+CREATE TABLE IF NOT EXISTS sellasist_brak_powiadomiony (
+  zamowienie_id INTEGER NOT NULL,
+  status_at     TEXT NOT NULL,
+  at            TEXT NOT NULL,
+  PRIMARY KEY (zamowienie_id, status_at)
+);
 
 CREATE TABLE IF NOT EXISTS sellasist_sync_state (
   id              INTEGER PRIMARY KEY CHECK (id = 1),

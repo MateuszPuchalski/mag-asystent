@@ -33,6 +33,8 @@ const ZAMOWIENIE = {
     { id: 142394, symbol: "PAS-9", ean: "", name: "Pasek", quantity: 1, quantityMissing: 1 },
     { name: "pozycja bez numeru koszyka", quantity: 1 },
   ],
+  shipment: { id: 3, name: "InPost Paczkomat 24/7", pickup_point: "Kraków, ul. Długa 15 (KRA12M)",
+    pickup_code: "KRA12M", internal_name: "inpost" },
   shipments: [{ ordershipment_id: 7, service: "InPost Paczkomaty", tracking_number: "6032, 6033" },
     { ordershipment_id: 8, service: "Kurier XYZ", tracking_number: "XYZ1" }],
 };
@@ -40,11 +42,20 @@ const ZAMOWIENIE = {
 test("zamówienie: z kupującego wyłącznie login, adresów i e-maila nie ma w wyniku", () => {
   const z = S.mapujZamowienie(ZAMOWIENIE)!;
   const tekst = JSON.stringify(z);
-  for (const zakazane of ["Kowalski", "Fakturowa", "Dostawcza", "600700800", "9876543219", "example.com", "Wieliczka"]) {
+  for (const zakazane of ["Kowalski", "Fakturowa", "Dostawcza", "600700800", "9876543219", "example.com", "Wieliczka",
+    "Długa", "KRA12M"]) {
     assert.ok(!tekst.includes(zakazane), `mapowanie przepuściło ${zakazane}`);
   }
   assert.equal(z.login, "Ogrodnik_77");
   assert.equal(z.externalId, "29a1c2b0-0000-11ef-9a00-1234567890ab");
+});
+
+test("zamówienie: metoda dostawy z nazwy, a bez niej z nazwy w źródle — punkt odbioru nie przechodzi", () => {
+  assert.equal(S.mapujZamowienie(ZAMOWIENIE)!.dostawa, "InPost Paczkomat 24/7");
+  const zeZrodla = S.mapujZamowienie({ ...ZAMOWIENIE, shipment: undefined,
+    external_data: { ...ZAMOWIENIE.external_data, external_shipment_name: "Allegro Kurier DPD" } })!;
+  assert.equal(zeZrodla.dostawa, "Allegro Kurier DPD");
+  assert.equal(S.mapujZamowienie({ ...ZAMOWIENIE, shipment: undefined })!.dostawa, null);
 });
 
 test("zamówienie: daty w UTC, termin-dzień zostaje dniem, oryginał nie jest kopią", () => {

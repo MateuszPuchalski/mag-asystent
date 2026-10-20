@@ -930,6 +930,10 @@ export function migrate(database: DatabaseSync) {
      `sellasist_sync_state.pomylki_od_at` w `schema.sql`. Tabela stoi już na
      produkcji, a NULL znaczy prawdę: z kluczem jeszcze nic nie przeczytano. */
   addColumn("sellasist_sync_state", "pomylki_od_at", "TEXT");
+  /* Metoda dostawy zamówienia Sellasist — patrz `sellasist_zamowienie.dostawa`
+     w `schema.sql`. NULL znaczy „lustro jej jeszcze nie czytało", a każda
+     zmiana zamówienia czyta szczegół od nowa. */
+  addColumn("sellasist_zamowienie", "dostawa", "TEXT");
   addColumn("problem", "zrodlo",
     "TEXT CHECK (zrodlo IS NULL OR zrodlo IN ('zakonczenie','nadmiar'))");
   identyfikatorZamiennika(database);

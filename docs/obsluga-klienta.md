@@ -545,7 +545,12 @@ działania stoją w `docs/sellasist.md`.
   w serwisie źródła, źródło, status z nazwą nadaną przez firmę i terminy.
   Do tego dzień zebrania i spakowania. Z koszyka: numer pozycji, symbol, EAN, nazwę
   towaru, ilość i brak do skompletowania. Z etykiet: numer przesyłki, usługę
-  przewoźnika i datę wydruku.
+  przewoźnika i datę wydruku. Z dostawy: nazwę metody, np. „InPost Paczkomat
+  24/7”, bo od przewoźnika zależy godzina graniczna braku. Adresu punktu
+  odbioru (`shipment.pickup_point`) mapowanie nie czyta.
+- **„Klient powiadomiony” przy braku z kompletacji** to numer zamówienia,
+  wejście w status i chwila kliknięcia, bez pracownika. Kto kliknął, mówi
+  dziennik `sellasist_brak_powiadomiony`, który niesie sam numer zamówienia.
 - **Login to jedyne pole kupującego.** Ten sam powód co przy Allegro: login
   jest kluczem klienta. Adresu z faktury, adresu dostawy, e-maila, NIP-u
   i telefonu mapowanie nie czyta wcale (`adapters/sellasist.http.ts`), więc

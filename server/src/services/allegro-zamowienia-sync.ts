@@ -146,6 +146,11 @@ export interface ZamowieniaSyncDeps {
  * cała gwarancja tej poprawki: negatyw odsiewa się tym samym kluczem, którym
  * się go pisze. Klucz filtra wzięty skądinąd niż klucz zapisu nie trafiałby
  * w nic i wyglądałoby to dokładnie tak, jak ta awaria — czyli wcale.
+ *
+ * CZWARTE źródło to zamówienie Allegro, które w Sellasist stoi w braku
+ * z kompletacji. Po godzinie granicznej trafia do „Do zrobienia” i prowadzi
+ * na profil klienta, a profil zna kupującego dopiero z zamówienia. Lustro
+ * Sellasist nie zna konta Allegro, więc numer idzie pod konto przebiegu.
  */
 export function brakujaceZamowienia(
   database: Db,
@@ -153,6 +158,7 @@ export function brakujaceZamowienia(
   ile: number,
   teraz = new Date(),
   ignorujBrak = false,
+  statusyBrak: readonly number[] = config.sellasist.statusyBrak,
 ): string[] {
   const doba = new Date(teraz.getTime() - 86_400_000).toISOString();
   return (database.prepare(`SELECT DISTINCT z.id
@@ -167,12 +173,20 @@ export function brakujaceZamowienia(
          przypadkiem istniał zwrot albo wiadomość. Bez zamówienia nie ma daty
          zakupu, więc Copilot wypisywał ją w liście braków.
 
-         Sortowanie malejące po dacie zostaje wspólne dla wszystkich trzech
+         Sortowanie malejące po dacie zostaje wspólne dla wszystkich czterech
          źródeł, a sufit przebiegu chroni limit 429 tak samo jak dotąd:
          reklamacje konkurują o ten sam budżet, nie dostają własnego.
 
          Backticków tu nie ma świadomie — blok stoi w literale szablonowym. */
       SELECT order_id, channel_account_id, otwarto_at FROM reklamacja_klienta
+      UNION ALL
+      /* Tylko kształt UUID: Allegro odpowiada na inny numer 422, a negatyw
+         zapisujemy wyłącznie przy 404, więc zły numer wracałby co przebieg. */
+      SELECT external_id, ?, status_at FROM sellasist_zamowienie
+       WHERE status_id IN (SELECT value FROM json_each(?)) AND skopiowane_z IS NULL
+         AND lower(ifnull(zrodlo, '')) LIKE 'allegro%'
+         AND lower(external_id) GLOB '[0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f]-*'
+         AND length(external_id) = 36
     ) z
     LEFT JOIN zamowienie_klienta k
       ON k.channel_account_id = z.channel_account_id AND k.external_id = z.id
@@ -191,7 +205,8 @@ export function brakujaceZamowienia(
           ))
     ORDER BY z.at DESC
     LIMIT ?`).all(
-      doba, ignorujBrak ? 1 : 0, konto, teraz.toISOString(), ile) as Array<{ id: string }>
+      konto, JSON.stringify(statusyBrak), doba, ignorujBrak ? 1 : 0, konto, teraz.toISOString(), ile,
+    ) as Array<{ id: string }>
   ).map((r) => r.id);
 }
 

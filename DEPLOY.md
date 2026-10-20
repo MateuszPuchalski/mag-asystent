@@ -1050,6 +1050,11 @@ Numery statusu „Brak podczas pakowania" z tej samej listy wpisz do
 zbierania złapane przed wysyłką. Liczenie rusza od doby po wpisaniu, wstecz
 nie.
 
+Numery statusu „Brak podczas kompletacji" wpisz do `SELLASIST_STATUSY_BRAK`.
+Zamówienie, które po godzinie granicznej dalej w nim stoi, stanie w „Do
+zrobienia". Godziny stoją w `SELLASIST_BRAK_GODZINA` (domyślnie 12)
+i `SELLASIST_BRAK_GODZINA_INPOST` (domyślnie 15).
+
 Co robi integracja i czego nie robi: `docs/sellasist.md`. Pierwszy przebieg
 czyta dziennik zmian z dwóch dni, więc lustro dochodzi przez kilkadziesiąt
 minut. `SELLASIST_SYNC_MS=0` wyłącza lustro bez wyłączania reszty.

@@ -416,4 +416,7 @@ test("Sellasist: zła subdomena i zły numer statusu to błędy; klucz nie trafi
   assert.match(subdomena[0], /sama subdomena/);
   assert.match(z({ konto: "firma", apiKey: "k", statusyZebrane: [5, Number.NaN] })[0], /SELLASIST_STATUSY_ZEBRANE/);
   assert.match(z({ konto: "firma", apiKey: "k", statusyPomylka: [0] })[0], /SELLASIST_STATUSY_POMYLKA/);
+  assert.match(z({ konto: "firma", apiKey: "k", statusyBrak: [-12] })[0], /SELLASIST_STATUSY_BRAK/);
+  assert.match(z({ konto: "firma", apiKey: "k", brakGodzina: 24 })[0], /SELLASIST_BRAK_GODZINA=24/);
+  assert.match(z({ konto: "firma", apiKey: "k", brakGodzinaInpost: 14.5 })[0], /SELLASIST_BRAK_GODZINA_INPOST/);
 });
