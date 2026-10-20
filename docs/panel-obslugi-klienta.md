@@ -2741,7 +2741,8 @@ bo wartość musi stać w zadeklarowanym odczycie.
 Trzy zawężenia, opisane w polityce danych (`docs/obsluga-klienta.md`): tylko
 `SAFE`, tylko przychodzące i sufit sztuk. Sufit jest tu, a nie przy
 reklamacji, bo tamtą ścieżkę uruchamia kliknięcie człowieka, a tę potrafi
-uruchomić takt z 0.317.0.
+uruchomić takt z 0.317.0. Dopytanie Copilota klika agent, więc od @wydanie
+bierze do ośmiu zdjęć (`SUFIT_SZTUK_DOPYTANIA`), a szkice zostają przy czterech.
 
 **Karta Copilota przestaje być zatłoczona (0.342.0).** Zgłoszenie właściciela
 ze zrzutu ekranu rozmowy: „panel jest zbyt zatłoczony, użyj technik, aby

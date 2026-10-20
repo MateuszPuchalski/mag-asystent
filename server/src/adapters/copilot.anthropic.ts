@@ -882,8 +882,11 @@ export const nadawcaPytaniaAnthropic: NadawcaPytania = async (k): Promise<Odpowi
     /* Wyjście niesie notkę, jej twierdzenia i CAŁY szkic z rachunkiem źródeł,
        czyli więcej niż szkic na kliknięcie (4500), a myślenie liczy się do
        tego samego sufitu. Ucięty JSON to zapłacone wywołanie bez odpowiedzi,
-       a sufit nic nie kosztuje. Liczy się NA RUNDĘ. */
-    maxTokens: 8000,
+       a sufit nic nie kosztuje. Liczy się NA RUNDĘ.
+       Zdjęć bywa tu `SUFIT_SZTUK_DOPYTANIA`, dwa razy tyle co przy szkicu,
+       a `odczytZeZdjec` w szkicu ma wpis na każde. Szkic dostał na cztery
+       zdjęcia 1500 tokenów zapasu, więc dopytanie dostaje drugie tyle. */
+    maxTokens: 10000,
     /* Średni wysiłek: to jest rozstrzyganie wątpliwości, nie etykieta. */
     wysilek: "medium",
     coNieOddal: "odpowiedzi",

@@ -13,7 +13,9 @@ import {
   type TwierdzenieSurowe,
 } from "./copilot-szkic.js";
 import { ofertyPoSygnaturze } from "./allegro-oferty-po-sygnaturze.js";
-import { przygotujZdjeciaRozmowy, spisZdjec, type Pobieracz, type ZdjecieZBramki } from "./copilot-zdjecia.js";
+import {
+  przygotujZdjeciaRozmowy, spisZdjec, SUFIT_SZTUK_DOPYTANIA, type Pobieracz, type ZdjecieZBramki,
+} from "./copilot-zdjecia.js";
 import {
   zestawNarzedzi, type UzycieNarzedzia, type WynikWywolania, type ZestawNarzedzi,
 } from "./copilot-narzedzia.js";
@@ -195,8 +197,10 @@ export async function zadajPytanie(
     [...surowy.kartoteki.values()].map((x) => x.symbol)));
 
   /* Zdjęcia tą samą bramką co przy szkicu. Dopytanie „co dokładnie widać na
-     tabliczce" bez zdjęcia byłoby pytaniem o nic. */
-  const zdjecia = await przygotujZdjeciaRozmowy(db(), conversationId, o.pobierzZdjecie);
+     tabliczce" bez zdjęcia byłoby pytaniem o nic. Sufit sztuk jest wyższy niż
+     przy szkicu, bo pytanie klika człowiek; powód przy stałej. */
+  const zdjecia = await przygotujZdjeciaRozmowy(
+    db(), conversationId, o.pobierzZdjecie, SUFIT_SZTUK_DOPYTANIA);
   const spis = spisZdjec(zdjecia);
   const fakty = (spis ? `${kontekst.tekstFaktow}\n\n${spis}` : kontekst.tekstFaktow) as FaktyBezpieczne;
 
