@@ -96,6 +96,21 @@ test("zamówienie wskazane w wiadomości klienta też idzie do pobrania", () => 
     "wiadomość bez numeru zamówienia nie generuje żądania");
 });
 
+/* Brak z kompletacji prowadzi w „Do zrobienia” na profil klienta, a profil
+   zna kupującego dopiero z zamówienia. Zamówienie spoza Allegro, kopia
+   i inny status nie mają tu czego szukać. */
+test("zamówienie Allegro w braku z kompletacji w Sellasist też idzie do pobrania", () => {
+  const d = stanowisko();
+  const z = d.prepare(`INSERT INTO sellasist_zamowienie(id, external_id, zrodlo, status_id, status_at,
+      skopiowane_z, pobrano_at) VALUES (?,?,?,?,'2026-08-30T08:00:00Z',?,'x')`);
+  z.run(1, "ord-brak", "allegro", 12, null);
+  z.run(2, "ord-inny-status", "allegro", 13, null);
+  z.run(3, "ord-kopia", "allegro", 12, 1);
+  z.run(4, "emag-5", "emag", 12, null);
+  assert.deepEqual(brakujaceZamowienia(d, KONTO, 10, new Date(), false, [12]), ["ord-brak"]);
+  assert.deepEqual(brakujaceZamowienia(d, KONTO, 10, new Date(), false, []), [], "bez statusu braku nic");
+});
+
 test("zamówienie z wiadomości, które już mamy, nie wraca na listę", () => {
   const d = stanowisko();
   wiadomosc(d, "m1", "ord-7");

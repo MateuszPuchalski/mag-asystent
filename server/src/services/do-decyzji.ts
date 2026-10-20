@@ -18,6 +18,9 @@ import { listaDyskusji } from "./dyskusje.js";
 import { listaRozmow } from "./skrzynka.js";
 import { listaZadan } from "./zadania-terenowe.js";
 import { odmowyBezDosylki } from "./odmowy-dosylki.js";
+import { brakiPoTerminie } from "./brak-kompletacji.js";
+import { linkZamowienia } from "./allegro-linki.js";
+import { sellasistWlaczony } from "../adapters/sellasist.http.js";
 
 /* ── DO DECYZJI — jedna lista tego, co czeka na biuro (`docs/obsluga-klienta.md` §7) ──
    Cel biura zapisany przy decyzji o jednym froncie: biuro rozstrzyga to,
@@ -50,7 +53,7 @@ export type Obszar = "magazyn" | "obsluga";
 
 export type ZrodloDecyzji =
   | "dostawy" | "odpowiedzi" | "kosze" | "zapisy" | "kody" | "allegro"
-  | "reklamacje" | "zwroty" | "skrzynka" | "dyskusje" | "sonda" | "zadania" | "dosylki";
+  | "reklamacje" | "zwroty" | "skrzynka" | "dyskusje" | "sonda" | "zadania" | "dosylki" | "braki";
 
 /**
  * Dokąd prowadzi wiersz — adres w panelu. Do 0.441.0 był tu też wariant
@@ -75,13 +78,18 @@ export interface PozycjaDecyzji {
   /** Termin minął albo mija — wiersz idzie na górę bez względu na wiek. */
   pilne: boolean;
   cel: CelDecyzji;
+  /** Druga linijka wiersza, gdy decyzja potrzebuje kontekstu, np. reszta zamówienia przy braku. */
+  szczegol?: string;
   /**
-   * Jedyny przycisk na tej liście (0.541.0): „Śledź dosyłkę” przy odmowie
-   * z panelu Allegro. Zasada „rozstrzyga się przy dowodach” go nie dotyczy —
-   * odmowę już złożono, przycisk tylko ją rejestruje. Powód przy
-   * `dosylkiBezSledzenia`.
+   * Przycisk przy wierszu. „Śledź dosyłkę” przy odmowie z panelu Allegro
+   * i „Klient powiadomiony” przy braku z kompletacji. Zasada „rozstrzyga się
+   * przy dowodach” ich nie dotyczy: rozstrzygnięcie zapadło gdzie indziej,
+   * a przycisk tylko je rejestruje. Powody przy `dosylkiBezSledzenia`
+   * i `brakiZKompletacji`.
    */
-  akcja?: { rodzaj: "sledz_dosylke"; zwrotId: number };
+  akcja?:
+    | { rodzaj: "sledz_dosylke"; zwrotId: number }
+    | { rodzaj: "brak_powiadomiony"; zamowienieId: number; statusAt: string; allegro: string | null };
 }
 
 export interface DoDecyzji {
@@ -403,6 +411,38 @@ function dosylkiBezSledzenia(teraz: number): PozycjaDecyzji[] {
 }
 
 /**
+ * Zamówienia z brakiem z kompletacji po godzinie granicznej — wiersz na zamówienie.
+ *
+ * Biuro pisze do klienta w Allegro, bo WERTIS nie zakłada nowego wątku. Wiersz
+ * prowadzi więc na profil klienta, a obok niesie odnośnik do zamówienia
+ * w Allegro i przycisk „Klient powiadomiony”. Przycisk tylko rejestruje list
+ * wysłany gdzie indziej, tak jak „Śledź dosyłkę” rejestruje odmowę.
+ *
+ * Pilny zawsze: godzina graniczna już minęła, a klient czeka na paczkę.
+ * Zatrzymane lustro nie daje wierszy, bo jego status bywa już nieprawdą.
+ */
+function brakiZKompletacji(teraz: number): PozycjaDecyzji[] {
+  const s = config.sellasist;
+  if (!sellasistWlaczony() || s.syncMs <= 0) return [];
+  return brakiPoTerminie(db(), new Date(teraz)).map((b) => {
+    const brak = b.braki.length
+      ? b.braki.map((x) => `${x.nazwa} (potrzeba ${x.potrzeba}, jest ${x.jest})`).join(", ")
+      : "pozycji Sellasist nie wskazał";
+    return {
+      klucz: `brak:${b.zamowienieId}:${b.statusAt}`, obszar: "obsluga" as const, zrodlo: "braki" as const,
+      pytanie: "Towaru nie znaleziono — napisać do klienta?",
+      co: `${b.login}: brak ${brak} przy zamówieniu ${b.externalId.slice(0, 8)}`,
+      szczegol: b.reszta.length ? `W zamówieniu też: ${b.reszta.join(", ")}` : "Innych pozycji w zamówieniu nie ma",
+      od: b.terminAt,
+      pilne: true,
+      cel: { panel: `/obsluga/klient/${encodeURIComponent(b.login)}` },
+      akcja: { rodzaj: "brak_powiadomiony" as const, zamowienieId: b.zamowienieId, statusAt: b.statusAt,
+        allegro: linkZamowienia(b.externalId) },
+    };
+  });
+}
+
+/**
  * Wszystko, co czeka na biuro — najpilniejsze pierwsze, potem najstarsze.
  *
  * KOLEJNOŚĆ LICZY SERWER i panel jej nie zmienia — ta sama zasada co przy
@@ -414,7 +454,7 @@ export function doDecyzji(teraz = Date.now()): DoDecyzji {
   const pozycje = [
     ...kontoAllegro(), ...zapisyWBledzie(), ...dostawyZWyjatkiem(), ...odpowiedziHali(),
     ...kosze(), ...odeslaneZadania(), ...kodyKreskowe(), ...kolejkiKlienta(teraz),
-    ...dosylkiBezSledzenia(teraz), ...sonda(),
+    ...dosylkiBezSledzenia(teraz), ...brakiZKompletacji(teraz), ...sonda(),
   ].sort((a, b) =>
     Number(b.pilne) - Number(a.pilne)
     || Number(a.od == null) - Number(b.od == null)

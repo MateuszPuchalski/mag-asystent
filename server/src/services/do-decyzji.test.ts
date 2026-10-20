@@ -196,3 +196,37 @@ test("inny kod odmowy i odmowa sprzed trzydziestu dni wiersza nie dają", () => 
   assert.ok(!klucze.includes(`dosylka:${inny}`), "naprawa to nie dosyłka");
   assert.ok(!klucze.includes(`dosylka:${stara}`), "okno trzydziestu dni, jak śledzenie");
 });
+
+/* ── Brak z kompletacji po godzinie granicznej ───────────────────────────── */
+
+test("brak z kompletacji po godzinie granicznej staje pilnym wierszem z przyciskiem i prowadzi na profil", async () => {
+  const { config } = await import("../config.js");
+  const bylo = { ...config.sellasist };
+  const d = db();
+  d.exec("DELETE FROM sellasist_pozycja; DELETE FROM sellasist_zamowienie; DELETE FROM sellasist_brak_powiadomiony");
+  d.prepare(`INSERT INTO sellasist_zamowienie(id, external_id, kupujacy_login, zrodlo, status_id, status_at, dostawa,
+      pobrano_at) VALUES (501, 'dd-brak-1234abcd', 'Ogrodnik_77', 'allegro', 12, '2026-10-20T06:30:00.000Z',
+      'Allegro Kurier DPD', 'x')`).run();
+  d.prepare(`INSERT INTO sellasist_pozycja(koszyk_id, zamowienie_id, nazwa, ilosc, brakuje)
+      VALUES (1, 501, 'Pasek', 1, 1), (2, 501, 'Nóż', 2, 0)`).run();
+  const braki = () => D.doDecyzji(Date.parse("2026-10-20T10:30:00Z")).pozycje.filter((p) => p.zrodlo === "braki");
+  try {
+    Object.assign(config.sellasist, { konto: "firma", apiKey: "k", syncMs: 251_000, statusyBrak: [12],
+      brakGodzina: 12, brakGodzinaInpost: 15 });
+    const [w, ...reszta] = braki();
+    assert.equal(reszta.length, 0);
+    assert.equal(w.pytanie, "Towaru nie znaleziono — napisać do klienta?");
+    assert.equal(w.co, "Ogrodnik_77: brak Pasek (potrzeba 1, jest 0) przy zamówieniu dd-brak-");
+    assert.equal(w.szczegol, "W zamówieniu też: Nóż ×2");
+    assert.equal(w.od, "2026-10-20T10:00:00.000Z", "wiek liczy się od godziny granicznej");
+    assert.equal(w.pilne, true);
+    assert.deepEqual(w.cel, { panel: "/obsluga/klient/Ogrodnik_77" });
+    assert.deepEqual({ ...w.akcja, allegro: undefined },
+      { rodzaj: "brak_powiadomiony", zamowienieId: 501, statusAt: "2026-10-20T06:30:00.000Z", allegro: undefined });
+    Object.assign(config.sellasist, { syncMs: 0 });
+    assert.deepEqual(braki(), [], "zatrzymane lustro nie daje wierszy");
+  } finally {
+    Object.assign(config.sellasist, bylo);
+  }
+  assert.deepEqual(braki(), [], "bez integracji nie ma wierszy");
+});

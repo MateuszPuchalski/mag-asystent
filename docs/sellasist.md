@@ -18,6 +18,7 @@ sama zasada co przy Allegro, opisana w `docs/sellasist/README.md`.
 | „czy wyjdzie dziś" | status, braki i etykieta | fakt w szkicu Copilota |
 | notatka do zamówienia | agent na profilu klienta | Sellasist, przy zamówieniu |
 | pomyłki złapane przy pakowaniu | wejście w status z `SELLASIST_STATUSY_POMYLKA` | zakładka „Pomyłki” |
+| brak z kompletacji po godzinie granicznej | status z `SELLASIST_STATUSY_BRAK` i metoda dostawy | „Do zrobienia” |
 
 Notatka to jedyny zapis do Sellasist. Status, koszyk i etykiety zostają
 w rękach magazynu, a automat ich nie dotyka.
@@ -103,3 +104,21 @@ Zamówienie stojące w nim od wczoraj ma prawdziwy brak, bo „zwykle" to nie
 Braki/Można pakować": `13,41,43,47,68,71`. „Do ponownej kompletacji" (44, 51)
 nie wchodzi, bo tam zbieranie dopiero się powtarza. Decyzja właściciela
 z 19 października 2026.
+
+**Brak z kompletacji.** Status 12 „Brak podczas kompletacji" znaczy, że
+magazyn szuka towaru, którego nie było na półce. Czasem go znajdzie, czasem
+nie. Reguła właściciela z 19 października 2026: zamówienie, które o 12:00 dalej
+stoi w braku, nie zdąży na kuriera, a przy InPoście ta sama granica to 15:00.
+Wejście w brak po tej godzinie staje od razu, bo kurier już pojechał.
+
+Biuro dostaje wtedy wiersz w „Do zrobienia": czego brakuje, co jeszcze jest
+w zamówieniu i odnośnik do zamówienia w Allegro. Pisze do klienta w Allegro,
+bo WERTIS nie zakłada nowego wątku. Do wyboru jest anulowanie, pytanie
+o wysyłkę niepełnej paczki albo wysyłka bez nieistotnego towaru ze zwrotem
+pieniędzy za niego.
+
+Zamówienie zostaje w Sellasist w braku, gdy biuro czeka na odpowiedź klienta.
+Wiersz gasi więc przycisk „Klient powiadomiony" albo wyjście ze statusu.
+Przewoźnika mówi metoda dostawy (`shipment.name`), a bez niej etykieta.
+Nieznany przewoźnik dostaje wcześniejszą godzinę. Na razie tylko zamówienia
+z Allegro, bo tylko tam WERTIS zna klienta po loginie.

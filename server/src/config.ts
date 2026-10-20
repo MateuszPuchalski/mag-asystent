@@ -711,6 +711,20 @@ export const config = {
      */
     statusyPomylka: (process.env.SELLASIST_STATUSY_POMYLKA ?? "")
       .split(",").map((s) => s.trim()).filter((s) => s !== "").map(Number),
+    /**
+     * Statusy braku przy kompletacji (u tej firmy „Brak podczas kompletacji").
+     * Magazyn szuka wtedy towaru, którego nie było na półce. Pusta lista
+     * wyłącza wiersz w „Do zrobienia".
+     */
+    statusyBrak: (process.env.SELLASIST_STATUSY_BRAK ?? "")
+      .split(",").map((s) => s.trim()).filter((s) => s !== "").map(Number),
+    /**
+     * Godzina graniczna braku, pełna godzina czasu magazynu. Zamówienie, które
+     * o tej porze dalej czeka na towar, nie zdąży na kuriera, więc biuro pisze
+     * do klienta. InPost odbiera paczki później, stąd druga godzina.
+     */
+    brakGodzina: num(process.env.SELLASIST_BRAK_GODZINA, 12, "SELLASIST_BRAK_GODZINA"),
+    brakGodzinaInpost: num(process.env.SELLASIST_BRAK_GODZINA_INPOST, 15, "SELLASIST_BRAK_GODZINA_INPOST"),
   },
 
   /**
@@ -1316,6 +1330,13 @@ export function bledyKonfiguracji(c: Config = config): string[] {
   }
   if (s.statusyPomylka.some((n) => !Number.isInteger(n) || n <= 0)) {
     bledy.push("SELLASIST_STATUSY_POMYLKA — oczekuję numerów statusów po przecinku, np. 30.");
+  }
+  if (s.statusyBrak.some((n) => !Number.isInteger(n) || n <= 0)) {
+    bledy.push("SELLASIST_STATUSY_BRAK — oczekuję numerów statusów po przecinku, np. 12.");
+  }
+  for (const [klucz, h] of [["SELLASIST_BRAK_GODZINA", s.brakGodzina],
+    ["SELLASIST_BRAK_GODZINA_INPOST", s.brakGodzinaInpost]] as const) {
+    if (!Number.isInteger(h) || h < 0 || h > 23) bledy.push(`${klucz}=${h} — oczekuję pełnej godziny od 0 do 23, np. 12.`);
   }
 
   /* Magazyn skutku rozstrzyga, którym trybem idzie dokument. Dwa te same id

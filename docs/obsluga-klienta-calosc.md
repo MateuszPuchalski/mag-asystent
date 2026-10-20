@@ -338,7 +338,7 @@ miesiącu ma pełną historię, a spam — status `spam`.
 | dyskusja przed reklamacją | dyskusje, wiązanie drogą zakupu | zegara |
 | pytanie reklamacyjne bez sprawy w Allegro | skrzynka, znacznik „reklamacyjna" (nasz; `/sale/issues` ma tylko GET) | zegara (§26) |
 | wymiana na inny towar | zwrot przez Allegro, krok „dosłać" ze śledzeniem dosyłki (S6) | potwierdzenia, że numer dosyłki stoi przy zamówieniu |
-| brak towaru do sprzedanego zamówienia | Sellasist; Ctrl+K po numerze zamówienia daje kupującego | drogi braku z Sellasist do sprawy klienta |
+| brak towaru do sprzedanego zamówienia | Sellasist: po godzinie granicznej wiersz w „Do zrobienia" z profilem klienta i przyciskiem „Klient powiadomiony" | listu do klienta z WERTIS i kroku w sprawie klienta |
 | klient pisze z drugiego konta | dwie historie, bez wiązania | świadomej odpowiedzi „nie wiążemy" |
 | klient milczy po naszym pytaniu | kubełek BEZ RUCHU w reklamacjach | tego samego w skrzynce i zwrotach |
 | sprawa poza Allegro: telefon, e-mail | NIGDZIE | decyzji o drugim kanale |

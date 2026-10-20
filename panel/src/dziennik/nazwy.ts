@@ -325,6 +325,7 @@ export const NAZWA_ZDARZENIA: Record<string, string> = {
   zbiorki_import: "Zbiórki wczytane",
   zbiorki_z_sellasist: "Zbiórki z Sellasist",
   sellasist_notatka: "Notatka do zamówienia w Sellasist",
+  sellasist_brak_powiadomiony: "Klient powiadomiony o braku z kompletacji",
 
   /* Konta, ustawienia, system */
   login: "Logowanie",

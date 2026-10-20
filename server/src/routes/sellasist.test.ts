@@ -74,3 +74,30 @@ test("biuro bez integracji: stan i wgląd mówią „wyłączone” bez sieci, n
   }
   assert.equal(db().prepare("SELECT COUNT(*) AS n FROM events WHERE type = 'sellasist_notatka'").get()!.n, 0);
 });
+
+test("„Klient powiadomiony”: bramka biura, 400, 404, 409 przy zmienionym statusie, potem zapis z dziennikiem", async () => {
+  const { config } = await import("../config.js");
+  const bylo = config.sellasist.statusyBrak;
+  const url = "/api/obsluga/sellasist/braki/601/powiadomiony";
+  const statusAt = "2026-10-20T06:30:00.000Z";
+  db().prepare(`INSERT INTO sellasist_zamowienie(id, external_id, kupujacy_login, zrodlo, status_id, status_at, pobrano_at)
+      VALUES (601, 'ord-601', 'Ogrodnik_77', 'allegro', 12, ?, 'x')`).run(statusAt);
+  const biuro = login("biuro", "Ola B");
+  const hala = login("magazynier", "Hala B");
+  try {
+    config.sellasist.statusyBrak = [12];
+    assert.equal((await app.inject({ method: "POST", url, payload: { statusAt } })).statusCode, 401);
+    assert.equal((await app.inject({ method: "POST", url, headers: hala, payload: { statusAt } })).statusCode, 403);
+    assert.equal((await app.inject({ method: "POST", url, headers: biuro, payload: {} })).statusCode, 400);
+    assert.equal((await app.inject({ method: "POST", url: "/api/obsluga/sellasist/braki/602/powiadomiony",
+      headers: biuro, payload: { statusAt } })).statusCode, 404);
+    const stary = await app.inject({ method: "POST", url, headers: biuro, payload: { statusAt: "2026-10-19T06:30:00.000Z" } });
+    assert.equal(stary.statusCode, 409);
+    const ok = await app.inject({ method: "POST", url, headers: biuro, payload: { statusAt } });
+    assert.equal(ok.statusCode, 200);
+    assert.deepEqual(ok.json(), { ok: true });
+  } finally {
+    config.sellasist.statusyBrak = bylo;
+  }
+  assert.equal(db().prepare("SELECT COUNT(*) AS n FROM events WHERE type = 'sellasist_brak_powiadomiony'").get()!.n, 1);
+});

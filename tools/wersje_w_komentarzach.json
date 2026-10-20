@@ -567,7 +567,7 @@
  "server/src/services/czas-odpowiedzi.ts": 1,
  "server/src/services/delivery.ts": 6,
  "server/src/services/do-decyzji.test.ts": 1,
- "server/src/services/do-decyzji.ts": 6,
+ "server/src/services/do-decyzji.ts": 5,
  "server/src/services/dopasowanie-sku.test.ts": 3,
  "server/src/services/dopasowanie-sku.ts": 8,
  "server/src/services/dosylka-opis.test.ts": 1,

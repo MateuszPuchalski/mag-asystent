@@ -218,6 +218,13 @@ export interface ZamowienieSellasist {
   statusId: number | null;
   statusNazwa: string | null;
   statusAt: string | null;
+  /**
+   * Nazwa metody dostawy: `shipment.name`, a bez niego nazwa ze źródła
+   * (`external_data.external_shipment_name`). Stoi przed etykietą, więc
+   * mówi o przewoźniku wcześniej niż `shipments[]`. Adresu punktu odbioru
+   * (`shipment.pickup_point`) nie czytamy.
+   */
+  dostawa: string | null;
   termin: string | null;
   utworzonoAt: string | null;
   /** `copied_order_id` kopii; kopię Sellasist robi m.in. pod dosyłkę. */
@@ -270,6 +277,7 @@ export function mapujZamowienie(v: unknown): ZamowienieSellasist | null {
     statusId: calkowita(status?.id),
     statusNazwa: tekst(status?.name),
     statusAt: dataSellasist(z.last_status_change),
+    dostawa: tekst(obiekt(z.shipment)?.name) ?? tekst(zew?.external_shipment_name),
     termin: dataSellasist(z.deadline),
     utworzonoAt: dataSellasist(z.date),
     skopiowaneZ: jestKopia(z.is_copied) ? calkowita(z.copied_order_id) : null,
