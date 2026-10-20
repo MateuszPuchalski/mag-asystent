@@ -15,5 +15,4 @@ jako kolejna wersja z różnicą. Starszą wersję wstawia się jednym kliknięc
 Poprawka przechodzi przez te same sita co szkic: numer bez źródła, fakt spoza
 listy albo za długi tekst zatrzymują ją, a agent dostaje zdanie, dlaczego.
 Tekst z pola idzie do modelu zamaskowany, jak nasze wysłane wiadomości.
-Automat wysyłki nie wysyła starego szkicu w rozmowie, w której agent już go
-poprawiał Copilotem.
+Automat wysyłki nie wysyła szkicu, o który agent już dopytywał Copilota.

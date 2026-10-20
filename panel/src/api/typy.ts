@@ -643,23 +643,43 @@ export type SzkicCopilota = {
 };
 
 /**
- * Wymiana z Copilotem (0.332.0): pytanie agenta i odpowiedź modelu.
+ * Wymiana z Copilotem: polecenie albo pytanie agenta i to, co model z nim zrobił.
  *
- * ODPOWIEDŹ CZYTA AGENT, nie klient, i nie ma stąd drogi do wiadomości.
- * Dlatego wiersz nie ma `ocena` — mierzy się szkic, nie rozmowę o nim —
- * i dlatego ekran nie daje przycisku „wstaw". Żeby coś z wymiany poszło do
- * klienta, agent układa szkic od nowa, a tamten ma swoje sita.
+ * Model sam rozróżnia oba rodzaje. Polecenie („dodaj drugą wersję gaźnika”)
+ * daje NOWĄ WERSJĘ szkicu w `szkicPo` i notkę w `odpowiedz`, co zmienił.
+ * Pytanie („skąd wiesz?”) daje samą odpowiedź, a pola szkicu stoją puste.
+ *
+ * `odpowiedz` czyta agent, nie klient, więc notka nie ma drogi do wiadomości.
+ * Drogę ma tylko `szkicPo`, bo serwer przepuścił go przez te same sita co
+ * szkic. Wiersz nie ma `ocena`: los tekstu mierzy wysyłka, nie ta wymiana.
+ *
+ * Wymiany zapisane przed poprawianiem szkicu nie niosą pól szkicu. Stąd pola
+ * opcjonalne: brak czytamy jak `null` albo pustą listę.
  */
 export type WymianaCopilota = {
   id: number;
   pytanie: string;
+  /** Notka dla agenta, co model zmienił, albo odpowiedź na pytanie. */
   odpowiedz: string;
   twierdzenia: TwierdzenieCopilota[];
   model: string;
   at: string;
   przez: string;
-  /** Po co model sięgnął do bazy (0.507.0). Brak = starszy serwer albo nie sięgał. */
+  /** Po co model sięgnął do bazy. Brak = starszy serwer albo nie sięgał. */
   narzedzia?: UzycieNarzedziaCopilota[];
+  /**
+   * Tekst, który model poprawiał: pole agenta, a przy pustym polu szkic
+   * Copilota. `null` = czyste pytanie, bez próby poprawki.
+   */
+  szkicPrzed?: string | null;
+  /** Nowa wersja po sitach serwera. `null` = pytanie, poprawka odrzucona albo identyczna. */
+  szkicPo?: string | null;
+  /** Rachunek „Skąd to wiem” nowej wersji — ten sam kształt co przy szkicu. */
+  szkicTwierdzenia?: TwierdzenieCopilota[];
+  /** Czego model nie znalazł w faktach, pisząc nową wersję. */
+  szkicZastrzezenia?: string[];
+  /** Zdanie, czemu serwer odrzucił poprawkę. `null` = nie odrzucił. */
+  szkicOdrzucony?: string | null;
 };
 
 /** Jedno wywołanie narzędzia: nazwa, zapytanie modelu i długość wyniku. */

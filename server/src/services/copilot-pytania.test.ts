@@ -8,25 +8,29 @@ process.env.DB_PATH = path.join(fs.mkdtempSync(path.join(os.tmpdir(), "wertis-py
 process.env.SGT_MODE = "seeded";
 process.env.LOG_LEVEL = "silent";
 
-/* ── Dopytanie Copilota (0.332.0) ────────────────────────────────────────────
-   Właściciel: „dodaj możliwość kontynuowania rozmowy z modelem".
+/* ── Dopytanie Copilota ──────────────────────────────────────────────────────
+   Właściciel: „dodaj możliwość kontynuowania rozmowy z modelem". I decyzja
+   do tego: dopytanie poprawia szkic, zamiast mówić, co w nim poprawić.
 
-   Testy pilnują granicy, która odróżnia to od szkicu: ODPOWIEDŹ IDZIE DO
-   AGENTA, nie do klienta. Z tego wynika wszystko, co tu sprawdzamy.
+   Testy pilnują granicy między dwoma tekstami jednej wymiany.
 
-   1. Odpowiedź NIE przechodzi przez sita szkicu. Model wolno nazwać numer
-      spoza faktów — właśnie po to agent pyta. Gdyby sita działały, zdanie
-      „tego numeru u nas nie ma" wywracałoby własną odpowiedź.
-   2. NIE MA STĄD DROGI DO KLIENTA. Dopytanie nie rusza szkicu ani jednym
-      znakiem; żeby cokolwiek poszło dalej, agent układa szkic od nowa.
+   1. NOTKA dla agenta NIE przechodzi przez sita szkicu. Model wolno nazwać
+      numer spoza faktów — właśnie po to agent pyta. Gdyby sita działały,
+      zdanie „tego numeru u nas nie ma" wywracałoby własną odpowiedź.
+   2. NOWA WERSJA przechodzi przez WSZYSTKIE sita szkicu i wraca do pola
+      agenta. `szkic_copilota` zostaje nietknięty, bo na nim stoi automat
+      wysyłki. Do dostawcy tekst z pola idzie zamaskowany, z powrotem wraca
+      z wartościami klienta.
    3. Nieudane wywołanie NIE zostawia wymiany, ale ZOSTAWIA ślad w księdze.
+      Odrzucona wersja to udane wywołanie: wymiana stoi, księga mówi `ok`.
    4. Kontekst rośnie: drugie pytanie widzi pierwszą wymianę.
-   5. Sufit pytań na rozmowę i limit długości pytania.                      */
+   5. Sufit pytań na rozmowę, limit długości pytania i sufit tekstu z pola. */
 
 let db: typeof import("../db/db.js").db;
 let config: typeof import("../config.js").config;
 let Q: typeof import("./copilot-pytania.js");
 let S: typeof import("./copilot-szkic.js");
+let LIMIT_ZNAKOW = 0;
 let subiekt: typeof import("../context.js").subiekt;
 let biuro = 0;
 let konto = 0;
@@ -38,6 +42,7 @@ before(async () => {
   ({ subiekt } = await import("../context.js"));
   Q = await import("./copilot-pytania.js");
   S = await import("./copilot-szkic.js");
+  ({ LIMIT_ZNAKOW } = await import("./wysylka.js"));
   const d = db();
   const rows = JSON.parse(fs.readFileSync(config.seedProducts, "utf8")) as string[][];
   const ins = d.prepare("INSERT INTO sgt_towar(tw_id,symbol,nazwa,ean,opis) VALUES (?,?,?,?,?)");
@@ -83,6 +88,43 @@ function nadawca(tresc = "Fakty tego nie rozstrzygają.", twierdzenia: import(".
   return { widziane, nadaj };
 }
 
+type Wersja = Partial<import("./copilot-szkic.js").SzkicSurowy> & { tresc: string };
+
+/**
+ * Nadawca-atrapa poprawki: notka plus wersja zbudowana z tego, co dostał.
+ * `wersja` zwraca `null` przy czystym pytaniu.
+ */
+function poprawiacz(
+  wersja: (k: import("./copilot-pytania.js").KontekstPytania) => Wersja | null,
+  notka = "Dodałem jedno zdanie na końcu.",
+  wynikiNarzedzi: import("./copilot-narzedzia.js").WynikWywolania[] = [],
+) {
+  const widziane: { ostatni: import("./copilot-pytania.js").KontekstPytania | null; wywolan: number } =
+    { ostatni: null, wywolan: 0 };
+  const nadaj: import("./copilot-pytania.js").NadawcaPytania = async (k) => {
+    widziane.ostatni = k;
+    widziane.wywolan += 1;
+    const w = wersja(k);
+    return {
+      tresc: notka, twierdzenia: [], model: "atrapa",
+      zuzycie: { wej: 100, wyj: 20, cacheZapis: 0, cacheOdczyt: 0 }, ms: 5, narzedzia: [],
+      szkic: w ? { uzyteFakty: [], zastrzezenia: [], twierdzenia: [], odczytZeZdjec: [], ...w } : null,
+      wynikiNarzedzi,
+    };
+  };
+  return { widziane, nadaj };
+}
+
+/** Szkic Copilota pod rozmową, bez sieci i bez sit, żeby podstawa była znana co do znaku. */
+function szkicCopilotaZ(tresc: string) {
+  db().prepare(`INSERT INTO szkic_copilota(conversation_id,tresc,model,at,przez)
+    VALUES (?,?,'atrapa','2026-09-14T10:05:00.000Z','automat')`).run(rozmowa, tresc);
+}
+
+const ksiegaPytania = () => db().prepare(
+  "SELECT wynik, blad FROM copilot_wywolanie WHERE zadanie='pytanie' ORDER BY id DESC").get() as
+  { wynik: string; blad: string | null };
+
 test("odpowiedź wolno oprzeć na numerze SPOZA faktów — po to agent pyta", async () => {
   /* To jest cała różnica wobec szkicu. Tam numer spoza faktów wywraca całość,
      bo tekst idzie do klienta. Tu zdanie „tego u nas nie ma" jest dokładnie
@@ -97,7 +139,7 @@ test("odpowiedź wolno oprzeć na numerze SPOZA faktów — po to agent pyta", a
   assert.equal(w.twierdzenia[0]!.pewnosc, "niepewne", "sufit źródła `model` obowiązuje tak samo");
 });
 
-test("dopytanie NIE rusza szkicu ani jednym znakiem", async () => {
+test("poprawka NIE rusza szkicu Copilota ani jednym znakiem; wersja żyje w wymianie", async () => {
   const s = await S.ulozSzkic(rozmowa, KTO(), async () => ({
     /* Treść bez numeru katalogowego: ta rozmowa nie ma faktu o kartotece,
        więc numer w szkicu wywróciłby go na odsiewie i test mierzyłby co
@@ -107,11 +149,13 @@ test("dopytanie NIE rusza szkicu ani jednym znakiem", async () => {
     model: "atrapa", zuzycie: { wej: 1, wyj: 1, cacheZapis: 0, cacheOdczyt: 0 }, ms: 1,
   }), subiekt);
 
-  await Q.zadajPytanie(rozmowa, "Na pewno pasuje?", KTO(), nadawca().nadaj, subiekt);
+  const w = await Q.zadajPytanie(rozmowa, "Dodaj podziękowanie", KTO(),
+    poprawiacz((k) => ({ tresc: `${k.szkic} Dziękujemy za zakup.` })).nadaj, subiekt);
 
-  /* Żeby cokolwiek z wymiany trafiło do klienta, agent układa szkic OD NOWA
-     i tamten przechodzi przez swoje sita. Jedna droga do klienta, ta sama. */
+  /* Na `szkic_copilota` stoi automat wysyłki i pomiar losu szkicu. Wersja
+     z dopytania jest pracą agenta: wraca do jego pola, nie do propozycji. */
   assert.equal(S.szkicCopilota(rozmowa)!.tresc, s.tresc);
+  assert.equal(w.szkicPo, "Dzień dobry, ta uszczelka pasuje. Dziękujemy za zakup.");
 });
 
 test("model widzi szkic i poprzednie wymiany, bo pyta się O NIE", async () => {
@@ -230,4 +274,188 @@ test("dziennik niesie DŁUGOŚCI, nigdy treści pytania", async () => {
   assert.ok(zd, "zdarzenie miało powstać");
   assert.ok(!zd!.payload.includes("Kowalski"), "treść pytania nie ma prawa stanąć w dzienniku");
   assert.ok(zd!.payload.includes("znakowPytania"));
+});
+
+/* ── Poprawka szkicu ─────────────────────────────────────────────────────────
+   Agent pisze polecenie, model oddaje notkę i CAŁĄ nową wersję tekstu z pola.
+   Wersja przechodzi przez wszystkie sita szkicu, a odrzucona zostawia pole
+   bez zmian i zdanie dla agenta, czemu. */
+
+test("poprawka: tekst z pola wygrywa ze szkicem Copilota", async () => {
+  szkicCopilotaZ("Szkic Copilota.");
+  const n = poprawiacz((k) => ({ tresc: `${k.szkic} Pozdrawiamy.` }));
+  const w = await Q.zadajPytanie(rozmowa, "Dodaj pozdrowienie", KTO(), n.nadaj, subiekt,
+    { szkic: "Tekst agenta z pola." });
+
+  assert.equal(String(n.widziane.ostatni!.szkic), "Tekst agenta z pola.", "model poprawia pole, nie swój szkic");
+  assert.equal(w.szkicPrzed, "Tekst agenta z pola.");
+  assert.equal(w.szkicPo, "Tekst agenta z pola. Pozdrawiamy.");
+  assert.equal(w.szkicOdrzucony, null);
+  assert.equal(w.odpowiedz, "Dodałem jedno zdanie na końcu.", "notka zostaje notką");
+  assert.deepEqual(Q.wymianyRozmowy(rozmowa)[0], w, "wersja przeżywa odczyt z bazy");
+});
+
+test("poprawka: puste pole znaczy „poprawiaj szkic Copilota”", async () => {
+  szkicCopilotaZ("Szkic Copilota.");
+  const n = poprawiacz((k) => ({ tresc: `${k.szkic} Pozdrawiamy.` }));
+  const w = await Q.zadajPytanie(rozmowa, "Dodaj pozdrowienie", KTO(), n.nadaj, subiekt, { szkic: "  \n " });
+
+  assert.equal(String(n.widziane.ostatni!.szkic), "Szkic Copilota.");
+  assert.equal(w.szkicPrzed, "Szkic Copilota.");
+  assert.equal(w.szkicPo, "Szkic Copilota. Pozdrawiamy.");
+});
+
+test("poprawka: do dostawcy idzie maska, do pola wracają wartości klienta", async () => {
+  const pole = "Dzień dobry zielony_ogrod,\n\noddzwonimy pod 601 234 567 jutro.";
+  const n = poprawiacz((k) => ({ tresc: `${k.szkic}\n\nPozdrawiamy.` }));
+  const w = await Q.zadajPytanie(rozmowa, "Dodaj pozdrowienie", KTO(), n.nadaj, subiekt, { szkic: pole });
+
+  const widzial = String(n.widziane.ostatni!.szkic);
+  assert.equal(widzial, "Dzień dobry [login],\n\noddzwonimy pod [telefon 1] jutro.");
+  assert.equal(w.szkicPrzed, pole, "historia trzyma oryginał, nie maskę");
+  assert.equal(w.szkicPo, `${pole}\n\nPozdrawiamy.`);
+});
+
+test("poprawka: znacznik, którego nie wydaliśmy, odrzuca wersję, a wymiana i księga stoją", async () => {
+  /* `[telefon]` goły pochodzi z wątku: jego wartości model nie widział. */
+  const n = poprawiacz(() => ({ tresc: "Oddzwonimy pod [telefon] jutro." }));
+  const w = await Q.zadajPytanie(rozmowa, "Dodaj telefon klienta", KTO(), n.nadaj, subiekt,
+    { szkic: "Oddzwonimy jutro." });
+
+  assert.equal(w.szkicPo, null);
+  assert.equal(w.szkicPrzed, "Oddzwonimy jutro.", "była próba poprawki, więc podstawa stoi");
+  assert.match(w.szkicOdrzucony!, /dane klienta, których nie widział/);
+  assert.match(w.szkicOdrzucony!, /\[telefon\]/);
+  assert.equal(liczba("copilot_pytanie"), 1, "notka jest użyteczna, wymiana zostaje");
+  assert.deepEqual({ ...ksiegaPytania() }, { wynik: "ok", blad: null });
+});
+
+test("poprawka: numer niezadeklarowany odrzuca wersję i stoi w zdaniu dla agenta", async () => {
+  const n = poprawiacz(() => ({ tresc: "Ta uszczelka pasuje, numer XYZ-9999." }));
+  const w = await Q.zadajPytanie(rozmowa, "Dopisz numer uszczelki", KTO(), n.nadaj, subiekt,
+    { szkic: "Ta uszczelka pasuje." });
+
+  assert.equal(w.szkicPo, null);
+  assert.match(w.szkicOdrzucony!, /XYZ-9999/);
+  assert.match(w.szkicOdrzucony!, /bez zmian/);
+  assert.deepEqual({ ...ksiegaPytania() }, { wynik: "ok", blad: null });
+});
+
+test("poprawka: numer zadeklarowany w twierdzeniu wersji przechodzi, z sufitem pewności", async () => {
+  const n = poprawiacz(() => ({
+    tresc: "Ta uszczelka pasuje, numer XYZ-9999.",
+    twierdzenia: [{ teza: "Uszczelka ma numer XYZ-9999", zrodlo: "model", odwolanie: null, pewnosc: "pewne" }],
+  }));
+  const w = await Q.zadajPytanie(rozmowa, "Dopisz numer uszczelki", KTO(), n.nadaj, subiekt,
+    { szkic: "Ta uszczelka pasuje." });
+
+  assert.equal(w.szkicPo, "Ta uszczelka pasuje, numer XYZ-9999.");
+  assert.equal(w.szkicTwierdzenia.length, 1);
+  assert.equal(w.szkicTwierdzenia[0]!.pewnosc, "niepewne", "sufit źródła `model`, jak przy szkicu");
+  assert.deepEqual(w.twierdzenia, [], "twierdzenia wersji nie mieszają się z twierdzeniami notki");
+});
+
+test("poprawka: numer z polecenia agenta i numer już stojący w polu przechodzą sita", async () => {
+  const zPolecenia = await Q.zadajPytanie(rozmowa, "Dodaj numer 17211-ZL8-023", KTO(),
+    poprawiacz((k) => ({ tresc: `${k.szkic} Numer katalogowy: 17211-ZL8-023.` })).nadaj, subiekt,
+    { szkic: "Filtr pasuje." });
+  assert.equal(zPolecenia.szkicPo, "Filtr pasuje. Numer katalogowy: 17211-ZL8-023.");
+
+  /* Dziewięć cyfr bez „nr" to dla maski telefon: numer części chowa się pod
+     `[telefon 1]` i ma się porównać z sobą samym po odmaskowaniu. */
+  const wPolu = await Q.zadajPytanie(rozmowa, "Dodaj pozdrowienie", KTO(),
+    poprawiacz((k) => ({ tresc: `${k.szkic} Pozdrawiamy.` })).nadaj, subiekt,
+    { szkic: "Pasuje nóż 532199377 i pasek W09-0211." });
+  assert.equal(wPolu.szkicPo, "Pasuje nóż 532199377 i pasek W09-0211. Pozdrawiamy.");
+});
+
+test("poprawka: odwołanie N# spoza wyników narzędzi odrzuca wersję", async () => {
+  const n = poprawiacz(() => ({ tresc: "Mamy go na stanie (N3).", uzyteFakty: ["N3"] }));
+  const w = await Q.zadajPytanie(rozmowa, "Dopisz, że mamy na stanie", KTO(), n.nadaj, subiekt,
+    { szkic: "Dzień dobry." });
+  assert.equal(w.szkicPo, null);
+  assert.match(w.szkicOdrzucony!, /N3/);
+
+  /* To samo odwołanie przechodzi, gdy narzędzie naprawdę oddało N3. */
+  const wynik = (id: string) => ({ id, nazwa: "karta_towaru", argument: "GAZ-1", tresc: "Kartoteka GAZ-1" });
+  const ok = await Q.zadajPytanie(rozmowa, "Dopisz, że mamy na stanie", KTO(),
+    poprawiacz(() => ({ tresc: "Mamy go na stanie (N3).", uzyteFakty: ["N3"] }), "Dopisałem.",
+      [wynik("N1"), wynik("N2"), wynik("N3")]).nadaj, subiekt, { szkic: "Dzień dobry." });
+  assert.equal(ok.szkicPo, "Mamy go na stanie.", "znacznik N# zdjęty jak przy szkicu");
+});
+
+test("poprawka: znacznik faktu (F1) znika z wersji po sprawdzeniu", async () => {
+  /* Ta rozmowa nie ma oferty ani rozpoznania, więc F1 to fakt intake. */
+  const w = await Q.zadajPytanie(rozmowa, "Dopytaj o model kosiarki", KTO(),
+    poprawiacz(() => ({ tresc: "Proszę o model kosiarki z tabliczki (F1).", uzyteFakty: ["F1"] })).nadaj,
+    subiekt, { szkic: "Dzień dobry." });
+  assert.equal(w.szkicPo, "Proszę o model kosiarki z tabliczki.");
+});
+
+test("poprawka: wersja ponad limit Allegro odrzucona, zdanie podaje obie długości", async () => {
+  const dluga = "Bardzo długi tekst. ".repeat(Math.ceil((LIMIT_ZNAKOW + 1) / 20));
+  const w = await Q.zadajPytanie(rozmowa, "Rozwiń", KTO(), poprawiacz(() => ({ tresc: dluga })).nadaj,
+    subiekt, { szkic: "Krótko." });
+  assert.equal(w.szkicPo, null);
+  assert.match(w.szkicOdrzucony!, new RegExp(`${dluga.length} znaków`));
+  assert.match(w.szkicOdrzucony!, new RegExp(String(LIMIT_ZNAKOW)));
+  assert.match(w.szkicOdrzucony!, /miał 7/, "długość poprawianego tekstu");
+});
+
+test("poprawka: pole ponad sufit odpada PRZED siecią, bez wiersza w księdze", async () => {
+  const n = poprawiacz(() => null);
+  await assert.rejects(
+    Q.zadajPytanie(rozmowa, "Skróć to", KTO(), n.nadaj, subiekt, { szkic: "a".repeat(Q.SUFIT_POLA + 1) }),
+    /poprawia najwyżej/);
+  assert.equal(n.widziane.wywolan, 0, "za odrzucone pole nie płacimy");
+  assert.equal(liczba("copilot_wywolanie"), 0);
+  assert.equal(liczba("copilot_pytanie"), 0);
+
+  /* Szkic ponad limit Allegro, ale pod sufitem: „skróć to" ma na nim działać. */
+  const w = await Q.zadajPytanie(rozmowa, "Skróć to", KTO(),
+    poprawiacz(() => ({ tresc: "Krótko." })).nadaj, subiekt, { szkic: "a ".repeat(LIMIT_ZNAKOW) });
+  assert.equal(w.szkicPo, "Krótko.");
+});
+
+test("czyste pytanie: bez wersji, `szkicPrzed` i `szkicPo` puste", async () => {
+  const w = await Q.zadajPytanie(rozmowa, "Skąd to wiesz?", KTO(),
+    poprawiacz(() => null, "Z faktu F1.").nadaj, subiekt, { szkic: "Ta uszczelka pasuje." });
+  assert.equal(w.szkicPrzed, null);
+  assert.equal(w.szkicPo, null);
+  assert.equal(w.szkicOdrzucony, null);
+  assert.deepEqual([w.szkicTwierdzenia, w.szkicZastrzezenia], [[], []]);
+});
+
+test("wersja równa podstawie po zwinięciu białych znaków to brak zmian, nie odrzucenie", async () => {
+  const w = await Q.zadajPytanie(rozmowa, "Popraw literówki", KTO(),
+    poprawiacz(() => ({ tresc: "Ta  uszczelka\n\npasuje. " })).nadaj, subiekt, { szkic: "Ta uszczelka pasuje." });
+  assert.equal(w.szkicPrzed, "Ta uszczelka pasuje.");
+  assert.equal(w.szkicPo, null);
+  assert.equal(w.szkicOdrzucony, null);
+});
+
+test("wersja bez podstawy jest pomijana: od szkicu od zera jest przycisk szkicu", async () => {
+  const w = await Q.zadajPytanie(rozmowa, "Napisz odpowiedź", KTO(),
+    poprawiacz(() => ({ tresc: "Dzień dobry, pasuje." })).nadaj, subiekt);
+  assert.deepEqual([w.szkicPrzed, w.szkicPo, w.szkicOdrzucony], [null, null, null]);
+});
+
+test("dziennik poprawki niesie długości i los, nigdy tekstu szkicu", async () => {
+  await Q.zadajPytanie(rozmowa, "Dodaj pozdrowienie", KTO(),
+    poprawiacz((k) => ({ tresc: `${k.szkic} Pozdrawiamy serdecznie.` })).nadaj, subiekt,
+    { szkic: "Panie Kowalski, paczka wyszła." });
+  await Q.zadajPytanie(rozmowa, "Dopisz numer", KTO(),
+    poprawiacz(() => ({ tresc: "Panie Kowalski, numer XYZ-9999." })).nadaj, subiekt,
+    { szkic: "Panie Kowalski, paczka wyszła." });
+  const zd = (db().prepare("SELECT payload FROM events WHERE type='copilot_pytanie' ORDER BY id").all() as
+    Array<{ payload: string }>).map((e) => e.payload);
+
+  assert.deepEqual(JSON.parse(zd[0]!), { ...JSON.parse(zd[0]!),
+    znakowPrzed: 30, znakowPo: 54, poprawka: "wersja", powod: null });
+  assert.deepEqual(JSON.parse(zd[1]!), { ...JSON.parse(zd[1]!),
+    znakowPrzed: 30, znakowPo: null, poprawka: "odrzucona", powod: "numer_niezadeklarowany" });
+  for (const p of zd) {
+    assert.ok(!p.includes("Kowalski"), "tekst szkicu nie ma prawa stanąć w dzienniku");
+    assert.ok(!p.includes("XYZ-9999"), "ani numer z odrzuconej wersji");
+  }
 });

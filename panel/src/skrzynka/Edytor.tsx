@@ -6,6 +6,7 @@ import { KartaSzkicu, PasekSzkicu, PrzyciskSzkicu, UwagiSzkicu,
   type PropsSzkicuCopilota } from "./SzkicCopilota";
 import type { ZalacznikSzkicu } from "../api/rozmowy";
 import { doSprawdzenia } from "./ProcesCopilota";
+import { wersjaWPolu, wersjeSzkicu } from "./wersjeSzkicu";
 import { useOkienko } from "./MenuRozmowy";
 import { klawiszZajety, useSkrotyDzialaja } from "../nawigacja/fokus";
 
@@ -252,18 +253,21 @@ export function Edytor({
      że wymuszanie namysłu zmniejsza nadmierne zaufanie, ale ludzie oceniają
      je najgorzej — więc bez okna dialogowego (klikane z przyzwyczajenia,
      Anderson i in., CHI 2015). Przycisk mówi, co się stanie, a twierdzenia
-     stoją obok. Porównanie po zwinięciu białych znaków, tak jak `losSzkicu`
-     na serwerze liczy „bez zmian". */
-  const zwin = (t: string) => t.replace(/\s+/g, " ").trim();
-  const niezmieniony = !wKomentarzu && copilot?.szkic != null && szkic.trim() !== ""
-    && zwin(szkic) === zwin(copilot.szkic.tresc);
-  const niesprawdzone = niezmieniony ? (copilot?.szkic?.twierdzenia ?? []).filter(doSprawdzenia) : [];
+     stoją obok. Porównanie po zwinięciu białych znaków (`zwin`).
+
+     Nietknięta jest KAŻDA wersja Copilota, nie tylko oryginał. Poprawka
+     z dopytania to dalej tekst modelu, którego agent nie przeczytał słowo
+     po słowie. Twierdzenia bierze się z tej wersji, która stoi w polu. */
+  const wersjaPola = !wKomentarzu && copilot
+    ? wersjaWPolu(wersjeSzkicu(copilot.szkic, copilot.dopytanie?.wymiany ?? []), szkic) : null;
+  const niesprawdzone = wersjaPola ? wersjaPola.twierdzenia.filter(doSprawdzenia) : [];
   const wyczysc = () => { setWyczyszczone(szkic); onZmiana(""); };
   /* Uwagi modelu PRZEŻYWAJĄ przyjęcie — patrz `UwagiSzkicu`. Znikają razem
-     z tekstem agenta i przy nieświeżym szkicu, bo wtedy mówią o innym tekście. */
+     z tekstem agenta i przy nieświeżym szkicu, bo wtedy mówią o innym tekście.
+     Pole równe wersji z dopytania niesie uwagi tej wersji. */
   const uwagiPoPrzyjeciu = !wKomentarzu && !wPolu && copilot?.szkic && szkic.trim() !== "" && !copilot.nieswiezy
     && (copilot.szkic.ocena === "wstawiony" || copilot.szkic.ocena === "zastapiony")
-    ? copilot.szkic.zastrzezenia : [];
+    ? (wersjaPola ?? copilot.szkic).zastrzezenia : [];
 
   /* ZWINIĘTY = NIC DO POKAZANIA POZA POLEM. Karta Copilota liczy się tym
      samym warunkiem, którym `KartaSzkicu` decyduje, czy się rysuje. */

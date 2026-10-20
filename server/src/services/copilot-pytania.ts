@@ -3,39 +3,47 @@ import { db } from "../db/db.js";
 import { config } from "../config.js";
 import type { SubiektAdapter } from "../adapters/subiekt.js";
 import { logEvent } from "./events.js";
-import { zostalyDaneOsobowe, type TrescBezpieczna } from "./copilot-maskowanie.js";
+import {
+  zamaskujOdwracalnie, zostalyDaneOsobowe, type MaskaOdwracalna, type TrescBezpieczna,
+} from "./copilot-maskowanie.js";
 import type { Tokeny } from "./copilot-koszt.js";
 import {
-  dopiszLinkiOfert, kontekstSzkicu, ocenTwierdzenia, szkicCopilota,
-  type FaktyBezpieczne, type Twierdzenie, type TwierdzenieSurowe,
+  dopiszLinkiOfert, kontekstSzkicu, loginRozmowcy, ocenTwierdzenia, sitaSzkicu, szkicCopilota,
+  type Fakt, type FaktyBezpieczne, type KodSita, type SzkicSurowy, type Twierdzenie,
+  type TwierdzenieSurowe,
 } from "./copilot-szkic.js";
 import { ofertyPoSygnaturze } from "./allegro-oferty-po-sygnaturze.js";
 import { przygotujZdjeciaRozmowy, spisZdjec, type Pobieracz, type ZdjecieZBramki } from "./copilot-zdjecia.js";
-import { zestawNarzedzi, type UzycieNarzedzia, type ZestawNarzedzi } from "./copilot-narzedzia.js";
+import {
+  zestawNarzedzi, type UzycieNarzedzia, type WynikWywolania, type ZestawNarzedzi,
+} from "./copilot-narzedzia.js";
+import { LIMIT_ZNAKOW } from "./wysylka.js";
 
-/* ── Dopytanie Copilota (§14.6, 0.332.0) ─────────────────────────────────────
+/* ── Dopytanie Copilota (§14.6) ──────────────────────────────────────────────
    Właściciel: „dodaj możliwość kontynuowania rozmowy z modelem, możliwość
-   dopytania, rozwiania wątpliwości".
+   dopytania, rozwiania wątpliwości". I decyzja do tego: dopytanie POPRAWIA
+   szkic, zamiast mówić agentowi, co ma w nim poprawić.
 
-   ── ODPOWIEDŹ JEST DLA AGENTA I NIE MA STĄD DROGI DO KLIENTA ─────────────
-   To jest cała architektura tego modułu i jedyna rzecz, którą trzeba tu
-   zrozumieć. Szkic ma swoje sita: numer spoza faktów wywraca go, fakt spoza
-   listy wywraca go, dane osobowe wywracają go. Te sita stoją tam, bo tamten
-   tekst IDZIE DO KLIENTA.
+   ── DWA TEKSTY, DWIE DROGI ───────────────────────────────────────────────
+   To jest cała architektura tego modułu. Jedno wywołanie oddaje dwa teksty
+   i każdy idzie inną drogą.
 
-   Odpowiedź na dopytanie nie idzie nigdzie. Czyta ją agent, tak samo jak
-   `zastrzezenia` i okno „Skąd to wiem". Gdyby przepuścić ją przez sita
+   NOTKA DLA AGENTA (`odpowiedz`) nie idzie nigdzie. Czyta ją agent, tak samo
+   jak `zastrzezenia` i okno „Skąd to wiem". Gdyby przepuścić ją przez sita
    szkicu, model nie mógłby odpowiedzieć „numeru 17211-ZL8-023 nie mamy
    w kartotece" — bo ten numer nie stoi w faktach. Zdanie, którego agent
-   najbardziej potrzebuje, wywracałoby własną odpowiedź.
+   najbardziej potrzebuje, wywracałoby własną odpowiedź. Z dyscypliny zostają
+   `twierdzenia` w tym samym kształcie co przy szkicu, z tym samym sufitem
+   pewności na źródło.
 
-   Co zostaje z dyscypliny: `twierdzenia` w tym samym kształcie co przy
-   szkicu, z tym samym sufitem pewności na źródło. Agent widzi, na czym stoi
-   każde zdanie, także wtedy gdy stoi na niczym.
+   NOWA WERSJA SZKICU przechodzi przez WSZYSTKIE sita szkicu, te same co
+   szkic na kliknięcie (`sitaSzkicu`), i wraca do pola agenta. Do klienta
+   idzie dopiero po „Wyślij", więc jedna droga do klienta zostaje ta sama.
+   Wersja odrzucona przez sita nie wywraca wymiany: notka dalej jest
+   użyteczna, a agent dostaje zdanie, czemu tekst został bez zmian.
 
-   Żeby cokolwiek z tej wymiany trafiło do klienta, agent układa szkic OD
-   NOWA — a wtedy wymiana jest częścią materiału i szkic przechodzi przez
-   wszystkie swoje sita. Jedna droga do klienta, ta sama co była.
+   `szkic_copilota` zostaje NIETKNIĘTY. Na nim stoi automat wysyłki i pomiar
+   losu szkicu, a wersja z dopytania jest pracą agenta, nie propozycją modelu.
 
    ── HAMULEC ──────────────────────────────────────────────────────────────
    Jeden: sufit pytań na rozmowę. Reszty nie ma i to jest ten sam rachunek,
@@ -48,12 +56,20 @@ export const SUFIT_PYTAN = 20;
 /** Ile znaków może mieć pytanie. Dłuższe to już nie pytanie, tylko szkic. */
 export const LIMIT_PYTANIA = 600;
 
+/**
+ * Ile znaków może mieć tekst z pola, który model poprawia. Dwa limity Allegro,
+ * nie jeden: polecenie „skróć to" ma działać właśnie na szkicu ponad limitem.
+ * Sufit stoi, bo cały tekst wraca w odpowiedzi i płacimy za niego dwa razy.
+ */
+export const SUFIT_POLA = 2 * LIMIT_ZNAKOW;
+
 /** Ile wymian wchodzi do kontekstu następnej. Starsze i tak nie ważą. */
 export const HISTORII_W_KONTEKSCIE = 6;
 
 export interface WymianaCopilota {
   id: number;
   pytanie: string;
+  /** Odpowiedź na pytanie albo notka, co model zmienił w szkicu. Tylko dla agenta. */
   odpowiedz: string;
   twierdzenia: Twierdzenie[];
   model: string;
@@ -61,6 +77,19 @@ export interface WymianaCopilota {
   przez: string;
   /** Po co model sięgnął do bazy, w kolejności wywołań. Pusta = nie sięgał. */
   narzedzia: UzycieNarzedzia[];
+  /**
+   * Tekst, który model poprawiał: pole agenta albo szkic Copilota. Stoi tylko
+   * przy próbie poprawki, także odrzuconej; `null` przy czystym pytaniu.
+   */
+  szkicPrzed: string | null;
+  /** Wersja po sitach, z wartościami klienta. `null`: brak, odrzucona albo bez zmian. */
+  szkicPo: string | null;
+  /** Skąd model wie to, co stoi w nowej wersji. Pusta lista bez wersji. */
+  szkicTwierdzenia: Twierdzenie[];
+  /** Czego modelowi zabrakło przy wersji. Pusta lista bez wersji. */
+  szkicZastrzezenia: string[];
+  /** Zdanie dla agenta, czemu sita odrzuciły poprawkę; `null` = nie odrzuciły. */
+  szkicOdrzucony: string | null;
 }
 
 export interface OdpowiedzNaPytanie {
@@ -71,6 +100,13 @@ export interface OdpowiedzNaPytanie {
   zuzycie: Tokeny;
   ms: number;
   narzedzia: UzycieNarzedzia[];
+  /**
+   * Cała nowa wersja szkicu, gdy agent prosił o zmianę; `null` przy czystym
+   * pytaniu. Opcjonalne, bo nadawca bez poprawek, jak atrapa, go nie zna.
+   */
+  szkic?: SzkicSurowy | null;
+  /** Wyniki narzędzi z numerami N#: na nich sita sprawdzają odwołania wersji. */
+  wynikiNarzedzi?: WynikWywolania[];
 }
 
 /** Materiał, na którym model odpowiada. Wszystko przeszło przez maskowanie. */
@@ -78,12 +114,12 @@ export interface KontekstPytania {
   watek: TrescBezpieczna;
   fakty: FaktyBezpieczne;
   zdjecia: ZdjecieZBramki[];
-  /** Aktualny szkic albo `null` — model ma wiedzieć, o czym agent wątpi. */
-  szkic: string | null;
+  /** Tekst z pola agenta albo szkic Copilota, zamaskowany; `null` = nie ma czego poprawiać. */
+  szkic: TrescBezpieczna | null;
   /** Poprzednie wymiany, od najstarszej. */
   historia: Array<{ pytanie: string; odpowiedz: string }>;
   pytanie: string;
-  /** Odczyt naszej bazy na żądanie modelu (0.507.0). `null` = bez narzędzi. */
+  /** Odczyt naszej bazy na żądanie modelu. `null` = bez narzędzi. */
   narzedzia: ZestawNarzedzi | null;
 }
 
@@ -94,7 +130,8 @@ export function wymianyRozmowy(
   conversationId: number, database: DatabaseSync = db(),
 ): WymianaCopilota[] {
   return (database.prepare(
-    `SELECT id, pytanie, odpowiedz, twierdzenia, model, at, przez, narzedzia
+    `SELECT id, pytanie, odpowiedz, twierdzenia, model, at, przez, narzedzia,
+            szkic_przed, szkic_po, szkic_odrzucony, szkic_twierdzenia, szkic_zastrzezenia
        FROM copilot_pytanie WHERE conversation_id=? ORDER BY id`)
     .all(conversationId) as Array<Record<string, unknown>>)
     .map((w) => ({
@@ -106,16 +143,24 @@ export function wymianyRozmowy(
       at: String(w.at),
       przez: String(w.przez),
       narzedzia: JSON.parse(String(w.narzedzia ?? "[]")) as UzycieNarzedzia[],
+      szkicPrzed: w.szkic_przed == null ? null : String(w.szkic_przed),
+      szkicPo: w.szkic_po == null ? null : String(w.szkic_po),
+      szkicTwierdzenia: JSON.parse(String(w.szkic_twierdzenia ?? "[]")) as Twierdzenie[],
+      szkicZastrzezenia: JSON.parse(String(w.szkic_zastrzezenia ?? "[]")) as string[],
+      szkicOdrzucony: w.szkic_odrzucony == null ? null : String(w.szkic_odrzucony),
     }));
 }
 
 /**
- * Dopytanie: pytanie agenta → model → zapis wymiany.
+ * Dopytanie: pytanie albo polecenie agenta → model → sita wersji → zapis wymiany.
  *
  * Fakty zbiera ten sam `kontekstSzkicu`, co szkic, i to jest decyzja, nie
  * oszczędność: dopytanie o szkic, które widzi INNY materiał niż szkic, jest
  * dopytaniem o coś innego. Agent pyta „skąd wiesz" i musi dostać odpowiedź
- * z tego samego zbioru.
+ * z tego samego zbioru. Te same fakty dźwigają też sita nowej wersji.
+ *
+ * `o.szkic` to tekst z pola agenta, z jego ręcznymi zmianami. Puste pole
+ * znaczy „poprawiaj szkic Copilota".
  *
  * ZAPIS WYMIANY DOPIERO PO ODPOWIEDZI. Nieudane wywołanie nie zostawia
  * wiersza — zostawia ślad w księdze, tam gdzie liczy się koszt. Pytanie
@@ -123,14 +168,20 @@ export function wymianyRozmowy(
  */
 export async function zadajPytanie(
   conversationId: number, pytanie: string, kto: { id: number | null; name: string },
-  nadaj: NadawcaPytania, subiekt: SubiektAdapter, teraz = new Date(),
-  pobierzZdjecie?: Pobieracz,
+  nadaj: NadawcaPytania, subiekt: SubiektAdapter,
+  o: { szkic?: string | null; teraz?: Date; pobierzZdjecie?: Pobieracz } = {},
 ): Promise<WymianaCopilota> {
+  const teraz = o.teraz ?? new Date();
   const tresc = String(pytanie ?? "").trim();
   if (!tresc) throw new Error("Puste pytanie — nie ma o co pytać");
   if (tresc.length > LIMIT_PYTANIA) {
     throw new Error(`Pytanie ma ${tresc.length} znaków, a mieści się ${LIMIT_PYTANIA}. `
       + "Dłuższe to już nie pytanie, tylko szkic — rozbij je na dwa.");
+  }
+  const zPola = typeof o.szkic === "string" && o.szkic.trim() ? o.szkic : null;
+  if (zPola && zPola.length > SUFIT_POLA) {
+    throw new Error(`Tekst w polu ma ${zPola.length} znaków, a Copilot poprawia najwyżej ${SUFIT_POLA}. `
+      + "Skróć go sam albo wyczyść pole, żeby Copilot pracował na swoim szkicu.");
   }
 
   const dotad = wymianyRozmowy(conversationId);
@@ -143,26 +194,33 @@ export async function zadajPytanie(
   const kontekst = dopiszLinkiOfert(surowy, await ofertyPoSygnaturze(
     [...surowy.kartoteki.values()].map((x) => x.symbol)));
 
-  /* Zdjęcia tą samą bramką co przy szkicu (0.330.0). Dopytanie „co dokładnie
-     widać na tabliczce" bez zdjęcia byłoby pytaniem o nic. */
-  const zdjecia = await przygotujZdjeciaRozmowy(db(), conversationId, pobierzZdjecie);
+  /* Zdjęcia tą samą bramką co przy szkicu. Dopytanie „co dokładnie widać na
+     tabliczce" bez zdjęcia byłoby pytaniem o nic. */
+  const zdjecia = await przygotujZdjeciaRozmowy(db(), conversationId, o.pobierzZdjecie);
   const spis = spisZdjec(zdjecia);
   const fakty = (spis ? `${kontekst.tekstFaktow}\n\n${spis}` : kontekst.tekstFaktow) as FaktyBezpieczne;
 
-  /* Asercja przed siecią, tak samo jak przy szkicu: wątek niesie tekst
-     klienta i to on ma być czysty. PYTANIE AGENTA NIE PRZECHODZI przez
+  /* PODSTAWA POPRAWKI: tekst z pola wygrywa ze szkicem Copilota, bo niesie
+     ręczne zmiany agenta, a poprawka ma iść od nich, nie od nich wstecz.
+     Do dostawcy idzie ZAMASKOWANA, jak nasze wychodzące w wątku: agent
+     przepisuje klientowi jego adres i telefon. Maska jest odwracalna, bo
+     nowa wersja wraca do pola z wartościami. */
+  const baza = zPola ?? (szkicCopilota(conversationId)?.tresc || null);
+  const maska = baza ? zamaskujOdwracalnie(baza, loginRozmowcy(conversationId)) : null;
+
+  /* Asercja przed siecią, tak samo jak przy szkicu: wątek i pole niosą dane
+     klienta i to one mają być czyste. PYTANIE AGENTA NIE PRZECHODZI przez
      maskowanie — pisze je pracownik biura o naszym towarze, nie klient
      o sobie, a wycinanie z niego numerów zabrałoby mu sens. */
-  if (zostalyDaneOsobowe(String(kontekst.watek))) {
+  if (zostalyDaneOsobowe(String(kontekst.watek)) || (maska && zostalyDaneOsobowe(String(maska.tresc)))) {
     throw new Error("Maskowanie nie oczyściło rozmowy — nic nie wyszło do dostawcy");
   }
 
-  const szkic = szkicCopilota(conversationId);
   let odp: OdpowiedzNaPytanie;
   try {
     odp = await nadaj({
       watek: kontekst.watek, fakty, zdjecia: zdjecia.zdjecia,
-      szkic: szkic ? szkic.tresc : null,
+      szkic: maska ? maska.tresc : null,
       historia: dotad.slice(-HISTORII_W_KONTEKSCIE)
         .map((w) => ({ pytanie: w.pytanie, odpowiedz: w.odpowiedz })),
       pytanie: tresc,
@@ -177,12 +235,27 @@ export async function zadajPytanie(
     throw e;
   }
 
+  /* Numery, które stoją już w polu albo w poleceniu agenta, przechodzą sita.
+     Za nie odpowiada agent: wpisał je sam albo kazał je wpisać, a sito ma
+     łapać numer wzięty przez model z niczego, nie z ręki człowieka. */
+  const poprawka = poprawkaSzkicu(odp.szkic, maska, baza, {
+    fakty: kontekst.fakty,
+    material: `${fakty}\n${kontekst.watek}\n${baza ?? ""}\n${tresc}`,
+    wyslaneZdjecia: new Set(zdjecia.zdjecia.map((z) => z.numer)),
+    wynikiN: odp.wynikiNarzedzi ?? [],
+  });
+
   const twierdzenia = ocenTwierdzenia(odp.twierdzenia);
   const id = Number(db().prepare(`INSERT INTO copilot_pytanie
-    (conversation_id,pytanie,odpowiedz,twierdzenia,model,at,przez,przez_user_id,narzedzia)
-    VALUES (?,?,?,?,?,?,?,?,?)`)
+    (conversation_id,pytanie,odpowiedz,twierdzenia,model,at,przez,przez_user_id,narzedzia,
+     szkic_przed,szkic_po,szkic_odrzucony,szkic_twierdzenia,szkic_zastrzezenia)
+    VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)`)
     .run(conversationId, tresc, odp.tresc, JSON.stringify(twierdzenia), odp.model,
-      teraz.toISOString(), kto.name, kto.id, JSON.stringify(odp.narzedzia ?? [])).lastInsertRowid);
+      teraz.toISOString(), kto.name, kto.id, JSON.stringify(odp.narzedzia ?? []),
+      poprawka.przed, poprawka.po, poprawka.odrzucona,
+      JSON.stringify(poprawka.twierdzenia), JSON.stringify(poprawka.zastrzezenia)).lastInsertRowid);
+  /* Odrzucona poprawka to dalej udane wywołanie: model odpowiedział, a notka
+     jest dla agenta użyteczna. Błąd w księdze znaczyłby, że nic nie wróciło. */
   zapiszWywolanie(conversationId, odp, "ok", null, kto, teraz);
 
   /* Ładunek niesie DŁUGOŚCI, nigdy treści (§19): pytanie agenta bywa
@@ -190,20 +263,98 @@ export async function zadajPytanie(
   logEvent("copilot_pytanie", kto.name, null, {
     conversationId, znakowPytania: tresc.length, znakowOdpowiedzi: odp.tresc.length,
     wymiana: dotad.length + 1, model: odp.model, tokeny: odp.zuzycie,
-    /* Zdjęcia liczbami, jak przy szkicu — patrz blizna 0.484.6 w `copilot-zdjecia`. */
+    /* Zdjęcia liczbami, jak przy szkicu — patrz blizna w `copilot-zdjecia`. */
     zdjec: zdjecia.zdjecia.length, zdjecBledow: zdjecia.bledow,
     /* Nazwy narzędzi, bez argumentów: argument bywa numerem z rozmowy. */
     narzedzia: (odp.narzedzia ?? []).map((n) => n.nazwa),
+    /* Los poprawki kodem, bez tekstu: szkic niesie dane klienta. */
+    znakowPrzed: poprawka.przed?.length ?? null, znakowPo: poprawka.po?.length ?? null,
+    poprawka: poprawka.rodzaj, powod: poprawka.powod,
   }, kto.id);
 
   return wymianyRozmowy(conversationId).find((w) => w.id === id)!;
 }
 
+/** Czemu poprawka nie weszła: sita szkicu albo znacznik, którego nie wydaliśmy. */
+export type KodPoprawki = KodSita | "znacznik_obcy";
+
+interface Poprawka {
+  przed: string | null;
+  po: string | null;
+  odrzucona: string | null;
+  twierdzenia: Twierdzenie[];
+  zastrzezenia: string[];
+  rodzaj: "wersja" | "odrzucona" | "bez_zmian" | "brak";
+  powod: KodPoprawki | null;
+}
+
+/** Białe znaki zwinięte do jednej spacji: przestawiony akapit to jeszcze nie zmiana. */
+const zwinBiale = (s: string) => s.replace(/\s+/g, " ").trim();
+
+/**
+ * Nowa wersja szkicu z odpowiedzi modelu, po wszystkich sitach.
+ *
+ * Kolejność ma znaczenie. Najpierw odmaskowanie: znacznik, którego nie
+ * wydaliśmy, to dana klienta, której model nie widział, więc wersja odpada,
+ * zanim cokolwiek ją sprawdzi. Potem sita na tekście ODMASKOWANYM, bo
+ * materiał niesie odmaskowaną podstawę, a numer części schowany pod
+ * `[telefon 1]` ma się porównać z sobą samym.
+ */
+function poprawkaSzkicu(
+  s: SzkicSurowy | null | undefined, maska: MaskaOdwracalna | null, baza: string | null,
+  m: { fakty: Fakt[]; material: string; wyslaneZdjecia: ReadonlySet<string>; wynikiN: WynikWywolania[] },
+): Poprawka {
+  const brak: Poprawka = {
+    przed: null, po: null, odrzucona: null, twierdzenia: [], zastrzezenia: [], rodzaj: "brak", powod: null,
+  };
+  /* Wersja bez podstawy nie ma czego poprawiać: model napisał szkic od zera,
+     a od tego jest przycisk szkicu, z własnym miejscem i pomiarem. */
+  if (!s || !maska || baza === null) return brak;
+  const odrzuc = (powod: KodPoprawki, zdanie: string): Poprawka =>
+    ({ ...brak, przed: baza, odrzucona: zdanie, rodzaj: "odrzucona", powod });
+
+  const tekst = maska.odmaskuj(s.tresc);
+  if (tekst.obce.length) {
+    return odrzuc("znacznik_obcy", `Copilot wpisał dane klienta, których nie widział `
+      + `(${tekst.obce.join(", ")}), więc szkic został bez zmian.`);
+  }
+  /* Tezy też odmaskowane: numer zadeklarowany pod znacznikiem ma pokryć
+     ten sam numer w tekście. Cudzy znacznik w tezie niczego nie psuje, bo
+     twierdzenia czyta agent, a nie klient. */
+  const sito = sitaSzkicu({
+    ...s, tresc: tekst.tresc,
+    twierdzenia: s.twierdzenia.map((t) => ({ ...t, teza: maska.odmaskuj(t.teza).tresc })),
+  }, m);
+  if (!sito.ok) return odrzuc(sito.kod, zdaniePoprawki(sito, tekst.tresc.length, baza.length));
+  if (zwinBiale(sito.tresc) === zwinBiale(baza)) return { ...brak, przed: baza, rodzaj: "bez_zmian" };
+  return {
+    przed: baza, po: sito.tresc, odrzucona: null, twierdzenia: sito.twierdzenia,
+    zastrzezenia: s.zastrzezenia.map((z) => maska.odmaskuj(z).tresc),
+    rodzaj: "wersja", powod: null,
+  };
+}
+
+/** Zdanie dla agenta pod odrzuconą poprawką. Mówi, co sito złapało, i że pole stoi. */
+function zdaniePoprawki(w: { kod: KodSita; lista: string[] }, znakowPo: number, znakowPrzed: number): string {
+  const bez = "więc szkic został bez zmian.";
+  switch (w.kod) {
+    case "numer_niezadeklarowany":
+      return `Copilot użył numeru ${w.lista[0]}, nie mówiąc, skąd go ma, ${bez}`;
+    case "fakt_spoza_listy":
+      return `Copilot powołał się na ${w.lista[0]}, którego nie dostał, ${bez}`;
+    case "zdjecie_spoza_listy":
+      return `Copilot powołał się na zdjęcie ${w.lista[0]}, którego nie dostał, ${bez}`;
+    case "za_dlugi":
+      return `Nowa wersja ma ${znakowPo} znaków, a Allegro przyjmuje ${LIMIT_ZNAKOW}. `
+        + `Poprawiany tekst miał ${znakowPrzed}, ${bez}`;
+  }
+}
+
 function zapiszWywolanie(
   conversationId: number, odp: OdpowiedzNaPytanie | null, wynik: "ok" | "blad",
   blad: string | null, kto: { id: number | null }, teraz: Date,
-  /* Rundy narzędzi zapłacone przed błędem (0.507.0). Bez nich porażka po
-     czterech rundach ważyłaby w pomiarze zero, a kosztowała cztery żądania. */
+  /* Rundy narzędzi zapłacone przed błędem. Bez nich porażka po czterech
+     rundach ważyłaby w pomiarze zero, a kosztowała cztery żądania. */
   zuzyciePrzedBledem?: Tokeny,
 ): void {
   const t = odp?.zuzycie ?? zuzyciePrzedBledem;

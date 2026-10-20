@@ -231,7 +231,7 @@ test("schemat i instrukcja szkicu nie znają danych doboru ani pasowania", async
    wywołaniem nie wywraca parsowania, że tokeny sumują się po rundach i że
    sufit rund kończy pętlę wymuszoną odpowiedzią.                          */
 
-const ODPOWIEDZ = JSON.stringify({ tresc: "Pasuje do MS 230.", twierdzenia: [] });
+const ODPOWIEDZ = JSON.stringify({ odpowiedz: "Pasuje do MS 230.", twierdzenia: [], szkic: null });
 const zuzycieRundy = { input_tokens: 100, output_tokens: 10, cache_creation_input_tokens: 0, cache_read_input_tokens: 50 };
 
 function kontekstPytania(narzedzia: ZestawNarzedzi | null): KontekstPytania {
@@ -391,7 +391,10 @@ test("szkic bez narzędzi: jedno żądanie bez tools i bez cache całości", asy
   }
 });
 
-test("dopytanie: wynik narzędzia wraca bez numeru N#, numer ma tylko szkic", async () => {
+/* Poprawka szkicu z dopytania przechodzi przez sita szkicu, a sito faktów
+   zna wyniki narzędzi tylko po numerze. Bez numeru model nie miałby czego
+   wpisać do `uzyteFakty`, a wersja oparta na kartotece wywracałaby się. */
+test("dopytanie: wynik narzędzia wraca z numerem N#, jak przy szkicu", async () => {
   const { zestaw } = atrapaNarzedzi();
   const zadania = klientSekwencja([
     () => ({ stop_reason: "tool_use", model: "m", usage: zuzycieRundy,
@@ -399,12 +402,90 @@ test("dopytanie: wynik narzędzia wraca bez numeru N#, numer ma tylko szkic", as
     () => ({ stop_reason: "end_turn", model: "m", usage: zuzycieRundy, content: [{ type: "text", text: ODPOWIEDZ }] }),
   ]);
   try {
-    await nadawcaPytaniaAnthropic(kontekstPytania(zestaw));
+    const o = await nadawcaPytaniaAnthropic(kontekstPytania(zestaw));
     const wyniki = (zadania[1]!.messages as Array<{ content: unknown }>)[2]!.content as Array<{ content: string }>;
-    assert.equal(wyniki[0]!.content, "Kartoteka GAZ-1: gaźnik");
+    assert.equal(wyniki[0]!.content, "[N1] Kartoteka GAZ-1: gaźnik");
+    assert.deepEqual(o.wynikiNarzedzi!.map((w) => [w.id, w.tresc]), [["N1", "Kartoteka GAZ-1: gaźnik"]],
+      "serwis dostaje czystą treść wyniku z numerem do sit");
   } finally {
     _ustawKlienta(null);
   }
+});
+
+/* ── Poprawka szkicu w dopytaniu ─────────────────────────────────────────────
+   Model sam rozpoznaje pytanie i polecenie. Przy poleceniu oddaje CAŁĄ nową
+   wersję w `szkic`, przy pytaniu `null`. Instrukcja szkicu wchodzi bajt
+   w bajt, bo te same reguły formy obowiązują w tekście dla klienta. */
+
+/** Jedno żądanie dopytania z pełnym `output_config`, bez klonowania formatu. */
+async function zadanieDopytania(k: KontekstPytania, odpowiedz = ODPOWIEDZ) {
+  let wyslane: Record<string, unknown> | null = null;
+  _ustawKlienta({ messages: { create: async (p: Record<string, unknown>) => {
+    wyslane = p;
+    return { stop_reason: "end_turn", model: "m", usage: zuzycieRundy, content: [{ type: "text", text: odpowiedz }] };
+  } } } as unknown as Anthropic);
+  try {
+    const o = await nadawcaPytaniaAnthropic(k);
+    return { o, p: wyslane! as unknown as {
+      system: Array<{ text: string }>; max_tokens: number;
+      output_config: { format: { schema: { properties: Record<string, { anyOf?: Array<{ type?: string }> }> } } };
+      messages: Array<{ content: string }>;
+    } };
+  } finally {
+    _ustawKlienta(null);
+  }
+}
+
+test("dopytanie: schemat ma notkę, jej twierdzenia i szkic, który bywa null", async () => {
+  const { p } = await zadanieDopytania(kontekstPytania(null));
+  const pola = p.output_config.format.schema.properties;
+  assert.deepEqual(Object.keys(pola).sort(), ["odpowiedz", "szkic", "twierdzenia"]);
+  assert.ok(pola.szkic!.anyOf?.some((w) => w.type === "null"), "czyste pytanie nie ma wersji");
+  assert.equal(p.max_tokens, 8000, "wyjście niesie cały szkic, a myślenie liczy się do sufitu");
+});
+
+test("dopytanie: instrukcja poprawia szkic i niesie instrukcję szkicu bajt w bajt", async () => {
+  const { p } = await zadanieDopytania(kontekstPytania(null));
+  const system = p.system[0]!.text;
+  assert.doesNotMatch(system, /NIE PRZEPISUJ SZKICU/);
+  assert.match(system, /wpisz do `szkic` CAŁĄ nową wersję/);
+
+  /* Instrukcję szkicu bierzemy z żądania szkicu, nie z kopii w teście. */
+  const zadania = klientSekwencja([() => ({ stop_reason: "end_turn", model: "m", usage: zuzycieRundy,
+    content: [{ type: "text", text: SZKIC }] })]);
+  try {
+    await nadawcaSzkicuAnthropic(TRESC, FAKTY);
+  } finally {
+    _ustawKlienta(null);
+  }
+  const instrukcjaSzkicu = (zadania[0]!.system as Array<{ text: string }>)[0]!.text;
+  assert.ok(system.endsWith(instrukcjaSzkicu), "reguły szkicu na końcu, bez przeróbek");
+  assert.doesNotMatch(system.slice(0, system.length - instrukcjaSzkicu.length), /[–—]/,
+    "zdania instrukcji dopytania bez półpauzy i pauzy");
+});
+
+test("dopytanie: tekst z pola idzie we własnej sekcji, a bez niego sekcja mówi, że go nie ma", async () => {
+  const z = await zadanieDopytania({ ...kontekstPytania(null), szkic: "Dzień dobry [login]." as TrescBezpieczna });
+  assert.match(z.p.messages[0]!.content, /SZKIC W POLU AGENTA \(to poprawiasz\):\nDzień dobry \[login\]\./);
+  assert.doesNotMatch(z.p.messages[0]!.content, /AKTUALNY SZKIC/);
+  const bez = await zadanieDopytania(kontekstPytania(null));
+  assert.match(bez.p.messages[0]!.content, /SZKIC W POLU AGENTA \(to poprawiasz\): \(jeszcze go nie ma\)/);
+});
+
+test("dopytanie: wersja z odpowiedzi trafia do `szkic`, notka do `tresc`", async () => {
+  const { o } = await zadanieDopytania(kontekstPytania(null), JSON.stringify({
+    odpowiedz: "Dodałem numer.", twierdzenia: [],
+    szkic: {
+      tresc: "Pasuje (F1).", uzyteFakty: ["F1"], zastrzezenia: [], twierdzenia: [],
+      odczytZeZdjec: [{ zdjecie: " Z1 ", tekst: " HONDA GX160 " }, { zdjecie: "Z2", tekst: "  " }],
+    },
+  }));
+  assert.equal(o.tresc, "Dodałem numer.");
+  assert.equal(o.szkic!.tresc, "Pasuje (F1).");
+  assert.deepEqual(o.szkic!.odczytZeZdjec, [{ zdjecie: "Z1", tekst: "HONDA GX160" }],
+    "ten sam odsiew kształtu co przy szkicu na kliknięcie");
+  const pytanie = await zadanieDopytania(kontekstPytania(null));
+  assert.equal(pytanie.o.szkic, null);
 });
 
 test("instrukcja szkicu: cena klientowi tylko z oferty, cennik kartoteki do zastrzeżeń", async () => {

@@ -338,14 +338,26 @@ CREATE INDEX IF NOT EXISTS ix_propozycja_rozmowa ON propozycja_przeplywu(convers
 -- powstaje dopiero, gdy model odpowie — nieudane wywołanie zostawia ślad
 -- w księdze `copilot_wywolanie` i tam jest jego miejsce.
 --
--- ODPOWIEDŹ JEST DLA AGENTA, NIE DLA KLIENTA, i to jest najważniejsze zdanie
--- o tej tabeli. Nie ma stąd żadnej drogi do wiadomości: żeby cokolwiek z tej
--- wymiany trafiło do klienta, agent układa szkic na nowo, a szkic przechodzi
--- przez swoje sprawdzenia (numery spoza faktów, fakty spoza listy). Dlatego
--- ta tabela nie ma `ocena` — mierzy się szkic, nie rozmowę o nim.
+-- `odpowiedz` czyta wyłącznie agent: odpowiedź na pytanie albo notka, co
+-- model zmienił w szkicu. Nie przechodzi przez sita, więc nie ma stąd drogi do
+-- klienta. Tabela nie ma `ocena`, bo mierzy się szkic, nie rozmowę o nim.
 --
 -- `twierdzenia` w tym samym kształcie co przy szkicu: agent ma widzieć, na
 -- czym stoi odpowiedź, także gdy jest nią „fakty tego nie rozstrzygają".
+--
+-- ── Poprawka szkicu: historia wersji ───────────────────────────────────────
+-- Na polecenie agenta model oddaje też CAŁĄ nową wersję tekstu z pola.
+-- Wersja jest 1:1 z wymianą: to samo wywołanie, ten sam autor, ten sam czas
+-- i ten sam wiersz księgi. Dlatego mieszka w kolumnach wymiany, a nie
+-- w osobnej tabeli, która powtarzałaby te cztery rzeczy.
+--
+-- `szkic_przed` to tekst, który model poprawiał (pole agenta albo szkic
+-- Copilota), `szkic_po` to wersja po wszystkich sitach szkicu. Do klienta
+-- idzie dopiero po „Wyślij", więc jedna droga do klienta zostaje.
+-- `szkic_odrzucony` to zdanie dla agenta, czemu sita wersję odrzuciły.
+-- Ręczne zmiany agenta NIE SĄ wersją: widać je jako lukę między `szkic_po`
+-- jednej wymiany a `szkic_przed` następnej. `szkic_copilota` zostaje
+-- nietknięty, bo na nim stoi automat wysyłki i pomiar losu szkicu.
 CREATE TABLE IF NOT EXISTS copilot_pytanie (
   id              INTEGER PRIMARY KEY AUTOINCREMENT,
   conversation_id INTEGER NOT NULL REFERENCES conversation(id) ON DELETE CASCADE,
@@ -357,7 +369,15 @@ CREATE TABLE IF NOT EXISTS copilot_pytanie (
   przez           TEXT NOT NULL,
   przez_user_id   INTEGER REFERENCES app_user(user_id),
   -- Narzędzia, po które model sięgnął (0.507.0): [{nazwa, argument, znakow}].
-  narzedzia       TEXT NOT NULL DEFAULT '[]'
+  narzedzia       TEXT NOT NULL DEFAULT '[]',
+  -- Poprawka szkicu, opis nad tabelą. NULL w obu = wymiana bez wersji.
+  -- Ostatnia kolumna stoi bez komentarza nad sobą: starszy SQLite nie zdejmie
+  -- jej przez DROP COLUMN, gdy tuż przed nią stoi `--` (blizna w `db.ts`).
+  szkic_przed     TEXT,
+  szkic_po        TEXT,
+  szkic_odrzucony TEXT,
+  szkic_twierdzenia  TEXT NOT NULL DEFAULT '[]',
+  szkic_zastrzezenia TEXT NOT NULL DEFAULT '[]'
 );
 CREATE INDEX IF NOT EXISTS ix_copilot_pytanie_rozmowa
   ON copilot_pytanie(conversation_id, id);

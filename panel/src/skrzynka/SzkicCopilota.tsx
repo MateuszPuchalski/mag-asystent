@@ -5,6 +5,7 @@ import { OdczytZdjec } from "./OdczytZdjec";
 import { ProcesCopilota } from "./ProcesCopilota";
 import type { OsRozmowy, StanCopilota, SzkicCopilota, WymianaCopilota } from "../api/typy";
 import { Dopytanie } from "./Dopytanie";
+import { wersjaWPolu, wersjeSzkicu } from "./wersjeSzkicu";
 import { useSkrotyDzialaja } from "../nawigacja/fokus";
 
 /**
@@ -52,6 +53,10 @@ export interface PropsSzkicuCopilota {
     pracuje: boolean;
     onPytaj: (pytanie: string) => void;
     limitZnakow: number;
+    /** Tekst pola odpowiedzi. Po nim karta poznaje wersję szkicu, która w nim stoi. */
+    pole: string;
+    /** Wersja Copilota do pola — ekran stawia przy tym pasek „Cofnij”. */
+    onWstaw: (tresc: string) => void;
   };
   onUloz: () => void;
   /** Treść szkicu do pola agenta — wstawia przy pustym, zastępuje przy pełnym. */
@@ -238,6 +243,21 @@ export function KartaSzkicu({ p, wPolu = false, zwinieta = false }: {
      zostaje z tym, na czym stoi — uwagami, odczytem zdjęć i dopytaniem —
      także po „Wstaw do odpowiedzi", bo agent właśnie go poprawia. */
   if (!s || (s.ocena !== null && !(wPolu && s.ocena !== "odrzucony"))) return null;
+  /* ── NA CZYM STOI TEKST W POLU, NIE ORYGINAŁ ──────────────────────────────
+     Po poprawce z dopytania w polu stoi inna wersja niż ta, którą ułożył
+     takt. Jej uwagi i „Skąd to wiem” mówią o zdaniach, które agent wyśle.
+     Rachunek oryginału przy poprawionym tekście kłamałby o źródłach.
+
+     Pole poprawione ręcznie nie równa się żadnej wersji. Wtedy rachunek daje
+     najnowsza wersja, bo z niej agent zwykle poprawia. Oryginał w tej chwili
+     zgubiłby twierdzenia, które doszły w poprawce, po jednym przecinku.
+     Karta poza polem pokazuje treść oryginału, więc i jego rachunek. */
+  const wersje = wPolu ? wersjeSzkicu(s, p.dopytanie?.wymiany ?? []) : [];
+  const podstawa = wPolu
+    ? wersjaWPolu(wersje, p.dopytanie?.pole ?? "") ?? wersje[wersje.length - 1]
+    : null;
+  const zastrzezenia = podstawa ? podstawa.zastrzezenia : s.zastrzezenia;
+  const twierdzenia = podstawa ? podstawa.twierdzenia : s.twierdzenia;
   /* PRZYCISKI NA GÓRZE (0.232.1) — patrz `PasekSzkicu`. */
   return <section className={wPolu ? "mt-2" : "mt-3 rounded-lg border border-violet-200 bg-violet-50 p-3"}
     aria-label={wPolu ? "Na czym stoi szkic Copilota" : "Szkic Copilota"}>
@@ -272,7 +292,7 @@ export function KartaSzkicu({ p, wPolu = false, zwinieta = false }: {
       <pre className="mt-1 whitespace-pre-wrap font-sans text-tresc text-slate-800"
         data-testid="szkic-copilota-tresc">{s.tresc}</pre>
     </details>}
-    {s.zastrzezenia.length > 0 && <UwagiSzkicu uwagi={s.zastrzezenia} />}
+    {zastrzezenia.length > 0 && <UwagiSzkicu uwagi={zastrzezenia} />}
     {/* Rachunek POD tekstem, nie w nim (0.253.0): klient ma dostać gładką
         odpowiedź, a agent — to, na czym ona stoi. Klucz z czasu szkicu, żeby
         nowy szkic otwierał okno od nowa wg własnych twierdzeń. */}
@@ -280,11 +300,15 @@ export function KartaSzkicu({ p, wPolu = false, zwinieta = false }: {
         Agent czyta go z miniaturą na osi przed oczami; dopiero potem ma sens
         pytanie, czy twierdzenie oparte na tym odczycie jest do przyjęcia. */}
     <OdczytZdjec odczyt={s.odczytZeZdjec} />
-    <ProcesCopilota key={s.at} twierdzenia={s.twierdzenia} />
+    {/* Klucz z wersji: inna wersja w polu otwiera okno od nowa wg własnych twierdzeń. */}
+    <ProcesCopilota key={podstawa ? `${podstawa.nr}-${podstawa.at}` : s.at} twierdzenia={twierdzenia} />
     {/* DOPYTANIE POD SZKICEM, nie obok: agent czyta szkic, rodzi mu się
         wątpliwość, pyta. Odwrotna kolejność kazałaby pytać na ślepo. */}
     {p.dopytanie && <Dopytanie
       wymiany={p.dopytanie.wymiany}
+      szkic={s}
+      pole={p.dopytanie.pole}
+      onWstaw={p.dopytanie.onWstaw}
       wylaczony={p.wylaczony}
       blad={p.dopytanie.blad}
       pracuje={p.dopytanie.pracuje}

@@ -435,7 +435,7 @@ function ofertaRozmowy(database: DatabaseSync, conversationId: number): { konto:
 }
 
 /** Login rozmówcy z WĄTKU Allegro — nie z tematu, bo temat bywa tytułem oferty. */
-function loginRozmowcy(conversationId: number): string | null {
+export function loginRozmowcy(conversationId: number): string | null {
   const w = db().prepare(`SELECT t.interlocutor_login AS login
       FROM conversation c JOIN allegro_inbox_thread t ON t.id = c.external_conversation_id
      WHERE c.id=?`).get(conversationId) as { login: string | null } | undefined;
@@ -778,6 +778,80 @@ async function odswiezSellasistRozmowy(conversationId: number, teraz: Date): Pro
   await odswiezZamowienieSellasist(db(), numer.externalId).catch(() => undefined);
 }
 
+/** Tekst szkicu z rachunkiem źródeł: to, co sita czytają z odpowiedzi modelu. */
+export type SzkicSurowy = Pick<OdpowiedzSzkicu,
+  "tresc" | "uzyteFakty" | "zastrzezenia" | "twierdzenia" | "odczytZeZdjec">;
+
+/** Powód, dla którego sita odrzuciły szkic. Klucz idzie do księgi przed listą. */
+export type KodSita = "zdjecie_spoza_listy" | "numer_niezadeklarowany" | "fakt_spoza_listy" | "za_dlugi";
+
+export type WynikSit =
+  | { ok: true; tresc: string; twierdzenia: Twierdzenie[] }
+  /** `lista` to winowajcy; przy `za_dlugi` jedna pozycja: długość szkicu. */
+  | { ok: false; kod: KodSita; lista: string[] };
+
+/**
+ * Sita szkicu, czyli wszystko, co stoi między odpowiedzią modelu a tekstem
+ * dla klienta. Czysta funkcja: szkic na kliknięcie i poprawka z dopytania
+ * przechodzą te same sita, więc stoją raz, a nie w dwóch kopiach.
+ *
+ * `material` to fakty i wątek. Odczyty zdjęć i wyniki narzędzi dokleja ta
+ * funkcja, bo stają się materiałem dopiero po sprawdzeniu tożsamości zdjęć.
+ * Zwraca treść już BEZ znaczników `(F3)`: odwołania były potrzebne kontroli,
+ * klientowi nie.
+ */
+export function sitaSzkicu(s: SzkicSurowy, m: {
+  fakty: Fakt[]; material: string; wyslaneZdjecia: ReadonlySet<string>; wynikiN: WynikWywolania[];
+}): WynikSit {
+  const twierdzenia = zRozpoznaniaNiepewne(ocenTwierdzenia(s.twierdzenia), m.fakty);
+  /* ── ODCZYT ZE ZDJĘĆ: NAJPIERW TOŻSAMOŚĆ, POTEM ZAUFANIE ──────────────────
+     Odczyt powołany na `Z7`, gdy wysłaliśmy trzy zdjęcia, nie jest pomyłką
+     w numeracji — to jedyny znany sposób, żeby przemycić przez `numery-
+     SpozaFaktow` numer wzięty z niczego. Dlatego sprawdzenie jest takie samo
+     jak przy faktach spoza listy: wywraca szkic, nie filtruje po cichu. */
+  const zmyslone = s.odczytZeZdjec.filter((o) => !m.wyslaneZdjecia.has(o.zdjecie));
+  if (zmyslone.length) return { ok: false, kod: "zdjecie_spoza_listy", lista: zmyslone.map((o) => o.zdjecie) };
+  /* Dopiero TERAZ odczyt staje się materiałem, z którego wolno cytować —
+     na równi z faktami i wątkiem. Bez tego każde poprawne odczytanie
+     tabliczki wywracałoby własny szkic na odsiewie numerów. */
+  const zOdczytu = s.odczytZeZdjec.map((o) => o.tekst).join("\n");
+  /* Wynik narzędzia to nasza baza, jak fakty: numer z karty znalezionej
+     przez model jest sprawdzalny tak samo jak numer z F#. */
+  const zNarzedzi = m.wynikiN.map((w) => w.tresc).join("\n");
+  const material = `${m.material}${zOdczytu ? `\n${zOdczytu}` : ""}`
+    + (zNarzedzi ? `\n${zNarzedzi}` : "");
+
+  /* Numer wolno wziąć z własnej wiedzy — ale nie po cichu. Niezadeklarowany
+     to zdanie, którego agent nie ma jak sprawdzić przed wysłaniem do klienta. */
+  const obce = numeryNiezadeklarowane(s.tresc, material, s.twierdzenia);
+  if (obce.length) return { ok: false, kod: "numer_niezadeklarowany", lista: obce };
+  /* N# spoza wyników to ta sama furtka co F# spoza listy: odwołanie do
+     czegoś, czego model nie dostał. */
+  const znane = new Set([...m.fakty.map((f) => f.id), ...m.wynikiN.map((w) => w.id)]);
+  const nieznane = s.uzyteFakty.filter((f) => !znane.has(f));
+  if (nieznane.length) return { ok: false, kod: "fakt_spoza_listy", lista: nieznane };
+  /* Nadmiar to BŁĄD, nie przycięcie: ucięte zdanie na końcu szkicu wyglądałoby
+     na gotowe, a wysyłka i tak odmówiłaby ponad limitem Allegro. */
+  if (s.tresc.length > LIMIT_ZNAKOW) return { ok: false, kod: "za_dlugi", lista: [String(s.tresc.length)] };
+
+  return { ok: true, tresc: bezZnacznikow(s.tresc), twierdzenia };
+}
+
+/** Zdanie dla agenta przy szkicu na kliknięcie. Poprawka z dopytania ma własne. */
+function zdanieOdrzucenia(w: { kod: KodSita; lista: string[] }, znakow: number): string {
+  switch (w.kod) {
+    case "zdjecie_spoza_listy":
+      return `Model powołał się na zdjęcie ${w.lista[0]}, którego nie dostał — szkic odrzucony.`;
+    case "numer_niezadeklarowany":
+      return `Model użył numeru ${w.lista[0]}, nie mówiąc, skąd go ma — szkic odrzucony. `
+        + "Kliknij ponownie albo napisz odpowiedź sam.";
+    case "fakt_spoza_listy":
+      return `Model powołał się na fakt ${w.lista[0]}, którego nie dostał — szkic odrzucony.`;
+    case "za_dlugi":
+      return `Model napisał ${znakow} znaków, a Allegro przyjmuje ${LIMIT_ZNAKOW} — szkic odrzucony.`;
+  }
+}
+
 /**
  * Ułożenie szkicu: fakty → model → SPRAWDZENIE → zapis. Rzuca, gdy dostawca
  * odmówił albo gdy model wyszedł poza fakty; w obu razach wywołanie było
@@ -880,65 +954,18 @@ export async function ulozSzkic(
     zapiszBlad(conversationId, slad, kto, teraz, (e as { zuzycie?: Tokeny }).zuzycie);
     throw e;
   }
-  const wynikiN = odp.wynikiNarzedzi ?? [];
-
   /* SPRAWDZENIE DETERMINISTYCZNE — orkiestrator, nie wyrocznia. Bez ponowienia:
      wywołanie jest zapłacone, agent widzi zdanie i klika drugi raz, jeśli chce. */
-  const twierdzenia = zRozpoznaniaNiepewne(ocenTwierdzenia(odp.twierdzenia), k.fakty);
-  /* Numer wolno wziąć z własnej wiedzy — ale nie po cichu. Niezadeklarowany
-     jest tym samym, czym był każdy numer spoza faktów do 0.252.0: zdaniem,
-     którego agent nie ma jak sprawdzić przed wysłaniem do klienta. */
-  /* ── ODCZYT ZE ZDJĘĆ: NAJPIERW TOŻSAMOŚĆ, POTEM ZAUFANIE ──────────────────
-     Odczyt powołany na `Z7`, gdy wysłaliśmy trzy zdjęcia, nie jest pomyłką
-     w numeracji — to jedyny znany sposób, żeby przemycić przez `numery-
-     SpozaFaktow` numer wzięty z niczego. Dlatego sprawdzenie jest takie samo
-     jak przy faktach spoza listy: wywraca szkic, nie filtruje po cichu. */
-  const wyslane = new Set(zdjecia.zdjecia.map((z) => z.numer));
-  const zmyslone = odp.odczytZeZdjec.filter((o) => !wyslane.has(o.zdjecie));
-  if (zmyslone.length) {
-    zapiszWywolanie(conversationId, odp, "blad",
-      `zdjecie_spoza_listy: ${zmyslone.map((o) => o.zdjecie).join(", ")}`, kto, teraz);
-    throw new BladOdpowiedziCopilota(
-      `Model powołał się na zdjęcie ${zmyslone[0]!.zdjecie}, którego nie dostał — szkic odrzucony.`,
-      200, "zdjecie_spoza_listy");
+  const sito = sitaSzkicu(odp, {
+    fakty: k.fakty, material: `${tekstFaktow}\n${k.watek}`,
+    wyslaneZdjecia: new Set(zdjecia.zdjecia.map((z) => z.numer)),
+    wynikiN: odp.wynikiNarzedzi ?? [],
+  });
+  if (!sito.ok) {
+    zapiszWywolanie(conversationId, odp, "blad", `${sito.kod}: ${sito.lista.join(", ")}`, kto, teraz);
+    throw new BladOdpowiedziCopilota(zdanieOdrzucenia(sito, odp.tresc.length), 200, sito.kod);
   }
-  /* Dopiero TERAZ odczyt staje się materiałem, z którego wolno cytować —
-     na równi z faktami i wątkiem. Bez tego każde poprawne odczytanie
-     tabliczki wywracałoby własny szkic na odsiewie numerów. */
-  const zOdczytu = odp.odczytZeZdjec.map((o) => o.tekst).join("\n");
-  /* Wynik narzędzia to nasza baza, jak fakty: numer z karty znalezionej
-     przez model jest sprawdzalny tak samo jak numer z F#. */
-  const zNarzedzi = wynikiN.map((w) => w.tresc).join("\n");
-  const material = `${tekstFaktow}\n${k.watek}${zOdczytu ? `\n${zOdczytu}` : ""}`
-    + (zNarzedzi ? `\n${zNarzedzi}` : "");
-
-  const obce = numeryNiezadeklarowane(odp.tresc, material, odp.twierdzenia);
-  if (obce.length) {
-    zapiszWywolanie(conversationId, odp, "blad", `numer_niezadeklarowany: ${obce.join(", ")}`, kto, teraz);
-    throw new BladOdpowiedziCopilota(
-      `Model użył numeru ${obce[0]}, nie mówiąc, skąd go ma — szkic odrzucony. `
-      + "Kliknij ponownie albo napisz odpowiedź sam.", 200, "numer_niezadeklarowany");
-  }
-  /* N# spoza wyników to ta sama furtka co F# spoza listy: odwołanie do
-     czegoś, czego model nie dostał. */
-  const znane = new Set([...k.fakty.map((f) => f.id), ...wynikiN.map((w) => w.id)]);
-  const nieznane = odp.uzyteFakty.filter((f) => !znane.has(f));
-  if (nieznane.length) {
-    zapiszWywolanie(conversationId, odp, "blad", `fakt_spoza_listy: ${nieznane.join(", ")}`, kto, teraz);
-    throw new BladOdpowiedziCopilota(
-      `Model powołał się na fakt ${nieznane[0]}, którego nie dostał — szkic odrzucony.`, 200, "fakt_spoza_listy");
-  }
-  /* Nadmiar to BŁĄD, nie przycięcie: ucięte zdanie na końcu szkicu wyglądałoby
-     na gotowe, a wysyłka i tak odmówiłaby ponad limitem Allegro. */
-  if (odp.tresc.length > LIMIT_ZNAKOW) {
-    zapiszWywolanie(conversationId, odp, "blad", `za_dlugi: ${odp.tresc.length}`, kto, teraz);
-    throw new BladOdpowiedziCopilota(
-      `Model napisał ${odp.tresc.length} znaków, a Allegro przyjmuje ${LIMIT_ZNAKOW} — szkic odrzucony.`,
-      200, "za_dlugi");
-  }
-
-  /* Dopiero TERAZ, po sprawdzeniu: odwołania były potrzebne kontroli, klientowi nie. */
-  const tresc = bezZnacznikow(odp.tresc);
+  const { tresc, twierdzenia } = sito;
   transaction(db(), () => {
     db().prepare(`INSERT INTO szkic_copilota
       (conversation_id,tresc,zastrzezenia,uzyte_fakty,message_id,model,at,przez,przez_user_id,

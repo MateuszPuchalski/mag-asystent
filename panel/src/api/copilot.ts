@@ -118,14 +118,15 @@ export function useOcenSzkic() {
   });
 }
 
-/* ── Dopytanie Copilota (0.332.0) ────────────────────────────────────────────
-   Agent pyta o szkic, model odpowiada JEMU. Nie ma stąd drogi do klienta:
-   żeby coś z wymiany trafiło do wiadomości, agent układa szkic od nowa.
+/* ── Dopytanie Copilota ──────────────────────────────────────────────────────
+   Agent wydaje polecenie albo zadaje pytanie o tekst z pola odpowiedzi.
+   Polecenie daje nową wersję szkicu, pytanie samą odpowiedź dla agenta.
+   Nowa wersja wchodzi do pola po stronie ekranu, jako stan, nie zapis.
 
-   Wymiany trzymamy pod WŁASNYM kluczem, nie w `rozmowa(id)`. Powód jest
-   praktyczny: dopytanie nie zmienia osi rozmowy ani szkicu, więc doklejenie
-   go do tamtego klucza kazałoby przy każdym pytaniu odświeżać całą oś —
-   z migotaniem listy wiadomości pod ręką agenta. */
+   Wymiany trzymamy pod WŁASNYM kluczem, nie w `rozmowa(id)`. Wymiana nie
+   zmienia osi rozmowy ani zapisanego szkicu Copilota. Doklejenie jej do
+   tamtego klucza kazałoby przy każdym pytaniu odświeżać całą oś, z migotaniem
+   listy wiadomości pod ręką agenta. */
 
 /**
  * Ile znaków może mieć pytanie.
@@ -148,16 +149,24 @@ export function useWymianyCopilota(rozmowaId: number) {
   });
 }
 
+/**
+ * Polecenie albo pytanie do Copilota, z tekstem pola odpowiedzi.
+ *
+ * `szkic` to pole w chwili kliknięcia, także puste. Model poprawia TEN tekst,
+ * z ręcznymi zmianami agenta, a nie zapisany szkic Copilota. Inaczej
+ * poprawka kasowałaby to, co agent dopisał przed zadaniem polecenia.
+ */
 export function useZadajPytanie() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (v: { rozmowaId: number; pytanie: string }) =>
+    mutationFn: (v: { rozmowaId: number; pytanie: string; szkic: string }) =>
       api<{ wymiana: WymianaCopilota }>("/api/obsluga/copilot/pytanie",
         { method: "POST", body: JSON.stringify(v) }),
     onSettled: (_d, _e, v) => {
       qc.invalidateQueries({ queryKey: kluczeCopilota.pytania(v.rozmowaId) });
-      /* Pomiar TAK, oś rozmowy NIE: każde pytanie kosztuje i ma stanąć
-         w rachunku, ale szkicu ani wiadomości nie rusza ani o znak. */
+      /* Pomiar TAK, oś rozmowy NIE. Każde wywołanie kosztuje i ma stanąć
+         w rachunku. Zapisany szkic Copilota zostaje bez zmian, bo nowa
+         wersja żyje w wymianie i w polu agenta. */
       qc.invalidateQueries({ queryKey: kluczeCopilota.pomiar });
     },
   });

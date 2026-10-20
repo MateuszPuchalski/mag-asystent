@@ -1,14 +1,14 @@
 import { describe, expect, test, vi } from "vitest";
-import { render, screen, fireEvent } from "@testing-library/react";
+import { render, screen, fireEvent, within } from "@testing-library/react";
 import { Dopytanie } from "./Dopytanie";
-import type { WymianaCopilota } from "../api/typy";
+import type { SzkicCopilota, WymianaCopilota } from "../api/typy";
 
-/* ── Dopytanie Copilota (0.332.0) ────────────────────────────────────────────
-   Jedna granica jest tu ważniejsza od wszystkich razem: ODPOWIEDŹ IDZIE DO
-   AGENTA. Gdyby ekran dał przycisk „wstaw do szkicu", jedno kliknięcie
-   omijałoby wszystkie sita, którymi szkic jest sprawdzany przed wysłaniem
-   do klienta — a te sita są jedynym powodem, dla którego tamtemu tekstowi
-   da się ufać. Dlatego pierwszy test pilnuje CZEGOŚ, CZEGO NIE MA.          */
+/* ── Dopytanie Copilota ──────────────────────────────────────────────────────
+   Jedna granica jest tu ważniejsza od wszystkich razem: NOTKA IDZIE DO
+   AGENTA. Przycisk „wstaw” przy notce omijałby wszystkie sita, którymi szkic
+   jest sprawdzany przed wysłaniem do klienta. Przycisk ma tylko WERSJA, bo
+   serwer przepuścił ją przez te same sita. Pierwszy test pilnuje obu stron
+   tej granicy naraz.                                                       */
 
 const w = (n: Partial<WymianaCopilota> = {}): WymianaCopilota => ({
   id: 1, pytanie: "Czy ten nóż pasuje do 46 cm?",
@@ -17,32 +17,51 @@ const w = (n: Partial<WymianaCopilota> = {}): WymianaCopilota => ({
   przez: "A. Lewandowska", ...n,
 });
 
-const props = (n: Partial<Parameters<typeof Dopytanie>[0]> = {}) => ({
-  wymiany: [] as WymianaCopilota[], wylaczony: false, blad: null,
-  pracuje: false, onPytaj: vi.fn(), limitZnakow: 600, ...n,
+const ORYGINAL = "Dzień dobry, nóż pasuje do kosiarki.";
+const szkic = (n: Partial<SzkicCopilota> = {}): SzkicCopilota => ({
+  tresc: ORYGINAL, zastrzezenia: [], uzyteFakty: [], messageId: 1, model: "m",
+  at: "2026-09-14T09:00:00.000Z", przez: "Copilot", ocena: null, twierdzenia: [], odczytZeZdjec: [], ...n,
+});
+
+/** Wymiana-polecenie: model poprawił `przed` na `po`. */
+const poprawka = (id: number, przed: string, po: string, n: Partial<WymianaCopilota> = {}) => w({
+  id, pytanie: "dodaj model kosiarki", odpowiedz: "Dopisałem model kosiarki.",
+  at: `2026-09-14T10:0${id}:00.000Z`, szkicPrzed: przed, szkicPo: po,
+  szkicTwierdzenia: [], szkicZastrzezenia: [], szkicOdrzucony: null, ...n,
+});
+
+type Props = Parameters<typeof Dopytanie>[0];
+const props = (n: Partial<Props> = {}): Props => ({
+  wymiany: [] as WymianaCopilota[], szkic: szkic(), pole: "", onWstaw: vi.fn(),
+  wylaczony: false, blad: null, pracuje: false, onPytaj: vi.fn(), limitZnakow: 600, ...n,
 });
 
 /**
- * Renderuje i ROZWIJA blok (0.342.0).
+ * Renderuje i ROZWIJA blok.
  *
- * Od tego wydania dopytanie jest zwinięte, dopóki nie ma o co pytać: pole
- * i przycisk zajmowały wysokość w każdej rozmowie, także tej, w której agent
- * niczego nie kwestionuje. `getByRole` pomija elementy ukryte, więc test
- * badający pole MUSI je wpierw otworzyć — inaczej sprawdzałby pustkę.
+ * Dopytanie jest zwinięte, dopóki nie ma o co pytać. `getByRole` pomija
+ * elementy ukryte, więc test badający pole MUSI je wpierw otworzyć —
+ * inaczej sprawdzałby pustkę.
  */
-function otworz(p: Parameters<typeof Dopytanie>[0]) {
+function otworz(p: Props) {
   render(<Dopytanie {...p} />);
   fireEvent.click(screen.getByRole("button", { name: /Dopytaj Copilota/ }));
 }
 
 describe("dopytanie Copilota", () => {
-  test("odpowiedź NIE MA przycisku wstawiania — to jest granica, nie brak", () => {
+  test("notka NIE MA przycisku wstawiania, wersja MA — to jest granica, nie brak", () => {
     /* Blok z odbytą wymianą otwiera się sam, więc nie ma tu czego rozwijać —
        i właśnie dlatego brak przycisku jest tu sprawdzalny, a nie pozorny. */
-    render(<Dopytanie {...props({ wymiany: [w()] })} />);
-    for (const slowo of [/wstaw/i, /zastąp/i]) {
+    const { unmount } = render(<Dopytanie {...props({ wymiany: [w()] })} />);
+    for (const slowo of [/wstaw/i, /zastąp/i, /przywróć/i]) {
       expect(screen.queryByRole("button", { name: slowo })).toBeNull();
     }
+    unmount();
+
+    const p = props({ wymiany: [poprawka(1, ORYGINAL, `${ORYGINAL} Model LS 46.`)] });
+    render(<Dopytanie {...p} />);
+    fireEvent.click(screen.getByRole("button", { name: /Wstaw do odpowiedzi/ }));
+    expect(p.onWstaw).toHaveBeenCalledWith(`${ORYGINAL} Model LS 46.`);
   });
 
   test("pod odpowiedzią stoi, co Copilot sprawdził w bazie — i nic, gdy nie sięgał", () => {
@@ -58,10 +77,9 @@ describe("dopytanie Copilota", () => {
     expect(screen.getAllByText(/Sprawdził w bazie/)).toHaveLength(1);
   });
 
-  test("ekran mówi wprost, kto czyta odpowiedź", () => {
+  test("zwinięty blok mówi, co da się w nim zrobić", () => {
     render(<Dopytanie {...props()} />);
-    /* Krótko od 0.517.0: „tylko dla Ciebie" zamiast pięciu słów o tym samym. */
-    expect(screen.getByText(/tylko dla Ciebie/i)).toBeTruthy();
+    expect(screen.getByText(/poprawi szkic albo odpowie/i)).toBeTruthy();
   });
 
   test("puste pytanie nie da się wysłać", () => {
@@ -80,6 +98,12 @@ describe("dopytanie Copilota", () => {
 
     expect(p.onPytaj).toHaveBeenCalledWith("Skąd to wiesz?");
     expect((pole as HTMLTextAreaElement).value).toBe("");
+  });
+
+  test("podpowiedź pola pokazuje polecenie, nie tylko pytanie", () => {
+    otworz(props());
+    expect(screen.getByLabelText(/pytanie do copilota/i))
+      .toHaveAttribute("placeholder", expect.stringMatching(/^np\. dodaj .* albo zapytaj:/));
   });
 
   test("pytanie dłuższe od limitu blokuje przycisk, zanim żądanie poleci", () => {
@@ -115,9 +139,89 @@ describe("dopytanie Copilota", () => {
     otworz(props({ blad: "Ta rozmowa ma już 20 dopytań." }));
     expect(screen.getByText(/ma już 20 dopytań/)).toBeTruthy();
   });
+
+  test("stara wymiana, zapisana przed poprawianiem szkicu, renderuje się jak dotąd", () => {
+    /* Wiersz z bazy sprzed poprawiania nie ma żadnego pola szkicu. */
+    const stara = { id: 7, pytanie: "Skąd wiesz?", odpowiedz: "Z karty towaru.", twierdzenia: [],
+      model: "m", at: "2026-09-14T10:00:00.000Z", przez: "A. Lewandowska" } as WymianaCopilota;
+    render(<Dopytanie {...props({ wymiany: [stara] })} />);
+    expect(screen.getByText("Z karty towaru.")).toBeInTheDocument();
+    expect(screen.queryByRole("group", { name: /Wersja/ })).toBeNull();
+    expect(screen.queryByText(/nie poprawił szkicu/)).toBeNull();
+  });
 });
 
-describe("zwijanie dopytania (0.342.0)", () => {
+describe("wersje szkicu w dopytaniu", () => {
+  const V2 = "Dzień dobry, nóż pasuje do kosiarki LS 46.";
+  const V3 = "Dzień dobry, nóż pasuje do kosiarki LS 46. Wysyłka dziś.";
+
+  test("różnica słów: dopisane i skreślone mają słowo dla czytnika, nie tylko barwę", () => {
+    render(<Dopytanie {...props({ wymiany: [poprawka(1, ORYGINAL, "Dzień dobry, nóż pasuje do LS 46.")] })} />);
+    const wersja = screen.getByRole("group", { name: "Wersja 2" });
+    const ins = wersja.querySelector("ins");
+    const del = wersja.querySelector("del");
+    expect(ins).toHaveTextContent("dodano: LS 46.");
+    expect(del).toHaveTextContent("usunięto: kosiarki.");
+    expect(within(wersja).getByText("dodano:")).toHaveClass("sr-only");
+    /* Podsumowanie słowami, odmienione: „+2 słowa”, „−1 słowo”. */
+    expect(within(wersja).getByText("+2 słowa, −1 słowo")).toBeInTheDocument();
+  });
+
+  test("wersja w polu mówi „w polu” zamiast przycisku", () => {
+    render(<Dopytanie {...props({ pole: `${V2}\n`, wymiany: [poprawka(1, ORYGINAL, V2)] })} />);
+    const wersja = screen.getByRole("group", { name: "Wersja 2" });
+    expect(within(wersja).getByText("w polu")).toBeInTheDocument();
+    expect(within(wersja).queryByRole("button")).toBeNull();
+  });
+
+  test("starsza wersja ma „Przywróć tę wersję” ze swoją treścią, a jej różnica jest zwinięta", () => {
+    const p = props({ pole: V3, wymiany: [poprawka(1, ORYGINAL, V2), poprawka(2, V2, V3)] });
+    render(<Dopytanie {...p} />);
+    const starsza = screen.getByRole("group", { name: "Wersja 2" });
+    const najnowsza = screen.getByRole("group", { name: "Wersja 3" });
+    expect(within(najnowsza).getByText("w polu")).toBeInTheDocument();
+    expect(within(starsza).getByTestId("roznica-szkicu").closest("details")).not.toHaveAttribute("open");
+    expect(within(najnowsza).getByTestId("roznica-szkicu").closest("details")).toBeNull();
+    fireEvent.click(within(starsza).getByRole("button", { name: /Przywróć tę wersję/ }));
+    expect(p.onWstaw).toHaveBeenCalledWith(V2);
+    /* Podpis zwiniętego bloku liczy wymiany i poprawki, odmienione. */
+    expect(screen.getByText("2 wymiany · 2 poprawki")).toBeInTheDocument();
+  });
+
+  test("nagłówek wersji niesie numer i godzinę", () => {
+    render(<Dopytanie {...props({ wymiany: [poprawka(1, ORYGINAL, V2)] })} />);
+    expect(within(screen.getByRole("group", { name: "Wersja 2" })).getByText(/^Wersja 2 · \d{1,2}:\d{2}$/))
+      .toBeInTheDocument();
+  });
+
+  test("odrzucona poprawka mówi, dlaczego — i nie ma wersji", () => {
+    render(<Dopytanie {...props({ wymiany: [poprawka(1, ORYGINAL, "", {
+      szkicPo: null,
+      szkicOdrzucony: "Copilot użył numeru LC-9999, nie mówiąc, skąd go ma, więc szkic został bez zmian." })] })} />);
+    /* Zdanie serwera stoi samo, bez doklejonego wstępu, który je dublował. */
+    expect(screen.getByText("Copilot użył numeru LC-9999, nie mówiąc, skąd go ma, więc szkic został bez zmian."))
+      .toBeInTheDocument();
+    expect(screen.queryByText(/nie poprawił szkicu/)).toBeNull();
+    expect(screen.queryByRole("group", { name: /Wersja/ })).toBeNull();
+  });
+
+  test("ręczne zmiany agenta przed poleceniem stoją osobno, zwinięte", () => {
+    const zMoimi = `${V2} Pozdrawiam, Ania.`;
+    render(<Dopytanie {...props({ wymiany: [poprawka(1, ORYGINAL, V2), poprawka(2, zMoimi, V3)] })} />);
+    const luka = screen.getByText("Twoje zmiany przed poprawką").closest("details")!;
+    expect(luka).not.toHaveAttribute("open");
+    expect(luka.querySelector("ins")).toHaveTextContent("dodano: Pozdrawiam, Ania.");
+    /* Pierwsza poprawka szła od nietkniętego oryginału — luki nie ma. */
+    expect(screen.getAllByText("Twoje zmiany przed poprawką")).toHaveLength(1);
+  });
+
+  test("cudza rozmowa gasi też przycisk wersji", () => {
+    render(<Dopytanie {...props({ wylaczony: true, wymiany: [poprawka(1, ORYGINAL, V2)] })} />);
+    expect(screen.getByRole("button", { name: /Wstaw do odpowiedzi/ })).toBeDisabled();
+  });
+});
+
+describe("zwijanie dopytania", () => {
   test("bez wymian blok jest ZWINIĘTY — wątpliwość rodzi się po przeczytaniu szkicu", () => {
     render(<Dopytanie {...props()} />);
     expect(screen.queryByRole("button", { name: /zapytaj/i })).toBeNull();

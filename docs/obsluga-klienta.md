@@ -276,6 +276,16 @@ z firmy nie wychodzi ani jeden znak. Klasyfikacja nie pisze do klienta.
   tego test narzędzi (`copilot-narzedzia.test.ts`).
 - **Szkic nie staje się odpowiedzią sam.** Stoi w pustym polu jako tekst do
   poprawiania, nie zapisany; do klienta idzie po „Wyślij".
+- **Poprawka szkicu wysyła tekst z pola, zamaskowany.** Polecenie w „Dopytaj
+  Copilota" niesie do dostawcy tekst, który agent ma w polu. Przechodzi ono
+  to samo maskowanie co nasze wysłane wiadomości. Znaczniki są numerowane, więc
+  serwer oddaje w nowej wersji te same wartości. Znacznik, którego serwer nie
+  wydał, odrzuca poprawkę. Cena: numer części w kształcie telefonu też znika,
+  więc model go nie widzi i nie poprawi.
+- **Wersje szkicu zostają w `copilot_pytanie`**: tekst sprzed poprawki i po
+  niej. To nasz tekst do klienta, ta sama klasa danych co szkic zespołu
+  i wysłana wiadomość. Nie znika po wysyłce, bo jest historią pracy nad
+  odpowiedzią. Dziennik dostaje wyłącznie długości.
 
 **Zdjęcia w rozmowie wychodzą do dostawcy, także bez kliknięcia.** Pikseli
 zamaskować się nie da: zdjęcie bywa paragonem, etykietą albo ekranem telefonu

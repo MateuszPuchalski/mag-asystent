@@ -598,32 +598,75 @@ export const nadawcaSzkicuAnthropic: NadawcaSzkicu =
   };
 };
 
-/* ── Dopytanie Copilota (0.332.0) ────────────────────────────────────────────
-   Odpowiedź dla AGENTA, nie dla klienta, i instrukcja mówi to w pierwszym
-   zdaniu. Cała reszta z niej wynika: bez form grzecznościowych, bez zakazu
-   półpauzy, bez limitu znaków wiadomości, za to z prawem powiedzenia wprost
-   „fakty tego nie rozstrzygają".
+/* ── Dopytanie Copilota ──────────────────────────────────────────────────────
+   Jedno wywołanie, dwa teksty. `odpowiedz` jest dla AGENTA, nie dla klienta,
+   i instrukcja mówi to w pierwszym zdaniu. Cała reszta z niej wynika: bez
+   form grzecznościowych, bez zakazu półpauzy, bez limitu znaków wiadomości,
+   za to z prawem powiedzenia wprost „fakty tego nie rozstrzygają". Ta notka
+   NIE przechodzi przez sita szkicu i to jest zamierzone (patrz nagłówek
+   `services/copilot-pytania.ts`): model wolno tu nazwać numer, którego nie
+   mamy w kartotece, bo właśnie po to agent pyta.
 
-   Ta odpowiedź NIE przechodzi przez sita szkicu i to jest zamierzone (patrz
-   nagłówek `services/copilot-pytania.ts`). Model wolno tu nazwać numer,
-   którego nie mamy w kartotece — właśnie po to agent pyta.                 */
+   `szkic` to cała nowa wersja tekstu z pola, gdy agent prosi o zmianę. Ten
+   tekst idzie do klienta, więc serwis przepuszcza go przez wszystkie sita
+   szkicu. Kształt jest ten sam co przy szkicu na kliknięcie, bo te same sita
+   czytają te same pola. `nullable`, bo czyste pytanie wersji nie ma, a wyjście
+   strukturalne wymaga wszystkich kluczy.                                    */
 
 const OdpowiedzPytania = z.object({
-  tresc: z.string(),
+  odpowiedz: z.string(),
   twierdzenia: z.array(Twierdzenie),
+  szkic: Szkic.nullable(),
 });
 
+/* ── POWODY REGUŁ POPRAWIANIA ────────────────────────────────────────────────
+   Decyzja właściciela: dopytanie ma POPRAWIAĆ szkic, a nie mówić, co poprawić.
+   Model przepisuje szkic sam, bo rada „zamień to na tamto" każe agentowi
+   przepisywać ręcznie tekst, który model umie napisać. Rozpoznanie pytania
+   i polecenia zostaje przy modelu, bo agent pisze jedno pole i nie ma
+   wybierać trybu.
+
+   Reguła 6, „resztę słowo w słowo": tekst w polu niesie ręczne zmiany agenta
+   i są one celowe. Panel pokazuje różnicę między wersjami, a przepisany przy
+   okazji akapit zasłoniłby w niej jedyną zmianę, o którą agent prosił.
+
+   Reguła 7: łamanie formy w nietkniętym tekście należy do agenta. Poprawione
+   po cichu poszerzałoby różnicę i nadpisywało jego decyzję, więc model tylko
+   o nim mówi.
+
+   Reguła 8: znaczniki to zamaskowane dane klienta z pola. Serwis podmienia
+   z powrotem wyłącznie te, które sam wydał, a znacznik spoza listy odrzuca
+   całą wersję, bo jego wartości model nie widział.
+
+   Reguła 9: zmiana, której nie dźwigają fakty ani narzędzia, wywróciłaby się
+   na sitach. Szkic bez zmian z jednym zdaniem „czego brakuje" jest wart
+   więcej niż wersja odrzucona po zapłaconym wywołaniu.
+
+   Reguła 10: sita czytają deklaracje numerów z `szkic.twierdzenia`, a panel
+   pokazuje je obok wersji. Twierdzenia notki wylądowałyby przy pytaniu,
+   nie przy tekście dla klienta.
+
+   Zakaz półpauzy dotyczy tekstu dla klienta i stoi w instrukcji szkicu.
+   Zdania tej instrukcji też go nie mają, bo model czyta rejestr instrukcji
+   jako wzorzec (patrz uwaga przy `INSTRUKCJA_SZKICU`).                     */
 const INSTRUKCJA_PYTANIA = [
-  "Odpowiadasz AGENTOWI biura obsługi, nie klientowi. Tekst, który piszesz,",
-  "nie pójdzie do klienta: agent czyta go, żeby rozstrzygnąć wątpliwość przy",
-  "szkicu odpowiedzi.",
+  "Odpowiadasz AGENTOWI biura obsługi, nie klientowi. Agent pracuje nad szkicem",
+  "odpowiedzi dla klienta i albo o coś pyta, albo prosi o zmianę tego szkicu.",
   "",
-  "Z tego wynika forma. Bez zwrotów grzecznościowych, bez wstępu, bez",
-  "podsumowania na koniec. Jedno konkretne zdanie bije akapit ogólników.",
-  "Agent zna towar i skróty branżowe, więc nie tłumacz podstaw.",
+  "Pole `odpowiedz` czyta tylko agent. Z tego wynika jego forma: bez zwrotów",
+  "grzecznościowych, bez wstępu, bez podsumowania na koniec. Jedno konkretne",
+  "zdanie bije akapit ogólników. Agent zna towar i skróty branżowe, więc nie",
+  "tłumacz podstaw.",
   "",
-  "Dostajesz FAKTY z naszej bazy, ROZMOWĘ z klientem, czasem ZDJĘCIA od",
-  "klienta, aktualny SZKIC odpowiedzi i poprzednie dopytania.",
+  "Dostajesz FAKTY z naszej bazy, ROZMOWĘ Z KLIENTEM, czasem ZDJĘCIA od klienta,",
+  "SZKIC W POLU AGENTA (tekst, który agent ma teraz w polu odpowiedzi, razem",
+  "z jego własnymi zmianami), poprzednie dopytania i PYTANIE AGENTA.",
+  "",
+  "PYTANIE CZY POLECENIE. Sam rozpoznaj, czego agent chce.",
+  "- Gdy agent prosi o zmianę szkicu (dodaj, zamień, usuń, skróć, przeredaguj),",
+  "  wpisz do `szkic` CAŁĄ nową wersję. W `odpowiedz` napisz jednym lub dwoma",
+  "  zdaniami, co zmieniłeś, a po nich uwagi, jeśli są.",
+  "- Gdy agent tylko pyta, `szkic` = null, a odpowiedź idzie do `odpowiedz`.",
   "",
   "ZASADY:",
   "1. ODPOWIEDZ NA ZADANE PYTANIE. Agent pyta o jedną rzecz i chce jednej",
@@ -631,26 +674,56 @@ const INSTRUKCJA_PYTANIA = [
   "2. „FAKTY TEGO NIE ROZSTRZYGAJĄ” JEST PEŁNOPRAWNĄ ODPOWIEDZIĄ i często",
   "   najcenniejszą. Powiedz to wprost i dopowiedz, CO by to rozstrzygnęło:",
   "   pomiar, zdjęcie tabliczki, numer z części, pytanie do klienta.",
-  "3. KAŻDE TWIERDZENIE TECHNICZNE WPISZ DO `twierdzenia` ze źródłem, tak samo",
-  "   jak przy szkicu. `fakty` to nasza baza, `oferta` to opis naszej aukcji,",
-  "   `zdjecie` to fotografia od klienta, `model` to Twoja własna wiedza.",
-  "   Pewność przyznaje serwer, więc nie zawyżaj jej dla efektu.",
-  "4. WOLNO CI NAZWAĆ NUMER, KTÓREGO NIE MA W FAKTACH, i to jest różnica",
-  "   wobec szkicu. Agent pyta właśnie o takie rzeczy. Podpisz je źródłem",
-  "   `model` i powiedz, że u nas tego nie ma.",
-  "5. NIE PRZEPISUJ SZKICU. Agent go widzi. Gdy pyta, czy coś w nim poprawić,",
-  "   powiedz co i dlaczego, a nie oddawaj całości od nowa.",
-  "6. Gdy pytanie dotyczy zdjęcia, opisuj TO, CO WIDAĆ, i cytuj numer zdjęcia.",
+  "3. KAŻDE TWIERDZENIE TECHNICZNE Z `odpowiedz` WPISZ DO `twierdzenia` ze",
+  "   źródłem, tak samo jak przy szkicu. `fakty` to nasza baza, `oferta` to opis",
+  "   naszej aukcji, `zdjecie` to fotografia od klienta, `model` to Twoja własna",
+  "   wiedza. Pewność przyznaje serwer, więc nie zawyżaj jej dla efektu.",
+  "4. W `odpowiedz` WOLNO CI NAZWAĆ NUMER, KTÓREGO NIE MA W FAKTACH. Agent pyta",
+  "   właśnie o takie rzeczy. Podpisz go źródłem `model` i powiedz, że u nas",
+  "   tego nie ma. W `szkic` obowiązuje reguła 2 szkicu.",
+  "5. Gdy pytanie dotyczy zdjęcia, opisuj TO, CO WIDAĆ, i cytuj numer zdjęcia.",
   "   Nieczytelnego nie zgaduj.",
+  "",
+  "POPRAWIANIE SZKICU:",
+  "6. ZMIENIAJ WYŁĄCZNIE TO, O CO PROSI AGENT. Resztę przepisz słowo w słowo,",
+  "   z tymi samymi akapitami.",
+  "7. Reguły szkicu (niżej) obowiązują w tym, co dopisujesz albo zmieniasz.",
+  "   Gdy nietknięty tekst agenta łamie regułę formy, powiedz o tym",
+  "   w `odpowiedz` i nie przepisuj go.",
+  "8. Znaczniki w rodzaju [telefon 1], [adres 1] i [login] przepisz bez zmian",
+  "   i nie dodawaj nowych.",
+  "9. Gdy fakty ani narzędzia nie dźwigają zmiany, daj `szkic` = null",
+  "   i powiedz w `odpowiedz`, czego brakuje.",
+  "10. Przy nowej wersji jej twierdzenia idą do `szkic.twierdzenia`, a zewnętrzne",
+  "   `twierdzenia` zostaw puste.",
   "",
   "NARZĘDZIA. Masz narzędzia, które czytają naszą bazę: kartotekę i treść",
   "naszych ofert. Gdy FAKTY nie rozstrzygają pytania, sprawdź w bazie, zanim",
   "odpowiesz z własnej wiedzy.",
-  "- Wynik narzędzia to baza sklepu: źródło `fakty`. W `odwolanie` wpisz",
-  "  nazwę narzędzia i zapytanie.",
+  "- Wynik narzędzia zaczyna się od numeru w nawiasie, np. [N2]. To baza sklepu:",
+  "  źródło `fakty`, a numer N2 wpisz do `odwolanie`.",
   "- Wynik „nie ma w bazie” znaczy „nie wiemy”, a nie „nie pasuje”.",
   "",
-  "Pola odpowiedzi: `tresc` (odpowiedź dla agenta) i `twierdzenia`.",
+  "Pola odpowiedzi: `odpowiedz` (odpowiedź albo notka dla agenta), `twierdzenia`",
+  "(skąd wiesz to, co piszesz w `odpowiedz`) i `szkic` (cała nowa wersja",
+  "szkicu albo null).",
+].join("\n");
+
+/* Instrukcja szkicu wchodzi BAJT W BAJT, bez przeróbek pod dopytanie. Reguły
+   tekstu dla klienta stoją wtedy w jednym miejscu i poprawka szkicu dostaje
+   je razem z każdą przyszłą zmianą. Akapit łączący mówi tylko, gdzie
+   obowiązują i że opis pól na jej końcu dotyczy obiektu `szkic`.
+
+   Całość jest STAŁA, jak każda instrukcja tu: prefiks stały to cache. */
+const INSTRUKCJA_DOPYTANIA = [
+  INSTRUKCJA_PYTANIA,
+  "",
+  "REGUŁY SZKICU. Niżej stoi instrukcja, według której powstaje szkic. Obowiązuje",
+  "w obiekcie `szkic`, w tym, co dopisujesz albo zmieniasz. Jej ROZMOWA to sekcja",
+  "ROZMOWA Z KLIENTEM, a opis pól na jej końcu dotyczy pól obiektu `szkic`.",
+  "W `szkic.tresc` stoi cała nowa wersja tekstu z pola.",
+  "",
+  INSTRUKCJA_SZKICU,
 ].join("\n");
 
 /* Ile rund narzędzi na jedno dopytanie. Pytanie o towar to zwykle dwie:
@@ -695,9 +768,10 @@ async function rozmowaZNarzedziami<T>(o: {
   /** Dopełnienie zdania „Model nie oddał …” przy pustej odpowiedzi. */
   coNieOddal: string;
   /**
-   * Czy wynik narzędzia wraca do modelu z przedrostkiem `[N#]`. Tylko szkic:
-   * on cytuje wyniki i serwis sprawdza te odwołania. Dopytanie podpisuje
-   * wynik nazwą narzędzia, więc numer byłby mu szumem bez kontroli.
+   * Czy wynik narzędzia wraca do modelu z przedrostkiem `[N#]`. Szkic
+   * i dopytanie cytują wyniki numerem, a serwis sprawdza te odwołania sitami
+   * szkicu: bez numeru model nie ma czego wpisać do `uzyteFakty`, a sito
+   * faktów odrzuciłoby poprawkę opartą na kartotece.
    */
   numerujWyniki: boolean;
 }): Promise<WynikRozmowy<T>> {
@@ -783,31 +857,37 @@ async function rozmowaZNarzedziami<T>(o: {
   }
 }
 
-/** Dopytanie z narzędziami (0.507.0) — przez wspólną pętlę. */
+/** Dopytanie z narzędziami — przez wspólną pętlę. */
 export const nadawcaPytaniaAnthropic: NadawcaPytania = async (k): Promise<OdpowiedzNaPytanie> => {
   const start = Date.now();
   const historia = k.historia
     .map((h, i) => `[D${i + 1}] AGENT: ${h.pytanie}\n[D${i + 1}] TY: ${h.odpowiedz}`)
     .join("\n");
+  /* Sekcja mówi, że TO jest tekst do poprawiania: model poprawia pole agenta
+     z jego ręcznymi zmianami, a nie swój dawny szkic. */
   const tekst = [
     `FAKTY:\n${String(k.fakty)}`,
     `ROZMOWA Z KLIENTEM:\n${String(k.watek)}`,
-    k.szkic ? `AKTUALNY SZKIC:\n${k.szkic}` : "AKTUALNY SZKIC: (jeszcze go nie ma)",
+    k.szkic ? `SZKIC W POLU AGENTA (to poprawiasz):\n${String(k.szkic)}`
+      : "SZKIC W POLU AGENTA (to poprawiasz): (jeszcze go nie ma)",
     historia ? `POPRZEDNIE DOPYTANIA:\n${historia}` : "",
     `PYTANIE AGENTA:\n${k.pytanie}`,
   ].filter(Boolean).join("\n\n");
 
   const r = await rozmowaZNarzedziami({
-    system: INSTRUKCJA_PYTANIA,
+    system: INSTRUKCJA_DOPYTANIA,
     format: zodOutputFormat(OdpowiedzPytania),
     narzedzia: k.narzedzia,
     sufitRund: SUFIT_RUND_NARZEDZI,
-    /* Odpowiedź bywa wyliczeniem czterech rzeczy do sprawdzenia. */
-    maxTokens: 4000,
+    /* Wyjście niesie notkę, jej twierdzenia i CAŁY szkic z rachunkiem źródeł,
+       czyli więcej niż szkic na kliknięcie (4500), a myślenie liczy się do
+       tego samego sufitu. Ucięty JSON to zapłacone wywołanie bez odpowiedzi,
+       a sufit nic nie kosztuje. Liczy się NA RUNDĘ. */
+    maxTokens: 8000,
     /* Średni wysiłek: to jest rozstrzyganie wątpliwości, nie etykieta. */
     wysilek: "medium",
     coNieOddal: "odpowiedzi",
-    numerujWyniki: false,
+    numerujWyniki: true,
     wiadomosci: [{
       role: "user",
       content: k.zdjecia.length === 0 ? tekst : [
@@ -819,13 +899,22 @@ export const nadawcaPytaniaAnthropic: NadawcaPytania = async (k): Promise<Odpowi
       ],
     }],
   });
+  const s = r.wynik.szkic;
   return {
-    tresc: r.wynik.tresc,
+    tresc: r.wynik.odpowiedz,
     twierdzenia: r.wynik.twierdzenia,
+    szkic: s ? {
+      tresc: s.tresc, uzyteFakty: s.uzyteFakty, zastrzezenia: s.zastrzezenia, twierdzenia: s.twierdzenia,
+      /* Ten sam odsiew kształtu co przy szkicu na kliknięcie. */
+      odczytZeZdjec: s.odczytZeZdjec
+        .map((o) => ({ zdjecie: o.zdjecie.trim(), tekst: o.tekst.trim() }))
+        .filter((o) => o.zdjecie && o.tekst),
+    } : null,
     model: r.model,
     zuzycie: r.zuzycie,
     ms: Date.now() - start,
     narzedzia: r.uzyte,
+    wynikiNarzedzi: r.wyniki,
   };
 };
 

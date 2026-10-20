@@ -433,3 +433,43 @@ test("8. szkic, który sięgał do kartoteki, czeka na agenta z powodem przy pro
   b2.d.prepare("UPDATE szkic_copilota SET narzedzia='to nie JSON' WHERE conversation_id=?").run(r2.rozmowa);
   assert.equal((await biegnij(b2, [r2.rozmowa]).wynik).wyslanych, 0);
 });
+
+test("9. agent dopytuje Copilota o szkic: wymiana nie starsza niż szkic wstrzymuje automat", async () => {
+  /* Nowa wersja żyje w polu agenta, a `szkic_copilota` zostaje stary. Automat
+     wysłałby klientowi tekst, który agent właśnie zmienia albo kwestionuje. */
+  const wymiana = (b: Baza, r: ReturnType<typeof gotowa>, at: string, przed: string | null, po: string | null) =>
+    b.d.prepare(`INSERT INTO copilot_pytanie(conversation_id,pytanie,odpowiedz,model,at,przez,szkic_przed,szkic_po)
+      VALUES (?,?,?,?,?,?,?,?)`).run(r.rozmowa, "Dodaj numer przesyłki", "Dodałem.", "m", at, "Ala", przed, po);
+
+  const b = baza();
+  const r = gotowa(b);
+  wymiana(b, r, "2026-10-06T09:55:00.000Z", SZKIC, `${SZKIC} Numer przesyłki jest w zakładce zamówienia.`);
+  await pominietaZ(b, r, "poprawka");
+
+  /* Ta sama sekunda co szkic, zapisana z milisekundami. Jako tekst stałaby
+     przed szkicem i automat by wysłał. */
+  const b1 = baza();
+  const r1 = gotowa(b1);
+  wymiana(b1, r1, "2026-10-06T09:52:00.000Z", SZKIC, "Inna wersja.");
+  await pominietaZ(b1, r1, "poprawka");
+
+  /* Poprawka odrzucona przez sita: szkic został stary, ale agent chciał go
+     zmienić. Automat wysłałby właśnie ten tekst. */
+  const c = baza();
+  const s = gotowa(c);
+  wymiana(c, s, "2026-10-06T09:55:00.000Z", SZKIC, null);
+  await pominietaZ(c, s, "poprawka");
+
+  /* Samo pytanie też wstrzymuje: polecenie, któremu model odmówił, zapisuje
+     się tak samo, a pytanie o szkic znaczy, że agent mu nie ufa. */
+  const c2 = baza();
+  const s2 = gotowa(c2);
+  wymiana(c2, s2, "2026-10-06T09:55:00.000Z", null, null);
+  await pominietaZ(c2, s2, "poprawka");
+
+  /* Wersja starsza niż szkic poprawiała poprzedni szkic, nie ten. */
+  const e = baza();
+  const t = gotowa(e);
+  wymiana(e, t, "2026-10-06T09:40:00.000Z", SZKIC, "Stara wersja.");
+  assert.equal((await biegnij(e, [t.rozmowa]).wynik).wyslanych, 1);
+});
