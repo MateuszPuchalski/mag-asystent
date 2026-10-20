@@ -2861,7 +2861,7 @@ Nieudane wywołanie **nie zostawia wymiany**, ale zostawia ślad w księdze
 kosztów. Wiersz to wymiana, nie tura: pytanie bez odpowiedzi to ślad po
 nieudanym żądaniu, a nie rozmowa.
 
-**Dopytanie poprawia szkic (@wydanie).** Właściciel pokazał zrzut: agent
+**Dopytanie poprawia szkic (0.596.0).** Właściciel pokazał zrzut: agent
 napisał „dodaj tą drugą wersję gaźnika", a Copilot odpisał akapitem, co
 dopisać i gdzie. Właściciel: dopytanie ma edytować szkic, pokazać, co było
 edytowane, i tworzyć historię edycji, a nie mówić, co edytować.
@@ -7150,7 +7150,7 @@ stoi. W tym repo zdarzyło się to już dwa razy.
 | Dane wejściowe wchodzą same (§11.2) | **działa** od 0.341.0 | `copilot-szkic.ts`: wpis w puste pola przed zapisem szkicu, podpis `automat (szkic)`; zmiana wersji doboru budzi takt `copilot-auto-szkic` |
 | Wiedza z ofert bez kolejki (§11.3) | **usunięte** w 0.565.0 | `wiedza-z-oferty.ts`: klucz składany przy zbieraniu z trzech źródeł deterministycznych, podpis `automat (oferta)`; bez rozpoznanej marki wiersz zostaje w kolejce |
 | Dopytanie Copilota (§14.6) | **działa** od 0.332.0 | `services/copilot-pytania.ts`, tabela `copilot_pytanie`, siódma trasa zapisu Copilota, blok `skrzynka/Dopytanie.tsx`; notka dla agenta bez przycisku wstawiania, sufit dopytań na rozmowę |
-| Dopytanie poprawia szkic (§14.6) | **działa** od @wydanie | `zadajPytanie` z tekstem pola, `sitaSzkicu`, `zamaskujOdwracalnie`; wersje w `copilot_pytanie`, różnica w `skrzynka/RoznicaSzkicu.tsx`, „Cofnij" w `ekrany/Skrzynka.tsx` |
+| Dopytanie poprawia szkic (§14.6) | **działa** od 0.596.0 | `zadajPytanie` z tekstem pola, `sitaSzkicu`, `zamaskujOdwracalnie`; wersje w `copilot_pytanie`, różnica w `skrzynka/RoznicaSzkicu.tsx`, „Cofnij" w `ekrany/Skrzynka.tsx` |
 | Link do naszej oferty w szkicu (§14.6) | **działa** od 0.270.0 | `services/allegro-oferty-po-sygnaturze.ts`, `urlOfertPoSygnaturze`: jedno żądanie `external.id` na komplet kandydatów, tylko `ACTIVE`; fakt `oferta_link`, reguły 7d i 7e instrukcji |
 | Miary doboru w analizie | **usunięte** w 0.565.0 | `GET /api/obsluga/miary-doboru`, `services/miary-doboru.ts`, `analiza/MiaryDoboru.tsx`: ostatni wynik każdej rozmowy i podstawa wybranej części z księgi zdarzeń |
 | Ekran przegranego przejęcia (§6.2) | **działa** od 0.147.0 | `skrzynka/KonfliktPrzejecia.tsx` |
