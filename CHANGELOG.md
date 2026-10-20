@@ -10,6 +10,12 @@ z wersją monorepo" — i właśnie tak przestał być zgodny: `0.3.0` przetrwa�
 sześć zmergowanych zmian, w tym takie, które wymagały nowego uprawnienia SQL.
 Komentarz nie jest mechanizmem.
 
+## 0.597.1 — 20 października 2026
+
+Oferta z Allegro z kwotą w obcym kształcie nie przerywa już szkicu ani
+dopytania Copilota. Zapis snapshotu idzie oferta po ofercie, a zła oferta
+trafia do ostrzeżenia w logu. Link do niej dalej wraca, tylko bez ceny.
+
 ## 0.597.0 — 20 października 2026
 
 **Szkic Copilota podaje link do naszej aukcji także dla towaru spoza oferty
