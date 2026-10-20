@@ -118,3 +118,19 @@ test("porcja jest ograniczona, a odpowiedź ląduje w snapshocie ofert", async (
   assert.equal(w?.status, "ACTIVE");
   d.close();
 });
+
+test("link niesie cenę z tej samej odpowiedzi, a brak kwoty to brak ceny", async () => {
+  /* Narzędzie `oferty_towaru` podaje klientowi link razem z ceną, a cena
+     przyszła w tej samej odpowiedzi, więc nie płacimy za nią drugim żądaniem. */
+  const d = baza();
+  const wynik = await ofertyPoSygnaturze(["A-1", "B-2"], {
+    database: d, apiUrl: "https://api.test", accountId: "konto-1",
+    query: async () => ({ offers: [
+      oferta("1", "A-1"),
+      { ...oferta("2", "B-2"), sellingMode: null },
+    ] }),
+  });
+  assert.deepEqual([wynik.get("a1")!.cenaGrosze, wynik.get("a1")!.waluta], [4990, "PLN"]);
+  assert.equal(wynik.get("b2")!.cenaGrosze, null);
+  d.close();
+});

@@ -4,6 +4,7 @@ import { urlOfertPoSygnaturze, zapytajAllegro } from "../adapters/allegro.http.j
 import { kontoKanalu } from "./kanal-konto.js";
 import { zapiszSnapshotOferty, type Oferta } from "./allegro-oferty-sync.js";
 import { linkOferty } from "./allegro-linki.js";
+import { naGrosze } from "./allegro-zwroty-sync.js";
 import { zwin } from "../tekst.js";
 
 /**
@@ -51,6 +52,19 @@ export interface LinkDoOferty {
   ofertaId: string;
   nazwa: string;
   link: string;
+  /** Cena kup teraz z tej samej odpowiedzi; null, gdy Allegro jej nie podało albo ma obcy kształt. */
+  cenaGrosze?: number | null;
+  waluta?: string | null;
+}
+
+/**
+ * Cena z odpowiedzi, którą i tak mamy, więc bez drugiego żądania. Kształt
+ * kwoty sprawdził już zapis snapshotu. Brak albo zero znaczy „nie wiemy”.
+ */
+function cenaOferty(o: Oferta): { cenaGrosze: number | null; waluta: string | null } {
+  const kwota = o.sellingMode?.price;
+  const grosze = kwota?.amount == null ? null : naGrosze(kwota.amount);
+  return { cenaGrosze: grosze != null && grosze > 0 ? grosze : null, waluta: kwota?.currency ?? null };
 }
 
 export interface LinkiDeps {
@@ -126,7 +140,10 @@ export async function ofertyPoSygnaturze(
        nie ma prawa podejmować, a druga oferta w faktach kazałaby modelowi
        wybierać za nas. */
     if (out.has(klucz)) continue;
-    out.set(klucz, { symbol: sygnatura, ofertaId: String(o.id), nazwa: String(o.name ?? ""), link });
+    out.set(klucz, {
+      symbol: sygnatura, ofertaId: String(o.id), nazwa: String(o.name ?? ""), link,
+      ...cenaOferty(o),
+    });
   }
   return out;
 }

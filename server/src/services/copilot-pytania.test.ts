@@ -258,7 +258,7 @@ test("model dostaje narzędzia, a wymiana pamięta, po co sięgnął", async () 
     assert.ok(k.narzedzia, "dopytanie idzie z zestawem narzędzi");
     assert.deepEqual(k.narzedzia!.definicje.map((d) => d.name),
       ["szukaj_towaru", "karta_towaru", "tresc_oferty", "oferty_towaru"]);
-    wynik = String(k.narzedzia!.wykonaj("szukaj_towaru", { zapytanie: "gaźnik" }).wynik);
+    wynik = String((await k.narzedzia!.wykonaj("szukaj_towaru", { zapytanie: "gaźnik" })).wynik);
     return {
       tresc: "Sprawdziłem kartotekę.", twierdzenia: [], model: "atrapa",
       zuzycie: { wej: 300, wyj: 40, cacheZapis: 0, cacheOdczyt: 200 }, ms: 9,

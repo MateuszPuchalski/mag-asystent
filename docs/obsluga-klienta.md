@@ -266,9 +266,11 @@ z firmy nie wychodzi ani jeden znak. Klasyfikacja nie pisze do klienta.
   zakupów klienta ani jego adres.
 - **Szkic i dopytanie sięgają do kartoteki narzędziami.** Klient pyta często
   o towar spoza oferty rozmowy, numerem albo nazwą. Model sam szuka wtedy
-  w lokalnym odczycie Subiekta, w szkicu najwyżej trzy rundy narzędzi. Narzędzia nie
-  piszą i nie wołają sieci. Wynik ma oznaczenie `N#` i przechodzi tę samą
-  walidację co fakty.
+  w lokalnym odczycie Subiekta, w szkicu najwyżej trzy rundy narzędzi.
+  Narzędzia nie piszą do naszych danych sprawy i niczego nie wysyłają. Jedyny
+  odczyt sieciowy to nasze aktywne oferty Allegro po sygnaturze. W żądaniu
+  wychodzi sam symbol kartoteki, bez żadnych danych klienta. Wynik ma
+  oznaczenie `N#` i przechodzi tę samą walidację co fakty.
 - **Ceny sprzedaży i nasze oferty Allegro wychodzą, cena zakupu nie.**
   Właściciel zdecydował 19 października, że Copilot podaje klientowi cenę
   i link do naszej aukcji. Cennik sklepu i oferty to dane, które klient
