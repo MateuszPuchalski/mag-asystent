@@ -10,6 +10,13 @@ z wersją monorepo" — i właśnie tak przestał być zgodny: `0.3.0` przetrwa�
 sześć zmergowanych zmian, w tym takie, które wymagały nowego uprawnienia SQL.
 Komentarz nie jest mechanizmem.
 
+## 0.600.0 — 20 października 2026
+
+**Zdjęcie z zakładki „Zdjęcia" zawsze jako lekki kwadrat.** Do Subiekta idzie
+JPEG 800 × 800 px na białym tle, ściśnięty do około 60 kB. Przełącznik
+„Białe tło i kwadrat" i klawisz `B` znikają, bo kwadrat jest zawsze. Pod
+podglądem widać wymiar i wagę pliku, który trafi do kartoteki.
+
 ## 0.599.0 — 20 października 2026
 
 **Najpierw zdjęcia tego, co się sprzedaje.** Zakładka „Zdjęcia" układa
