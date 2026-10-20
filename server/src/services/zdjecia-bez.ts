@@ -84,6 +84,7 @@ export async function listaBezZdjecia(zapytanie: {
   offset?: unknown;
   sortuj?: unknown;
   naStanie?: unknown;
+  sprzedane?: unknown;
 }): Promise<ListaBezZdjecia> {
   const powod = powodWylaczenia();
   if (powod) return { wlaczone: false, powod, razem: 0, pozycje: [] };
@@ -95,10 +96,12 @@ export async function listaBezZdjecia(zapytanie: {
      może wywrócić ekranu błędem 400. */
   const sortuj = (SORTOWANIA_BEZ_ZDJECIA as readonly string[]).includes(String(zapytanie.sortuj))
     ? (zapytanie.sortuj as SortBezZdjecia)
-    : "stan";
-  const naStanie = zapytanie.naStanie === "1" || zapytanie.naStanie === "true";
+    : "sprzedaz";
+  const tak = (v: unknown) => v === "1" || v === "true";
+  const naStanie = tak(zapytanie.naStanie);
+  const sprzedane = tak(zapytanie.sprzedane);
 
-  const { razem, pozycje } = await zrodlo({ q, limit, offset, sortuj, naStanie });
+  const { razem, pozycje } = await zrodlo({ q, limit, offset, sortuj, naStanie, sprzedane });
   const czeka = oczekujace(pozycje.map((p) => p.twId));
   return {
     wlaczone: true,

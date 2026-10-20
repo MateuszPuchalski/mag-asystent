@@ -21,6 +21,7 @@ import { klawiszZajety } from "../nawigacja/fokus";
    chwilę później, a do tego czasu wiersz już ma być w kolejce. */
 
 const SORTOWANIA: Array<{ wartosc: SortBezZdjecia; etykieta: string }> = [
+  { wartosc: "sprzedaz", etykieta: "Najczęściej sprzedawane (30 dni)" },
   { wartosc: "stan", etykieta: "Największy stan" },
   { wartosc: "symbol", etykieta: "Symbol" },
   { wartosc: "nazwa", etykieta: "Nazwa" },
@@ -54,9 +55,11 @@ function Wiersz({ p, wybrany, wKolejce, onWybierz }: {
     <span className="flex items-baseline justify-between gap-2">
       <span className="truncate font-mono text-sm text-slate-800">{p.symbol}</span>
       {wKolejce ? <EtykietaWartosci className="shrink-0">w kolejce</EtykietaWartosci>
-        /* Stan przy symbolu: przy sortowaniu po stanie to on tłumaczy kolejność. */
-        : <span className={`shrink-0 text-sm tabular-nums ${p.stan > 0 ? "text-slate-700" : "text-slate-500"}`}>
-            stan {LICZBA.format(p.stan)}</span>}
+        /* Sprzedaż i stan przy symbolu: to one tłumaczą kolejność listy. */
+        : <span className="shrink-0 text-sm tabular-nums text-slate-600">
+            <span className={p.sprzedaz > 0 ? "font-semibold text-slate-800" : undefined}
+              title="Sztuki sprzedane w ostatnich 30 dniach">sprzedano {LICZBA.format(p.sprzedaz)}</span>
+            {" · "}stan {LICZBA.format(p.stan)}</span>}
     </span>
     <span className={`line-clamp-2 text-sm ${wKolejce ? "text-slate-500" : "text-slate-900"}`}>{p.nazwa}</span>
     {p.ean && <span className="font-mono text-podpis text-slate-500">{p.ean}</span>}
@@ -75,13 +78,16 @@ export function Zdjecia() {
   /* Szukanie liczy serwer — ćwierć sekundy przerwy, jak w koszach i dostawach. */
   const [q, setQ] = useState("");
   const [offset, setOffset] = useState(0);
-  const [sortuj, setSortuj] = useState<SortBezZdjecia>("stan");
+  /* Domyślnie najczęściej sprzedawane: zdjęcie chodliwego towaru pracuje
+     na każdej ofercie, a leżącego — na żadnej. */
+  const [sortuj, setSortuj] = useState<SortBezZdjecia>("sprzedaz");
   const [naStanie, setNaStanie] = useState(false);
+  const [sprzedane, setSprzedane] = useState(false);
   useEffect(() => {
     const t = setTimeout(() => { setQ(fraza.trim()); setOffset(0); }, 250);
     return () => clearTimeout(t);
   }, [fraza]);
-  const lista = useBezZdjecia(q, offset, sortuj, naStanie);
+  const lista = useBezZdjecia(q, offset, sortuj, naStanie, sprzedane);
   const [wybrany, setWybrany] = useState<PozycjaBezZdjecia | null>(null);
   const [zrobione, setZrobione] = useState<ReadonlySet<number>>(() => new Set());
   const [ostatni, setOstatni] = useState("");
@@ -146,6 +152,7 @@ export function Zdjecia() {
     /* Błąd bez danych zamiast „wszystko ma zdjęcie” — awaria to nie koniec pracy. */
     : lista.error && !lista.data ? bladListy
     : pozycje.length === 0 ? <Pusto waga="lista">{q ? "Nic nie pasuje do szukania."
+        : sprzedane ? "Każdy towar sprzedany w 30 dni ma zdjęcie."
         : naStanie ? "Każdy towar na stanie ma zdjęcie." : "Każdy towar ma zdjęcie."}</Pusto>
     : <ul className="divide-y divide-slate-100">
         {pozycje.map((p) => <Wiersz key={p.twId} p={p} wybrany={wybrany?.twId === p.twId}
@@ -161,14 +168,19 @@ export function Zdjecia() {
             placeholder="Symbol, nazwa albo EAN" aria-label="Szukaj towaru bez zdjęcia" />
           {/* Zmiana porządku albo filtra wraca na pierwszą stronę: dalsza strona
               innego porządku to przypadkowy wycinek listy. */}
-          <div className="mt-2 flex items-center gap-3">
-            <label className="flex min-w-0 flex-1 items-center gap-2 text-sm text-slate-700">Kolejność
-              <select className="field min-w-0 flex-1" value={sortuj}
-                onChange={(e) => { setSortuj(e.target.value as SortBezZdjecia); setOffset(0); }}>
-                {SORTOWANIA.map((s) => <option key={s.wartosc} value={s.wartosc}>{s.etykieta}</option>)}
-              </select>
+          <label className="mt-2 flex items-center gap-2 text-sm text-slate-700">Kolejność
+            <select className="field min-w-0 flex-1" value={sortuj}
+              onChange={(e) => { setSortuj(e.target.value as SortBezZdjecia); setOffset(0); }}>
+              {SORTOWANIA.map((s) => <option key={s.wartosc} value={s.wartosc}>{s.etykieta}</option>)}
+            </select>
+          </label>
+          <div className="mt-1 flex flex-wrap items-center gap-x-4">
+            <label className="flex min-h-10 items-center gap-1.5 text-sm text-slate-700">
+              <input type="checkbox" checked={sprzedane}
+                onChange={(e) => { setSprzedane(e.target.checked); setOffset(0); }} />
+              Sprzedane w 30 dni
             </label>
-            <label className="flex shrink-0 items-center gap-1.5 text-sm text-slate-700">
+            <label className="flex min-h-10 items-center gap-1.5 text-sm text-slate-700">
               <input type="checkbox" checked={naStanie}
                 onChange={(e) => { setNaStanie(e.target.checked); setOffset(0); }} />
               Tylko na stanie

@@ -25,7 +25,7 @@ vi.mock("../zdjecia/obraz", () => ({
 }));
 
 const poz = (twId: number, symbol: string, nazwa: string, oczekuje = false): PozycjaBezZdjecia =>
-  ({ twId, symbol, nazwa, ean: `59000000000${twId}`, stan: twId === 3 ? 0 : twId * 2.5, oczekuje });
+  ({ twId, symbol, nazwa, ean: `59000000000${twId}`, stan: twId === 3 ? 0 : twId * 2.5, sprzedaz: twId === 1 ? 6 : 0, oczekuje });
 
 const LISTA: ListaBezZdjecia = {
   wlaczone: true, razem: 3,
@@ -79,17 +79,20 @@ describe("Zdjęcia", () => {
     const u = userEvent.setup();
     pokaz();
     await screen.findByRole("heading", { name: "Sekator kowadełkowy" });
-    /* Stan sekatora stoi na liście i w nagłówku edytora. */
-    expect(screen.getAllByText("stan 2,5")).toHaveLength(2);
-    expect(screen.getByText("stan 0")).toBeInTheDocument();
+    /* Sprzedaż i stan stoją na liście, a w nagłówku edytora razem z oknem. */
+    expect(screen.getByText("sprzedano 6")).toBeInTheDocument();
+    expect(screen.getByText("sprzedano 6 w 30 dni · stan 2,5")).toBeInTheDocument();
     const adresy = () => vi.mocked(fetch).mock.calls.map(([adres]) => String(adres))
       .filter((a) => a.startsWith("/api/zdjecia/bez-zdjecia"));
-    expect(adresy()[0]).toContain("sortuj=stan");
+    expect(adresy()[0]).toContain("sortuj=sprzedaz");
+    expect(adresy()[0]).not.toContain("sprzedane=");
 
     await u.selectOptions(screen.getByLabelText("Kolejność"), "nazwa");
     await waitFor(() => expect(adresy().at(-1)).toContain("sortuj=nazwa"));
     await u.click(screen.getByLabelText("Tylko na stanie"));
     await waitFor(() => expect(adresy().at(-1)).toContain("naStanie=1"));
+    await u.click(screen.getByLabelText("Sprzedane w 30 dni"));
+    await waitFor(() => expect(adresy().at(-1)).toContain("sprzedane=1"));
     expect(adresy().at(-1)).toContain("offset=0");
     expect(stan.wyslane).toEqual([]);
   });

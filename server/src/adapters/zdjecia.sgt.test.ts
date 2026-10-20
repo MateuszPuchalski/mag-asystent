@@ -2,6 +2,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import {
   budujZapytanieBezZdjecia,
+  zrodloSprzedazy,
   budujZapytanieBlob,
   nazwaZeWzorca,
   rozpoznajMime,
@@ -157,10 +158,13 @@ test("osobna tabela zdjęć: brak to NOT EXISTS po kluczu obcym", () => {
   });
   assert.match(strona, /NOT EXISTS \(SELECT 1 FROM tw_ZdjecieTw z WITH \(NOLOCK\) WHERE z\.zd_IdTowar = t\.tw_Id\)/);
   assert.match(strona, /t\.tw_Zablokowany = 0/);
-  /* Domyślnie stan malejąco. Porządek domyka tw_Id: symbol nie jest unikalny,
-     a stronicowanie bez pełnego porządku gubi i dubluje wiersze między stronami. */
+  /* Domyślnie sprzedaż malejąco, remis rozstrzyga stan. Porządek domyka tw_Id:
+     stronicowanie bez pełnego porządku gubi i dubluje wiersze między stronami. */
   assert.ok(
-    strona.endsWith("ORDER BY ISNULL(s.stan, 0) DESC, t.tw_Symbol, t.tw_Id OFFSET @offset ROWS FETCH NEXT @limit ROWS ONLY"),
+    strona.endsWith(
+      "ORDER BY ISNULL(sp.sprzedaz, 0) DESC, ISNULL(s.stan, 0) DESC, t.tw_Symbol, t.tw_Id " +
+        "OFFSET @offset ROWS FETCH NEXT @limit ROWS ONLY"
+    ),
     strona
   );
   assert.match(razem, /^SELECT COUNT\(\*\) AS razem FROM tw__Towar t/);
@@ -183,6 +187,7 @@ test("stan to suma po magazynach z podzapytania, a licznik go nie złącza", () 
 
 test("każde sortowanie ma stały porządek domknięty tw_Id", () => {
   const oczekiwane = {
+    sprzedaz: "ISNULL(sp.sprzedaz, 0) DESC, ISNULL(s.stan, 0) DESC, t.tw_Symbol, t.tw_Id",
     stan: "ISNULL(s.stan, 0) DESC, t.tw_Symbol, t.tw_Id",
     symbol: "t.tw_Symbol, t.tw_Id",
     nazwa: "t.tw_Nazwa, t.tw_Id",
@@ -195,6 +200,41 @@ test("każde sortowanie ma stały porządek domknięty tw_Id", () => {
     });
     assert.ok(strona.includes(`ORDER BY ${porzadek} OFFSET`), strona);
   }
+});
+
+/* Sprzedaż to FS i PA z okna, z pozycji handlowych. Faktura do paragonu nie
+   dodaje sztuk drugi raz — ta sama reguła co w przekroju towaru. */
+test("sprzedaż: FS i PA od daty okna, po ob_DokHanId, bez faktury do paragonu", () => {
+  const z = zrodloSprzedazy({ fs: 2, pa: 21, odnosnik: "dok_DoDokId" });
+  assert.ok(z.startsWith("FROM dok_Pozycja p WITH (NOLOCK) JOIN dok__Dokument d WITH (NOLOCK) ON d.dok_Id = p.ob_DokHanId"), z);
+  assert.ok(z.includes("d.dok_Typ IN (2, 21) AND d.dok_DataWyst >= @odSprzedazy"), z);
+  assert.ok(z.includes("WHERE pa.dok_Id = d.dok_DoDokId AND pa.dok_Typ = 21"), z);
+  assert.ok(z.includes("WHERE pa.dok_DoDokId = d.dok_Id AND pa.dok_Typ = 21"), z);
+  assert.ok(z.includes("AND NOT (d.dok_Typ = 2 AND"), z);
+});
+
+/* Gdy import faktur nie znalazł kolumny odnośnika, zapytanie jej nie używa:
+   brakująca kolumna wywróciłaby całą listę błędem 207. */
+test("bez kolumny odnośnika sprzedaż liczy się bez pary, a nazwa kolumny przechodzi przez bramkę", () => {
+  const z = zrodloSprzedazy({ fs: 2, pa: 21 });
+  assert.ok(!z.includes("NOT ("), z);
+  assert.throws(() => zrodloSprzedazy({ fs: 2, pa: 21, odnosnik: "dok_DoDokId; DROP" }));
+});
+
+test("sprzedaż na stronie to suma z podzapytania, a filtr „sprzedane” zawęża też licznik", () => {
+  const z = budujZapytanieBezZdjecia({
+    tabela: "tw_ZdjecieTw", kolumna: "zd_Zdjecie", klucz: "zd_IdTowar", zFiltrem: false, sprzedane: true,
+    sprzedaz: { fs: 2, pa: 21, odnosnik: "dok_DoDokId" },
+  });
+  assert.ok(z.strona.includes("ISNULL(sp.sprzedaz, 0) AS sprzedaz"), z.strona);
+  assert.ok(z.strona.includes("LEFT JOIN (SELECT p.ob_TowId, SUM(p.ob_IloscMag) AS sprzedaz FROM dok_Pozycja p"), z.strona);
+  assert.ok(z.strona.includes("GROUP BY p.ob_TowId) sp ON sp.ob_TowId = t.tw_Id"), z.strona);
+  const filtr = "AND p.ob_TowId = t.tw_Id AND p.ob_IloscMag > 0)";
+  assert.ok(z.strona.includes(filtr) && z.razem.includes(filtr), z.razem);
+  const bez = budujZapytanieBezZdjecia({
+    tabela: "tw_ZdjecieTw", kolumna: "zd_Zdjecie", klucz: "zd_IdTowar", zFiltrem: false,
+  });
+  assert.ok(!bez.razem.includes("dok_Pozycja"), bez.razem);
 });
 
 test("filtr „na stanie” zawęża stronę i licznik tak samo", () => {
