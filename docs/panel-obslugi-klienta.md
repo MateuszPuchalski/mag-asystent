@@ -2909,7 +2909,7 @@ Cena jest jawna. Każde dopytanie niesie dłuższą instrukcję, bo zawiera
 reguły szkicu. Sufit dopytań na rozmowę zostaje ten sam, a poprawki zużywają
 go szybciej. Pomiar losu szkicu przy wysyłce dalej porównuje z oryginałem.
 
-**Zdjęcie agenta w dopytaniu (@wydanie).** Agent ma czasem zdjęcie, którego
+**Zdjęcie agenta w dopytaniu (0.602.0).** Agent ma czasem zdjęcie, którego
 nie ma w rozmowie: kartkę z wymiarami od klienta z innego kanału albo zdjęcie
 części z magazynu. Spinacz obok pola albo wklejenie ze schowka dołącza do
 trzech obrazów, każdy do 7 MB. Przed wysłaniem stoją miniatury z „Usuń".

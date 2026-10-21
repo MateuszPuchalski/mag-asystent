@@ -10,6 +10,13 @@ z wersją monorepo" — i właśnie tak przestał być zgodny: `0.3.0` przetrwa�
 sześć zmergowanych zmian, w tym takie, które wymagały nowego uprawnienia SQL.
 Komentarz nie jest mechanizmem.
 
+## 0.602.0 — 21 października 2026
+
+**Zdjęcie do „Dopytaj Copilota”.** Spinacz obok pola polecenia albo wklejenie
+ze schowka dołącza do trzech zdjęć, każde do 7 MB. Copilot czyta je razem
+z poleceniem, numeruje dalej po zdjęciach rozmowy i może się na nie powołać
+w odpowiedzi i w nowej wersji szkicu. Historia dopytań pokazuje miniaturę.
+
 ## 0.601.1 — 21 października 2026
 
 **„Układam szkic z faktów…” stoi tylko w rozmowie, w której kliknięto „Ułóż”.**
