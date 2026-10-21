@@ -130,6 +130,17 @@ export function enqueueSetEan(
   return queueId;
 }
 
+/** Skąd przyszło zdjęcie. `import` to plik z folderu biura, przypinany po symbolu. */
+export type ZrodloZdjecia = "aparat" | "galeria" | "panel" | "import";
+
+export interface AudytZdjecia {
+  bajtow: number;
+  tloUsuniete: boolean;
+  zrodlo: ZrodloZdjecia;
+  /** Nazwa pliku z importu. Po niej biuro znajdzie plik, który trafił w złą kartotekę. */
+  plik?: string | null;
+}
+
 /**
  * Zadanie dopisania zdjęcia do kartoteki (0.88.0) wraz z wpisem do audytu.
  *
@@ -145,14 +156,20 @@ export function enqueueSetEan(
 export function enqueueSetZdjecie(
   twId: number,
   base: EnqueueBase,
-  audyt: { bajtow: number; tloUsuniete: boolean; zrodlo: "aparat" | "galeria" | "panel" }
+  audyt: AudytZdjecia
 ): number {
   const queueId = insert("set_zdjecie", { twId }, base);
   logEvent(
     "zdjecie_dodane",
     base.createdBy,
     twId,
-    { bajtow: audyt.bajtow, tloUsuniete: audyt.tloUsuniete, zrodlo: audyt.zrodlo, queueId },
+    {
+      bajtow: audyt.bajtow,
+      tloUsuniete: audyt.tloUsuniete,
+      zrodlo: audyt.zrodlo,
+      queueId,
+      ...(audyt.plik ? { plik: audyt.plik } : {}),
+    },
     base.createdByRef ?? currentUserRef()
   );
   return queueId;

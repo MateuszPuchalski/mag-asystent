@@ -2,6 +2,8 @@ import { createHash, randomUUID } from "node:crypto";
 import { db, nowIso } from "../db/db.js";
 import { config } from "../config.js";
 import { rozpoznajMime } from "../adapters/zdjecia.sgt.js";
+import { enqueueSetZdjecie, type ZrodloZdjecia } from "./queue.js";
+import { logEvent } from "./events.js";
 
 /* ── Zdjęcie kartoteki dodane z kolektora (0.88.0) ───────────────────────────
    Magazynier stoi przy regale z towarem w ręku i widzi na karcie pusty slot.
@@ -216,6 +218,78 @@ export function zapiszWlasne(dane: {
       dane.dodaneByRef
     );
   return { etag, bajtow: dane.obraz.length };
+}
+
+/**
+ * Zapis zatwierdzonego zdjęcia i jego droga do Subiekta — JEDNA dla wszystkich wejść.
+ *
+ * Woła ją zatwierdzenie podglądu (kolektor, panel) i import z folderu. Gdyby
+ * każde wejście kolejkowało po swojemu, audyt i zadanie dla Sfery
+ * rozjechałyby się przy pierwszej zmianie jednego z nich.
+ *
+ * Zdjęcie ląduje w bazie WERTIS ZAWSZE. Zadanie do Subiekta powstaje tylko
+ * przy `ZDJECIA_DODAWANIE=subiekt`. Bez niego zdarzenie i tak powstaje,
+ * bo karta milczałaby o tym, skąd wzięło się zdjęcie i kto je dodał.
+ */
+export function zapiszIZglos(dane: {
+  twId: number;
+  symbol: string;
+  obraz: Buffer;
+  mime: string;
+  tloUsuniete: boolean;
+  zrodlo: ZrodloZdjecia;
+  plik?: string | null;
+  autor: { nazwa: string; ref: number | null };
+}): { queueId: number | null; etag: string; bajtow: number; wSubiekcie: boolean } {
+  const { twId, autor, tloUsuniete, zrodlo } = dane;
+  const plik = dane.plik ?? null;
+  const { etag, bajtow } = zapiszWlasne({
+    twId,
+    obraz: dane.obraz,
+    mime: dane.mime,
+    tloUsuniete,
+    dodaneBy: autor.nazwa,
+    dodaneByRef: autor.ref,
+  });
+
+  const wSubiekcie = config.zdjecia.dodawanie === "subiekt";
+  let queueId: number | null = null;
+  if (wSubiekcie) {
+    queueId = enqueueSetZdjecie(
+      twId,
+      {
+        createdBy: autor.nazwa,
+        createdByRef: autor.ref,
+        twId,
+        label: "Zdjęcie · " + dane.symbol,
+        detail: `${Math.round(bajtow / 1024)} kB, tło ${tloUsuniete ? "usunięte" : "zostawione"}`,
+      },
+      { bajtow, tloUsuniete, zrodlo, plik }
+    );
+    przypiszZadanie(twId, queueId);
+  } else {
+    logEvent(
+      "zdjecie_dodane",
+      autor.nazwa,
+      twId,
+      { bajtow, tloUsuniete, zrodlo, queueId: null, ...(plik ? { plik } : {}) },
+      autor.ref
+    );
+  }
+  return { queueId, etag, bajtow, wSubiekcie };
+}
+
+/**
+ * Czy towar ma u nas zdjęcie, którego Subiekt jeszcze nie przyjął.
+ *
+ * Import pyta o to przed zapisem: ponowione przejście folderu nie może
+ * podmienić zdjęcia, które już czeka w kolejce do kartoteki.
+ */
+export function czekaNaSubiekt(twId: number): boolean {
+  return (
+    db().prepare("SELECT 1 FROM zdjecie_wlasne WHERE tw_id = ? AND w_subiekcie_at IS NULL").get(twId) !==
+    undefined
+  );
 }
 
 /**
