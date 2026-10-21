@@ -38,37 +38,107 @@ export function symbolZNazwy(nazwa: string): string | null {
   return rdzen;
 }
 
+/* Dopiski, które ludzie doklejają do symbolu: `W08-0501-miniaturka`,
+   `W08-0501-1`, `W08-0501 (2)`. Cyfr odcinamy najwyżej trzy, bo symbol
+   sam kończy się czterema (`-0501`) i tych ruszyć nie wolno. */
+const DOPISEK = /(?:[\s_-]+(?:miniaturka|miniatura|mini|thumbnail|thumb|small|\d{1,3})|\s*\(\d{1,3}\))$/i;
+
+/** Rdzeń bez dopisków, zdejmowanych póki jakiś jest: `W08-0501-1-miniaturka` → `W08-0501`. */
+export function bezDopiskow(rdzen: string): string {
+  let r = rdzen.trim();
+  for (let i = 0; i < 4; i++) {
+    const krotszy = r.replace(DOPISEK, "").trim();
+    if (krotszy === r || !krotszy) break;
+    r = krotszy;
+  }
+  return r;
+}
+
+/**
+ * Możliwe symbole jednego pliku, od najpewniejszego.
+ *
+ * Pełna nazwa idzie pierwsza, więc symbol z cyfrą na końcu wygrywa
+ * z wersją przyciętą. Dalej nazwa bez dopisku, potem foldery od
+ * najbliższego: plik `miniaturka.jpg` w folderze `W08-0501` należy do
+ * `W08-0501`. Który kandydat jest symbolem, rozstrzyga Subiekt, nie wzorzec.
+ */
+export function kandydaci(p: { name: string; webkitRelativePath?: string }): string[] {
+  const wynik: string[] = [];
+  const dodaj = (rdzen: string) => {
+    for (const r of [rdzen, bezDopiskow(rdzen)]) {
+      const s = symbolZNazwy(r);
+      if (s && !wynik.includes(s)) wynik.push(s);
+    }
+  };
+  const kropka = p.name.lastIndexOf(".");
+  dodaj(kropka > 0 ? p.name.slice(0, kropka) : p.name);
+  /* Ścieżkę względną daje tylko wybór folderu; pliki luzem jej nie mają. */
+  const foldery = (p.webkitRelativePath ?? "").split("/").slice(0, -1).reverse();
+  for (const f of foldery) dodaj(f);
+  return wynik;
+}
+
 export interface Grupa<P> { symbol: string; pliki: P[] }
 
 export interface Rozbior<P> {
-  /** Jeden wpis na symbol, w kolejności pierwszego pliku. */
-  grupy: Grupa<P>[];
-  /** Zdjęcia, których nazwa nie może być symbolem. */
+  /** Zdjęcia z kandydatami na symbol, w kolejności wyboru. */
+  pliki: Array<{ plik: P; kandydaci: string[] }>;
+  /** Zdjęcia bez żadnego kandydata — ani nazwa, ani folder nie mogą być symbolem. */
   niesymbole: P[];
   /** Pliki, które nie są zdjęciami. */
   odrzucone: P[];
 }
 
-/** Podział wybranych plików: grupy po symbolu, nazwy niebędące symbolem i nie-zdjęcia. */
-export function rozbierz<P extends { name: string; type: string }>(pliki: readonly P[]): Rozbior<P> {
-  const grupy = new Map<string, Grupa<P>>();
+/** Podział wybranych plików: zdjęcia z kandydatami, zdjęcia bez kandydata i nie-zdjęcia. */
+export function rozbierz<P extends { name: string; type: string; webkitRelativePath?: string }>(
+  pliki: readonly P[]): Rozbior<P> {
+  const zKandydatami: Rozbior<P>["pliki"] = [];
   const niesymbole: P[] = [];
   const odrzucone: P[] = [];
   for (const p of pliki) {
     if (!czyZdjecie(p)) { odrzucone.push(p); continue; }
-    const s = symbolZNazwy(p.name);
-    if (!s) { niesymbole.push(p); continue; }
-    const g = grupy.get(s);
-    if (g) g.pliki.push(p); else grupy.set(s, { symbol: s, pliki: [p] });
+    const k = kandydaci(p);
+    if (k.length === 0) niesymbole.push(p); else zKandydatami.push({ plik: p, kandydaci: k });
   }
-  return { grupy: [...grupy.values()], niesymbole, odrzucone };
+  return { pliki: zKandydatami, niesymbole, odrzucone };
+}
+
+/**
+ * Grupy po symbolu po odpowiedzi `dopasuj`.
+ *
+ * Plik dostaje pierwszego kandydata, którego Subiekt zna — także
+ * niejednoznacznego, bo to wciąż towar, tylko do ręcznego wyboru.
+ * Plik bez trafienia stoi pod swoim pierwszym kandydatem i wychodzi
+ * jako „brak w Subiekcie”.
+ */
+export function przypiszSymbole<P>(pliki: ReadonlyArray<{ plik: P; kandydaci: string[] }>,
+  znane: ReadonlyMap<string, PozycjaDopasowania>): Grupa<P>[] {
+  const grupy = new Map<string, Grupa<P>>();
+  for (const { plik, kandydaci: k } of pliki) {
+    const s = k.find((x) => { const p = znane.get(x); return !!p && (p.twId !== null || !!p.niejednoznaczny); }) ?? k[0];
+    const g = grupy.get(s);
+    if (g) g.pliki.push(plik); else grupy.set(s, { symbol: s, pliki: [plik] });
+  }
+  return [...grupy.values()];
 }
 
 /** Wariant pliku po wczytaniu: wymiary znamy dopiero z płótna. */
 export interface Wariant { nazwa: string; typ: string; bajtow: number; szer: number; wys: number }
 
+/* Zdjęcie główne oferty: w folderach Allegro to `min.jpg` albo
+   `W08-0501-miniaturka.jpg`. Reszta (`2`, `kat`, `ls1`) to ujęcia
+   dodatkowe i aranżacje, które na kartę towaru się nie nadają. */
+const GLOWNE = /(?:^|[\s_-])(?:min|mini|miniaturka|miniatura|glowne|główne|main)$/i;
+
+/** Czy nazwa pliku wskazuje zdjęcie główne oferty. */
+export function czyGlowne(nazwa: string): boolean {
+  const kropka = nazwa.lastIndexOf(".");
+  return GLOWNE.test((kropka > 0 ? nazwa.slice(0, kropka) : nazwa).trim());
+}
+
 /**
- * Jeden plik na symbol: więcej pikseli wygrywa.
+ * Jeden plik na symbol. Pierwsze wygrywa zdjęcie główne (`min`, `miniaturka`),
+ * dalej więcej pikseli.
  *
  * Przy remisie PNG przed resztą, bo PNG bywa wycięty z tłem i nie niesie
  * strat kompresji. Dalej większy plik, bo przy tych samych wymiarach
@@ -76,8 +146,9 @@ export interface Wariant { nazwa: string; typ: string; bajtow: number; szer: num
  */
 export function wybierzWariant<W extends Wariant>(warianty: readonly W[]): W {
   const png = (w: W) => (w.typ === "image/png" || /\.png$/i.test(w.nazwa) ? 1 : 0);
+  const glowne = (w: W) => (czyGlowne(w.nazwa) ? 1 : 0);
   return [...warianty].sort((a, b) =>
-    b.szer * b.wys - a.szer * a.wys || png(b) - png(a) || b.bajtow - a.bajtow
+    glowne(b) - glowne(a) || b.szer * b.wys - a.szer * a.wys || png(b) - png(a) || b.bajtow - a.bajtow
       || a.nazwa.localeCompare(b.nazwa))[0];
 }
 

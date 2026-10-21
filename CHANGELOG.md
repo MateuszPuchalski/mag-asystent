@@ -10,6 +10,15 @@ z wersją monorepo" — i właśnie tak przestał być zgodny: `0.3.0` przetrwa�
 sześć zmergowanych zmian, w tym takie, które wymagały nowego uprawnienia SQL.
 Komentarz nie jest mechanizmem.
 
+## 0.604.2 — 21 października 2026
+
+**Import zdjęć rozpoznaje więcej nazw.** Plik `W08-0501-miniaturka.jpg`,
+`W08-0501-1.jpg` albo `W08-0501 (2).png` trafia do towaru `W08-0501`.
+Plik `miniaturka.jpg` w folderze `W08-0501` też. Pełna nazwa pliku ma
+pierwszeństwo, a o tym, która wersja jest symbolem, rozstrzyga Subiekt.
+Z kilku zdjęć jednego towaru import bierze najpierw zdjęcie główne oferty
+(`min`, `miniaturka`), a nie największą aranżację.
+
 ## 0.604.1 — 21 października 2026
 
 Każde wywołanie Copilota zapisuje w księdze, z której wersji instrukcji

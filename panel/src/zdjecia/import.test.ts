@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
-  czyZdjecie, jedenNaTowar, klasyfikuj, paczki, poKolei, rozbierz, symbolZNazwy, wybierzWariant, type Wariant,
+  bezDopiskow, czyGlowne, czyZdjecie, jedenNaTowar, kandydaci, klasyfikuj, paczki, poKolei, przypiszSymbole, rozbierz, symbolZNazwy,
+  wybierzWariant, type Wariant,
 } from "./import";
 import type { PozycjaDopasowania } from "../api/zdjecia";
 
@@ -25,18 +26,65 @@ describe("symbol z nazwy pliku", () => {
   });
 });
 
+describe("kandydaci na symbol", () => {
+  /* Właściciel ma pliki `symbol-miniaturka`, `symbol-1` i `miniaturka.jpg`
+     w folderze nazwanym symbolem. Pełna nazwa zawsze idzie pierwsza. */
+  it("nazwa, potem nazwa bez dopisku", () => {
+    expect(kandydaci(plik("W08-0501.jpg"))).toEqual(["W08-0501"]);
+    expect(kandydaci(plik("W08-0501-miniaturka.jpg"))).toEqual(["W08-0501-MINIATURKA", "W08-0501"]);
+    expect(kandydaci(plik("W08-0501-1.jpg"))).toEqual(["W08-0501-1", "W08-0501"]);
+    expect(kandydaci(plik("W08-0501 (2).png"))).toEqual(["W08-0501 (2)", "W08-0501"]);
+    expect(kandydaci(plik("W08-0501_mini.jpg"))).toEqual(["W08-0501_MINI", "W08-0501"]);
+  });
+  it("dopisek nie zjada czterech cyfr symbolu, a kilka dopisków schodzi po kolei", () => {
+    expect(bezDopiskow("W08-0501")).toBe("W08-0501");
+    expect(bezDopiskow("W08-0501-1-miniaturka")).toBe("W08-0501");
+    expect(bezDopiskow("miniaturka")).toBe("miniaturka");
+  });
+  it("foldery od najbliższego, gdy wybrano folder", () => {
+    expect(kandydaci({ name: "miniaturka.jpg", webkitRelativePath: "WERTIS SKU/Filtry/W08-0501/miniaturka.jpg" }))
+      .toEqual(["MINIATURKA", "W08-0501", "FILTRY", "WERTIS SKU"]);
+    expect(kandydaci({ name: "Zrzut ekranu 2026-10-07 123809.jpg", webkitRelativePath: "x/W08-0501-1/Zrzut ekranu 2026-10-07 123809.jpg" }))
+      .toEqual(["W08-0501-1", "W08-0501", "X"]);
+  });
+});
+
 describe("rozbiór wybranych plików", () => {
-  it("grupuje po symbolu bez wielkości liter i odkłada nie-symbole oraz nie-zdjęcia", () => {
+  it("zdjęcia z kandydatami, bez kandydata i nie-zdjęcia", () => {
     const r = rozbierz([
-      plik("W08-0501.jpg"), plik("w08-0501.png"), plik("W04-0402.png"),
-      plik("Zrzut ekranu 2026-10-07 123809.jpg"), { name: "opis.txt", type: "text/plain" },
+      plik("W08-0501.jpg"), plik("Zrzut ekranu 2026-10-07 123809.jpg"), { name: "opis.txt", type: "text/plain" },
     ]);
-    expect(r.grupy.map((g) => [g.symbol, g.pliki.map((p) => p.name)])).toEqual([
-      ["W08-0501", ["W08-0501.jpg", "w08-0501.png"]],
-      ["W04-0402", ["W04-0402.png"]],
-    ]);
+    expect(r.pliki.map((x) => [x.plik.name, x.kandydaci])).toEqual([["W08-0501.jpg", ["W08-0501"]]]);
     expect(r.niesymbole.map((p) => p.name)).toEqual(["Zrzut ekranu 2026-10-07 123809.jpg"]);
     expect(r.odrzucone.map((p) => p.name)).toEqual(["opis.txt"]);
+  });
+});
+
+describe("przypisanie symbolu po odpowiedzi serwera", () => {
+  const znany = (symbol: string, twId: number | null, niejednoznaczny?: true): PozycjaDopasowania =>
+    ({ symbol, twId, nazwa: null, maZdjecie: false, oczekuje: false, zablokowany: false, ...(niejednoznaczny ? { niejednoznaczny } : {}) });
+  it("pierwszy kandydat znany Subiektowi; nieznany zostaje pod pierwszym kandydatem", () => {
+    const r = rozbierz([
+      plik("W08-0501.jpg"), plik("w08-0501-1.png"), plik("W08-0501-miniaturka.jpg"),
+      { name: "miniaturka.jpg", type: "image/jpeg", webkitRelativePath: "SKU/W04-0402/miniaturka.jpg" },
+      plik("W99-9999-1.jpg"), plik("W77-0001.jpg"),
+    ]);
+    const mapa = new Map([
+      ["W08-0501", znany("W08-0501", 1)], ["W04-0402", znany("W04-0402", 2)],
+      ["W99-9999-1", znany("W99-9999-1", null)], ["W77-0001", znany("W77-0001", null, true)],
+    ]);
+    expect(przypiszSymbole(r.pliki, mapa).map((g) => [g.symbol, g.pliki.map((p) => p.name)])).toEqual([
+      ["W08-0501", ["W08-0501.jpg", "w08-0501-1.png", "W08-0501-miniaturka.jpg"]],
+      ["W04-0402", ["miniaturka.jpg"]],
+      ["W99-9999-1", ["W99-9999-1.jpg"]],
+      ["W77-0001", ["W77-0001.jpg"]],
+    ]);
+  });
+  /* Symbol z cyfrą na końcu, który w Subiekcie istnieje, wygrywa z przyciętym. */
+  it("pełna nazwa przed przyciętą, gdy obie są w Subiekcie", () => {
+    const r = rozbierz([plik("W28-303.png")]);
+    const mapa = new Map([["W28-303", znany("W28-303", 5)], ["W28", znany("W28", 6)]]);
+    expect(przypiszSymbole(r.pliki, mapa)[0].symbol).toBe("W28-303");
   });
 });
 
@@ -49,6 +97,21 @@ describe("wybór jednego pliku na symbol", () => {
   it("przy remisie pikseli PNG, potem większy plik", () => {
     expect(wybierzWariant([w("A.jpg", 200, 200, 9000), w("A.png", 200, 200, 100)]).nazwa).toBe("A.png");
     expect(wybierzWariant([w("A.jpg", 200, 200, 100), w("A.jpeg", 200, 200, 900)]).nazwa).toBe("A.jpeg");
+  });
+  /* Folder Allegro `W09-0819` ma `2`, `kat`, `ls1`…`ls3` i `min`; główne jest `min`,
+     choć aranżacja `ls1` ma więcej pikseli. */
+  it("zdjęcie główne oferty wygrywa z większym ujęciem dodatkowym", () => {
+    expect(wybierzWariant([w("ls1.jpg", 4000, 3000), w("kat.jpg", 900, 900), w("min.jpg", 2000, 2000)]).nazwa)
+      .toBe("min.jpg");
+    expect(wybierzWariant([w("W08-0501.jpg", 1600, 1600), w("W08-0501-miniaturka.jpg", 300, 300)]).nazwa)
+      .toBe("W08-0501-miniaturka.jpg");
+  });
+  it("główne poznaje po końcówce nazwy, nie po fragmencie słowa", () => {
+    expect(czyGlowne("min.jpg")).toBe(true);
+    expect(czyGlowne("W08-0501_miniaturka.png")).toBe(true);
+    expect(czyGlowne("ls1.jpg")).toBe(false);
+    expect(czyGlowne("admin.jpg")).toBe(false);
+    expect(czyGlowne("2.jpg")).toBe(false);
   });
 });
 
