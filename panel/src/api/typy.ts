@@ -680,6 +680,34 @@ export type WymianaCopilota = {
   szkicZastrzezenia?: string[];
   /** Zdanie, czemu serwer odrzucił poprawkę. `null` = nie odrzucił. */
   szkicOdrzucony?: string | null;
+  /** Zdjęcia agenta dołączone do pytania. Brak = starszy serwer, czytamy jak pustą listę. */
+  zdjecia?: ZdjecieWymiany[];
+};
+
+/**
+ * Zdjęcie dołączone przez agenta do pytania, tak jak zostało w wymianie.
+ *
+ * Serwer trzyma na stałe TYLKO miniaturę. Oryginał poszedł do modelu i nie
+ * leży w bazie, bo kartka z wymiarami od klienta nie ma powodu żyć dłużej
+ * niż odpowiedź. `miniatura: null` = panel nie umiał jej zrobić.
+ */
+export type ZdjecieWymiany = {
+  /** Numer, po którym model i agent mówią o zdjęciu, np. „Z9”. */
+  numer: string;
+  nazwa: string;
+  typ: string;
+  bajtow: number;
+  /** Base64 JPEG. */
+  miniatura: string | null;
+};
+
+/** Zdjęcie w ciele pytania: oryginał dla modelu i miniatura do historii. */
+export type ZdjeciePytania = {
+  nazwa: string;
+  /** Base64 oryginału. */
+  dane: string;
+  /** Base64 JPEG, dłuższy bok około 320 px. `null` = przeglądarka nie zrobiła miniatury. */
+  miniatura?: string | null;
 };
 
 /** Jedno wywołanie narzędzia: nazwa, zapytanie modelu i długość wyniku. */

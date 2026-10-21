@@ -199,6 +199,27 @@ test("wyłączony Copilot nie układa szkicu i nie wychodzi do sieci", async () 
   assert.equal(liczba("szkic_copilota"), 0);
 });
 
+/* Dopytanie ze zdjęciami agenta ma WŁASNY limit ciała. Globalne 6 MiB
+   odrzuciłoby kodem 413 już jedno zdjęcie z telefonu, zanim serwis zdążyłby
+   powiedzieć zdaniem, czemu. Tutaj ciało przechodzi i dochodzi do bramki
+   „wyłączony", a ta sama treść na trasie szkicu dalej odpada na 6 MiB. */
+test("dopytanie przyjmuje ciało ponad globalne 6 MiB, reszta tras nie", async () => {
+  const b = login("biuro", "Ala");
+  const ciezkie = { rozmowaId: rozmowa, pytanie: "Co na kartce?",
+    zdjecia: [{ nazwa: "kartka.jpg", dane: "A".repeat(7 * 1024 * 1024) }] };
+  const pytanie = await app.inject({
+    method: "POST", url: "/api/obsluga/copilot/pytanie", headers: b.naglowki, payload: ciezkie,
+  });
+  assert.equal(pytanie.statusCode, 400, "ciało doszło do trasy, a ta odmówiła zdaniem");
+  assert.match(pytanie.json<{ error: string }>().error, /wertis\.env/);
+
+  const szkic = await app.inject({
+    method: "POST", url: "/api/obsluga/copilot/szkic", headers: b.naglowki, payload: ciezkie,
+  });
+  assert.equal(szkic.statusCode, 413, "globalny limit dalej stoi na pozostałych trasach");
+  assert.equal(liczba("copilot_wywolanie"), 0);
+});
+
 test("ocena szkicu bez szkicu odmawia zdaniem", async () => {
   const b = login("biuro", "Ala");
   const r = await app.inject({

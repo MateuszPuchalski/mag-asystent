@@ -382,6 +382,29 @@ CREATE TABLE IF NOT EXISTS copilot_pytanie (
 CREATE INDEX IF NOT EXISTS ix_copilot_pytanie_rozmowa
   ON copilot_pytanie(conversation_id, id);
 
+-- ── Zdjęcia agenta przy dopytaniu ──────────────────────────────────────────
+-- Agent dołącza do pytania do trzech obrazów: kartkę, ekran, część z biurka.
+-- Bajty oryginału idą do modelu w tym jednym żądaniu i tu ich NIE MA
+-- (decyzja właściciela). Zostaje miniatura JPEG zrobiona przez panel
+-- i metadane, żeby wymiana pokazywała, na co model patrzył, gdy cytował Z9.
+--
+-- Osobna tabela, nie kolumna JSON w wymianie: zdjęć jest kilka na wymianę,
+-- a miniatura to BLOB, którego JSON nie uniesie bez base64 w tekście.
+-- Wiersze powstają w tej samej transakcji co wymiana, więc nieudane
+-- wywołanie nie zostawia ani jednego.
+CREATE TABLE IF NOT EXISTS copilot_pytanie_zdjecie (
+  id          INTEGER PRIMARY KEY AUTOINCREMENT,
+  pytanie_id  INTEGER NOT NULL REFERENCES copilot_pytanie(id) ON DELETE CASCADE,
+  -- Numer nadany w TYM pytaniu: zdjęcia rozmowy idą przed zdjęciami agenta.
+  numer       TEXT NOT NULL,
+  nazwa       TEXT NOT NULL,
+  typ         TEXT NOT NULL,
+  bajtow      INTEGER NOT NULL,
+  miniatura   BLOB
+);
+CREATE INDEX IF NOT EXISTS ix_copilot_pytanie_zdjecie_pytanie
+  ON copilot_pytanie_zdjecie(pytanie_id, id);
+
 CREATE TABLE IF NOT EXISTS copilot_wywolanie (
   id              INTEGER PRIMARY KEY AUTOINCREMENT,
   -- BEZ `CHECK` z tego samego powodu, co kategoria: kolejne przyrosty etapu F

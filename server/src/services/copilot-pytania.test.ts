@@ -171,7 +171,7 @@ test("model widzi szkic i poprzednie wymiany, bo pyta się O NIE", async () => {
 
   const k = drugi.widziane.ostatni!;
   assert.equal(k.szkic, "Szkic pierwszy.");
-  assert.deepEqual(k.historia, [{ pytanie: "Pytanie pierwsze", odpowiedz: "Odpowiedź pierwsza" }]);
+  assert.deepEqual(k.historia, [{ pytanie: "Pytanie pierwsze", odpowiedz: "Odpowiedź pierwsza", zdjecAgenta: 0 }]);
   assert.equal(k.pytanie, "Pytanie drugie");
 });
 
@@ -478,4 +478,180 @@ test("dziennik poprawki niesie długości i los, nigdy tekstu szkicu", async () 
     assert.ok(!p.includes("Kowalski"), "tekst szkicu nie ma prawa stanąć w dzienniku");
     assert.ok(!p.includes("XYZ-9999"), "ani numer z odrzuconej wersji");
   }
+});
+
+/* ── Zdjęcia od agenta ───────────────────────────────────────────────────────
+   Agent dołącza do pytania do trzech obrazów. Pilnujemy pięciu granic:
+   numery idą PO zdjęciach rozmowy i zgadzają się ze spisem, sita znają
+   numery agenta, zła lista odpada PRZED siecią, przy wymianie zostaje
+   miniatura (bajty oryginału nie), a zdjęcia agenta mają pierwszeństwo
+   we wspólnym suficie bajtów. */
+
+const JPEG_GLOWA = Buffer.from([0xff, 0xd8, 0xff, 0xe0]);
+const PNG_GLOWA = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
+const jpeg = (bajtow = 64) => Buffer.concat([JPEG_GLOWA, Buffer.alloc(bajtow - JPEG_GLOWA.length, 7)]);
+const MINIATURA = jpeg(200);
+
+/** Zdjęcie z ręki agenta w kształcie ciała żądania. */
+const odAgenta = (nazwa: string, bajty: Buffer = jpeg(), miniatura: Buffer | string | null = MINIATURA) => ({
+  nazwa, dane: bajty.toString("base64"),
+  miniatura: Buffer.isBuffer(miniatura) ? miniatura.toString("base64") : miniatura,
+});
+
+/** Załączniki rozmowy (PNG od klienta) i pobieracz, który liczy wyjścia po bajty. */
+function zalacznikiRozmowy(ile: number, bajty: Buffer = PNG_GLOWA) {
+  const m = db().prepare("SELECT id FROM message WHERE conversation_id=?").get(rozmowa) as { id: number };
+  const ins = db().prepare(`INSERT INTO message_attachment(message_id,file_name,mime_type,url,status)
+    VALUES (?,?,'image/png',?,'SAFE')`);
+  for (let i = 1; i <= ile; i += 1) ins.run(m.id, `z${i}.png`, `https://allegro.pl/plik/z${i}.png`);
+  const licznik = { pobran: 0 };
+  const pobierzZdjecie = async () => {
+    licznik.pobran += 1;
+    return bajty.buffer.slice(bajty.byteOffset, bajty.byteOffset + bajty.byteLength) as ArrayBuffer;
+  };
+  return { licznik, pobierzZdjecie };
+}
+
+test("zdjęcia agenta idą PO zdjęciach rozmowy, z numerami dalej i z podpisem w spisie", async () => {
+  const { pobierzZdjecie } = zalacznikiRozmowy(2);
+  const kartka = jpeg(100);
+  const n = nadawca();
+  await Q.zadajPytanie(rozmowa, "Jaki wymiar jest na kartce?", KTO(), n.nadaj, subiekt, {
+    pobierzZdjecie, zdjecia: [odAgenta("kartka.jpg", kartka), odAgenta("ekran.jpg")],
+  });
+
+  const k = n.widziane.ostatni!;
+  /* Kolejność obrazów to kolejność spisu: numer wskazuje obraz na tym samym miejscu. */
+  assert.deepEqual(k.zdjecia.map((z) => [z.numer, z.zrodlo]),
+    [["Z1", "zalacznik"], ["Z2", "zalacznik"], ["Z3", "agent"], ["Z4", "agent"]]);
+  assert.equal(k.zdjecia[2]!.base64, kartka.toString("base64"), "do modelu idą bajty z ręki agenta");
+  assert.equal(k.zdjecia[2]!.typ, "image/jpeg");
+  const fakty = String(k.fakty);
+  assert.ok(fakty.includes("[Z2] plik: z2.png"));
+  assert.ok(fakty.includes("[Z3] od agenta, dołączone do tego pytania, plik: kartka.jpg"),
+    "model ma wiedzieć, że to nie zdjęcie od klienta");
+  assert.ok(fakty.includes("[Z4] od agenta, dołączone do tego pytania, plik: ekran.jpg"));
+});
+
+test("brak zdjęć i pusta lista to dotychczasowe dopytanie, bez wierszy zdjęć", async () => {
+  for (const zdjecia of [undefined, null, []]) {
+    const n = nadawca();
+    const w = await Q.zadajPytanie(rozmowa, "Pytanie", KTO(), n.nadaj, subiekt, { zdjecia });
+    assert.deepEqual(n.widziane.ostatni!.zdjecia, []);
+    assert.deepEqual(w.zdjecia, []);
+    assert.ok(!String(n.widziane.ostatni!.fakty).includes("ZDJĘCIA"), "pusty spis nic nie kosztuje");
+  }
+  assert.equal(liczba("copilot_pytanie_zdjecie"), 0);
+});
+
+test("odczyt ze zdjęcia agenta przechodzi sita, a numer spoza spisu dalej odrzuca wersję", async () => {
+  const z = { zdjecia: [odAgenta("tabliczka.jpg")], szkic: "Dzień dobry." };
+  const ok = await Q.zadajPytanie(rozmowa, "Dopisz, co widać na tabliczce", KTO(), poprawiacz(() => ({
+    tresc: "Dzień dobry. Tabliczka pokazuje pękniętą obudowę filtra.",
+    odczytZeZdjec: [{ zdjecie: "Z1", tekst: "pęknięta obudowa filtra" }],
+  })).nadaj, subiekt, z);
+  assert.equal(ok.szkicOdrzucony, null, "Z1 to zdjęcie agenta z tego pytania, więc sito je zna");
+  assert.equal(ok.szkicPo, "Dzień dobry. Tabliczka pokazuje pękniętą obudowę filtra.");
+
+  const zle = await Q.zadajPytanie(rozmowa, "Dopisz, co widać na tabliczce", KTO(), poprawiacz(() => ({
+    tresc: "Dzień dobry. Tabliczka pokazuje pękniętą obudowę filtra.",
+    odczytZeZdjec: [{ zdjecie: "Z2", tekst: "pęknięta obudowa filtra" }],
+  })).nadaj, subiekt, z);
+  assert.equal(zle.szkicPo, null);
+  assert.match(zle.szkicOdrzucony!, /Z2/);
+});
+
+test("odmowy zdjęć agenta odpadają zdaniem PRZED siecią: ani Allegro, ani dostawca", async () => {
+  const { licznik, pobierzZdjecie } = zalacznikiRozmowy(1);
+  const pdf = Buffer.from("%PDF-1.7\nnie obraz", "latin1");
+  const przypadki: Array<[string, unknown, RegExp]> = [
+    ["cztery zdjęcia", [1, 2, 3, 4].map((i) => odAgenta(`z${i}.jpg`)), /najwyżej 3 zdjęcia, a wybrano 4/],
+    ["PDF z nazwą .jpg", [odAgenta("faktura.jpg", pdf)], /„faktura\.jpg” nie jest zdjęciem.*po zawartości/s],
+    ["zdjęcie ponad sufit na sztukę", [odAgenta("duze.jpg", jpeg(7_000_001))], /„duze\.jpg” waży 7,1 MB.*najwyżej 7,0 MB/],
+    ["suma ponad sufit żądania",
+      [odAgenta("a.jpg", jpeg(7_000_000)), odAgenta("b.jpg", jpeg(7_000_000)), odAgenta("c.jpg", jpeg(7_000_000))],
+      /razem 21,0 MB.*mieści się 20,0 MB/],
+    ["miniatura nie JPEG", [odAgenta("a.jpg", jpeg(), PNG_GLOWA)], /Miniatura zdjęcia „a\.jpg” nie jest plikiem JPEG/],
+    ["miniatura za duża", [odAgenta("a.jpg", jpeg(), jpeg(100_001))], /Miniatura zdjęcia „a\.jpg”/],
+    ["puste dane", [{ nazwa: "a.jpg", dane: "" }], /„a\.jpg” dotarło puste albo uszkodzone/],
+    ["zły base64", [{ nazwa: "a.jpg", dane: "to nie jest base64!" }], /dotarło puste albo uszkodzone/],
+    ["lista w złym kształcie", { nazwa: "a.jpg" }, /w złym kształcie/],
+  ];
+  for (const [nazwa, zdjecia, zdanie] of przypadki) {
+    const n = poprawiacz(() => null);
+    await assert.rejects(
+      Q.zadajPytanie(rozmowa, "Co na zdjęciu?", KTO(), n.nadaj, subiekt, { pobierzZdjecie, zdjecia }),
+      zdanie, nazwa);
+    assert.equal(n.widziane.wywolan, 0, `${nazwa}: za odrzucone zdjęcie nie płacimy`);
+  }
+  assert.equal(licznik.pobran, 0, "odmowa nie wychodzi nawet po zdjęcia rozmowy");
+  assert.deepEqual([liczba("copilot_wywolanie"), liczba("copilot_pytanie"), liczba("copilot_pytanie_zdjecie")],
+    [0, 0, 0]);
+});
+
+test("wymiana zostawia miniaturę i metadane, a bajtów oryginału nie trzyma", async () => {
+  const oryginal = jpeg(5000);
+  const w = await Q.zadajPytanie(rozmowa, "Co na kartce?", KTO(), nadawca().nadaj, subiekt, {
+    zdjecia: [odAgenta("kartka.jpg", oryginal), odAgenta("bez-miniatury.png", Buffer.concat([PNG_GLOWA, Buffer.alloc(50)]), null)],
+  });
+
+  assert.deepEqual(w.zdjecia, [
+    { numer: "Z1", nazwa: "kartka.jpg", typ: "image/jpeg", bajtow: 5000, miniatura: MINIATURA.toString("base64") },
+    { numer: "Z2", nazwa: "bez-miniatury.png", typ: "image/png", bajtow: 58, miniatura: null },
+  ]);
+  assert.deepEqual(Q.wymianyRozmowy(rozmowa)[0], w, "ślad przeżywa odczyt z bazy");
+  const bloby = db().prepare("SELECT miniatura FROM copilot_pytanie_zdjecie").all() as Array<{ miniatura: Uint8Array | null }>;
+  for (const b of bloby) {
+    assert.ok(b.miniatura === null || b.miniatura.byteLength < oryginal.byteLength, "oryginał nie zostaje w bazie");
+  }
+});
+
+test("nieudane wywołanie nie zostawia wymiany ani wierszy zdjęć", async () => {
+  const odmowa: import("./copilot-pytania.js").NadawcaPytania =
+    async () => { throw new Error("dostawca odmówił"); };
+  await assert.rejects(Q.zadajPytanie(rozmowa, "Co na kartce?", KTO(), odmowa, subiekt,
+    { zdjecia: [odAgenta("kartka.jpg")] }), /odmówił/);
+  assert.equal(liczba("copilot_pytanie"), 0);
+  assert.equal(liczba("copilot_pytanie_zdjecie"), 0, "zdjęcie bez wymiany nie znaczy nic");
+  assert.equal(liczba("copilot_wywolanie"), 1, "ale koszt i tak poszedł");
+});
+
+test("zdjęcia agenta mają pierwszeństwo: rozmowa dostaje to, co zostało z sufitu", async () => {
+  const duze = Buffer.concat([PNG_GLOWA, Buffer.alloc(7_000_000 - PNG_GLOWA.length)]);
+  const agent = [odAgenta("a.jpg", jpeg(7_000_000)), odAgenta("b.jpg", jpeg(7_000_000))];
+
+  /* Bez zdjęć agenta to samo zdjęcie rozmowy mieści się bez kłopotu. */
+  const bez = nadawca();
+  await Q.zadajPytanie(rozmowa, "Co na zdjęciu?", KTO(), bez.nadaj, subiekt,
+    { pobierzZdjecie: zalacznikiRozmowy(1, duze).pobierzZdjecie });
+  assert.equal(bez.widziane.ostatni!.zdjecia.length, 1);
+
+  /* Z dwoma po 7 MB zostaje 6 MB, więc zdjęcie rozmowy odpada, a spis to mówi. */
+  const z = nadawca();
+  await Q.zadajPytanie(rozmowa, "Co na zdjęciu?", KTO(), z.nadaj, subiekt,
+    { pobierzZdjecie: zalacznikiRozmowy(0, duze).pobierzZdjecie, zdjecia: agent });
+  const k = z.widziane.ostatni!;
+  assert.deepEqual(k.zdjecia.map((x) => [x.numer, x.zrodlo]), [["Z1", "agent"], ["Z2", "agent"]]);
+  assert.ok(String(k.fakty).includes("Nie pokazano z braku miejsca: 1"));
+});
+
+test("historia mówi, że agent dołączył zdjęcia, których w nowym pytaniu nie ma", async () => {
+  await Q.zadajPytanie(rozmowa, "Co na kartce?", KTO(), nadawca("Wymiar 42 mm.").nadaj, subiekt,
+    { zdjecia: [odAgenta("kartka.jpg"), odAgenta("ekran.jpg")] });
+  const drugi = nadawca();
+  await Q.zadajPytanie(rozmowa, "A druga strona?", KTO(), drugi.nadaj, subiekt);
+
+  const k = drugi.widziane.ostatni!;
+  assert.deepEqual(k.historia, [{ pytanie: "Co na kartce?", odpowiedz: "Wymiar 42 mm.", zdjecAgenta: 2 }]);
+  assert.deepEqual(k.zdjecia, [], "obrazy starego pytania nie wracają");
+});
+
+test("dziennik niesie liczbę i wagę zdjęć agenta, bez nazw plików", async () => {
+  await Q.zadajPytanie(rozmowa, "Co na kartce?", KTO(), nadawca().nadaj, subiekt,
+    { zdjecia: [odAgenta("Kowalski-paragon.jpg", jpeg(300)), odAgenta("b.jpg", jpeg(200))] });
+  const zd = db().prepare("SELECT payload FROM events WHERE type='copilot_pytanie'").get() as { payload: string };
+  const p = JSON.parse(zd.payload) as Record<string, unknown>;
+  assert.equal(p.zdjecAgenta, 2);
+  assert.equal(p.zdjecAgentaBajtow, 500);
+  assert.ok(!zd.payload.includes("Kowalski"), "nazwa pliku bywa daną osobową");
 });

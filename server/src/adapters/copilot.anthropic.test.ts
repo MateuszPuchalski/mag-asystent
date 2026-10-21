@@ -512,6 +512,38 @@ test("dopytanie: tekst z pola idzie we własnej sekcji, a bez niego sekcja mówi
   assert.match(bez.p.messages[0]!.content, /SZKIC W POLU AGENTA \(to poprawiasz\): \(jeszcze go nie ma\)/);
 });
 
+test("dopytanie: historia mówi o zdjęciach agenta, których w tym żądaniu nie ma", async () => {
+  /* Historia niesie sam tekst. Bez dopisku model wziąłby stare Z9 za obraz
+     z tego żądania, a sita odrzuciłyby wersję, która się na nie powoła. */
+  const { p } = await zadanieDopytania({
+    ...kontekstPytania(null),
+    historia: [
+      { pytanie: "Co na kartce?", odpowiedz: "Wymiar 42 mm.", zdjecAgenta: 2 },
+      { pytanie: "A filtr?", odpowiedz: "Nie wiem.", zdjecAgenta: 0 },
+    ],
+  });
+  const tekst = p.messages[0]!.content;
+  assert.match(tekst, /\[D1\] AGENT \(dołączył zdjęcia: 2, w tym pytaniu ich nie ma\): Co na kartce\?/);
+  assert.match(tekst, /\[D2\] AGENT: A filtr\?/, "wymiana bez zdjęć bez dopisku");
+  assert.match(p.system[0]!.text, /ZDJĘCIA OD AGENTA/);
+});
+
+test("dopytanie: zdjęcie agenta idzie obrazem jak każde, a miniatura nie wychodzi", async () => {
+  const miniatura = Buffer.from("MINIATURA-TYLKO-U-NAS");
+  const { p } = await zadanieDopytania({
+    ...kontekstPytania(null),
+    zdjecia: [{
+      numer: "Z1", zrodlo: "agent", typ: "image/jpeg", base64: "/9j/AAAA", nazwa: "kartka.jpg", bajtow: 6, miniatura,
+    }],
+  });
+  const tresc = (p.messages[0] as unknown as { content: Array<Record<string, unknown>> }).content;
+  assert.deepEqual(tresc.map((b) => b.type), ["image", "text"]);
+  const wyslane = JSON.stringify(p.messages);
+  assert.ok(wyslane.includes("/9j/AAAA"), "do modelu idzie oryginał");
+  assert.ok(!wyslane.includes(miniatura.toString("base64")) && !wyslane.includes("\"Buffer\""),
+    "miniatura zostaje u nas");
+});
+
 test("dopytanie: wersja z odpowiedzi trafia do `szkic`, notka do `tresc`", async () => {
   const { o } = await zadanieDopytania(kontekstPytania(null), JSON.stringify({
     odpowiedz: "Dodałem numer.", twierdzenia: [],

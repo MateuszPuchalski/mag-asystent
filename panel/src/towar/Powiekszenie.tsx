@@ -1,6 +1,8 @@
-import React, { useState } from "react";
-import { ChevronLeft, ChevronRight, Search, X } from "lucide-react";
+import React, { useEffect, useState } from "react";
+import { ChevronLeft, ChevronRight, RotateCcw, RotateCw, Search, X } from "lucide-react";
 import { useOkno } from "../nawigacja/fokus";
+import { obroc, type Obrot } from "../zdjecia/obrobka";
+import { obroconeZdjecie } from "./obrotZdjecia";
 
 /* Powiększenie odpowiada na pytanie „co dokładnie widać na zdjęciu”: czy to
    ten sam wariant, który wrócił, i gdzie klient widzi usterkę.
@@ -12,7 +14,11 @@ import { useOkno } from "../nawigacja/fokus";
    GALERIA I LUPA, decyzją właściciela. Klient przysyła usterkę kilkoma
    zdjęciami, a pęknięcie z telefonu w oknie 70% wysokości ekranu bywa
    niewidoczne. Przełączanie dostaje okno tylko od galerii rozmowy
-   (`Galeria.tsx`); lupa jest przy każdym zdjęciu. */
+   (`Galeria.tsx`); lupa jest przy każdym zdjęciu.
+
+   OBRÓT, bo zdjęcie z telefonu przychodzi bokiem, a przechylona głowa
+   to gorszy sposób oglądania niż jedno kliknięcie. Obrót należy do
+   zdjęcia, nie do okna: w galerii jedno leży bokiem, reszta prosto. */
 
 /** Przybliżenie lupy względem zdjęcia w oknie. Zdjęcie z telefonu ma kilka
     razy więcej pikseli niż okno, więc lupa pokazuje szczegół, nie rozmycie. */
@@ -43,6 +49,12 @@ export function Powiekszenie({ url, nazwa, symbol, zamknij, galeria }: {
   /* Lupa zostaje włączona przy przełączaniu: agent, który ogląda szczegóły,
      ogląda je na każdym zdjęciu po kolei. */
   const [lupa, setLupa] = useState(false);
+  const [obroty, setObroty] = useState<Record<string, Obrot>>({});
+  const obrot: Obrot = url ? obroty[url] ?? 0 : 0;
+  const obrocone = useObroconeZdjecie(url, obrot);
+  const obracaj = (kierunek: 1 | -1) => {
+    if (url) setObroty((o) => ({ ...o, [url]: obroc(o[url] ?? 0, kierunek) }));
+  };
 
   /* Strzałki wprost w oknie, bo fokus stoi w nim od otwarcia. Okno bez pól
      pisania nie ma komu tych klawiszy zabrać. */
@@ -70,23 +82,34 @@ export function Powiekszenie({ url, nazwa, symbol, zamknij, galeria }: {
           <h2 className="truncate font-bold">{nazwa}</h2>
           {symbol && <p className="text-sm text-slate-500">{symbol}</p>}
         </div>
-        {/* Licznik mówi, ile jeszcze zostało do obejrzenia. Strzałki
-            zawijają się na końcu, więc bez niego nie widać, gdzie koniec. */}
-        {galeria && <span className="ml-auto shrink-0 pt-0.5 text-sm tabular-nums text-slate-600">
-          {galeria.pozycja} z {galeria.ile}</span>}
-        {url && <button type="button" onClick={() => setLupa((l) => !l)} aria-pressed={lupa}
-          title="Lupa — przybliża miejsce pod kursorem"
-          className={`${galeria ? "" : "ml-auto"} inline-flex shrink-0 items-center gap-1.5 rounded-lg border px-2.5 py-1 text-sm font-semibold ${
-            lupa ? "border-sky-700 bg-sky-50 text-sky-900" : "border-slate-200 text-slate-600 hover:bg-slate-100"}`}>
-          <Search size={16} />Lupa</button>}
-        <button onClick={zamknij} aria-label="Zamknij"
-          className={`${galeria || url ? "" : "ml-auto"} rounded-lg p-1 text-slate-500 hover:bg-slate-100`}><X size={20} /></button>
+        <div className="ml-auto flex shrink-0 items-center gap-2">
+          {/* Licznik mówi, ile jeszcze zostało do obejrzenia. Strzałki
+              zawijają się na końcu, więc bez niego nie widać, gdzie koniec. */}
+          {galeria && <span className="text-sm tabular-nums text-slate-600">
+            {galeria.pozycja} z {galeria.ile}</span>}
+          {url && <>
+            <button type="button" onClick={() => obracaj(-1)} aria-label="Obróć w lewo" title="Obróć w lewo"
+              className="grid h-8 w-8 place-items-center rounded-lg border border-slate-200 text-slate-600 hover:bg-slate-100">
+              <RotateCcw size={16} /></button>
+            <button type="button" onClick={() => obracaj(1)} aria-label="Obróć w prawo" title="Obróć w prawo"
+              className="grid h-8 w-8 place-items-center rounded-lg border border-slate-200 text-slate-600 hover:bg-slate-100">
+              <RotateCw size={16} /></button>
+            <button type="button" onClick={() => setLupa((l) => !l)} aria-pressed={lupa}
+              title="Lupa — przybliża miejsce pod kursorem"
+              className={`inline-flex h-8 items-center gap-1.5 rounded-lg border px-2.5 text-sm font-semibold ${
+                lupa ? "border-sky-700 bg-sky-50 text-sky-900" : "border-slate-200 text-slate-600 hover:bg-slate-100"}`}>
+              <Search size={16} />Lupa</button>
+          </>}
+          <button onClick={zamknij} aria-label="Zamknij"
+            className="rounded-lg p-1 text-slate-500 hover:bg-slate-100"><X size={20} /></button>
+        </div>
       </div>
+      {obrocone.blad && <p role="alert" className="mb-2 text-sm text-ranga-zle">{obrocone.blad}</p>}
       <div className="flex items-center gap-3">
         {strzalka("poprzednie")}
         <div className="flex min-w-0 flex-1 justify-center">
           {url
-            ? <ObrazZLupa url={url} nazwa={nazwa} lupa={lupa} />
+            ? <ObrazZLupa url={obrocone.adres ?? url} nazwa={nazwa} lupa={lupa} />
             : <p className="p-10 text-center text-sm text-slate-500">
                 {url === null ? "Ta kartoteka nie ma zdjęcia." : "Wczytuję…"}</p>}
         </div>
@@ -94,6 +117,35 @@ export function Powiekszenie({ url, nazwa, symbol, zamknij, galeria }: {
       </div>
     </div>
   </div>;
+}
+
+/**
+ * Adres obróconego zdjęcia albo `null`, gdy obrotu nie ma albo trwa.
+ *
+ * W trakcie obracania okno pokazuje zdjęcie sprzed obrotu: puste okno na
+ * ułamek sekundy wyglądałoby, jakby zdjęcie zniknęło. Stary adres `blob:`
+ * zwalnia się przy każdej zmianie, bo pełne zdjęcie z telefonu waży
+ * dziesiątki megabajtów w pamięci karty.
+ */
+function useObroconeZdjecie(url: string | null | undefined, obrot: Obrot): {
+  adres: string | null; blad: string | null;
+} {
+  const [stan, setStan] = useState<{ klucz: string; adres: string | null; blad: string | null } | null>(null);
+  const klucz = `${url}|${obrot}`;
+  useEffect(() => {
+    if (!url || obrot === 0) return;
+    let zywy = true;
+    let adres: string | null = null;
+    obroconeZdjecie(url, obrot).then((a) => {
+      if (!zywy) { URL.revokeObjectURL(a); return; }
+      adres = a;
+      setStan({ klucz, adres: a, blad: null });
+    }, () => {
+      if (zywy) setStan({ klucz, adres: null, blad: "Nie udało się obrócić zdjęcia. Widać je bez obrotu." });
+    });
+    return () => { zywy = false; if (adres) URL.revokeObjectURL(adres); };
+  }, [url, obrot, klucz]);
+  return stan?.klucz === klucz && obrot !== 0 ? stan : { adres: null, blad: null };
 }
 
 /**

@@ -52,6 +52,16 @@ import { ROLE_BIUROWE } from "../services/users.js";
 
 const BIURO = ROLE_BIUROWE;
 
+/**
+ * Ciało dopytania ze zdjęciami agenta. OSOBNY limit dla tej jednej trasy,
+ * a globalne 6 MiB zostaje dla reszty. Zdjęcia jadą base64 w JSON, które
+ * rozdyma bajty o jedną trzecią: sufit żądania to 20 MB surowych
+ * (`SUFIT_ZDJEC.lacznie`), czyli około 26,7 MB po kodowaniu. Do tego
+ * miniatury i tekst. Bez tego limitu już jedno zdjęcie z telefonu odpadałoby
+ * kodem 413, zanim serwis zdążyłby powiedzieć agentowi zdaniem, czemu.
+ */
+const LIMIT_CIALA_PYTANIA = 30 * 1024 * 1024;
+
 function odmowa(reply: FastifyReply) {
   const s = sesjaZadania();
   if (!s) return reply.code(401).send({ error: "Brak sesji — zaloguj się" });
@@ -224,9 +234,12 @@ export async function copilotRoutes(app: FastifyInstance) {
    * szkicu. `szkic` to tekst, który agent ma teraz w polu; puste pole znaczy
    * „poprawiaj szkic Copilota". Kliknięcie jest hamulcem samo w sobie, jak
    * przy szkicu; sufit pytań na rozmowę chroni przed pętlą, nie przed wydatkiem.
+   *
+   * `zdjecia` to obrazy z ręki agenta, base64 w JSON. Kształt i bramkę
+   * sprawdza serwis (`przyjmijZdjeciaAgenta`), bo tam stoją sufity.
    */
-  app.post<{ Body: { rozmowaId?: number; pytanie?: string; szkic?: string } }>(
-    "/api/obsluga/copilot/pytanie", async (req, reply) => {
+  app.post<{ Body: { rozmowaId?: number; pytanie?: string; szkic?: string; zdjecia?: unknown } }>(
+    "/api/obsluga/copilot/pytanie", { bodyLimit: LIMIT_CIALA_PYTANIA }, async (req, reply) => {
       const nie = odmowa(reply);
       if (nie) return nie;
       const powod = czemuWylaczony();
@@ -238,7 +251,7 @@ export async function copilotRoutes(app: FastifyInstance) {
         return {
           wymiana: await zadajPytanie(
             rozmowaId, String(req.body?.pytanie ?? ""), kto(), nadawcaPytaniaAnthropic, subiekt,
-            { szkic: typeof szkic === "string" ? szkic : null }),
+            { szkic: typeof szkic === "string" ? szkic : null, zdjecia: req.body?.zdjecia }),
         };
       } catch (e) {
         const dostawcy = e instanceof BladLimituCopilota || e instanceof BladKluczaCopilota

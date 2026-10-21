@@ -2909,6 +2909,20 @@ Cena jest jawna. Każde dopytanie niesie dłuższą instrukcję, bo zawiera
 reguły szkicu. Sufit dopytań na rozmowę zostaje ten sam, a poprawki zużywają
 go szybciej. Pomiar losu szkicu przy wysyłce dalej porównuje z oryginałem.
 
+**Zdjęcie agenta w dopytaniu (0.602.0).** Agent ma czasem zdjęcie, którego
+nie ma w rozmowie: kartkę z wymiarami od klienta z innego kanału albo zdjęcie
+części z magazynu. Spinacz obok pola albo wklejenie ze schowka dołącza do
+trzech obrazów, każdy do 7 MB. Przed wysłaniem stoją miniatury z „Usuń".
+
+Zdjęcia idą do modelu z poleceniem, numerowane dalej po zdjęciach rozmowy:
+po Z1–Z8 przychodzi Z9. Model powołuje się na nie tak samo jak na zdjęcia
+klienta, w twierdzeniach i w odczycie nowej wersji szkicu. Sito wersji zna
+ich numery, więc poprawka z odczytem kartki przechodzi.
+
+Wymiana w historii pokazuje miniaturę z numerem. Oryginał nie zostaje, więc
+następne dopytanie go nie widzi i trzeba dołączyć je ponownie. Powód i zakres
+danych: polityka danych skrzynki w `docs/obsluga-klienta.md`.
+
 **Rachunek stoi w osobnym oknie, nie w tekście.** Klient ma dostać gładką
 odpowiedź, agent — to, na czym ona stoi. Okno „Skąd to wiem"
 (`skrzynka/ProcesCopilota.tsx`) wisi pod szkicem i otwiera się samo tylko

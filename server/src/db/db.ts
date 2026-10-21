@@ -238,6 +238,20 @@ export function migrate(database: DatabaseSync) {
   addColumn("copilot_pytanie", "szkic_odrzucony", "TEXT");
   addColumn("copilot_pytanie", "szkic_twierdzenia", "TEXT NOT NULL DEFAULT '[]'");
   addColumn("copilot_pytanie", "szkic_zastrzezenia", "TEXT NOT NULL DEFAULT '[]'");
+  /* Zdjęcia agenta przy dopytaniu — patrz `copilot_pytanie_zdjecie`
+     w `schema.sql`. Tabela nowa, więc ta linia jest dla istniejących
+     instalacji. Stare wymiany nie mają wierszy i to jest o nich prawda:
+     agent nie mógł wtedy dołączyć zdjęcia. */
+  database.exec(`CREATE TABLE IF NOT EXISTS copilot_pytanie_zdjecie (
+    id          INTEGER PRIMARY KEY AUTOINCREMENT,
+    pytanie_id  INTEGER NOT NULL REFERENCES copilot_pytanie(id) ON DELETE CASCADE,
+    numer       TEXT NOT NULL,
+    nazwa       TEXT NOT NULL,
+    typ         TEXT NOT NULL,
+    bajtow      INTEGER NOT NULL,
+    miniatura   BLOB)`);
+  database.exec(`CREATE INDEX IF NOT EXISTS ix_copilot_pytanie_zdjecie_pytanie
+    ON copilot_pytanie_zdjecie(pytanie_id, id)`);
   /* Zapytania do wyszukiwarki w księdze Copilota. Dziś nikt ich nie zleca,
      ale stare wiersze je niosą, a pomiar kosztów liczy je do rachunku. */
   addColumn("copilot_wywolanie", "wyszukiwania", "INTEGER NOT NULL DEFAULT 0");

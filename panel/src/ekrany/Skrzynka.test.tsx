@@ -61,6 +61,20 @@ let wysylkaWisi = false;
 let wymiany: Record<number, unknown[]> = {};
 let wstrzymajPytanie = false;
 let zwolnijPytanie: Array<() => void> = [];
+/* „Ułóż odpowiedź”: Copilot włączony i model, który pisze, dopóki test go nie
+   zwolni — pustym wywołaniem ze szkicem albo zdaniem błędu. */
+let copilotWlaczony = false;
+let wstrzymajSzkic = false;
+let zwolnijSzkic: Array<(blad?: string) => void> = [];
+
+function odpowiedzSzkicu(body: string | null, json: (v: unknown) => Response): Response {
+  const { rozmowaId } = JSON.parse(body ?? "{}") as { rozmowaId: number };
+  const gotowa = (blad?: string) => blad
+    ? new Response(JSON.stringify({ error: blad }), { status: 422 })
+    : json({ szkic: SZKIC(rozmowaId) });
+  if (!wstrzymajSzkic) return gotowa();
+  return new Promise<Response>((r) => { zwolnijSzkic.push((blad) => r(gotowa(blad))); }) as never;
+}
 
 /** Polecenie poprawia tekst, który przyszedł z pola: dopisuje podpis. */
 function odpowiedzPytania(body: string | null, json: (v: unknown) => Response): Response {
@@ -83,6 +97,7 @@ function odpowiedz(url: string, metoda: string, body: string | null = null): Res
       return wysylkaWisi ? (new Promise<never>(() => {}) as never) : json({ status: "sent" });
     }
     if (url === "/api/obsluga/copilot/pytanie") return odpowiedzPytania(body, json);
+    if (url === "/api/obsluga/copilot/szkic") return odpowiedzSzkicu(body, json);
     return json({ ok: true });
   }
   if (url === "/api/auth/me") return json({ user: { userId: 7, name: "A. Lewandowska", role: "biuro" } });
@@ -98,7 +113,12 @@ function odpowiedz(url: string, metoda: string, body: string | null = null): Res
       droga: [{ rodzaj: "rozmowa", id: 1, at: "2026-09-26T08:00:00.000Z", opis: null },
         { rodzaj: "zwrot", id: 9, at: "2026-09-27T08:00:00.000Z", opis: null }] });
   }
-  if (url === "/api/obsluga/copilot") return json({ wlaczony: false, powod: "wyłączony" });
+  if (url === "/api/obsluga/copilot") {
+    return json(copilotWlaczony
+      ? { wlaczony: true, powod: null, model: "m", modelKlasyfikacji: "m", maxPartia: 10,
+        autoKlasyfikacja: false, autoSzkic: false }
+      : { wlaczony: false, powod: "wyłączony" });
+  }
   if (url === "/api/health") return json({ allegroInbox: { status: "current", alarm: false } });
   if (url === "/api/users") return json({ users: [] });
   const pytania = /\/copilot\/pytania\/(\d+)$/.exec(url)?.[1];
@@ -112,6 +132,7 @@ beforeEach(() => {
   rozmowy = [wiersz(1), wiersz(2), wiersz(3)];
   dane = {};
   wymiany = {}; wstrzymajPytanie = false; zwolnijPytanie = [];
+  copilotWlaczony = false; wstrzymajSzkic = false; zwolnijSzkic = [];
   localStorage.setItem("wertis-panel-token", "t");
   vi.stubGlobal("fetch", vi.fn(async (url: string, init?: RequestInit) => {
     const metoda = init?.method ?? "GET";
@@ -400,5 +421,115 @@ describe("EKRAN SKRZYNKI: dopytanie poprawia szkic", () => {
     expect(p).toHaveValue(`${SKLEJONY} Pozdrawiamy.`);
     await u.click(screen.getByRole("button", { name: "Cofnij" }));
     expect(p).toHaveValue(`${SKLEJONY} Jeszcze.`);
+  });
+
+  it("zdjęcie agenta jedzie w pytaniu: nazwa i bajty base64, a bez płótna miniatura jest pusta", async () => {
+    /* jsdom nie ma `URL.createObjectURL` ani `createImageBitmap`. Pierwsze
+       podstawiamy dla podglądu, drugiego brak to właśnie przypadek „przeglądarka
+       nie zrobiła miniatury”, który ma nie zatrzymać pytania. */
+    URL.createObjectURL = vi.fn(() => "blob:kartka");
+    URL.revokeObjectURL = vi.fn();
+    const u = userEvent.setup();
+    dane[1] = szczegoly(1, { szkicCopilota: SZKIC(1) });
+    pokaz("/obsluga/skrzynka/1");
+    await pole();
+    await u.click(screen.getByRole("button", { name: /Dopytaj Copilota/ }));
+    await u.upload(screen.getByLabelText("Wybierz zdjęcia do pytania"),
+      new File([new Uint8Array([255, 216, 255, 224])], "kartka.jpg", { type: "image/jpeg" }));
+    expect(screen.getByRole("img", { name: "kartka.jpg" })).toBeInTheDocument();
+    await u.type(screen.getByRole("textbox", { name: /pytanie do Copilota/ }), "przepisz wymiary");
+    await u.click(screen.getByRole("button", { name: "Zapytaj" }));
+
+    const wyslane = await waitFor(() => {
+      const z = zadania.find((x) => x.url === "/api/obsluga/copilot/pytanie");
+      expect(z).toBeTruthy();
+      return z!;
+    });
+    expect(JSON.parse(wyslane.body!)).toEqual({
+      rozmowaId: 1, pytanie: "przepisz wymiary", szkic: "Dzień dobry, odpowiedź 1.",
+      zdjecia: [{ nazwa: "kartka.jpg", dane: "/9j/4A==", miniatura: null }],
+    });
+  });
+});
+
+/* ── Praca Copilota należy do JEDNEJ rozmowy ─────────────────────────────────
+   Mutacja „Ułóż” i mutacja dopytania są po jednej na ekran, a rozmów wiele.
+   Gdy stan brał samo `isPending`, kliknięcie w rozmowie A stawiało „Układam
+   szkic z faktów…” w każdej rozmowie, do której agent przeszedł, a błąd
+   z A lądował pod przyciskiem B. Agent czytał to jako pracę nad B.         */
+describe("EKRAN SKRZYNKI: praca Copilota nie przechodzi do innej rozmowy", () => {
+  /** Fokus na tło, żeby j/k chodziły po liście, a nie pisały w polu. */
+  async function przejdz(u: ReturnType<typeof userEvent.setup>, klawisz: "j" | "k", cel: string) {
+    (document.activeElement as HTMLElement | null)?.blur();
+    await u.keyboard(klawisz);
+    await waitFor(() => expect(adres()).toBe(cel));
+    await pole();
+  }
+
+  const przyciskiUloz = () => screen.findAllByRole("button", { name: /Ułóż odpowiedź/ });
+
+  it("„Układam szkic” zostaje przy rozmowie, dla której poszło żądanie", async () => {
+    const u = userEvent.setup();
+    copilotWlaczony = true; wstrzymajSzkic = true;
+    pokaz("/obsluga/skrzynka/1");
+    await pole();
+    await u.click((await przyciskiUloz())[0]);
+    await waitFor(() => expect(zwolnijSzkic).toHaveLength(1));
+    expect(screen.getAllByText(/Układam szkic z faktów/).length).toBeGreaterThan(0);
+
+    await przejdz(u, "j", "/obsluga/skrzynka/2");
+    const wB = await przyciskiUloz();
+    expect(screen.queryByText(/Układam szkic z faktów/)).not.toBeInTheDocument();
+    wB.forEach((p) => expect(p).toBeEnabled());
+
+    await przejdz(u, "k", "/obsluga/skrzynka/1");
+    expect((await screen.findAllByText(/Układam szkic z faktów/)).length).toBeGreaterThan(0);
+    await act(async () => { zwolnijSzkic[0](); });
+  });
+
+  it("„Pytam…” zostaje przy rozmowie, w której agent zadał pytanie", async () => {
+    const u = userEvent.setup();
+    wstrzymajPytanie = true;
+    dane[1] = szczegoly(1, { szkicCopilota: SZKIC(1) });
+    dane[2] = szczegoly(2, { szkicCopilota: SZKIC(2) });
+    /* Blok bywa zamknięty po przejściu — otwieramy go tylko wtedy. */
+    const otworz = async () => {
+      const naglowek = await screen.findByRole("button", { name: /Dopytaj Copilota/ });
+      if (naglowek.getAttribute("aria-expanded") !== "true") await u.click(naglowek);
+    };
+    pokaz("/obsluga/skrzynka/1");
+    await pole();
+    await otworz();
+    await u.type(screen.getByRole("textbox", { name: /pytanie do Copilota/ }), "dodaj podpis");
+    await u.click(screen.getByRole("button", { name: "Zapytaj" }));
+    await waitFor(() => expect(zwolnijPytanie).toHaveLength(1));
+    expect(screen.getByRole("button", { name: "Pytam…" })).toBeInTheDocument();
+
+    await przejdz(u, "j", "/obsluga/skrzynka/2");
+    await otworz();
+    expect(screen.queryByRole("button", { name: "Pytam…" })).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Zapytaj" })).toBeInTheDocument();
+
+    await przejdz(u, "k", "/obsluga/skrzynka/1");
+    await otworz();
+    expect(await screen.findByRole("button", { name: "Pytam…" })).toBeInTheDocument();
+    await act(async () => { zwolnijPytanie[0](); });
+  });
+
+  it("błąd szkicu z rozmowy A, który przychodzi w B, nie staje pod przyciskiem B", async () => {
+    const u = userEvent.setup();
+    copilotWlaczony = true; wstrzymajSzkic = true;
+    pokaz("/obsluga/skrzynka/1");
+    await pole();
+    await u.click((await przyciskiUloz())[0]);
+    await waitFor(() => expect(zwolnijSzkic).toHaveLength(1));
+
+    await przejdz(u, "j", "/obsluga/skrzynka/2");
+    await przyciskiUloz();
+    await act(async () => { zwolnijSzkic[0]("Model nie odpowiedział"); });
+    /* Kilka obrotów pętli: odpowiedź, odczyt JSON-u, `onError` mutacji. */
+    await act(async () => { await new Promise((r) => setTimeout(r, 50)); });
+    expect(screen.queryByText("Model nie odpowiedział")).not.toBeInTheDocument();
+    expect(screen.queryByText(/Układam szkic z faktów/)).not.toBeInTheDocument();
   });
 });
