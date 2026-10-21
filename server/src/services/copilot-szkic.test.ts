@@ -828,3 +828,64 @@ test("błąd po rundach narzędzi zostawia w księdze tokeny wszystkich rund", a
   assert.equal(Number(ks.tokeny_wej), 300);
   assert.notEqual(ks.model, "");
 });
+
+/* ── Znaczniki pomiaru w księdze ─────────────────────────────────────────────
+   Księga mówi pomiarowi, skąd przyszedł szkic, pod jaką instrukcją, pod jaką
+   kategorią i czym się skończył. Bez tych pól ekran pomiaru zgadywałby
+   z tekstu śladu, a szkic taktu mieszałby się z kliknięciem człowieka. */
+
+const znaczniki = () => db().prepare(`SELECT zadanie, wynik, kod_bledu, wersja_instrukcji, zrodlo, rund,
+    narzedzi, twierdzen, twierdzen_obnizonych, twierdzen_spoza_faktow, kategoria
+    FROM copilot_wywolanie ORDER BY id DESC`).get() as Record<string, unknown>;
+
+test("udany szkic zapisuje źródło, wersję, rundy, liczniki twierdzeń i kategorię", async () => {
+  rozpoznaj("PRODUCT_COMPATIBILITY", "CHECK_COMPATIBILITY");
+  await S.ulozSzkic(rozmowa, { ...KTO(), zrodlo: "klik" }, nadawca({
+    tresc: "Pasuje uszczelka XYZ-9999 (F1).", wersjaInstrukcji: "s1", rund: 2,
+    narzedzia: [{ nazwa: "karta_towaru", argument: "W09-0211", znakow: 40 }],
+    twierdzenia: [
+      { teza: "Gaźnik jest na stanie", zrodlo: "fakty", odwolanie: "F1", pewnosc: "pewne" },
+      { teza: "Uszczelka XYZ-9999 bywa stosowana", zrodlo: "model", odwolanie: null, pewnosc: "prawdopodobne" },
+    ],
+  }), subiekt);
+  assert.deepEqual({ ...znaczniki() }, {
+    zadanie: "szkic", wynik: "ok", kod_bledu: null, wersja_instrukcji: "s1", zrodlo: "klik", rund: 2,
+    narzedzi: 1, twierdzen: 2, twierdzen_obnizonych: 1, twierdzen_spoza_faktow: 1,
+    kategoria: "PRODUCT_COMPATIBILITY",
+  });
+});
+
+test("atrapa bez wersji i bez rund zostawia NULL wersji i jedną rundę, bez decyzji NULL kategorii", async () => {
+  await S.ulozSzkic(rozmowa, KTO(), nadawca(), subiekt);
+  const z = znaczniki();
+  assert.equal(z.wersja_instrukcji, null, "nadawca nie podał wersji, więc jej nie wiemy");
+  assert.equal(z.zrodlo, null, "autor bez źródła to NULL, nie zgadnięty klik");
+  assert.equal(z.rund, 1, "nadawca bez pętli wysyła jedno żądanie");
+  assert.equal(z.twierdzen, 0);
+  assert.equal(z.kategoria, null);
+});
+
+test("szkic odrzucony sitem ma kod sita, a błąd dostawcy kod klasy błędu", async () => {
+  await assert.rejects(S.ulozSzkic(rozmowa, { ...KTO(), zrodlo: "klik" }, nadawca({
+    tresc: "Pasuje uszczelka XYZ-9999 (F1).", wersjaInstrukcji: "s1",
+  }), subiekt), (e: unknown) => {
+    /* Kod idzie też w wyjątku: trasa i takt mogą po nim rozróżniać porażki. */
+    assert.equal((e as { kod?: string }).kod, "numer_niezadeklarowany");
+    return true;
+  });
+  let z = znaczniki();
+  assert.equal(z.wynik, "blad");
+  assert.equal(z.kod_bledu, "numer_niezadeklarowany");
+  assert.equal(z.wersja_instrukcji, "s1", "odrzucony szkic też powstał pod tą instrukcją");
+  assert.equal(z.twierdzen, 0);
+
+  const { BladPrzeciazeniaCopilota } = await import("../adapters/copilot.js");
+  await assert.rejects(S.ulozSzkic(rozmowa, { ...KTO(), zrodlo: "klik" }, async () => {
+    throw Object.assign(new BladPrzeciazeniaCopilota("przeciążone", 529, "overloaded_error 529"), {
+      zuzycie: { wej: 300, wyj: 30, cacheZapis: 0, cacheOdczyt: 0 }, rund: 2, narzedzi: 1, wersjaInstrukcji: "s1",
+    });
+  }, subiekt), BladPrzeciazeniaCopilota);
+  z = znaczniki();
+  assert.deepEqual([z.kod_bledu, z.rund, z.narzedzi, z.wersja_instrukcji, z.zrodlo, z.twierdzen],
+    ["przeciazenie", 2, 1, "s1", "klik", null], "porażka niesie to, co adapter dopiął, a twierdzeń nie zna");
+});

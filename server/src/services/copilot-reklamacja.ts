@@ -1,6 +1,7 @@
 import type { DatabaseSync } from "node:sqlite";
 import { db, transaction } from "../db/db.js";
 import { logEvent } from "./events.js";
+import { kodBledu, zapiszWKsiedze } from "./copilot-ksiega.js";
 import { kosztUsd, type Tokeny } from "./copilot-koszt.js";
 import {
   polacz, zamaskujBlok, zamaskujWatek,
@@ -306,7 +307,7 @@ export async function rozpoznajSprawe(z: ZadanieRozpoznania): Promise<KartaSpraw
     odp = await z.nadaj(tresc, zdjecia.zdjecia);
   } catch (e) {
     zapiszWywolanie(database, z.reklamacjaId, null, "blad",
-      (e as Error).message, z.kto, teraz);
+      (e as Error).message, z.kto, teraz, kodBledu(e));
     throw e;
   }
 
@@ -315,7 +316,7 @@ export async function rozpoznajSprawe(z: ZadanieRozpoznania): Promise<KartaSpraw
      `dowody` byłaby podpisana słowami klienta. */
   const fakty = JSON.stringify([odp.usterka, odp.kiedy, odp.oczekiwanie, odp.dowody]);
   if (sugerujeWerdykt(fakty)) {
-    zapiszWywolanie(database, z.reklamacjaId, odp, "blad", "werdykt w faktach", z.kto, teraz);
+    zapiszWywolanie(database, z.reklamacjaId, odp, "blad", "werdykt w faktach", z.kto, teraz, "werdykt_w_faktach");
     throw new Error(
       "Copilot wpisał rozstrzygnięcie w pole opisujące słowa klienta — karta " +
       "odrzucona. Rada ma stać w swoim polu i być podpisana jako rada.");
@@ -326,7 +327,7 @@ export async function rozpoznajSprawe(z: ZadanieRozpoznania): Promise<KartaSpraw
      zdania, nie zważył sprawy — zgadł. Karta leci, a nie sama rada: taka
      odpowiedź podważa też resztę. */
   if (odp.rada && odp.rada.pewnosc === "wysoka" && odp.rada.czegoNieWiem.length === 0) {
-    zapiszWywolanie(database, z.reklamacjaId, odp, "blad", "pewnosc bez niewiedzy", z.kto, teraz);
+    zapiszWywolanie(database, z.reklamacjaId, odp, "blad", "pewnosc bez niewiedzy", z.kto, teraz, "pewnosc_bez_niewiedzy");
     throw new Error(
       "Copilot zadeklarował wysoką pewność, nie nazywając ani jednej rzeczy, " +
       "której nie wie — karta odrzucona.");
@@ -345,7 +346,7 @@ export async function rozpoznajSprawe(z: ZadanieRozpoznania): Promise<KartaSpraw
   const karta = { ...zPokryciem, brakuje };
 
   if (pustaKarta(karta)) {
-    zapiszWywolanie(database, z.reklamacjaId, odp, "blad", "karta bez pokrycia", z.kto, teraz);
+    zapiszWywolanie(database, z.reklamacjaId, odp, "blad", "karta bez pokrycia", z.kto, teraz, "karta_bez_pokrycia");
     throw new Error("Copilot nie znalazł w tej rozmowie niczego, co dałoby się zacytować");
   }
 
@@ -443,14 +444,12 @@ export function kartaSprawy(database: DatabaseSync, reklamacjaId: number): (Kart
 function zapiszWywolanie(
   database: DatabaseSync, reklamacjaId: number, odp: OdpowiedzRozpoznania | null,
   wynik: "ok" | "blad", blad: string | null, kto: { id: number }, teraz: Date,
+  kod: string | null = null,
 ): void {
-  database.prepare(`INSERT INTO copilot_wywolanie
-    (zadanie,reklamacja_id,model,tokeny_wej,tokeny_wyj,tokeny_cache_zapis,
-     tokeny_cache_odczyt,ms,wynik,blad,przez_user_id,at)
-    VALUES ('rozpoznanie_reklamacji',?,?,?,?,?,?,?,?,?,?,?)`)
-    .run(reklamacjaId, odp?.model ?? "", odp?.zuzycie.wej ?? 0, odp?.zuzycie.wyj ?? 0,
-      odp?.zuzycie.cacheZapis ?? 0, odp?.zuzycie.cacheOdczyt ?? 0, odp?.ms ?? null,
-      wynik, blad ? blad.slice(0, 300) : null, kto.id, teraz.toISOString());
+  zapiszWKsiedze(database, {
+    zadanie: "rozpoznanie_reklamacji", reklamacjaId, model: odp?.model ?? "", zuzycie: odp?.zuzycie,
+    ms: odp?.ms, wynik, blad, przezUserId: kto.id, at: teraz, kodBledu: kod,
+  });
 }
 
 /** Koszt jednego rozpoznania — do paska na ekranie ustawień. */

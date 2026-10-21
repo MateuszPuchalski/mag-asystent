@@ -80,6 +80,11 @@ test("rozpoznanie daje szkic automatu, czekający na agenta — nic nie idzie do
   assert.equal(s.przez_user_id, null);
   assert.equal(s.ocena, null, "czeka na zatwierdzenie agenta");
   assert.ok(s.decyzja_id > 0, "szkic pamięta decyzję, pod którą powstał");
+  /* Zadanie zostaje `szkic`, bo liczy się do sufitu godzinowego taktu.
+     Pomiar oddziela go źródłem, a kategoria mówi, pod jaką decyzją powstał. */
+  const k = db().prepare("SELECT zadanie, zrodlo, kategoria FROM copilot_wywolanie WHERE conversation_id=?")
+    .get(r) as Record<string, unknown>;
+  assert.deepEqual({ ...k }, { zadanie: "szkic", zrodlo: "po_rozpoznaniu", kategoria: "ORDER_STATUS" });
   assert.equal(ostatniaKategoriaWFaktach, "ORDER_STATUS");
   const wyslanych = db().prepare("SELECT count(*) n FROM message WHERE direction='outgoing'").get() as { n: number };
   assert.equal(wyslanych.n, 0);

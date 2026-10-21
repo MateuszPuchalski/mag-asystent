@@ -655,3 +655,65 @@ test("dziennik niesie liczbę i wagę zdjęć agenta, bez nazw plików", async (
   assert.equal(p.zdjecAgentaBajtow, 500);
   assert.ok(!zd.payload.includes("Kowalski"), "nazwa pliku bywa daną osobową");
 });
+
+/* ── Znaczniki pomiaru w księdze ─────────────────────────────────────────────
+   Dopytanie zawsze ma źródło `dopytanie`. Odrzucona poprawka to udane
+   wywołanie z kodem: wymiana stoi, a pomiar ma widzieć, która sita łapią
+   poprawki. Twierdzenia liczy się z wersji, gdy weszła, bo ona idzie do klienta. */
+
+const znaczniki = () => db().prepare(`SELECT wynik, kod_bledu, wersja_instrukcji, zrodlo, rund, narzedzi,
+    twierdzen, twierdzen_obnizonych, twierdzen_spoza_faktow, ms
+    FROM copilot_wywolanie WHERE zadanie='pytanie' ORDER BY id DESC`).get() as Record<string, unknown>;
+
+test("odrzucona poprawka zostawia wynik ok z kodem sita i źródłem dopytania", async () => {
+  const n = poprawiacz(() => ({ tresc: "Ta uszczelka pasuje, numer XYZ-9999." }));
+  await Q.zadajPytanie(rozmowa, "Dopisz numer uszczelki", KTO(), n.nadaj, subiekt,
+    { szkic: "Ta uszczelka pasuje." });
+  const z = znaczniki();
+  assert.equal(z.wynik, "ok");
+  assert.equal(z.kod_bledu, "numer_niezadeklarowany");
+  assert.equal(z.zrodlo, "dopytanie");
+  assert.equal(z.rund, 1, "atrapa bez pętli wysyła jedno żądanie");
+  assert.equal(z.wersja_instrukcji, null, "atrapa nie podaje wersji");
+
+  await Q.zadajPytanie(rozmowa, "Dodaj telefon klienta", KTO(),
+    poprawiacz(() => ({ tresc: "Oddzwonimy pod [telefon] jutro." })).nadaj, subiekt,
+    { szkic: "Oddzwonimy jutro." });
+  assert.equal(znaczniki().kod_bledu, "znacznik_obcy");
+});
+
+test("twierdzenia liczą się z wersji, gdy weszła, a z notki przy czystym pytaniu", async () => {
+  await Q.zadajPytanie(rozmowa, "Dopisz numer uszczelki", KTO(), poprawiacz(() => ({
+    tresc: "Ta uszczelka pasuje, numer XYZ-9999.",
+    twierdzenia: [
+      { teza: "Uszczelka ma numer XYZ-9999", zrodlo: "model", odwolanie: null, pewnosc: "pewne" },
+      { teza: "Gaźnik jest na stanie", zrodlo: "fakty", odwolanie: "F1", pewnosc: "pewne" },
+    ],
+  })).nadaj, subiekt, { szkic: "Ta uszczelka pasuje." });
+  let z = znaczniki();
+  assert.deepEqual([z.kod_bledu, z.twierdzen, z.twierdzen_obnizonych, z.twierdzen_spoza_faktow], [null, 2, 1, 1]);
+
+  const notka = nadawca("Pasuje do MS 230.", [
+    { teza: "Pasuje do MS 230", zrodlo: "oferta", odwolanie: null, pewnosc: "prawdopodobne" },
+  ]);
+  const o = notka.nadaj;
+  await Q.zadajPytanie(rozmowa, "Pasuje?", KTO(), async (k) => ({
+    ...(await o(k)), wersjaInstrukcji: "d1", rund: 3,
+  }), subiekt);
+  z = znaczniki();
+  assert.deepEqual([z.twierdzen, z.twierdzen_obnizonych, z.twierdzen_spoza_faktow, z.wersja_instrukcji, z.rund],
+    [1, 0, 1, "d1", 3]);
+});
+
+test("błąd dostawcy w dopytaniu ma kod klasy błędu i to, co adapter dopiął", async () => {
+  const { BladLimituCopilota } = await import("../adapters/copilot.js");
+  await assert.rejects(Q.zadajPytanie(rozmowa, "Pytanie", KTO(), async () => {
+    throw Object.assign(new BladLimituCopilota("przerwa", 1000), { rund: 2, narzedzi: 1, wersjaInstrukcji: "d1" });
+  }, subiekt), BladLimituCopilota);
+  const z = znaczniki();
+  /* `ms` 0 to dawny zapis błędu dopytania, zachowany celowo (patrz nagłówek
+     `copilot-ksiega.ts`). Asercja pilnuje, że pisarz go nie zmienił, a nie
+     że zero jest zasadą. */
+  assert.deepEqual([z.wynik, z.kod_bledu, z.zrodlo, z.rund, z.narzedzi, z.wersja_instrukcji, z.twierdzen, z.ms],
+    ["blad", "limit", "dopytanie", 2, 1, "d1", null, 0]);
+});

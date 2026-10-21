@@ -2,6 +2,7 @@ import { createHash } from "node:crypto";
 import type { DatabaseSync } from "node:sqlite";
 import { db as defaultDb, transaction } from "../db/db.js";
 import { logEvent } from "./events.js";
+import { kodBledu, zapiszWKsiedze, type ZrodloWywolania } from "./copilot-ksiega.js";
 import {
   polacz, zamaskujBlok, zamaskujWatekZeSladem, zostalyDaneOsobowe, type TrescBezpieczna,
 } from "./copilot-maskowanie.js";
@@ -93,6 +94,8 @@ export type Autor = {
   id: number | null; name: string;
   /** Zadanie w księdze; brak = `klasyfikacja`. Powód przy `AutorSzkicu`. */
   zadanie?: string;
+  /** Droga wywołania do księgi; brak = NULL. Powód przy `AutorSzkicu`. */
+  zrodlo?: ZrodloWywolania;
 };
 
 /**
@@ -390,7 +393,7 @@ export async function sklasyfikujRozmowy(
       zapiszDecyzje(database, rozmowaId, messageId,
         zKodami(decyzjaZastepcza(KODY.bladMaskowania, "FAILED", mapa.wskazowka)),
         { kontekst: null, zalacznikow, model: null, promptWersja: null, surowa: undefined, struktura },
-        kto, teraz, () => { zapiszBlad(database, rozmowaId, "maskowanie", kto, teraz); doPrzegladu(); });
+        kto, teraz, () => { zapiszBlad(database, rozmowaId, "maskowanie", kto, teraz, "maskowanie"); doPrzegladu(); });
       wynik.bledy.push({ rozmowaId, powod: "maskowanie nie oczyściło treści — nie wysyłam" });
       continue;
     }
@@ -406,7 +409,7 @@ export async function sklasyfikujRozmowy(
          następnego przebiegu, a decyzja FAILED by ją stamtąd zdjęła. To jest
          „bounded retry" specyfikacji — ograniczony sufitem godzinowym. */
       if (e instanceof BladLimituCopilota) {
-        zapiszBlad(database, rozmowaId, slad, kto, teraz);
+        zapiszBlad(database, rozmowaId, slad, kto, teraz, kodBledu(e));
         wynik.bledy.push({ rozmowaId, powod });
         const za = e.poIluMs ? ` Spróbuj za ${Math.ceil(e.poIluMs / 60000)} min.` : "";
         wynik.przerwane = `Dostawca poprosił o przerwę.${za}`;
@@ -414,7 +417,7 @@ export async function sklasyfikujRozmowy(
       }
       if (e instanceof BladKluczaCopilota || e instanceof BladPrzeciazeniaCopilota
         || e instanceof BladLacznosciCopilota) {
-        zapiszBlad(database, rozmowaId, slad, kto, teraz);
+        zapiszBlad(database, rozmowaId, slad, kto, teraz, kodBledu(e));
         wynik.bledy.push({ rozmowaId, powod });
         wynik.przerwane = e.message;
         break;
@@ -424,7 +427,7 @@ export async function sklasyfikujRozmowy(
       zapiszDecyzje(database, rozmowaId, messageId,
         zKodami(decyzjaZastepcza(KODY.bladModelu, "FAILED", mapa.wskazowka)),
         { kontekst, zalacznikow, model: null, promptWersja: null, surowa: undefined, struktura },
-        kto, teraz, () => { zapiszBlad(database, rozmowaId, slad, kto, teraz); doPrzegladu(); });
+        kto, teraz, () => { zapiszBlad(database, rozmowaId, slad, kto, teraz, kodBledu(e)); doPrzegladu(); });
       wynik.bledy.push({ rozmowaId, powod });
       continue;
     }
@@ -439,7 +442,7 @@ export async function sklasyfikujRozmowy(
           struktura },
         kto, teraz, () => {
           doPrzegladu();
-          zapiszWywolanie(database, rozmowaId, odp, "blad", w.powod, kto, teraz);
+          zapiszWywolanie(database, rozmowaId, odp, "blad", w.powod, kto, teraz, "spoza_slownika");
           logEvent("copilot_klasyfikacja_niepoprawna", kto.name, null,
             { conversationId: rozmowaId, powod: w.powod, model: odp.model }, kto.id, database);
         });
@@ -470,27 +473,28 @@ function dolicz(wynik: WynikPartii, odp: OdpowiedzModelu): void {
 
 function zapiszWywolanie(
   database: DatabaseSync, rozmowaId: number, odp: OdpowiedzModelu,
-  wynik: "ok" | "blad", blad: string | null, kto: Autor, teraz: Date,
+  wynik: "ok" | "blad", blad: string | null, kto: Autor, teraz: Date, kod: string | null = null,
 ): void {
-  database.prepare(`INSERT INTO copilot_wywolanie
-    (zadanie,conversation_id,model,tokeny_wej,tokeny_wyj,tokeny_cache_zapis,
-     tokeny_cache_odczyt,ms,wynik,blad,przez_user_id,at)
-    VALUES (?,?,?,?,?,?,?,?,?,?,?,?)`)
-    .run(kto.zadanie ?? "klasyfikacja", rozmowaId, odp.model, odp.zuzycie.wej, odp.zuzycie.wyj,
-      odp.zuzycie.cacheZapis, odp.zuzycie.cacheOdczyt, odp.ms, wynik,
-      blad ? blad.slice(0, 300) : null, kto.id, teraz.toISOString());
+  /* Wersja z odpowiedzi, nie stała z adaptera Claude: rozpoznaje też Jev,
+     a jego pytania mają własny numer. */
+  zapiszWKsiedze(database, {
+    zadanie: kto.zadanie ?? "klasyfikacja", conversationId: rozmowaId, model: odp.model,
+    zuzycie: odp.zuzycie, ms: odp.ms, wynik, blad, przezUserId: kto.id, at: teraz,
+    kodBledu: kod, wersjaInstrukcji: odp.promptWersja, zrodlo: kto.zrodlo ?? null,
+  });
 }
 
 /* Próba, która nie doszła do odpowiedzi, też bywa płatna — a przy braku
    wiersza w księdze ta część rachunku znika bez śladu. Tokenów nie znamy,
-   więc idą zera; liczy się fakt i klasa błędu. */
+   więc idą zera; liczy się fakt i klasa błędu. Wersji też nie znamy:
+   nadawcę wstrzykuje wołający, a błąd nie mówi, który to był. */
 function zapiszBlad(
-  database: DatabaseSync, rozmowaId: number, powod: string, kto: Autor, teraz: Date,
+  database: DatabaseSync, rozmowaId: number, powod: string, kto: Autor, teraz: Date, kod: string,
 ): void {
-  database.prepare(`INSERT INTO copilot_wywolanie
-    (zadanie,conversation_id,model,wynik,blad,przez_user_id,at)
-    VALUES (?,?,'',?,?,?,?)`)
-    .run(kto.zadanie ?? "klasyfikacja", rozmowaId, "blad", powod.slice(0, 300), kto.id, teraz.toISOString());
+  zapiszWKsiedze(database, {
+    zadanie: kto.zadanie ?? "klasyfikacja", conversationId: rozmowaId, model: "", wynik: "blad",
+    blad: powod, przezUserId: kto.id, at: teraz, kodBledu: kod, zrodlo: kto.zrodlo ?? null,
+  });
 }
 
 /**

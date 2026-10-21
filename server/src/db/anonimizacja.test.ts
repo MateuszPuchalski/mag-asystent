@@ -618,6 +618,14 @@ test("dobór z rozmowy i warunek zastosowania to tekst od człowieka, numer OEM 
   assert.equal(regulaKolumny("dobor_rozmowy", "wybrany_symbol").regula, R.ZOSTAJE);
 });
 
+test("znaczniki księgi Copilota to słowniki i numery wersji, więc zostają", () => {
+  /* Kod błędu i wersja instrukcji to jedyne, po czym pomiar na kopii dzieli
+     porażki i wersje. Rozsypane dałyby kopię bez pomiaru. */
+  for (const kolumna of ["kod_bledu", "wersja_instrukcji", "zrodlo", "kategoria"]) {
+    assert.equal(regulaKolumny("copilot_wywolanie", kolumna).regula, R.ZOSTAJE, `copilot_wywolanie.${kolumna}`);
+  }
+});
+
 test("wiersz poleceń: kod 0 z liczbą sprawdzonych wartości, kod 2 bez ani jednej wartości osobowej na wyjściu", async () => {
   const { uruchom } = narzedzie;
   const przechwyc = (fn: () => number) => {

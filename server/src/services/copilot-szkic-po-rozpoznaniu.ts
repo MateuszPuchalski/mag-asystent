@@ -8,7 +8,7 @@ import {
   BladKluczaCopilota, BladLimituCopilota, BladPrzeciazeniaCopilota,
 } from "../adapters/copilot.js";
 import { nadawcaSzkicuAnthropic } from "../adapters/copilot.anthropic.js";
-import { ulozSzkic, type NadawcaSzkicu } from "./copilot-szkic.js";
+import { ulozSzkic, type AutorSzkicu, type NadawcaSzkicu } from "./copilot-szkic.js";
 import { AUTOMAT, zuzyteWGodzinie } from "./copilot-auto-szkic.js";
 import { CEL_KLASYFIKACJI } from "./copilot-klasyfikacja.js";
 import { TAKSONOMIA_WERSJA } from "./klasyfikacja-slownik.js";
@@ -111,6 +111,13 @@ export async function szkicujPoRozpoznaniu(
   }
 }
 
+/**
+ * Autor szkicu po rozpoznaniu: ten sam „automat” i to samo zadanie `szkic`,
+ * bo liczy się do sufitu godzinowego taktu (`zuzyteWGodzinie`). Inne jest
+ * tylko źródło, żeby pomiar oddzielił szkic pod świeżą decyzję od taktu.
+ */
+export const AUTOMAT_PO_ROZPOZNANIU: AutorSzkicu = { ...AUTOMAT, zrodlo: "po_rozpoznaniu" };
+
 async function szkicuj(
   database: DatabaseSync, rozmowyId: number[], deps: SzkicPoRozpoznaniuDeps,
 ): Promise<WynikSzkicuPoRozpoznaniu> {
@@ -130,7 +137,7 @@ async function szkicuj(
   let ulozonych = 0; let bledow = 0; let przerwane: string | null = null;
   for (const rozmowa of czekaja.slice(0, budzet)) {
     try {
-      await ulozSzkic(rozmowa, AUTOMAT, nadaj, subiekt, now());
+      await ulozSzkic(rozmowa, AUTOMAT_PO_ROZPOZNANIU, nadaj, subiekt, now());
       ulozonych++;
     } catch (e) {
       if (e instanceof BladLimituCopilota || e instanceof BladKluczaCopilota

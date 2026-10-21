@@ -87,6 +87,10 @@ test("pytanie pod ofertą dostaje szkic, a podpisuje go AUTOMAT, nie człowiek",
     .get(r) as { przez: string; przez_user_id: number | null };
   assert.equal(s.przez, "automat");
   assert.equal(s.przez_user_id, null);
+  /* Źródło w księdze: pomiar oddziela szkic taktu od kliknięcia agenta. */
+  const k = db().prepare("SELECT zadanie, zrodlo FROM copilot_wywolanie WHERE conversation_id=?")
+    .get(r) as { zadanie: string; zrodlo: string | null };
+  assert.deepEqual({ ...k }, { zadanie: "szkic", zrodlo: "takt" });
 });
 
 test("pytanie BEZ oferty nie dostaje nic — to rozstrzygnięcie właściciela o zakresie", async () => {

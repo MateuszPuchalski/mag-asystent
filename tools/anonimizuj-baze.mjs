@@ -183,6 +183,8 @@ const JAWNE = {
   "dobor.zmienil": [R.PRACOWNIK, "autor zmiany: pracownik albo automat"],
   "copilot_wywolanie.zadanie": [R.ZOSTAJE, "nazwa zadania modelu, nie jego treść"],
   "copilot_wywolanie.model": [R.ZOSTAJE, "identyfikator modelu"],
+  "copilot_wywolanie.kod_bledu": [R.ZOSTAJE, "kod ze słownika błędów, nie treść błędu"],
+  "copilot_wywolanie.wersja_instrukcji": [R.ZOSTAJE, "numer wersji instrukcji modelu"],
   "conversation.priorytet": [R.ZOSTAJE, "słownik"],
   "klient_dosylka.zamowienie": [R.ZOSTAJE, "identyfikator zamówienia"],
   "pomylka_wysylki.zamowienie": [R.ZOSTAJE, "identyfikator zamówienia"],

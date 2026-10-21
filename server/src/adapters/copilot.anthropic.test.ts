@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import Anthropic from "@anthropic-ai/sdk";
 import {
   _ustawKlienta, nadawcaAnthropic, nadawcaPytaniaAnthropic, nadawcaSzkicuAnthropic,
-  SUFIT_RUND_NARZEDZI, SUFIT_RUND_SZKICU, wspieraWysilek,
+  PROMPT_DOPYTANIA, PROMPT_SZKICU, SUFIT_RUND_NARZEDZI, SUFIT_RUND_SZKICU, wspieraWysilek,
 } from "./copilot.anthropic.js";
 import type { KontekstPytania } from "../services/copilot-pytania.js";
 import type { WynikNarzedzia, ZestawNarzedzi } from "../services/copilot-narzedzia.js";
@@ -155,6 +155,10 @@ test("wysiłek idzie tylko do modeli, które go przyjmują", () => {
   assert.equal(wspieraWysilek("claude-sonnet-5"), true);
   assert.equal(wspieraWysilek("claude-haiku-4-5"), false);
   assert.equal(wspieraWysilek("claude-sonnet-4-5"), false);
+  assert.equal(wspieraWysilek("claude-haiku-4-5-20251001"), false, "wersja z datą to dalej Haiku 4.5");
+  /* Haiku 5.5 wysiłek przyjmuje, a bez niego chodzi na domyślnym `medium`
+     zamiast zamówionego `low`. */
+  assert.equal(wspieraWysilek("claude-haiku-5-5"), true);
 });
 
 test("klasyfikacja wysyła model z modelKlasyfikacji i oddaje go w odpowiedzi", async () => {
@@ -568,6 +572,63 @@ test("instrukcja szkicu: cena klientowi tylko z oferty, cennik kartoteki do zast
     const tekst = (zadania[0]!.system as Array<{ text: string }>)[0]!.text;
     assert.match(tekst, /Cenę podajesz klientowi WYŁĄCZNIE z wyniku naszej oferty/);
     assert.match(tekst, /ceny z cennika kartoteki NIE PISZ klientowi[\s\S]*`zastrzezenia`/);
+  } finally {
+    _ustawKlienta(null);
+  }
+});
+
+/* ── Kody i znaczniki do księgi ──────────────────────────────────────────────
+   Pomiar dzieli porażki po kodzie, a wyniki po wersji instrukcji. Kod ucięcia
+   i odmowy zna tylko adapter, bo tylko on widzi `stop_reason`. Wersja i rundy
+   wracają także z błędem, bo za porażkę po rundach też się płaci. */
+
+test("ucięcie i odmowa przy szkicu niosą własny kod, wersję i liczbę rund", async () => {
+  for (const [stop, kod] of [["max_tokens", "uciety"], ["refusal", "odmowa"]] as const) {
+    klientSekwencja([() => ({
+      stop_reason: stop, model: "m", usage: zuzycieRundy, content: [{ type: "text", text: "{\"tre" }],
+    })]);
+    try {
+      const e = await nadawcaSzkicuAnthropic(TRESC, FAKTY).then(() => null, (x: unknown) => x);
+      assert.ok(e instanceof BladOdpowiedziCopilota);
+      assert.equal((e as BladOdpowiedziCopilota).kod, kod);
+      const slad = e as unknown as { rund: number; narzedzi: number; wersjaInstrukcji: string };
+      assert.equal(slad.rund, 1);
+      assert.equal(slad.narzedzi, 0);
+      assert.equal(slad.wersjaInstrukcji, PROMPT_SZKICU);
+    } finally {
+      _ustawKlienta(null);
+    }
+  }
+});
+
+test("klasyfikacja bez rozstrzygnięcia przy max_tokens to ucięcie, nie inny", async () => {
+  _ustawKlienta({ messages: { parse: async () => ({
+    parsed_output: null, model: "m", stop_reason: "max_tokens", usage: { input_tokens: 1, output_tokens: 1 },
+  }) } } as unknown as Anthropic);
+  try {
+    const e = await nadawcaAnthropic(TRESC).then(() => null, (x: unknown) => x);
+    assert.equal((e as BladOdpowiedziCopilota).kod, "uciety");
+  } finally {
+    _ustawKlienta(null);
+  }
+});
+
+test("udany szkic i udane dopytanie oddają swoją wersję instrukcji i rundy", async () => {
+  klientSekwencja([() => ({ stop_reason: "end_turn", model: "m", usage: zuzycieRundy,
+    content: [{ type: "text", text: SZKIC }] })]);
+  try {
+    const s = await nadawcaSzkicuAnthropic(TRESC, FAKTY);
+    assert.equal(s.wersjaInstrukcji, PROMPT_SZKICU);
+    assert.equal(s.rund, 1);
+  } finally {
+    _ustawKlienta(null);
+  }
+  klientSekwencja([() => ({ stop_reason: "end_turn", model: "m", usage: zuzycieRundy,
+    content: [{ type: "text", text: ODPOWIEDZ }] })]);
+  try {
+    const o = await nadawcaPytaniaAnthropic(kontekstPytania(null));
+    assert.equal(o.wersjaInstrukcji, PROMPT_DOPYTANIA);
+    assert.equal(o.rund, 1);
   } finally {
     _ustawKlienta(null);
   }
