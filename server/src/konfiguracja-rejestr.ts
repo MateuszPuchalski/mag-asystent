@@ -305,6 +305,8 @@ export const KLUCZE: readonly Klucz[] = [
     opis: "Szkic układany zaraz po rozpoznaniu wiadomości." },
   { klucz: "COPILOT_SZKIC_NARZEDZIA", grupa: "copilot", kto: "zaawansowane",
     opis: "0 = szkic nie sięga sam do kartoteki i naszych ofert; domyślnie sięga, jak dopytanie." },
+  { klucz: "COPILOT_ZAPIS_WEJSCIA", grupa: "copilot", kto: "zaawansowane",
+    opis: "0 = bez zapisu zamaskowanego wejścia szkicu i dopytania; domyślnie trzymamy je 90 dni do porównań." },
   { klucz: "COPILOT_AUTO_NA_GODZINE", grupa: "copilot", kto: "wlasciciel", edycja: LICZBA,
     nazwa: "Sufit szkiców w tle", jednostka: NA_GODZINE,
     opis: "Sufit automatycznych szkiców na godzinę; hamulec kosztów." },

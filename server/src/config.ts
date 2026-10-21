@@ -1164,6 +1164,15 @@ export const config = {
      */
     szkicNarzedzia: !["0", "false"].includes(String(process.env.COPILOT_SZKIC_NARZEDZIA ?? "").trim().toLowerCase()),
     /**
+     * ZAPIS WEJŚCIA SZKICU I DOPYTANIA na 90 dni (decyzja właściciela).
+     * Zamaskowane wejście i surowe wyjście modelu są zestawem testowym do
+     * porównania instrukcji i modeli. Włączony domyślnie, bo bez niego
+     * porównanie nie ma na czym stanąć. `0` albo `false` wyłącza zapis;
+     * sprzątanie starych wierszy chodzi dalej, żeby retencja nie zależała
+     * od przełącznika.
+     */
+    zapisWejscia: !["0", "false"].includes(String(process.env.COPILOT_ZAPIS_WEJSCIA ?? "").trim().toLowerCase()),
+    /**
      * Rytm krótszy niż przy szkicu, bo rozpoznanie ma stać przy wiadomości,
      * ZANIM agent ją otworzy — a jedno wywołanie trwa sekundę, nie kilka.
      */

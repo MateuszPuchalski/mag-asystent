@@ -91,6 +91,7 @@ import { czytajStan, problemyKopii } from "./services/kopie-bazy.js";
 import { liniaLogu, stanPamieci, zapiszProbke } from "./services/pamiec-procesu.js";
 import { problemDyskusji, stanDyskusjiHealth } from "./services/dyskusje.js";
 import { przebiegNocny, TAKT_NOCNY_MS } from "./services/przebieg-nocny.js";
+import { sprzatnijWejscia } from "./services/copilot-wejscie.js";
 import { przebiegRaportow, TAKT_RAPORTOW_MS } from "./services/raport-tygodnia.js";
 import { podNssm, ustawRestart } from "./services/restart.js";
 import {
@@ -800,6 +801,12 @@ async function main() {
      każdej instalacji. Dotąd były wpisami w Harmonogramie zadań, których
      instalator nie zakładał. Powód i okno nocne: `services/przebieg-nocny.ts`. */
   uruchomTakt("noc", TAKT_NOCNY_MS, async () => { przebiegNocny(); });
+
+  /* RETENCJA WEJŚCIA COPILOTA: 90 dni, sprawdzane co godzinę, bez warunku.
+     Nie w `przebiegNocny`, bo ten chodzi tylko w oknie nocnym, a serwer
+     wyłączany na noc nie skasowałby nic nigdy. Termin obiecany w polityce
+     danych nie może zależeć od tego, czy serwer nocą stoi. */
+  uruchomTakt("retencja-copilota", 60 * 60_000, async () => { sprzatnijWejscia(db(), new Date()); });
 
   /* PAMIĘĆ PROCESU: próbka przy starcie i co godzinę. Zwykły `setInterval`,
      nie `uruchomTakt`: to lokalny odczyt, bez Allegro, więc rozrzut i respekt

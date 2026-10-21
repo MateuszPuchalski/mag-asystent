@@ -4,6 +4,7 @@ import type { SubiektAdapter } from "../adapters/subiekt.js";
 import { BladOdpowiedziCopilota } from "../adapters/copilot.js";
 import { logEvent } from "./events.js";
 import { kodBledu, sladPorazki, zapiszWKsiedze, type WpisKsiegi, type ZrodloWywolania } from "./copilot-ksiega.js";
+import { zapiszWejscie, type WpisWejscia } from "./copilot-wejscie.js";
 import { publishConversationEvent } from "./conversation-realtime.js";
 import {
   zamaskujWatek, zostalyDaneOsobowe, type TrescBezpieczna, type WiadomoscWatku,
@@ -967,6 +968,17 @@ export async function ulozSzkic(
     zadanie: kto.zadanie ?? "szkic", conversationId, przezUserId: kto.id, at: teraz,
     zrodlo: kto.zrodlo ?? null, kategoria, ...w,
   });
+  /* Wiersz księgi razem z wejściem wywołania: dokładnie tym, co poszło do
+     dostawcy, już zamaskowanym. Wołający trzyma oba w jednej transakcji, bo
+     wejście bez wiersza księgi nie wie, czym się skończyło. */
+  type ZWywolania = Pick<WpisWejscia, "model" | "wersjaInstrukcji" | "wynikiNarzedzi" | "wyjscie" | "wynikSit">;
+  const zWejsciem = (w: Omit<WpisKsiegi, "zadanie" | "przezUserId" | "at">, we: ZWywolania) => {
+    zapiszWejscie(db(), {
+      wywolanieId: ksiega(w), conversationId, messageId: k.ostatniaWiadomoscId,
+      zadanie: kto.zadanie ?? "szkic", zrodlo: kto.zrodlo ?? null, at: teraz,
+      watek: k.watek, fakty: tekstFaktow, zdjecia: zdjecia.zdjecia, ...we,
+    });
+  };
 
   /* Asercja przed siecią — na WĄTKU, bo tam jest tekst klienta. Faktów nie
      sprawdzamy tymi wzorcami celowo: dziewięć cyfr numeru OEM zapaliłoby
@@ -994,10 +1006,14 @@ export async function ulozSzkic(
        pusty przy błędzie bez rund, jak dotąd: pomiar go pomija. */
     const p = sladPorazki(e);
     const t = p.zuzycie && (p.zuzycie.wej || p.zuzycie.wyj) ? p.zuzycie : null;
-    ksiega({
-      model: t ? config.copilot.model : "", zuzycie: t, wynik: "blad", blad: slad,
+    const model = t ? config.copilot.model : "";
+    /* Wejście porażki też idzie do zestawu, z wynikami narzędzi sprzed
+       błędu: sprawa, na której model się wyłożył, jest dla porównania
+       najcenniejsza. Wyjścia nie ma, sita nie ruszyły. */
+    transaction(db(), () => zWejsciem({
+      model, zuzycie: t, wynik: "blad", blad: slad,
       kodBledu: kodBledu(e), rund: p.rund, narzedzi: p.narzedzi, wersjaInstrukcji: p.wersjaInstrukcji,
-    });
+    }, { model, wersjaInstrukcji: p.wersjaInstrukcji, wynikiNarzedzi: p.wynikiNarzedzi, wynikSit: null }))();
     throw e;
   }
   /* SPRAWDZENIE DETERMINISTYCZNE — orkiestrator, nie wyrocznia. Bez ponowienia:
@@ -1012,13 +1028,23 @@ export async function ulozSzkic(
     model: odp.model, zuzycie: odp.zuzycie, ms: odp.ms, rund: odp.rund ?? 1,
     narzedzi: (odp.narzedzia ?? []).length, wersjaInstrukcji: odp.wersjaInstrukcji ?? null,
   };
+  /* Do wejścia surowa odpowiedź PRZED sitami: porównanie modeli pyta także
+     o to, co sita odrzuciły. */
+  const doWejscia: ZWywolania = {
+    model: odp.model, wersjaInstrukcji: odp.wersjaInstrukcji ?? null,
+    wynikiNarzedzi: odp.wynikiNarzedzi ?? [], wynikSit: sito.ok ? "ok" : sito.kod,
+    wyjscie: {
+      tresc: odp.tresc, uzyteFakty: odp.uzyteFakty, zastrzezenia: odp.zastrzezenia,
+      twierdzenia: odp.twierdzenia, odczytZeZdjec: odp.odczytZeZdjec,
+    },
+  };
   if (!sito.ok) {
     /* Twierdzenia odrzuconego szkicu też się liczą: pomiar pyta, czy szkice
        z wiedzy modelu odpadają częściej niż te z faktów. Ta sama ocena co w sicie. */
-    ksiega({
+    transaction(db(), () => zWejsciem({
       ...zOdpowiedzi, wynik: "blad", blad: `${sito.kod}: ${sito.lista.join(", ")}`, kodBledu: sito.kod,
       twierdzenia: zRozpoznaniaNiepewne(ocenTwierdzenia(odp.twierdzenia), k.fakty),
-    });
+    }, doWejscia))();
     throw new BladOdpowiedziCopilota(zdanieOdrzucenia(sito, odp.tresc.length), 200, sito.kod, sito.kod);
   }
   const { tresc, twierdzenia } = sito;
@@ -1040,7 +1066,7 @@ export async function ulozSzkic(
         k.ostatniaWiadomoscId, odp.model, teraz.toISOString(), kto.name, kto.id,
         JSON.stringify(twierdzenia), JSON.stringify(odp.odczytZeZdjec), k.decyzjaId,
         JSON.stringify(odp.narzedzia ?? []));
-    ksiega({ ...zOdpowiedzi, wynik: "ok", twierdzenia });
+    zWejsciem({ ...zOdpowiedzi, wynik: "ok", twierdzenia }, doWejscia);
     /* Ładunki niosą identyfikatory i DŁUGOŚCI, nigdy treść (§19). */
     logEvent("copilot_szkic", kto.name, null, {
       conversationId, znakow: tresc.length, zastrzezen: odp.zastrzezenia.length,

@@ -254,6 +254,7 @@ export const NAZWA_ZDARZENIA: Record<string, string> = {
 
   /* Copilot */
   copilot_pytanie: "Pytanie do Copilota",
+  copilot_wejscie_retencja: "Stare wejścia Copilota skasowane",
   copilot_szkic: "Szkic Copilota",
   copilot_szkic_ocena: "Szkic Copilota oceniony",
   copilot_szkic_po_rozpoznaniu: "Szkic Copilota po rozpoznaniu",

@@ -48,6 +48,7 @@ export const OBOWIAZUJE: Readonly<Record<string, Pole>> = {
   COPILOT_AUTO_KLASYFIKACJA: (c) => c.copilot.autoKlasyfikacja,
   COPILOT_SZKIC_PO_ROZPOZNANIU: (c) => c.copilot.szkicPoRozpoznaniu,
   COPILOT_SZKIC_NARZEDZIA: (c) => c.copilot.szkicNarzedzia,
+  COPILOT_ZAPIS_WEJSCIA: (c) => c.copilot.zapisWejscia,
   COPILOT_AUTO_NA_GODZINE: (c) => c.copilot.autoNaGodzine,
   COPILOT_AUTO_KLASYFIKACJA_NA_GODZINE: (c) => c.copilot.autoKlasyfikacjaNaGodzine,
   COPILOT_PRZED_PRACA: (c) => c.copilot.przedPraca,
