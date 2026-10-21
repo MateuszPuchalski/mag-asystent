@@ -61,6 +61,7 @@ test("bierze wiadomości z okna, najstarsze pierwsze, i podpisuje się jako auto
   assert.equal(k.conversation_id, a, "najdłużej czekająca idzie pierwsza");
   assert.equal(k.przez, "automat");
   assert.equal(k.przez_user_id, null, "automat nie podpisuje się kontem człowieka");
+  assert.equal((d.prepare("SELECT zrodlo FROM copilot_wywolanie").get() as any).zrodlo, "takt");
 
   await sklasyfikujNowe({ database: d, nadaj, naPrzebieg: 10, naGodzine: 10, oknoDni: 7, now: () => TERAZ });
   const rozpoznane = (d.prepare("SELECT conversation_id FROM decyzja_klasyfikacji").all() as any[])

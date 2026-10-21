@@ -61,7 +61,7 @@ import { glosAllegro, zamknietyProblem } from "./glos-allegro.js";
  * Podpisanie takiego szkicu kontem zalogowanego agenta zafałszowałoby
  * jedyny pomiar, jaki mamy — jego ocenę przez człowieka.
  */
-export const AUTOMAT: AutorSzkicu = { id: null, name: "automat" };
+export const AUTOMAT: AutorSzkicu = { id: null, name: "automat", zrodlo: "takt" };
 
 export interface AutoSzkicDeps {
   database?: DatabaseSync;

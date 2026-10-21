@@ -128,6 +128,12 @@ test("rozpoznaje i szkicuje zaległość: PILNE, potem najdłużej czekające", 
   const wyslanych = db().prepare("SELECT count(*) n FROM message WHERE direction='outgoing'").get() as { n: number };
   assert.equal(wyslanych.n, 0, "nic nie idzie do klienta");
   assert.ok(db().prepare("SELECT 1 FROM events WHERE type='copilot_przed_praca'").get());
+  const zrodla = db().prepare("SELECT DISTINCT zadanie, zrodlo FROM copilot_wywolanie ORDER BY zadanie")
+    .all() as Array<Record<string, unknown>>;
+  assert.deepEqual(zrodla.map((z) => ({ ...z })), [
+    { zadanie: "klasyfikacja_przed_praca", zrodlo: "przed_praca" },
+    { zadanie: "szkic_przed_praca", zrodlo: "przed_praca" },
+  ]);
 });
 
 test("rozmowa, w której już odpisaliśmy, i rozmowa sprzed okna dni nie kosztują nic", async () => {

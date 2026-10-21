@@ -100,6 +100,10 @@ test("ścieżka szczęśliwa: decyzja z wersjami, księga i zdarzenie w jednej t
   const ks = d.prepare("SELECT * FROM copilot_wywolanie").get() as any;
   assert.equal(ks.wynik, "ok");
   assert.equal(Number(ks.tokeny_wej), 900);
+  /* Wersja z odpowiedzi nadawcy, nie stała adaptera: rozpoznaje też Jev. */
+  assert.equal(ks.wersja_instrukcji, "k2");
+  assert.equal(ks.kod_bledu, null);
+  assert.equal(ks.zrodlo, null, "autor bez źródła to NULL, nie zgadnięty klik");
 
   const zd = d.prepare("SELECT type FROM events WHERE type='copilot_klasyfikacja'").get();
   assert.ok(zd, "mutacja bez zdarzenia w dzienniku to mutacja bez autora");
@@ -223,8 +227,10 @@ test("kategoria spoza słownika daje decyzję FAILED, a słownik rośnie przez z
   assert.ok(zd, "brak śladu znaczy, że słownik nigdy nie urośnie");
   assert.match(String(zd!.payload), /gwarancja_rozszerzona/);
 
-  const ks = d.prepare("SELECT wynik FROM copilot_wywolanie").get() as any;
+  const ks = d.prepare("SELECT wynik, kod_bledu, wersja_instrukcji FROM copilot_wywolanie").get() as any;
   assert.equal(ks.wynik, "blad", "wywołanie było płatne — ma być w księdze");
+  assert.equal(ks.kod_bledu, "spoza_slownika");
+  assert.equal(ks.wersja_instrukcji, "k2", "odpowiedź przyszła, więc wersję znamy");
 });
 
 test("błąd jednej rozmowy nie zabija partii — rozmowa dostaje FAILED, nie znika", async () => {
@@ -242,6 +248,7 @@ test("błąd jednej rozmowy nie zabija partii — rozmowa dostaje FAILED, nie zn
   assert.equal(aktywna(d, a).status, "FAILED");
   assert.deepEqual(JSON.parse(aktywna(d, a).kody_polityki), ["BLAD_MODELU"]);
   assert.equal((d.prepare("SELECT COUNT(*) n FROM copilot_wywolanie WHERE wynik='blad'").get() as any).n, 1);
+  assert.equal((d.prepare("SELECT kod_bledu k FROM copilot_wywolanie WHERE wynik='blad'").get() as any).k, "inny");
 });
 
 /* Specyfikacja: „do not silently treat an attachment-only message as understood". */
@@ -377,6 +384,7 @@ test("przeciążenie dostawcy zatrzymuje partię, zamiast bić w ten sam mur", a
   assert.match(String(w.przerwane), /przeciążone/);
   assert.equal(w.bledy.length, 1);
   assert.equal((d.prepare("SELECT count(*) n FROM copilot_wywolanie").get() as any).n, 1);
+  assert.equal((d.prepare("SELECT kod_bledu k FROM copilot_wywolanie").get() as any).k, "przeciazenie");
   assert.equal((d.prepare("SELECT count(*) n FROM decyzja_klasyfikacji").get() as any).n, 0,
     "stan dostawcy nie jest decyzją o rozmowie");
 });

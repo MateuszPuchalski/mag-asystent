@@ -7,6 +7,7 @@ import {
   zamaskujOdwracalnie, zostalyDaneOsobowe, type MaskaOdwracalna, type TrescBezpieczna,
 } from "./copilot-maskowanie.js";
 import type { Tokeny } from "./copilot-koszt.js";
+import { kodBledu, sladPorazki, zapiszWKsiedze } from "./copilot-ksiega.js";
 import {
   dopiszLinkiOfert, kontekstSzkicu, loginRozmowcy, ocenTwierdzenia, sitaSzkicu, szkicCopilota,
   type Fakt, type FaktyBezpieczne, type KodSita, type SzkicSurowy, type Twierdzenie,
@@ -127,6 +128,10 @@ export interface OdpowiedzNaPytanie {
   szkic?: SzkicSurowy | null;
   /** Wyniki narzędzi z numerami N#: na nich sita sprawdzają odwołania wersji. */
   wynikiNarzedzi?: WynikWywolania[];
+  /** Ile żądań poszło do dostawcy. Brak = nadawca bez pętli, jak atrapa. */
+  rund?: number;
+  /** Wersja instrukcji, jak przy szkicu. Brak = atrapa i NULL w księdze. */
+  wersjaInstrukcji?: string;
 }
 
 /** Materiał, na którym model odpowiada. Wszystko przeszło przez maskowanie. */
@@ -283,9 +288,12 @@ export async function zadajPytanie(
       narzedzia: zestawNarzedzi(subiekt),
     });
   } catch (e) {
+    const p = sladPorazki(e);
     zapiszWywolanie(conversationId, null, "blad",
-      (e as { slad?: string }).slad || (e as Error).message, kto, teraz,
-      (e as { zuzycie?: Tokeny }).zuzycie);
+      (e as { slad?: string }).slad || (e as Error).message, kto, teraz, {
+        zuzycie: p.zuzycie, kodBledu: kodBledu(e), rund: p.rund, narzedzi: p.narzedzi,
+        wersjaInstrukcji: p.wersjaInstrukcji,
+      });
     throw e;
   }
 
@@ -320,7 +328,13 @@ export async function zadajPytanie(
   })();
   /* Odrzucona poprawka to dalej udane wywołanie: model odpowiedział, a notka
      jest dla agenta użyteczna. Błąd w księdze znaczyłby, że nic nie wróciło. */
-  zapiszWywolanie(conversationId, odp, "ok", null, kto, teraz);
+  /* Kod przy udanym wywołaniu to powód odrzuconej poprawki: wymiana się
+     udała, ale wersja odpadła na sicie, a pomiar ma to widzieć. Twierdzenia
+     z wersji, gdy weszła, bo to ona idzie do klienta; inaczej z notki. */
+  zapiszWywolanie(conversationId, odp, "ok", null, kto, teraz, {
+    kodBledu: poprawka.powod,
+    twierdzenia: poprawka.rodzaj === "wersja" ? poprawka.twierdzenia : twierdzenia,
+  });
 
   /* Ładunek niesie DŁUGOŚCI, nigdy treści (§19): pytanie agenta bywa
      o konkretnym kliencie, a `events` nie ma retencji. */
@@ -420,19 +434,23 @@ function zdaniePoprawki(w: { kod: KodSita; lista: string[] }, znakowPo: number, 
 function zapiszWywolanie(
   conversationId: number, odp: OdpowiedzNaPytanie | null, wynik: "ok" | "blad",
   blad: string | null, kto: { id: number | null }, teraz: Date,
-  /* Rundy narzędzi zapłacone przed błędem. Bez nich porażka po czterech
-     rundach ważyłaby w pomiarze zero, a kosztowała cztery żądania. */
-  zuzyciePrzedBledem?: Tokeny,
+  dodatkowo: {
+    /* Rundy narzędzi zapłacone przed błędem. Bez nich porażka po czterech
+       rundach ważyłaby w pomiarze zero, a kosztowała cztery żądania. */
+    zuzycie?: Tokeny; kodBledu?: string | null; rund?: number; narzedzi?: number;
+    wersjaInstrukcji?: string; twierdzenia?: Twierdzenie[];
+  } = {},
 ): void {
-  const t = odp?.zuzycie ?? zuzyciePrzedBledem;
+  const t = odp?.zuzycie ?? dodatkowo.zuzycie;
   /* Model pusty przy błędzie bez rund, jak dotąd — pomiar go pomija. Z rundami
      wpisujemy model z konfiguracji, bo inaczej pomiar zgubiłby ich koszt. */
   const model = odp?.model ?? (t && (t.wej || t.wyj) ? config.copilot.model : "");
-  db().prepare(`INSERT INTO copilot_wywolanie
-    (zadanie,conversation_id,model,tokeny_wej,tokeny_wyj,tokeny_cache_zapis,
-     tokeny_cache_odczyt,ms,wynik,blad,przez_user_id,at)
-    VALUES ('pytanie',?,?,?,?,?,?,?,?,?,?,?)`)
-    .run(conversationId, model, t?.wej ?? 0, t?.wyj ?? 0,
-      t?.cacheZapis ?? 0, t?.cacheOdczyt ?? 0, odp?.ms ?? 0, wynik,
-      blad ? blad.slice(0, 300) : null, kto.id, teraz.toISOString());
+  zapiszWKsiedze(db(), {
+    zadanie: "pytanie", conversationId, model, zuzycie: t, ms: odp?.ms ?? 0, wynik, blad,
+    przezUserId: kto.id, at: teraz, zrodlo: "dopytanie", kodBledu: dodatkowo.kodBledu,
+    rund: odp ? odp.rund ?? 1 : dodatkowo.rund,
+    narzedzi: odp ? odp.narzedzia.length : dodatkowo.narzedzi,
+    wersjaInstrukcji: odp?.wersjaInstrukcji ?? dodatkowo.wersjaInstrukcji,
+    twierdzenia: dodatkowo.twierdzenia,
+  });
 }

@@ -5,7 +5,7 @@ import { config } from "../config.js";
 import { retryAfterMs } from "./allegro.js";
 import {
   BladKluczaCopilota, BladLacznosciCopilota, BladLimituCopilota,
-  BladOdpowiedziCopilota, BladPrzeciazeniaCopilota,
+  BladOdpowiedziCopilota, BladPrzeciazeniaCopilota, kodZatrzymania,
 } from "./copilot.js";
 import type { NadawcaKlasyfikacji, OdpowiedzModelu } from "../services/copilot-klasyfikacja.js";
 import {
@@ -58,7 +58,8 @@ const Wynik = z.object({
  * Wersja instrukcji klasyfikatora. Zapisuje się przy każdej decyzji —
  * specyfikacja każe ponowić ocenę po każdej istotnej zmiany instrukcji,
  * a bez numeru nie da się oddzielić decyzji starej instrukcji od nowej.
- * ZMIENIASZ `INSTRUKCJA` — podnosisz numer.
+ * ZMIENIASZ `INSTRUKCJA_KLASYFIKACJI` — podnosisz numer. Pilnuje tego skrót tekstu
+ * w `wersje-instrukcji.test.ts`.
  */
 export const PROMPT_KLASYFIKACJI = "k5";
 
@@ -70,8 +71,10 @@ export const PROMPT_KLASYFIKACJI = "k5";
    GRANICE KATEGORII SĄ PRZEPISANE ZE SPECYFIKACJI, nie wymyślone, i stoją
    w słowniku (`OPISY_KATEGORII`), bo Jev dostaje te same słowa. Przykłady
    są te same, które specyfikacja podaje jako przykłady etykietowania — to nie
-   są zmierzone wyniki modelu i tak je traktujemy. */
-const INSTRUKCJA = [
+   są zmierzone wyniki modelu i tak je traktujemy.
+
+   Eksport tylko dla strażnika wersji: serwis zapisuje numer, nie tekst. */
+export const INSTRUKCJA_KLASYFIKACJI = [
   "Rozpoznajesz wiadomości klientów sklepu z częściami do kosiarek, traktorków, kos, pilarek i silników ogrodniczych.",
   "Dostajesz dane z systemu i zamaskowany wątek. Rozpoznajesz OSTATNIĄ wiadomość oznaczoną KLIENT; wcześniejsze wiadomości są kontekstem.",
   "Typ i podtyp wątku Allegro w danych z systemu opisują CAŁY wątek, nie bieżącą wiadomość: to wskazówka, nie rozstrzygnięcie. Dopisek w wątku bywa inną sprawą.",
@@ -128,9 +131,13 @@ export function _ustawKlienta(c: Anthropic | null): void {
  * jaką ktoś spróbuje. Bez tej funkcji każde rozpoznanie kończyłoby się decyzją
  * FAILED za pełną cenę. Lista zna tylko rodziny opisane w dokumentacji;
  * reszta dostaje wysiłek jak dotąd.
+ *
+ * Haiku z numerem 4, nie każde Haiku: Haiku 5.5 wysiłek przyjmuje, a bez
+ * niego chodzi na domyślnym `medium`. Szerszy wzorzec zabierałby mu
+ * jedyną dźwignię kosztu po cichu, bez błędu w księdze.
  */
 export function wspieraWysilek(model: string): boolean {
-  return !/^claude-(haiku-|sonnet-4-5)/.test(model);
+  return !/^claude-(haiku-4|sonnet-4-5)/.test(model);
 }
 
 /**
@@ -154,7 +161,7 @@ export const nadawcaAnthropic: NadawcaKlasyfikacji = async (tresc): Promise<Odpo
       /* Instrukcja ma dziś ponad tysiąc tokenów, więc przekracza minimalny
          prefiks cache'u większości modeli (512–4096, zależnie od modelu).
          Czy działa, mówi księga (`cache_read_input_tokens`), nie ta uwaga. */
-      system: [{ type: "text", text: INSTRUKCJA, cache_control: { type: "ephemeral" } }],
+      system: [{ type: "text", text: INSTRUKCJA_KLASYFIKACJI, cache_control: { type: "ephemeral" } }],
       output_config: {
         /* Najniższy wysiłek: rozpoznanie nie jest trudnym rozumowaniem, a
            wysiłek jest pierwszą dźwignią kosztu. Myślenia NIE wyłączamy — na
@@ -180,7 +187,8 @@ export const nadawcaAnthropic: NadawcaKlasyfikacji = async (tresc): Promise<Odpo
     const w = odp.parsed_output;
     if (!w) {
       throw new BladOdpowiedziCopilota(
-        `Model nie oddał rozstrzygnięcia (stop: ${odp.stop_reason ?? "?"})`, 200);
+        `Model nie oddał rozstrzygnięcia (stop: ${odp.stop_reason ?? "?"})`, 200, "",
+        kodZatrzymania(odp.stop_reason));
     }
 
     return {
@@ -326,7 +334,7 @@ const Szkic = z.object({
    przy tym niepełna i spóźniona o dobę, więc brak oferty w wyniku nie
    znaczy braku aukcji. Cennik idzie wtedy do agenta, który sprawdzi aukcję,
    a nie do klienta jako cena, której możemy nie dotrzymać. */
-const INSTRUKCJA_SZKICU = [
+export const INSTRUKCJA_SZKICU = [
   "Układasz SZKIC odpowiedzi dla agenta obsługi klienta w sklepie z częściami",
   "do sprzętu ogrodniczego (kosiarki, pilarki, kosy, gaźniki, uszczelki).",
   "Szkic czyta i poprawia człowiek; do klienta wysyła go człowiek. Ty nie wysyłasz.",
@@ -523,6 +531,14 @@ const INSTRUKCJA_SZKICU = [
   "`odczytZeZdjec` (co widać na zdjęciach, wg reguły 8a; pusta lista bez zdjęć).",
 ].join("\n");
 
+/**
+ * Wersja instrukcji szkicu razem z opisami narzędzi (`DEFINICJE`), bo obie
+ * idą w prefiksie żądania. Księga zapisuje ją przy każdym wywołaniu, żeby
+ * pomiar oddzielił szkice starej instrukcji od nowej. Zmieniasz tekst
+ * albo opis narzędzia, podnosisz numer. Pilnuje skrót w `wersje-instrukcji.test.ts`.
+ */
+export const PROMPT_SZKICU = "s1";
+
 /* Ile rund narzędzi na jeden szkic. Mniej niż przy dopytaniu, bo szkic
    ma już fakty, a sięga po bazę tylko o towar spoza nich: znajdź symbol,
    otwórz kartę albo oferty. Szkic układa też takt, więc każda runda to
@@ -559,6 +575,7 @@ export const nadawcaSzkicuAnthropic: NadawcaSzkicu =
        Warunek `wspieraWysilek` siedzi w pętli. */
     wysilek: "medium",
     coNieOddal: "szkicu",
+    wersja: PROMPT_SZKICU,
     numerujWyniki: true,
     /* ── OBRAZY PRZED TEKSTEM ───────────────────────────────────────────────
        Ten sam kształt, co przy karcie reklamacyjnej (0.283.0), i z tego
@@ -595,6 +612,7 @@ export const nadawcaSzkicuAnthropic: NadawcaSzkicu =
     narzedzia: r.uzyte,
     wynikiNarzedzi: r.wyniki,
     rund: r.rund,
+    wersjaInstrukcji: PROMPT_SZKICU,
   };
 };
 
@@ -730,7 +748,7 @@ const INSTRUKCJA_PYTANIA = [
    obowiązują i że opis pól na jej końcu dotyczy obiektu `szkic`.
 
    Całość jest STAŁA, jak każda instrukcja tu: prefiks stały to cache. */
-const INSTRUKCJA_DOPYTANIA = [
+export const INSTRUKCJA_DOPYTANIA = [
   INSTRUKCJA_PYTANIA,
   "",
   "REGUŁY SZKICU. Niżej stoi instrukcja, według której powstaje szkic. Obowiązuje",
@@ -740,6 +758,13 @@ const INSTRUKCJA_DOPYTANIA = [
   "",
   INSTRUKCJA_SZKICU,
 ].join("\n");
+
+/**
+ * Wersja instrukcji dopytania razem z opisami narzędzi. Zmiana instrukcji
+ * szkicu zmienia też tę, bo wchodzi do niej bajt w bajt, więc podnosisz
+ * oba numery. Powód i strażnik jak przy `PROMPT_SZKICU`.
+ */
+export const PROMPT_DOPYTANIA = "d1";
 
 /* Ile rund narzędzi na jedno dopytanie. Pytanie o towar to zwykle dwie:
    znajdź symbol, otwórz kartę. Sufit zatrzymuje pętlę, w której model
@@ -789,17 +814,21 @@ async function rozmowaZNarzedziami<T>(o: {
    * faktów odrzuciłoby poprawkę opartą na kartotece.
    */
   numerujWyniki: boolean;
+  /** Wersja instrukcji `system`. Wraca też z błędem, bo porażkę księga liczy pod tą samą wersją. */
+  wersja: string;
 }): Promise<WynikRozmowy<T>> {
   const model = config.copilot.model;
   const zuzycie: Tokeny = { wej: 0, wyj: 0, cacheZapis: 0, cacheOdczyt: 0 };
   const uzyte: UzycieNarzedzia[] = [];
   const wyniki: WynikWywolania[] = [];
   const wiadomosci = [...o.wiadomosci];
+  let wyslanych = 0;
   const zestaw = o.narzedzia?.definicje.length ? o.narzedzia : null;
   const narzedzia: Anthropic.ToolUnion[] = (zestaw?.definicje ?? []).map((d) => ({ ...d }));
   try {
     for (let runda = 0; ; runda++) {
       const ostatnia = runda >= o.sufitRund;
+      wyslanych += 1;
       const odp = await anthropic().messages.create({
         model,
         /* Sufit NA RUNDĘ. Myślenie przed wywołaniem narzędzia liczy się do
@@ -856,7 +885,8 @@ async function rozmowaZNarzedziami<T>(o: {
       const ostatniTekst = odp.content.filter((b): b is Anthropic.TextBlock => b.type === "text").at(-1);
       if (!ostatniTekst || odp.stop_reason === "max_tokens" || odp.stop_reason === "refusal") {
         throw new BladOdpowiedziCopilota(
-          `Model nie oddał ${o.coNieOddal} (stop: ${odp.stop_reason ?? "?"})`, 200);
+          `Model nie oddał ${o.coNieOddal} (stop: ${odp.stop_reason ?? "?"})`, 200, "",
+          kodZatrzymania(odp.stop_reason));
       }
       return {
         wynik: o.format.parse(ostatniTekst.text),
@@ -868,7 +898,11 @@ async function rozmowaZNarzedziami<T>(o: {
     /* Tokeny zapłaconych rund nie giną z błędem: serwis zapisuje je w księdze
        razem z porażką, bo inaczej pomiar zaniżałby koszt nieudanych wywołań. */
     const blad = naNasz(e);
-    (blad as { zuzycie?: Tokeny }).zuzycie = { ...zuzycie };
+    /* Z tego samego powodu rundy, narzędzia i wersja: porażka po trzech
+       rundach to inna porażka niż odmowa przy pierwszym żądaniu. */
+    Object.assign(blad, {
+      zuzycie: { ...zuzycie }, rund: wyslanych, narzedzi: uzyte.length, wersjaInstrukcji: o.wersja,
+    });
     throw blad;
   }
 }
@@ -913,6 +947,7 @@ export const nadawcaPytaniaAnthropic: NadawcaPytania = async (k): Promise<Odpowi
     /* Średni wysiłek: to jest rozstrzyganie wątpliwości, nie etykieta. */
     wysilek: "medium",
     coNieOddal: "odpowiedzi",
+    wersja: PROMPT_DOPYTANIA,
     numerujWyniki: true,
     wiadomosci: [{
       role: "user",
@@ -941,6 +976,8 @@ export const nadawcaPytaniaAnthropic: NadawcaPytania = async (k): Promise<Odpowi
     ms: Date.now() - start,
     narzedzia: r.uzyte,
     wynikiNarzedzi: r.wyniki,
+    rund: r.rund,
+    wersjaInstrukcji: PROMPT_DOPYTANIA,
   };
 };
 
@@ -995,10 +1032,13 @@ function naNasz(e: unknown): Error {
      JSON nie domknął się nawiasem. Dlatego zdanie mówi o ponowieniu — a surowy
      tekst błędu idzie do księgi, gdzie szuka się przyczyny. */
   if (e instanceof Anthropic.AnthropicError && !(e instanceof Anthropic.APIError)) {
+    /* Kod `nieczytelny`, nie `uciety`. Pętla narzędzi łapie ucięcie wcześniej,
+       po `stop_reason`, więc tam ten błąd znaczy zły kształt. Przy `parse`
+       przyczyny nie widać, a zgadnięty kod zafałszowałby pomiar. */
     return new BladOdpowiedziCopilota(
       "Model oddał odpowiedź, której nie dało się odczytać — zwykle znaczy to, "
       + "że nie zmieścił się w limicie. Kliknij ponownie albo napisz sam.",
-      200, `parsowanie: ${e.message.slice(0, 200)}`);
+      200, `parsowanie: ${e.message.slice(0, 200)}`, "nieczytelny");
   }
 
   if (e instanceof Anthropic.APIError) {
@@ -1178,7 +1218,8 @@ export const nadawcaRozpoznaniaAnthropic: NadawcaRozpoznania =
       const w = odp.parsed_output;
       if (!w) {
         throw new BladOdpowiedziCopilota(
-          `Model nie oddał karty (stop: ${odp.stop_reason ?? "?"})`, 200);
+          `Model nie oddał karty (stop: ${odp.stop_reason ?? "?"})`, 200, "",
+          kodZatrzymania(odp.stop_reason));
       }
 
       return {

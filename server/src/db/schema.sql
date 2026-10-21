@@ -427,7 +427,26 @@ CREATE TABLE IF NOT EXISTS copilot_wywolanie (
   at              TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')),
   -- Zapytania do wyszukiwarki (0.507.0). Płatne od sztuki, nie od tokenu,
   -- więc osobna kolumna; pomiar dolicza je do kosztu.
-  wyszukiwania    INTEGER NOT NULL DEFAULT 0
+  wyszukiwania    INTEGER NOT NULL DEFAULT 0,
+  -- Znaczniki pomiaru, pisze je `services/copilot-ksiega.ts`. NULL znaczy
+  -- „nie wiemy”: wiersz sprzed znaczników albo wywołanie bez tej liczby.
+  -- Kod błędu ze słownika, nie zdanie; przy dopytaniu niesie też powód
+  -- odrzuconej poprawki, choć wymiana się udała. Wersja to `PROMPT_*`
+  -- z adaptera, źródło to droga wywołania (klik, takt i reszta).
+  kod_bledu         TEXT,
+  wersja_instrukcji TEXT,
+  zrodlo            TEXT,
+  -- Żądania do dostawcy i wywołania narzędzi w jednym zadaniu.
+  rund              INTEGER,
+  narzedzi          INTEGER,
+  -- Twierdzenia po ocenie serwera: wszystkie, obniżone przez sufit źródła
+  -- i oparte na czymś innym niż fakty. Kategoria to kategoria decyzji
+  -- klasyfikacji, pod którą powstał szkic. Ostatnia kolumna stoi bez
+  -- komentarza nad sobą, powód przy `copilot_pytanie`.
+  twierdzen              INTEGER,
+  twierdzen_obnizonych   INTEGER,
+  twierdzen_spoza_faktow INTEGER,
+  kategoria         TEXT
 );
 CREATE INDEX IF NOT EXISTS ix_copilot_wywolanie_at ON copilot_wywolanie(at);
 

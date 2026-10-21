@@ -167,7 +167,7 @@ export async function copilotRoutes(app: FastifyInstance) {
          ekranowi wyrzucić wynik, za który już zapłaciliśmy. */
       /* `ponowNieudane`: kliknięcie człowieka to jawne ponowienie decyzji
          FAILED i tworzy jej nową wersję. Takt tego nie robi — patrz serwis. */
-      const wynik = await sklasyfikujRozmowy(db(), ids, kto(), nadawcaKlasyfikacji, new Date(),
+      const wynik = await sklasyfikujRozmowy(db(), ids, { ...kto(), zrodlo: "klik" }, nadawcaKlasyfikacji, new Date(),
         { ponowNieudane: true });
       return { ...wynik, szkicow: szkicPoRozpoznaniu(ids) };
     });
@@ -207,7 +207,7 @@ export async function copilotRoutes(app: FastifyInstance) {
     const rozmowaId = Number(req.body?.rozmowaId);
     if (!Number.isInteger(rozmowaId)) return reply.code(400).send({ error: "Nie podano rozmowy" });
     try {
-      return { szkic: await ulozSzkic(rozmowaId, kto(), nadawcaSzkicuAnthropic, subiekt) };
+      return { szkic: await ulozSzkic(rozmowaId, { ...kto(), zrodlo: "klik" }, nadawcaSzkicuAnthropic, subiekt) };
     } catch (e) {
       /* Odmowa dostawcy albo szkic odrzucony przez sprawdzenie — 502 ze
          ZDANIEM dla człowieka; ślad poszedł do księgi. Reszta to nasze 400
