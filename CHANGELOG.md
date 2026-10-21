@@ -10,6 +10,13 @@ z wersją monorepo" — i właśnie tak przestał być zgodny: `0.3.0` przetrwa�
 sześć zmergowanych zmian, w tym takie, które wymagały nowego uprawnienia SQL.
 Komentarz nie jest mechanizmem.
 
+## 0.605.1 — 21 października 2026
+
+**Lista dodanych zdjęć po imporcie.** Podsumowanie importu z folderu ma
+tabelę: symbol, nazwa towaru z Subiekta, plik ze ścieżką i to, czy zdjęcie
+czeka w kolejce do Subiekta. Przycisk „Kopiuj listę do arkusza" kopiuje ją
+tak, że w Excelu sama rozkłada się na kolumny.
+
 ## 0.605.0 — 21 października 2026
 
 Każdy szkic i każde dopytanie zostawia na 90 dni kopię tego, co poszło do
