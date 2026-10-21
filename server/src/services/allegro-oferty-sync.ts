@@ -54,7 +54,8 @@ export type Oferta = {
   name?: string;
   sellingMode?: { price?: { amount?: string; currency?: string } | null } | null;
   external?: { id?: string } | null;
-  publication?: { status?: string } | null;
+  /* `startedAt` czyta wybór zdjęcia kartoteki; snapshot go nie zapisuje. */
+  publication?: { status?: string; startedAt?: string } | null;
   primaryImage?: { url?: string } | null;
 };
 type Odpowiedz = { offers?: Oferta[] };

@@ -160,6 +160,31 @@ export function urlOfertPoSygnaturze(apiUrl: string, sygnatury: readonly string[
     + `&limit=${Math.max(1, sygnatury.length)}`;
 }
 
+/** Sufit `limit` dla `/sale/offers` według specyfikacji (1..1000). */
+export const OFERT_NA_STRONE = 1000;
+
+/**
+ * Strona ofert po sygnaturach z WYBRANYMI statusami.
+ *
+ * Osobny builder, bo `urlOfertPoSygnaturze` służy linkom Copilota i musi
+ * zostać przy samych aktywnych. Zdjęcie kartoteki bierzemy też z zakończonej
+ * aukcji: obraz towaru nie starzeje się razem z ofertą.
+ *
+ * `limit` stoi na suficie, bo jedna sygnatura bywa na wielu aukcjach.
+ * Kolejną stronę woła serwis offsetem, tylko gdy strona wróciła pełna.
+ */
+export function urlOfertPoSygnaturzeStrona(
+  apiUrl: string,
+  sygnatury: readonly string[],
+  statusy: readonly string[],
+  offset = 0,
+): string {
+  const filtr = sygnatury.map((s) => `external.id=${encodeURIComponent(s)}`);
+  const status = statusy.map((s) => `publication.status=${encodeURIComponent(s)}`);
+  return `${apiUrl}/sale/offers?${[...filtr, ...status].join("&")}`
+    + `&limit=${OFERT_NA_STRONE}&offset=${Math.max(0, Math.trunc(offset))}`;
+}
+
 /**
  * Historia statusów przesyłki u przewoźnika (0.187.0).
  *

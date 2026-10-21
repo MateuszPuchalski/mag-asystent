@@ -82,6 +82,7 @@ export const ZDARZENIA: readonly string[] = [
   "zadanie_terenowe_oddane", "zadanie_terenowe_odeslane", "zadanie_terenowe_ponowione",
   "zadanie_terenowe_przejete", "zadanie_terenowe_utworzone", "zadanie_terenowe_wykonane",
   "zadanie_terenowe_zalacznik", "zamowienie_przesylka", "zbiorki_import", "zbiorki_z_sellasist", "zdjecie_dodane",
+  "zdjecia_allegro_dopasowane",
   "zwrot_faktura", "zwrot_faktura_cofnieta", "zwrot_ilosc_zwrocona", "zwrot_kartoteka",
   "zwrot_kartoteka_zdjeta", "zwrot_korekta", "zwrot_korekta_cofnieta", "zwrot_kwota",
   "zwrot_kwota_cofnieta", "zwrot_nieodebrana", "zwrot_notatka", "zwrot_notatka_cofnieta",

@@ -180,3 +180,13 @@ export async function pobierzBajty(sciezka: string): Promise<Uint8Array> {
   const odp = await odbierzPlik(sciezka);
   return new Uint8Array(await odp.arrayBuffer());
 }
+
+/**
+ * Plik zza sesji jako `Blob`, np. duże zdjęcie oferty do złożenia na płótnie.
+ * Ta sama droga co `pobierzBajty`, więc brak sieci to `BrakPolaczenia`,
+ * a 401 i brama znaczą to samo co w reszcie panelu.
+ */
+export async function pobierzBlob(sciezka: string): Promise<Blob> {
+  const odp = await odbierzPlik(sciezka);
+  return odp.blob();
+}
