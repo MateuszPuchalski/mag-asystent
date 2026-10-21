@@ -10,6 +10,14 @@ z wersją monorepo" — i właśnie tak przestał być zgodny: `0.3.0` przetrwa�
 sześć zmergowanych zmian, w tym takie, które wymagały nowego uprawnienia SQL.
 Komentarz nie jest mechanizmem.
 
+## 0.604.0 — 21 października 2026
+
+**Zdjęcia z całego folderu naraz.** W zakładce „Zdjęcia" przycisk „Import
+z folderu" bierze pliki nazwane symbolem towaru, na przykład `W08-0501.jpg`.
+Panel pokazuje, które towary nie mają jeszcze zdjęcia, a które już mają albo
+których symbolu nie ma w Subiekcie. Potem dodaje zdjęcia jako lekki biały
+kwadrat, tą samą kolejką co zdjęcia pojedyncze, z paskiem postępu.
+
 ## 0.603.0 — 21 października 2026
 
 **Zdjęcie z kolektora trafia do Subiekta tak samo jak z panelu.** Kolektor
