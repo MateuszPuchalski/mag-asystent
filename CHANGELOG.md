@@ -10,6 +10,13 @@ z wersją monorepo" — i właśnie tak przestał być zgodny: `0.3.0` przetrwa�
 sześć zmergowanych zmian, w tym takie, które wymagały nowego uprawnienia SQL.
 Komentarz nie jest mechanizmem.
 
+## 0.601.0 — 21 października 2026
+
+**Zdjęcie w powiększeniu obrócisz.** Przyciski obok lupy obracają je o ćwierć
+obrotu w lewo albo w prawo. Zdjęcie z telefonu, które przyszło bokiem,
+ustawisz prosto bez pobierania. Obrót pamięta każde zdjęcie osobno, a lupa
+działa na obróconym.
+
 ## 0.600.0 — 20 października 2026
 
 **Zdjęcie z zakładki „Zdjęcia" zawsze jako lekki kwadrat.** Do Subiekta idzie
