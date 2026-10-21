@@ -34,7 +34,7 @@ import { TAKSONOMIA_WERSJA } from "./klasyfikacja-slownik.js";
  *
  * Nie wysyła niczego do klienta i nie zmienia statusu rozmowy.
  */
-export const AUTOMAT_KLASYFIKACJI: Autor = { id: null, name: "automat" };
+export const AUTOMAT_KLASYFIKACJI: Autor = { id: null, name: "automat", zrodlo: "takt" };
 
 export interface AutoKlasyfikacjaDeps {
   database?: DatabaseSync;

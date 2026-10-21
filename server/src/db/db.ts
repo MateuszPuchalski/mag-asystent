@@ -255,6 +255,15 @@ export function migrate(database: DatabaseSync) {
   /* Zapytania do wyszukiwarki w księdze Copilota. Dziś nikt ich nie zleca,
      ale stare wiersze je niosą, a pomiar kosztów liczy je do rachunku. */
   addColumn("copilot_wywolanie", "wyszukiwania", "INTEGER NOT NULL DEFAULT 0");
+  /* Znaczniki pomiaru Copilota — patrz `copilot_wywolanie` w `schema.sql`.
+     Stare wiersze mają NULL, czyli „nie wiemy”, i to jest o nich prawda:
+     wersji, źródła ani kodu nikt wtedy nie zapisywał. Zero udawałoby pomiar. */
+  for (const [kol, typ] of [
+    ["kod_bledu", "TEXT"], ["wersja_instrukcji", "TEXT"], ["zrodlo", "TEXT"],
+    ["rund", "INTEGER"], ["narzedzi", "INTEGER"], ["twierdzen", "INTEGER"],
+    ["twierdzen_obnizonych", "INTEGER"], ["twierdzen_spoza_faktow", "INTEGER"],
+    ["kategoria", "TEXT"],
+  ] as const) addColumn("copilot_wywolanie", kol, typ);
   /* Treść oferty dla Copilota (0.253.0) — patrz `offer_snapshot`. Wiersze
      sprzed tego wydania mają NULL w `tresc_synced_at`, czyli „nie pytaliśmy
      jeszcze"; dociągną się leniwie, przy pierwszym szkicu pod tą ofertą. */

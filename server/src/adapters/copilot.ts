@@ -62,7 +62,31 @@ export class BladLacznosciCopilota extends Error {
  * także te komunikaty, które coś mówią.
  */
 export class BladOdpowiedziCopilota extends Error {
-  constructor(komunikat: string, readonly status: number, readonly slad: string = "") {
+  constructor(
+    komunikat: string, readonly status: number, readonly slad: string = "",
+    /**
+     * Kod do księgi. `uciety` i `odmowa` nadaje adapter po `stop_reason`,
+     * sita szkicu wpisują tu własny kod. Domyślne `inny` to odmowa, której
+     * nikt nie nazwał, więc pomiar pokaże ją jako jeszcze nienazwaną.
+     */
+    readonly kod: string = "inny",
+  ) {
     super(komunikat);
   }
+}
+
+/**
+ * Kod błędu do księgi: słowo ze słownika, po którym pomiar grupuje porażki.
+ * Ślad i zdanie bywają różne przy tej samej przyczynie, kod nie. Bez niego
+ * pomiar musiałby zgadywać przyczynę z tekstu śladu, a ten pisze dostawca.
+ */
+export type KodBleduCopilota =
+  | "limit" | "klucz" | "przeciazenie" | "lacznosc"
+  | "uciety" | "odmowa" | "nieczytelny" | "inny";
+
+/** Kod z `stop_reason` odpowiedzi, która nie oddała wyniku. */
+export function kodZatrzymania(stop: string | null | undefined): KodBleduCopilota {
+  if (stop === "max_tokens") return "uciety";
+  if (stop === "refusal") return "odmowa";
+  return "inny";
 }

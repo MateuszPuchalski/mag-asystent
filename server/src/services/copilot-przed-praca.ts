@@ -61,11 +61,11 @@ import { glosAllegro } from "./glos-allegro.js";
 
 /** Autor rozpoznań poranka: ten sam „automat", własne zadanie w księdze. */
 export const AUTOMAT_PRZED_PRACA_KLASYFIKACJA: Autor = {
-  id: null, name: "automat", zadanie: "klasyfikacja_przed_praca",
+  id: null, name: "automat", zadanie: "klasyfikacja_przed_praca", zrodlo: "przed_praca",
 };
 /** Autor szkiców poranka. Ekran dalej pokazuje „automat" — to ta sama ręka. */
 export const AUTOMAT_PRZED_PRACA_SZKIC: AutorSzkicu = {
-  id: null, name: "automat", zadanie: "szkic_przed_praca",
+  id: null, name: "automat", zadanie: "szkic_przed_praca", zrodlo: "przed_praca",
 };
 
 /**

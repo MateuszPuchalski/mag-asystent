@@ -135,10 +135,11 @@ test("werdykt w polu FAKTOGRAFICZNYM dalej odrzuca kartę", async () => {
 
   assert.equal(kartaSprawy(d, id), null, "odrzucona karta nie zapisuje się wcale");
   const w = d.prepare(
-    "SELECT wynik, blad FROM copilot_wywolanie WHERE zadanie='rozpoznanie_reklamacji'")
-    .get() as { wynik: string; blad: string };
+    "SELECT wynik, blad, kod_bledu FROM copilot_wywolanie WHERE zadanie='rozpoznanie_reklamacji'")
+    .get() as { wynik: string; blad: string; kod_bledu: string };
   assert.equal(w.wynik, "blad");
   assert.match(w.blad, /werdykt w faktach/);
+  assert.equal(w.kod_bledu, "werdykt_w_faktach", "pomiar grupuje porażki po kodzie, nie po zdaniu");
 });
 
 test("wysoka pewność BEZ nazwanej niewiedzy jest odrzucana", async () => {

@@ -61,6 +61,20 @@ progi są dostrojone do wersji. Zmieniając pytania albo progi, podnieś
 je oba adaptery. Ich zmiana podnosi też `PROMPT_KLASYFIKACJI`. Jev ma
 najlepszą trafność po angielsku, więc polską mierzy porównanie z Claude.
 
+**Wersje instrukcji Claude.** `PROMPT_KLASYFIKACJI`, `PROMPT_SZKICU`
+i `PROMPT_DOPYTANIA` idą do księgi przy każdym wywołaniu, a pomiar dzieli
+wyniki po nich. Zmieniasz tekst instrukcji albo opis narzędzia w
+`DEFINICJE`, podnosisz numer i dopisujesz nowy skrót. Instrukcja szkicu
+wchodzi do dopytania, więc jej zmiana podnosi oba numery. Stare wpisy
+zostają w tabeli. Schematu odpowiedzi (`zodOutputFormat`) strażnik nie
+widzi, choć model go czyta. Zmiana pola schematu też podnosi numer.
+*Strażnik: `src/adapters/wersje-instrukcji.test.ts`; schemat: konwencja.*
+
+**Księgę pisze jeden pisarz**, `zapiszWKsiedze` z
+`services/copilot-ksiega.ts`. Nowe zadanie modelu podaje w nim źródło,
+wersję i kod błędu z `kodBledu`. Nowa liczba bez wartości to NULL, bo zero
+udawałoby pomiar. *Strażnik: konwencja.*
+
 Cztery reguły Claude z audytu promptów, każda po awarii albo o krok od niej:
 
 - `output_config.effort` idzie tylko przez `wspieraWysilek`, bo Haiku 4.5

@@ -3,6 +3,7 @@ import { db, transaction } from "../db/db.js";
 import type { SubiektAdapter } from "../adapters/subiekt.js";
 import { BladOdpowiedziCopilota } from "../adapters/copilot.js";
 import { logEvent } from "./events.js";
+import { kodBledu, sladPorazki, zapiszWKsiedze, type WpisKsiegi, type ZrodloWywolania } from "./copilot-ksiega.js";
 import { publishConversationEvent } from "./conversation-realtime.js";
 import {
   zamaskujWatek, zostalyDaneOsobowe, type TrescBezpieczna, type WiadomoscWatku,
@@ -273,6 +274,11 @@ export interface OdpowiedzSzkicu {
   wynikiNarzedzi?: WynikWywolania[];
   /** Ile żądań poszło do dostawcy. Brak = jedno, bo nadawca bez pętli wysyła jedno żądanie. */
   rund?: number;
+  /**
+   * Wersja instrukcji, którą nadawca wysłał. Opcjonalna, bo atrapa w teście
+   * żadnej nie wysyła, a księga ma wtedy NULL, czyli prawdę.
+   */
+  wersjaInstrukcji?: string;
 }
 
 /**
@@ -888,6 +894,12 @@ export type AutorSzkicu = {
    * godzinę biura. Karta pomiaru pokazuje je dzięki temu osobno.
    */
   zadanie?: string;
+  /**
+   * Droga wywołania do księgi. Osobno od `zadanie`, bo szkic po rozpoznaniu
+   * liczy się do tego samego sufitu godzinowego co takt, a pomiar ma go
+   * widzieć osobno. Brak = NULL w księdze, czyli „nie wiemy”.
+   */
+  zrodlo?: ZrodloWywolania;
 };
 
 export async function ulozSzkic(
@@ -947,11 +959,21 @@ export async function ulozSzkic(
      przeszedł przez maskowanie, żeby nic naszego się w nim nie znalazło. */
   const tekstFaktow = (spis ? `${k.tekstFaktow}\n\n${spis}` : k.tekstFaktow) as FaktyBezpieczne;
 
+  /* Wspólna część każdego wiersza księgi tego szkicu. Kategoria pod decyzją
+     klasyfikacji idzie do każdego, także do porażki: pomiar pyta, które
+     kategorie szkicują się najgorzej, a porażka jest tu najcenniejszą odpowiedzią. */
+  const kategoria = kategoriaDecyzji(k.decyzjaId);
+  const ksiega = (w: Omit<WpisKsiegi, "zadanie" | "przezUserId" | "at">) => zapiszWKsiedze(db(), {
+    zadanie: kto.zadanie ?? "szkic", conversationId, przezUserId: kto.id, at: teraz,
+    zrodlo: kto.zrodlo ?? null, kategoria, ...w,
+  });
+
   /* Asercja przed siecią — na WĄTKU, bo tam jest tekst klienta. Faktów nie
      sprawdzamy tymi wzorcami celowo: dziewięć cyfr numeru OEM zapaliłoby
      „telefon" i to byłby fałszywy alarm, a nie zepsute maskowanie. */
   if (zostalyDaneOsobowe(String(k.watek))) {
-    zapiszBlad(conversationId, "maskowanie", kto, teraz);
+    /* Model pusty: nic nie wyszło, nic nie zapłacone, pomiar kosztu go pomija. */
+    ksiega({ model: "", wynik: "blad", blad: "maskowanie", kodBledu: "maskowanie" });
     throw new Error("Maskowanie nie oczyściło rozmowy — nic nie wyszło do dostawcy");
   }
 
@@ -967,7 +989,15 @@ export async function ulozSzkic(
       : await nadaj(k.watek, tekstFaktow, zdjecia.zdjecia);
   } catch (e) {
     const slad = (e as { slad?: string }).slad || (e as Error).message;
-    zapiszBlad(conversationId, slad, kto, teraz, (e as { zuzycie?: Tokeny }).zuzycie);
+    /* Rundy narzędzi zapłacone przed błędem. Bez nich porażka po trzech
+       rundach ważyłaby w pomiarze zero, a kosztowała trzy żądania. Model
+       pusty przy błędzie bez rund, jak dotąd: pomiar go pomija. */
+    const p = sladPorazki(e);
+    const t = p.zuzycie && (p.zuzycie.wej || p.zuzycie.wyj) ? p.zuzycie : null;
+    ksiega({
+      model: t ? config.copilot.model : "", zuzycie: t, wynik: "blad", blad: slad,
+      kodBledu: kodBledu(e), rund: p.rund, narzedzi: p.narzedzi, wersjaInstrukcji: p.wersjaInstrukcji,
+    });
     throw e;
   }
   /* SPRAWDZENIE DETERMINISTYCZNE — orkiestrator, nie wyrocznia. Bez ponowienia:
@@ -977,9 +1007,19 @@ export async function ulozSzkic(
     wyslaneZdjecia: new Set(zdjecia.zdjecia.map((z) => z.numer)),
     wynikiN: odp.wynikiNarzedzi ?? [],
   });
+  /* Wspólne pola wywołania, które odpowiedziało: rachunek, rundy i wersja. */
+  const zOdpowiedzi = {
+    model: odp.model, zuzycie: odp.zuzycie, ms: odp.ms, rund: odp.rund ?? 1,
+    narzedzi: (odp.narzedzia ?? []).length, wersjaInstrukcji: odp.wersjaInstrukcji ?? null,
+  };
   if (!sito.ok) {
-    zapiszWywolanie(conversationId, odp, "blad", `${sito.kod}: ${sito.lista.join(", ")}`, kto, teraz);
-    throw new BladOdpowiedziCopilota(zdanieOdrzucenia(sito, odp.tresc.length), 200, sito.kod);
+    /* Twierdzenia odrzuconego szkicu też się liczą: pomiar pyta, czy szkice
+       z wiedzy modelu odpadają częściej niż te z faktów. Ta sama ocena co w sicie. */
+    ksiega({
+      ...zOdpowiedzi, wynik: "blad", blad: `${sito.kod}: ${sito.lista.join(", ")}`, kodBledu: sito.kod,
+      twierdzenia: zRozpoznaniaNiepewne(ocenTwierdzenia(odp.twierdzenia), k.fakty),
+    });
+    throw new BladOdpowiedziCopilota(zdanieOdrzucenia(sito, odp.tresc.length), 200, sito.kod, sito.kod);
   }
   const { tresc, twierdzenia } = sito;
   transaction(db(), () => {
@@ -1000,7 +1040,7 @@ export async function ulozSzkic(
         k.ostatniaWiadomoscId, odp.model, teraz.toISOString(), kto.name, kto.id,
         JSON.stringify(twierdzenia), JSON.stringify(odp.odczytZeZdjec), k.decyzjaId,
         JSON.stringify(odp.narzedzia ?? []));
-    zapiszWywolanie(conversationId, odp, "ok", null, kto, teraz);
+    ksiega({ ...zOdpowiedzi, wynik: "ok", twierdzenia });
     /* Ładunki niosą identyfikatory i DŁUGOŚCI, nigdy treść (§19). */
     logEvent("copilot_szkic", kto.name, null, {
       conversationId, znakow: tresc.length, zastrzezen: odp.zastrzezenia.length,
@@ -1062,32 +1102,13 @@ export function szkicCopilota(conversationId: number): SzkicCopilota | null {
   };
 }
 
-function zapiszWywolanie(
-  conversationId: number, odp: OdpowiedzSzkicu, wynik: "ok" | "blad", blad: string | null,
-  kto: { id: number | null; zadanie?: string }, teraz: Date,
-): void {
-  db().prepare(`INSERT INTO copilot_wywolanie
-    (zadanie,conversation_id,model,tokeny_wej,tokeny_wyj,tokeny_cache_zapis,
-     tokeny_cache_odczyt,ms,wynik,blad,przez_user_id,at)
-    VALUES (?,?,?,?,?,?,?,?,?,?,?,?)`)
-    .run(kto.zadanie ?? "szkic", conversationId, odp.model, odp.zuzycie.wej, odp.zuzycie.wyj,
-      odp.zuzycie.cacheZapis, odp.zuzycie.cacheOdczyt, odp.ms, wynik,
-      blad ? blad.slice(0, 300) : null, kto.id, teraz.toISOString());
-}
-
-function zapiszBlad(
-  conversationId: number, powod: string, kto: { id: number | null; zadanie?: string }, teraz: Date,
-  /* Rundy narzędzi zapłacone przed błędem. Bez nich porażka po trzech
-     rundach ważyłaby w pomiarze zero, a kosztowała trzy żądania. */
-  zuzycie?: Tokeny,
-): void {
-  const t = zuzycie && (zuzycie.wej || zuzycie.wyj) ? zuzycie : null;
-  /* Model pusty przy błędzie bez rund, jak dotąd: pomiar go pomija. */
-  db().prepare(`INSERT INTO copilot_wywolanie
-    (zadanie,conversation_id,model,tokeny_wej,tokeny_wyj,tokeny_cache_zapis,tokeny_cache_odczyt,
-     wynik,blad,przez_user_id,at)
-    VALUES (?,?,?,?,?,?,?,?,?,?,?)`)
-    .run(kto.zadanie ?? "szkic", conversationId, t ? config.copilot.model : "",
-      t?.wej ?? 0, t?.wyj ?? 0, t?.cacheZapis ?? 0, t?.cacheOdczyt ?? 0,
-      "blad", powod.slice(0, 300), kto.id, teraz.toISOString());
+/**
+ * Kategoria decyzji klasyfikacji, na której stoi szkic. Kategoria efektywna,
+ * czyli po poprawce człowieka, bo pod nią szkic powstał. NULL bez decyzji.
+ */
+function kategoriaDecyzji(decyzjaId: number | null): string | null {
+  if (decyzjaId === null) return null;
+  const w = db().prepare("SELECT kategoria FROM decyzja_klasyfikacji WHERE id=?").get(decyzjaId) as
+    { kategoria: string | null } | undefined;
+  return w?.kategoria ?? null;
 }
