@@ -2253,6 +2253,26 @@ CREATE TABLE IF NOT EXISTS zdjecie_oferty_cache (
   PRIMARY KEY (channel_account_id, external_id)
 );
 
+-- ── Wybór oferty, z której biuro bierze zdjęcie kartoteki ───────────────────
+-- Jeden wiersz na symbol, klucz to symbol małymi literami, jak kolacja
+-- Subiekta. Nie `zwin`, bo zwinięcie skleja dwie różne kartoteki. Wiersz mówi, którą
+-- ofertę serwer wskazał i ile było kandydatek. Po nim biuro odtworzy, skąd
+-- przyszło zdjęcie, gdy trafi w złą kartotekę.
+-- `offer_id` NULL znaczy „pytaliśmy, Allegro nie ma oferty z tą sygnaturą".
+-- Nowa tabela, więc `CREATE TABLE IF NOT EXISTS` wystarcza też na starych
+-- bazach: `schema.sql` wykonuje się przy każdym starcie z migracją.
+CREATE TABLE IF NOT EXISTS zdjecie_oferty_wybor (
+  symbol_klucz TEXT PRIMARY KEY,
+  symbol TEXT NOT NULL,
+  channel_account_id INTEGER NOT NULL REFERENCES channel_account(id),
+  offer_id TEXT,
+  status TEXT,
+  started_at TEXT,
+  ofert INTEGER NOT NULL DEFAULT 0,
+  wybrano_at TEXT NOT NULL,
+  wybrano_przez TEXT NOT NULL
+);
+
 -- ── Cyfrowe kosze zwrotowe (Etap 3) ─────────────────────────────────────────
 -- Kosz zastępuje papierową kartkę wożoną z towarem: biuro przypina zwroty do
 -- kosza skanem jego kodu, zamyka go, a magazynier na kolektorze rozkłada

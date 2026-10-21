@@ -9,6 +9,12 @@ import {
   zapiszIZglos,
 } from "../services/zdjecia-wlasne.js";
 import { ROLE_BIUROWE } from "../services/users.js";
+import {
+  dopasujOfertyAllegro,
+  duzeZdjecieOferty,
+  symboleAllegroZCiala,
+} from "../services/zdjecia-allegro.js";
+import { BladLimituAllegro } from "../adapters/allegro.js";
 
 /* ── Zdjęcia kartoteki widziane z biura ──────────────────────────────────────
    Dodawanie z podglądem stoi w `products.ts`, bo kolektor woła je z karty
@@ -108,10 +114,49 @@ export async function zdjeciaRoutes(app: FastifyInstance) {
         obraz: bajty.obraz,
         mime: bajty.mime,
         tloUsuniete: false,
-        zrodlo: "import",
+        /* Inne źródła niż oferta to plik z dysku. Nieznana nazwa nie może
+           wpisać do audytu źródła, którego nie ma w typie. */
+        zrodlo: req.body?.zrodlo === "allegro" ? "allegro" : "import",
         plik: nazwaPliku(req.body?.plik),
         autor: autorOperacji(req),
       });
+    }
+  );
+
+  /**
+   * Które z NASZYCH ofert dają zdjęcie kartotekom. POST, bo zapisuje snapshot
+   * ofert i wybór, a lista symboli nie zmieści się w adresie.
+   */
+  app.post<{ Body: { symbole?: unknown } }>("/api/zdjecia/allegro/dopasuj", async (req, reply) => {
+    const nie = odmowa(reply, "Import zdjęć"); if (nie) return nie;
+    const wejscie = symboleAllegroZCiala(req.body?.symbole);
+    if (!wejscie.ok) return reply.code(400).send({ error: wejscie.error });
+    try {
+      return await dopasujOfertyAllegro(wejscie.symbole, autorOperacji(req).nazwa);
+    } catch (e) {
+      if (e instanceof BladLimituAllegro) {
+        return reply.code(429).send({
+          error: "Allegro prosi o chwilę przerwy — spróbuj za minutę.",
+          poIluMs: e.poIluMs,
+        });
+      }
+      return reply.code(502).send({
+        error: `Allegro nie odpowiedziało: ${e instanceof Error ? e.message : String(e)}`,
+      });
+    }
+  });
+
+  /** Duże zdjęcie wybranej oferty, z którego przeglądarka składa kwadrat. */
+  app.get<{ Params: { offerId: string } }>(
+    "/api/zdjecia/allegro/oferta/:offerId/zdjecie",
+    async (req, reply) => {
+      const nie = odmowa(reply, "Import zdjęć"); if (nie) return nie;
+      const wynik = await duzeZdjecieOferty(String(req.params.offerId));
+      if (!wynik.ok) return reply.code(wynik.kod).send({ error: wynik.error });
+      return reply
+        .type(wynik.obraz.mime)
+        .header("cache-control", "private, max-age=3600")
+        .send(wynik.obraz.bajty);
     }
   );
 }

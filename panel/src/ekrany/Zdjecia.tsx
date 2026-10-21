@@ -1,11 +1,12 @@
 import React, { useEffect, useRef, useState } from "react";
-import { FolderInput, ImageOff, ImagePlus } from "lucide-react";
+import { FolderInput, ImageOff, ImagePlus, Store } from "lucide-react";
 import {
   NA_STRONIE, useBezZdjecia, type PozycjaBezZdjecia, type SortBezZdjecia, type ZapisanieZdjecia,
 } from "../api/zdjecia";
 import { Blad, EtykietaWartosci, Karta, Pole, Przycisk, Pusto, WierszKolejki, ile } from "../ui";
 import { Edytor } from "../zdjecia/Edytor";
 import { ImportZFolderu } from "../zdjecia/ImportZFolderu";
+import { ImportZAllegro } from "../zdjecia/ImportZAllegro";
 import { klawiszZajety } from "../nawigacja/fokus";
 
 /* ── ZDJĘCIA: TOWARY BEZ ZDJĘCIA ───────────────────────────────────────────
@@ -93,6 +94,7 @@ export function Zdjecia() {
   const [zrobione, setZrobione] = useState<ReadonlySet<number>>(() => new Set());
   const [ostatni, setOstatni] = useState("");
   const [importuje, setImportuje] = useState(false);
+  const [zAllegro, setZAllegro] = useState(false);
 
   const pozycje = lista.data?.pozycje ?? [];
   /* Pierwszy wolny towar wybiera się sam. Wybór nie jest zapisem, a oszczędza
@@ -161,6 +163,7 @@ export function Zdjecia() {
 
   return <div className="flex flex-col gap-4 lg:h-full lg:min-h-0">
     {importuje && <ImportZFolderu onZamknij={() => setImportuje(false)} />}
+    {zAllegro && <ImportZAllegro onZamknij={() => setZAllegro(false)} />}
     <div className="grid gap-4 lg:min-h-0 lg:flex-1 lg:grid-cols-[23rem_minmax(0,1fr)] lg:grid-rows-[minmax(0,1fr)] 2xl:grid-cols-[25rem_minmax(0,1fr)]">
       <Karta className="flex min-h-0 flex-col overflow-hidden">
         <div className="shrink-0 p-2">
@@ -187,13 +190,19 @@ export function Zdjecia() {
             </label>
           </div>
         </div>
-        <div className="flex shrink-0 items-center justify-between gap-2 border-y border-slate-200 bg-slate-50 px-3 py-1">
+        <div className="flex shrink-0 flex-wrap items-center justify-between gap-x-2 border-y border-slate-200 bg-slate-50 px-3 py-1">
           <span className="text-xs font-semibold text-slate-600">
             {razem === undefined ? "Towary bez zdjęcia" : `${ile(razem, "towar", "towary", "towarów")} bez zdjęcia`}</span>
-          {/* Import seryjny stoi przy liście, bo zdejmuje z niej setki wierszy naraz. */}
+          {/* Import seryjny stoi przy liście, bo zdejmuje z niej setki wierszy naraz.
+              Oferty Allegro obok folderu: to dwa źródła tej samej pracy. */}
+          <div className="flex flex-wrap gap-1">
           <button type="button" onClick={() => setImportuje(true)}
             className="inline-flex min-h-8 items-center gap-1.5 rounded-md px-2 text-xs font-semibold text-slate-700 hover:bg-slate-200">
             <FolderInput size={14} aria-hidden="true" />Import z folderu</button>
+          <button type="button" onClick={() => setZAllegro(true)}
+            className="inline-flex min-h-8 items-center gap-1.5 rounded-md px-2 text-xs font-semibold text-slate-700 hover:bg-slate-200">
+            <Store size={14} aria-hidden="true" />Z ofert Allegro</button>
+          </div>
         </div>
         <div className="min-h-0 flex-1 overflow-y-auto">{lewa}</div>
         {lista.data && bladListy}

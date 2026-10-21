@@ -130,8 +130,11 @@ export function enqueueSetEan(
   return queueId;
 }
 
-/** Skąd przyszło zdjęcie. `import` to plik z folderu biura, przypinany po symbolu. */
-export type ZrodloZdjecia = "aparat" | "galeria" | "panel" | "import";
+/**
+ * Skąd przyszło zdjęcie. `import` to plik z folderu biura, przypinany po symbolu.
+ * `allegro` to obraz z naszej oferty: audyt ma odróżnić go od pliku z dysku.
+ */
+export type ZrodloZdjecia = "aparat" | "galeria" | "panel" | "import" | "allegro";
 
 export interface AudytZdjecia {
   bajtow: number;

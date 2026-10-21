@@ -51,7 +51,7 @@ const towarow = (n: number) => ile(n, "towar", "towary", "towarów");
 const plikow = (n: number) => ile(n, "plik", "pliki", "plików");
 
 /** Rozwijana lista nazw: liczba zawsze widoczna, nazwy dopiero na żądanie (punkt 2). */
-function Nazwy({ nazwy }: { nazwy: string[] }) {
+export function Nazwy({ nazwy }: { nazwy: string[] }) {
   if (nazwy.length === 0) return null;
   return <details className="mt-1 text-sm text-slate-700">
     <summary className="cursor-pointer text-slate-600">Pokaż nazwy</summary>
@@ -60,7 +60,7 @@ function Nazwy({ nazwy }: { nazwy: string[] }) {
   </details>;
 }
 
-function Wiersz({ etykieta, liczba, children }: { etykieta: string; liczba: number; children?: React.ReactNode }) {
+export function Wiersz({ etykieta, liczba, children }: { etykieta: string; liczba: number; children?: React.ReactNode }) {
   return <li className="py-1.5">
     <div className="flex items-baseline justify-between gap-3 text-sm">
       <span className="text-slate-700">{etykieta}</span>
