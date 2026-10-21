@@ -10,6 +10,12 @@ z wersją monorepo" — i właśnie tak przestał być zgodny: `0.3.0` przetrwa�
 sześć zmergowanych zmian, w tym takie, które wymagały nowego uprawnienia SQL.
 Komentarz nie jest mechanizmem.
 
+## 0.601.1 — 21 października 2026
+
+**„Układam szkic z faktów…” stoi tylko w rozmowie, w której kliknięto „Ułóż”.**
+Do tej pory napis pokazywał się w każdej otwartej w tym czasie rozmowie. To samo
+dotyczyło „Pytam…” w „Dopytaj Copilota” i błędów obu przycisków.
+
 ## 0.601.0 — 21 października 2026
 
 **Zdjęcie w powiększeniu obrócisz.** Przyciski obok lupy obracają je o ćwierć
