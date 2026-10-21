@@ -29,6 +29,46 @@ test("model spoza cennika nie jest darmowy", () => {
   assert.equal(znanyModel("claude-opus-5"), true);
 });
 
+/* Modele 5.5 to cel przejścia z claude-opus-5. Bez wpisu w cenniku liczyłyby
+   się po stawce najdroższej i porównanie modeli na ekranie pomiaru kłamałoby
+   na korzyść starego. Stawki z cennika Anthropic, 21 października 2026. */
+const MILION = 1_000_000;
+const tylko = (pole: "wej" | "wyj" | "cacheZapis" | "cacheOdczyt") =>
+  ({ wej: 0, wyj: 0, cacheZapis: 0, cacheOdczyt: 0, [pole]: MILION });
+
+for (const [model, wej, wyj, zapis, odczyt] of [
+  ["claude-opus-5-5", 4, 20, 5, 0.2],
+  ["claude-sonnet-5-5", 2, 10, 2.5, 0.1],
+  ["claude-haiku-5-5", 0.1, 0.5, 0.125, 0.01],
+] as const) {
+  test(`${model}: wejście, wyjście, zapis i odczyt cache po stawkach z cennika`, () => {
+    assert.equal(znanyModel(model), true);
+    assert.equal(kosztUsd(model, tylko("wej")), wej);
+    assert.equal(kosztUsd(model, tylko("wyj")), wyj);
+    assert.equal(kosztUsd(model, tylko("cacheZapis")), zapis);
+    assert.equal(kosztUsd(model, tylko("cacheOdczyt")), odczyt);
+  });
+}
+
+test("odczyt cache ma stawkę per model, a bez niej zostaje jedna dziesiąta wejścia", () => {
+  /* Opus 5.5 czyta cache za 0,05 wejścia; ta sama reguła 0,1 co u Opusa 5
+     zawyżyłaby jego odczyt dwukrotnie. */
+  assert.equal(kosztUsd("claude-opus-5-5", tylko("cacheOdczyt")), 0.2);
+  assert.equal(kosztUsd("claude-opus-5", tylko("cacheOdczyt")), 0.5);
+  assert.equal(kosztUsd("claude-haiku-4-5", tylko("cacheOdczyt")), 0.1);
+});
+
+test("nieznany model dalej liczy się po najdroższej stawce, także w cache", () => {
+  const nieznany = (pole: Parameters<typeof tylko>[0]) => kosztUsd("claude-cos-nowego", tylko(pole));
+  for (const pole of ["wej", "wyj", "cacheZapis", "cacheOdczyt"] as const) {
+    assert.equal(nieznany(pole), kosztUsd("claude-opus-5", tylko(pole)), pole);
+    assert.ok(nieznany(pole) >= kosztUsd("claude-opus-5-5", tylko(pole)), pole);
+  }
+  /* Identyfikator z przyrostkiem nie zgaduje się do bazowego modelu: księga
+     trzyma to, co zwróciło API, a ciche dopasowanie ukryłoby nowy model. */
+  assert.equal(znanyModel("claude-opus-5-5-20261001"), false);
+});
+
 test("jedna klasyfikacja kosztuje ułamek centa, a nie zero", () => {
   /* Typowe wywołanie: ~1000 tokenów wejścia, ~300 wyjścia. Gdyby zaokrąglać
      do centa, każde pojedyncze wywołanie pokazywałoby zero i pomiar nie
