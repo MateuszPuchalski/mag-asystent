@@ -51,7 +51,9 @@ import pl.wertis.kolektor.core.product.KrokZdjecia
 import pl.wertis.kolektor.core.product.napisZapisu
 import pl.wertis.kolektor.core.product.pokazacZostawTlo
 import pl.wertis.kolektor.device.KARTOTEKA_JPEG_QUALITY
+import pl.wertis.kolektor.device.GotowyKwadrat
 import pl.wertis.kolektor.device.KARTOTEKA_MAX_EDGE
+import pl.wertis.kolektor.device.KwadratZdjecia
 import pl.wertis.kolektor.device.PhotoCapture
 import pl.wertis.kolektor.net.apiCall
 import pl.wertis.kolektor.ui.components.OutlineButton
@@ -105,6 +107,20 @@ fun ZdjecieSheet(
     var podglad by remember(twId) { mutableStateOf<ImageBitmap?>(null) }
     var zrodlo by remember(twId) { mutableStateOf("aparat") }
     var blad by remember(twId) { mutableStateOf<String?>(null) }
+    /* Obie wersje podglądu zostają w pamięci arkusza, bo gotowy kwadrat składa
+       kolektor, nie serwer. „ZOSTAW TŁO" składa go z oryginału. */
+    var wyslany by remember(twId) { mutableStateOf<ByteArray?>(null) }
+    var bezTla by remember(twId) { mutableStateOf<ByteArray?>(null) }
+    var gotowy by remember(twId) { mutableStateOf<ByteArray?>(null) }
+
+    /** Kwadrat z wybranej wersji podglądu; zdanie błędu idzie od razu na ekran. */
+    suspend fun kwadrat(zTlem: Boolean): ByteArray? {
+        val z = (if (zTlem) wyslany else bezTla ?: wyslany) ?: return null
+        return when (val w = withContext(Dispatchers.Default) { KwadratZdjecia.zlozKwadrat(z) }) {
+            is GotowyKwadrat.Plik -> w.jpeg
+            is GotowyKwadrat.Blad -> { blad = w.zdanie; null }
+        }
+    }
 
     /* Porzucony podgląd kasujemy OD RAZU, nie po kwadransie: prób bywa kilka
        pod rząd, a każda zostawia w bazie wiersz z dwoma obrazami.
@@ -134,10 +150,20 @@ fun ZdjecieSheet(
                 podgladId = odp.podgladId
                 tloUsuniete = odp.tloUsuniete
                 powod = odp.powod
+                wyslany = Base64.decode(base64, Base64.DEFAULT)
+                bezTla = if (odp.tloUsuniete) {
+                    runCatching { Base64.decode(odp.png, Base64.DEFAULT) }.getOrNull()
+                } else {
+                    null
+                }
+                /* Podgląd pokazuje DOKŁADNIE ten plik, który pojedzie do Subiekta:
+                   biały kwadrat. Obraz z serwera jest tylko zapasem, gdy kwadratu
+                   nie dało się złożyć, a powód stoi wtedy w `blad`. */
+                gotowy = kwadrat(zTlem = !odp.tloUsuniete)
+                val naEkran = gotowy ?: bezTla ?: wyslany
                 podglad = withContext(Dispatchers.IO) {
                     runCatching {
-                        val b = Base64.decode(odp.png, Base64.DEFAULT)
-                        BitmapFactory.decodeByteArray(b, 0, b.size)?.asImageBitmap()
+                        naEkran?.let { BitmapFactory.decodeByteArray(it, 0, it.size)?.asImageBitmap() }
                     }.getOrNull()
                 }
                 krok = KrokZdjecia.PODGLAD
@@ -188,10 +214,23 @@ fun ZdjecieSheet(
 
     fun zapisz(zTlem: Boolean) {
         krok = KrokZdjecia.WYSYLANIE
+        blad = null
         scope.launch {
             try {
+                /* Kwadrat z podglądu bierzemy gotowy. „ZOSTAW TŁO" przy usuniętym
+                   tle składa go dopiero teraz, z oryginału: dwa płótna naraz to
+                   za dużo pamięci jak na tani kolektor. */
+                val zOryginalu = zTlem || !tloUsuniete
+                val plik = if (zOryginalu == !tloUsuniete) gotowy else kwadrat(zTlem = true)
+                if (plik == null) {
+                    if (blad == null) blad = "Nie udało się złożyć zdjęcia. Spróbuj jeszcze raz."
+                    krok = KrokZdjecia.PODGLAD
+                    graph.feedback.beep(false)
+                    return@launch
+                }
+                val b64 = Base64.encodeToString(plik, Base64.NO_WRAP)
                 apiCall {
-                    graph.api.zapiszZdjecie(twId, ZdjecieZapisBody(podgladId, zTlem, zrodlo))
+                    graph.api.zapiszZdjecie(twId, ZdjecieZapisBody(podgladId, zTlem, zrodlo, gotowy = b64))
                 }
                 podgladId = ""
                 /* Cache kolektora musi ZAPOMNIEĆ ten towar, inaczej karta rysuje
@@ -270,10 +309,9 @@ fun ZdjecieSheet(
                 )
 
                 KrokZdjecia.PODGLAD -> {
-                    /* Szachownica pod podglądem — przezroczystość musi być
-                       WIDOCZNA. Na białym tle arkusza wycięte zdjęcie wygląda
-                       identycznie jak zdjęcie na białym stole, więc człowiek
-                       nie ma po czym poznać, czy tło zniknęło. */
+                    /* Szare pole pod podglądem, bo gotowy kwadrat jest biały.
+                       Na białym tle arkusza nie byłoby widać jego krawędzi ani
+                       tego, ile marginesu dostał towar. */
                     Box(
                         modifier = Modifier
                             .fillMaxWidth()
@@ -328,6 +366,9 @@ fun ZdjecieSheet(
                     porzuc(podgladId)
                     podgladId = ""
                     podglad = null
+                    wyslany = null
+                    bezTla = null
+                    gotowy = null
                     powod = null
                     blad = null
                     krok = KrokZdjecia.WYBOR
