@@ -208,7 +208,7 @@ export function Skrzynka() {
     setZrodlo(null); setWskazowka(""); setTowar(null); setNowa(false); setBlad("");
     setKonflikt(null); setBladKonfliktu(""); setBladOferty("");
     setKonfliktWysylki(null); setBladWysylki(""); setBladStatusu(""); setPrzyRozmowie(null);
-    setBladSzkicu("");
+    setBladSzkicu(""); setBladPytania(null);
     /* Powrót po „Cofnij" albo po odmowie odłożonej wysyłki: treść wraca do
        pola, a konflikt — do swojego dialogu. Dopiero gdy rozmowa się wczytała,
        inaczej szkic z serwera nadpisałby przywróconą treść chwilę później. */
@@ -698,7 +698,10 @@ export function Skrzynka() {
         /* Nieświeży = klient dopisał po tym, jak model czytał wątek. Porównanie
            po identyfikatorze ostatniej wiadomości KLIENTA, tak jak przy wysyłce. */
         nieswiezy: (rozmowa.data?.szkicCopilota?.messageId ?? null) !== ostatniaDoSzkicu,
-        uklada: ulozSzkic.isPending,
+        /* Mutacja jest JEDNA na ekran, a rozmów wiele. Samo `isPending` stawiało
+           „Układam szkic” w każdej otwartej po kliknięciu rozmowie, choć model
+           pisał tylko dla tej jednej. Liczy się rozmowa, dla której poszło żądanie. */
+        uklada: ulozSzkic.isPending && ulozSzkic.variables?.rozmowaId === rozmowa.data?.rozmowa.id,
         blad: bladSzkicu,
         maSzkicAgenta: szkic.trim() !== "",
         wPolu: zCopilota,
@@ -714,9 +717,11 @@ export function Skrzynka() {
           if (!rozmowa.data) return;
           const id = rozmowa.data.rozmowa.id;
           ulozSzkic.mutate({ rozmowaId: id }, {
-            onError: (e) => setBladSzkicu((e as Error).message),
+            /* Błąd i sukces innej rozmowy nie mają czego szukać w tej, którą
+               agent ma teraz przed oczami. */
+            onError: (e) => { if (wybranaIdTeraz.current === id) setBladSzkicu((e as Error).message); },
             onSuccess: (r) => {
-              setBladSzkicu("");
+              if (wybranaIdTeraz.current === id) setBladSzkicu("");
               if (wybranaIdTeraz.current !== id || szkicTeraz.current !== "" || !r.szkic?.tresc) return;
               wstawione.current.add(`${id}:${r.szkic.at}`);
               ustawSzkic(r.szkic.tresc);
@@ -739,7 +744,8 @@ export function Skrzynka() {
         dopytanie: {
           wymiany: wymiany.data ?? [],
           blad: bladPytania,
-          pracuje: zadajPytanie.isPending,
+          /* Ta sama zasada co przy „Ułóż”: pytanie dotyczy jednej rozmowy. */
+          pracuje: zadajPytanie.isPending && zadajPytanie.variables?.rozmowaId === rozmowa.data?.rozmowa.id,
           limitZnakow: LIMIT_PYTANIA,
           pole: szkic,
           onWstaw: (t: string) => {
@@ -750,9 +756,9 @@ export function Skrzynka() {
             const id = rozmowa.data.rozmowa.id;
             const wyslany = szkicTeraz.current;
             zadajPytanie.mutate({ rozmowaId: id, pytanie, szkic: wyslany }, {
-              onError: (e) => setBladPytania((e as Error).message),
+              onError: (e) => { if (wybranaIdTeraz.current === id) setBladPytania((e as Error).message); },
               onSuccess: (r) => {
-                setBladPytania(null);
+                if (wybranaIdTeraz.current === id) setBladPytania(null);
                 const po = r.wymiana.szkicPo;
                 if (po && wybranaIdTeraz.current === id && szkicTeraz.current === wyslany) {
                   wstawWersje(po, id, "Copilot poprawił szkic");
