@@ -55,34 +55,65 @@ export function bezDopiskow(rdzen: string): string {
 }
 
 /**
- * Możliwe symbole jednego pliku, od najpewniejszego.
+ * Kawałki opisowej nazwy, które mogą być symbolem.
  *
- * Pełna nazwa idzie pierwsza, więc symbol z cyfrą na końcu wygrywa
- * z wersją przyciętą. Dalej nazwa bez dopisku, potem foldery od
- * najbliższego: plik `miniaturka.jpg` w folderze `W08-0501` należy do
- * `W08-0501`. Który kandydat jest symbolem, rozstrzyga Subiekt, nie wzorzec.
+ * Foldery właściciela nazywają towar opisem z symbolem w środku:
+ * `Gaznik_Wacker_BS50-2_BS30-2_W09-1501`, `noz_do_14-05013`. Bierzemy
+ * fragmenty między `_` i spacjami, które mają cyfrę — słowo bez cyfry
+ * symbolem nie bywa, a pytanie o nie tylko wydłuża listę. Dwie liczby
+ * obok siebie sklejamy myślnikiem, bo `10_02014` to zapisany podkreślnikiem
+ * symbol `10-02014`.
  */
-export function kandydaci(p: { name: string; webkitRelativePath?: string }): string[] {
+export function kawalki(rdzen: string): string[] {
+  const t = rdzen.split(/[\s_]+/).map((x) => x.replace(/^[-.,]+|[-.,]+$/g, "")).filter(Boolean);
   const wynik: string[] = [];
-  const dodaj = (rdzen: string) => {
-    for (const r of [rdzen, bezDopiskow(rdzen)]) {
-      const s = symbolZNazwy(r);
-      if (s && !wynik.includes(s)) wynik.push(s);
-    }
-  };
-  const kropka = p.name.lastIndexOf(".");
-  dodaj(kropka > 0 ? p.name.slice(0, kropka) : p.name);
-  /* Ścieżkę względną daje tylko wybór folderu; pliki luzem jej nie mają. */
-  const foldery = (p.webkitRelativePath ?? "").split("/").slice(0, -1).reverse();
-  for (const f of foldery) dodaj(f);
+  for (const x of t) if (/\d/.test(x) && x.length >= 3) wynik.push(x);
+  for (let i = 0; i + 1 < t.length; i++) {
+    if (/^\d+$/.test(t[i]) && /^\d+$/.test(t[i + 1])) wynik.push(`${t[i]}-${t[i + 1]}`);
+  }
   return wynik;
 }
 
-export interface Grupa<P> { symbol: string; pliki: P[] }
+/**
+ * Możliwe symbole jednego pliku, poziomami od najpewniejszego.
+ *
+ * Pierwszy poziom to nazwa pliku, dalej foldery od najbliższego: plik
+ * `miniaturka.jpg` w `katownik_FT1249` należy do `FT1249`. W poziomie
+ * pełna nazwa idzie pierwsza, więc symbol z cyfrą na końcu wygrywa z
+ * wersją przyciętą; dalej nazwa bez dopisku i kawałki opisu. Który
+ * kandydat jest symbolem, rozstrzyga Subiekt, nie wzorzec.
+ */
+/** Jeden poziom: pełna nazwa, gdy sama może być symbolem, i wszyscy kandydaci. */
+export interface Poziom { pelna: string | null; symbole: string[] }
+
+export function kandydaci(p: { name: string; webkitRelativePath?: string }): Poziom[] {
+  const poziomy: Poziom[] = [];
+  const poziom = (rdzen: string) => {
+    const l: string[] = [];
+    const dodaj = (r: string) => {
+      for (const x of [r, bezDopiskow(r)]) {
+        const s = symbolZNazwy(x);
+        if (s && !l.includes(s)) l.push(s);
+      }
+    };
+    dodaj(rdzen);
+    for (const k of kawalki(rdzen)) dodaj(k);
+    if (l.length) poziomy.push({ pelna: symbolZNazwy(rdzen), symbole: l });
+  };
+  const kropka = p.name.lastIndexOf(".");
+  poziom(kropka > 0 ? p.name.slice(0, kropka) : p.name);
+  /* Ścieżkę względną daje tylko wybór folderu; pliki luzem jej nie mają. */
+  const foldery = (p.webkitRelativePath ?? "").split("/").slice(0, -1).reverse();
+  for (const f of foldery) poziom(f);
+  return poziomy;
+}
+
+/** `wiele` — jedna nazwa wskazała kilka różnych towarów; symbole, które trafiły. */
+export interface Grupa<P> { symbol: string; pliki: P[]; wiele?: string[] }
 
 export interface Rozbior<P> {
-  /** Zdjęcia z kandydatami na symbol, w kolejności wyboru. */
-  pliki: Array<{ plik: P; kandydaci: string[] }>;
+  /** Zdjęcia z kandydatami na symbol (poziomami), w kolejności wyboru. */
+  pliki: Array<{ plik: P; kandydaci: Poziom[] }>;
   /** Zdjęcia bez żadnego kandydata — ani nazwa, ani folder nie mogą być symbolem. */
   niesymbole: P[];
   /** Pliki, które nie są zdjęciami. */
@@ -106,18 +137,34 @@ export function rozbierz<P extends { name: string; type: string; webkitRelativeP
 /**
  * Grupy po symbolu po odpowiedzi `dopasuj`.
  *
- * Plik dostaje pierwszego kandydata, którego Subiekt zna — także
- * niejednoznacznego, bo to wciąż towar, tylko do ręcznego wyboru.
- * Plik bez trafienia stoi pod swoim pierwszym kandydatem i wychodzi
- * jako „brak w Subiekcie”.
+ * Poziomy idą po kolei; pierwszy, w którym Subiekt coś zna, rozstrzyga.
+ * W poziomie pełna nazwa wygrywa od razu. Kawałki trafiające w jeden
+ * towar dają ten towar, także niejednoznaczny, bo to wciąż towar do
+ * ręcznego wyboru. Kawałki trafiające w KILKA towarów (`W27-1309_W27-1305`)
+ * nie zgadują — grupa dostaje `wiele` i idzie do ręcznego dodania.
+ * Plik bez trafienia stoi pod swoim pierwszym kandydatem jako „brak w Subiekcie”.
  */
-export function przypiszSymbole<P>(pliki: ReadonlyArray<{ plik: P; kandydaci: string[] }>,
+export function przypiszSymbole<P>(pliki: ReadonlyArray<{ plik: P; kandydaci: Poziom[] }>,
   znane: ReadonlyMap<string, PozycjaDopasowania>): Grupa<P>[] {
   const grupy = new Map<string, Grupa<P>>();
-  for (const { plik, kandydaci: k } of pliki) {
-    const s = k.find((x) => { const p = znane.get(x); return !!p && (p.twId !== null || !!p.niejednoznaczny); }) ?? k[0];
-    const g = grupy.get(s);
-    if (g) g.pliki.push(plik); else grupy.set(s, { symbol: s, pliki: [plik] });
+  const trafia = (x: string) => { const p = znane.get(x); return !!p && (p.twId !== null || !!p.niejednoznaczny); };
+  /* Ten sam towar pod dwoma kandydatami (`W08-0501-1` i `W08-0501`) to jedno trafienie. */
+  const towar = (x: string) => { const p = znane.get(x)!; return p.twId !== null ? `t${p.twId}` : `s${x}`; };
+  for (const { plik, kandydaci: poziomy } of pliki) {
+    let symbol = poziomy[0].symbole[0];
+    let wiele: string[] | undefined;
+    for (const l of poziomy) {
+      const tu = l.symbole.filter(trafia);
+      if (tu.length === 0) continue;
+      /* Pełna nazwa sprawdzana wprost: za długa nie jest kandydatem i pierwszym na liście staje kawałek. */
+      if (l.pelna && trafia(l.pelna)) { symbol = l.pelna; break; }
+      if (new Set(tu.map(towar)).size === 1) { symbol = tu[0]; break; }
+      wiele = [...new Map(tu.map((x) => [towar(x), x])).values()];
+      symbol = wiele.join(" / ");
+      break;
+    }
+    const g = grupy.get(symbol);
+    if (g) g.pliki.push(plik); else grupy.set(symbol, { symbol, pliki: [plik], ...(wiele ? { wiele } : {}) });
   }
   return [...grupy.values()];
 }
@@ -152,7 +199,9 @@ export function wybierzWariant<W extends Wariant>(warianty: readonly W[]): W {
       || a.nazwa.localeCompare(b.nazwa))[0];
 }
 
-export type Klasa = "do_importu" | "ma_zdjecie" | "czeka" | "zablokowany" | "niejednoznaczny" | "nieznany_symbol";
+/** `wiele_symboli` nadaje `przypiszSymbole`, nie `klasyfikuj`: to cecha nazwy, nie towaru. */
+export type Klasa = "do_importu" | "ma_zdjecie" | "czeka" | "zablokowany" | "niejednoznaczny" | "wiele_symboli"
+  | "nieznany_symbol";
 
 /**
  * Klasa symbolu po odpowiedzi `dopasuj`.

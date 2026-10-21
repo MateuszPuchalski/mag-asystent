@@ -114,14 +114,14 @@ export function ImportZFolderu({ onZamknij }: { onZamknij: () => void }) {
     const nazwa = sciezka;
     const nazwyTowarow = new Map<number, string | null>();
     let plikiSymbolu = new Map<string, string[]>();
-    const klasy: Sprawdzenie["klasy"] = { ma_zdjecie: [], czeka: [], zablokowany: [], niejednoznaczny: [], nieznany_symbol: [] };
+    const klasy: Sprawdzenie["klasy"] = { ma_zdjecie: [], czeka: [], zablokowany: [], niejednoznaczny: [], wiele_symboli: [], nieznany_symbol: [] };
     const trafione: Array<{ symbol: string; twId: number; pliki: File[] }> = [];
     if (r.pliki.length > 0) {
       setSprawdzam({ z: 0, ile: 0 });
       let d;
       try {
         /* Pytamy o wszystkich kandydatów naraz: który jest symbolem, wie Subiekt. */
-        d = await dopasuj.mutateAsync(paczki(r.pliki.flatMap((x) => x.kandydaci)));
+        d = await dopasuj.mutateAsync(paczki(r.pliki.flatMap((x) => x.kandydaci.flatMap((l) => l.symbole))));
       } catch (e) {
         if (!zywy.current) return;
         setSprawdzam(null);
@@ -138,6 +138,8 @@ export function ImportZFolderu({ onZamknij }: { onZamknij: () => void }) {
       const grupy = przypiszSymbole(r.pliki, mapa);
       plikiSymbolu = new Map(grupy.map((g) => [g.symbol, g.pliki.map(nazwa)]));
       for (const g of grupy) {
+        /* Kilka towarów w jednej nazwie: zgadywanie dałoby zdjęcie złej kartotece. */
+        if (g.wiele) { klasy.wiele_symboli.push(g.symbol); continue; }
         const p = mapa.get(g.symbol);
         const k = klasyfikuj(p);
         if (k === "do_importu" && p?.twId != null) {
@@ -295,9 +297,11 @@ export function ImportZFolderu({ onZamknij }: { onZamknij: () => void }) {
         <Wiersz etykieta="Zablokowane w Subiekcie" liczba={spr.klasy.zablokowany.length} />
         <Wiersz etykieta="Kilka kartotek z tym symbolem — dodaj ręcznie w edytorze" liczba={spr.klasy.niejednoznaczny.length}>
           <Nazwy nazwy={spr.klasy.niejednoznaczny.flatMap((s) => spr.plikiSymbolu.get(s) ?? [s])} /></Wiersz>
+        <Wiersz etykieta="Kilka różnych symboli w jednej nazwie — dodaj ręcznie w edytorze" liczba={spr.klasy.wiele_symboli.length}>
+          <Nazwy nazwy={spr.klasy.wiele_symboli.flatMap((s) => (spr.plikiSymbolu.get(s) ?? []).map((n) => `${n} (${s})`))} /></Wiersz>
         <Wiersz etykieta="Nie ma takiego symbolu w Subiekcie" liczba={spr.klasy.nieznany_symbol.length}>
           <Nazwy nazwy={nieznane} /></Wiersz>
-        <Wiersz etykieta="Nazwa pliku nie jest symbolem" liczba={spr.niesymbole.length}>
+        <Wiersz etykieta="Ani nazwa pliku, ani folder nie mają symbolu" liczba={spr.niesymbole.length}>
           <Nazwy nazwy={spr.niesymbole} /></Wiersz>
         {spr.nieczytelne.length > 0 && <Wiersz etykieta="Pliki, których nie da się odczytać" liczba={spr.nieczytelne.length}>
           <Nazwy nazwy={spr.nieczytelne.map((n) => `${n.nazwa} — ${n.powod}`)} /></Wiersz>}
