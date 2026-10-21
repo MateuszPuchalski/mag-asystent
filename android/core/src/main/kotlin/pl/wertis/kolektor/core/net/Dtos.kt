@@ -140,6 +140,13 @@ data class ZdjecieZapisBody(
     val zTlem: Boolean,
     /** `aparat` albo `galeria` — do analizy „dlaczego te zdjęcia wychodzą źle". */
     val zrodlo: String,
+    /**
+     * Gotowy biały kwadrat JPEG w base64, złożony na kolektorze
+     * (`core/product/KwadratZdjecia.kt`). Serwer zapisuje te bajty zamiast
+     * podglądu, bo sam nie ma czym składać obrazu. `zTlem` mówi już tylko,
+     * z której wersji kwadrat powstał.
+     */
+    val gotowy: String? = null,
 )
 
 @Serializable
