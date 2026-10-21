@@ -113,7 +113,8 @@ describe("Import zdjęć z folderu", () => {
 
     const dodaj = await within(okno).findByRole("button", { name: "Dodaj 2 zdjęcia" });
     expect(ciala("/api/zdjecia/dopasuj")).toEqual([
-      { symbole: ["W08-0501", "W04-0402", "W01-0001", "W02-0002", "W28-303", "W03-0003"] }]);
+      /* `W28` to kandydat z `W28-303` bez dopisku `-303`; który jest symbolem, rozstrzyga Subiekt. */
+      { symbole: ["W08-0501", "W04-0402", "W01-0001", "W02-0002", "W28-303", "W28", "W03-0003"] }]);
     expect(within(okno).getByText("Wybrano 8 plików.")).toBeInTheDocument();
     expect(liczba(okno, "Do dodania")).toBe("2");
     expect(liczba(okno, "Mają już zdjęcie")).toBe("1");

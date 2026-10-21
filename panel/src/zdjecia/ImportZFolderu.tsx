@@ -6,7 +6,8 @@ import { useOkno } from "../nawigacja/fokus";
 import { Blad, Przycisk, ile } from "../ui";
 import { pngZrodla, wczytajPlik, zlozGotowy } from "./obraz";
 import {
-  MALY_BOK, WSPOLBIEZNOSC, jedenNaTowar, klasyfikuj, paczki, poKolei, rozbierz, wybierzWariant, type Klasa, type Wariant,
+  MALY_BOK, WSPOLBIEZNOSC, jedenNaTowar, klasyfikuj, paczki, poKolei, przypiszSymbole, rozbierz, wybierzWariant,
+  type Klasa, type Wariant,
 } from "./import";
 
 /* ── IMPORT ZDJĘĆ Z FOLDERU ────────────────────────────────────────────────
@@ -106,14 +107,17 @@ export function ImportZFolderu({ onZamknij }: { onZamknij: () => void }) {
   async function sprawdz(pliki: File[]) {
     setBlad(""); setWylaczone(null); setSpr(null); setWyniki(new Map());
     const r = rozbierz(pliki);
-    const plikiSymbolu = new Map(r.grupy.map((g) => [g.symbol, g.pliki.map((p) => p.name)]));
+    /* Ścieżka z folderem, bo przy `miniaturka.jpg` sama nazwa nic nie mówi. */
+    const nazwa = (p: File) => p.webkitRelativePath || p.name;
+    let plikiSymbolu = new Map<string, string[]>();
     const klasy: Sprawdzenie["klasy"] = { ma_zdjecie: [], czeka: [], zablokowany: [], niejednoznaczny: [], nieznany_symbol: [] };
     const trafione: Array<{ symbol: string; twId: number; pliki: File[] }> = [];
-    if (r.grupy.length > 0) {
+    if (r.pliki.length > 0) {
       setSprawdzam({ z: 0, ile: 0 });
       let d;
       try {
-        d = await dopasuj.mutateAsync(paczki(r.grupy.map((g) => g.symbol)));
+        /* Pytamy o wszystkich kandydatów naraz: który jest symbolem, wie Subiekt. */
+        d = await dopasuj.mutateAsync(paczki(r.pliki.flatMap((x) => x.kandydaci)));
       } catch (e) {
         if (!zywy.current) return;
         setSprawdzam(null);
@@ -127,7 +131,9 @@ export function ImportZFolderu({ onZamknij }: { onZamknij: () => void }) {
         return;
       }
       const mapa = new Map(d.pozycje.map((p) => [p.symbol.toUpperCase(), p]));
-      for (const g of r.grupy) {
+      const grupy = przypiszSymbole(r.pliki, mapa);
+      plikiSymbolu = new Map(grupy.map((g) => [g.symbol, g.pliki.map(nazwa)]));
+      for (const g of grupy) {
         const p = mapa.get(g.symbol);
         const k = klasyfikuj(p);
         if (k === "do_importu" && p?.twId != null) trafione.push({ symbol: g.symbol, twId: p.twId, pliki: g.pliki });
@@ -168,7 +174,7 @@ export function ImportZFolderu({ onZamknij }: { onZamknij: () => void }) {
     }
     setSprawdzam(null);
     setSpr({
-      wszystkich: pliki.length, odrzucone: r.odrzucone.length, niesymbole: r.niesymbole.map((p) => p.name),
+      wszystkich: pliki.length, odrzucone: r.odrzucone.length, niesymbole: r.niesymbole.map(nazwa),
       klasy, plikiSymbolu, lista, nieczytelne, duplikaty: wybrane.filter((w) => w.pliki.length > 1).length,
     });
   }
