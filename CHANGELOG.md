@@ -10,6 +10,13 @@ z wersją monorepo" — i właśnie tak przestał być zgodny: `0.3.0` przetrwa�
 sześć zmergowanych zmian, w tym takie, które wymagały nowego uprawnienia SQL.
 Komentarz nie jest mechanizmem.
 
+## 0.603.0 — 21 października 2026
+
+**Zdjęcie z kolektora trafia do Subiekta tak samo jak z panelu.** Kolektor
+przycina zdjęcie do towaru, stawia je na białym kwadracie o boku najwyżej
+800 px i zapisuje jako lekki JPEG. Podgląd przed zapisem pokazuje dokładnie
+ten kwadrat, także przy „Zostaw tło”.
+
 ## 0.602.0 — 21 października 2026
 
 **Zdjęcie do „Dopytaj Copilota”.** Spinacz obok pola polecenia albo wklejenie
