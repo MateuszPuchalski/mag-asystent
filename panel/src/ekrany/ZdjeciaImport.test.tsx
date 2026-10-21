@@ -139,6 +139,15 @@ describe("Import zdjęć z folderu", () => {
     expect(ciala("/api/products/12/zdjecie/gotowe")).toEqual([{ gotowy: "R09UT1dZ", zrodlo: "import", plik: "W04-0402.png" }]);
     expect(stan.wyslane.filter((w) => w.includes("/gotowe"))).toHaveLength(2);
     expect(within(okno).getByRole("progressbar", { name: "Postęp importu" })).toHaveAttribute("aria-valuenow", "2");
+    /* Podsumowanie mówi, który plik poszedł do której kartoteki, w kolejności listy. */
+    expect(within(okno).getByText("Dodane zdjęcia: 2")).toBeInTheDocument();
+    const wiersze = within(okno).getAllByRole("row").slice(1)
+      .map((w) => within(w).getAllByRole("cell").map((c) => c.textContent));
+    expect(wiersze).toEqual([
+      ["W08-0501", "Towar W08-0501", "W08-0501.jpg", "kolejka do Subiekta"],
+      ["W04-0402", "Towar W04-0402", "W04-0402.png", "kolejka do Subiekta"],
+    ]);
+    expect(within(okno).getByRole("button", { name: "Kopiuj listę do arkusza" })).toBeInTheDocument();
     /* Lista towarów bez zdjęcia odświeża się raz, po całym imporcie. */
     await waitFor(() => expect(pytaniaListy()).toBeGreaterThan(przed));
     await u.click(within(okno).getByRole("button", { name: "Zamknij" }));

@@ -3,7 +3,7 @@ import { FolderInput, X } from "lucide-react";
 import { BrakPolaczenia, Konflikt } from "../api/klient";
 import { useDopasujSymbole, useImportGotowych, type ZapisanieZdjecia } from "../api/zdjecia";
 import { useOkno } from "../nawigacja/fokus";
-import { Blad, Przycisk, ile } from "../ui";
+import { Blad, Przycisk, PrzyciskKopiuj, ile } from "../ui";
 import { pngZrodla, wczytajPlik, zlozGotowy } from "./obraz";
 import {
   MALY_BOK, WSPOLBIEZNOSC, jedenNaTowar, klasyfikuj, paczki, poKolei, przypiszSymbole, rozbierz, wybierzWariant,
@@ -22,7 +22,11 @@ import {
    decyzją właściciela. Małe zdjęcia tylko liczymy, bo małe jest lepsze
    niż żadne. */
 
-interface DoImportu extends Wariant { symbol: string; twId: number; plik: File }
+/** `towar` to nazwa kartoteki z Subiekta — w podsumowaniu mówi, KOMU doszło zdjęcie. */
+interface DoImportu extends Wariant { symbol: string; twId: number; plik: File; towar: string | null }
+
+/* Ścieżka z folderem, bo przy `min.jpg` czy `miniaturka.jpg` sama nazwa nic nie mówi. */
+const sciezka = (p: File) => p.webkitRelativePath || p.name;
 
 type Wynik = { stan: "dodane"; wSubiekcie: boolean } | { stan: "pominiete" | "blad"; powod: string };
 
@@ -107,8 +111,8 @@ export function ImportZFolderu({ onZamknij }: { onZamknij: () => void }) {
   async function sprawdz(pliki: File[]) {
     setBlad(""); setWylaczone(null); setSpr(null); setWyniki(new Map());
     const r = rozbierz(pliki);
-    /* Ścieżka z folderem, bo przy `miniaturka.jpg` sama nazwa nic nie mówi. */
-    const nazwa = (p: File) => p.webkitRelativePath || p.name;
+    const nazwa = sciezka;
+    const nazwyTowarow = new Map<number, string | null>();
     let plikiSymbolu = new Map<string, string[]>();
     const klasy: Sprawdzenie["klasy"] = { ma_zdjecie: [], czeka: [], zablokowany: [], niejednoznaczny: [], nieznany_symbol: [] };
     const trafione: Array<{ symbol: string; twId: number; pliki: File[] }> = [];
@@ -136,7 +140,10 @@ export function ImportZFolderu({ onZamknij }: { onZamknij: () => void }) {
       for (const g of grupy) {
         const p = mapa.get(g.symbol);
         const k = klasyfikuj(p);
-        if (k === "do_importu" && p?.twId != null) trafione.push({ symbol: g.symbol, twId: p.twId, pliki: g.pliki });
+        if (k === "do_importu" && p?.twId != null) {
+          trafione.push({ symbol: g.symbol, twId: p.twId, pliki: g.pliki });
+          nazwyTowarow.set(p.twId, p.nazwa);
+        }
         else if (k !== "do_importu") klasy[k].push(g.symbol);
       }
     }
@@ -170,7 +177,9 @@ export function ImportZFolderu({ onZamknij }: { onZamknij: () => void }) {
         if (typeof x === "string" || !x) nieczytelne.push({ nazwa: p.name, powod: x ?? "Nie udało się odczytać." });
         else dobre.push({ ...x, plik: p });
       }
-      if (dobre.length) lista.push({ ...wybierzWariant(dobre), symbol: w.symbol, twId: w.twId });
+      if (dobre.length) {
+        lista.push({ ...wybierzWariant(dobre), symbol: w.symbol, twId: w.twId, towar: nazwyTowarow.get(w.twId) ?? null });
+      }
     }
     setSprawdzam(null);
     setSpr({
@@ -233,6 +242,15 @@ export function ImportZFolderu({ onZamknij }: { onZamknij: () => void }) {
   const doPonowienia = [...bledy, ...niewyslane];
   const poImporcie = wyniki.size > 0 && !trwa;
   const tylkoWWertis = [...wyniki.values()].some((w) => w.stan === "dodane" && !w.wSubiekcie);
+  /* Kolejność listy importu, nie kolejność zakończenia: przy dwóch torach
+     ta druga skakałaby i trudniej byłoby porównać z folderem. */
+  const dodaneLista = lista.flatMap((p) => {
+    const w = wyniki.get(p.symbol);
+    return w?.stan === "dodane" ? [{ p, wSubiekcie: w.wSubiekcie }] : [];
+  });
+  /* Tabulatory, bo wklejone do Excela same rozkładają się na kolumny. */
+  const tsvDodanych = ["Symbol\tTowar\tPlik", ...dodaneLista.map(({ p }) =>
+    [p.symbol, p.towar ?? "", sciezka(p.plik)].map((x) => x.replace(/\s+/g, " ")).join("\t"))].join("\n");
   const male = lista.filter((p) => Math.max(p.szer, p.wys) < MALY_BOK).length;
 
   let tresc: React.ReactNode;
@@ -309,6 +327,32 @@ export function ImportZFolderu({ onZamknij }: { onZamknij: () => void }) {
         Dodano {dodane}, pominięto {pominiete}, błędy {bledy.length}
         {niewyslane.length > 0 ? `, nie wysłano ${niewyslane.length}` : ""}.
         {tylkoWWertis ? " Ta instalacja nie wysyła zdjęć do Subiekta, więc zostały w WERTIS." : ""}</p>}
+      {dodaneLista.length > 0 && <details open className="text-sm text-slate-700">
+        {/* Rozwinięte od razu: to odpowiedź na pytanie „co poszło do której
+            kartoteki”, a nie szczegół do szukania. */}
+        <summary className="cursor-pointer text-slate-600">Dodane zdjęcia: {dodaneLista.length}</summary>
+        <div className="mt-1 flex justify-end">
+          <PrzyciskKopiuj tekst={tsvDodanych}>Kopiuj listę do arkusza</PrzyciskKopiuj>
+        </div>
+        <div className="mt-1 max-h-64 overflow-y-auto">
+          <table className="w-full text-left text-sm">
+            <thead className="sticky top-0 bg-white text-slate-600">
+              <tr><th scope="col" className="py-1 pr-2 font-semibold">Symbol</th>
+                <th scope="col" className="py-1 pr-2 font-semibold">Towar</th>
+                <th scope="col" className="py-1 pr-2 font-semibold">Plik</th>
+                <th scope="col" className="py-1 font-semibold">Gdzie</th></tr>
+            </thead>
+            <tbody className="divide-y divide-slate-100">
+              {dodaneLista.map(({ p, wSubiekcie }) => <tr key={p.twId}>
+                <td className="py-1 pr-2 font-mono whitespace-nowrap">{p.symbol}</td>
+                <td className="py-1 pr-2 text-slate-900">{p.towar ?? "—"}</td>
+                <td className="py-1 pr-2 break-all text-slate-700">{sciezka(p.plik)}</td>
+                <td className="py-1 whitespace-nowrap text-slate-700">{wSubiekcie ? "kolejka do Subiekta" : "tylko WERTIS"}</td>
+              </tr>)}
+            </tbody>
+          </table>
+        </div>
+      </details>}
       {pominiete > 0 && <details className="text-sm text-slate-700">
         <summary className="cursor-pointer text-slate-600">Pominięte: {pominiete}</summary>
         <ul className="mt-1 max-h-40 overflow-y-auto">

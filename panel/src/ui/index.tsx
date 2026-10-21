@@ -579,6 +579,18 @@ export function Skopiuj({ tekst, tytul = "Kopiuj" }: { tekst: string; tytul?: st
 }
 
 /**
+ * Kopiowanie z napisem, dla całych list: ikona bez słowa przy takim
+ * przycisku nie mówi, CO trafi do schowka. Ten sam stan co `Skopiuj`.
+ */
+export function PrzyciskKopiuj({ tekst, children }: { tekst: string; children: React.ReactNode }) {
+  const { stan, kopiuj } = useKopiowanie(tekst);
+  return <Przycisk onClick={kopiuj}>
+    <Copy size={14} />
+    {stan === "zrobione" ? "Skopiowano" : stan === "blad" ? "Nie udało się skopiować" : children}
+  </Przycisk>;
+}
+
+/**
  * Wspólny stan kopiowania: „gotowe", „skopiowano" i „nie udało się".
  *
  * TRZECI STAN JEST TU NAJWAŻNIEJSZY. Do 0.227.0 nieudane kopiowanie kończyło
