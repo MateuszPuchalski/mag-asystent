@@ -10,6 +10,14 @@ z wersją monorepo" — i właśnie tak przestał być zgodny: `0.3.0` przetrwa�
 sześć zmergowanych zmian, w tym takie, które wymagały nowego uprawnienia SQL.
 Komentarz nie jest mechanizmem.
 
+## 0.604.3 — 21 października 2026
+
+Koszt Copilota na ekranie pomiaru i w raporcie tygodnia liczy się poprawnie
+dla `claude-opus-5-5`, `claude-sonnet-5-5` i `claude-haiku-5-5`. Dotąd te
+modele szły po stawce najdroższego znanego modelu. Odczyt z cache ma teraz
+stawkę per model, bo Opus 5.5 i Sonnet 5.5 czytają cache za 0,05 ceny
+wejścia, a nie 0,1.
+
 ## 0.604.2 — 21 października 2026
 
 **Import zdjęć rozpoznaje więcej nazw.** Plik `W08-0501-miniaturka.jpg`,
