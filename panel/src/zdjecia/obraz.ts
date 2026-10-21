@@ -121,3 +121,11 @@ export async function zlozGotowy(base64: string, mime: string): Promise<Plik> {
   if (!w.miesciSie) throw new Error("Gotowe zdjęcie jest za duże nawet po kompresji. Wykadruj ciaśniej sam towar.");
   return { base64: w.base64, adres: `data:image/jpeg;base64,${w.base64}`, bok: g.bok };
 }
+
+/**
+ * Wczytane zdjęcie jako PNG w base64, wejście dla `zlozGotowy` przy imporcie.
+ * PNG, bo nie traci jakości po drodze i zachowuje alfę wyciętego tła.
+ */
+export function pngZrodla(z: Zrodlo): string {
+  return base64ZAdresu(z.kanwa.toDataURL("image/png"));
+}

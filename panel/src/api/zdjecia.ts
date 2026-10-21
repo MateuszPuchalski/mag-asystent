@@ -113,3 +113,63 @@ export function usePorzucPodglad() {
       api(`${sciezka(twId)}/wstepne/${encodeURIComponent(String(podgladId))}`, { method: "DELETE" }),
   });
 }
+
+/* ── IMPORT Z FOLDERU ──────────────────────────────────────────────────────
+   Setki plików nazwanych symbolem, każdy jako gotowy biały kwadrat. Bez
+   podglądu na serwerze, bo tła nie usuwamy — decyzja właściciela. */
+
+export interface PozycjaDopasowania {
+  symbol: string;
+  /** `null`: w Subiekcie nie ma towaru o tym symbolu. */
+  twId: number | null;
+  nazwa: string | null;
+  maZdjecie: boolean;
+  /** Zdjęcie tego towaru już czeka w kolejce do Subiekta. */
+  oczekuje: boolean;
+  zablokowany: boolean;
+  /** Symbol trafia w kilka aktywnych kartotek; wtedy `twId` i `nazwa` są `null`. */
+  niejednoznaczny?: boolean;
+}
+
+export interface Dopasowanie { wlaczone: boolean; powod?: string; pozycje: PozycjaDopasowania[] }
+
+/**
+ * Symbole z nazw plików → towary Subiekta. To odczyt, ale w POST, bo lista
+ * symboli nie mieści się w adresie. Woła go dopiero wybór plików, nigdy
+ * otwarcie ekranu.
+ */
+export function useDopasujSymbole() {
+  return useMutation({
+    mutationFn: async (paczki: string[][]): Promise<Dopasowanie> => {
+      const wynik: Dopasowanie = { wlaczone: true, pozycje: [] };
+      /* Paczki po kolei: jedna baza Subiekta, a równoległe pytania tylko by ją dławiły. */
+      for (const symbole of paczki) {
+        const d = await api<Dopasowanie>("/api/zdjecia/dopasuj", { method: "POST", body: JSON.stringify({ symbole }) });
+        if (!d.wlaczone) return d;
+        wynik.pozycje.push(...d.pozycje);
+      }
+      return wynik;
+    },
+  });
+}
+
+/**
+ * Wysyłka gotowych zdjęć importu. `wyslij` NIE unieważnia listy przy każdym
+ * pliku: trzysta odświeżeń listy w minutę to trzysta pytań do bazy Subiekta.
+ * Listę odświeża `zakoncz`, raz po całym przebiegu.
+ */
+export function useImportGotowych() {
+  const qc = useQueryClient();
+  const wyslij = useMutation({
+    mutationFn: ({ twId, gotowy, plik }: { twId: number; gotowy: string; plik: string }) =>
+      api<ZapisanieZdjecia>(`${sciezka(twId)}/gotowe`, {
+        method: "POST", body: JSON.stringify({ gotowy, zrodlo: "import", plik }),
+      }),
+    /* Jak przy zapisie z edytora: pamięć obrazów nie może dalej mówić „bez zdjęcia". */
+    onSuccess: (_w, { twId }) => zapomnijObraz(sciezka(twId)),
+  });
+  return {
+    wyslij: wyslij.mutateAsync,
+    zakoncz: () => void qc.invalidateQueries({ queryKey: ["zdjecia"] }),
+  };
+}

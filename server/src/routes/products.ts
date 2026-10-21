@@ -4,16 +4,15 @@ import { autorOperacji, subiekt, userOf } from "../context.js";
 import { sciezkaZdjecia, zapewnijZdjecie } from "../services/zdjecia.js";
 import { config } from "../config.js";
 import { buildProductCard } from "../services/stock.js";
-import { enqueueSetEan, enqueueSetLocation, enqueueSetZdjecie } from "../services/queue.js";
+import { enqueueSetEan, enqueueSetLocation } from "../services/queue.js";
 import {
   bajtyZeZdjecia,
   dodawanieWlaczone,
   obrazDoZapisu,
   podglad,
-  przypiszZadanie,
   usunPodglad,
+  zapiszIZglos,
   zapiszPodglad,
-  zapiszWlasne,
 } from "../services/zdjecia-wlasne.js";
 import { tloWlaczone, usunTlo } from "../adapters/tlo.js";
 import { aliasKodu, bladKodu, ktoMaTenKod, zapiszAlias, zdejmijAlias } from "../services/ean-alias.js";
@@ -480,7 +479,6 @@ export async function productRoutes(app: FastifyInstance) {
       const doZapisu = obrazDoZapisu(w, { zTlem: req.body?.zTlem === true, gotowy: req.body?.gotowy });
       if (!doZapisu.ok) return reply.code(400).send({ error: doZapisu.error });
       const { obraz, mime, tloUsuniete } = doZapisu;
-      const zTlem = !tloUsuniete;
 
       /* Skąd wzięło się zdjęcie — aparat, galeria czy panel biura. Wpływu na przetwarzanie
          nie ma żadnego; jest pierwszym pytaniem przy analizie „dlaczego te
@@ -488,41 +486,9 @@ export async function productRoutes(app: FastifyInstance) {
       const zrodlo =
         req.body?.zrodlo === "galeria" || req.body?.zrodlo === "panel" ? req.body.zrodlo : "aparat";
       const autor = autorOperacji(req);
-      const { etag, bajtow } = zapiszWlasne({
-        twId,
-        obraz,
-        mime,
-        tloUsuniete: !zTlem,
-        dodaneBy: autor.nazwa,
-        dodaneByRef: autor.ref,
-      });
+      const wynik = zapiszIZglos({ twId, symbol: p.symbol, obraz, mime, tloUsuniete, zrodlo, autor });
       usunPodglad(w.id, twId);
-
-      let queueId: number | null = null;
-      if (config.zdjecia.dodawanie === "subiekt") {
-        queueId = enqueueSetZdjecie(
-          twId,
-          {
-            createdBy: autor.nazwa,
-            createdByRef: autor.ref,
-            twId,
-            label: "Zdjęcie · " + p.symbol,
-            detail: `${Math.round(bajtow / 1024)} kB, tło ${zTlem ? "zostawione" : "usunięte"}`,
-          },
-          { bajtow, tloUsuniete: !zTlem, zrodlo }
-        );
-        przypiszZadanie(twId, queueId);
-      } else {
-        /* Bez zapisu do Subiekta zdarzenie i tak musi powstać: bez niego karta
-           milczałaby o tym, skąd wzięło się zdjęcie i kto je zrobił. */
-        logEvent("zdjecie_dodane", autor.nazwa, twId, {
-          bajtow,
-          tloUsuniete: !zTlem,
-          zrodlo,
-          queueId: null,
-        }, autor.ref);
-      }
-      return { queueId, etag, bajtow, wSubiekcie: config.zdjecia.dodawanie === "subiekt" };
+      return wynik;
     }
   );
 

@@ -2,6 +2,9 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import {
   budujZapytanieBezZdjecia,
+  budujZapytanieDopasowania,
+  paczkiSymboli,
+  SYMBOLI_W_PACZCE,
   zrodloSprzedazy,
   budujZapytanieBlob,
   nazwaZeWzorca,
@@ -281,4 +284,49 @@ test("wieloznaczniki LIKE w tekście szukania są zwykłymi znakami", () => {
   assert.equal(wzorzecLike("[A]"), "%![A]%");
   assert.equal(wzorzecLike("Hej!"), "%Hej!!%");
   assert.equal(wzorzecLike("a/b\\c"), "%a/b\\c%");
+});
+
+// ── Dopasowanie symboli z importu folderu ───────────────────────────────────
+
+test("dopasowanie: parametry @s0..@sN w IN, przycięta kolumna, bez wklejonych wartości", () => {
+  const q = budujZapytanieDopasowania({ tabela: "tw_ZdjecieTw", kolumna: "zd_Zdjecie", klucz: "zd_IdTowar", ile: 3 });
+  assert.match(q, /LTRIM\(RTRIM\(t\.tw_Symbol\)\) IN \(@s0, @s1, @s2\)/);
+  assert.doesNotMatch(q, /@s3/);
+  assert.doesNotMatch(q, /'/, "żadnego literału: symbol z pliku idzie wyłącznie parametrem");
+});
+
+test("dopasowanie: brak zdjęcia liczy ten sam warunek co lista braków", () => {
+  const opts = { tabela: "tw_ZdjecieTw", kolumna: "zd_Zdjecie", klucz: "zd_IdTowar" };
+  const q = budujZapytanieDopasowania({ ...opts, ile: 1 });
+  const { razem } = budujZapytanieBezZdjecia({ ...opts, zFiltrem: false });
+  const warunek = "NOT EXISTS (SELECT 1 FROM tw_ZdjecieTw z WITH (NOLOCK) WHERE z.zd_IdTowar = t.tw_Id)";
+  assert.ok(razem.includes(warunek));
+  assert.ok(q.includes(`CASE WHEN ${warunek} THEN 0 ELSE 1 END AS maZdjecie`));
+  const wKartotece = budujZapytanieDopasowania({ tabela: "", kolumna: "tw_Zdjecie", klucz: "tw_Id", ile: 1 });
+  assert.match(wKartotece, /CASE WHEN \(t\.tw_Zdjecie IS NULL OR DATALENGTH\(t\.tw_Zdjecie\) = 0\) THEN 0/);
+});
+
+/* Zablokowany zostaje w wyniku: biuro ma zobaczyć, czemu plik nie trafi. */
+test("dopasowanie: zablokowanych nie wycina, tylko oznacza", () => {
+  const q = budujZapytanieDopasowania({ tabela: "", kolumna: "tw_Zdjecie", klucz: "tw_Id", ile: 1 });
+  assert.match(q, /CASE WHEN t\.tw_Zablokowany = 1 THEN 1 ELSE 0 END AS zablokowany/);
+  assert.doesNotMatch(q, /WHERE t\.tw_Zablokowany/);
+});
+
+test("dopasowanie: paczka mieści się w limicie 2100 parametrów MSSQL", () => {
+  assert.ok(SYMBOLI_W_PACZCE < 2100);
+  assert.throws(() => budujZapytanieDopasowania({ tabela: "", kolumna: "k", klucz: "id", ile: SYMBOLI_W_PACZCE + 1 }));
+  assert.throws(() => budujZapytanieDopasowania({ tabela: "", kolumna: "k", klucz: "id", ile: 0 }));
+  const symbole = Array.from({ length: 1201 }, (_, i) => `S${i}`);
+  const paczki = paczkiSymboli(symbole);
+  assert.deepEqual(paczki.map((p) => p.length), [500, 500, 201]);
+  assert.deepEqual(paczki.flat(), symbole, "kolejność i komplet bez zmian");
+  assert.deepEqual(paczkiSymboli([]), []);
+});
+
+test("dopasowanie: nazwa z konfiguracji nie wstrzyknie SQL", () => {
+  assert.throws(() =>
+    budujZapytanieDopasowania({ tabela: "x; DROP TABLE y", kolumna: "k", klucz: "id", ile: 1 })
+  );
+  assert.throws(() => budujZapytanieDopasowania({ tabela: "", kolumna: "k--", klucz: "id", ile: 1 }));
 });

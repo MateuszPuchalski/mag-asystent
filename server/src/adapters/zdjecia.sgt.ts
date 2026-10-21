@@ -465,3 +465,94 @@ export async function towaryBezZdjecia(z: {
     })),
   };
 }
+
+/* ── Dopasowanie symboli z nazw plików — import zdjęć z folderu ──────────────
+   Biuro ma folder plików nazwanych symbolem towaru i pyta, które z nich da
+   się przypiąć do kartoteki. Odczyt i nic więcej: zapis idzie potem po jednym
+   zdjęciu, tą samą drogą co zatwierdzenie podglądu. */
+
+/** Wiersz kartoteki trafionej po symbolu. Symbol jest taki, jak leży w Subiekcie. */
+export interface TowarPoSymbolu {
+  twId: number;
+  symbol: string;
+  nazwa: string;
+  maZdjecie: boolean;
+  zablokowany: boolean;
+}
+
+/* MSSQL przyjmuje najwyżej 2100 parametrów na zapytanie. 500 zostawia zapas
+   i trzyma pojedyncze zapytanie krótkim. */
+export const SYMBOLI_W_PACZCE = 500;
+
+/* Dłuższy symbol i tak nie istnieje w kartotece. Parametr krótszy niż
+   wartość uciąłby ją po cichu i dał fałszywe trafienie, więc dłuższe
+   odrzuca serwis, zanim tu dojdą. */
+export const DLUGOSC_SYMBOLU = 100;
+
+/**
+ * Zapytanie o kartoteki po liście symboli, parametry `@s0..@sN`.
+ *
+ * Porównanie zostawiamy kolacji bazy: Subiekt stoi na kolacji bez wielkości
+ * liter, tak jak `COLLATE NOCASE` w naszym read-modelu. Przycinamy kolumnę,
+ * bo import kartoteki nie przycina `tw_Symbol` (services/dopasowanie-sku.ts).
+ * Brak zdjęcia liczy ten sam warunek co lista braków, żeby oba ekrany
+ * nie mogły się rozjechać. Zablokowanych NIE wycinamy: biuro ma zobaczyć,
+ * czemu plik nie trafi, zamiast „brak w Subiekcie".
+ */
+export function budujZapytanieDopasowania(opts: {
+  tabela: string;
+  kolumna: string;
+  klucz: string;
+  ile: number;
+}): string {
+  const ile = Math.trunc(opts.ile);
+  if (!(ile >= 1 && ile <= SYMBOLI_W_PACZCE)) {
+    throw new Error(`Paczka symboli musi mieć od 1 do ${SYMBOLI_W_PACZCE} pozycji`);
+  }
+  const parametry = Array.from({ length: ile }, (_, i) => `@s${i}`).join(", ");
+  return (
+    "SELECT t.tw_Id AS twId, t.tw_Symbol AS symbol, t.tw_Nazwa AS nazwa, " +
+    `CASE WHEN ${warunekBrakuZdjecia(opts)} THEN 0 ELSE 1 END AS maZdjecie, ` +
+    "CASE WHEN t.tw_Zablokowany = 1 THEN 1 ELSE 0 END AS zablokowany " +
+    `FROM tw__Towar t WITH (NOLOCK) WHERE LTRIM(RTRIM(t.tw_Symbol)) IN (${parametry}) ` +
+    "ORDER BY t.tw_Id"
+  );
+}
+
+/** Dzieli listę na paczki mieszczące się w limicie parametrów. */
+export function paczkiSymboli(symbole: string[], rozmiar = SYMBOLI_W_PACZCE): string[][] {
+  const paczki: string[][] = [];
+  for (let i = 0; i < symbole.length; i += rozmiar) paczki.push(symbole.slice(i, i + rozmiar));
+  return paczki;
+}
+
+/** Kartoteki o podanych symbolach prosto z Subiekta; wyjątek = nie dało się zapytać. */
+export async function towaryPoSymbolach(symbole: string[]): Promise<TowarPoSymbolu[]> {
+  if (symbole.length === 0) return [];
+  const c = config.zdjecia;
+  const pool = await mssqlPool();
+  const wynik: TowarPoSymbolu[] = [];
+  for (const paczka of paczkiSymboli(symbole)) {
+    const zapytanie = budujZapytanieDopasowania({
+      tabela: c.tabela,
+      kolumna: c.kolumna,
+      klucz: c.kolumnaKlucza,
+      ile: paczka.length,
+    });
+    const r = pool.request();
+    paczka.forEach((s, i) => r.input(`s${i}`, sql.NVarChar(DLUGOSC_SYMBOLU), s));
+    const w = await r.query<{ twId: number; symbol: string; nazwa: string; maZdjecie: number; zablokowany: number }>(
+      zapytanie
+    );
+    for (const x of w.recordset) {
+      wynik.push({
+        twId: x.twId,
+        symbol: x.symbol,
+        nazwa: x.nazwa,
+        maZdjecie: Number(x.maZdjecie) === 1,
+        zablokowany: Number(x.zablokowany) === 1,
+      });
+    }
+  }
+  return wynik;
+}
