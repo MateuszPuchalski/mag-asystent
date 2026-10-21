@@ -114,14 +114,15 @@ describe("Import zdjęć z folderu", () => {
     const dodaj = await within(okno).findByRole("button", { name: "Dodaj 2 zdjęcia" });
     expect(ciala("/api/zdjecia/dopasuj")).toEqual([
       /* `W28` to kandydat z `W28-303` bez dopisku `-303`; który jest symbolem, rozstrzyga Subiekt. */
-      { symbole: ["W08-0501", "W04-0402", "W01-0001", "W02-0002", "W28-303", "W28", "W03-0003"] }]);
+      { symbole: ["W08-0501", "W04-0402", "W01-0001", "W02-0002", "W28-303", "W28", "2026-10-07", "2026", "123809", "W03-0003"] }]);
     expect(within(okno).getByText("Wybrano 8 plików.")).toBeInTheDocument();
     expect(liczba(okno, "Do dodania")).toBe("2");
     expect(liczba(okno, "Mają już zdjęcie")).toBe("1");
     expect(liczba(okno, "Zdjęcie czeka w kolejce do Subiekta")).toBe("1");
     expect(liczba(okno, "Zablokowane w Subiekcie")).toBe("1");
-    expect(liczba(okno, "Nie ma takiego symbolu w Subiekcie")).toBe("1");
-    expect(liczba(okno, "Nazwa pliku nie jest symbolem")).toBe("1");
+    /* Zrzut ekranu ma kawałki z cyfrą (`2026-10-07`), więc idzie do sprawdzenia i wraca jako brak w Subiekcie. */
+    expect(liczba(okno, "Nie ma takiego symbolu w Subiekcie")).toBe("2");
+    expect(liczba(okno, "Ani nazwa pliku, ani folder nie mają symbolu")).toBe("0");
     expect(within(okno).getByText("W28-303.png")).toBeInTheDocument();
     expect(within(okno).getByText("Zrzut ekranu 2026-10-07 123809.jpg")).toBeInTheDocument();
     expect(within(okno).getByText(/1 towar ma po kilka plików/)).toBeInTheDocument();
@@ -163,7 +164,7 @@ describe("Import zdjęć z folderu", () => {
       [...FOLDER, plik("W08-0501B.png"), plik("W09-0009.jpg")]);
     await within(okno).findByRole("button", { name: "Dodaj 2 zdjęcia" });
     expect(liczba(okno, "Kilka kartotek z tym symbolem — dodaj ręcznie w edytorze")).toBe("1");
-    expect(liczba(okno, "Nie ma takiego symbolu w Subiekcie")).toBe("1");
+    expect(liczba(okno, "Nie ma takiego symbolu w Subiekcie")).toBe("2");
     await u.click(within(okno).getByRole("button", { name: "Dodaj 2 zdjęcia" }));
     await within(okno).findByText(/Dodano 2, pominięto 0, błędy 0./);
     expect(ciala("/api/products/11/zdjecie/gotowe")).toEqual([{ gotowy: "R09UT1dZ", zrodlo: "import", plik: "W08-0501B.png" }]);

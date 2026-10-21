@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
-  bezDopiskow, czyGlowne, czyZdjecie, jedenNaTowar, kandydaci, klasyfikuj, paczki, poKolei, przypiszSymbole, rozbierz, symbolZNazwy,
+  bezDopiskow, czyGlowne, czyZdjecie, jedenNaTowar, kandydaci, kawalki, klasyfikuj, paczki, poKolei, przypiszSymbole, rozbierz, symbolZNazwy,
   wybierzWariant, type Wariant,
 } from "./import";
 import type { PozycjaDopasowania } from "../api/zdjecia";
@@ -26,65 +26,109 @@ describe("symbol z nazwy pliku", () => {
   });
 });
 
+const zFolderu = (sciezka: string) => ({ name: sciezka.split("/").at(-1)!, type: "image/jpeg", webkitRelativePath: sciezka });
+const G = "--- Gotowe - wystawione ---";
+
+describe("kawałki opisowej nazwy", () => {
+  it("fragmenty z cyfrą, bez słów; dwie liczby sklejone myślnikiem", () => {
+    expect(kawalki("katownik_FT1249")).toEqual(["FT1249"]);
+    expect(kawalki("Gaznik_Wacker_BS50-2_BS30-2_W09-1501")).toEqual(["BS50-2", "BS30-2", "W09-1501"]);
+    expect(kawalki("dystans_gaznika_honda_gx160_gx160_zongshen_168fb_10_02014"))
+      .toEqual(["gx160", "gx160", "168fb", "02014", "10-02014"]);
+    expect(kawalki("GAŹNK GX270 - 76-011")).toEqual(["GX270", "76-011"]);
+    expect(kawalki("8_stolarskie")).toEqual([]);
+  });
+});
+
 describe("kandydaci na symbol", () => {
-  /* Właściciel ma pliki `symbol-miniaturka`, `symbol-1` i `miniaturka.jpg`
-     w folderze nazwanym symbolem. Pełna nazwa zawsze idzie pierwsza. */
-  it("nazwa, potem nazwa bez dopisku", () => {
-    expect(kandydaci(plik("W08-0501.jpg"))).toEqual(["W08-0501"]);
-    expect(kandydaci(plik("W08-0501-miniaturka.jpg"))).toEqual(["W08-0501-MINIATURKA", "W08-0501"]);
-    expect(kandydaci(plik("W08-0501-1.jpg"))).toEqual(["W08-0501-1", "W08-0501"]);
-    expect(kandydaci(plik("W08-0501 (2).png"))).toEqual(["W08-0501 (2)", "W08-0501"]);
-    expect(kandydaci(plik("W08-0501_mini.jpg"))).toEqual(["W08-0501_MINI", "W08-0501"]);
+  /* Pełna nazwa zawsze pierwsza w swoim poziomie. */
+  it("nazwa pliku: pełna, bez dopisku", () => {
+    expect(kandydaci(plik("W08-0501.jpg"))).toEqual([{ pelna: "W08-0501", symbole: ["W08-0501"] }]);
+    expect(kandydaci(plik("W08-0501-miniaturka.jpg"))[0].symbole.slice(0, 2)).toEqual(["W08-0501-MINIATURKA", "W08-0501"]);
+    expect(kandydaci(plik("W08-0501-1.jpg"))[0].symbole.slice(0, 2)).toEqual(["W08-0501-1", "W08-0501"]);
+    expect(kandydaci(plik("W08-0501 (2).png"))[0].symbole.slice(0, 2)).toEqual(["W08-0501 (2)", "W08-0501"]);
   });
   it("dopisek nie zjada czterech cyfr symbolu, a kilka dopisków schodzi po kolei", () => {
     expect(bezDopiskow("W08-0501")).toBe("W08-0501");
     expect(bezDopiskow("W08-0501-1-miniaturka")).toBe("W08-0501");
     expect(bezDopiskow("miniaturka")).toBe("miniaturka");
   });
-  it("foldery od najbliższego, gdy wybrano folder", () => {
-    expect(kandydaci({ name: "miniaturka.jpg", webkitRelativePath: "WERTIS SKU/Filtry/W08-0501/miniaturka.jpg" }))
-      .toEqual(["MINIATURKA", "W08-0501", "FILTRY", "WERTIS SKU"]);
-    expect(kandydaci({ name: "Zrzut ekranu 2026-10-07 123809.jpg", webkitRelativePath: "x/W08-0501-1/Zrzut ekranu 2026-10-07 123809.jpg" }))
-      .toEqual(["W08-0501-1", "W08-0501", "X"]);
+  it("foldery od najbliższego, z kawałkami opisu", () => {
+    const k = kandydaci(zFolderu(`${G}/7_budowlane/katownik_FT1249/miniaturka.jpg`));
+    expect(k[0]).toEqual({ pelna: "MINIATURKA", symbole: ["MINIATURKA"] });
+    expect(k[1]).toEqual({ pelna: "KATOWNIK_FT1249", symbole: ["KATOWNIK_FT1249", "FT1249"] });
+    /* Nazwa dłuższa niż symbol nie jest kandydatem, ale jej kawałki są. */
+    expect(kandydaci(zFolderu(`${G}/x/W27-1309_W27-1305_W27-1306/m.jpg`))[1])
+      .toEqual({ pelna: null, symbole: ["W27-1309", "W27-1305", "W27-1306"] });
+    expect(kandydaci(zFolderu(`${G}/2_Do kosiarek spalinowych/3_noze/noz_do_14-05013/Untitled.jpg`))[1].symbole)
+      .toEqual(["NOZ_DO_14-05013", "14-05013"]);
   });
 });
 
 describe("rozbiór wybranych plików", () => {
   it("zdjęcia z kandydatami, bez kandydata i nie-zdjęcia", () => {
     const r = rozbierz([
-      plik("W08-0501.jpg"), plik("Zrzut ekranu 2026-10-07 123809.jpg"), { name: "opis.txt", type: "text/plain" },
+      plik("W08-0501.jpg"), plik("Zrzut ekranu.jpg"), { name: "opis.txt", type: "text/plain" },
+      { name: "Untitled.jpg", type: "image/jpeg", webkitRelativePath: "Bardzo dlugi folder bez cyfr na dysku/Untitled.jpg" },
     ]);
-    expect(r.pliki.map((x) => [x.plik.name, x.kandydaci])).toEqual([["W08-0501.jpg", ["W08-0501"]]]);
-    expect(r.niesymbole.map((p) => p.name)).toEqual(["Zrzut ekranu 2026-10-07 123809.jpg"]);
+    expect(r.pliki.map((x) => [x.plik.name, x.kandydaci.map((l) => l.symbole)])).toEqual([
+      ["W08-0501.jpg", [["W08-0501"]]], ["Zrzut ekranu.jpg", [["ZRZUT EKRANU"]]], ["Untitled.jpg", [["UNTITLED"]]],
+    ]);
     expect(r.odrzucone.map((p) => p.name)).toEqual(["opis.txt"]);
+    /* Bez kandydata zostaje tylko nazwa za długa na symbol i bez kawałka z cyfrą. */
+    expect(rozbierz([plik("bardzo dlugi opis bez zadnej cyfry.jpg")]).niesymbole).toHaveLength(1);
   });
 });
 
 describe("przypisanie symbolu po odpowiedzi serwera", () => {
   const znany = (symbol: string, twId: number | null, niejednoznaczny?: true): PozycjaDopasowania =>
     ({ symbol, twId, nazwa: null, maZdjecie: false, oczekuje: false, zablokowany: false, ...(niejednoznaczny ? { niejednoznaczny } : {}) });
+  const przypisz = (pliki: Array<{ name: string; type: string; webkitRelativePath?: string }>, znane: PozycjaDopasowania[]) =>
+    przypiszSymbole(rozbierz(pliki).pliki, new Map(znane.map((z) => [z.symbol, z])))
+      .map((g) => [g.symbol, g.pliki.map((p) => p.name), g.wiele ?? null]);
+
   it("pierwszy kandydat znany Subiektowi; nieznany zostaje pod pierwszym kandydatem", () => {
-    const r = rozbierz([
+    expect(przypisz([
       plik("W08-0501.jpg"), plik("w08-0501-1.png"), plik("W08-0501-miniaturka.jpg"),
       { name: "miniaturka.jpg", type: "image/jpeg", webkitRelativePath: "SKU/W04-0402/miniaturka.jpg" },
       plik("W99-9999-1.jpg"), plik("W77-0001.jpg"),
-    ]);
-    const mapa = new Map([
-      ["W08-0501", znany("W08-0501", 1)], ["W04-0402", znany("W04-0402", 2)],
-      ["W99-9999-1", znany("W99-9999-1", null)], ["W77-0001", znany("W77-0001", null, true)],
-    ]);
-    expect(przypiszSymbole(r.pliki, mapa).map((g) => [g.symbol, g.pliki.map((p) => p.name)])).toEqual([
-      ["W08-0501", ["W08-0501.jpg", "w08-0501-1.png", "W08-0501-miniaturka.jpg"]],
-      ["W04-0402", ["miniaturka.jpg"]],
-      ["W99-9999-1", ["W99-9999-1.jpg"]],
-      ["W77-0001", ["W77-0001.jpg"]],
+    ], [znany("W08-0501", 1), znany("W04-0402", 2), znany("W99-9999-1", null), znany("W77-0001", null, true)])).toEqual([
+      ["W08-0501", ["W08-0501.jpg", "w08-0501-1.png", "W08-0501-miniaturka.jpg"], null],
+      ["W04-0402", ["miniaturka.jpg"], null],
+      ["W99-9999-1", ["W99-9999-1.jpg"], null],
+      ["W77-0001", ["W77-0001.jpg"], null],
     ]);
   });
-  /* Symbol z cyfrą na końcu, który w Subiekcie istnieje, wygrywa z przyciętym. */
   it("pełna nazwa przed przyciętą, gdy obie są w Subiekcie", () => {
-    const r = rozbierz([plik("W28-303.png")]);
-    const mapa = new Map([["W28-303", znany("W28-303", 5)], ["W28", znany("W28", 6)]]);
-    expect(przypiszSymbole(r.pliki, mapa)[0].symbol).toBe("W28-303");
+    expect(przypisz([plik("W28-303.png")], [znany("W28-303", 5), znany("W28", 6)])[0][0]).toBe("W28-303");
+  });
+
+  /* Prawdziwe ścieżki z folderu właściciela: symbol siedzi w opisie folderu. */
+  it("symbol z opisu folderu, także pod dwoma folderami i z podkreślnikiem zamiast myślnika", () => {
+    expect(przypisz([
+      zFolderu(`${G}/7_budowlane/katownik_FT1249/miniaturka.jpg`),
+      zFolderu(`${G}/7_budowlane/Gaznik_Wacker_BS50-2_BS30-2_W09-1501/miniaturka.jpg`),
+      zFolderu(`${G}/4_Do traktorków/4.Gazniki/gaznik_do_kosiarki_briggs_&_stratton_12_hp_10-01019/zestaw/miniaturka.jpg`),
+      zFolderu(`${G}/6_Do Agregatów prądotwórczych/dystans_gaznika_honda_gx160_gx160_zongshen_168fb_10_02014/miniaturka.jpg`),
+      zFolderu(`${G}/21.Tarcze/tarcza_widiowa_185_60T_20mm_FTBW18560/tarcza.jpg`),
+    ], [znany("FT1249", 1), znany("W09-1501", 2), znany("10-01019", 3), znany("10-02014", 4), znany("FTBW18560", 5)]))
+      .toEqual([
+        ["FT1249", ["miniaturka.jpg"], null],
+        ["W09-1501", ["miniaturka.jpg"], null],
+        ["10-01019", ["miniaturka.jpg"], null],
+        ["10-02014", ["miniaturka.jpg"], null],
+        ["FTBW18560", ["tarcza.jpg"], null],
+      ]);
+  });
+
+  /* Kilka towarów w jednej nazwie: zgadywanie dałoby zdjęcie złej kartotece. */
+  it("kilka różnych towarów w jednej nazwie idzie do ręcznego dodania", () => {
+    const sc = `${G}/4_Do traktorków/1_noze/W27-1309_W27-1305_W27-1306/miniaturka.jpg`;
+    expect(przypisz([zFolderu(sc)], [znany("W27-1309", 1), znany("W27-1305", 2), znany("W27-1306", 3)]))
+      .toEqual([["W27-1309 / W27-1305 / W27-1306", ["miniaturka.jpg"], ["W27-1309", "W27-1305", "W27-1306"]]]);
+    /* Dwa kawałki tego samego towaru to nie „kilka”. */
+    expect(przypisz([zFolderu(`${G}/x/noz_W08-0501_W08-0501-1/miniaturka.jpg`)],
+      [znany("W08-0501", 1), znany("W08-0501-1", 1)])[0]).toEqual(["W08-0501", ["miniaturka.jpg"], null]);
   });
 });
 
