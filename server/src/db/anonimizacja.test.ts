@@ -129,6 +129,9 @@ function budujZrodlo(sciezka: string) {
   wstaw(d, "events", { type: "zamowienie.podglad", payload: "{}", user_id: "anonim", created_at: "2026-09-21T03:01:00.000Z" });
   wstaw(d, "sgt_towar", { symbol: "NOZ-LS46", nazwa: "Nóż do kosiarki NAC LS 46 mm", ean: "5901234567890", unit: "szt", lokalizacja: "A-03-2" });
   wstaw(d, "zdjecie_wlasne", { obraz: new Uint8Array([1, 2, 3, 4, 5, 6, 7, 8, 9, 10]), mime: "image/webp", dodane_by: "Anna Lewandowska" });
+  /* Wejście Copilota niesie wątek klienta. Maskowanie bywa dziurawe, więc
+     fikstura ma w nim to, co maskowanie przepuszcza: adres bez kodu. */
+  wstaw(d, "copilot_wejscie", { zadanie: "szkic", at: "2026-09-21T09:00:00.000Z", watek: "KLIENT: Kosiarka nie pali, mieszkam na Lipowej, pytać o Zbigniewa", fakty: "F1: Nóż NOZ-LS46", pytanie: "Czy Zbigniew dostał paczkę?", wyjscie: JSON.stringify({ tresc: "Panie Zbigniewie, kosiarka nie pali" }) });
   d.close();
 }
 
@@ -271,6 +274,23 @@ test("tokeny, sesje i hasła nie zostają, obrazy są zastąpione", () => {
     const img = po.prepare("SELECT obraz, mime FROM zdjecie_wlasne").get() as { obraz: Uint8Array; mime: string };
     assert.equal(img.mime, "image/png");
     assert.deepEqual([...img.obraz.slice(1, 4)], [0x50, 0x4e, 0x47], "PNG");
+    po.close();
+  });
+});
+
+test("wejście Copilota wychodzi puste: całe wątki klientów nie mają drogi do kopii", () => {
+  assert.ok(TABELE_DO_OPROZNIENIA.includes("copilot_wejscie"));
+  wKatalogu((k) => {
+    const we = path.join(k, "kopia.db");
+    const wy = path.join(k, "wynik.db");
+    zbudujBaze(we);
+    const przed = new DatabaseSync(we);
+    assert.equal((przed.prepare("SELECT COUNT(*) AS n FROM copilot_wejscie").get() as { n: number }).n, 1,
+      "fikstura bez wiersza wejścia niczego nie sprawdza");
+    przed.close();
+    anonimizuj(we, wy, { ziarno: "test" });
+    const po = new DatabaseSync(wy);
+    assert.equal((po.prepare("SELECT COUNT(*) AS n FROM copilot_wejscie").get() as { n: number }).n, 0);
     po.close();
   });
 });

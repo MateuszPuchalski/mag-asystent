@@ -419,6 +419,26 @@ test("szkic: sufit rund kończy pętlę rundą bez narzędzi, a koszt to suma ru
   }
 });
 
+test("szkic: błąd po rundzie narzędzi niesie wyniki narzędzi do wejścia porażki", async () => {
+  /* Wejście porażki trafia do zestawu testowego. Bez wyników powtórka sprawy
+     nie miałaby tego, co model przeczytał, zanim się wyłożył. */
+  const { zestaw } = atrapaNarzedzi();
+  klientSekwencja([
+    () => ({ stop_reason: "tool_use", model: "m", usage: zuzycieRundy,
+      content: [{ type: "tool_use", id: "tu_1", name: "karta_towaru", input: { zapytanie: "GAZ-1" } }] }),
+    () => ({ stop_reason: "max_tokens", model: "m", usage: zuzycieRundy, content: [{ type: "text", text: "{\"tre" }] }),
+  ]);
+  try {
+    const e = await nadawcaSzkicuAnthropic(TRESC, FAKTY, [], zestaw).then(() => null, (x: unknown) => x);
+    assert.ok(e instanceof BladOdpowiedziCopilota);
+    assert.deepEqual((e as { wynikiNarzedzi?: unknown }).wynikiNarzedzi,
+      [{ id: "N1", nazwa: "karta_towaru", argument: "GAZ-1", tresc: "Kartoteka GAZ-1: gaźnik" }]);
+    assert.equal((e as { rund?: number }).rund, 2);
+  } finally {
+    _ustawKlienta(null);
+  }
+});
+
 test("szkic bez narzędzi: jedno żądanie bez tools i bez cache całości", async () => {
   const zadania = klientSekwencja([() => ({ stop_reason: "end_turn", model: "m", usage: zuzycieRundy,
     content: [{ type: "text", text: SZKIC }] })]);

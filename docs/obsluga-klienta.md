@@ -288,6 +288,19 @@ z firmy nie wychodzi ani jeden znak. Klasyfikacja nie pisze do klienta.
   niej. To nasz tekst do klienta, ta sama klasa danych co szkic zespołu
   i wysłana wiadomość. Nie znika po wysyłce, bo jest historią pracy nad
   odpowiedzią. Dziennik dostaje wyłącznie długości.
+- **Wejście szkicu i dopytania trzymamy 90 dni w `copilot_wejscie`.** To
+  dokładnie to, co poszło do dostawcy: zamaskowany wątek, fakty i wyniki
+  narzędzi. Do tego surowa odpowiedź modelu sprzed sit. Przy dopytaniu
+  dochodzi zamaskowany tekst pola, historia wymian i pytanie agenta, bez
+  maskowania, jak poszło. Zdjęcia stoją jako lista: numer, typ i rozmiar, bez
+  bajtów i bez nazw plików. Spis zdjęć w faktach niesie nazwy plików, bo tak
+  wyszedł do dostawcy. Po co: zestaw testowy do porównania instrukcji i modeli
+  przed wydaniem. Serwer kasuje starsze wiersze co godzinę, a z rozmową znikają
+  od razu. Wejście zostaje w kopiach bazy: w 14 ostatnich nocnych i w 5 sprzed
+  aktualizacji. Kopie przycina się dopiero przy następnej kopii tego rodzaju. Gdy
+  nowe kopie nie powstają, stare leżą dalej, razem z wejściem. Kopia
+  zanonimizowana ma tę tabelę pustą. `COPILOT_ZAPIS_WEJSCIA=0` wyłącza zapis, a kasowanie chodzi
+  dalej.
 
 **Zdjęcia w rozmowie wychodzą do dostawcy, także bez kliknięcia.** Pikseli
 zamaskować się nie da: zdjęcie bywa paragonem, etykietą albo ekranem telefonu

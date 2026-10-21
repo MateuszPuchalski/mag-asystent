@@ -900,8 +900,11 @@ async function rozmowaZNarzedziami<T>(o: {
     const blad = naNasz(e);
     /* Z tego samego powodu rundy, narzędzia i wersja: porażka po trzech
        rundach to inna porażka niż odmowa przy pierwszym żądaniu. */
+    /* Wyniki narzędzi też: wejście porażki idzie do zestawu testowego, a bez
+       nich powtórka sprawy nie miałaby tego, co model przeczytał przed błędem. */
     Object.assign(blad, {
       zuzycie: { ...zuzycie }, rund: wyslanych, narzedzi: uzyte.length, wersjaInstrukcji: o.wersja,
+      wynikiNarzedzi: [...wyniki],
     });
     throw blad;
   }

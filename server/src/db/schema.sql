@@ -450,6 +450,54 @@ CREATE TABLE IF NOT EXISTS copilot_wywolanie (
 );
 CREATE INDEX IF NOT EXISTS ix_copilot_wywolanie_at ON copilot_wywolanie(at);
 
+-- ── Copilot: wejście szkicu i dopytania, 90 dni ────────────────────────────
+-- Dokładnie to, co poszło do dostawcy modelu, już zamaskowane, i surowa
+-- odpowiedź przed sitami. Po co: zestaw testowy do porównania instrukcji
+-- i modeli przed wydaniem (decyzja właściciela). Księga mówi, ile kosztowało
+-- i czy wyszło; bez wejścia nie da się puścić tej samej sprawy drugi raz.
+--
+-- Retencja 90 dni, kasuje `sprzatnijWejscia` co godzinę (`index.ts`).
+-- Wiersz znika też razem z rozmową, kaskadą. Kopia zanonimizowana ma tabelę
+-- pustą. Zakres i powód: `docs/obsluga-klienta.md`, sekcja o Copilocie.
+--
+-- Zapisujemy WYŁĄCZNIE wersje zamaskowane: wątek i pole agenta jako
+-- `TrescBezpieczna`, nigdy surowy tekst ani odmaskowaną poprawkę. Pytanie
+-- agenta idzie do dostawcy bez maskowania z zasady, więc tak tu stoi.
+CREATE TABLE IF NOT EXISTS copilot_wejscie (
+  id                INTEGER PRIMARY KEY AUTOINCREMENT,
+  -- Wiersz księgi tego samego wywołania. Księga żyje dłużej niż wejście,
+  -- więc to wejście wskazuje księgę, nie odwrotnie.
+  wywolanie_id      INTEGER UNIQUE REFERENCES copilot_wywolanie(id) ON DELETE SET NULL,
+  conversation_id   INTEGER REFERENCES conversation(id) ON DELETE CASCADE,
+  -- Wiadomość klienta, na którą odpowiadał szkic. Bez klucza obcego, bo
+  -- wejście jest zapisem chwili, a nie częścią rozmowy.
+  message_id        INTEGER,
+  zadanie           TEXT NOT NULL,
+  zrodlo            TEXT,
+  wersja_instrukcji TEXT,
+  model             TEXT,
+  at                TEXT NOT NULL,
+  -- Zamaskowany wątek i fakty ze spisem zdjęć, bit w bit jak w żądaniu.
+  watek             TEXT NOT NULL,
+  fakty             TEXT NOT NULL,
+  -- JSON: [{numer, zalacznikId, typ, bajtow}]. Bez bajtów i bez nazw plików.
+  zdjecia           TEXT NOT NULL DEFAULT '[]',
+  -- JSON: [{id, nazwa, argument, tresc}], wyniki narzędzi z numerami N#.
+  wyniki_narzedzi   TEXT NOT NULL DEFAULT '[]',
+  -- Tylko dopytanie: pytanie agenta, zamaskowane pole i historia wymian.
+  pytanie           TEXT,
+  szkic_wejscie     TEXT,
+  historia          TEXT,
+  -- Surowa odpowiedź modelu w JSON, przed sitami. NULL przy błędzie dostawcy.
+  -- `wynik_sit` to `ok` albo kod sita lub odrzuconej poprawki; NULL, gdy
+  -- sita nie miały czego sprawdzać. Ostatnia kolumna stoi bez komentarza
+  -- nad sobą, powód przy `copilot_pytanie`.
+  wyjscie           TEXT,
+  wynik_sit         TEXT
+);
+CREATE INDEX IF NOT EXISTS ix_copilot_wejscie_at ON copilot_wejscie(at);
+CREATE INDEX IF NOT EXISTS ix_copilot_wejscie_rozmowa ON copilot_wejscie(conversation_id);
+
 -- ── Copilot: szkic odpowiedzi z faktów (§14.6, etap F, przyrost drugi) ────
 -- Propozycja modelu, NIE szkic agenta. Szkic agenta mieszka w
 -- `conversation_draft` i pilnuje go `conversation.version`; gdyby model pisał

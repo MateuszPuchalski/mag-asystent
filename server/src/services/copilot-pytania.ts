@@ -8,6 +8,7 @@ import {
 } from "./copilot-maskowanie.js";
 import type { Tokeny } from "./copilot-koszt.js";
 import { kodBledu, sladPorazki, zapiszWKsiedze } from "./copilot-ksiega.js";
+import { zapiszWejscie, type WpisWejscia } from "./copilot-wejscie.js";
 import {
   dopiszLinkiOfert, kontekstSzkicu, loginRozmowcy, ocenTwierdzenia, sitaSzkicu, szkicCopilota,
   type Fakt, type FaktyBezpieczne, type KodSita, type SzkicSurowy, type Twierdzenie,
@@ -275,13 +276,23 @@ export async function zadajPytanie(
     throw new Error("Maskowanie nie oczyściło rozmowy — nic nie wyszło do dostawcy");
   }
 
+  const historia = dotad.slice(-HISTORII_W_KONTEKSCIE)
+    .map((w) => ({ pytanie: w.pytanie, odpowiedz: w.odpowiedz, zdjecAgenta: w.zdjecia.length }));
+  /* Wejście dopytania: to samo, co dostaje nadawca, z ZAMASKOWANYM polem.
+     Tekst pola sprzed maskowania i odmaskowana poprawka tu nie wchodzą. */
+  const wejscie = (wywolanieId: number, we: Pick<WpisWejscia,
+    "model" | "wersjaInstrukcji" | "wynikiNarzedzi" | "wyjscie" | "wynikSit">) => zapiszWejscie(db(), {
+    wywolanieId, conversationId, messageId: kontekst.ostatniaWiadomoscId, zadanie: "pytanie",
+    zrodlo: "dopytanie", at: teraz, watek: kontekst.watek, fakty, zdjecia: wszystkie,
+    pytanie: tresc, szkicWejscie: maska ? maska.tresc : null, historia, ...we,
+  });
+
   let odp: OdpowiedzNaPytanie;
   try {
     odp = await nadaj({
       watek: kontekst.watek, fakty, zdjecia: wszystkie,
       szkic: maska ? maska.tresc : null,
-      historia: dotad.slice(-HISTORII_W_KONTEKSCIE)
-        .map((w) => ({ pytanie: w.pytanie, odpowiedz: w.odpowiedz, zdjecAgenta: w.zdjecia.length })),
+      historia,
       pytanie: tresc,
       /* Narzędzia czytają tę samą bazę co fakty, ale na żądanie modelu.
          Tylko odczyt i tylko nasz towar — granica stoi w `copilot-narzedzia`. */
@@ -289,11 +300,17 @@ export async function zadajPytanie(
     });
   } catch (e) {
     const p = sladPorazki(e);
-    zapiszWywolanie(conversationId, null, "blad",
-      (e as { slad?: string }).slad || (e as Error).message, kto, teraz, {
-        zuzycie: p.zuzycie, kodBledu: kodBledu(e), rund: p.rund, narzedzi: p.narzedzi,
-        wersjaInstrukcji: p.wersjaInstrukcji,
+    transaction(db(), () => {
+      const id = zapiszWywolanie(conversationId, null, "blad",
+        (e as { slad?: string }).slad || (e as Error).message, kto, teraz, {
+          zuzycie: p.zuzycie, kodBledu: kodBledu(e), rund: p.rund, narzedzi: p.narzedzi,
+          wersjaInstrukcji: p.wersjaInstrukcji,
+        });
+      wejscie(id, {
+        model: p.zuzycie && (p.zuzycie.wej || p.zuzycie.wyj) ? config.copilot.model : null,
+        wersjaInstrukcji: p.wersjaInstrukcji, wynikiNarzedzi: p.wynikiNarzedzi, wynikSit: null,
       });
+    })();
     throw e;
   }
 
@@ -331,10 +348,21 @@ export async function zadajPytanie(
   /* Kod przy udanym wywołaniu to powód odrzuconej poprawki: wymiana się
      udała, ale wersja odpadła na sicie, a pomiar ma to widzieć. Twierdzenia
      z wersji, gdy weszła, bo to ona idzie do klienta; inaczej z notki. */
-  zapiszWywolanie(conversationId, odp, "ok", null, kto, teraz, {
-    kodBledu: poprawka.powod,
-    twierdzenia: poprawka.rodzaj === "wersja" ? poprawka.twierdzenia : twierdzenia,
-  });
+  /* Wejście dostaje odpowiedź modelu PRZED odmaskowaniem i sitami: wersja
+     szkicu stoi w niej ze znacznikami, tak jak model ją napisał. */
+  transaction(db(), () => {
+    const wywolanie = zapiszWywolanie(conversationId, odp, "ok", null, kto, teraz, {
+      kodBledu: poprawka.powod,
+      twierdzenia: poprawka.rodzaj === "wersja" ? poprawka.twierdzenia : twierdzenia,
+    });
+    wejscie(wywolanie, {
+      model: odp.model, wersjaInstrukcji: odp.wersjaInstrukcji ?? null,
+      /* Bez wersji sita nie miały czego sprawdzać: NULL, nie `ok`. */
+      wynikiNarzedzi: odp.wynikiNarzedzi ?? [],
+      wynikSit: poprawka.rodzaj === "brak" ? null : poprawka.powod ?? "ok",
+      wyjscie: { odpowiedz: odp.tresc, twierdzenia: odp.twierdzenia, szkic: odp.szkic ?? null },
+    });
+  })();
 
   /* Ładunek niesie DŁUGOŚCI, nigdy treści (§19): pytanie agenta bywa
      o konkretnym kliencie, a `events` nie ma retencji. */
@@ -440,12 +468,12 @@ function zapiszWywolanie(
     zuzycie?: Tokeny; kodBledu?: string | null; rund?: number; narzedzi?: number;
     wersjaInstrukcji?: string; twierdzenia?: Twierdzenie[];
   } = {},
-): void {
+): number {
   const t = odp?.zuzycie ?? dodatkowo.zuzycie;
   /* Model pusty przy błędzie bez rund, jak dotąd — pomiar go pomija. Z rundami
      wpisujemy model z konfiguracji, bo inaczej pomiar zgubiłby ich koszt. */
   const model = odp?.model ?? (t && (t.wej || t.wyj) ? config.copilot.model : "");
-  zapiszWKsiedze(db(), {
+  return zapiszWKsiedze(db(), {
     zadanie: "pytanie", conversationId, model, zuzycie: t, ms: odp?.ms ?? 0, wynik, blad,
     przezUserId: kto.id, at: teraz, zrodlo: "dopytanie", kodBledu: dodatkowo.kodBledu,
     rund: odp ? odp.rund ?? 1 : dodatkowo.rund,

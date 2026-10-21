@@ -83,8 +83,12 @@ export const R = Object.freeze({
   SEKRET: "sekret",
 });
 
-/** Tabele opróżniane w całości: tokeny Allegro i sesje nie mają prawa wyjść. */
-export const TABELE_DO_OPROZNIENIA = ["allegro_token", "device_session"];
+/**
+ * Tabele opróżniane w całości: tokeny Allegro i sesje nie mają prawa wyjść.
+ * Wejście Copilota też: to całe wątki klientów w jednym miejscu, a rozsypany
+ * wątek nie nadaje się już do porównania modeli, więc nie ma po co go nieść.
+ */
+export const TABELE_DO_OPROZNIENIA = ["allegro_token", "device_session", "copilot_wejscie"];
 
 /** Kolumny opróżnianych tabel, które trafiają na listę do skanu. Nie wszystkie: znaczniki czasu byłyby wszędzie. */
 const SEKRETNE_KOLUMNY = { allegro_token: ["access_token", "refresh_token"], device_session: ["token"] };
