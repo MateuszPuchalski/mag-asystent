@@ -83,14 +83,20 @@ test("zapis oddaje id wiersza i liczy twierdzenia, a braki zostawia jako NULL", 
 });
 
 test("ślad porażki czyta tylko to, co adapter dopiął, i nie zmyśla reszty", () => {
+  const wyniki = [{ id: "N1", nazwa: "karta_towaru", argument: "GAZ-1", tresc: "Kartoteka GAZ-1" }];
   const e = Object.assign(new Error("x"), {
     zuzycie: { wej: 1, wyj: 1, cacheZapis: 0, cacheOdczyt: 0 }, rund: 3, narzedzi: 2, wersjaInstrukcji: "s1",
+    wynikiNarzedzi: wyniki,
   });
   assert.deepEqual(sladPorazki(e), {
     zuzycie: { wej: 1, wyj: 1, cacheZapis: 0, cacheOdczyt: 0 }, rund: 3, narzedzi: 2, wersjaInstrukcji: "s1",
+    wynikiNarzedzi: wyniki,
   });
   assert.deepEqual(sladPorazki(new Error("goły")), {
     zuzycie: undefined, rund: undefined, narzedzi: undefined, wersjaInstrukcji: undefined,
+    wynikiNarzedzi: undefined,
   });
+  /* Coś, co nie jest listą, nie udaje wyników narzędzi. */
+  assert.equal(sladPorazki(Object.assign(new Error("y"), { wynikiNarzedzi: "N1" })).wynikiNarzedzi, undefined);
   assert.deepEqual(sladPorazki(null).rund, undefined);
 });

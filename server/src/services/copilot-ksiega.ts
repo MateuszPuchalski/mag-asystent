@@ -4,6 +4,7 @@ import {
   BladOdpowiedziCopilota, BladPrzeciazeniaCopilota,
 } from "../adapters/copilot.js";
 import type { Tokeny } from "./copilot-koszt.js";
+import type { WynikWywolania } from "./copilot-narzedzia.js";
 
 /* ── Księga Copilota: jeden pisarz ───────────────────────────────────────────
    Każde wywołanie modelu zostawia wiersz w `copilot_wywolanie`, także nieudane,
@@ -100,6 +101,7 @@ export function kodBledu(e: unknown): string {
  */
 export function sladPorazki(e: unknown): {
   zuzycie?: Tokeny; rund?: number; narzedzi?: number; wersjaInstrukcji?: string;
+  wynikiNarzedzi?: WynikWywolania[];
 } {
   const z = (e ?? {}) as Record<string, unknown>;
   return {
@@ -107,5 +109,6 @@ export function sladPorazki(e: unknown): {
     rund: typeof z.rund === "number" ? z.rund : undefined,
     narzedzi: typeof z.narzedzi === "number" ? z.narzedzi : undefined,
     wersjaInstrukcji: typeof z.wersjaInstrukcji === "string" ? z.wersjaInstrukcji : undefined,
+    wynikiNarzedzi: Array.isArray(z.wynikiNarzedzi) ? z.wynikiNarzedzi as WynikWywolania[] : undefined,
   };
 }

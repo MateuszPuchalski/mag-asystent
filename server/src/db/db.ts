@@ -264,6 +264,31 @@ export function migrate(database: DatabaseSync) {
     ["twierdzen_obnizonych", "INTEGER"], ["twierdzen_spoza_faktow", "INTEGER"],
     ["kategoria", "TEXT"],
   ] as const) addColumn("copilot_wywolanie", kol, typ);
+  /* Wejście szkicu i dopytania — patrz `copilot_wejscie` w `schema.sql`.
+     Tabela nowa, więc ta linia jest dla istniejących instalacji. Stare
+     wywołania nie mają wierszy i to jest o nich prawda: nikt wtedy wejścia
+     nie zapisywał. */
+  database.exec(`CREATE TABLE IF NOT EXISTS copilot_wejscie (
+    id                INTEGER PRIMARY KEY AUTOINCREMENT,
+    wywolanie_id      INTEGER UNIQUE REFERENCES copilot_wywolanie(id) ON DELETE SET NULL,
+    conversation_id   INTEGER REFERENCES conversation(id) ON DELETE CASCADE,
+    message_id        INTEGER,
+    zadanie           TEXT NOT NULL,
+    zrodlo            TEXT,
+    wersja_instrukcji TEXT,
+    model             TEXT,
+    at                TEXT NOT NULL,
+    watek             TEXT NOT NULL,
+    fakty             TEXT NOT NULL,
+    zdjecia           TEXT NOT NULL DEFAULT '[]',
+    wyniki_narzedzi   TEXT NOT NULL DEFAULT '[]',
+    pytanie           TEXT,
+    szkic_wejscie     TEXT,
+    historia          TEXT,
+    wyjscie           TEXT,
+    wynik_sit         TEXT)`);
+  database.exec("CREATE INDEX IF NOT EXISTS ix_copilot_wejscie_at ON copilot_wejscie(at)");
+  database.exec("CREATE INDEX IF NOT EXISTS ix_copilot_wejscie_rozmowa ON copilot_wejscie(conversation_id)");
   /* Treść oferty dla Copilota (0.253.0) — patrz `offer_snapshot`. Wiersze
      sprzed tego wydania mają NULL w `tresc_synced_at`, czyli „nie pytaliśmy
      jeszcze"; dociągną się leniwie, przy pierwszym szkicu pod tą ofertą. */
