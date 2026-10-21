@@ -51,7 +51,7 @@ export interface PropsSzkicuCopilota {
     wymiany: WymianaCopilota[];
     blad: string | null;
     pracuje: boolean;
-    onPytaj: (pytanie: string) => void;
+    onPytaj: (pytanie: string, pliki: File[]) => void;
     limitZnakow: number;
     /** Tekst pola odpowiedzi. Po nim karta poznaje wersję szkicu, która w nim stoi. */
     pole: string;

@@ -19,10 +19,16 @@ import { typPodgladu } from "./typ-podgladu.js";
    zaradziła. Marka `ZdjecieZBramki` nie mówi więc „bezpieczne" — mówi
    dokładnie trzy rzeczy, i tylko je:
 
-     1. bajty przyszły z załącznika TEJ sprawy, nie z dowolnego adresu,
+     1. bajty przyszły z załącznika TEJ sprawy albo z ręki agenta w TYM
+        pytaniu, nie z dowolnego adresu (pole `zrodlo` mówi, z której drogi),
      2. są obrazem w typie, który dostawca przyjmuje — rozstrzygnięte po
         SYGNATURZE, nie po rozszerzeniu w nazwie,
      3. mieszczą się w suficie bajtów.
+
+   Obie drogi przechodzą przez JEDNO sprawdzenie bajtów (`ocenBajty`). Różnią
+   się tylko reakcją. Droga załączników pomija i liczy, bo potknięcie nie ma
+   wywracać szkicu. Droga agenta odmawia zdaniem, bo agent wybrał plik sam
+   i ma wiedzieć, czemu nie poszedł.
 
    Cena jest jawna i zapisana w polityce danych (`docs/obsluga-klienta.md`).
    Marka obiecująca więcej byłaby kłamstwem wbudowanym w typ, a takich w tym
@@ -83,17 +89,41 @@ export const SUFIT_SZTUK_ROZMOWY = 4;
  */
 export const SUFIT_SZTUK_DOPYTANIA = 8;
 
-export interface ZdjecieZBramki {
+interface ZdjecieZBramkiWspolne {
   readonly numer: string;
   readonly typ: TypModelu;
   readonly base64: string;
-  readonly zalacznikId: number;
   readonly nazwa: string;
   readonly bajtow: number;
 }
 
+/** Zdjęcie z załącznika sprawy albo rozmowy. */
+export interface ZdjecieZalacznika extends ZdjecieZBramkiWspolne {
+  readonly zrodlo: "zalacznik";
+  readonly zalacznikId: number;
+}
+
+/**
+ * Zdjęcie, które agent dołączył do dopytania.
+ *
+ * `miniatura` NIE idzie do modelu. To JPEG zrobiony przez panel, który zostaje
+ * przy wymianie na stałe, gdy bajty oryginału giną po tym jednym żądaniu
+ * (decyzja właściciela).
+ */
+export interface ZdjecieAgenta extends ZdjecieZBramkiWspolne {
+  readonly zrodlo: "agent";
+  readonly miniatura: Buffer | null;
+}
+
+/**
+ * Jedna marka na obie drogi, bo adapter modelu ma widzieć jeden rodzaj
+ * obrazu. Pole `zrodlo` rozróżnia je tam, gdzie to ma znaczenie: karta
+ * reklamacji zapisuje `zalacznikId`, dopytanie zapisuje miniaturę.
+ */
+export type ZdjecieZBramki = ZdjecieZalacznika | ZdjecieAgenta;
+
 export interface WynikZdjec {
-  zdjecia: ZdjecieZBramki[];
+  zdjecia: ZdjecieZalacznika[];
   /** Załączniki, które nie są obrazem w przyjmowanym typie — z nazwami. */
   nieObrazy: string[];
   /** Ile obrazów nie zmieściło się w suficie bajtów. */
@@ -186,6 +216,25 @@ export function kandydaciRozmowy(database: DatabaseSync, conversationId: number)
 }
 
 /**
+ * Wspólne sprawdzenie bajtów obu dróg: typ po SYGNATURZE i sufit na sztukę.
+ *
+ * Jedno miejsce, bo dwie kopie tej samej bramki rozjeżdżają się przy
+ * pierwszej zmianie listy typów. Wołający decyduje, co zrobić z odmową.
+ */
+export type OcenaBajtow =
+  | { ok: true; typ: TypModelu }
+  | { ok: false; powod: "nie_obraz" | "za_duze" };
+
+export function ocenBajty(bajty: Buffer): OcenaBajtow {
+  const typ = typPodgladu(rozpoznajMime(bajty));
+  if (!typ || !(TYPY_MODELU as readonly string[]).includes(typ)) return { ok: false, powod: "nie_obraz" };
+  /* Droga załączników ma ten sam próg już w pobieraczu (`maksBajtow`), ale
+     pobieracz da się podmienić. Bramka nie polega na tym, kto ją woła. */
+  if (bajty.byteLength > SUFIT_ZDJEC.naSztuke) return { ok: false, powod: "za_duze" };
+  return { ok: true, typ: typ as TypModelu };
+}
+
+/**
  * Pobierz i przepuść przez bramkę.
  *
  * ŻADNE POTKNIĘCIE NIE WYWRACA ROZPOZNANIA. Plik spoza typu jest pomijany
@@ -197,12 +246,12 @@ export function kandydaciRozmowy(database: DatabaseSync, conversationId: number)
  * ekranie znaczyło to samo co `Z1` w karcie.
  */
 async function przezBramke(
-  lista: Kandydat[], pobierz: Pobieracz, sufitSztuk: number | null,
+  lista: Kandydat[], pobierz: Pobieracz, sufitSztuk: number | null, sufitBajtow: number,
 ): Promise<WynikZdjec> {
   const wynik: WynikZdjec = { zdjecia: [], nieObrazy: [], pominieto: 0, ponadLimit: 0, bledow: 0 };
   let bajtow = 0;
 
-  const zebrane: Array<Omit<ZdjecieZBramki, "numer">> = [];
+  const zebrane: Array<Omit<ZdjecieZalacznika, "numer">> = [];
   for (const k of lista) {
     /* Sufit SZTUK sprawdzamy PRZED pobraniem, inaczej byłby sufitem na to,
        co model zobaczy, a nie na to, za co płacimy transferem. Sufit BAJTÓW
@@ -230,18 +279,21 @@ async function przezBramke(
     /* `Buffer`, nie `Uint8Array`: `rozpoznajMime` czyta sygnaturę z bufora,
        a i tak potrzebujemy go do base64. Jedna kopia zamiast dwóch. */
     const bajty = Buffer.from(dane);
-    const typ = typPodgladu(rozpoznajMime(bajty));
-    if (!typ || !(TYPY_MODELU as readonly string[]).includes(typ)) {
-      wynik.nieObrazy.push(k.nazwa);
+    const ocena = ocenBajty(bajty);
+    if (!ocena.ok) {
+      /* Za duży plik to brak miejsca, tak samo jak odmowa pobieracza wyżej. */
+      if (ocena.powod === "za_duze") wynik.pominieto += 1;
+      else wynik.nieObrazy.push(k.nazwa);
       continue;
     }
-    if (bajtow + bajty.byteLength > SUFIT_ZDJEC.lacznie) {
+    if (bajtow + bajty.byteLength > sufitBajtow) {
       wynik.pominieto += 1;
       continue;
     }
     bajtow += bajty.byteLength;
     zebrane.push({
-      typ: typ as TypModelu,
+      zrodlo: "zalacznik",
+      typ: ocena.typ,
       base64: bajty.toString("base64"),
       zalacznikId: k.id,
       nazwa: k.nazwa,
@@ -267,7 +319,7 @@ async function przezBramke(
 export async function przygotujZdjecia(
   database: DatabaseSync, reklamacjaId: number, pobierz: Pobieracz = pobierzZalacznik,
 ): Promise<WynikZdjec> {
-  return przezBramke(kandydaci(database, reklamacjaId), pobierz, null);
+  return przezBramke(kandydaci(database, reklamacjaId), pobierz, null, SUFIT_ZDJEC.lacznie);
 }
 
 /**
@@ -296,12 +348,131 @@ export const pobierzZdjecieRozmowy: Pobieracz = async (url, opcje) =>
  *
  * Tak samo jak tam: potknięcie nie wywraca szkicu. Szkic bez zdjęć jest tym,
  * czym był do tego wydania, a szkicu nie ma dopiero wtedy, gdy padnie model.
+ *
+ * `sufitBajtow` pomniejsza dopytanie o bajty zdjęć agenta. Jego zdjęcia mają
+ * pierwszeństwo (decyzja właściciela), bo agent dołączył je do TEGO pytania,
+ * a zdjęcia rozmowy wypełniają resztę wspólnego sufitu żądania.
  */
 export async function przygotujZdjeciaRozmowy(
   database: DatabaseSync, conversationId: number, pobierz: Pobieracz = pobierzZdjecieRozmowy,
-  sufitSztuk: number = SUFIT_SZTUK_ROZMOWY,
+  sufitSztuk: number = SUFIT_SZTUK_ROZMOWY, sufitBajtow: number = SUFIT_ZDJEC.lacznie,
 ): Promise<WynikZdjec> {
-  return przezBramke(kandydaciRozmowy(database, conversationId), pobierz, sufitSztuk);
+  return przezBramke(kandydaciRozmowy(database, conversationId), pobierz, sufitSztuk, sufitBajtow);
+}
+
+/* ── Zdjęcia od agenta (dopytanie) ───────────────────────────────────────────
+   Agent dołącza do pytania obraz, którego w rozmowie nie ma: kartkę z
+   wymiarami, ekran z katalogu, część na biurku. Bajty idą do modelu w tym
+   jednym żądaniu i nie zostają u nas. Zostaje miniatura z panelu, żeby
+   historia wymiany pokazywała, na co model patrzył. */
+
+/** Ile zdjęć agent dołącza do jednego pytania (decyzja właściciela). */
+export const SUFIT_ZDJEC_AGENTA = 3;
+
+/**
+ * Ile może ważyć miniatura. Panel robi ją sam, więc większa znaczy błąd
+ * panelu, nie wybór agenta, a każda zostaje w bazie na stałe.
+ */
+export const SUFIT_MINIATURY = 100_000;
+
+/** Zdjęcie agenta po bramce, jeszcze bez numeru: numer zależy od zdjęć rozmowy. */
+export type ZdjecieAgentaBezNumeru = Omit<ZdjecieAgenta, "numer">;
+
+/**
+ * Base64 sprawdzony, nie zgadywany. `Buffer.from` przyjmuje śmieci bez słowa
+ * i oddaje z nich jakieś bajty, a wtedy odmowa mówiłaby o złym typie pliku,
+ * gdy winny jest transport.
+ */
+function zBase64(s: unknown): Buffer | null {
+  if (typeof s !== "string") return null;
+  const czysty = s.replace(/\s+/g, "");
+  if (!czysty || czysty.length % 4 !== 0 || !/^[A-Za-z0-9+/]+={0,2}$/.test(czysty)) return null;
+  return Buffer.from(czysty, "base64");
+}
+
+/**
+ * Nazwa pliku do spisu. Bez znaków sterujących, bo spis to linie, a nowa
+ * linia w nazwie udawałaby w nim osobny wpis.
+ */
+function nazwaZReki(n: unknown, i: number): string {
+  const czysta = String(n ?? "").replace(/[\u0000-\u001f\u007f]+/g, " ").trim().slice(0, 120);
+  return czysta || `zdjecie-${i + 1}`;
+}
+
+/* W górę do dziesiątej części: plik o bajt ponad sufit nie może przeczytać
+   się jako „waży 7,0 MB, a mieści się 7,0 MB”. */
+const megabajty = (b: number) => `${(Math.ceil(b / 100_000) / 10).toFixed(1).replace(".", ",")} MB`;
+
+/**
+ * Zdjęcia z ręki agenta przez tę samą bramkę co załączniki.
+ *
+ * ODMAWIA ZDANIEM zamiast pomijać. Agent wybrał plik sam i czeka na
+ * odpowiedź o nim, więc cicho pominięte zdjęcie dałoby odpowiedź o czymś
+ * innym, niż pytał. Woła się PRZED siecią: odmowa nic nie kosztuje.
+ *
+ * `lista` przychodzi prosto z ciała żądania, więc kształt też sprawdzamy tu.
+ * Brak listy i pusta lista znaczą „bez zdjęć".
+ */
+export function przyjmijZdjeciaAgenta(lista: unknown): ZdjecieAgentaBezNumeru[] {
+  if (lista == null) return [];
+  if (!Array.isArray(lista)) {
+    throw new Error("Zdjęcia dotarły w złym kształcie. Odśwież stronę i dołącz je jeszcze raz.");
+  }
+  if (lista.length > SUFIT_ZDJEC_AGENTA) {
+    throw new Error(`Do jednego pytania dołączysz najwyżej ${SUFIT_ZDJEC_AGENTA} zdjęcia, `
+      + `a wybrano ${lista.length}. Odłącz nadmiarowe i wyślij jeszcze raz.`);
+  }
+  const wynik: ZdjecieAgentaBezNumeru[] = [];
+  let lacznie = 0;
+  lista.forEach((z: unknown, i) => {
+    const w = (z ?? {}) as { nazwa?: unknown; dane?: unknown; miniatura?: unknown };
+    const nazwa = nazwaZReki(w.nazwa, i);
+    const bajty = zBase64(w.dane);
+    if (!bajty || bajty.byteLength === 0) {
+      throw new Error(`Zdjęcie „${nazwa}” dotarło puste albo uszkodzone. Dołącz je jeszcze raz.`);
+    }
+    const ocena = ocenBajty(bajty);
+    if (!ocena.ok && ocena.powod === "nie_obraz") {
+      throw new Error(`Plik „${nazwa}” nie jest zdjęciem JPEG, PNG, WEBP ani GIF, więc nie poszedł `
+        + "do Copilota. Typ rozpoznajemy po zawartości pliku, nie po nazwie.");
+    }
+    if (!ocena.ok) {
+      throw new Error(`Zdjęcie „${nazwa}” waży ${megabajty(bajty.byteLength)}, a Copilot przyjmuje `
+        + `najwyżej ${megabajty(SUFIT_ZDJEC.naSztuke)} na zdjęcie. Zmniejsz je i dołącz jeszcze raz.`);
+    }
+    lacznie += bajty.byteLength;
+    /* Pusty napis to brak miniatury: panel, któremu się nie udało, nie ma
+       przez to tracić pytania. Podana miniatura musi być JPEG-iem, bo tak
+       ją panel odczyta z powrotem. */
+    let miniatura: Buffer | null = null;
+    if (w.miniatura != null && w.miniatura !== "") {
+      const m = zBase64(w.miniatura);
+      if (!m || rozpoznajMime(m) !== "image/jpeg" || m.byteLength > SUFIT_MINIATURY) {
+        throw new Error(`Miniatura zdjęcia „${nazwa}” nie jest plikiem JPEG do ${SUFIT_MINIATURY / 1000} kB. `
+          + "To błąd panelu, nie zdjęcia: odśwież stronę i dołącz je jeszcze raz.");
+      }
+      miniatura = m;
+    }
+    wynik.push({
+      zrodlo: "agent", typ: ocena.typ, base64: bajty.toString("base64"),
+      nazwa, bajtow: bajty.byteLength, miniatura,
+    });
+  });
+  if (lacznie > SUFIT_ZDJEC.lacznie) {
+    throw new Error(`Zdjęcia ważą razem ${megabajty(lacznie)}, a do jednego pytania mieści się `
+      + `${megabajty(SUFIT_ZDJEC.lacznie)}. Odłącz jedno albo je zmniejsz.`);
+  }
+  return wynik;
+}
+
+/**
+ * Numery zdjęć agenta idą PO zdjęciach rozmowy: Z9 po Z1–Z8. Tak stoją też
+ * obrazy w żądaniu, więc numer w spisie wskazuje obraz na tym samym miejscu.
+ */
+export function ponumerujZdjeciaAgenta(
+  przyjete: readonly ZdjecieAgentaBezNumeru[], zdjecRozmowy: number,
+): ZdjecieAgenta[] {
+  return przyjete.map((z, i) => ({ ...z, numer: `Z${zdjecRozmowy + i + 1}` }));
 }
 
 /**
@@ -312,10 +483,14 @@ export async function przygotujZdjeciaRozmowy(
  * jest równie potrzebny: to on pozwala modelowi napisać w `brakuje`
  * „czytelne zdjęcie zamiast dokumentu".
  */
-export function spisZdjec(w: WynikZdjec): string {
-  if (!w.zdjecia.length && !w.nieObrazy.length && !w.pominieto && !w.ponadLimit && !w.bledow) return "";
+export function spisZdjec(w: WynikZdjec, odAgenta: readonly ZdjecieAgenta[] = []): string {
+  if (!w.zdjecia.length && !odAgenta.length && !w.nieObrazy.length && !w.pominieto
+    && !w.ponadLimit && !w.bledow) return "";
   const linie = ["ZDJĘCIA (obrazy stoją PRZED tym tekstem, w tej kolejności):"];
   for (const z of w.zdjecia) linie.push(`[${z.numer}] plik: ${z.nazwa}`);
+  /* Zdjęcie agenta nie jest od klienta i model ma to wiedzieć. Kartka
+     z biurka cytowana jako „klient przysłał” byłaby w szkicu nieprawdą. */
+  for (const z of odAgenta) linie.push(`[${z.numer}] od agenta, dołączone do tego pytania, plik: ${z.nazwa}`);
   if (w.nieObrazy.length) {
     linie.push(`Nie pokazano, bo nie są obrazem: ${w.nieObrazy.join(", ")}`);
   }

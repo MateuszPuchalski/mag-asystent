@@ -401,4 +401,32 @@ describe("EKRAN SKRZYNKI: dopytanie poprawia szkic", () => {
     await u.click(screen.getByRole("button", { name: "Cofnij" }));
     expect(p).toHaveValue(`${SKLEJONY} Jeszcze.`);
   });
+
+  it("zdjęcie agenta jedzie w pytaniu: nazwa i bajty base64, a bez płótna miniatura jest pusta", async () => {
+    /* jsdom nie ma `URL.createObjectURL` ani `createImageBitmap`. Pierwsze
+       podstawiamy dla podglądu, drugiego brak to właśnie przypadek „przeglądarka
+       nie zrobiła miniatury”, który ma nie zatrzymać pytania. */
+    URL.createObjectURL = vi.fn(() => "blob:kartka");
+    URL.revokeObjectURL = vi.fn();
+    const u = userEvent.setup();
+    dane[1] = szczegoly(1, { szkicCopilota: SZKIC(1) });
+    pokaz("/obsluga/skrzynka/1");
+    await pole();
+    await u.click(screen.getByRole("button", { name: /Dopytaj Copilota/ }));
+    await u.upload(screen.getByLabelText("Wybierz zdjęcia do pytania"),
+      new File([new Uint8Array([255, 216, 255, 224])], "kartka.jpg", { type: "image/jpeg" }));
+    expect(screen.getByRole("img", { name: "kartka.jpg" })).toBeInTheDocument();
+    await u.type(screen.getByRole("textbox", { name: /pytanie do Copilota/ }), "przepisz wymiary");
+    await u.click(screen.getByRole("button", { name: "Zapytaj" }));
+
+    const wyslane = await waitFor(() => {
+      const z = zadania.find((x) => x.url === "/api/obsluga/copilot/pytanie");
+      expect(z).toBeTruthy();
+      return z!;
+    });
+    expect(JSON.parse(wyslane.body!)).toEqual({
+      rozmowaId: 1, pytanie: "przepisz wymiary", szkic: "Dzień dobry, odpowiedź 1.",
+      zdjecia: [{ nazwa: "kartka.jpg", dane: "/9j/4A==", miniatura: null }],
+    });
+  });
 });

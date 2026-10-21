@@ -1,11 +1,13 @@
 import React from "react";
-import { MessageCircleQuestion } from "lucide-react";
+import { MessageCircleQuestion, Paperclip, X } from "lucide-react";
 import { Przycisk, czas, godzina, ile } from "../ui";
 import { ProcesCopilota } from "./ProcesCopilota";
 import { RoznicaSzkicu } from "./RoznicaSzkicu";
 import { Zwijka } from "./Zwijka";
+import { obrazZeSchowka } from "./ZalacznikiWysylki";
 import { lukaReczna, wersjaWPolu, wersjeSzkicu, type WersjaSzkicu } from "./wersjeSzkicu";
-import type { SzkicCopilota, UzycieNarzedziaCopilota, WymianaCopilota } from "../api/typy";
+import { ZDJECIA_PYTANIA } from "../api/copilot";
+import type { SzkicCopilota, UzycieNarzedziaCopilota, WymianaCopilota, ZdjecieWymiany } from "../api/typy";
 
 /* Nazwy narzędzi po ludzku. Serwer mówi `karta_towaru`, agent czyta
    „karta towaru”; nieznana nazwa (nowsze narzędzie, starszy panel) zostaje
@@ -31,6 +33,63 @@ function Sprawdzono({ narzedzia }: { narzedzia: UzycieNarzedziaCopilota[] }) {
   return <p className="mt-1 text-xs text-slate-600">
     Sprawdził w bazie: {narzedzia.map((n) => `${NAZWY[n.nazwa] ?? n.nazwa} „${n.argument}”`).join(", ")}
   </p>;
+}
+
+/**
+ * Zdjęcia, które agent dołączył do pytania, pod jego treścią.
+ *
+ * Numer stoi przy każdym, bo model mówi o zdjęciu po numerze („na Z9 widać”),
+ * a agent ma wiedzieć, o którym. Bez miniatury zostaje sam numer z nazwą:
+ * zdjęcie poszło do modelu, tylko przeglądarka nie zrobiła podglądu.
+ */
+function ZdjeciaWymiany({ zdjecia }: { zdjecia: ZdjecieWymiany[] }) {
+  if (!zdjecia.length) return null;
+  return <ul className="mt-1 flex flex-wrap items-end gap-2" aria-label="Zdjęcia dołączone do pytania">
+    {zdjecia.map((z) => <li key={z.numer}>
+      {z.miniatura
+        ? <img src={`data:image/jpeg;base64,${z.miniatura}`} title={`${z.numer} · ${z.nazwa}`}
+            alt={`Zdjęcie ${z.numer} dołączone do pytania: ${z.nazwa}`}
+            className="h-16 max-w-28 rounded border border-slate-200 object-cover" />
+        : <span className="text-xs text-slate-700">{z.numer} · {z.nazwa}</span>}
+    </li>)}
+  </ul>;
+}
+
+/** Granica jednego zdjęcia w megabajtach, do zdań dla agenta. */
+const MB = ZDJECIA_PYTANIA.bajtow / 1_000_000;
+
+/**
+ * Rozmiar w megabajtach dziesiętnych, zaokrąglony W GÓRĘ do dziesiątej.
+ * Zaokrąglony zwykle plik o bajt za duży czytałby się „7,0 MB, granica 7 MB”.
+ */
+const megabajty = (bajtow: number) =>
+  `${(Math.ceil(bajtow / 100_000) / 10).toFixed(1).replace(".", ",")} MB`;
+
+/** Plik czekający na wysłanie razem z adresem podglądu. */
+type ZdjecieWToku = { id: number; plik: File; podglad: string };
+
+/**
+ * Zdanie, czemu plik nie wszedł, albo `null`, gdy wchodzi.
+ *
+ * Odmowa pada PRZY DOŁĄCZANIU, a nie przy wysyłce: wtedy agent ma jeszcze
+ * pod ręką inny plik, a polecenie nie odpada razem ze złym zdjęciem.
+ */
+function odmowaZdjecia(plik: File, juzJest: number, juzBajtow: number): string | null {
+  if (!ZDJECIA_PYTANIA.typy.includes(plik.type)) {
+    return `Plik „${plik.name}” nie wszedł: Copilot czyta zdjęcia JPEG, PNG, WEBP i GIF.`;
+  }
+  if (plik.size > ZDJECIA_PYTANIA.bajtow) {
+    return `Zdjęcie „${plik.name}” nie weszło: ma ${megabajty(plik.size)}, a granica to ${MB} MB.`;
+  }
+  if (juzJest >= ZDJECIA_PYTANIA.najwiecej) {
+    return `Zdjęcie „${plik.name}” nie weszło: do jednego pytania dołączysz najwyżej ${
+      ZDJECIA_PYTANIA.najwiecej} zdjęcia.`;
+  }
+  if (juzBajtow + plik.size > ZDJECIA_PYTANIA.lacznie) {
+    return `Zdjęcie „${plik.name}” nie weszło: razem byłoby ${megabajty(juzBajtow + plik.size)}, `
+      + `a granica na pytanie to ${ZDJECIA_PYTANIA.lacznie / 1_000_000} MB.`;
+  }
+  return null;
 }
 
 /**
@@ -110,12 +169,51 @@ export function Dopytanie(p: {
   /** `null` gdy nic nie leci; łańcuch = zdanie o tym, co poszło nie tak. */
   blad: string | null;
   pracuje: boolean;
-  onPytaj: (pytanie: string) => void;
+  /** Pliki idą surowe; base64 i miniaturę robi ekran, bo ten katalog jest czysty. */
+  onPytaj: (pytanie: string, pliki: File[]) => void;
   limitZnakow: number;
 }) {
   const [tekst, setTekst] = React.useState("");
   const zaDlugie = tekst.length > p.limitZnakow;
+  /* Samo zdjęcie nie wystarcza: serwer wymaga pytania, a model bez polecenia
+     nie wie, czy ma przepisać wymiary do szkicu, czy tylko je sprawdzić. */
   const gotowe = tekst.trim().length > 0 && !zaDlugie && !p.pracuje && !p.wylaczony;
+
+  /* ── ZDJĘCIA DO PYTANIA ─────────────────────────────────────────────────
+     Kartka z wymiarami z innego kanału albo zdjęcie części z magazynu.
+     Podgląd idzie przez adres `blob:`, który trzyma plik w pamięci karty,
+     dopóki ktoś go nie zwolni. Zwalniamy przy usunięciu, przy wysłaniu
+     i przy zniknięciu bloku, bo karta skrzynki żyje przez całą zmianę. */
+  const [zdjecia, setZdjecia] = React.useState<ZdjecieWToku[]>([]);
+  const [odmowa, setOdmowa] = React.useState<string | null>(null);
+  const kolejny = React.useRef(0);
+  const zdjeciaTeraz = React.useRef(zdjecia);
+  zdjeciaTeraz.current = zdjecia;
+  React.useEffect(() => () => {
+    for (const z of zdjeciaTeraz.current) URL.revokeObjectURL(z.podglad);
+  }, []);
+  const wejscie = React.useRef<HTMLInputElement>(null);
+  const pelne = zdjecia.length >= ZDJECIA_PYTANIA.najwiecej;
+  const zablokowane = p.wylaczony || p.pracuje;
+
+  const dolacz = (pliki: File[]) => {
+    const nowe: ZdjecieWToku[] = [];
+    const odmowy: string[] = [];
+    for (const plik of pliki) {
+      const powod = odmowaZdjecia(plik, zdjecia.length + nowe.length,
+        [...zdjecia, ...nowe].reduce((s, z) => s + z.plik.size, 0));
+      if (powod) { odmowy.push(powod); continue; }
+      nowe.push({ id: ++kolejny.current, plik, podglad: URL.createObjectURL(plik) });
+    }
+    setOdmowa(odmowy.length ? odmowy.join(" ") : null);
+    if (nowe.length) setZdjecia([...zdjecia, ...nowe]);
+  };
+  const usun = (id: number) => {
+    const z = zdjecia.find((x) => x.id === id);
+    if (z) URL.revokeObjectURL(z.podglad);
+    setZdjecia(zdjecia.filter((x) => x.id !== id));
+    setOdmowa(null);
+  };
 
   const wersje = wersjeSzkicu(p.szkic, p.wymiany);
   const wPolu = wersjaWPolu(wersje, p.pole);
@@ -145,6 +243,7 @@ export function Dopytanie(p: {
         const luka = lukaReczna(wersje, w);
         return <li key={w.id} className="p-2">
           <p className="text-xs font-semibold text-slate-700">{w.przez}: {w.pytanie}</p>
+          <ZdjeciaWymiany zdjecia={w.zdjecia ?? []} />
           {/* Ręczne zmiany agenta przed poleceniem. Różnica wersji niżej
               pokazuje tylko zmiany modelu, więc te stałyby się niewidoczne. */}
           {luka && <details className="mt-1">
@@ -175,8 +274,53 @@ export function Dopytanie(p: {
         value={tekst}
         disabled={p.wylaczony}
         onChange={(e) => setTekst(e.target.value)}
+        /* Zrzut ekranu wkleja się szybciej, niż zapisuje do pliku. Tekst
+           wygrywa z obrazem tak samo jak w polu odpowiedzi (`obrazZeSchowka`). */
+        onPaste={(e) => {
+          const plik = obrazZeSchowka(e.clipboardData);
+          if (!plik) return;
+          e.preventDefault();
+          /* W trakcie „Pytam…” obraz nie wchodzi, ale agent ma o tym wiedzieć:
+             cicho przechwycone wklejenie wygląda jak zepsuty schowek. */
+          if (zablokowane) setOdmowa("Zdjęcie nie weszło: poczekaj na odpowiedź Copilota i wklej je ponownie.");
+          else dolacz([plik]);
+        }}
       />
+      {zdjecia.length > 0 && <ul className="mt-1 flex flex-wrap gap-2" aria-label="Zdjęcia do pytania">
+        {zdjecia.map((z) => <li key={z.id}
+          className="flex items-center gap-1.5 rounded border border-slate-200 p-1 text-xs text-slate-700">
+          <img src={z.podglad} alt={z.plik.name} className="h-10 w-10 rounded object-cover" />
+          <span className="max-w-40 truncate">{z.plik.name}</span>
+          <button type="button" disabled={zablokowane} onClick={() => usun(z.id)}
+            aria-label={`Usuń zdjęcie ${z.plik.name}`} title="Usuń"
+            className="grid min-h-6 min-w-6 place-items-center rounded text-slate-600 hover:bg-slate-100 hover:text-slate-800 disabled:opacity-40">
+            <X size={13} />
+          </button>
+        </li>)}
+      </ul>}
       <div className="mt-1 flex items-center gap-2">
+        {/* `multiple`, bo kartka bywa w dwóch zdjęciach, a drugi raz przez
+            okno wyboru to drugie szukanie tego samego katalogu. */}
+        <input ref={wejscie} type="file" accept={ZDJECIA_PYTANIA.typy.join(",")} multiple
+          className="hidden" aria-label="Wybierz zdjęcia do pytania"
+          onChange={(e) => {
+            const pliki = Array.from(e.target.files ?? []);
+            /* Bez czyszczenia ten sam plik wybrany drugi raz nie wywoła `change`. */
+            e.target.value = "";
+            dolacz(pliki);
+          }} />
+        {/* Pełna lista gasi spinacz zamiast przyjąć czwarte zdjęcie i odmówić:
+            błąd, któremu da się zapobiec, nie potrzebuje zdania (dekalog p. 6). */}
+        <button type="button" disabled={zablokowane || pelne}
+          aria-label="Dołącz zdjęcie do pytania"
+          title={pelne
+            ? `Najwyżej ${ZDJECIA_PYTANIA.najwiecej} zdjęcia na pytanie`
+            : `Dołącz zdjęcie albo wklej je w pole — JPEG, PNG, WEBP lub GIF, najwyżej ${MB} MB`}
+          className="grid h-7 w-7 shrink-0 place-items-center rounded border border-slate-200 text-slate-600 hover:border-slate-300 hover:text-slate-800 disabled:opacity-40"
+          onClick={() => wejscie.current?.click()}>
+          <Paperclip size={14} />
+        </button>
+        {odmowa && <span role="alert" className="text-xs text-red-700">{odmowa}</span>}
         {/* Licznik pokazuje się dopiero BLISKO limitu. Stale widoczny uczy
             pisać krótko zamiast pisać jasno, a limit jest tu hamulcem na
             wklejony szkic, nie zachętą do skrótów. */}
@@ -189,7 +333,13 @@ export function Dopytanie(p: {
           className="ml-auto text-xs"
           wariant="glowny"
           disabled={!gotowe}
-          onClick={() => { p.onPytaj(tekst.trim()); setTekst(""); }}
+          /* Zdjęcia schodzą z listy razem z tekstem, tak jak dotąd pole.
+             Zostawione wisiałyby pod następnym pytaniem i poszłyby z nim drugi raz. */
+          onClick={() => {
+            p.onPytaj(tekst.trim(), zdjecia.map((z) => z.plik));
+            for (const z of zdjecia) URL.revokeObjectURL(z.podglad);
+            setTekst(""); setZdjecia([]); setOdmowa(null);
+          }}
         >
           {p.pracuje ? "Pytam…" : "Zapytaj"}
         </Przycisk>

@@ -648,7 +648,15 @@ const OdpowiedzPytania = z.object({
 
    Zakaz półpauzy dotyczy tekstu dla klienta i stoi w instrukcji szkicu.
    Zdania tej instrukcji też go nie mają, bo model czyta rejestr instrukcji
-   jako wzorzec (patrz uwaga przy `INSTRUKCJA_SZKICU`).                     */
+   jako wzorzec (patrz uwaga przy `INSTRUKCJA_SZKICU`).
+
+   Akapit o ZDJĘCIACH OD AGENTA: agent dołącza do pytania własne obrazy,
+   numerowane po zdjęciach rozmowy. Instrukcja szkicu (wchodzi bajt w bajt)
+   zna tylko zdjęcia od klienta, więc bez tego akapitu model pisałby
+   klientowi „na przesłanym zdjęciu widać”, gdy zdjęcie zrobił agent.
+   Zdanie o poprzednich dopytaniach stoi, bo historia niesie sam tekst,
+   a w nim stare numery: Z9 sprzed trzech pytań nie jest obrazem w tym
+   żądaniu, a sita odrzucą wersję, która się na niego powoła.            */
 const INSTRUKCJA_PYTANIA = [
   "Odpowiadasz AGENTOWI biura obsługi, nie klientowi. Agent pracuje nad szkicem",
   "odpowiedzi dla klienta i albo o coś pyta, albo prosi o zmianę tego szkicu.",
@@ -658,9 +666,15 @@ const INSTRUKCJA_PYTANIA = [
   "zdanie bije akapit ogólników. Agent zna towar i skróty branżowe, więc nie",
   "tłumacz podstaw.",
   "",
-  "Dostajesz FAKTY z naszej bazy, ROZMOWĘ Z KLIENTEM, czasem ZDJĘCIA od klienta,",
-  "SZKIC W POLU AGENTA (tekst, który agent ma teraz w polu odpowiedzi, razem",
-  "z jego własnymi zmianami), poprzednie dopytania i PYTANIE AGENTA.",
+  "Dostajesz FAKTY z naszej bazy, ROZMOWĘ Z KLIENTEM, czasem ZDJĘCIA od klienta",
+  "albo od agenta, SZKIC W POLU AGENTA (tekst, który agent ma teraz w polu",
+  "odpowiedzi, razem z jego własnymi zmianami), poprzednie dopytania i PYTANIE",
+  "AGENTA.",
+  "",
+  "ZDJĘCIA OD AGENTA. Spis zdjęć mówi przy numerze „od agenta”. Agent dołączył",
+  "je do tego pytania, klient ich nie przysłał. Cytujesz je numerem jak każde",
+  "zdjęcie, ale w szkicu nie pisz, że przysłał je klient. Zdjęcia z poprzednich",
+  "dopytań nie wracają: cytuj tylko numery, które stoją w spisie teraz.",
   "",
   "PYTANIE CZY POLECENIE. Sam rozpoznaj, czego agent chce.",
   "- Gdy agent prosi o zmianę szkicu (dodaj, zamień, usuń, skróć, przeredaguj),",
@@ -676,8 +690,9 @@ const INSTRUKCJA_PYTANIA = [
   "   pomiar, zdjęcie tabliczki, numer z części, pytanie do klienta.",
   "3. KAŻDE TWIERDZENIE TECHNICZNE Z `odpowiedz` WPISZ DO `twierdzenia` ze",
   "   źródłem, tak samo jak przy szkicu. `fakty` to nasza baza, `oferta` to opis",
-  "   naszej aukcji, `zdjecie` to fotografia od klienta, `model` to Twoja własna",
-  "   wiedza. Pewność przyznaje serwer, więc nie zawyżaj jej dla efektu.",
+  "   naszej aukcji, `zdjecie` to zdjęcie ze spisu (od klienta albo od agenta),",
+  "   `model` to Twoja własna wiedza. Pewność przyznaje serwer, więc nie zawyżaj",
+  "   jej dla efektu.",
   "4. W `odpowiedz` WOLNO CI NAZWAĆ NUMER, KTÓREGO NIE MA W FAKTACH. Agent pyta",
   "   właśnie o takie rzeczy. Podpisz go źródłem `model` i powiedz, że u nas",
   "   tego nie ma. W `szkic` obowiązuje reguła 2 szkicu.",
@@ -861,8 +876,15 @@ async function rozmowaZNarzedziami<T>(o: {
 /** Dopytanie z narzędziami — przez wspólną pętlę. */
 export const nadawcaPytaniaAnthropic: NadawcaPytania = async (k): Promise<OdpowiedzNaPytanie> => {
   const start = Date.now();
+  /* Historia niesie sam tekst, bez obrazów. Wymiana ze zdjęciami agenta mówi
+     o nich wprost, inaczej model wziąłby stary numer Z9 za obraz z tego
+     żądania (powód przy `INSTRUKCJA_PYTANIA`). */
   const historia = k.historia
-    .map((h, i) => `[D${i + 1}] AGENT: ${h.pytanie}\n[D${i + 1}] TY: ${h.odpowiedz}`)
+    .map((h, i) => {
+      const zdjecia = h.zdjecAgenta > 0
+        ? ` (dołączył zdjęcia: ${h.zdjecAgenta}, w tym pytaniu ich nie ma)` : "";
+      return `[D${i + 1}] AGENT${zdjecia}: ${h.pytanie}\n[D${i + 1}] TY: ${h.odpowiedz}`;
+    })
     .join("\n");
   /* Sekcja mówi, że TO jest tekst do poprawiania: model poprawia pole agenta
      z jego ręcznymi zmianami, a nie swój dawny szkic. */

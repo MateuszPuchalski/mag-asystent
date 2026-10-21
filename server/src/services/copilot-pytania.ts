@@ -1,5 +1,5 @@
 import type { DatabaseSync } from "node:sqlite";
-import { db } from "../db/db.js";
+import { db, transaction } from "../db/db.js";
 import { config } from "../config.js";
 import type { SubiektAdapter } from "../adapters/subiekt.js";
 import { logEvent } from "./events.js";
@@ -14,7 +14,8 @@ import {
 } from "./copilot-szkic.js";
 import { ofertyPoSygnaturze } from "./allegro-oferty-po-sygnaturze.js";
 import {
-  przygotujZdjeciaRozmowy, spisZdjec, SUFIT_SZTUK_DOPYTANIA, type Pobieracz, type ZdjecieZBramki,
+  ponumerujZdjeciaAgenta, przygotujZdjeciaRozmowy, przyjmijZdjeciaAgenta, spisZdjec,
+  SUFIT_SZTUK_DOPYTANIA, SUFIT_ZDJEC, type Pobieracz, type ZdjecieZBramki,
 } from "./copilot-zdjecia.js";
 import {
   zestawNarzedzi, type UzycieNarzedzia, type WynikWywolania, type ZestawNarzedzi,
@@ -92,6 +93,23 @@ export interface WymianaCopilota {
   szkicZastrzezenia: string[];
   /** Zdanie dla agenta, czemu sita odrzuciły poprawkę; `null` = nie odrzuciły. */
   szkicOdrzucony: string | null;
+  /** Zdjęcia, które agent dołączył do TEGO pytania. Pusta lista = bez zdjęć. */
+  zdjecia: ZdjecieWymiany[];
+}
+
+/**
+ * Ślad zdjęcia agenta przy wymianie. Bajtów oryginału nie ma, bo poszły
+ * do modelu tylko w tamtym żądaniu (decyzja właściciela). Zostaje miniatura,
+ * żeby agent widział, na co model patrzył, gdy cytował `numer`.
+ */
+export interface ZdjecieWymiany {
+  /** Numer nadany w TYM pytaniu, np. „Z9” po zdjęciach rozmowy Z1–Z8. */
+  numer: string;
+  nazwa: string;
+  typ: string;
+  bajtow: number;
+  /** JPEG z panelu w base64; `null`, gdy panel jej nie zrobił. */
+  miniatura: string | null;
 }
 
 export interface OdpowiedzNaPytanie {
@@ -118,8 +136,11 @@ export interface KontekstPytania {
   zdjecia: ZdjecieZBramki[];
   /** Tekst z pola agenta albo szkic Copilota, zamaskowany; `null` = nie ma czego poprawiać. */
   szkic: TrescBezpieczna | null;
-  /** Poprzednie wymiany, od najstarszej. */
-  historia: Array<{ pytanie: string; odpowiedz: string }>;
+  /**
+   * Poprzednie wymiany, od najstarszej. Bez obrazów: `zdjecAgenta` mówi tylko,
+   * ile agent wtedy dołączył, żeby model nie cytował starego Z9 jako obecnego.
+   */
+  historia: Array<{ pytanie: string; odpowiedz: string; zdjecAgenta: number }>;
   pytanie: string;
   /** Odczyt naszej bazy na żądanie modelu. `null` = bez narzędzi. */
   narzedzia: ZestawNarzedzi | null;
@@ -131,6 +152,21 @@ export type NadawcaPytania = (k: KontekstPytania) => Promise<OdpowiedzNaPytanie>
 export function wymianyRozmowy(
   conversationId: number, database: DatabaseSync = db(),
 ): WymianaCopilota[] {
+  /* Jedno zapytanie na całą rozmowę, nie jedno na wymianę: rozmowa ma do
+     `SUFIT_PYTAN` wymian, a ekran czyta je wszystkie naraz. */
+  const zdjecia = new Map<number, ZdjecieWymiany[]>();
+  for (const z of database.prepare(
+    `SELECT z.pytanie_id, z.numer, z.nazwa, z.typ, z.bajtow, z.miniatura
+       FROM copilot_pytanie_zdjecie z JOIN copilot_pytanie p ON p.id = z.pytanie_id
+      WHERE p.conversation_id=? ORDER BY z.id`)
+    .all(conversationId) as Array<Record<string, unknown>>) {
+    const lista = zdjecia.get(Number(z.pytanie_id)) ?? [];
+    lista.push({
+      numer: String(z.numer), nazwa: String(z.nazwa), typ: String(z.typ), bajtow: Number(z.bajtow),
+      miniatura: z.miniatura == null ? null : Buffer.from(z.miniatura as Uint8Array).toString("base64"),
+    });
+    zdjecia.set(Number(z.pytanie_id), lista);
+  }
   return (database.prepare(
     `SELECT id, pytanie, odpowiedz, twierdzenia, model, at, przez, narzedzia,
             szkic_przed, szkic_po, szkic_odrzucony, szkic_twierdzenia, szkic_zastrzezenia
@@ -150,6 +186,7 @@ export function wymianyRozmowy(
       szkicTwierdzenia: JSON.parse(String(w.szkic_twierdzenia ?? "[]")) as Twierdzenie[],
       szkicZastrzezenia: JSON.parse(String(w.szkic_zastrzezenia ?? "[]")) as string[],
       szkicOdrzucony: w.szkic_odrzucony == null ? null : String(w.szkic_odrzucony),
+      zdjecia: zdjecia.get(Number(w.id)) ?? [],
     }));
 }
 
@@ -167,11 +204,15 @@ export function wymianyRozmowy(
  * ZAPIS WYMIANY DOPIERO PO ODPOWIEDZI. Nieudane wywołanie nie zostawia
  * wiersza — zostawia ślad w księdze, tam gdzie liczy się koszt. Pytanie
  * wpisane w pole zostaje w panelu, więc agent nie traci tekstu.
+ *
+ * `o.zdjecia` to zdjęcia z ręki agenta, prosto z ciała żądania. Przechodzą
+ * bramkę `przyjmijZdjeciaAgenta` przed siecią, a zła lista kończy pytanie
+ * zdaniem, zanim cokolwiek wyjdzie do Allegro albo do dostawcy modelu.
  */
 export async function zadajPytanie(
   conversationId: number, pytanie: string, kto: { id: number | null; name: string },
   nadaj: NadawcaPytania, subiekt: SubiektAdapter,
-  o: { szkic?: string | null; teraz?: Date; pobierzZdjecie?: Pobieracz } = {},
+  o: { szkic?: string | null; teraz?: Date; pobierzZdjecie?: Pobieracz; zdjecia?: unknown } = {},
 ): Promise<WymianaCopilota> {
   const teraz = o.teraz ?? new Date();
   const tresc = String(pytanie ?? "").trim();
@@ -185,6 +226,8 @@ export async function zadajPytanie(
     throw new Error(`Tekst w polu ma ${zPola.length} znaków, a Copilot poprawia najwyżej ${SUFIT_POLA}. `
       + "Skróć go sam albo wyczyść pole, żeby Copilot pracował na swoim szkicu.");
   }
+  const przyjete = przyjmijZdjeciaAgenta(o.zdjecia);
+  const bajtowAgenta = przyjete.reduce((s, z) => s + z.bajtow, 0);
 
   const dotad = wymianyRozmowy(conversationId);
   if (dotad.length >= SUFIT_PYTAN) {
@@ -198,10 +241,17 @@ export async function zadajPytanie(
 
   /* Zdjęcia tą samą bramką co przy szkicu. Dopytanie „co dokładnie widać na
      tabliczce" bez zdjęcia byłoby pytaniem o nic. Sufit sztuk jest wyższy niż
-     przy szkicu, bo pytanie klika człowiek; powód przy stałej. */
+     przy szkicu, bo pytanie klika człowiek; powód przy stałej.
+     Zdjęcia agenta mają pierwszeństwo we wspólnym suficie bajtów (decyzja
+     właściciela): dołączył je do TEGO pytania, więc bez nich pytanie
+     traci sens. Zdjęcia rozmowy wypełniają resztę. */
   const zdjecia = await przygotujZdjeciaRozmowy(
-    db(), conversationId, o.pobierzZdjecie, SUFIT_SZTUK_DOPYTANIA);
-  const spis = spisZdjec(zdjecia);
+    db(), conversationId, o.pobierzZdjecie, SUFIT_SZTUK_DOPYTANIA, SUFIT_ZDJEC.lacznie - bajtowAgenta);
+  const odAgenta = ponumerujZdjeciaAgenta(przyjete, zdjecia.zdjecia.length);
+  /* Kolejność obrazów w żądaniu = kolejność w spisie: najpierw rozmowa,
+     potem agent. Numer w spisie wskazuje wtedy obraz na tym samym miejscu. */
+  const wszystkie: ZdjecieZBramki[] = [...zdjecia.zdjecia, ...odAgenta];
+  const spis = spisZdjec(zdjecia, odAgenta);
   const fakty = (spis ? `${kontekst.tekstFaktow}\n\n${spis}` : kontekst.tekstFaktow) as FaktyBezpieczne;
 
   /* PODSTAWA POPRAWKI: tekst z pola wygrywa ze szkicem Copilota, bo niesie
@@ -223,10 +273,10 @@ export async function zadajPytanie(
   let odp: OdpowiedzNaPytanie;
   try {
     odp = await nadaj({
-      watek: kontekst.watek, fakty, zdjecia: zdjecia.zdjecia,
+      watek: kontekst.watek, fakty, zdjecia: wszystkie,
       szkic: maska ? maska.tresc : null,
       historia: dotad.slice(-HISTORII_W_KONTEKSCIE)
-        .map((w) => ({ pytanie: w.pytanie, odpowiedz: w.odpowiedz })),
+        .map((w) => ({ pytanie: w.pytanie, odpowiedz: w.odpowiedz, zdjecAgenta: w.zdjecia.length })),
       pytanie: tresc,
       /* Narzędzia czytają tę samą bazę co fakty, ale na żądanie modelu.
          Tylko odczyt i tylko nasz towar — granica stoi w `copilot-narzedzia`. */
@@ -245,19 +295,29 @@ export async function zadajPytanie(
   const poprawka = poprawkaSzkicu(odp.szkic, maska, baza, {
     fakty: kontekst.fakty,
     material: `${fakty}\n${kontekst.watek}\n${baza ?? ""}\n${tresc}`,
-    wyslaneZdjecia: new Set(zdjecia.zdjecia.map((z) => z.numer)),
+    /* Numery agenta też: model wolno oprzeć wersję na jego kartce, bo
+       dostał ją w tym żądaniu, z numerem w spisie. */
+    wyslaneZdjecia: new Set(wszystkie.map((z) => z.numer)),
     wynikiN: odp.wynikiNarzedzi ?? [],
   });
 
   const twierdzenia = ocenTwierdzenia(odp.twierdzenia);
-  const id = Number(db().prepare(`INSERT INTO copilot_pytanie
-    (conversation_id,pytanie,odpowiedz,twierdzenia,model,at,przez,przez_user_id,narzedzia,
-     szkic_przed,szkic_po,szkic_odrzucony,szkic_twierdzenia,szkic_zastrzezenia)
-    VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)`)
-    .run(conversationId, tresc, odp.tresc, JSON.stringify(twierdzenia), odp.model,
-      teraz.toISOString(), kto.name, kto.id, JSON.stringify(odp.narzedzia ?? []),
-      poprawka.przed, poprawka.po, poprawka.odrzucona,
-      JSON.stringify(poprawka.twierdzenia), JSON.stringify(poprawka.zastrzezenia)).lastInsertRowid);
+  /* Wymiana i ślad jej zdjęć w jednej transakcji: wymiana bez zdjęć, które
+     model widział, cytowałaby Z9, którego nikt już nie zobaczy. */
+  const id = transaction(db(), () => {
+    const nowa = Number(db().prepare(`INSERT INTO copilot_pytanie
+      (conversation_id,pytanie,odpowiedz,twierdzenia,model,at,przez,przez_user_id,narzedzia,
+       szkic_przed,szkic_po,szkic_odrzucony,szkic_twierdzenia,szkic_zastrzezenia)
+      VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)`)
+      .run(conversationId, tresc, odp.tresc, JSON.stringify(twierdzenia), odp.model,
+        teraz.toISOString(), kto.name, kto.id, JSON.stringify(odp.narzedzia ?? []),
+        poprawka.przed, poprawka.po, poprawka.odrzucona,
+        JSON.stringify(poprawka.twierdzenia), JSON.stringify(poprawka.zastrzezenia)).lastInsertRowid);
+    const zdjecie = db().prepare(`INSERT INTO copilot_pytanie_zdjecie
+      (pytanie_id,numer,nazwa,typ,bajtow,miniatura) VALUES (?,?,?,?,?,?)`);
+    for (const z of odAgenta) zdjecie.run(nowa, z.numer, z.nazwa, z.typ, z.bajtow, z.miniatura);
+    return nowa;
+  })();
   /* Odrzucona poprawka to dalej udane wywołanie: model odpowiedział, a notka
      jest dla agenta użyteczna. Błąd w księdze znaczyłby, że nic nie wróciło. */
   zapiszWywolanie(conversationId, odp, "ok", null, kto, teraz);
@@ -269,6 +329,9 @@ export async function zadajPytanie(
     wymiana: dotad.length + 1, model: odp.model, tokeny: odp.zuzycie,
     /* Zdjęcia liczbami, jak przy szkicu — patrz blizna w `copilot-zdjecia`. */
     zdjec: zdjecia.zdjecia.length, zdjecBledow: zdjecia.bledow,
+    /* Zdjęcia agenta osobno, bo `zdjec` czyta sonda jako „czy zdjęcia
+       klienta docierają do modelu”. Bez nazw plików: nazwa bywa daną osobową. */
+    zdjecAgenta: odAgenta.length, zdjecAgentaBajtow: bajtowAgenta,
     /* Nazwy narzędzi, bez argumentów: argument bywa numerem z rozmowy. */
     narzedzia: (odp.narzedzia ?? []).map((n) => n.nazwa),
     /* Los poprawki kodem, bez tekstu: szkic niesie dane klienta. */

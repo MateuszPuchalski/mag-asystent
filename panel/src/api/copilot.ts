@@ -1,9 +1,10 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "./klient";
+import { miniaturaJpeg, naBase64 } from "./plik";
 import { klucze } from "./rozmowy";
 import type {
   Kategoria, OcenaSzkicu, PomiarCopilota, PropozycjaPrzeplywu, StanCopilota, SzkicCopilota,
-  WymianaCopilota, WynikPartii,
+  WymianaCopilota, WynikPartii, ZdjeciePytania,
 } from "./typy";
 
 /* ── Copilot: rozpoznanie, o co pyta klient (§14, etap F) ────────────────────
@@ -138,6 +139,39 @@ export function useOcenSzkic() {
  */
 export const LIMIT_PYTANIA = 600;
 
+/**
+ * Zdjęcia agenta przy jednym pytaniu: ile, jak duże i jakie.
+ *
+ * DRUGA KOPIA granic serwera, z tego samego powodu co `LIMIT_PYTANIA`.
+ * Ta mówi agentowi zdaniem, czemu plik nie wszedł, ZANIM poleci kilka
+ * megabajtów. Tamta sprawdza typ po sygnaturze pliku, bo typ podany przez
+ * przeglądarkę wynika z rozszerzenia. Rozjazd liczb kończy się odmową
+ * serwera z jego zdaniem, a nie zdjęciem zgubionym po cichu.
+ */
+export const ZDJECIA_PYTANIA = {
+  najwiecej: 3,
+  /* Megabajt dziesiętny, jak w `SUFIT_ZDJEC` serwera. Binarny przepuściłby
+     tu zdjęcie, którego serwer nie przyjmie. */
+  bajtow: 7_000_000,
+  /* Suma sprawdzana tu, bo „Zapytaj” czyści listę przed odpowiedzią serwera:
+     jego odmowa sumy kazałaby wybierać wszystkie pliki od nowa. */
+  lacznie: 20_000_000,
+  typy: ["image/jpeg", "image/png", "image/webp", "image/gif"] as readonly string[],
+};
+
+/**
+ * Pliki agenta w kształcie ciała pytania: oryginał base64 dla modelu
+ * i miniatura JPEG do historii. Miniatura bywa `null`, bo pytanie bez
+ * miniatury jest lepsze niż pytanie, które nie poszło.
+ */
+export async function zdjeciaPytania(pliki: File[]): Promise<ZdjeciePytania[]> {
+  return Promise.all(pliki.map(async (plik) => ({
+    nazwa: plik.name,
+    dane: await naBase64(plik),
+    miniatura: await miniaturaJpeg(plik),
+  })));
+}
+
 export function useWymianyCopilota(rozmowaId: number) {
   return useQuery({
     queryKey: kluczeCopilota.pytania(rozmowaId),
@@ -159,7 +193,9 @@ export function useWymianyCopilota(rozmowaId: number) {
 export function useZadajPytanie() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (v: { rozmowaId: number; pytanie: string; szkic: string }) =>
+    /* `zdjecia` tylko wtedy, gdy są. Pytanie bez nich ma to samo ciało co
+       dotąd, więc starszy serwer przyjmie je bez zmian. */
+    mutationFn: (v: { rozmowaId: number; pytanie: string; szkic: string; zdjecia?: ZdjeciePytania[] }) =>
       api<{ wymiana: WymianaCopilota }>("/api/obsluga/copilot/pytanie",
         { method: "POST", body: JSON.stringify(v) }),
     onSettled: (_d, _e, v) => {
