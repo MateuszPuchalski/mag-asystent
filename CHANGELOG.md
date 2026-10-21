@@ -10,6 +10,18 @@ z wersją monorepo" — i właśnie tak przestał być zgodny: `0.3.0` przetrwa�
 sześć zmergowanych zmian, w tym takie, które wymagały nowego uprawnienia SQL.
 Komentarz nie jest mechanizmem.
 
+## 0.606.0 — 21 października 2026
+
+**Zdjęcia z naszych ofert Allegro.** W zakładce „Zdjęcia” przycisk „Z ofert
+Allegro” szuka naszych ofert, których sygnatura to symbol towaru bez zdjęcia.
+Pokazuje, ile towarów ma ofertę ze zdjęciem, a ile nie ma oferty. Po podglądzie
+dodaje zdjęcia jako biały kwadrat, tą samą drogą co import z folderu.
+
+Przy kilku ofertach z tą samą sygnaturą serwer bierze ofertę ze zdjęciem,
+potem aktywną, potem najnowszą, i zapamiętuje wybór. Duże zdjęcie oddaje
+wyłącznie dla oferty z naszej listy ofert, nigdy dla oferty znanej tylko
+z wiadomości.
+
 ## 0.605.2 — 21 października 2026
 
 **Import zdjęć czyta symbol z opisu folderu.** Folder
