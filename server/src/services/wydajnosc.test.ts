@@ -20,7 +20,13 @@ before(async () => {
   U = await import("./users.js");
 });
 
+/* Jedna chwila na test, nie `Date.now()` przy każdym zdarzeniu. Dwie serie
+   z osobnym zegarem różniły się rozpiętością o milisekundy, a tempo po
+   zaokrągleniu rozjeżdżało się o 0,1 i porównanie dwóch osób padało losowo. */
+let teraz = Date.now();
+
 beforeEach(() => {
+  teraz = Date.now();
   db().prepare("DELETE FROM events").run();
   db().prepare("DELETE FROM app_user").run();
 });
@@ -29,14 +35,14 @@ beforeEach(() => {
 function ev(typ: string, userRef: number | null, minutTemu: number, name = "x") {
   db()
     .prepare("INSERT INTO events(type, user_id, user_ref, created_at) VALUES (?,?,?,?)")
-    .run(typ, name, userRef, new Date(Date.now() - minutTemu * 60_000).toISOString());
+    .run(typ, name, userRef, new Date(teraz - minutTemu * 60_000).toISOString());
 }
 
 /** Zdarzenie z payloadem — do reguł zależnych od `zrodlo`. */
 function evP(typ: string, userRef: number | null, minutTemu: number, payload: unknown, name = "x") {
   db()
     .prepare("INSERT INTO events(type, user_id, user_ref, payload, created_at) VALUES (?,?,?,?,?)")
-    .run(typ, name, userRef, JSON.stringify(payload), new Date(Date.now() - minutTemu * 60_000).toISOString());
+    .run(typ, name, userRef, JSON.stringify(payload), new Date(teraz - minutTemu * 60_000).toISOString());
 }
 
 /** `ile` odłożeń co minutę, kończąc `odMinut` temu — seria pracy ciągłej. */
