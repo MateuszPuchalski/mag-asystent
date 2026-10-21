@@ -300,6 +300,26 @@ agent kliknięciem i płaci za jedno pytanie. Szkic z taktu, szkic na kliknięci
 i szkic przed pracą zostają przy czterech. W obu ścieżkach spis zdjęć mówi
 modelowi, ile starszych zostało poza.
 
+**Zdjęcie agenta w dopytaniu też wychodzi do dostawcy, w całości.** Agent
+dołącza do trzech obrazów, każdy do 7 MB, spinaczem albo ze schowka. Bywa to
+kartka z wymiarami od klienta z innego kanału albo zdjęcie części z magazynu.
+Pikseli nie zamaskujemy, tak samo jak przy zdjęciach klienta. Dlatego zdjęcie
+wychodzi tylko na kliknięcie agenta, nigdy z taktu. Wchodzi tą samą bramką:
+typ po sygnaturze, sufit na sztukę i wspólny sufit bajtów żądania. Zdjęcia
+agenta mają w nim pierwszeństwo, bo agent wybrał je do tego pytania. Spis
+mówi modelowi, które zdjęcie jest od agenta, a numery biegną dalej po
+zdjęciach rozmowy. Nazwa pliku wychodzi w spisie bez maskowania, jak przy
+zdjęciach klienta.
+
+Oryginału nie przechowujemy. Idzie do modelu w jednym żądaniu, a następne
+dopytanie go nie powtarza. Zostaje miniatura JPEG, około 320 pikseli,
+w `copilot_pytanie_zdjecie`, razem z numerem, nazwą pliku, typem i rozmiarem.
+Właściciel zdecydował, że zostaje na stałe, jak reszta wymiany. Powód:
+historia dopytań ma pokazywać, na czym model odpowiadał. Miniatura bywa
+nieczytelna, ale może nieść dane osobowe ze zdjęcia. Znika z rozmową,
+kaskadą po `copilot_pytanie`. Dziennik dostaje liczbę zdjęć i sumę bajtów,
+bez nazw plików.
+
 Wraca `szkic_copilota.odczyt_zdjec`, bez którego odsiew numerów odrzucałby
 każdy numer odczytany ze zdjęcia. Twierdzenia ze zdjęcia mają źródło
 `zdjecie` z sufitem „prawdopodobne".

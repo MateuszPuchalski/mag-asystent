@@ -15,14 +15,14 @@ import { Blad, SIATKA_TRZECH_KOLUMN } from "../ui";
 import { Kolejka } from "../skrzynka/Kolejka";
 import {
   LIMIT_PYTANIA, useCopilot, useKlasyfikuj, usePoprawKlasyfikacje, useOcenSzkic, useUlozSzkic,
-  useWymianyCopilota, useZadajPytanie,
+  useWymianyCopilota, useZadajPytanie, zdjeciaPytania,
 } from "../api/copilot";
 import { Rozmowa } from "../skrzynka/Rozmowa";
 import { Kontekst } from "../skrzynka/Kontekst";
 import { ostatniaKupujacego, szkicNaStartRozmowy } from "../skrzynka/SzkicCopilota";
 import { wersjaWPolu, wersjeSzkicu } from "../skrzynka/wersjeSzkicu";
 import { AlarmSynchronizacji } from "../skrzynka/AlarmSynchronizacji";
-import type { SzczegolyKonfliktu, SzczegolyWysylki } from "../api/typy";
+import type { SzczegolyKonfliktu, SzczegolyWysylki, ZdjeciePytania } from "../api/typy";
 import { DialogKonfliktu } from "../skrzynka/DialogKonfliktu";
 import { OKNO_COFNIECIA_MS, Odlozone, nastepnaRozmowa, type Odlozona } from "../skrzynka/Odlozone";
 import { Cofniecie, type DoCofniecia } from "../skrzynka/Cofniecie";
@@ -751,11 +751,12 @@ export function Skrzynka() {
           onWstaw: (t: string) => {
             if (rozmowa.data) wstawWersje(t, rozmowa.data.rozmowa.id, "Wstawiono wersję Copilota");
           },
-          onPytaj: (pytanie: string) => {
+          onPytaj: (pytanie: string, pliki: File[]) => {
             if (!rozmowa.data) return;
             const id = rozmowa.data.rozmowa.id;
             const wyslany = szkicTeraz.current;
-            zadajPytanie.mutate({ rozmowaId: id, pytanie, szkic: wyslany }, {
+            const zadaj = (zdjecia?: ZdjeciePytania[]) =>
+            zadajPytanie.mutate({ rozmowaId: id, pytanie, szkic: wyslany, zdjecia }, {
               onError: (e) => { if (wybranaIdTeraz.current === id) setBladPytania((e as Error).message); },
               onSuccess: (r) => {
                 if (wybranaIdTeraz.current === id) setBladPytania(null);
@@ -765,6 +766,14 @@ export function Skrzynka() {
                 }
               },
             });
+            /* Zdjęcia czytamy TU, jak załączniki: katalog `skrzynka/` jest
+               czysty, a base64 to sprawa klienta HTTP. Bez zdjęć ciało jest
+               takie jak dotąd, bo `undefined` nie trafia do JSON-a. */
+            if (!pliki.length) { zadaj(); return; }
+            void zdjeciaPytania(pliki).then(zadaj,
+              (e) => {
+                if (wybranaIdTeraz.current === id) setBladPytania(`Nie udało się odczytać zdjęcia: ${(e as Error).message}`);
+              });
           },
         },
       }}

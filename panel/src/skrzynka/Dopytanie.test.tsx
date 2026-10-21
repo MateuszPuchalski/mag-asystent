@@ -1,4 +1,4 @@
-import { describe, expect, test, vi } from "vitest";
+import { beforeEach, describe, expect, test, vi } from "vitest";
 import { render, screen, fireEvent, within } from "@testing-library/react";
 import { Dopytanie } from "./Dopytanie";
 import type { SzkicCopilota, WymianaCopilota } from "../api/typy";
@@ -96,7 +96,7 @@ describe("dopytanie Copilota", () => {
     fireEvent.change(pole, { target: { value: "  Skąd to wiesz?  " } });
     fireEvent.click(screen.getByRole("button", { name: /zapytaj/i }));
 
-    expect(p.onPytaj).toHaveBeenCalledWith("Skąd to wiesz?");
+    expect(p.onPytaj).toHaveBeenCalledWith("Skąd to wiesz?", []);
     expect((pole as HTMLTextAreaElement).value).toBe("");
   });
 
@@ -237,5 +237,145 @@ describe("zwijanie dopytania", () => {
   test("liczebnik jest odmieniony — „3 wymian”, nie „3 wymiana”", () => {
     render(<Dopytanie {...props({ wymiany: [w(), w({ id: 2 }), w({ id: 3 })] })} />);
     expect(screen.getByText(/3 wymian/)).toBeVisible();
+  });
+});
+
+/* ── Zdjęcia agenta przy pytaniu ─────────────────────────────────────────────
+   Agent ma kartkę z wymiarami z innego kanału albo zdjęcie części z magazynu
+   i chce, żeby Copilot je przeczytał. Testy pilnują trzech rzeczy:
+
+   1. Zdjęcie wchodzi spinaczem i wklejeniem, z podglądem i z „Usuń”.
+   2. Plik, którego serwer nie przyjmie, nie wchodzi wcale, a agent dostaje
+      zdanie, dlaczego. Lepiej teraz niż po kilku megabajtach w sieci.
+   3. Historia pokazuje, co poszło do modelu, także bez miniatury.          */
+describe("zdjęcia w dopytaniu", () => {
+  let adresy = 0;
+  beforeEach(() => {
+    adresy = 0;
+    /* jsdom nie ma `URL.createObjectURL` — ten sam zastępnik co w `Ustawienia.test.tsx`. */
+    URL.createObjectURL = vi.fn(() => `blob:podglad-${++adresy}`);
+    URL.revokeObjectURL = vi.fn();
+  });
+
+  const zdjecie = (nazwa = "kartka.jpg", typ = "image/jpeg") =>
+    new File([new Uint8Array([255, 216, 255])], nazwa, { type: typ });
+  const wybierz = (...pliki: File[]) =>
+    fireEvent.change(screen.getByLabelText("Wybierz zdjęcia do pytania"), { target: { files: pliki } });
+  /** Schowek tak, jak widzi go zdarzenie `paste` — wzór z `WklejenieObrazu.test.tsx`. */
+  const schowek = ({ tekst = "", obraz = null as File | null } = {}) => ({
+    getData: (typ: string) => (typ === "text/plain" ? tekst : ""),
+    items: obraz ? [{ kind: "file", type: obraz.type, getAsFile: () => obraz }] : [],
+  });
+
+  test("zdjęcie ze spinacza ma podgląd z nazwą i przycisk „Usuń”, a usunięcie zwalnia podgląd", () => {
+    otworz(props());
+    expect(screen.getByRole("button", { name: "Dołącz zdjęcie do pytania" })).toBeEnabled();
+    wybierz(zdjecie());
+    const podglad = screen.getByRole("img", { name: "kartka.jpg" });
+    expect(podglad).toHaveAttribute("src", "blob:podglad-1");
+
+    fireEvent.click(screen.getByRole("button", { name: "Usuń zdjęcie kartka.jpg" }));
+    expect(screen.queryByRole("img", { name: "kartka.jpg" })).toBeNull();
+    expect(URL.revokeObjectURL).toHaveBeenCalledWith("blob:podglad-1");
+  });
+
+  test("czwarte zdjęcie nie wchodzi, mówi dlaczego, a pełna lista gasi spinacz", () => {
+    otworz(props());
+    wybierz(zdjecie("a.jpg"), zdjecie("b.png", "image/png"), zdjecie("c.webp", "image/webp"),
+      zdjecie("d.gif", "image/gif"));
+    expect(screen.getAllByRole("img")).toHaveLength(3);
+    expect(screen.queryByRole("img", { name: "d.gif" })).toBeNull();
+    expect(screen.getByText(/„d\.gif” nie weszło: do jednego pytania dołączysz najwyżej 3 zdjęcia/))
+      .toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Dołącz zdjęcie do pytania" })).toBeDisabled();
+  });
+
+  test("za duże zdjęcie i plik, który nie jest zdjęciem, nie wchodzą — każdy ze swoim zdaniem", () => {
+    otworz(props());
+    const duze = zdjecie("tabliczka.jpg");
+    Object.defineProperty(duze, "size", { value: 7_000_001 });
+    wybierz(duze, zdjecie("faktura.pdf", "application/pdf"));
+
+    expect(screen.queryByRole("img")).toBeNull();
+    expect(URL.createObjectURL).not.toHaveBeenCalled();
+    expect(screen.getByText(/„tabliczka\.jpg” nie weszło: ma 7,1 MB, a granica to 7 MB/)).toBeInTheDocument();
+    expect(screen.getByText(/„faktura\.pdf” nie wszedł: Copilot czyta zdjęcia JPEG, PNG, WEBP i GIF/))
+      .toBeInTheDocument();
+  });
+
+  test("zdjęcie, które przebiłoby sumę 20 MB na pytanie, nie wchodzi i mówi dlaczego", () => {
+    otworz(props());
+    const [a, b, c] = ["a.jpg", "b.jpg", "c.jpg"].map((n) => {
+      const z = zdjecie(n);
+      Object.defineProperty(z, "size", { value: 6_900_000 });
+      return z;
+    });
+    wybierz(a, b, c);
+
+    expect(screen.getAllByRole("img")).toHaveLength(2);
+    expect(screen.getByRole("alert")).toHaveTextContent(
+      /„c\.jpg” nie weszło: razem byłoby 20,7 MB, a granica na pytanie to 20 MB/);
+  });
+
+  test("obraz wklejony w trakcie „Pytam…” nie wchodzi, ale agent dostaje zdanie", () => {
+    otworz(props({ pracuje: true }));
+    fireEvent.paste(screen.getByLabelText(/pytanie do copilota/i),
+      { clipboardData: schowek({ obraz: zdjecie("image.png", "image/png") }) });
+    expect(screen.queryByRole("img")).toBeNull();
+    expect(screen.getByRole("alert")).toHaveTextContent(/poczekaj na odpowiedź Copilota/);
+  });
+
+  test("obraz wklejony w pole dołącza się, a tekst wkleja się jak dotąd", () => {
+    otworz(props());
+    const pole = screen.getByLabelText(/pytanie do copilota/i);
+    const zrzut = zdjecie("image.png", "image/png");
+    const obraz = fireEvent.paste(pole, { clipboardData: schowek({ obraz: zrzut }) });
+    expect(obraz).toBe(false);
+    expect(screen.getByRole("img", { name: "image.png" })).toBeInTheDocument();
+
+    /* Akapit z Worda niesie obok siebie swój obrazek — to wciąż tekst. */
+    const tekst = fireEvent.paste(pole, { clipboardData: schowek({ tekst: "wymiary 46 cm", obraz: zrzut }) });
+    expect(tekst).toBe(true);
+    expect(screen.getAllByRole("img")).toHaveLength(1);
+  });
+
+  test("„Zapytaj” oddaje pliki razem z pytaniem i czyści listę jak pole", () => {
+    const p = props();
+    otworz(p);
+    const plik = zdjecie();
+    wybierz(plik);
+    fireEvent.change(screen.getByLabelText(/pytanie do copilota/i), { target: { value: "przepisz wymiary" } });
+    fireEvent.click(screen.getByRole("button", { name: /zapytaj/i }));
+
+    expect(p.onPytaj).toHaveBeenCalledWith("przepisz wymiary", [plik]);
+    expect(screen.queryByRole("img")).toBeNull();
+    expect(URL.revokeObjectURL).toHaveBeenCalledWith("blob:podglad-1");
+  });
+
+  test("samo zdjęcie bez pytania nie wystarcza", () => {
+    otworz(props());
+    wybierz(zdjecie());
+    expect(screen.getByRole("button", { name: /zapytaj/i })).toBeDisabled();
+  });
+
+  test("cudza rozmowa gasi spinacz", () => {
+    otworz(props({ wylaczony: true }));
+    expect(screen.getByRole("button", { name: "Dołącz zdjęcie do pytania" })).toBeDisabled();
+  });
+
+  test("historia pokazuje miniaturę z numerem i nazwą, a bez miniatury sam numer z nazwą", () => {
+    render(<Dopytanie {...props({ wymiany: [w({ zdjecia: [
+      { numer: "Z9", nazwa: "kartka.jpg", typ: "image/jpeg", bajtow: 120_000, miniatura: "QUJD" },
+      { numer: "Z10", nazwa: "czesc.png", typ: "image/png", bajtow: 80_000, miniatura: null },
+    ] })] })} />);
+    expect(screen.getByRole("img", { name: "Zdjęcie Z9 dołączone do pytania: kartka.jpg" }))
+      .toHaveAttribute("src", "data:image/jpeg;base64,QUJD");
+    expect(screen.getByText("Z10 · czesc.png")).toBeInTheDocument();
+    expect(screen.getAllByRole("img")).toHaveLength(1);
+  });
+
+  test("wymiana ze starszego serwera, bez pola zdjęć, nie rysuje listy", () => {
+    render(<Dopytanie {...props({ wymiany: [w()] })} />);
+    expect(screen.queryByRole("list", { name: "Zdjęcia dołączone do pytania" })).toBeNull();
   });
 });
