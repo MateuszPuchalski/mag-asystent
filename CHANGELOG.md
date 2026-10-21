@@ -10,6 +10,15 @@ z wersją monorepo" — i właśnie tak przestał być zgodny: `0.3.0` przetrwa�
 sześć zmergowanych zmian, w tym takie, które wymagały nowego uprawnienia SQL.
 Komentarz nie jest mechanizmem.
 
+## 0.605.0 — 21 października 2026
+
+Każdy szkic i każde dopytanie zostawia na 90 dni kopię tego, co poszło do
+dostawcy modelu: zamaskowany wątek, fakty, listę zdjęć bez samych plików,
+wyniki narzędzi i surową odpowiedź modelu. Z tych kopii powstaje zestaw
+testowy, na którym sprawdzimy zmianę instrukcji albo modelu przed wydaniem.
+Starsze kopie kasuje automat co godzinę. Zakres i powód stoją w polityce
+danych skrzynki (`docs/obsluga-klienta.md`).
+
 ## 0.604.3 — 21 października 2026
 
 Koszt Copilota na ekranie pomiaru i w raporcie tygodnia liczy się poprawnie
