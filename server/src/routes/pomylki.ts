@@ -9,7 +9,7 @@ import {
 } from "../services/pomylki.js";
 import { sellasistWlaczony } from "../adapters/sellasist.http.js";
 import { config } from "../config.js";
-import { zlapanePomylki } from "../services/sellasist-sync.js";
+import { BladPracownika, przypiszPracownikaSellasist, zlapanePomylki } from "../services/sellasist-sync.js";
 import { ROLE_BIUROWE } from "../services/users.js";
 
 /* ── Pomyłki wysyłkowe: trasy zakładki ───────────────────────────────────────
@@ -64,14 +64,32 @@ export async function pomylkiRoutes(app: FastifyInstance) {
     }
   });
 
-  /* Pomyłki złapane przy pakowaniu, z Sellasist. Liczba na dobę bez osób,
-     więc widzi ją całe biuro, nie tylko admin. Czysty odczyt lustra.
-     Zatrzymane lustro wyłącza blok, bo nie czyta dziennika. */
+  /* Pomyłki złapane przy pakowaniu, z Sellasist. Liczbę na dobę widzi całe
+     biuro, a kto zbierał — wyłącznie admin, ta sama reguła co rachunek win.
+     Czysty odczyt lustra. Zatrzymane lustro wyłącza blok. */
   app.get("/api/pomylki/zlapane", async (_req, reply) => {
     const nie = odmowa(reply); if (nie) return nie;
     const s = config.sellasist;
-    return zlapanePomylki(db(), sellasistWlaczony() && s.syncMs > 0 && s.statusyPomylka.length > 0);
+    const z = zlapanePomylki(db(), sellasistWlaczony() && s.syncMs > 0 && s.statusyPomylka.length > 0);
+    return sesjaZadania()!.user.role === "admin" ? z : { ...z, osoby: [], bezOsoby: null };
   });
+
+  /* Numer pracownika Sellasist jako osoba z naszych kont. Tylko admin, bo
+     tylko admin widzi zestawienie, które to przypisanie opisuje. */
+  app.post<{ Body: { sellasistId?: unknown; userId?: unknown } }>("/api/pomylki/zlapane/pracownik",
+    async (req, reply) => {
+      const nie = odmowa(reply); if (nie) return nie;
+      if (sesjaZadania()!.user.role !== "admin") {
+        return reply.code(403).send({ error: "Pracowników Sellasist przypisuje admin" });
+      }
+      try {
+        przypiszPracownikaSellasist(req.body?.sellasistId, req.body?.userId ?? null, autor(), db());
+        return { zapisano: true };
+      } catch (e) {
+        if (e instanceof BladPracownika) return reply.code(400).send({ error: e.message });
+        throw e;
+      }
+    });
 
   app.get("/api/pomylki/licznik", async (_req, reply) => {
     const nie = odmowa(reply);

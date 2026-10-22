@@ -652,11 +652,16 @@ Tabela `pomylka_wysylki` trzyma jeden wiersz na zamówienie.
   pracy), tak jak zestawienie spraw w polityce sprawy klienta.
 - **Dziennik nie dostaje loginu ani opisu.** Zdarzenia pomyłek niosą jej
   numer. Pomyłki nie wychodzą do Copilota, CSV, migawki ani raportu tygodnia.
-- **Pomyłki złapane przy pakowaniu** (z Sellasist) to sam numer wpisu,
-  zamówienie i chwila, bez pracownika. Zakładka pokazuje całemu biuru liczbę
-  na dobę, tak jak Strefa złota. Doba z jedną osobą na zbieraniu bywa liczbą
-  tej osoby, bo biuro zna grafik. Właściciel zostawił mimo to dobę całemu
-  biuru, decyzją z 19 października 2026.
+- **Pomyłki złapane przy pakowaniu** (z Sellasist) to numer wpisu,
+  zamówienie i chwila. Zakładka pokazuje całemu biuru liczbę na dobę, tak jak
+  Strefa złota. Doba z jedną osobą na zbieraniu bywa liczbą tej osoby, bo
+  biuro zna grafik. Właściciel zostawił mimo to dobę całemu biuru, decyzją
+  z 19 października 2026.
+- **Kto zbierał złapaną pomyłkę widzi wyłącznie admin**, decyzją właściciela
+  z 22 października 2026. Serwer bierze z dziennika Sellasist numer
+  pracownika, który przestawił zamówienie w status zebranego. API Sellasist
+  nie podaje imion, więc admin przypisuje numer do osoby z naszych kont. Ta
+  sama reguła co zestawienie win w rejestrze: reszta biura dostaje samą liczbę.
 - **Retencji nie ma**, jak w sprawie klienta. O archiwizacji decyduje właściciel.
   Kopia anonimizowana (`tools/anonimizuj-baze.mjs`) zamienia login i imiona.
 

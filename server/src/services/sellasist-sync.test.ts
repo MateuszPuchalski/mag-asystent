@@ -37,7 +37,8 @@ before(async () => {
 beforeEach(() => {
   const d = db();
   for (const t of ["sellasist_pozycja", "sellasist_przesylka", "sellasist_zamowienie", "sellasist_do_pobrania",
-    "sellasist_sync_state", "sellasist_pomylka_zlapana", "pomylka_wysylki", "zbiorka", "sgt_towar", "events"]) d.exec(`DELETE FROM ${t}`);
+    "sellasist_sync_state", "sellasist_pomylka_zlapana",
+    "sellasist_pracownik", "pomylka_wysylki", "zbiorka", "sgt_towar", "events"]) d.exec(`DELETE FROM ${t}`);
   d.prepare("INSERT INTO sgt_towar(tw_id, symbol, nazwa, ean) VALUES (?,?,?,?)").run(11, "NOZ-01", "Nóż", "5901");
 });
 
@@ -327,7 +328,7 @@ test("bez ustawionego statusu pomyłki nic się nie liczy", async () => {
   assert.equal(db().prepare("SELECT COUNT(*) AS n FROM sellasist_pomylka_zlapana").get()!.n, 0);
 });
 
-const PUSTO = { dni: [], razem: null, doKlienta: null };
+const PUSTO = { dni: [], razem: null, doKlienta: null, osoby: [], bezOsoby: null };
 const stan = (pomylkiOd: string | null, ostatni: string | null) =>
   db().prepare("INSERT INTO sellasist_sync_state(id, pomylki_od_at, last_success_at) VALUES (1, ?, ?)")
     .run(pomylkiOd, ostatni);
@@ -382,4 +383,93 @@ test("do klienta: pomyłki z rejestru zgłoszone w tych samych dobach", () => {
     VALUES (?, 'Kupiec', 'recznie', 'x', 'x')`);
   for (const d of ["2026-10-10", "2026-10-11", "2026-10-13", "2026-10-14"]) p.run(d);
   assert.equal(S.zlapanePomylki(db(), true, TERAZ).doKlienta, 2, "doba startu i jutro poza oknem");
+});
+
+/* ── Kto zbierał pomyłkę złapaną przy pakowaniu ─────────────────────────── */
+
+const ZMIANY_800 = [
+  { id: 5, order_id: 800, operation_tag: "order_status_change", object_id: 2, user_id: 7, date: "2026-10-13 08:00:00" },
+  { id: 9, order_id: 800, operation_tag: "order_status_change", object_id: 13, user_id: 7, date: "2026-10-13 08:40:00" },
+  { id: 20, order_id: 800, operation_tag: "order_status_change", object_id: 30, user_id: 4, date: "2026-10-13 09:00:00" },
+  /* Ponowna kompletacja: drugie zebranie robi kto inny, a druga pomyłka jest jego. */
+  { id: 21, order_id: 800, operation_tag: "order_status_change", object_id: 13, user_id: 8, date: "2026-10-13 09:05:00" },
+  { id: 22, order_id: 800, operation_tag: "order_status_change", object_id: 30, user_id: 4, date: "2026-10-13 09:20:00" },
+];
+
+test("zbierający: autor ostatniego wejścia w status zebranego przed pomyłką, z dziennika tego zamówienia", async () => {
+  const a = atrapa({
+    "/orders_logs": (sciezka: string) => (sciezka.includes("orders=") ? ZMIANY_800 : ZMIANY_800.filter((w) => w.id >= 20)),
+    "/orders/800": zamowienie(800),
+  });
+  await przebieg(a.query, [13], [30]);
+  const pytanie = a.wolania.find((w) => w.includes("orders="))!;
+  assert.match(pytanie, /orders=800&operation_tag=order_status_change&sort=asc/);
+  assert.doesNotMatch(pytanie, /date_from/, "zebranie bywa sprzed okna strumienia");
+  const w = db().prepare(`SELECT log_id, zbieral_sellasist_id AS kto FROM sellasist_pomylka_zlapana ORDER BY log_id`).all();
+  assert.deepEqual(w.map((r) => ({ ...r })), [{ log_id: 20, kto: 7 }, { log_id: 22, kto: 8 }]);
+  /* Raz sprawdzona pomyłka nie wraca do pytania. */
+  const b = atrapa({ "/orders_logs": [] });
+  await przebieg(b.query, [13], [30]);
+  assert.equal(b.wolania.filter((x) => x.includes("orders=")).length, 0);
+});
+
+test("zbierający: bez statusów zebranych nie pyta, bez zebrania w dzienniku zostaje pusty, błąd nie psuje przebiegu", async () => {
+  const wpis = [{ id: 20, order_id: 800, operation_tag: "order_status_change", object_id: 30, date: "2026-10-13 09:00:00" }];
+  const a = atrapa({ "/orders_logs": wpis, "/orders/800": zamowienie(800) });
+  await przebieg(a.query, [], [30]);
+  assert.equal(a.wolania.filter((x) => x.includes("orders=")).length, 0);
+  const sprawdzono = () => db().prepare(`SELECT zbieral_sellasist_id AS kto, zbieral_sprawdzono_at AS at
+      FROM sellasist_pomylka_zlapana`).get() as { kto: number | null; at: string | null };
+  assert.equal(sprawdzono().at, null, "bez statusów zebranych czeka, aż ktoś je ustawi");
+
+  /* Błąd dziennika zamówień: przebieg kończy się sukcesem, pomyłka czeka dalej. */
+  const blad = atrapa({ "/orders_logs": (sc: string) => {
+    if (sc.includes("orders=")) throw new BladSellasist("Sellasist nie odpowiada", 500);
+    return [];
+  } });
+  await przebieg(blad.query, [13], [30]);
+  assert.equal(sprawdzono().at, null);
+  assert.equal(db().prepare("SELECT blad FROM sellasist_sync_state").get()!.blad, null);
+
+  /* Dziennik bez zebrania (np. system przestawił status): sprawdzone, osoba pusta. */
+  await przebieg(atrapa({ "/orders_logs": (sc: string) => (sc.includes("orders=") ? wpis : []) }).query, [13], [30]);
+  assert.deepEqual({ ...sprawdzono(), at: sprawdzono().at !== null }, { kto: null, at: true });
+});
+
+test("przypisanie numeru Sellasist do konta: imię z kartoteki, zdjęcie przypisania, wpis w dzienniku", () => {
+  const d = db();
+  d.prepare("DELETE FROM app_user WHERE user_id = 901").run();
+  d.prepare("INSERT INTO app_user(user_id,login,name,role) VALUES (901,'mariusz-t','Mariusz','magazynier')").run();
+  const kto = { id: 1, name: "Admin" };
+  S.przypiszPracownikaSellasist(7, 901, kto, d, TERAZ);
+  assert.deepEqual({ ...d.prepare("SELECT sellasist_id, user_id, nazwa FROM sellasist_pracownik").get() },
+    { sellasist_id: 7, user_id: 901, nazwa: "Mariusz" });
+  assert.throws(() => S.przypiszPracownikaSellasist(7, 999999, kto, d, TERAZ), S.BladPracownika);
+  assert.throws(() => S.przypiszPracownikaSellasist("7", 901, kto, d, TERAZ), S.BladPracownika);
+  S.przypiszPracownikaSellasist(7, null, kto, d, TERAZ);
+  assert.equal(d.prepare("SELECT COUNT(*) AS n FROM sellasist_pracownik").get()!.n, 0);
+  const wpisy = d.prepare("SELECT payload FROM events WHERE type = 'sellasist_pracownik_przypisany' ORDER BY id").all();
+  assert.deepEqual(wpisy.map((w) => JSON.parse(String(w.payload))),
+    [{ sellasistId: 7, userId: 901 }, { sellasistId: 7, userId: null }]);
+  d.prepare("DELETE FROM app_user WHERE user_id = 901").run();
+});
+
+test("złapane z osobami: imię po przypisaniu, numer bez przypisania, osobno bez ustalonej osoby", () => {
+  stan("2026-10-10T08:00:00.000Z", TERAZ.toISOString());
+  const d = db();
+  const dodaj = d.prepare(`INSERT INTO sellasist_pomylka_zlapana(log_id, zamowienie_id, at, zbieral_sellasist_id,
+      zbieral_sprawdzono_at) VALUES (?,?,?,?,?)`);
+  dodaj.run(1, 800, "2026-10-12T08:00:00.000Z", 7, "x");
+  dodaj.run(2, 801, "2026-10-12T09:00:00.000Z", 7, "x");
+  dodaj.run(3, 802, "2026-10-13T08:00:00.000Z", 8, "x");
+  dodaj.run(4, 803, "2026-10-13T08:30:00.000Z", null, null);
+  d.prepare("INSERT INTO sellasist_pracownik(sellasist_id, user_id, nazwa, zmieniono_at) VALUES (7, 2, 'Mariusz', 'x')")
+    .run();
+  const z = S.zlapanePomylki(d, true, TERAZ);
+  assert.equal(z.razem, 4);
+  assert.deepEqual(z.osoby, [
+    { sellasistId: 7, userId: 2, nazwa: "Mariusz", zlapanych: 2 },
+    { sellasistId: 8, userId: null, nazwa: null, zlapanych: 1 },
+  ]);
+  assert.equal(z.bezOsoby, 1);
 });

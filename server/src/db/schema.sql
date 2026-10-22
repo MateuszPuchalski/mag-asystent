@@ -3186,14 +3186,29 @@ CREATE TABLE IF NOT EXISTS sellasist_do_pobrania (
 
 -- Pomyłki zbierania złapane przy pakowaniu: wejście zamówienia w status
 -- z `SELLASIST_STATUSY_POMYLKA`, jeden wiersz na wpis dziennika Sellasist.
--- BEZ PRACOWNIKA: kto zbierał źle, to monitoring pracowniczy (art. 22² KP),
--- a miara dzienna go nie potrzebuje. `user_id` dziennika odrzuca mapowanie.
+-- KTO ZBIERAŁ to numer pracownika Sellasist z wpisu, który przed tą pomyłką
+-- przestawił zamówienie w status zebranego. Decyzja właściciela z 22
+-- października 2026. Zestawienie osób widzi wyłącznie admin, jak rachunek win
+-- rejestru (docs/obsluga-klienta.md). Strumień dziennika dalej `user_id` nie
+-- czyta, pyta o niego tylko ustalenie zbierającego (sellasist-sync.ts).
 CREATE TABLE IF NOT EXISTS sellasist_pomylka_zlapana (
   log_id        INTEGER PRIMARY KEY,    -- numer wpisu dziennika; ten sam wpis drugi raz to nic
   zamowienie_id INTEGER NOT NULL,
-  at            TEXT NOT NULL           -- chwila wejścia w status, ISO UTC
+  at            TEXT NOT NULL,          -- chwila wejścia w status, ISO UTC
+  zbieral_sellasist_id  INTEGER,        -- NULL = nie ustalono albo jeszcze nie pytano
+  zbieral_sprawdzono_at TEXT            -- NULL = dziennika zamówienia jeszcze nie pytano
 );
 CREATE INDEX IF NOT EXISTS ix_sellasist_pomylka_at ON sellasist_pomylka_zlapana(at);
+
+-- Pracownik Sellasist jako osoba z naszych kont. API Sellasist nie wystawia
+-- listy pracowników, sam numer z dziennika, więc numer przypisuje admin, raz.
+-- Imię DLA OKA bez klucza do `app_user`, ta sama pułapka co w `pomylka_wysylki`.
+CREATE TABLE IF NOT EXISTS sellasist_pracownik (
+  sellasist_id INTEGER PRIMARY KEY,
+  user_id      INTEGER,
+  nazwa        TEXT NOT NULL,
+  zmieniono_at TEXT NOT NULL
+);
 
 -- Brak z kompletacji, o którym biuro już powiadomiło klienta. Kluczem jest
 -- wejście w status (`status_at`): zamówienie, które wróci do braku później,

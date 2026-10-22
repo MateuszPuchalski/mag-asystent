@@ -322,6 +322,35 @@ describe("pomyłki złapane przy pakowaniu", () => {
     if (!zdanie.includes("zatrzymało")) expect(blok).not.toHaveTextContent("zatrzymało");
   });
 
+  it("kto zbierał (admin): imię po przypisaniu, numer Sellasist z wyborem osoby, reszta bez osoby", async () => {
+    const odczyt = odczytPomylek([pomylka()], zlapane({
+      osoby: [{ sellasistId: 7, userId: null, nazwa: null, zlapanych: 3 },
+        { sellasistId: 8, userId: 12, nazwa: "Ewa", zlapanych: 1 }],
+      bezOsoby: 1,
+    }));
+    const wyslane: Array<{ url: string; cialo: unknown }> = [];
+    vi.stubGlobal("fetch", vi.fn(async (url: string, init?: RequestInit) => {
+      if (init?.method === "POST") {
+        wyslane.push({ url, cialo: JSON.parse(String(init.body)) });
+        return new Response(JSON.stringify({ zapisano: true }), { status: 200 });
+      }
+      const c = odczyt(url);
+      return new Response(JSON.stringify(c ?? { error: "nieznany" }), { status: c === undefined ? 404 : 200 });
+    }));
+    otworz();
+    const kto = await screen.findByRole("group", { name: "Kto zbierał złapane" });
+    expect(kto).toHaveTextContent("Ewa");
+    expect(kto).toHaveTextContent("1 pomyłka bez ustalonej osoby");
+    const wybor = await within(kto).findByRole("combobox", { name: "Pracownik Sellasist nr 7 to" });
+    await waitFor(() => expect(wybor).not.toBeDisabled());
+    fireEvent.change(wybor, { target: { value: "11" } });
+    await waitFor(() => expect(wyslane).toEqual([
+      { url: "/api/pomylki/zlapane/pracownik", cialo: { sellasistId: 7, userId: 11 } }]));
+    /* Przypisany numer zmienia się klikiem, bez stale otwartego wyboru. */
+    fireEvent.click(within(kto).getByRole("button", { name: "zmień" }));
+    expect(within(kto).getByRole("combobox", { name: "Pracownik Sellasist nr 8 to" })).toHaveValue("12");
+  });
+
   it("pusta lista dób mówi, że Sellasist nic nie podał — bez żadnej cyfry", async () => {
     atrapaZlapanych(zlapane({ dni: [] }));
     otworz();

@@ -47,7 +47,7 @@ export const zlapane = (n: Partial<ZlapanePomylki> = {}): ZlapanePomylki => {
   ];
   const puste = dni.length === 0;
   return { wlaczone: true, dni, razem: puste ? null : dni.reduce((s, d) => s + d.zlapanych, 0),
-    doKlienta: puste ? null : 1, ...n };
+    doKlienta: puste ? null : 1, osoby: [], bezOsoby: null, ...n };
 };
 
 /** Odczyty ekranu pomyłek dla `atrapaZapisow`; nieznany adres → `undefined`. */

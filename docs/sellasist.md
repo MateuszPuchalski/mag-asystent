@@ -89,7 +89,15 @@ pakowania" to według właściciela zwykle pomyłka zbierania, naprawiana
 doniesieniem towaru przed wysyłką. Klient dostaje pełną paczkę, więc ten
 status nie zakłada sprawy klienta. Każde wejście w niego liczy się w zakładce
 „Pomyłki" jako pomyłka złapana (`SELLASIST_STATUSY_POMYLKA=30`). Liczba idzie
-na dobę, bez osób.
+na dobę dla całego biura.
+
+**Kto zbierał złapaną pomyłkę.** Serwer pyta dziennik samego zamówienia
+(`/orders_logs?orders=…&operation_tag=order_status_change`). Zbierającym jest
+autor ostatniego wejścia w status z `SELLASIST_STATUSY_ZEBRANE` przed
+pomyłką. Ostatniego, bo po ponownej kompletacji zbiera ktoś inny. Dziennik
+podaje sam `user_id`, a API nie ma listy pracowników. Numer przypisuje więc
+admin w zakładce „Pomyłki”, raz na osobę. Zestawienie widzi wyłącznie admin,
+decyzją właściciela z 22 października 2026.
 
 Doba wchodzi do bloku, gdy lustro przeczytało ją całą z ustawionym statusem.
 Doba wpisania statusu jest niepełna, a lustro, które stoi, nie dopisuje zer.
