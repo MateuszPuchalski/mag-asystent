@@ -10,6 +10,12 @@ z wersją monorepo" — i właśnie tak przestał być zgodny: `0.3.0` przetrwa�
 sześć zmergowanych zmian, w tym takie, które wymagały nowego uprawnienia SQL.
 Komentarz nie jest mechanizmem.
 
+## 0.611.1 — 22 października 2026
+
+**Przy pomyłkach złapanych przy pakowaniu stoi login pracownika z Sellasist.**
+Serwer czyta go z wpisów WMS w dzienniku zamówienia, więc zamiast „nr 18”
+widać np. „mariusz”. Admin dalej może przypisać numer do konta.
+
 ## 0.611.0 — 22 października 2026
 
 **Pomyłki złapane przy pakowaniu mają osobę, która zbierała.** Serwer czyta
