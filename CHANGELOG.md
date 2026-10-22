@@ -10,6 +10,12 @@ z wersją monorepo" — i właśnie tak przestał być zgodny: `0.3.0` przetrwa�
 sześć zmergowanych zmian, w tym takie, które wymagały nowego uprawnienia SQL.
 Komentarz nie jest mechanizmem.
 
+## 0.607.0 — 22 października 2026
+
+**Zdjęcia z ofert Allegro także po kodzie producenta.** Gdy sygnatura oferty
+nie trafia w symbol towaru, import szuka naszej oferty, której parametr „Kod
+producenta” to ten symbol. Podsumowanie mówi, ile towarów trafiło którą drogą.
+
 ## 0.606.0 — 21 października 2026
 
 **Zdjęcia z naszych ofert Allegro.** W zakładce „Zdjęcia” przycisk „Z ofert
