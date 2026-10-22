@@ -36,7 +36,10 @@ const OPISY: Record<string, (d: Dane) => string> = {
     d.lineId != null ? `pozycja ${tekst(d.lineId)}` : ""),
   problem_resolved: (d) => (d.problemId != null ? `problem nr ${tekst(d.problemId)}` : ""),
   device_drop: (d) => zloz(d.g != null ? `${tekst(d.g).replace(".", ",")} g` : "", d.bateria != null ? `bateria ${tekst(d.bateria)}%` : ""),
-  http_rejected: (d) => zloz(`${tekst(d.method)} ${tekst(d.url)}`, d.status != null ? `odpowiedź ${tekst(d.status)}` : ""),
+  /* Klucze po polsku, bo tak pisze je `context.ts` serwera. Powód stoi w zdaniu,
+     bo bez niego „odpowiedź 409" nie mówi, czy praca przepadła, czy weszła dwa razy. */
+  http_rejected: (d) => zloz(`${tekst(d.metoda)} ${tekst(d.sciezka)}`.trim(),
+    d.status != null ? `odpowiedź ${tekst(d.status)}` : "", cytat(d.powod)),
   klient_odrzucona: (d) => zloz(tekst(d.powod), tekst(d.rodzaj)),
   queue_failed: (d) => zloz(d.proby != null ? `${tekst(d.proby)} próby` : "", cytat(d.blad)),
   queue_retry: (d) => zloz(d.proba != null ? `próba ${tekst(d.proba)} z ${tekst(d.max)}` : "", cytat(d.blad)),

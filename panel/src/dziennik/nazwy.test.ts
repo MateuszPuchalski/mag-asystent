@@ -43,6 +43,13 @@ describe("opis zdarzenia", () => {
       .toBe("40 szt. · MGP → MAG · J02-02-03");
   });
 
+  it("odrzucone żądanie mówi trasą i powodem z kluczy serwera", () => {
+    expect(opisZdarzenia("http_rejected",
+      '{"metoda":"POST","sciezka":"/api/delivery/225/lines/2678/putaway","status":409,"powod":"Pozycja już odłożona"}'))
+      .toBe("POST /api/delivery/225/lines/2678/putaway · odpowiedź 409 · „Pozycja już odłożona”");
+    expect(opisZdarzenia("http_rejected", '{"status":404}')).toBe("odpowiedź 404");
+  });
+
   it("typ bez własnego zdania dostaje pary z danych — nic nie ginie", () => {
     expect(opisZdarzenia("zwrot_kwota", '{"zwrotId":12,"kwota":49.9,"uwaga":""}')).toBe("zwrotId 12 · kwota 49.9");
   });

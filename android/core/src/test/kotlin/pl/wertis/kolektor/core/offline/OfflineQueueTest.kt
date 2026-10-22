@@ -215,6 +215,33 @@ class OfflineQueueTest {
         assertEquals(listOf(7L to 400), zameldowane)
     }
 
+    @Test fun `juz odlozona z bufora to wykonane - bez toastu i meldunku`() = runTest {
+        val storage = MemStorage()
+        OfflineQueue(storage, { throw java.io.IOException("x") }, isOnline = { true })
+            .runOrBuffer(PendingOp.OpKind.SET_LOCATION, "a", 7, setLoc)
+        OfflineQueue(storage, { throw java.io.IOException("x") }, isOnline = { true })
+            .runOrBuffer(PendingOp.OpKind.SET_LOCATION, "a", 8, setLoc)
+
+        val odrzucone = mutableListOf<String>()
+        val zameldowane = mutableListOf<Int>()
+        val wyslane = mutableListOf<Long?>()
+        val q = OfflineQueue(
+            storage,
+            { op ->
+                if (op.productId == 7L) throw ApiError(409, "już odłożona", kod = "juz_odlozona")
+                wyslane += op.productId; null
+            },
+            isOnline = { true },
+            onRejected = { _, msg -> odrzucone += msg },
+            reporter = { _, e -> zameldowane += e.status },
+        )
+        q.flush()
+        assertEquals(0, q.count.value)
+        assertEquals(listOf(8L), wyslane) // kolejka idzie dalej
+        assertTrue(odrzucone.isEmpty())
+        assertTrue(zameldowane.isEmpty())
+    }
+
     @Test fun `po MAX_PROB przejsciowych odrzucen operacja przestaje blokowac kolejke`() = runTest {
         // inaczej serwer zwracający 500 bez końca zamraża bufor na zawsze:
         // pierwsza operacja wraca w nieskończoność, reszta nigdy nie rusza

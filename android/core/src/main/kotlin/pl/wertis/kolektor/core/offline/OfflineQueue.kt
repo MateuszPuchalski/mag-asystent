@@ -195,6 +195,10 @@ class OfflineQueue(
                 } catch (e: Exception) {
                     if (isNetworkError(e)) break // nadal offline — spróbujemy później
                     val err = e as ApiError
+                    if (err.kod in KODY_JUZ_WYKONANE) {
+                        persist(ops.drop(1))
+                        continue
+                    }
                     if (czyPrzejsciowy(err) && op.proby + 1 < MAX_PROB) {
                         // serwer choruje, operacja jest zdrowa: zostaje na czele
                         // kolejki z podbitym licznikiem i wraca przy następnym flushu
@@ -222,5 +226,14 @@ class OfflineQueue(
     companion object {
         /** Po tylu przejściowych odrzuceniach operacja przestaje blokować kolejkę. */
         const val MAX_PROB = 5
+
+        /**
+         * Odmowy, które znaczą „to już się stało". Po dziurze w Wi-Fi to samo
+         * odłożenie potrafi dojść na serwer dwa razy: oryginał wysłany w martwą
+         * sieć i kopia z bufora. Pierwsze wchodzi, drugie dostaje 409. Toast
+         * „odrzucona" i meldunek mówiłyby magazynierowi, że praca przepadła,
+         * choć leży zapisana — więc kopia wypada z bufora po cichu.
+         */
+        val KODY_JUZ_WYKONANE = setOf("juz_odlozona")
     }
 }
