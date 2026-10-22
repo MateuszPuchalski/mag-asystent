@@ -3,7 +3,7 @@ import { logEvent } from "./events.js";
 import {
   BladKosza, KOD_KOSZA_WIRTUALNEGO, odmowaKoszaWirtualnego, szczegolKosza, type SzczegolKosza,
 } from "./kosze.js";
-import { zwiazKoszykiZDokumentami } from "./kosze-zwrotow.js";
+import { zwiazKoszykZDokumentem } from "./kosze-zwrotow.js";
 
 /* ── Przyjęcia na regał zwrotów — kosz z dokumentu Subiekta ──────────────────
    Obieg magazynu jest starszy niż ta aplikacja i wygląda tak:
@@ -136,15 +136,27 @@ export function otworzPrzyjecie(raw: string, autor: string): SzczegolKosza {
      o tej samej liczbie to cudzy kosz. */
   const surowy = String(raw ?? "").trim().toUpperCase();
   if (KOD_KOSZA_WIRTUALNEGO.test(surowy)) {
-    /* OD 0.376.0 KOD KOSZYKA OTWIERA WŁASNY KOSZ — jeśli ma już dokument.
-       Koszyk związany z MM (`zwiazKoszykiZDokumentami`) jest tym samym pudłem,
-       które hala ma rozłożyć, więc skan jego etykiety ma prowadzić DO NIEGO.
+    /* KOD KOSZYKA OTWIERA WŁASNY KOSZ — jeśli jego dokument już jest.
+       Koszyk z MM jest tym samym pudłem, które hala ma rozłożyć, więc skan
+       etykiety prowadzi DO NIEGO, wiążąc dokument po drodze, jak skan kartki.
        Odmowa zostaje wyłącznie tam, gdzie papieru jeszcze nie ma: wtedy nie ma
-       czego rozkładać, a zdanie mówi, na co czekać. */
-    const wlasny = db().prepare(
-      "SELECT id FROM kosz WHERE kod = ? AND mm_dok_id IS NOT NULL ORDER BY id DESC LIMIT 1")
-      .get(surowy) as { id: number } | undefined;
-    if (wlasny) return szczegolKosza(wlasny.id);
+       czego rozkładać, a zdanie mówi, na co czekać. Kod wraca do obiegu, więc
+       wygrywa najnowszy koszyk, który ma już dokument albo gotowe MM. */
+    const d = db();
+    const kandydaci = d.prepare(
+      `SELECT k.id, k.mm_dok_id, q.sgt_doc_number AS numer
+         FROM kosz k
+         LEFT JOIN sfera_queue q ON q.id = k.mm_queue_id AND q.type='mm' AND q.status='done'
+        WHERE k.kod = ? AND (k.mm_dok_id IS NOT NULL OR q.sgt_doc_number IS NOT NULL)
+        ORDER BY k.id DESC`)
+      .all(surowy) as Array<{ id: number; mm_dok_id: number | null; numer: string | null }>;
+    for (const k of kandydaci) {
+      if (k.mm_dok_id !== null) return szczegolKosza(Number(k.id));
+      const dok = d.prepare(
+        "SELECT dok_id, nr_pelny, numer, mag_z FROM sgt_mm_zwrot WHERE nr_pelny = ?")
+        .get(k.numer) as DokumentMm | undefined;
+      if (dok) return otworzDokument(dok, autor);
+    }
     throw new BladKosza(404, odmowaKoszaWirtualnego(surowy));
   }
   const numer = numerZKartki(raw);
@@ -156,9 +168,7 @@ export function otworzPrzyjecie(raw: string, autor: string): SzczegolKosza {
       `SELECT dok_id, nr_pelny, numer, mag_z FROM sgt_mm_zwrot
         WHERE numer = ? ORDER BY dok_id DESC`
     )
-    .get(numer) as
-    | { dok_id: number; nr_pelny: string; numer: string; mag_z: number | null }
-    | undefined;
+    .get(numer) as DokumentMm | undefined;
   if (!dok) {
     throw new BladKosza(
       404,
@@ -166,19 +176,27 @@ export function otworzPrzyjecie(raw: string, autor: string): SzczegolKosza {
         "synchronizację z Subiektem"
     );
   }
+  return otworzDokument(dok, autor);
+}
 
-  /* WIĄZANIE TUTAJ, NIE TYLKO W WORKERZE (0.377.0). Worker wiąże koszyki co
-     minutę, a magazynier bywa szybszy niż jego takt: skan numeru z kartki
-     w tej luce zakładał NOWY kosz na dokument, który należy do czekającego
-     koszyka. Powstawał wtedy sobowtór — dokładnie ten, którego 0.376.0 miało
-     się pozbyć. Wiązanie jest idempotentne i tanie, więc stoi też na tej
-     drodze; kolejny wiersz niżej znajdzie już związany koszyk. */
-  zwiazKoszykiZDokumentami(d);
+type DokumentMm = { dok_id: number; nr_pelny: string; numer: string; mag_z: number | null };
 
+/**
+ * Kosz dla dokumentu: ten, który go już ma, koszyk, który go wystawił,
+ * albo nowy z pozycji dokumentu — w tej kolejności.
+ *
+ * Wszystko w jednym synchronicznym wywołaniu, więc dwa skany tej samej kartki
+ * nie mają jak założyć dwóch koszy ani związać koszyka obok sobowtóra.
+ */
+function otworzDokument(dok: DokumentMm, autor: string): SzczegolKosza {
+  const d = db();
   const istniejacy = d.prepare("SELECT id FROM kosz WHERE mm_dok_id = ?").get(dok.dok_id) as
     | { id: number }
     | undefined;
   if (istniejacy) return szczegolKosza(istniejacy.id);
+
+  const koszyk = zwiazKoszykZDokumentem(d, dok, autor);
+  if (koszyk !== null) return szczegolKosza(koszyk);
 
   const pozycje = d
     .prepare(

@@ -7,7 +7,7 @@ import {
   brakujaceKorekty, dolozDoKosza, otwarteKoszyki, koszDoDolozenia, stanOtwartegoKosza,
   wypuscGotoweKoszyki, wypuscMmMimoKorekt, zamknijKosz, zdejmijZKosza,
   dolozTowar, zdejmijTowar, koszykiBezDokumentu, koszykiCzekajaceNaKorekty,
-  MAX_SZTUK_RECZNIE, powodPozaMagazynem, zwiazKoszykiZDokumentami, zaznaczSkladnik,
+  MAX_SZTUK_RECZNIE, powodPozaMagazynem, zwiazKoszykZDokumentem, zaznaczSkladnik,
   zalozKoszyk, usunKoszyk,
 } from "./kosze-zwrotow.js";
 import { ocenPozycje, rozstrzygnijZwrot } from "./zwroty.js";
@@ -670,8 +670,8 @@ test("ocena „na stan” pozycji przesyłkowej NIE dokłada jej do pudła", () 
   assert.equal(slad.n, 1, "odmowa zostawia ślad — cisza byłaby tu najgorsza");
 });
 
-/* ── Jedno pudło, jedno imię (0.376.0) ──────────────────────────────────────
-   Karton nosił dwa imiona: „Z-7" w panelu i „1209" na hali. Wiązanie daje
+/* ── Jedno pudło, jedno imię ────────────────────────────────────────────────
+   Karton nosi dwa imiona: „Z-7" w panelu i „1209" na hali. Wiązanie daje
    koszykowi jego własny dokument, zamiast pozwolić hali zrodzić sobowtóra. */
 
 /** Koszyk zamknięty, z zadaniem MM w podanym stanie. */
@@ -686,28 +686,29 @@ function koszykZZadaniem(d: Db, numer: string | null, status = "done") {
   return id;
 }
 
-const dokument = (d: Db, dokId: number, nrPelny: string, numer: string) =>
+const dokument = (d: Db, dokId: number, nrPelny: string, numer: string) => {
   d.prepare(`INSERT INTO sgt_mm_zwrot(dok_id, nr_pelny, numer, data_wyst, mag_z, mag_do)
      VALUES (?,?,?,'2026-09-16',1,3)`).run(dokId, nrPelny, numer);
+  return { dok_id: dokId, nr_pelny: nrPelny, mag_z: 1 };
+};
 
-test("koszyk dostaje SWÓJ dokument, gdy ten wejdzie do read-modelu", () => {
+test("koszyk dostaje SWÓJ dokument", () => {
   const d = stanowisko();
   const koszId = koszykZZadaniem(d, "MM 1209/MAG/2026");
+  const dok = dokument(d, 41209, "MM 1209/MAG/2026", "1209");
 
-  assert.equal(zwiazKoszykiZDokumentami(d), 0, "bez dokumentu nie ma czego wiązać");
-
-  dokument(d, 41209, "MM 1209/MAG/2026", "1209");
-  assert.equal(zwiazKoszykiZDokumentami(d), 1);
+  assert.equal(zwiazKoszykZDokumentem(d, dok, "Jan"), koszId);
 
   const k = d.prepare("SELECT mm_dok_id, mm_numer, mm_mag_z FROM kosz WHERE id=?").get(koszId) as
     { mm_dok_id: number; mm_numer: string; mm_mag_z: number };
   assert.equal(k.mm_dok_id, 41209);
   assert.equal(k.mm_numer, "MM 1209/MAG/2026");
-  /* MAGAZYN ŹRÓDŁOWY RAZEM Z DOKUMENTEM. Od związania trasę powrotu liczy
-     gałąź „kosz z dokumentu", a ta bierze cel wyłącznie stąd — bez tej
-     kolumny towar zostałby na regale zwrotów. */
-  assert.equal(k.mm_mag_z, 1, "powrót ma dokąd wrócić");
-  assert.equal(zwiazKoszykiZDokumentami(d), 0, "drugi takt nie wiąże drugi raz");
+  assert.equal(k.mm_mag_z, 1, "kierunek dokumentu jedzie razem z nim");
+  assert.equal(zwiazKoszykZDokumentem(d, dok, "Jan"), null, "drugi skan nie wiąże drugi raz");
+  const slad = d.prepare(
+    "SELECT user_id AS kto FROM events WHERE type='kosz_zwrotow_zwiazany'").all() as
+    Array<{ kto: string }>;
+  assert.deepEqual(slad.map((w) => w.kto), ["Jan"], "w dzienniku stoi ten, kto zeskanował");
 });
 
 test("wiązanie idzie po PEŁNYM numerze — liczba powtarza się co rok", () => {
@@ -715,9 +716,10 @@ test("wiązanie idzie po PEŁNYM numerze — liczba powtarza się co rok", () =>
      numery MM w Subiekcie startują od nowa z każdym rokiem. */
   const d = stanowisko();
   const koszId = koszykZZadaniem(d, "MM 1209/MAG/2026");
-  dokument(d, 40209, "MM 1209/MAG/2025", "1209");
+  const dok = dokument(d, 40209, "MM 1209/MAG/2025", "1209");
 
-  assert.equal(zwiazKoszykiZDokumentami(d), 0, "zeszłoroczny dokument to nie ten karton");
+  assert.equal(zwiazKoszykZDokumentem(d, dok, "Jan"), null,
+    "zeszłoroczny dokument to nie ten karton");
   assert.equal((d.prepare("SELECT mm_dok_id FROM kosz WHERE id=?").get(koszId) as
     { mm_dok_id: number | null }).mm_dok_id, null);
 });
@@ -726,32 +728,24 @@ test("koszyk z zadaniem W TOKU nie wiąże się z niczym", () => {
   /* Dopóki Sfera nie oddała numeru, dokumentu nie ma — a kosz związany
      z cudzym dokumentem posłałby halę do nie tego pudła. */
   const d = stanowisko();
-  koszykZZadaniem(d, null, "pending");
-  dokument(d, 41209, "MM 1209/MAG/2026", "1209");
+  koszykZZadaniem(d, "MM 1209/MAG/2026", "processing");
+  const dok = dokument(d, 41209, "MM 1209/MAG/2026", "1209");
 
-  assert.equal(zwiazKoszykiZDokumentami(d), 0);
+  assert.equal(zwiazKoszykZDokumentem(d, dok, "Jan"), null);
 });
 
-/* ── Poprawki z przeglądu 0.377.0 ───────────────────────────────────────────
-   Trzy dziury znalezione w przeglądzie własnego diffu, każda z ceną w towarze. */
-
 test("dokument, który ma już swój kosz hali, NIE wiąże się z koszykiem", () => {
-  /* Wyścig: między importem a taktem workera mija do minuty, a magazynier
-     bywa szybszy. Drugi kosz z tym samym `mm_dok_id` dałby dwa wiersze
-     w liście przyjęć i drugie MM powrotne na towar, który już wrócił. */
+  /* Drugi kosz z tym samym `mm_dok_id` dałby dwa wiersze w liście przyjęć
+     i drugie MM powrotne na towar, który już wrócił. */
   const d = stanowisko();
   const koszId = koszykZZadaniem(d, "MM 1209/MAG/2026");
-  dokument(d, 41209, "MM 1209/MAG/2026", "1209");
+  const dok = dokument(d, 41209, "MM 1209/MAG/2026", "1209");
   d.prepare(`INSERT INTO kosz(kod, status, rodzaj, mm_dok_id, utworzono_at, utworzono_przez)
      VALUES ('1209','zamkniety','zwroty',41209,'2026-09-16T10:30:00Z','Jan')`).run();
 
-  assert.equal(zwiazKoszykiZDokumentami(d), 0);
+  assert.equal(zwiazKoszykZDokumentem(d, dok, "Jan"), null);
   assert.equal((d.prepare("SELECT mm_dok_id FROM kosz WHERE id=?").get(koszId) as
     { mm_dok_id: number | null }).mm_dok_id, null, "koszyk zostaje bez dokumentu");
-  const slad = d.prepare(
-    "SELECT COUNT(*) AS n FROM events WHERE type='kosz_zwrotow_zwiazanie_pominiete'")
-    .get() as { n: number };
-  assert.equal(slad.n, 1, "pominięcie zostawia ślad — cisza kazałaby szukać usterki");
 });
 
 test("kartoteki NIEZNANEJ read-modelowi nie sądzimy — to towar zablokowany", () => {

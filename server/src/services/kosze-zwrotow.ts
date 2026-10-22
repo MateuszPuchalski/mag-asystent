@@ -1484,82 +1484,57 @@ export interface KoszykCzekajacy {
   }>;
 }
 
-/* ── Jedno pudło, jedno imię (0.376.0) ──────────────────────────────────────
-   Do tego wydania karton nosił DWA imiona. Obsługa napełniała koszyk „Z-7",
-   a hala rozkładała kosz z jego dokumentu — „1209" — bo `otworzPrzyjecie`
-   zakładał wtedy NOWY kosz, pusty i bez związku z tamtym. Jeden fizyczny
-   karton był więc dwiema jednostkami pracy: pierwsza nie miała ani jednego
-   odłożenia, druga nie miała zamknięcia, a raport cyklu musiał zszywać je
-   heurystyką po czasie, bo numery MM powtarzają się co rok.
+/* ── Jedno pudło, jedno imię ────────────────────────────────────────────────
+   Koszyk „Z-7" i kosz z jego dokumentu „1209" to jeden fizyczny karton.
+   Dwa kosze na niego to dwie jednostki pracy: pierwsza bez odłożeń, druga
+   bez zamknięcia, a raport cyklu zszywa je heurystyką po czasie.
 
-   Wiązanie robi to, czego brakowało: po wejściu dokumentu do Subiekta koszyk
-   DOSTAJE ten dokument, zamiast rodzić sobie sobowtóra. Hala otwiera wtedy ten
-   sam kosz — z jego zawartością, jego historią i jego kodem.
+   Dlatego hala, skanując kartkę albo etykietę, otwiera SAM koszyk, który
+   wystawił ten dokument — z jego zawartością, historią i kodem.
+
+   WIĄZANIE PRZY SKANIE, nie taktem w tle. Nic przed skanem nie potrzebuje
+   dokumentu przy koszyku: trasę powrotu, rekoncyliację i blokadę edycji
+   rozstrzyga `mm_queue_id`. Takt w tle ścigał się z halą, a każdy przegrany
+   wyścig zostawiał sobowtóra i wpis w dzienniku co minutę.
 
    PO PEŁNYM NUMERZE, nie po samej liczbie. `sgt_doc_number` niesie to, co
    oddała Sfera („MM 1209/MAG/2026"), a liczba z numeru powtarza się co rok.
    Dopasowanie po niej zderzyłoby dzisiejszy karton z zeszłorocznym.          */
 
 /**
- * Wiąże koszyki z dokumentami MM, które weszły już do read-modelu.
+ * Przypina dokument MM do koszyka, który go wystawił.
  *
- * Oddaje liczbę związanych. Woła to worker co minutę, obok numerów ZW —
- * dokument pojawia się w read-modelu dopiero po imporcie, więc chwila między
- * zapisem w Sferze a tym wiązaniem jest normalna, nie awaryjna.
+ * Oddaje `id` związanego koszyka albo `null`, gdy dokumentu nie wystawił
+ * żaden koszyk (kosz z Subiekta) albo gdy ma go już inny kosz.
  *
- * IDEMPOTENTNE przez `mm_dok_id IS NULL` w warunku UPDATE: dwa takty w tej
- * samej sekundzie nie mają jak związać kosza dwa razy.
+ * IDEMPOTENTNE przez `mm_dok_id IS NULL` w warunku UPDATE, a cudzy kosz
+ * z tym dokumentem blokuje wiązanie w tym samym zapytaniu: dwa kosze z jednym
+ * `mm_dok_id` dałyby dwa wiersze w liście przyjęć i drugie MM powrotne.
  */
-export function zwiazKoszykiZDokumentami(database: Db): number {
-  const czekajace = database.prepare(
-    `SELECT k.id, k.kod, q.sgt_doc_number AS numer
-       FROM kosz k JOIN sfera_queue q ON q.id = k.mm_queue_id
+export function zwiazKoszykZDokumentem(
+  database: Db, dok: { dok_id: number; nr_pelny: string; mag_z: number | null }, autor: string,
+): number | null {
+  const k = database.prepare(
+    `SELECT k.id, k.kod FROM kosz k JOIN sfera_queue q ON q.id = k.mm_queue_id
       WHERE k.mm_dok_id IS NULL AND q.type='mm' AND q.status='done'
-        AND q.sgt_doc_number IS NOT NULL
-      ORDER BY k.id`).all() as Array<{ id: number; kod: string; numer: string }>;
+        AND q.sgt_doc_number = ?
+      ORDER BY k.id DESC LIMIT 1`).get(dok.nr_pelny) as { id: number; kod: string } | undefined;
+  if (!k) return null;
 
-  let zwiazanych = 0;
-  for (const k of czekajace) {
-    const dok = database.prepare(
-      "SELECT dok_id, mag_z FROM sgt_mm_zwrot WHERE nr_pelny = ?").get(k.numer) as
-      { dok_id: number; mag_z: number | null } | undefined;
-    /* Brak dokumentu w read-modelu NIE jest błędem: import chodzi co minutę,
-       a Sfera właśnie go wystawiła. Kosz poczeka do następnego taktu. */
-    if (!dok) continue;
-
-    /* WYŚCIG Z HALĄ. Między importem a tym taktem mija do minuty, a w tej
-       minucie magazynier może zdążyć zeskanować numer z kartki — wtedy
-       `otworzPrzyjecie` założyło już kosz na ten dokument. Drugi kosz z tym
-       samym `mm_dok_id` dałby dwa wiersze w liście przyjęć, otwierałby cudze
-       pudło i mógłby zamówić DRUGIE MM powrotne na towar, który już wrócił.
-
-       Nie wiążemy wtedy niczego. Kartka z numerem działa jak dotąd, a koszyk
-       zostaje bez dokumentu — czyli dokładnie tak, jak przed 0.376.0. */
-    const zajety = database.prepare(
-      "SELECT id FROM kosz WHERE mm_dok_id=? AND id<>? LIMIT 1")
-      .get(dok.dok_id, k.id) as { id: number } | undefined;
-    if (zajety) {
-      logEvent("kosz_zwrotow_zwiazanie_pominiete", AUTOMAT_KOREKTY, null,
-        { koszId: k.id, kod: k.kod, dokId: Number(dok.dok_id), zajetyPrzez: zajety.id },
-        undefined, database);
-      continue;
-    }
-    /* `mm_mag_z` RAZEM z dokumentem, nie osobno. Od chwili związania trasę
-       powrotu liczy gałąź „kosz z dokumentu" (`trasaPowrotu` w `kosze.ts`),
-       a ta bierze magazyn docelowy WYŁĄCZNIE z tej kolumny. Bez niej związany
-       koszyk przestałby dostawać MM powrotne i zgłaszałby się w rekoncyliacji
-       jako `kosz_bez_powrotu` — towar zostałby na regale zwrotów. */
-    const r = database.prepare(
-      "UPDATE kosz SET mm_dok_id=?, mm_numer=?, mm_mag_z=? WHERE id=? AND mm_dok_id IS NULL")
-      .run(dok.dok_id, k.numer, dok.mag_z, k.id);
-    if (Number(r.changes) === 0) continue;
-    zwiazanych++;
-    logEvent("kosz_zwrotow_zwiazany", AUTOMAT_KOREKTY, null,
-      { koszId: k.id, kod: k.kod, dokId: Number(dok.dok_id), numer: k.numer,
-        magZ: dok.mag_z },
-      undefined, database);
-  }
-  return zwiazanych;
+  /* `mm_mag_z` RAZEM z dokumentem: tak kosz niesie kierunek dokumentu tak
+     samo jak kosz założony z kartki, choć trasę koszyka i tak wyznacza
+     `mm_queue_id` (`trasaPowrotu` w `kosze.ts`). */
+  const r = database.prepare(
+    `UPDATE kosz SET mm_dok_id=?, mm_numer=?, mm_mag_z=?
+      WHERE id=? AND mm_dok_id IS NULL
+        AND NOT EXISTS (SELECT 1 FROM kosz z WHERE z.mm_dok_id = ?)`)
+    .run(dok.dok_id, dok.nr_pelny, dok.mag_z, k.id, dok.dok_id);
+  if (Number(r.changes) === 0) return null;
+  logEvent("kosz_zwrotow_zwiazany", autor, null,
+    { koszId: k.id, kod: k.kod, dokId: Number(dok.dok_id), numer: dok.nr_pelny,
+      magZ: dok.mag_z },
+    undefined, database);
+  return Number(k.id);
 }
 
 /**
@@ -1577,7 +1552,7 @@ export function zwiazKoszykiZDokumentami(database: Db): number {
  * TRZY STANY, JEDEN PASEK. Kosz bez dokumentu czeka dokładnie na jedno z:
  * brakującą korektę, poprawkę zawartości po odmowie Sfery, albo na samo
  * wypuszczenie MM (po poprawce zadanie znika i nikt go nie ponawia aż do
- * następnego taktu wiązań). Osobny ekran na każdy z nich kazałby zgadywać,
+ * następnego taktu wypuszczania). Osobny ekran na każdy z nich kazałby zgadywać,
  * na który patrzeć.
  *
  * Kosza z zadaniem W TOKU tu nie ma i nie powinno być: papier jest w drodze,

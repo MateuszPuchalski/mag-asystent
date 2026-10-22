@@ -47,7 +47,7 @@ export const ZDARZENIA: readonly string[] = [
   "kosz_zwrotow_odmowa", "kosz_zwrotow_otwarty", "kosz_zwrotow_przeliczony",
   "kosz_zwrotow_skladnik", "kosz_zwrotow_towar_dolozony", "kosz_zwrotow_towar_zdjety",
   "kosz_zwrotow_usuniety", "kosz_zwrotow_wypuszczony", "kosz_zwrotow_zamkniety",
-  "kosz_zwrotow_zdjeto", "kosz_zwrotow_zwiazanie_pominiete", "kosz_zwrotow_zwiazany",
+  "kosz_zwrotow_zdjeto", "kosz_zwrotow_zwiazany",
   "location_mismatch", "location_removed", "location_set", "login", "login_failed",
   "logo_dostawcy_usuniecie", "logo_dostawcy_zapis", "magazyny_widocznosc", "manual_entry",
   "migawka_dnia", "notatka_odpowiedz_przeczytana", "obsluga.zalacznik.pobrany",
