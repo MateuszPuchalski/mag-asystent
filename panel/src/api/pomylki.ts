@@ -159,7 +159,15 @@ export interface ZlapanePomylki {
   bezOsoby: number | null;
 }
 
-export interface OsobaZlapanych { sellasistId: number; userId: number | null; nazwa: string | null; zlapanych: number }
+export interface OsobaZlapanych {
+  sellasistId: number;
+  userId: number | null;
+  /** Imię z przypisania admina; `null` = numer bez przypisania. */
+  nazwa: string | null;
+  /** Login z wpisu WMS w dzienniku Sellasist, część przed `@`; `null` = jeszcze nie wyczytany. */
+  login: string | null;
+  zlapanych: number;
+}
 
 /* Pod kluczem rejestru, bo nowa pomyłka w rejestrze zmienia liczbę „do
    klienta”. Odczyt idzie z bazy serwera, nie z Sellasist, więc odświeżenie

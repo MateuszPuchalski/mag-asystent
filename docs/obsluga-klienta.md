@@ -661,7 +661,8 @@ Tabela `pomylka_wysylki` trzyma jeden wiersz na zamówienie.
 - **Kto zbierał złapaną pomyłkę widzi całe biuro**, tą samą decyzją.
   Serwer bierze z dziennika Sellasist numer pracownika, który przestawił
   zamówienie w status zebranego. API Sellasist nie podaje imion, więc admin
-  przypisuje numer do osoby z naszych kont, raz na osobę.
+  przypisuje numer do osoby z naszych kont, raz na osobę. Do tego czasu
+  stoi login z wpisu WMS, sama część przed `@`, bez adresu e-mail.
 - **Retencji nie ma**, jak w sprawie klienta. O archiwizacji decyduje właściciel.
   Kopia anonimizowana (`tools/anonimizuj-baze.mjs`) zamienia login i imiona.
 

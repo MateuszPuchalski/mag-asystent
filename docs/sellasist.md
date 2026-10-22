@@ -99,6 +99,13 @@ podaje sam `user_id`, a API nie ma listy pracowników. Numer przypisuje więc
 admin w zakładce „Pomyłki”, raz na osobę. Zestawienie widzi całe biuro,
 decyzją właściciela z 22 października 2026.
 
+**Login z wpisu WMS.** Wpis „… przez użytkownika jan@firma.pl” ma `user_id`
+tego samego pracownika. Serwer czyta więc cały dziennik zamówienia, bez
+filtra tagu, i zapisuje login sprzed `@` przy numerze. Panel pokazuje go,
+póki admin nie przypisze osoby. Adres e-mail do bazy nie wchodzi.
+`[WERYFIKUJ]` Czy pole `action` w API niesie ten tekst, jak widok w panelu
+Sellasist, sprawdzi dopiero pierwszy przebieg na żywym koncie.
+
 Doba wchodzi do bloku, gdy lustro przeczytało ją całą z ustawionym statusem.
 Doba wpisania statusu jest niepełna, a lustro, które stoi, nie dopisuje zer.
 Obok stoi liczba pomyłek z rejestru zgłoszonych w tych samych dobach. Razem

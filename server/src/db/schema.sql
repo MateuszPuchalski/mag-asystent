@@ -3196,9 +3196,20 @@ CREATE TABLE IF NOT EXISTS sellasist_pomylka_zlapana (
   zamowienie_id INTEGER NOT NULL,
   at            TEXT NOT NULL,          -- chwila wejścia w status, ISO UTC
   zbieral_sellasist_id  INTEGER,        -- NULL = nie ustalono albo jeszcze nie pytano
-  zbieral_sprawdzono_at TEXT            -- NULL = dziennika zamówienia jeszcze nie pytano
+  zbieral_sprawdzono_at TEXT,           -- NULL = dziennika zamówienia jeszcze nie pytano
+  login_szukano_at      TEXT            -- NULL = loginu zbierającego w dzienniku jeszcze nie szukano
 );
 CREATE INDEX IF NOT EXISTS ix_sellasist_pomylka_at ON sellasist_pomylka_zlapana(at);
+
+-- Login pracownika Sellasist wyczytany z wpisu WMS „… przez użytkownika
+-- jan@firma.pl", którego `user_id` to ten sam numer. Sama część przed `@`:
+-- wystarcza, by poznać kolegę, a adres e-mail nie wchodzi do bazy. Przypisanie
+-- admina w `sellasist_pracownik` wygrywa, bo daje pełne imię z naszych kont.
+CREATE TABLE IF NOT EXISTS sellasist_pracownik_login (
+  sellasist_id INTEGER PRIMARY KEY,
+  login        TEXT NOT NULL,
+  widziano_at  TEXT NOT NULL            -- ostatni wpis z tym loginem, ISO UTC
+);
 
 -- Pracownik Sellasist jako osoba z naszych kont. API Sellasist nie wystawia
 -- listy pracowników, sam numer z dziennika, więc numer przypisuje admin, raz.

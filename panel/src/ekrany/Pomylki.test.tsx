@@ -324,8 +324,8 @@ describe("pomyłki złapane przy pakowaniu", () => {
 
   it("kto zbierał (admin): imię po przypisaniu, numer Sellasist z wyborem osoby, reszta bez osoby", async () => {
     const odczyt = odczytPomylek([pomylka()], zlapane({
-      osoby: [{ sellasistId: 7, userId: null, nazwa: null, zlapanych: 3 },
-        { sellasistId: 8, userId: 12, nazwa: "Ewa", zlapanych: 1 }],
+      osoby: [{ sellasistId: 7, userId: null, nazwa: null, login: null, zlapanych: 3 },
+        { sellasistId: 8, userId: 12, nazwa: "Ewa", login: "ewa", zlapanych: 1 }],
       bezOsoby: 1,
     }));
     const wyslane: Array<{ url: string; cialo: unknown }> = [];
@@ -353,8 +353,8 @@ describe("pomyłki złapane przy pakowaniu", () => {
 
   it("kto zbierał (biuro): imiona i numery widać, wyboru osoby nie ma", async () => {
     const odczyt = odczytPomylek([pomylka()], zlapane({
-      osoby: [{ sellasistId: 7, userId: null, nazwa: null, zlapanych: 3 },
-        { sellasistId: 8, userId: 12, nazwa: "Ewa", zlapanych: 1 }],
+      osoby: [{ sellasistId: 7, userId: null, nazwa: null, login: null, zlapanych: 3 },
+        { sellasistId: 8, userId: 12, nazwa: "Ewa", login: "ewa", zlapanych: 1 }],
       bezOsoby: 0,
     }));
     vi.stubGlobal("fetch", vi.fn(async (url: string) => {
@@ -367,6 +367,20 @@ describe("pomyłki złapane przy pakowaniu", () => {
     expect(kto).toHaveTextContent("Ewa1×");
     expect(within(kto).queryByRole("combobox")).toBeNull();
     expect(within(kto).queryByRole("button", { name: "zmień" })).toBeNull();
+  });
+
+  it("kto zbierał: login z Sellasist zamiast samego numeru, póki admin nie przypisze osoby", async () => {
+    const odczyt = odczytPomylek([pomylka()], zlapane({
+      osoby: [{ sellasistId: 18, userId: null, nazwa: null, login: "mariusz", zlapanych: 2 }], bezOsoby: 0,
+    }));
+    vi.stubGlobal("fetch", vi.fn(async (url: string) => {
+      const c = url === "/api/auth/me" ? { user: { userId: 2, name: "Ola", role: "biuro" } } : odczyt(url);
+      return new Response(JSON.stringify(c ?? { error: "nieznany" }), { status: c === undefined ? 404 : 200 });
+    }));
+    otworz();
+    const kto = await screen.findByRole("group", { name: "Kto zbierał złapane" });
+    await waitFor(() => expect(kto).toHaveTextContent("mariusz2×"));
+    expect(within(kto).getByText("mariusz")).toHaveAttribute("title", "Pracownik Sellasist nr 18 — login z Sellasist");
   });
 
   it("pusta lista dób mówi, że Sellasist nic nie podał — bez żadnej cyfry", async () => {
