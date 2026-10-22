@@ -10,6 +10,18 @@ z wersją monorepo" — i właśnie tak przestał być zgodny: `0.3.0` przetrwa�
 sześć zmergowanych zmian, w tym takie, które wymagały nowego uprawnienia SQL.
 Komentarz nie jest mechanizmem.
 
+## 0.609.0 — 22 października 2026
+
+**Kolektor nie krzyczy błędem, gdy odłożenie już weszło.** Po przerwie
+w Wi-Fi to samo odłożenie potrafiło dojść na serwer dwa razy. Druga kopia
+dawała buczenie, „odśwież listę" albo „Operacja z bufora odrzucona", choć
+towar był zapisany. Teraz kolektor mówi „już odłożona — zapis wszedł
+wcześniej", sam odświeża listę, a kopia z bufora znika bez alarmu.
+
+Wpis „Serwer odrzucił żądanie" w dzienniku pokazuje znowu metodę, ścieżkę,
+kod odpowiedzi i powód. Dotąd stało samo „odpowiedź 409", bo opis czytał
+klucze, których serwer nie zapisuje.
+
 ## 0.608.0 — 22 października 2026
 
 **Pomyłkę założoną niepotrzebnie można usunąć.** Gdy okazuje się, że klient
