@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from "react";
+import React, { useEffect, useId, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { ChevronDown, Eraser, Lock, MessageSquare, Send, Undo2 } from "lucide-react";
 import { Przycisk } from "../ui";
 import { obrazZeSchowka, PrzyciskZalacznika, ZalacznikiWysylki } from "./ZalacznikiWysylki";
@@ -8,6 +8,8 @@ import type { ZalacznikSzkicu } from "../api/rozmowy";
 import { doSprawdzenia } from "./ProcesCopilota";
 import { wersjaWPolu, wersjeSzkicu } from "./wersjeSzkicu";
 import { useOkienko } from "./MenuRozmowy";
+import { zakresyWNowym } from "./roznica";
+import { LustroPoprawki, opisPoprawki } from "./PoprawkaWPolu";
 import { klawiszZajety, useSkrotyDzialaja } from "../nawigacja/fokus";
 
 /**
@@ -236,6 +238,27 @@ export function Edytor({
      i granice przy `szkicNaStart` w `SzkicCopilota.tsx`. Edytor wie tylko,
      że pole trzyma szkic, i mówi to nad nim. */
   const wPolu = !wKomentarzu && Boolean(copilot?.wPolu) && szkic !== "";
+  /* ── POPRAWKA Z DOPYTANIA PODŚWIETLONA W POLU ────────────────────────────
+     Powód i technika w `PoprawkaWPolu.tsx`. Podświetlenie trwa, dopóki pole
+     jest DOKŁADNIE wersją Copilota. Pierwsza litera agenta czyni tekst jego
+     i od tej chwili zielone tło kłamałoby, kto co napisał. */
+  const poprawka = wPolu && copilot?.poprawka && copilot.poprawka.po === szkic ? copilot.poprawka : null;
+  const miejsca = useMemo(() => poprawka ? zakresyWNowym(poprawka.przed, poprawka.po) : [],
+    [poprawka?.przed, poprawka?.po]);
+  const podswietlone = miejsca.length > 0;
+  const lustro = useRef<HTMLDivElement>(null);
+  const idOpisu = useId();
+  /* Pole bez `field-sizing` przewija się samo, a lustro nie ma własnego
+     przewijania: idzie za polem co do piksela i zwęża się o jego pasek
+     przewijania, inaczej zawijałoby szerzej niż pole. */
+  const zrownajLustro = () => {
+    const el = pole.current;
+    const l = lustro.current;
+    if (!el || !l) return;
+    l.scrollTop = el.scrollTop;
+    l.style.right = `${Math.max(0, el.offsetWidth - el.clientWidth)}px`;
+  };
+  useLayoutEffect(zrownajLustro, [podswietlone, szkic]);
   /* ── „WYCZYŚĆ WSZYSTKO" Z COFNIĘCIEM (0.499.0) ─────────────────────────
      Druga połowa zgłoszenia: „z opcją wyczyszczenia wszystkiego". Kasowanie
      pięciuset znaków zaznaczaniem to ruch na kilka sekund i łatwy do
@@ -406,7 +429,8 @@ export function Edytor({
       : <>
           {cudza && <p className="flex items-center gap-2 px-3.5 pt-2.5 text-xs text-slate-500">
             <Lock size={13} />Rozmowę prowadzi {wlasciciel} — szkic zapisze tylko właściciel.</p>}
-          {wPolu && copilot && <div className="px-3.5 pt-2.5"><PasekSzkicu p={copilot} wPolu /></div>}
+          {wPolu && copilot && <div className="px-3.5 pt-2.5">
+            <PasekSzkicu p={copilot} wPolu miejsca={podswietlone ? miejsca : undefined} /></div>}
           {/* ── POLE ROŚNIE Z TREŚCIĄ ────────────────────────────────────────
               Pole stoi w tym samym przewijaniu co rozmowa i niczego jej nie
               odejmuje. `field-sizing: content` rośnie z tekstem od progu
@@ -416,16 +440,22 @@ export function Edytor({
           {/* STAŁY RODZIC POLA: zwinięty rząd i rozwinięty dymek różnią się
               klasami, a nie drzewem. Inny rodzic przemontowałby pole
               i zabrał mu fokus przy pierwszej literze. */}
-          <div className={zwiniety ? "flex items-center gap-2" : ""}>
+          <div className={zwiniety ? "flex items-center gap-2" : "relative"}>
+          {/* Lustro leży POD polem, więc pole ma przezroczyste tło, a fiolet
+              szkicu niesie lustro. Odstępy i pismo te same co w polu niżej. */}
+          {!zwiniety && podswietlone && <LustroPoprawki ref={lustro} tekst={szkic} miejsca={miejsca}
+            className="bg-violet-50 px-3.5 pb-1.5 pt-3 text-tresc" />}
           <textarea ref={pole} className={zwiniety
             /* Stała wysokość jednej linii, bez `field-sizing`: puste pole
                mierzyło się podpowiedzią i zawijało rząd na dwie linie.
                Zwinięte pole jest zawsze puste, bo pierwsza litera je rozwija. */
             ? "h-10 min-w-0 flex-1 resize-none overflow-hidden bg-transparent py-2 text-tresc outline-none"
-            : `block min-h-[7.5rem] w-full resize-y px-3.5 pb-1.5 pt-3 text-tresc text-wertis-ink outline-none [field-sizing:content] ${
-              wPolu ? "bg-violet-50" : "bg-transparent"}`}
+            : `relative block min-h-[7.5rem] w-full resize-y px-3.5 pb-1.5 pt-3 text-tresc text-wertis-ink outline-none [field-sizing:content] ${
+              wPolu && !podswietlone ? "bg-violet-50" : "bg-transparent"}`}
             rows={zwiniety ? 1 : undefined} value={szkic}
             aria-label={etykietaPola} aria-keyshortcuts="Control+Enter"
+            aria-describedby={podswietlone ? idOpisu : undefined}
+            onScroll={podswietlone ? zrownajLustro : undefined}
             onChange={(e) => { if (e.target.value !== "") setWyczyszczone(null); onZmiana(e.target.value); }}
             /* CTRL+ENTER WYSYŁA. Ten sam warunek co przycisk niżej — skrót
                nie ma prawa ominąć blokady cudzej rozmowy. Sam Enter zostaje
@@ -454,6 +484,7 @@ export function Edytor({
                  z oboma klawiszami zawijała się i ucinała przy 1180 px. */
               ? (skrotyDzialaja ? `${podpowiedzZwinieta} (Enter)` : podpowiedzZwinieta)
               : skrotyDzialaja && !cudza ? `${podpowiedz} · Enter, żeby pisać` : podpowiedz} />
+          {podswietlone && <p id={idOpisu} className="sr-only">{opisPoprawki(szkic, miejsca)}</p>}
           {zwiniety && <>
             {/* Copilot w rzędzie tylko jako czynność. Zdanie o wyłączonym
                 Copilocie zjadłoby rząd, a nic się z nim nie zrobi. */}

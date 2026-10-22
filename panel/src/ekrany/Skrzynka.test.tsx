@@ -374,6 +374,10 @@ describe("EKRAN SKRZYNKI: pętla pracy", () => {
 describe("EKRAN SKRZYNKI: dopytanie poprawia szkic", () => {
   const SKLEJONY = "Dzień dobry, odpowiedź 1. Dopisek.";
 
+  /** Tekst podświetlony w lustrze pola. Kreska skreślenia dzieli zakres na kilka `<mark>`. */
+  const podswietlone = () => Array.from(screen.getByTestId("lustro-poprawki").querySelectorAll("mark"))
+    .map((m) => m.textContent).join("");
+
   async function polecenie(u: ReturnType<typeof userEvent.setup>, tresc: string) {
     await u.click(screen.getByRole("button", { name: /Dopytaj Copilota/ }));
     await u.type(screen.getByRole("textbox", { name: /pytanie do Copilota/ }), tresc);
@@ -391,14 +395,21 @@ describe("EKRAN SKRZYNKI: dopytanie poprawia szkic", () => {
     await waitFor(() => expect(p).toHaveValue(`${SKLEJONY} Pozdrawiamy.`));
     const wyslane = zadania.find((z) => z.url === "/api/obsluga/copilot/pytanie");
     expect(JSON.parse(wyslane!.body!)).toEqual({ rozmowaId: 1, pytanie: "dodaj podpis", szkic: SKLEJONY });
-    /* Wersja z różnicą stoi w wymianie i mówi, że jest w polu. */
+    /* Poprawka stoi W POLU: dopisane podświetlone w lustrze pod polem,
+       a pasek nad polem mówi, ile miejsc ruszył Copilot. */
+    await waitFor(() => expect(podswietlone()).toBe("Pozdrawiamy."));
+    expect(screen.getByText("Copilot zmienił 1 miejsce")).toBeInTheDocument();
+    /* Wersja w wymianie to jedna linia; różnica czeka za „Pokaż zmiany”. */
     const wersja = await screen.findByRole("group", { name: "Wersja 2" });
     expect(within(wersja).getByText("w polu")).toBeInTheDocument();
+    expect(wersja.querySelector("ins")).toBeNull();
+    await u.click(within(wersja).getByRole("button", { name: "Pokaż zmiany" }));
     expect(wersja.querySelector("ins")).toHaveTextContent("Pozdrawiamy.");
 
     expect(screen.getByText("Copilot poprawił szkic")).toBeInTheDocument();
     await u.click(screen.getByRole("button", { name: "Cofnij" }));
     expect(p).toHaveValue(SKLEJONY);
+    expect(screen.queryByTestId("lustro-poprawki")).toBeNull();
   });
 
   it("agent pisał w trakcie — pole zostaje, a wersja czeka z „Wstaw do odpowiedzi”", async () => {
@@ -419,6 +430,9 @@ describe("EKRAN SKRZYNKI: dopytanie poprawia szkic", () => {
     /* Wstawienie z wymiany to też droga z cofnięciem. */
     await u.click(within(wersja).getByRole("button", { name: /Wstaw do odpowiedzi/ }));
     expect(p).toHaveValue(`${SKLEJONY} Pozdrawiamy.`);
+    /* Wstawienie przyciskiem podświetla tak samo, od tekstu sprzed wstawienia. */
+    expect(podswietlone()).toBe("Pozdrawiamy.");
+    expect(screen.getByRole("button", { name: "Pokaż usunięte" })).toBeInTheDocument();
     await u.click(screen.getByRole("button", { name: "Cofnij" }));
     expect(p).toHaveValue(`${SKLEJONY} Jeszcze.`);
   });

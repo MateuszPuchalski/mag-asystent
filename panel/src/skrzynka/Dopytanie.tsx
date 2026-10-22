@@ -2,7 +2,7 @@ import React from "react";
 import { MessageCircleQuestion, Paperclip, X } from "lucide-react";
 import { Przycisk, czas, godzina, ile } from "../ui";
 import { ProcesCopilota } from "./ProcesCopilota";
-import { RoznicaSzkicu } from "./RoznicaSzkicu";
+import { RoznicaSzkicu, TekstRoznicy, podsumowanieZmian } from "./RoznicaSzkicu";
 import { Zwijka } from "./Zwijka";
 import { obrazZeSchowka } from "./ZalacznikiWysylki";
 import { lukaReczna, wersjaWPolu, wersjeSzkicu, type WersjaSzkicu } from "./wersjeSzkicu";
@@ -93,10 +93,14 @@ function odmowaZdjecia(plik: File, juzJest: number, juzBajtow: number): string |
 }
 
 /**
- * Nowa wersja szkicu z jednej wymiany: numer, różnica i droga do pola.
+ * Nowa wersja szkicu z jednej wymiany: numer, godzina, ile słów i droga do pola.
  *
- * Najnowsza stoi rozwinięta, bo to ją agent właśnie czyta. Starsze zwijają
- * różnicę pod jedną linijką: historia ma być pod ręką, nie w oczach.
+ * JEDNA LINIA, NIE DRUGI SZKIC. Zgłoszenie właściciela: „poprawki powinny być
+ * w inteligentny sposób nałożone na szkic, żeby nie tworzyć kolejnego
+ * bloku”. Wersja wchodzi do pola sama, a pole pokazuje poprawkę na miejscu
+ * (`PoprawkaWPolu.tsx`). Pełna różnica tutaj powtarzała cały tekst drugi raz
+ * pod polem. Stoi więc zwinięta za „Pokaż zmiany”, także przy najnowszej:
+ * sięga się po nią przy starszych wersjach i przy pytaniu, co model ruszył.
  *
  * Przycisk nie stoi przy wersji, która JUŻ jest w polu. Wstawienie jej drugi
  * raz niczego nie zmienia, a przycisk sugerowałby, że zmienia.
@@ -111,11 +115,19 @@ function Wersja({ w, po, wersja, najnowsza, wPolu, wylaczony, onWstaw }: {
   wylaczony: boolean;
   onWstaw: (tresc: string) => void;
 }) {
+  const [zmiany, setZmiany] = React.useState(false);
+  const przed = w.szkicPrzed ?? "";
+  const podsumowanie = React.useMemo(() => podsumowanieZmian(przed, po), [przed, po]);
   const nazwa = wersja ? `Wersja ${wersja.nr}` : "Wersja wcześniejszego szkicu";
   const napis = najnowsza ? "Wstaw do odpowiedzi" : "Przywróć tę wersję";
+  const idZmian = `zmiany-wersji-${w.id}`;
   return <div role="group" aria-label={nazwa} className="mt-2 rounded border border-violet-200 p-2">
-    <div className="flex flex-wrap items-center gap-2">
+    <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
       <p className="text-xs font-semibold text-violet-900" title={czas(w.at)}>{nazwa} · {godzina(w.at)}</p>
+      <span className="text-xs text-slate-700">· {podsumowanie}</span>
+      <button type="button" aria-expanded={zmiany} aria-controls={idZmian}
+        className="min-h-6 rounded px-1 text-xs font-semibold text-violet-900 hover:bg-violet-50 hover:underline"
+        onClick={() => setZmiany((z) => !z)}>{zmiany ? "Ukryj zmiany" : "Pokaż zmiany"}</button>
       {/* Poprawka starego szkicu nie ma przycisku. Odpowiada na fakty sprzed
           „Ułóż ponownie”, a tarcie przy wysyłce liczy tylko wersje obecnego. */}
       {/* Numer wersji w nazwie dla czytnika: „Wstaw do odpowiedzi” stoi też
@@ -126,7 +138,7 @@ function Wersja({ w, po, wersja, najnowsza, wPolu, wylaczony, onWstaw }: {
             aria-label={`${napis} — wersja ${wersja.nr}`}
             disabled={wylaczony} onClick={() => onWstaw(po)}>{napis}</Przycisk>)}
     </div>
-    <RoznicaSzkicu przed={w.szkicPrzed ?? ""} po={po} zwinieta={!najnowsza} />
+    {zmiany && <div id={idZmian}><TekstRoznicy przed={przed} po={po} /></div>}
     <ProcesCopilota key={`${w.id}-${w.at}-wersja`} twierdzenia={w.szkicTwierdzenia ?? []} />
   </div>;
 }
@@ -145,7 +157,8 @@ function Wersja({ w, po, wersja, najnowsza, wPolu, wylaczony, onWstaw }: {
  * NOTKA NIE MA PRZYCISKU „WSTAW”. Czyta ją agent, a przycisk byłby obejściem
  * wszystkich sit szkicu jednym kliknięciem. Przycisk ma tylko WERSJA, bo
  * serwer przepuścił ją przez te same sita co szkic. Nowa wersja wchodzi do
- * pola sama, z różnicą słów i paskiem „Cofnij” (`ekrany/Skrzynka.tsx`).
+ * pola sama, z poprawką podświetloną w polu i paskiem „Cofnij”
+ * (`ekrany/Skrzynka.tsx`).
  *
  * KSZTAŁT JEST ROZMOWĄ, NIE KARTĄ. Polecenie i to, co z nim zrobił model,
  * stoją naprzemiennie, bo druga prośba zwykle wynika z pierwszej odpowiedzi.
