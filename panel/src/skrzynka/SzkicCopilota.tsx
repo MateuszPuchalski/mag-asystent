@@ -6,6 +6,8 @@ import { ProcesCopilota } from "./ProcesCopilota";
 import type { OsRozmowy, StanCopilota, SzkicCopilota, WymianaCopilota } from "../api/typy";
 import { Dopytanie } from "./Dopytanie";
 import { wersjaWPolu, wersjeSzkicu } from "./wersjeSzkicu";
+import { LiniaPoprawki, ListaUsunietych } from "./PoprawkaWPolu";
+import type { MiejsceZmiany } from "./roznica";
 import { useSkrotyDzialaja } from "../nawigacja/fokus";
 
 /**
@@ -41,6 +43,12 @@ export interface PropsSzkicuCopilota {
    * w edytorze"; gaśnie przy wyczyszczeniu pola i przy zmianie rozmowy.
    */
   wPolu?: boolean;
+  /**
+   * Ostatnia wersja Copilota wstawiona z dopytania i tekst pola sprzed niej.
+   * Pole podświetla poprawkę, dopóki jest DOKŁADNIE równe `po`. Ekran zdejmuje
+   * ją przy pierwszej zmianie agenta, przy „Cofnij” i przy zmianie rozmowy.
+   */
+  poprawka?: { przed: string; po: string } | null;
   wylaczony: boolean;
   /**
    * DOPYTANIE (0.332.0). `undefined` = rozmowa jeszcze się nie wczytała.
@@ -175,11 +183,19 @@ export function PrzyciskSzkicu({ p }: { p: PropsSzkicuCopilota }) {
  * i zdanie mówiące, skąd tekst w polu. Przyjmowanie Tabem z 0.495.0
  * odeszło razem z podpowiedzią.
  */
-export function PasekSzkicu({ p, wPolu = false }: { p: PropsSzkicuCopilota; wPolu?: boolean }) {
+export function PasekSzkicu({ p, wPolu = false, miejsca }: {
+  p: PropsSzkicuCopilota;
+  wPolu?: boolean;
+  /** Miejsca poprawki z dopytania podświetlonej w polu — patrz `PoprawkaWPolu.tsx`. */
+  miejsca?: MiejsceZmiany[];
+}) {
   /* Znaczki E i R tylko wtedy, gdy klawisze działają — powód w `nawigacja/fokus.ts`. */
   const skrotyDzialaja = useSkrotyDzialaja();
+  const [usuniete, setUsuniete] = React.useState(false);
+  const idListy = React.useId();
   const s = p.szkic;
   if (!s) return null;
+  const poprawka = wPolu && miejsca && miejsca.length > 0 ? miejsca : null;
   /* ── METRYKA W DYMKU, NIE W WIERSZU (0.517.0) ────────────────────────
      Model, godzina, kto i liczba znaków stały zawsze widoczne obok nazwy.
      Agent sięga po nie wyjątkowo — przy reklamacji szkicu, nie przy
@@ -191,7 +207,11 @@ export function PasekSzkicu({ p, wPolu = false }: { p: PropsSzkicuCopilota; wPol
       <b className="cursor-help text-violet-900"
         title={`${s.model} · ${czas(s.at)} · ${s.przez} · ${s.tresc.length} znaków`}>
         <Sparkles size={12} className="inline" /> Szkic Copilota{wPolu && " w polu"}</b>
-      {p.nieswiezy && <span className="rounded bg-amber-100 px-1.5 py-0.5 font-semibold text-amber-800">
+      {/* Poprawka z dopytania mówi o sobie TU, w pasku nad polem, jedną
+          linią. Osobny blok pod polem powtarzałby szkic drugi raz. */}
+      {poprawka && <LiniaPoprawki miejsca={poprawka} otwarte={usuniete}
+        onPrzelacz={() => setUsuniete((o) => !o)} idListy={idListy} />}
+      {p.nieswiezy &&<span className="rounded bg-amber-100 px-1.5 py-0.5 font-semibold text-amber-800">
         powstał przed nową wiadomością klienta</span>}
       <span className="ml-auto flex flex-wrap items-center gap-2">
         {!wPolu && <Przycisk wariant="glowny" className="text-xs" disabled={p.wylaczony} onClick={p.onPopraw}
@@ -208,6 +228,7 @@ export function PasekSzkicu({ p, wPolu = false }: { p: PropsSzkicuCopilota; wPol
           {skrotyDzialaja && <kbd aria-hidden="true" className="ml-1 rounded bg-slate-100 px-1 font-sans">R</kbd>}
         </Przycisk>
       </span>
+      {poprawka && usuniete && <ListaUsunietych miejsca={poprawka} id={idListy} />}
     </div>;
 }
 

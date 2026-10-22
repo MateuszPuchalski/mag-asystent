@@ -158,34 +158,54 @@ describe("wersje szkicu w dopytaniu", () => {
   test("różnica słów: dopisane i skreślone mają słowo dla czytnika, nie tylko barwę", () => {
     render(<Dopytanie {...props({ wymiany: [poprawka(1, ORYGINAL, "Dzień dobry, nóż pasuje do LS 46.")] })} />);
     const wersja = screen.getByRole("group", { name: "Wersja 2" });
+    fireEvent.click(within(wersja).getByRole("button", { name: "Pokaż zmiany" }));
     const ins = wersja.querySelector("ins");
     const del = wersja.querySelector("del");
     expect(ins).toHaveTextContent("dodano: LS 46.");
     expect(del).toHaveTextContent("usunięto: kosiarki.");
     expect(within(wersja).getByText("dodano:")).toHaveClass("sr-only");
     /* Podsumowanie słowami, odmienione: „+2 słowa”, „−1 słowo”. */
-    expect(within(wersja).getByText("+2 słowa, −1 słowo")).toBeInTheDocument();
+    expect(within(wersja).getByText("· +2 słowa, −1 słowo")).toBeInTheDocument();
   });
 
   test("wersja w polu mówi „w polu” zamiast przycisku", () => {
     render(<Dopytanie {...props({ pole: `${V2}\n`, wymiany: [poprawka(1, ORYGINAL, V2)] })} />);
     const wersja = screen.getByRole("group", { name: "Wersja 2" });
     expect(within(wersja).getByText("w polu")).toBeInTheDocument();
-    expect(within(wersja).queryByRole("button")).toBeNull();
+    for (const slowo of [/wstaw/i, /przywróć/i]) expect(within(wersja).queryByRole("button", { name: slowo })).toBeNull();
   });
 
-  test("starsza wersja ma „Przywróć tę wersję” ze swoją treścią, a jej różnica jest zwinięta", () => {
+  test("starsza wersja ma „Przywróć tę wersję” ze swoją treścią", () => {
     const p = props({ pole: V3, wymiany: [poprawka(1, ORYGINAL, V2), poprawka(2, V2, V3)] });
     render(<Dopytanie {...p} />);
     const starsza = screen.getByRole("group", { name: "Wersja 2" });
     const najnowsza = screen.getByRole("group", { name: "Wersja 3" });
     expect(within(najnowsza).getByText("w polu")).toBeInTheDocument();
-    expect(within(starsza).getByTestId("roznica-szkicu").closest("details")).not.toHaveAttribute("open");
-    expect(within(najnowsza).getByTestId("roznica-szkicu").closest("details")).toBeNull();
     fireEvent.click(within(starsza).getByRole("button", { name: /Przywróć tę wersję/ }));
     expect(p.onWstaw).toHaveBeenCalledWith(V2);
     /* Podpis zwiniętego bloku liczy wymiany i poprawki, odmienione. */
     expect(screen.getByText("2 wymiany · 2 poprawki")).toBeInTheDocument();
+  });
+
+  /* ── Wersja to jedna linia, nie drugi szkic ──────────────────────────────
+     Zgłoszenie właściciela: nowa wersja stoi już w polu, z poprawką
+     podświetloną na miejscu. Pełny tekst z różnicą tutaj był drugim
+     szkicem pod polem, więc czeka zwinięty za „Pokaż zmiany”.            */
+  test("wersja z wymiany to jedna linia: numer, godzina, ile słów — różnica zwinięta, także w najnowszej", () => {
+    render(<Dopytanie {...props({ pole: V3, wymiany: [poprawka(1, ORYGINAL, V2), poprawka(2, V2, V3)] })} />);
+    for (const nazwa of ["Wersja 2", "Wersja 3"]) {
+      const wersja = screen.getByRole("group", { name: nazwa });
+      expect(within(wersja).queryByTestId("roznica-szkicu")).toBeNull();
+      expect(within(wersja).getByRole("button", { name: "Pokaż zmiany" })).toHaveAttribute("aria-expanded", "false");
+    }
+    const najnowsza = screen.getByRole("group", { name: "Wersja 3" });
+    expect(within(najnowsza).getByText("· +2 słowa")).toBeInTheDocument();
+    /* Pełny tekst wersji nie stoi w bloku drugi raz. */
+    expect(najnowsza).not.toHaveTextContent("Wysyłka dziś");
+
+    fireEvent.click(within(najnowsza).getByRole("button", { name: "Pokaż zmiany" }));
+    expect(within(najnowsza).getByRole("button", { name: "Ukryj zmiany" })).toHaveAttribute("aria-expanded", "true");
+    expect(within(najnowsza).getByTestId("roznica-szkicu").querySelector("ins")).toHaveTextContent("Wysyłka dziś.");
   });
 
   test("nagłówek wersji niesie numer i godzinę", () => {

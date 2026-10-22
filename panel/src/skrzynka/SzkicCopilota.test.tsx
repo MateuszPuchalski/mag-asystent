@@ -351,3 +351,81 @@ describe("ostatniaKupujacego", () => {
     expect(ostatniaKupujacego([wpis(2, false)])).toBeNull();
   });
 });
+
+/* ── Poprawka z dopytania podświetlona w samym polu ──────────────────────────
+   Zgłoszenie właściciela: „poprawki powinny być w inteligentny sposób
+   nałożone na szkic, żeby nie tworzyć kolejnego bloku”. Pod polem leży
+   lustro z tym samym tekstem: dopisane ma zielone tło, skreślenie cienką
+   kreskę. Lustro musi trzymać DOKŁADNIE tekst pola, inaczej podświetlenie
+   rozjedzie się z literami. Pierwsza zmiana agenta zdejmuje podświetlenie,
+   bo od niej tekst jest jego.                                             */
+describe("poprawka Copilota w polu", () => {
+  const PRZED = "Dzień dobry,\n\nObecne dane mamy: Husqvarna 345 łańcuch z 64 ogniwami.\n\nPozdrawiamy";
+  const PO = "Dzień dobry,\n\ndziękujemy za link. Ten zestaw to prowadnica Oregon 15 cali.\n\nPozdrawiamy";
+
+  /** Edytor z polem, które pisze naprawdę: `onZmiana` zmienia tekst, a poprawka zostaje. */
+  function PoleZPoprawka({ przed, po }: { przed: string; po: string }) {
+    const [tekst, setTekst] = React.useState(po);
+    return <Edytor {...props} szkic={tekst} onZmiana={setTekst}
+      copilot={copilot({ szkic: szkic(), wPolu: true, maSzkicAgenta: true, poprawka: { przed, po } })} />;
+  }
+  const lustro = () => screen.queryByTestId("lustro-poprawki");
+  const podswietlone = () => Array.from(lustro()!.querySelectorAll("mark")).map((m) => m.textContent).join("");
+
+  it("lustro trzyma dokładnie tekst pola, a dopisane stoi w <mark>", () => {
+    render(<PoleZPoprawka przed={PRZED} po={PO} />);
+    expect(lustro()).toHaveAttribute("aria-hidden", "true");
+    expect(lustro()!.textContent).toBe(PO);
+    expect(screen.getByLabelText("Szkic odpowiedzi")).toHaveValue(PO);
+    expect(podswietlone()).toBe("dziękujemy za link. Ten zestaw to prowadnica Oregon 15 cali.");
+    /* Skreślenie ma kreskę przy pierwszej literze dopisanego, bez wstawiania znaków. */
+    expect(lustro()!.querySelectorAll("[data-kreska]")).toHaveLength(1);
+    expect(lustro()!.querySelector("[data-kreska]")).toHaveTextContent("d");
+  });
+
+  it("pasek nad polem mówi, ile miejsc ruszył Copilot, a „Pokaż usunięte” rozwija skreślenia", async () => {
+    render(<PoleZPoprawka przed={PRZED} po={PO} />);
+    expect(screen.getByText("Copilot zmienił 1 miejsce")).toBeInTheDocument();
+    const przycisk = screen.getByRole("button", { name: "Pokaż usunięte" });
+    expect(przycisk).toHaveAttribute("aria-expanded", "false");
+    expect(screen.queryByRole("list", { name: "Fragmenty usunięte przez Copilota" })).toBeNull();
+    await userEvent.click(przycisk);
+    const lista = screen.getByRole("list", { name: "Fragmenty usunięte przez Copilota" });
+    expect(lista.querySelector("del")).toHaveTextContent("Obecne dane mamy: Husqvarna 345 łańcuch z 64 ogniwami.");
+    expect(screen.getByRole("button", { name: "Ukryj usunięte" })).toHaveAttribute("aria-expanded", "true");
+  });
+
+  it("czytnik ekranu dostaje jedno zdanie przy polu", () => {
+    render(<PoleZPoprawka przed={PRZED} po={PO} />);
+    expect(screen.getByLabelText("Szkic odpowiedzi")).toHaveAccessibleDescription(
+      /^W polu jest poprawka Copilota: 1 zmiana, dopisane 10 słów, skreślone 9 słów\. .*Pokaż usunięte/);
+  });
+
+  it("pierwsza litera agenta zdejmuje podświetlenie i linię w pasku", async () => {
+    render(<PoleZPoprawka przed={PRZED} po={PO} />);
+    expect(lustro()).not.toBeNull();
+    await userEvent.type(screen.getByLabelText("Szkic odpowiedzi"), "!");
+    expect(lustro()).toBeNull();
+    expect(screen.queryByText(/Copilot zmienił/)).toBeNull();
+    expect(screen.getByLabelText("Szkic odpowiedzi")).not.toHaveAttribute("aria-describedby");
+  });
+
+  it("samo skreślenie: kreska i „Pokaż usunięte”; samo dopisanie: bez przycisku", () => {
+    const { unmount } = render(<PoleZPoprawka przed="Nóż chyba pasuje do kosiarki." po="Nóż pasuje do kosiarki." />);
+    expect(lustro()!.querySelector("mark")).toBeNull();
+    expect(lustro()!.querySelector("[data-kreska]")).toHaveTextContent("p");
+    expect(screen.getByRole("button", { name: "Pokaż usunięte" })).toBeInTheDocument();
+    unmount();
+
+    render(<PoleZPoprawka przed="Nóż pasuje." po="Nóż na pewno pasuje." />);
+    expect(podswietlone()).toBe("na pewno");
+    expect(screen.queryByRole("button", { name: "Pokaż usunięte" })).toBeNull();
+  });
+
+  it("pole różne od wersji Copilota nie ma lustra", () => {
+    edytor(copilot({ szkic: szkic(), wPolu: true, maSzkicAgenta: true, poprawka: { przed: PRZED, po: PO } }),
+      { szkic: `${PO} Ania` });
+    expect(lustro()).toBeNull();
+    expect(screen.queryByText(/Copilot zmienił/)).toBeNull();
+  });
+});
