@@ -179,8 +179,9 @@ export function useImportGotowych() {
 
 /* ── ZDJĘCIA Z OFERT ALLEGRO ───────────────────────────────────────────────
    Towar bez zdjęcia w Subiekcie często ma ofertę ze zdjęciem na Allegro.
-   Serwer wybiera ofertę po symbolu (`external.id`), a panel składa z jej
-   zdjęcia biały kwadrat tą samą drogą co import z folderu. */
+   Serwer wybiera ofertę po symbolu (`external.id`), a gdy tej brak — po
+   kodzie producenta z lokalnego indeksu. Panel składa z jej zdjęcia biały
+   kwadrat tą samą drogą co import z folderu. */
 
 /** Ile symboli mieści jedno pytanie — tyle przyjmuje `external.id` w Allegro. */
 export const SYMBOLI_NA_PYTANIE_ALLEGRO = 100;
@@ -200,7 +201,18 @@ export interface OfertaZdjecia {
   zdjecie: boolean;
 }
 
-export interface PozycjaOferty { symbol: string; ofert: number; oferta: OfertaZdjecia | null }
+/** Którą drogą serwer znalazł ofertę: sygnatura to `external.id`, kod producenta — lokalny indeks. */
+export type DrogaDopasowania = "sygnatura" | "kod_producenta";
+
+export interface PozycjaOferty {
+  symbol: string;
+  ofert: number;
+  oferta: OfertaZdjecia | null;
+  /** `null` albo brak: oferty nie wybrano (starszy serwer pola nie zna). */
+  po?: DrogaDopasowania | null;
+  /** Oferta kodu producenta trafia w kilka symboli, więc żaden jej nie dostaje. */
+  niejednoznaczny?: boolean;
+}
 
 export interface DopasowanieOfert { wlaczone: boolean; powod?: string; pozycje: PozycjaOferty[] }
 
@@ -262,6 +274,119 @@ export function useDopasujOferty() {
       s.postep(Math.min(i + paczka.length, symbole.length), symbole.length);
     }
     return { pozycje };
+  };
+}
+
+/* ── INDEKS NASZYCH OFERT ──────────────────────────────────────────────────
+   `GET /sale/offers` nie szuka po kodzie producenta, a parametry oddaje
+   tylko pytanie o jedną ofertę. Serwer trzyma więc lokalny indeks: listę
+   naszych ofert i kod producenta każdej. Buduje go dopiero przycisk
+   „Sprawdź oferty”, bo każdy krok kosztuje limit Allegro i zapisuje bazę. */
+
+export interface StanIndeksu {
+  /** Ofert z naszej listy. */
+  ofert: number;
+  zKodem: number;
+  /** Ile ofert czeka na odczyt kodu producenta. */
+  doPobrania: number;
+  listaAt: string | null;
+}
+
+export interface StronaListyOfert { ofert: number; razem: number | null; nastepny: number | null }
+export interface KrokParametrow { pobrano: number; zostalo: number }
+
+const KLUCZ_INDEKSU = ["zdjecia", "allegro", "indeks"] as const;
+
+/** Sam odczyt stanu indeksu; okno pokazuje go przy otwarciu. */
+export function useStanIndeksu() {
+  return useQuery({
+    queryKey: KLUCZ_INDEKSU,
+    queryFn: () => api<StanIndeksu>("/api/zdjecia/allegro/indeks"),
+  });
+}
+
+export type PostepIndeksu =
+  | { faza: "lista"; z: number; razem: number | null }
+  | { faza: "kody"; pobrano: number; zostalo: number | null };
+
+export interface SterowanieIndeksu {
+  postep: (p: PostepIndeksu) => void;
+  czekaj: (ms: number) => Promise<boolean>;
+  stop: () => boolean;
+}
+
+export interface PrzebiegIndeksu {
+  zatrzymane?: boolean;
+  blad?: unknown;
+  /** Oferty, których serwer w tym przebiegu nie odczytał, choć pytał (krok bez postępu). */
+  nieodczytane?: number;
+}
+
+/**
+ * Pytanie z jednym ponowieniem po 429, tą samą regułą co `useDopasujOferty`.
+ * `null`: agent zatrzymał przebieg w czasie przerwy.
+ */
+async function zPonowieniem<T>(pytaj: () => Promise<T>, czekaj: SterowanieIndeksu["czekaj"]): Promise<T | null> {
+  try {
+    return await pytaj();
+  } catch (e) {
+    if (!(e instanceof PrzerwaAllegro)) throw e;
+    if (!(await czekaj(e.poIluMs ?? PRZERWA_ALLEGRO_MS))) return null;
+    return await pytaj();
+  }
+}
+
+/**
+ * Odświeżenie indeksu: lista naszych ofert stronami, potem kody producenta
+ * paczkami, aż serwer powie „zostało 0”. Stan leży w bazie serwera, więc
+ * zatrzymany przebieg dokończy następne „Sprawdź oferty”.
+ */
+export function useBudujIndeks() {
+  const qc = useQueryClient();
+  const lista = useMutation({
+    mutationFn: (offset: number) => api<StronaListyOfert>("/api/zdjecia/allegro/indeks/lista", {
+      method: "POST", body: JSON.stringify({ offset }),
+    }),
+  });
+  const parametry = useMutation({
+    mutationFn: () => api<KrokParametrow>("/api/zdjecia/allegro/indeks/parametry", {
+      method: "POST", body: JSON.stringify({}),
+    }),
+  });
+  const strona = lista.mutateAsync, krok = parametry.mutateAsync;
+  return async (s: SterowanieIndeksu): Promise<PrzebiegIndeksu> => {
+    try {
+      let z = 0;
+      let razem: number | null = null;
+      s.postep({ faza: "lista", z, razem });
+      for (let offset: number | null = 0; offset !== null;) {
+        if (s.stop()) return { zatrzymane: true };
+        const o: number = offset;
+        const d = await zPonowieniem(() => strona(o), s.czekaj);
+        if (!d) return { zatrzymane: true };
+        z += d.ofert;
+        razem = d.razem;
+        s.postep({ faza: "lista", z, razem });
+        offset = d.nastepny ?? null;
+      }
+      let pobrano = 0;
+      s.postep({ faza: "kody", pobrano, zostalo: null });
+      for (;;) {
+        if (s.stop()) return { zatrzymane: true };
+        const d = await zPonowieniem(() => krok(), s.czekaj);
+        if (!d) return { zatrzymane: true };
+        pobrano += d.pobrano;
+        s.postep({ faza: "kody", pobrano, zostalo: d.zostalo });
+        if (!(d.zostalo > 0)) return {};
+        /* Krok bez postępu znaczy, że serwer pominął każdą ofertę paczki.
+           Następny krok wziąłby te same, więc pętla kręciłaby się w miejscu. */
+        if (d.pobrano === 0) return { nieodczytane: d.zostalo };
+      }
+    } catch (e) {
+      return { blad: e };
+    } finally {
+      void qc.invalidateQueries({ queryKey: KLUCZ_INDEKSU });
+    }
   };
 }
 

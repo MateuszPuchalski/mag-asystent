@@ -66,8 +66,10 @@ function oferta(id: string, sygnatura: string, o: { status?: string; startedAt?:
   };
 }
 
-const deps = (d: DatabaseSync, odpowiedz: (url: string) => unknown, adresy: string[] = []) => ({
-  database: d, apiUrl: "https://api.test", accountId: "konto-1",
+/* Subiekt atrapą: domyślnie żadna sygnatura nie jest symbolem kartoteki. */
+const deps = (d: DatabaseSync, odpowiedz: (url: string) => unknown, adresy: string[] = [],
+  towary: (symbole: string[]) => Promise<Array<{ symbol: string }>> = async () => []) => ({
+  database: d, apiUrl: "https://api.test", accountId: "konto-1", towary,
   now: () => new Date("2026-10-21T10:00:00.000Z"),
   query: async (url: string) => { adresy.push(url); return odpowiedz(url); },
 });
@@ -107,10 +109,10 @@ test("dopasowanie bez wielkości liter, jedna pozycja na symbol, w kolejności w
     wlaczone: true,
     pozycje: [
       { symbol: "W08-0501", ofert: 1, oferta: {
-        id: "10", nazwa: "Oferta 10", status: "ACTIVE", startedAt: "2026-01-01T00:00:00Z", zdjecie: true } },
-      { symbol: "NIE-MA", ofert: 0, oferta: null },
+        id: "10", nazwa: "Oferta 10", status: "ACTIVE", startedAt: "2026-01-01T00:00:00Z", zdjecie: true }, po: "sygnatura", niejednoznaczny: false },
+      { symbol: "NIE-MA", ofert: 0, oferta: null, po: null, niejednoznaczny: false },
       { symbol: "ab 12", ofert: 1, oferta: {
-        id: "12", nazwa: "Oferta 12", status: "ACTIVE", startedAt: null, zdjecie: false } },
+        id: "12", nazwa: "Oferta 12", status: "ACTIVE", startedAt: null, zdjecie: false }, po: "sygnatura", niejednoznaczny: false },
     ],
   });
   d.close();
@@ -145,7 +147,9 @@ test("zapis: snapshot każdej oferty, wybór na symbol i jeden wpis w dzienniku"
   const zdarzenia = d.prepare("SELECT type, payload FROM events").all() as Array<{ type: string; payload: string }>;
   assert.equal(zdarzenia.length, 1);
   assert.equal(zdarzenia[0].type, "zdjecia_allegro_dopasowane");
-  assert.deepEqual(JSON.parse(zdarzenia[0].payload), { symboli: 2, ofert: 2, wybranych: 1, zeZdjeciem: 1 });
+  assert.deepEqual(JSON.parse(zdarzenia[0].payload), {
+    symboli: 2, ofert: 2, wybranych: 1, zeZdjeciem: 1, poKodzieProducenta: 0, niejednoznacznych: 0,
+  });
   d.close();
 });
 
@@ -253,5 +257,145 @@ test("duże zdjęcie: CDN bez obrazu albo ponad 10 MB to 502", async () => {
     pobierz: async () => ({ bajty: Buffer.alloc(10 * 1024 * 1024 + 1), mime: "image/jpeg" }),
   });
   assert.equal(!duze.ok && duze.kod, 502);
+  d.close();
+});
+
+// ── Kod producenta z lokalnego indeksu ─────────────────────────────────────
+
+/** Oferta w indeksie: z naszej listy (albo cudza), z kodem producenta i sygnaturą. */
+function wIndeksie(d: DatabaseSync, id: string, kod: string, o: {
+  sygnatura?: string; status?: string; zdjecie?: boolean; nasza?: boolean; synced?: string;
+} = {}) {
+  const konto = Number((d.prepare(`INSERT INTO channel_account(channel, external_account_id) VALUES ('allegro','konto-1')
+    ON CONFLICT(channel, external_account_id) DO UPDATE SET channel=channel RETURNING id`).get() as { id: number }).id);
+  d.prepare(`INSERT INTO offer_snapshot(channel_account_id, external_id, nazwa, sku, status, primary_image_url,
+      synced_at, nasza_lista_at, kod_producenta, kod_producenta_at)
+    VALUES (?,?,?,?,?,?,?,?,?,?)`).run(konto, id, `Oferta ${id}`, o.sygnatura ?? `SYG-${id}`, o.status ?? "ACTIVE",
+    o.zdjecie === false ? "" : `${ZDJ}?${id}`, o.synced ?? "2026-10-01T00:00:00.000Z",
+    o.nasza === false ? null : "2026-10-01T00:00:00.000Z", kod, "2026-10-01T00:00:00.000Z");
+}
+
+const bezOfert = () => ({ offers: [] });
+
+test("kod producenta: symbol bez oferty po sygnaturze dostaje naszą ofertę z kodem, bez wielkości liter", async () => {
+  const d = baza();
+  wIndeksie(d, "k1", " ls-1 ");
+  /* Cudza aukcja spod wiadomości ma ten sam kod, świeższy snapshot i zdjęcie. Nie wchodzi. */
+  wIndeksie(d, "cudza", "LS-1", { nasza: false, synced: "2026-10-20T00:00:00.000Z" });
+  const wynik = await m.dopasujOfertyAllegro(["LS-1"], "Ala", deps(d, bezOfert));
+  assert.ok(wynik.wlaczone);
+  assert.deepEqual(wynik.pozycje, [{
+    symbol: "LS-1", ofert: 1, po: "kod_producenta", niejednoznaczny: false,
+    oferta: { id: "k1", nazwa: "Oferta k1", status: "ACTIVE", startedAt: null, zdjecie: true },
+  }]);
+  const wybor = { ...d.prepare("SELECT offer_id, po FROM zdjecie_oferty_wybor").get() as object };
+  assert.deepEqual(wybor, { offer_id: "k1", po: "kod_producenta" });
+  const zd = d.prepare("SELECT payload FROM events").get() as { payload: string };
+  assert.equal(JSON.parse(zd.payload).poKodzieProducenta, 1);
+  /* Wybór po kodzie otwiera duże zdjęcie, bo strażnik patrzy na `zdjecie_oferty_wybor`. */
+  const duze = await m.duzeZdjecieOferty("k1", {
+    database: d, accountId: "konto-1", pobierz: async () => ({ bajty: JPEG, mime: "image/jpeg" }),
+  });
+  assert.equal(duze.ok, true);
+  d.close();
+});
+
+test("kod producenta: sygnatura ze zdjęciem wygrywa, sygnatura bez zdjęcia ustępuje", async () => {
+  const d = baza();
+  wIndeksie(d, "k1", "S-1");
+  wIndeksie(d, "k2", "S-2");
+  const wynik = await m.dopasujOfertyAllegro(["S-1", "S-2"], "Ala", deps(d, () => ({
+    offers: [oferta("10", "S-1"), oferta("20", "S-2", { zdjecie: false })],
+  })));
+  assert.ok(wynik.wlaczone);
+  assert.deepEqual(wynik.pozycje.map((p) => [p.symbol, p.oferta?.id, p.po]), [
+    ["S-1", "10", "sygnatura"],
+    ["S-2", "k2", "kod_producenta"],
+  ]);
+  const po = d.prepare("SELECT symbol, po FROM zdjecie_oferty_wybor ORDER BY symbol").all().map((w) => ({ ...w }));
+  assert.deepEqual(po, [{ symbol: "S-1", po: "sygnatura" }, { symbol: "S-2", po: "kod_producenta" }]);
+  d.close();
+});
+
+test("kod producenta: kod różny tylko kreską nie trafia, a brak trafienia zapisuje po NULL", async () => {
+  const d = baza();
+  wIndeksie(d, "k1", "LS51-139");
+  const wynik = await m.dopasujOfertyAllegro(["LS51139"], "Ala", deps(d, bezOfert));
+  assert.ok(wynik.wlaczone);
+  assert.deepEqual(wynik.pozycje, [{ symbol: "LS51139", ofert: 0, oferta: null, po: null, niejednoznaczny: false }]);
+  assert.equal((d.prepare("SELECT po FROM zdjecie_oferty_wybor").get() as { po: string | null }).po, null);
+  d.close();
+});
+
+test("kod producenta: wybór jak przy sygnaturze, zdjęcie przed statusem, potem świeższy snapshot", async () => {
+  const d = baza();
+  wIndeksie(d, "bez", "K-1", { zdjecie: false, synced: "2026-10-20T00:00:00.000Z" });
+  wIndeksie(d, "konczona", "K-1", { status: "ENDED", synced: "2026-10-19T00:00:00.000Z" });
+  wIndeksie(d, "starsza", "K-1", { synced: "2026-10-02T00:00:00.000Z" });
+  wIndeksie(d, "nowsza", "K-1", { synced: "2026-10-10T00:00:00.000Z" });
+  const wynik = await m.dopasujOfertyAllegro(["K-1"], "Ala", deps(d, bezOfert));
+  assert.ok(wynik.wlaczone);
+  assert.equal(wynik.pozycje[0].oferta?.id, "nowsza");
+  assert.equal(wynik.pozycje[0].ofert, 4);
+  d.close();
+});
+
+test("kod producenta: oferta trafiająca w kilka symboli wejścia nie trafia w żaden", async () => {
+  const d = baza();
+  /* Oferta kartoteki B-1 ma w kodzie producenta symbol A-1. Dałaby obu to samo zdjęcie. */
+  wIndeksie(d, "k5", "A-1", { sygnatura: "B-1" });
+  const wynik = await m.dopasujOfertyAllegro(["A-1", "B-1"], "Ala", deps(d, () => ({ offers: [oferta("k5", "B-1")] })));
+  assert.ok(wynik.wlaczone);
+  assert.deepEqual(wynik.pozycje.map((p) => [p.symbol, p.oferta?.id ?? null, p.po, p.niejednoznaczny]), [
+    ["A-1", null, null, true],
+    ["B-1", "k5", "sygnatura", false],
+  ]);
+
+  /* Dwa symbole wejścia o tym samym kluczu też dzielą jedną ofertę. */
+  wIndeksie(d, "k6", "Ab-1");
+  const dwa = await m.dopasujOfertyAllegro(["ab-1", "AB-1"], "Ala", deps(d, bezOfert));
+  assert.ok(dwa.wlaczone);
+  assert.deepEqual(dwa.pozycje.map((p) => [p.oferta, p.niejednoznaczny]), [[null, true], [null, true]]);
+  const zd = d.prepare("SELECT payload FROM events ORDER BY id DESC LIMIT 1").get() as { payload: string };
+  assert.equal(JSON.parse(zd.payload).niejednoznacznych, 2);
+  d.close();
+});
+
+test("kod producenta: oferta z sygnaturą innej kartoteki Subiektu nie trafia, choć tamtej nie ma w wejściu", async () => {
+  /* Kartoteka B-1 ma już zdjęcie albo jest w innej paczce, więc wejście jej nie zna. */
+  const d = baza();
+  wIndeksie(d, "k7", "A-1", { sygnatura: "B-1" });
+  const pytania: string[][] = [];
+  const wynik = await m.dopasujOfertyAllegro(["A-1"], "Ala", deps(d, bezOfert, [],
+    async (s) => { pytania.push(s); return [{ symbol: "b-1" }]; }));
+  assert.ok(wynik.wlaczone);
+  assert.deepEqual(wynik.pozycje, [{ symbol: "A-1", ofert: 0, oferta: null, po: null, niejednoznaczny: false }]);
+  assert.deepEqual(pytania, [["B-1"]], "jedno pytanie do Subiektu na żądanie");
+  d.close();
+});
+
+test("kod producenta: pusta sygnatura albo sygnatura spoza Subiektu nie blokuje oferty", async () => {
+  const d = baza();
+  wIndeksie(d, "k8", "A-1", { sygnatura: "" });
+  wIndeksie(d, "k9", "C-1", { sygnatura: "NIE-KARTOTEKA" });
+  const pytania: string[][] = [];
+  const wynik = await m.dopasujOfertyAllegro(["A-1", "C-1"], "Ala", deps(d, bezOfert, [],
+    async (s) => { pytania.push(s); return []; }));
+  assert.ok(wynik.wlaczone);
+  assert.deepEqual(wynik.pozycje.map((p) => [p.symbol, p.oferta?.id, p.po]), [
+    ["A-1", "k8", "kod_producenta"],
+    ["C-1", "k9", "kod_producenta"],
+  ]);
+  assert.deepEqual(pytania, [["NIE-KARTOTEKA"]], "pustej sygnatury nie sprawdzamy");
+  d.close();
+});
+
+test("kod producenta: błąd Subiektu odrzuca oferty z cudzą sygnaturą, nie przepuszcza ich", async () => {
+  const d = baza();
+  wIndeksie(d, "k10", "A-1", { sygnatura: "B-1" });
+  const wynik = await m.dopasujOfertyAllegro(["A-1"], "Ala", deps(d, bezOfert, [],
+    async () => { throw new Error("Subiekt nie odpowiada"); }));
+  assert.ok(wynik.wlaczone);
+  assert.equal(wynik.pozycje[0].oferta, null);
   d.close();
 });

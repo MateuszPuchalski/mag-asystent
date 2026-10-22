@@ -1158,8 +1158,18 @@ Pozycja typu `ID` niesie sam identyfikator, więc dla człowieka nie znaczy nic.
 **Ta końcówka kosztuje jedno żądanie NA OFERTĘ.** `GET /sale/offers` obok
 przyjmuje dwadzieścia numerów naraz, ale opisu nie oddaje.
 `/sale/product-offers/{offerId}/parts` nie jest tańszym zamiennikiem: schemat
-dopuszcza w `include` wyłącznie `stock` i `price`. Dlatego po treść chodzimy
-leniwie i tylko dla oferty, o którą pyta klient w otwartej rozmowie.
+dopuszcza w `include` wyłącznie `stock` i `price`. Dlatego po treść dla
+rozmowy chodzimy leniwie, tylko dla oferty, o którą pyta klient.
+
+Wyjątkiem jest indeks kodów producenta dla zdjęć kartotek. Biuro uruchamia go
+przyciskiem, a on czyta każdą naszą ofertę raz na 30 dni, po dziesięć na krok.
+Kod producenta leży w `parameters[]` albo w `productSet[].product.parameters[]`,
+oba typu `ParameterProductOfferResponse` z polami `id`, `name` i `values`.
+
+`[WERYFIKUJ]` **Id parametru „Kod producenta”.** Wartość `224017` stoi w
+specyfikacji tylko w przykładach, z nazwą raz polską, raz angielską. Kod szuka
+najpierw po id, potem po nazwie. Na żywym koncie trzeba sprawdzić, czy nasze
+oferty mają ten parametr wypełniony symbolem z Subiekta.
 
 Uprawnienie: `allegro:api:sale:offers:read`, to samo co przy liście ofert.
 

@@ -2220,6 +2220,19 @@ CREATE TABLE IF NOT EXISTS offer_snapshot (
   -- `tresc_synced_at` albo NULL znaczy „jest co zebrać" — tak zbiórka wie,
   -- gdzie skończyła, bez trzymania stanu przebiegu na serwerze.
   pasuje_do_zebrano_at TEXT,
+  -- ── INDEKS KODÓW PRODUCENTA DLA ZDJĘĆ KARTOTEK ──────────────────────────
+  -- Kiedy oferta przyszła z NASZEJ listy `GET /sale/offers`. Snapshot zna też
+  -- cudze aukcje spod wiadomości klientów, a zdjęcie kartoteki bierzemy
+  -- wyłącznie z naszej. NULL znaczy „nie widzieliśmy jej na naszej liście".
+  nasza_lista_at TEXT,
+  -- Pierwsza wartość parametru „Kod producenta" z `/sale/product-offers/{id}`.
+  -- NULL = nie pytaliśmy, '' = pytaliśmy i oferta go nie ma. Bez tego
+  -- rozróżnienia oferta bez kodu kosztowałaby żądanie przy każdym przebiegu.
+  kod_producenta TEXT,
+  kod_producenta_at TEXT,
+  -- Kiedy odczyt parametrów ostatnio padł. Taka oferta czeka godzinę, zanim
+  -- krok indeksu weźmie ją znowu, żeby trwale zła nie blokowała kolejki.
+  kod_producenta_blad_at TEXT,
   UNIQUE (channel_account_id, external_id)
 );
 
@@ -2270,7 +2283,11 @@ CREATE TABLE IF NOT EXISTS zdjecie_oferty_wybor (
   started_at TEXT,
   ofert INTEGER NOT NULL DEFAULT 0,
   wybrano_at TEXT NOT NULL,
-  wybrano_przez TEXT NOT NULL
+  wybrano_przez TEXT NOT NULL,
+  -- Którą drogą oferta trafiła: 'sygnatura' albo 'kod_producenta'. Kod
+  -- producenta to słabszy dowód, więc biuro musi umieć odsiać te zdjęcia.
+  -- NULL przy braku oferty i w wierszach sprzed tej kolumny.
+  po TEXT
 );
 
 -- ── Cyfrowe kosze zwrotowe (Etap 3) ─────────────────────────────────────────

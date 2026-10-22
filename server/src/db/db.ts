@@ -298,6 +298,16 @@ export function migrate(database: DatabaseSync) {
   /* Znacznik zbiórki „Pasuje do" ze wszystkich ofert — patrz `offer_snapshot`
      w `schema.sql`. Stare wiersze mają NULL, czyli „jeszcze nie zbierane". */
   addColumn("offer_snapshot", "pasuje_do_zebrano_at", "TEXT");
+  /* Indeks kodów producenta dla zdjęć kartotek — patrz `offer_snapshot`
+     w `schema.sql`. Stare wiersze mają NULL, czyli „nie z naszej listy"
+     i „nie pytaliśmy o kod", więc pierwszy przebieg biura je dociągnie. */
+  for (const kol of ["nasza_lista_at", "kod_producenta", "kod_producenta_at", "kod_producenta_blad_at"]) {
+    addColumn("offer_snapshot", kol, "TEXT");
+  }
+  /* Droga dopasowania zdjęcia — patrz `zdjecie_oferty_wybor`. Stare wybory
+     mają NULL, choć wszystkie szły po sygnaturze: nie dopisujemy faktu,
+     którego wiersz sam nie zapisał. */
+  addColumn("zdjecie_oferty_wybor", "po", "TEXT");
   /* Werdykt reklamacji (przyrost trzeci) — patrz `reklamacja_klienta`
      w `schema.sql`. Tabela stoi na produkcji od 0.222.0, więc kolumny dochodzą
      migracją; stare sprawy mają NULL, czyli „werdykt nie wyszedł stąd" — i to

@@ -186,6 +186,23 @@ export function urlOfertPoSygnaturzeStrona(
 }
 
 /**
+ * Strona WSZYSTKICH naszych ofert w wybranych statusach, bez filtru po ofercie.
+ *
+ * Indeks kodów producenta potrzebuje listy ofert konta, bo `/sale/offers`
+ * nie filtruje po parametrze. Ta końcówka oddaje wyłącznie oferty
+ * zalogowanego sprzedawcy, więc wiersz z tej listy dowodzi, że oferta jest nasza.
+ */
+export function urlNaszychOfertStrona(
+  apiUrl: string,
+  statusy: readonly string[],
+  offset = 0,
+): string {
+  const status = statusy.map((s) => `publication.status=${encodeURIComponent(s)}`);
+  return `${apiUrl}/sale/offers?${status.join("&")}`
+    + `&limit=${OFERT_NA_STRONE}&offset=${Math.max(0, Math.trunc(offset))}`;
+}
+
+/**
  * Historia statusów przesyłki u przewoźnika (0.187.0).
  *
  * `GET /order/carriers/{carrierId}/tracking?waybill=…`. To JEDYNE miejsce
