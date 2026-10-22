@@ -58,6 +58,7 @@ const TRASY = [
   { method: "PATCH" as const, url: "/api/pomylki/1" },
   { method: "POST" as const, url: "/api/pomylki/1/zakoncz" },
   { method: "POST" as const, url: "/api/pomylki/1/wznow" },
+  { method: "POST" as const, url: "/api/pomylki/1/usun" },
 ];
 
 test("bez sesji 401, hala 403 — na każdej trasie, także odczytu", async () => {

@@ -637,6 +637,16 @@ Tabela `pomylka_wysylki` trzyma jeden wiersz na zamówienie.
 - **Kto zbierał, kto pakował i kto zawinił to dane o NAS.** Imię i konto
   z `app_user`, bez klucza obcego, bo ten blokowałby kasowanie kont. Przy
   pojedynczej pomyłce widzi je całe biuro, jak w arkuszu.
+- **Osoba bez konta ma samo imię**, wpisane ręcznie, np. pracownik sezonowy.
+  Panel podsuwa wcześniej wpisane imiona, żeby literówka nie rozbiła jednej
+  osoby na dwie. Imię znika z podpowiedzi razem z ostatnią pomyłką, która je
+  niesie.
+- **Usunięta pomyłka znika naprawdę**, np. gdy klient nie miał racji. Nie ma
+  jej w rachunku miesiąca, profilu ani drodze klienta. W dzienniku zostaje
+  numer i źródło, bez loginu i treści.
+- **Statystyki miesiąca** liczą stany, źródła, pół roku wstecz i towary po
+  „co zamówił”. Towar nie mówi nic o kliencie ani pracowniku, więc widzi je
+  całe biuro.
 - **Zestawienie win na osobę widzi wyłącznie admin**, decyzją właściciela.
   Dla reszty biura byłoby monitoringiem pracowniczym (art. 22² Kodeksu
   pracy), tak jak zestawienie spraw w polityce sprawy klienta.

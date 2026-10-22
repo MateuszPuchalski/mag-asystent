@@ -491,6 +491,13 @@ export function miesiacSlownie(rrrrMm: string): string {
   return new Date(r, m - 1, 1).toLocaleDateString("pl", { month: "long", year: "numeric" });
 }
 
+/** „RRRR-MM" jako skrót miesiąca pod słupkiem wykresu: „paź". */
+export function miesiacKrotko(rrrrMm: string): string {
+  const [r, m] = rrrrMm.split("-").map(Number);
+  if (!r || !m) return rrrrMm;
+  return new Date(r, m - 1, 1).toLocaleDateString("pl", { month: "short" });
+}
+
 /**
  * Chwila w wierszu listy — „15:32", „wczoraj", „04.10" albo „04.10.2025".
  *

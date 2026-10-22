@@ -51,10 +51,27 @@ export interface OsobaPodsumowania {
   userId: number | null; nazwa: string; zbieral: number; pakowal: number; winny: number;
 }
 
+export interface PodsumowaniePomylek {
+  miesiac: string;
+  razem: number;
+  /** Pusta dla roli innej niż admin — to nie znaczy „nikt nie zawinił". */
+  osoby: OsobaPodsumowania[];
+  stany: Record<StanPomylki, number>;
+  zrodla: Record<Pomylka["zrodlo"], number>;
+  /** Pomyłki z osobą, ale bez wskazanej winy. */
+  bezWinnego: number;
+  /** Sześć miesięcy do wybranego włącznie, od najstarszego. */
+  trend: Array<{ miesiac: string; razem: number }>;
+  /** Najczęściej mylone towary, po „co zamówił". */
+  towary: Array<{ nazwa: string; ile: number }>;
+}
+
 export interface OdpowiedzPomylek {
   pomylki: Pomylka[];
-  podsumowanie: { miesiac: string; razem: number; osoby: OsobaPodsumowania[] };
+  podsumowanie: PodsumowaniePomylek;
   doUzupelnienia: number;
+  /** Imiona wpisane ręcznie, spoza kont — do ponownego wyboru. */
+  osobyReczne: string[];
 }
 
 export interface PozycjaDoWyboru { nazwa: string; ilosc: number; sku: string | null }
@@ -66,6 +83,9 @@ export interface ZmianaPomylki {
   uwagi?: string | null;
   zbieralUserId?: number | null;
   pakowalUserId?: number | null;
+  /** Osoba bez konta: samo imię. Nie idzie razem z `…UserId`. */
+  zbieralNazwa?: string;
+  pakowalNazwa?: string;
   winaZbierajacego?: boolean;
   winaPakujacego?: boolean;
   nowyTowar?: "tak" | "nie" | null;
@@ -238,6 +258,20 @@ export function useWznowPomylke() {
     mutationFn: (v: { id: number; wersja: number }) => api<{ pomylka: Pomylka }>(`/api/pomylki/${v.id}/wznow`,
       { method: "POST", body: JSON.stringify({ wersja: v.wersja }) }),
     onSuccess: (d) => wstawDoList(qc, d.pomylka),
+    onError: (e) => { const p = pomylkaZKonfliktu(e); if (p) wstawDoList(qc, p); },
+    onSettled: () => poZapisie(qc),
+  });
+}
+
+/**
+ * Usuwa pomyłkę założoną niepotrzebnie, np. gdy klient nie miał racji.
+ * Pod blokadą wersji, więc cudza zmiana w międzyczasie daje 409.
+ */
+export function useUsunPomylke() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (v: { id: number; wersja: number }) => api<{ usunieto: true }>(`/api/pomylki/${v.id}/usun`,
+      { method: "POST", body: JSON.stringify({ wersja: v.wersja }) }),
     onError: (e) => { const p = pomylkaZKonfliktu(e); if (p) wstawDoList(qc, p); },
     onSettled: () => poZapisie(qc),
   });

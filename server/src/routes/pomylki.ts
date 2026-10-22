@@ -3,7 +3,8 @@ import { sesjaZadania } from "../context.js";
 import { db } from "../db/db.js";
 import {
   BladPomylki, BrakPomylki, KonfliktPomylki, biezacyMiesiac, dodajPomylke, licznikDoUzupelnienia,
-  listaPomylek, podsumowanieMiesiaca, pozycjeDoWyboru, wznowPomylke, zakonczPomylke, zmienPomylke,
+  listaPomylek, osobyReczne, podsumowanieMiesiaca, pozycjeDoWyboru, usunPomylke, wznowPomylke, zakonczPomylke,
+  zmienPomylke,
   type NowaPomylka, type ZmianaPomylki,
 } from "../services/pomylki.js";
 import { sellasistWlaczony } from "../adapters/sellasist.http.js";
@@ -57,7 +58,7 @@ export async function pomylkiRoutes(app: FastifyInstance) {
       const pomylki = listaPomylek({ stan: req.query.stan, miesiac: req.query.miesiac }, db());
       const podsumowanie = podsumowanieMiesiaca(req.query.miesiac ?? biezacyMiesiac(), db());
       if (sesjaZadania()!.user.role !== "admin") podsumowanie.osoby = [];
-      return { pomylki, podsumowanie, doUzupelnienia: licznikDoUzupelnienia(db()) };
+      return { pomylki, podsumowanie, doUzupelnienia: licznikDoUzupelnienia(db()), osobyReczne: osobyReczne(db()) };
     } catch (e) {
       return blad(reply, e);
     }
@@ -126,6 +127,19 @@ export async function pomylkiRoutes(app: FastifyInstance) {
     if (nie) return nie;
     try {
       return { pomylka: wznowPomylke(Number(req.params.id), req.body?.wersja, autor(), new Date(), db()) };
+    } catch (e) {
+      return blad(reply, e);
+    }
+  });
+
+  /* POST, nie DELETE: ciało niesie wersję, a ciało przy DELETE bywa gubione
+     po drodze. Ten sam kształt co zakończenie i wznowienie. */
+  app.post<{ Params: { id: string }; Body: { wersja?: unknown } }>("/api/pomylki/:id/usun", async (req, reply) => {
+    const nie = odmowa(reply);
+    if (nie) return nie;
+    try {
+      usunPomylke(Number(req.params.id), req.body?.wersja, autor(), db());
+      return { usunieto: true };
     } catch (e) {
       return blad(reply, e);
     }
