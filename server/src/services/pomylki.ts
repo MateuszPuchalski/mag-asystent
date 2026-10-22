@@ -85,6 +85,8 @@ export class KonfliktPomylki extends Error {
 export const LIMIT_POZYCJI = 200;
 /** Najdłuższe uwagi. Jedno zdanie dla kolegi, nie akta sprawy. */
 export const LIMIT_UWAG = 1000;
+/** Najdłuższe imię wpisane ręcznie. Imię i nazwisko, nie opis osoby. */
+export const LIMIT_OSOBY = 60;
 
 const KOD_POMYLKI = "NEW_ITEM_SENT";
 const KOD_BRAKUJACEJ_CZESCI = "MISSING_PART_SENT";
@@ -205,7 +207,29 @@ const sprawdzMiesiac = (m: string): string => {
 };
 
 export interface OsobaPodsumowania { userId: number | null; nazwa: string; zbieral: number; pakowal: number; winny: number }
-export interface PodsumowanieMiesiaca { miesiac: string; razem: number; osoby: OsobaPodsumowania[] }
+export interface PodsumowanieMiesiaca {
+  miesiac: string;
+  razem: number;
+  osoby: OsobaPodsumowania[];
+  /** Stan liczony tą samą regułą co lista, więc suma równa się `razem`. */
+  stany: Record<StanPomylki, number>;
+  zrodla: Record<ZrodloPomylki, number>;
+  /** Pomyłki z osobą, ale bez wskazanej winy: rachunek miesiąca ich nie widzi. */
+  bezWinnego: number;
+  /** Ile pomyłek w każdym z sześciu miesięcy do wybranego włącznie, od najstarszego. */
+  trend: Array<{ miesiac: string; razem: number }>;
+  /** Najczęściej mylone towary — po „co zamówił”, najwyżej pięć. */
+  towary: Array<{ nazwa: string; ile: number }>;
+}
+
+/** Ile miesięcy wstecz pokazuje trend. Pół roku łapie sezon ogrodniczy bez przewijania. */
+const MIESIECY_TRENDU = 6;
+const NAJWIECEJ_TOWAROW = 5;
+
+const miesiacWstecz = (m: string, ile: number): string => {
+  const [r, mm] = m.split("-").map(Number);
+  return new Date(Date.UTC(r, mm - 1 - ile, 1)).toISOString().slice(0, 7);
+};
 
 /**
  * Lista do zakładki. Filtr stanu idzie w kodzie, nie w SQL-u, bo stan jest
@@ -266,11 +290,55 @@ export function podsumowanieMiesiaca(miesiac: string, database: Db = defaultDb()
     }
     for (const k of winni) osoby.get(k)!.winny++;
   }
+
+  /* Stany i źródła z listy, nie z SQL-a: stan jest wyliczany z kolejek. */
+  const stany: Record<StanPomylki, number> = { do_uzupelnienia: 0, w_toku: 0, zakonczona: 0 };
+  const zrodla: Record<ZrodloPomylki, number> = { odmowa: 0, dosylka: 0, recznie: 0 };
+  let bezWinnego = 0;
+  const towary = new Map<string, { nazwa: string; ile: number }>();
+  for (const x of listaPomylek({ miesiac: m }, database)) {
+    stany[x.stan]++;
+    if (x.zrodlo in zrodla) zrodla[x.zrodlo]++;
+    if ((x.zbieral || x.pakowal) && !x.winaZbierajacego && !x.winaPakujacego) bezWinnego++;
+    /* Ta sama nazwa różną wielkością liter to jeden towar, w pisowni najnowszej. */
+    if (x.coZamowil) {
+      const k = x.coZamowil.toLowerCase();
+      const t = towary.get(k) ?? { nazwa: x.coZamowil, ile: 0 };
+      t.ile++;
+      towary.set(k, t);
+    }
+  }
+
+  const od = miesiacWstecz(m, MIESIECY_TRENDU - 1);
+  const policzone = new Map((database.prepare(`SELECT substr(zgloszono, 1, 7) AS m, count(*) AS n
+      FROM pomylka_wysylki WHERE substr(zgloszono, 1, 7) BETWEEN ? AND ? GROUP BY 1`).all(od, m) as Wiersz[])
+    .map((w) => [String(w.m), Number(w.n)]));
+  const trend = Array.from({ length: MIESIECY_TRENDU }, (_, i) => {
+    const mi = miesiacWstecz(m, MIESIECY_TRENDU - 1 - i);
+    return { miesiac: mi, razem: policzone.get(mi) ?? 0 };
+  });
+
   return {
     miesiac: m,
     razem: wiersze.length,
     osoby: [...osoby.values()].sort((a, b) => b.winny - a.winny || a.nazwa.localeCompare(b.nazwa, "pl")),
+    stany, zrodla, bezWinnego, trend,
+    towary: [...towary.values()].sort((a, b) => b.ile - a.ile || a.nazwa.localeCompare(b.nazwa, "pl"))
+      .slice(0, NAJWIECEJ_TOWAROW),
   };
+}
+
+/**
+ * Imiona wpisane ręcznie, spoza kont — do ponownego wyboru jednym kliknięciem.
+ * Bez tego sezonowy pracownik byłby wpisywany od nowa przy każdej pomyłce,
+ * a literówka rozbiłaby go w rachunku miesiąca na dwie osoby.
+ */
+export function osobyReczne(database: Db = defaultDb()): string[] {
+  return (database.prepare(`SELECT nazwa FROM (
+        SELECT zbieral AS nazwa FROM pomylka_wysylki WHERE zbieral_user_id IS NULL AND zbieral IS NOT NULL
+        UNION SELECT pakowal FROM pomylka_wysylki WHERE pakowal_user_id IS NULL AND pakowal IS NOT NULL)
+      GROUP BY lower(nazwa) ORDER BY nazwa COLLATE NOCASE`).all() as Wiersz[])
+    .map((w) => String(w.nazwa));
 }
 
 /** Ile pomyłek zgłoszono od doby `od` do doby `doDnia` włącznie — obie `RRRR-MM-DD`. */
@@ -488,6 +556,8 @@ export interface ZmianaPomylki {
   wersja?: unknown;
   coZamowil?: unknown; coDostal?: unknown; uwagi?: unknown;
   zbieralUserId?: unknown; pakowalUserId?: unknown;
+  /** Imię osoby bez konta, np. sezonowej. Wyklucza `…UserId` w tym samym zapisie. */
+  zbieralNazwa?: unknown; pakowalNazwa?: unknown;
   winaZbierajacego?: unknown; winaPakujacego?: unknown;
   nowyTowar?: unknown; towarWrocil?: unknown; odmowa?: unknown;
 }
@@ -540,10 +610,20 @@ export function zmienPomylke(
     if ("coDostal" in zmiana) ustaw("co_dostal", tekstPola(zmiana.coDostal, "coDostal", LIMIT_POZYCJI), "coDostal");
     if ("uwagi" in zmiana) ustaw("uwagi", tekstPola(zmiana.uwagi, "uwagi", LIMIT_UWAG), "uwagi");
 
-    for (const [pole, kolumna, wina] of [
-      ["zbieralUserId", "zbieral", "wina_zbierajacego"],
-      ["pakowalUserId", "pakowal", "wina_pakujacego"],
+    for (const [pole, poleNazwy, kolumna, wina] of [
+      ["zbieralUserId", "zbieralNazwa", "zbieral", "wina_zbierajacego"],
+      ["pakowalUserId", "pakowalNazwa", "pakowal", "wina_pakujacego"],
     ] as const) {
+      if (poleNazwy in zmiana) {
+        if (pole in zmiana) throw new BladPomylki(`Podaj „${pole}” albo „${poleNazwy}”, nie oba`);
+        /* Osoba bez konta: samo imię, `user_id` pusty — tak samo stoi
+           konto skasowane, więc rachunek miesiąca liczy ją po imieniu. */
+        const nazwa = tekstPola(zmiana[poleNazwy], poleNazwy, LIMIT_OSOBY);
+        if (nazwa === null) throw new BladPomylki("Wpisz imię osoby");
+        ustaw(kolumna, nazwa, poleNazwy);
+        ustaw(`${kolumna}_user_id`, null, poleNazwy);
+        continue;
+      }
       if (!(pole in zmiana)) continue;
       const v = zmiana[pole];
       if (v === null) {
@@ -610,6 +690,25 @@ export function wznowPomylke(
         WHERE id = ?`).run(teraz.toISOString(), id);
     logEvent("pomylka_wznowiona", autor.name, null, { pomylka: id }, autor.id, database);
     return pomylka(id, database)!;
+  })();
+}
+
+/**
+ * Usuwa pomyłkę założoną niepotrzebnie, np. gdy klient nie miał racji.
+ *
+ * USUWA NAPRAWDĘ, nie chowa. Pomyłki, której nie było, nie ma w rachunku
+ * miesiąca, w drodze klienta ani w profilu, a ukryty wiersz trzeba by
+ * odfiltrować w każdym z tych odczytów. Ślad zostaje w dzienniku z numerem
+ * i źródłem. Blokada wersji jak przy zmianie: nie kasuje się czegoś, czego
+ * stanu się nie widziało.
+ */
+export function usunPomylke(
+  id: number, wersja: unknown, autor: Autor, database: Db = defaultDb(),
+): void {
+  transaction(database, () => {
+    const w = doZmiany(database, id, wersja);
+    database.prepare("DELETE FROM pomylka_wysylki WHERE id = ?").run(id);
+    logEvent("pomylka_usunieta", autor.name, null, { pomylka: id, zrodlo: String(w.zrodlo) }, autor.id, database);
   })();
 }
 

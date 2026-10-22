@@ -5,7 +5,7 @@ import { DatabaseSync } from "node:sqlite";
 import { migrate, type Db } from "../db/db.js";
 import {
   BladPomylki, BrakPomylki, KonfliktPomylki, dodajPomylke, licznikDoUzupelnienia, listaPomylek,
-  opisPomylki, podsumowanieMiesiaca, pomylka, pomylkiKlienta, pozycjeDoWyboru,
+  opisPomylki, osobyReczne, podsumowanieMiesiaca, pomylka, pomylkiKlienta, pozycjeDoWyboru, usunPomylke,
   wznowPomylke, zakonczPomylke, zalozPomylkeZDosylki, zalozPomylkeZOdmowy, zmienPomylke,
 } from "./pomylki.js";
 
@@ -219,6 +219,64 @@ test("podsumowanie miesiąca liczy role i winę na osobę; podwójna wina to jed
     { userId: 3, nazwa: "Ola", zbieral: 1, pakowal: 0, winny: 1 },
   ]);
   assert.equal(podsumowanieMiesiaca("2026-09", d).razem, 1);
+});
+
+test("podsumowanie niesie stany, źródła, pół roku wstecz i najczęściej mylone towary", () => {
+  const d = baza();
+  const raz = dodajPomylke({ login: "a", coZamowil: "Nóż NAC 46" }, KTO, TERAZ, d).pomylka;
+  zmienPomylke(raz.id, { wersja: 1, coDostal: "Nóż 40", zbieralUserId: 2 }, KTO, TERAZ, d);
+  dodajPomylke({ login: "b", coZamowil: "nóż nac 46" }, KTO, TERAZ, d);
+  dodajPomylke({ login: "c", coZamowil: "Pompa" }, KTO, TERAZ, d);
+  dodajPomylke({ login: "d" }, KTO, new Date("2026-06-10T10:00:00Z"), d);
+  dodajPomylke({ login: "e" }, KTO, new Date("2026-04-10T10:00:00Z"), d);
+  const s = podsumowanieMiesiaca("2026-10", d);
+  assert.deepEqual(s.stany, { do_uzupelnienia: 2, w_toku: 1, zakonczona: 0 });
+  assert.deepEqual(s.zrodla, { odmowa: 0, dosylka: 0, recznie: 3 });
+  assert.equal(s.bezWinnego, 1, "osoba bez winy nie wchodzi do rachunku, więc liczy się osobno");
+  assert.deepEqual(s.trend, [
+    { miesiac: "2026-05", razem: 0 }, { miesiac: "2026-06", razem: 1 }, { miesiac: "2026-07", razem: 0 },
+    { miesiac: "2026-08", razem: 0 }, { miesiac: "2026-09", razem: 0 }, { miesiac: "2026-10", razem: 3 },
+  ]);
+  /* Pisownia z najnowszego wpisu: lista idzie od najnowszej. */
+  assert.deepEqual(s.towary, [{ nazwa: "nóż nac 46", ile: 2 }, { nazwa: "Pompa", ile: 1 }]);
+  assert.deepEqual(podsumowanieMiesiaca("2026-01", d).trend.map((t) => t.miesiac),
+    ["2025-08", "2025-09", "2025-10", "2025-11", "2025-12", "2026-01"], "trend przechodzi przez rok");
+});
+
+test("osoba spoza listy: samo imię bez konta, liczona po imieniu i podsuwana ponownie", () => {
+  const d = baza();
+  const p = dodajPomylke({ login: "a" }, KTO, TERAZ, d).pomylka;
+  const z = zmienPomylke(p.id, { wersja: 1, zbieralNazwa: "  Kuba sezonowy ", winaZbierajacego: true }, KTO, TERAZ, d);
+  assert.deepEqual([z.zbieral, z.winaZbierajacego], [{ userId: null, nazwa: "Kuba sezonowy" }, true]);
+  const q = dodajPomylke({ login: "b" }, KTO, TERAZ, d).pomylka;
+  zmienPomylke(q.id, { wersja: 1, pakowalNazwa: "kuba sezonowy" }, KTO, TERAZ, d);
+  assert.deepEqual(osobyReczne(d), ["Kuba sezonowy"], "jedno imię bez względu na wielkość liter");
+  assert.deepEqual(podsumowanieMiesiaca("2026-10", d).osoby,
+    [{ userId: null, nazwa: "Kuba sezonowy", zbieral: 1, pakowal: 1, winny: 1 }]);
+  assert.throws(() => zmienPomylke(p.id, { wersja: 2, zbieralNazwa: " " }, KTO, TERAZ, d), BladPomylki);
+  assert.throws(() => zmienPomylke(p.id, { wersja: 2, zbieralNazwa: "x".repeat(61) }, KTO, TERAZ, d), BladPomylki);
+  assert.throws(() => zmienPomylke(p.id, { wersja: 2, zbieralNazwa: "Kuba", zbieralUserId: 2 }, KTO, TERAZ, d),
+    BladPomylki);
+  /* Wybór konta po imieniu ręcznym zdejmuje imię: id wraca razem z nazwą z kartoteki. */
+  assert.deepEqual(zmienPomylke(p.id, { wersja: 2, zbieralUserId: 2 }, KTO, TERAZ, d).zbieral,
+    { userId: 2, nazwa: "Marek" });
+});
+
+test("usunięcie zdejmuje pomyłkę z rejestru i rachunku, pod blokadą wersji, z wpisem bez treści", () => {
+  const d = baza();
+  zamowienie(d);
+  const p = dodajPomylke({ zamowienie: "ord-1", coDostal: "Nóż 40" }, KTO, TERAZ, d).pomylka;
+  assert.throws(() => usunPomylke(p.id, 99, KTO, d), KonfliktPomylki);
+  assert.equal(ileWierszy(d), 1, "konflikt niczego nie kasuje");
+  usunPomylke(p.id, p.wersja, KTO, d);
+  assert.equal(ileWierszy(d), 0);
+  assert.equal(podsumowanieMiesiaca("2026-10", d).razem, 0);
+  assert.throws(() => usunPomylke(p.id, p.wersja, KTO, d), BrakPomylki);
+  const ostatni = wpisy(d).at(-1)!;
+  assert.equal(ostatni.type, "pomylka_usunieta");
+  assert.deepEqual(JSON.parse(ostatni.payload), { pomylka: p.id, zrodlo: "recznie" });
+  /* To samo zamówienie można zgłosić od nowa, gdy jednak była pomyłka. */
+  assert.equal(dodajPomylke({ zamowienie: "ord-1" }, KTO, TERAZ, d).nowa, true);
 });
 
 test("pozycje z zamówienia, a bez niego ze zwrotu; podpowiedź z komentarza klienta", () => {

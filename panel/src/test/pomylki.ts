@@ -20,7 +20,24 @@ export const MAGAZYNIERZY = [
 
 export const lista = (pomylki: Pomylka[], osoby: OdpowiedzPomylek["podsumowanie"]["osoby"] = []): OdpowiedzPomylek => ({
   pomylki, doUzupelnienia: pomylki.filter((p) => p.stan === "do_uzupelnienia").length,
-  podsumowanie: { miesiac: "2026-10", razem: pomylki.length, osoby },
+  osobyReczne: [],
+  podsumowanie: {
+    miesiac: "2026-10", razem: pomylki.length, osoby,
+    stany: {
+      do_uzupelnienia: pomylki.filter((p) => p.stan === "do_uzupelnienia").length,
+      w_toku: pomylki.filter((p) => p.stan === "w_toku").length,
+      zakonczona: pomylki.filter((p) => p.stan === "zakonczona").length,
+    },
+    zrodla: {
+      odmowa: pomylki.filter((p) => p.zrodlo === "odmowa").length,
+      dosylka: pomylki.filter((p) => p.zrodlo === "dosylka").length,
+      recznie: pomylki.filter((p) => p.zrodlo === "recznie").length,
+    },
+    bezWinnego: 0,
+    trend: ["2026-05", "2026-06", "2026-07", "2026-08", "2026-09", "2026-10"]
+      .map((m) => ({ miesiac: m, razem: m === "2026-10" ? pomylki.length : 0 })),
+    towary: [],
+  },
 });
 
 /** Złapane przy pakowaniu: domyślnie trzy doby z Sellasist, w tym jedna czysta, i jedna pomyłka do klienta. */

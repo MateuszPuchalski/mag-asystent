@@ -40,11 +40,13 @@ function atrapa(start: Pomylka[], zapis: (metoda: string, url: string, cialo: an
 
 /** Odpowiedź serwera na PATCH: pola z ciała wchodzą do pomyłki, wersja rośnie. */
 const przyjmij = (_m: string, _u: string, c: any, p: Pomylka) => {
-  const osoba = (id: number | null | undefined, stara: Pomylka["zbieral"]) =>
-    id === undefined ? stara : id === null ? null : { userId: id, nazwa: id === 11 ? "Marek" : "Ewa" };
+  const osoba = (id: number | null | undefined, nazwa: string | undefined, stara: Pomylka["zbieral"]) =>
+    nazwa !== undefined ? { userId: null, nazwa }
+      : id === undefined ? stara : id === null ? null : { userId: id, nazwa: id === 11 ? "Marek" : "Ewa" };
   const nowa: Pomylka = {
     ...p, wersja: p.wersja + 1,
-    zbieral: osoba(c.zbieralUserId, p.zbieral), pakowal: osoba(c.pakowalUserId, p.pakowal),
+    zbieral: osoba(c.zbieralUserId, c.zbieralNazwa, p.zbieral),
+    pakowal: osoba(c.pakowalUserId, c.pakowalNazwa, p.pakowal),
     winaZbierajacego: c.winaZbierajacego ?? p.winaZbierajacego, winaPakujacego: c.winaPakujacego ?? p.winaPakujacego,
     coZamowil: "coZamowil" in c ? c.coZamowil : p.coZamowil, coDostal: "coDostal" in c ? c.coDostal : p.coDostal,
   };
@@ -61,17 +63,22 @@ const otworz = (adres = "/obsluga/pomylki") => {
 afterEach(() => vi.unstubAllGlobals());
 
 describe("rejestr pomyłek", () => {
-  it("lista jak arkusz: klient prowadzi do profilu, fakty z kolejki mają dopisek „z Allegro”", async () => {
+  it("lista ma sześć kolumn, klient prowadzi do profilu, fakty z kolejki czekają w rozwinięciu", async () => {
     atrapa([pomylka()], przyjmij);
     otworz();
     const klient = await screen.findByRole("link", { name: "jan_kowalski" });
     expect(klient).toHaveAttribute("href", "/obsluga/klient/jan_kowalski");
+    const tabela = screen.getByRole("table", { name: /Pomyłki wysyłkowe/ });
+    expect(within(tabela).getAllByRole("columnheader").map((k) => k.textContent))
+      .toEqual(["Data", "Klient", "Pomyłka", "Zbierał", "Pakował", "Stan"]);
     const wiersz = klient.closest("tr")!;
-    expect(within(wiersz).getByText("wysłany")).toBeInTheDocument();
-    expect(within(wiersz).getAllByText("z Allegro")).toHaveLength(2);
+    expect(within(wiersz).queryByText("wysłany")).toBeNull();
     expect(within(wiersz).getByText("do uzupełnienia", { selector: "span.italic" })).toBeInTheDocument();
     /* Licznik filtra przy danych, z odpowiedzi serwera. */
     expect(screen.getByRole("button", { name: "Do uzupełnienia 1" })).toHaveAttribute("aria-pressed", "true");
+    fireEvent.click(wiersz);
+    expect(within(await screen.findByRole("group", { name: "Nowy towar" })).getByText("wysłany")).toBeInTheDocument();
+    expect(screen.getAllByText("z Allegro")).toHaveLength(2);
   });
 
   it("klik w wiersz rozwija uzupełnianie z pozycjami zamówienia jako przyciskami", async () => {
@@ -96,23 +103,98 @@ describe("rejestr pomyłek", () => {
     expect(wyslane[0]).toEqual({ metoda: "PATCH", url: "/api/pomylki/7", cialo: { wersja: 3, coZamowil: "Lampa LED 12V" } });
   });
 
-  it("imię: pierwszy klik wybiera, drugi robi winnym, trzeci odznacza — każdy z wersją z odpowiedzi", async () => {
+  it("imię wybiera i odznacza, a winę wskazuje „Kto zawinił” — każdy zapis z wersją z odpowiedzi", async () => {
     const { wyslane } = atrapa([pomylka()], przyjmij);
     otworz("/obsluga/pomylki?id=7&miesiac=2026-10");
     const zbieral = await screen.findByRole("group", { name: "Zbierał" });
-    await within(zbieral).findByRole("button", { name: "Marek" });
-    fireEvent.click(within(zbieral).getByRole("button", { name: "Marek" }));
+    const wina = () => screen.getByRole("group", { name: "Kto zawinił" });
+    expect(wina()).toHaveTextContent("Najpierw wybierz, kto zbierał albo pakował.");
+    fireEvent.click(await within(zbieral).findByRole("button", { name: "Marek" }));
     await waitFor(() => expect(within(zbieral).getByRole("button", { name: "Marek" }))
       .toHaveAttribute("aria-pressed", "true"));
+    fireEvent.click(within(wina()).getByRole("button", { name: "Marek (zbierał)" }));
+    await waitFor(() => expect(within(wina()).getByRole("button", { name: "Marek (zbierał)" }))
+      .toHaveAttribute("aria-pressed", "true"));
     fireEvent.click(within(zbieral).getByRole("button", { name: "Marek" }));
-    await waitFor(() => expect(within(zbieral).getByRole("button", { name: /Marek.*winny/ })).toBeInTheDocument());
-    fireEvent.click(within(zbieral).getByRole("button", { name: /Marek.*winny/ }));
     await waitFor(() => expect(wyslane).toHaveLength(3));
     expect(wyslane.map((w) => w.cialo)).toEqual([
       { wersja: 3, zbieralUserId: 11, winaZbierajacego: false },
       { wersja: 4, winaZbierajacego: true },
       { wersja: 5, zbieralUserId: null, winaZbierajacego: false },
     ]);
+  });
+
+  it("osoba spoza listy: imię wpisane ręcznie idzie bez konta i staje wybrana", async () => {
+    const { wyslane } = atrapa([pomylka()], przyjmij);
+    otworz("/obsluga/pomylki?id=7&miesiac=2026-10");
+    const pakowal = await screen.findByRole("group", { name: "Pakował" });
+    fireEvent.click(within(pakowal).getByRole("button", { name: "inna osoba" }));
+    const pole = within(pakowal).getByRole("textbox", { name: "Pakował: imię osoby spoza listy" });
+    fireEvent.change(pole, { target: { value: "  Kuba sezonowy " } });
+    fireEvent.keyDown(pole, { key: "Enter" });
+    await waitFor(() => expect(wyslane).toHaveLength(1));
+    expect(wyslane[0].cialo).toEqual({ wersja: 3, pakowalNazwa: "Kuba sezonowy", winaPakujacego: false });
+    expect(await within(pakowal).findByRole("button", { name: "Kuba sezonowy" })).toHaveAttribute("aria-pressed", "true");
+  });
+
+  it("imię wpisane przy innej pomyłce wraca na listę i zapisuje się po imieniu", async () => {
+    const start = [pomylka()];
+    const { wyslane } = atrapa(start, przyjmij);
+    const zapasowy = globalThis.fetch;
+    vi.stubGlobal("fetch", vi.fn(async (url: string, init?: RequestInit) => {
+      if (url.startsWith("/api/pomylki?")) {
+        return new Response(JSON.stringify({ ...lista(start), osobyReczne: ["Kuba sezonowy"] }), { status: 200 });
+      }
+      return zapasowy(url, init);
+    }));
+    otworz("/obsluga/pomylki?id=7&miesiac=2026-10");
+    const zbieral = await screen.findByRole("group", { name: "Zbierał" });
+    fireEvent.click(await within(zbieral).findByRole("button", { name: "Kuba sezonowy" }));
+    await waitFor(() => expect(wyslane).toHaveLength(1));
+    expect(wyslane[0].cialo).toEqual({ wersja: 3, zbieralNazwa: "Kuba sezonowy", winaZbierajacego: false });
+  });
+
+  it("usunięcie pyta drugi raz, idzie z wersją i zwija wiersz", async () => {
+    const start = [pomylka()];
+    const { wyslane, biezace } = atrapa(start, (_m, url) => {
+      if (url.endsWith("/usun")) biezace.splice(0, 1);
+      return { status: 200, cialo: { usunieto: true } };
+    });
+    otworz("/obsluga/pomylki?id=7&miesiac=2026-10");
+    fireEvent.click(await screen.findByRole("button", { name: "Usuń pomyłkę" }));
+    expect(wyslane).toHaveLength(0);
+    const pytanie = screen.getByRole("group", { name: "Potwierdź usunięcie" });
+    fireEvent.click(within(pytanie).getByRole("button", { name: "Nie" }));
+    expect(screen.queryByRole("group", { name: "Potwierdź usunięcie" })).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "Usuń pomyłkę" }));
+    fireEvent.click(screen.getByRole("button", { name: "Tak, usuń" }));
+    await waitFor(() => expect(wyslane).toEqual([{ metoda: "POST", url: "/api/pomylki/7/usun", cialo: { wersja: 3 } }]));
+    await waitFor(() => expect(screen.queryByRole("group", { name: "Zbierał" })).toBeNull());
+    await waitFor(() => expect(screen.queryByRole("link", { name: "jan_kowalski" })).toBeNull());
+  });
+
+  it("statystyki: stany, źródła, pół roku z przejściem do miesiąca i najczęściej mylone towary", async () => {
+    const p = pomylka();
+    vi.stubGlobal("fetch", vi.fn(async (url: string) => {
+      const d = lista([p]);
+      d.podsumowanie.towary = [{ nazwa: "Lampa LED 24V", ile: 3 }];
+      d.podsumowanie.bezWinnego = 2;
+      d.podsumowanie.trend[4].razem = 4;
+      return new Response(JSON.stringify(url.startsWith("/api/pomylki?") ? d : {}), { status: 200 });
+    }));
+    otworz();
+    const s = await screen.findByRole("region", { name: "Podsumowanie miesiąca" });
+    expect(s).toHaveTextContent("do uzupełnienia1");
+    expect(s).toHaveTextContent("1 z odmowy wypłaty");
+    expect(s).toHaveTextContent("2 pomyłki bez wskazanego winnego");
+    expect(within(within(s).getByRole("list", { name: "Najczęściej mylone towary" })).getByRole("listitem"))
+      .toHaveTextContent("Lampa LED 24V3×");
+    const slupki = within(within(s).getByRole("list", { name: "Pomyłki w ostatnich miesiącach" })).getAllByRole("button");
+    expect(slupki).toHaveLength(6);
+    expect(slupki[5]).toHaveAttribute("aria-current", "true");
+    expect(slupki[4]).toHaveAccessibleName("wrzesień 2026: 4 pomyłki");
+    fireEvent.click(slupki[4]);
+    await waitFor(() => expect(screen.getByRole("button", { name: "Następny miesiąc" })).not.toBeDisabled());
   });
 
   it("wiersz, który zapis wyprowadził poza filtr, zostaje do zwinięcia", async () => {
