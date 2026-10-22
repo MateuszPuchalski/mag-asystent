@@ -491,7 +491,7 @@ test("login zbierającego z wpisu WMS: numer dostaje część przed @, bez adres
   }).query, [13], [30]);
   assert.deepEqual(db().prepare("SELECT sellasist_id, login FROM sellasist_pracownik_login").all().map((r) => ({ ...r })),
     [{ sellasist_id: 18, login: "mariusz" }]);
-  const z = db().prepare("SELECT zbieral_sellasist_id AS kto, login_szukano_at AS at FROM sellasist_pomylka_zlapana")
+  const z = db().prepare("SELECT zbieral_sellasist_id AS kto, pracownik_szukano_at AS at FROM sellasist_pomylka_zlapana")
     .get() as { kto: number; at: string | null };
   assert.equal(z.kto, 18);
   assert.notEqual(z.at, null);

@@ -241,7 +241,7 @@ export const ZBIERAJACYCH_NA_PRZEBIEG = 10;
  * Wpis bez znalezionego zebrania dostaje datę sprawdzenia i więcej nie wraca.
  *
  * Ten sam odczyt zbiera loginy pracowników z wpisów WMS. Pomyłka, której
- * zbierający nie ma jeszcze loginu, wraca raz po niego (`login_szukano_at`):
+ * zbierający nie ma jeszcze loginu, wraca raz po niego (`pracownik_szukano_at`):
  * tak nadrabiają się pomyłki ustalone, zanim czytaliśmy loginy.
  */
 async function ustalZbierajacych(
@@ -251,7 +251,7 @@ async function ustalZbierajacych(
   const czekajace = database.prepare(`SELECT log_id, zamowienie_id, zbieral_sprawdzono_at IS NULL AS bez_osoby
       FROM sellasist_pomylka_zlapana
       WHERE zbieral_sprawdzono_at IS NULL
-         OR (login_szukano_at IS NULL AND zbieral_sellasist_id IS NOT NULL
+         OR (pracownik_szukano_at IS NULL AND zbieral_sellasist_id IS NOT NULL
              AND zbieral_sellasist_id NOT IN (SELECT sellasist_id FROM sellasist_pracownik_login))
       ORDER BY bez_osoby DESC, at DESC, log_id DESC`).all() as Wiersz[];
   const ids = [...new Set(czekajace.map((w) => Number(w.zamowienie_id)))].slice(0, ZBIERAJACYCH_NA_PRZEBIEG);
@@ -268,8 +268,8 @@ async function ustalZbierajacych(
         VALUES (?,?,?) ON CONFLICT(sellasist_id) DO UPDATE SET login = excluded.login, widziano_at = excluded.widziano_at`);
     for (const w of wpisy) if (w.pracownik !== null && w.login !== null) login.run(w.pracownik, w.login, at);
     const ustaw = database.prepare(`UPDATE sellasist_pomylka_zlapana
-        SET zbieral_sellasist_id = ?, zbieral_sprawdzono_at = ?, login_szukano_at = ? WHERE log_id = ?`);
-    const szukano = database.prepare("UPDATE sellasist_pomylka_zlapana SET login_szukano_at = ? WHERE log_id = ?");
+        SET zbieral_sellasist_id = ?, zbieral_sprawdzono_at = ?, pracownik_szukano_at = ? WHERE log_id = ?`);
+    const szukano = database.prepare("UPDATE sellasist_pomylka_zlapana SET pracownik_szukano_at = ? WHERE log_id = ?");
     for (const p of czekajace) {
       const zamowienie = Number(p.zamowienie_id);
       if (!ids.includes(zamowienie)) continue;

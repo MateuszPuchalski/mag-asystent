@@ -194,6 +194,8 @@ const JAWNE = {
   "pomylka_wysylki.zamowienie": [R.ZOSTAJE, "identyfikator zamówienia"],
   "pomylka_wysylki.zbieral": [R.PRACOWNIK, "imię zbierającego"],
   "pomylka_wysylki.pakowal": [R.PRACOWNIK, "imię pakującego"],
+  "sellasist_pracownik.nazwa": [R.PRACOWNIK, "imię pracownika z przypisania admina"],
+  "sellasist_pracownik_login.login": [R.PRACOWNIK, "login pracownika z wpisu WMS Sellasist"],
   "pomylka_wysylki.zgloszono": [R.ZOSTAJE, "data"],
   "pomylka_wysylki.nowy_towar": [R.ZOSTAJE, "słownik"],
   "pomylka_wysylki.towar_wrocil": [R.ZOSTAJE, "data albo słownik"],

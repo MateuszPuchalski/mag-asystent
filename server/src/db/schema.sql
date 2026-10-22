@@ -3197,7 +3197,7 @@ CREATE TABLE IF NOT EXISTS sellasist_pomylka_zlapana (
   at            TEXT NOT NULL,          -- chwila wejścia w status, ISO UTC
   zbieral_sellasist_id  INTEGER,        -- NULL = nie ustalono albo jeszcze nie pytano
   zbieral_sprawdzono_at TEXT,           -- NULL = dziennika zamówienia jeszcze nie pytano
-  login_szukano_at      TEXT            -- NULL = loginu zbierającego w dzienniku jeszcze nie szukano
+  pracownik_szukano_at  TEXT            -- NULL = loginu zbierającego w dzienniku jeszcze nie szukano
 );
 CREATE INDEX IF NOT EXISTS ix_sellasist_pomylka_at ON sellasist_pomylka_zlapana(at);
 
