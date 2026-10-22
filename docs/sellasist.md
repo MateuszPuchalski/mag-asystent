@@ -96,7 +96,7 @@ na dobę dla całego biura.
 autor ostatniego wejścia w status z `SELLASIST_STATUSY_ZEBRANE` przed
 pomyłką. Ostatniego, bo po ponownej kompletacji zbiera ktoś inny. Dziennik
 podaje sam `user_id`, a API nie ma listy pracowników. Numer przypisuje więc
-admin w zakładce „Pomyłki”, raz na osobę. Zestawienie widzi wyłącznie admin,
+admin w zakładce „Pomyłki”, raz na osobę. Zestawienie widzi całe biuro,
 decyzją właściciela z 22 października 2026.
 
 Doba wchodzi do bloku, gdy lustro przeczytało ją całą z ustawionym statusem.

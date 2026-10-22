@@ -449,9 +449,8 @@ export interface ZlapanePomylki {
    */
   doKlienta: number | null;
   /**
-   * Kto zbierał złapane z tych samych dób, najczęstsi pierwsi. Trasa oddaje
-   * je wyłącznie adminowi, innym pustą listę. `nazwa: null` = numer
-   * Sellasist, którego admin jeszcze nie przypisał osobie.
+   * Kto zbierał złapane z tych samych dób, najczęstsi pierwsi.
+   * `nazwa: null` = numer Sellasist, którego admin jeszcze nie przypisał osobie.
    */
   osoby: OsobaZlapanych[];
   /** Złapane z tych dób bez ustalonej osoby: jeszcze nie pytane albo bez zebrania w dzienniku. */

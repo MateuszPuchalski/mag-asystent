@@ -4,6 +4,7 @@ import {
   ChevronDown, ChevronLeft, ChevronRight, PackageCheck, PackageX, Plus, ReceiptText, Trash2, UserPlus,
 } from "lucide-react";
 import { Konflikt } from "../api/klient";
+import { useJa } from "../api/rozmowy";
 import {
   pomylkaZKonfliktu, useNowaPomylka, useOsobyPomylek, usePomylki, usePozycjePomylki, usePrzypiszPracownikaSellasist,
   useUsunPomylke, useWznowPomylke, useZakonczPomylke, useZlapanePomylki, useZmienPomylke, type FiltrPomylek,
@@ -197,15 +198,15 @@ export function Pomylki() {
    arkusz na koniec miesiąca. Liczby zbierał i pakował stoją obok winy,
    bo bez nich „trzy razy winny" nie mówi, z ilu paczek.
 
-   ZESTAWIENIE OSÓB WIDZI TYLKO ADMIN, decyzją właściciela: to monitoring
-   pracowników. Innym rolom serwer oddaje pustą listę osób. Pusta lista nie
-   znaczy więc „nikt nie zawinił" i ekran mówi wtedy samą liczbę pomyłek. */
+   ZESTAWIENIE OSÓB WIDZI CAŁE BIURO, decyzją właściciela z 22 października
+   2026: kto zbierał i kto zawinił to wiedza do pracy, jak w arkuszu. Pusta
+   lista znaczy, że nikogo jeszcze nie wpisano, i tabela wtedy nie staje. */
 const ZRODLO: Record<Pomylka["zrodlo"], string> = {
   odmowa: "z odmowy wypłaty", dosylka: "z dosyłki", recznie: "zgłoszone ręcznie",
 };
 
 /* Statystyki miesiąca w czterech kolumnach: stany, pół roku wstecz, mylone
-   towary i — dla admina — osoby. Wykres pół roku odpowiada na pytanie „lepiej
+   towary i osoby. Wykres pół roku odpowiada na pytanie „lepiej
    czy gorzej", którego jedna liczba miesiąca nie rozstrzyga. Słupek to
    przycisk, bo następne pytanie brzmi zwykle „co było w tamtym miesiącu".
 
@@ -295,10 +296,10 @@ function Podsumowanie({ d, onMiesiac }: { d: PodsumowaniePomylek; onMiesiac: (m:
    Jedna liczba z obu mieszałaby złapane z przepuszczonymi. Obie stoją więc
    obok siebie w zdaniu, z tych samych dni: tak widać, czy kontrola działa.
 
-   KTO ZBIERAŁ WIDZI TYLKO ADMIN, decyzją właściciela z 22 października
+   KTO ZBIERAŁ WIDZI CAŁE BIURO, decyzją właściciela z 22 października
    2026, ta sama reguła co rachunek win rejestru. Serwer zna z dziennika
    Sellasist sam numer pracownika, bo API nie wystawia listy pracowników.
-   Admin przypisuje numer osobie raz, a potem widzi imię.
+   Admin przypisuje numer osobie raz, a potem wszyscy widzą imię.
 
    BRAK DANYCH TO NIE ZERO. Pusta lista dni znaczy, że Sellasist nie oddał
    jeszcze żadnej pełnej doby. Padnięte zapytanie daje błąd zamiast bloku.
@@ -356,20 +357,28 @@ function ZlapanePrzyPakowaniu() {
   </Karta>;
 }
 
-/* Kto zbierał złapane, najczęstsi pierwsi. Numer bez przypisania ma obok
-   wybór osoby, bo bez niego admin nie wie, kogo dotyczy liczba. Przypisanie
-   zmienia się klikiem w „zmień", rzadko, więc wybór nie stoi stale otwarty. */
+/* Kto zbierał złapane, najczęstsi pierwsi. Numer bez przypisania ma u admina
+   obok wybór osoby, bo bez niego nikt nie wie, kogo dotyczy liczba. Reszta
+   biura widzi wtedy sam numer: przypisanie zmienia imię w każdym wierszu,
+   więc robi je jedna osoba. Wybór otwiera się klikiem w „zmień", rzadko. */
 function KtoZbieral({ osoby, bezOsoby }: { osoby: OsobaZlapanych[]; bezOsoby: number }) {
+  const admin = useJa().data?.user.role === "admin";
   const lista = useOsobyPomylek();
   const przypisz = usePrzypiszPracownikaSellasist();
   const [zmieniany, setZmieniany] = useState<number | null>(null);
   return <div className="space-y-1 pl-6 pt-1" role="group" aria-label="Kto zbierał złapane">
-    <p className="text-xs font-semibold text-slate-700">Kto zbierał <span className="font-normal text-slate-600">
-      · widzi tylko admin</span></p>
+    <p className="text-xs font-semibold text-slate-700">Kto zbierał</p>
     <ul className="flex flex-wrap gap-x-4 gap-y-1">
       {osoby.map((o) => {
-        const wybor = o.nazwa === null || zmieniany === o.sellasistId;
         const etykieta = `Pracownik Sellasist nr ${o.sellasistId}`;
+        if (!admin) {
+          return <li key={o.sellasistId} className="inline-flex items-center gap-2">
+            {o.nazwa ? <b>{o.nazwa}</b>
+              : <span className="text-slate-700" title="Imię przypisze admin">{etykieta}</span>}
+            <span className="font-semibold tabular-nums text-ranga-zle">{o.zlapanych}×</span>
+          </li>;
+        }
+        const wybor = o.nazwa === null || zmieniany === o.sellasistId;
         return <li key={o.sellasistId} className="inline-flex items-center gap-2">
           {wybor
             ? <>

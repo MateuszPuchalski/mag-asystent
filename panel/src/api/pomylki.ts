@@ -54,7 +54,7 @@ export interface OsobaPodsumowania {
 export interface PodsumowaniePomylek {
   miesiac: string;
   razem: number;
-  /** Pusta dla roli innej niż admin — to nie znaczy „nikt nie zawinił". */
+  /** Osoby z pomyłek miesiąca; pusta, gdy nikogo jeszcze nie wpisano. */
   osoby: OsobaPodsumowania[];
   stany: Record<StanPomylki, number>;
   zrodla: Record<Pomylka["zrodlo"], number>;
@@ -151,11 +151,11 @@ export interface ZlapanePomylki {
   /** Pomyłki z rejestru zgłoszone w tych samych dobach; `null` przy pustej liście. */
   doKlienta: number | null;
   /**
-   * Kto zbierał złapane, z dziennika Sellasist. Serwer podaje je wyłącznie
-   * adminowi, innym pustą listę. `nazwa: null` = numer Sellasist bez przypisanej osoby.
+   * Kto zbierał złapane, z dziennika Sellasist, dla całego biura.
+   * `nazwa: null` = numer Sellasist, któremu admin nie przypisał jeszcze osoby.
    */
   osoby: OsobaZlapanych[];
-  /** Złapane bez ustalonej osoby; `null` dla roli innej niż admin. */
+  /** Złapane bez ustalonej osoby; `null`, gdy blok nie ma danych. */
   bezOsoby: number | null;
 }
 

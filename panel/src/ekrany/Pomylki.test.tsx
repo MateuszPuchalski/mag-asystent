@@ -231,7 +231,7 @@ describe("rejestr pomyłek", () => {
     fireEvent.click(await screen.findByRole("button", { name: "Wszystkie" }));
     const wiersz = (await screen.findByRole("link", { name: "jan_kowalski" })).closest("tr")!;
     expect(within(wiersz).getByText("winny")).toBeInTheDocument();
-    /* Bez zestawienia (rola inna niż admin) sama liczba, bez zdania o winnych. */
+    /* Bez wpisanych osób sama liczba, bez zdania o winnych. */
     const podsumowanie = screen.getByRole("region", { name: "Podsumowanie miesiąca" });
     expect(podsumowanie).toHaveTextContent("W miesiącu: 1 pomyłka");
     expect(podsumowanie).not.toHaveTextContent(/winn/);
@@ -349,6 +349,24 @@ describe("pomyłki złapane przy pakowaniu", () => {
     /* Przypisany numer zmienia się klikiem, bez stale otwartego wyboru. */
     fireEvent.click(within(kto).getByRole("button", { name: "zmień" }));
     expect(within(kto).getByRole("combobox", { name: "Pracownik Sellasist nr 8 to" })).toHaveValue("12");
+  });
+
+  it("kto zbierał (biuro): imiona i numery widać, wyboru osoby nie ma", async () => {
+    const odczyt = odczytPomylek([pomylka()], zlapane({
+      osoby: [{ sellasistId: 7, userId: null, nazwa: null, zlapanych: 3 },
+        { sellasistId: 8, userId: 12, nazwa: "Ewa", zlapanych: 1 }],
+      bezOsoby: 0,
+    }));
+    vi.stubGlobal("fetch", vi.fn(async (url: string) => {
+      const c = url === "/api/auth/me" ? { user: { userId: 2, name: "Ola", role: "biuro" } } : odczyt(url);
+      return new Response(JSON.stringify(c ?? { error: "nieznany" }), { status: c === undefined ? 404 : 200 });
+    }));
+    otworz();
+    const kto = await screen.findByRole("group", { name: "Kto zbierał złapane" });
+    await waitFor(() => expect(kto).toHaveTextContent("Pracownik Sellasist nr 73×"));
+    expect(kto).toHaveTextContent("Ewa1×");
+    expect(within(kto).queryByRole("combobox")).toBeNull();
+    expect(within(kto).queryByRole("button", { name: "zmień" })).toBeNull();
   });
 
   it("pusta lista dób mówi, że Sellasist nic nie podał — bez żadnej cyfry", async () => {

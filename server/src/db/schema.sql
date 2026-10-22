@@ -3188,7 +3188,7 @@ CREATE TABLE IF NOT EXISTS sellasist_do_pobrania (
 -- z `SELLASIST_STATUSY_POMYLKA`, jeden wiersz na wpis dziennika Sellasist.
 -- KTO ZBIERAŁ to numer pracownika Sellasist z wpisu, który przed tą pomyłką
 -- przestawił zamówienie w status zebranego. Decyzja właściciela z 22
--- października 2026. Zestawienie osób widzi wyłącznie admin, jak rachunek win
+-- października 2026. Zestawienie osób widzi całe biuro, jak rachunek win
 -- rejestru (docs/obsluga-klienta.md). Strumień dziennika dalej `user_id` nie
 -- czyta, pyta o niego tylko ustalenie zbierającego (sellasist-sync.ts).
 CREATE TABLE IF NOT EXISTS sellasist_pomylka_zlapana (
