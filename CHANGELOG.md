@@ -10,6 +10,15 @@ z wersją monorepo" — i właśnie tak przestał być zgodny: `0.3.0` przetrwa�
 sześć zmergowanych zmian, w tym takie, które wymagały nowego uprawnienia SQL.
 Komentarz nie jest mechanizmem.
 
+## 0.611.0 — 22 października 2026
+
+**Pomyłki złapane przy pakowaniu mają osobę, która zbierała.** Serwer czyta
+z dziennika Sellasist, kto przestawił zamówienie w status zebranego. Admin
+raz przypisuje numer pracownika Sellasist do osoby z listy.
+
+**Kto zbierał i kto zawinił widzi całe biuro.** Zestawienie osób w rejestrze
+pomyłek i przy złapanych przy pakowaniu nie jest już tylko dla admina.
+
 ## 0.610.1 — 22 października 2026
 
 Koszyk wirtualny dostaje swój dokument MM w chwili, gdy hala skanuje kartkę
