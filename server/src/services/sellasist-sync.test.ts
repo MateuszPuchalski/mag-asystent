@@ -38,7 +38,7 @@ beforeEach(() => {
   const d = db();
   for (const t of ["sellasist_pozycja", "sellasist_przesylka", "sellasist_zamowienie", "sellasist_do_pobrania",
     "sellasist_sync_state", "sellasist_pomylka_zlapana",
-    "sellasist_pracownik", "pomylka_wysylki", "zbiorka", "sgt_towar", "events"]) d.exec(`DELETE FROM ${t}`);
+    "sellasist_pracownik", "sellasist_pracownik_login", "pomylka_wysylki", "zbiorka", "sgt_towar", "events"]) d.exec(`DELETE FROM ${t}`);
   d.prepare("INSERT INTO sgt_towar(tw_id, symbol, nazwa, ean) VALUES (?,?,?,?)").run(11, "NOZ-01", "Nóż", "5901");
 });
 
@@ -403,7 +403,8 @@ test("zbierający: autor ostatniego wejścia w status zebranego przed pomyłką,
   });
   await przebieg(a.query, [13], [30]);
   const pytanie = a.wolania.find((w) => w.includes("orders="))!;
-  assert.match(pytanie, /orders=800&operation_tag=order_status_change&sort=asc/);
+  assert.match(pytanie, /orders=800&sort=asc/);
+  assert.doesNotMatch(pytanie, /operation_tag/, "wpisy WMS z loginem nie mają tagu");
   assert.doesNotMatch(pytanie, /date_from/, "zebranie bywa sprzed okna strumienia");
   const w = db().prepare(`SELECT log_id, zbieral_sellasist_id AS kto FROM sellasist_pomylka_zlapana ORDER BY log_id`).all();
   assert.deepEqual(w.map((r) => ({ ...r })), [{ log_id: 20, kto: 7 }, { log_id: 22, kto: 8 }]);
@@ -468,8 +469,47 @@ test("złapane z osobami: imię po przypisaniu, numer bez przypisania, osobno be
   const z = S.zlapanePomylki(d, true, TERAZ);
   assert.equal(z.razem, 4);
   assert.deepEqual(z.osoby, [
-    { sellasistId: 7, userId: 2, nazwa: "Mariusz", zlapanych: 2 },
-    { sellasistId: 8, userId: null, nazwa: null, zlapanych: 1 },
+    { sellasistId: 7, userId: 2, nazwa: "Mariusz", login: null, zlapanych: 2 },
+    { sellasistId: 8, userId: null, nazwa: null, login: null, zlapanych: 1 },
   ]);
   assert.equal(z.bezOsoby, 1);
+});
+
+test("login zbierającego z wpisu WMS: numer dostaje część przed @, bez adresu klienta", async () => {
+  const wpisy = [
+    { id: 8, order_id: 800, user_id: 18, action: "[WMS] Przypisanie zamówienia do wózka Zigi 5/50 przez użytkownika Mariusz@wertis.com.pl",
+      date: "2026-10-13 08:16:00" },
+    { id: 9, order_id: 800, operation_tag: "order_status_change", object_id: 13, user_id: 18, date: "2026-10-13 08:40:00",
+      action: "Zmiana statusu zamówienia" },
+    /* Adres klienta w tekście akcji nie jest loginem pracownika. */
+    { id: 10, order_id: 800, user_id: 4, action: "Wysłano wiadomość do klient@example.com", date: "2026-10-13 08:50:00" },
+    { id: 20, order_id: 800, operation_tag: "order_status_change", object_id: 30, user_id: 4, date: "2026-10-13 09:00:00" },
+  ];
+  await przebieg(atrapa({
+    "/orders_logs": (sc: string) => (sc.includes("orders=") ? wpisy : wpisy.filter((w) => w.id >= 20)),
+    "/orders/800": zamowienie(800),
+  }).query, [13], [30]);
+  assert.deepEqual(db().prepare("SELECT sellasist_id, login FROM sellasist_pracownik_login").all().map((r) => ({ ...r })),
+    [{ sellasist_id: 18, login: "mariusz" }]);
+  const z = db().prepare("SELECT zbieral_sellasist_id AS kto, pracownik_szukano_at AS at FROM sellasist_pomylka_zlapana")
+    .get() as { kto: number; at: string | null };
+  assert.equal(z.kto, 18);
+  assert.notEqual(z.at, null);
+});
+
+test("pomyłka ustalona bez loginu wraca raz po login, potem już nie", async () => {
+  db().prepare(`INSERT INTO sellasist_pomylka_zlapana(log_id, zamowienie_id, at, zbieral_sellasist_id, zbieral_sprawdzono_at)
+      VALUES (20, 800, '2026-10-13T07:00:00.000Z', 18, '2026-10-13T07:30:00.000Z')`).run();
+  const wpisy = [{ id: 8, order_id: 800, user_id: 18, date: "2026-10-13 08:16:00",
+    action: "[WMS] Przypisanie zamówienia do wózka przez użytkownika mariusz@wertis.com.pl" }];
+  const a = atrapa({ "/orders_logs": (sc: string) => (sc.includes("orders=") ? wpisy : []) });
+  await przebieg(a.query, [13], [30]);
+  assert.equal(a.wolania.filter((x) => x.includes("orders=800")).length, 1);
+  assert.equal((db().prepare("SELECT login FROM sellasist_pracownik_login WHERE sellasist_id = 18").get() as
+    { login: string }).login, "mariusz");
+  assert.equal((db().prepare("SELECT zbieral_sellasist_id AS kto FROM sellasist_pomylka_zlapana").get() as
+    { kto: number }).kto, 18, "ustalona osoba zostaje");
+  const b = atrapa({ "/orders_logs": [] });
+  await przebieg(b.query, [13], [30]);
+  assert.equal(b.wolania.filter((x) => x.includes("orders=")).length, 0);
 });

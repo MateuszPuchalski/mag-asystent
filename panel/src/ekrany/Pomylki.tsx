@@ -357,10 +357,10 @@ function ZlapanePrzyPakowaniu() {
   </Karta>;
 }
 
-/* Kto zbierał złapane, najczęstsi pierwsi. Numer bez przypisania ma u admina
-   obok wybór osoby, bo bez niego nikt nie wie, kogo dotyczy liczba. Reszta
-   biura widzi wtedy sam numer: przypisanie zmienia imię w każdym wierszu,
-   więc robi je jedna osoba. Wybór otwiera się klikiem w „zmień", rzadko. */
+/* Kto zbierał złapane, najczęstsi pierwsi. Najpierw imię z przypisania
+   admina, potem login wyczytany z wpisów WMS Sellasist, na końcu sam numer.
+   Numer bez przypisania ma u admina obok wybór osoby. Przypisanie zmienia
+   imię w każdym wierszu, więc robi je jedna osoba. Wybór otwiera „zmień". */
 function KtoZbieral({ osoby, bezOsoby }: { osoby: OsobaZlapanych[]; bezOsoby: number }) {
   const admin = useJa().data?.user.role === "admin";
   const lista = useOsobyPomylek();
@@ -371,10 +371,12 @@ function KtoZbieral({ osoby, bezOsoby }: { osoby: OsobaZlapanych[]; bezOsoby: nu
     <ul className="flex flex-wrap gap-x-4 gap-y-1">
       {osoby.map((o) => {
         const etykieta = `Pracownik Sellasist nr ${o.sellasistId}`;
+        const bezImienia = o.login
+          ? <b title={`${etykieta} — login z Sellasist`}>{o.login}</b>
+          : <span className="text-slate-700" title="Imię przypisze admin">{etykieta}</span>;
         if (!admin) {
           return <li key={o.sellasistId} className="inline-flex items-center gap-2">
-            {o.nazwa ? <b>{o.nazwa}</b>
-              : <span className="text-slate-700" title="Imię przypisze admin">{etykieta}</span>}
+            {o.nazwa ? <b>{o.nazwa}</b> : bezImienia}
             <span className="font-semibold tabular-nums text-ranga-zle">{o.zlapanych}×</span>
           </li>;
         }
@@ -382,7 +384,7 @@ function KtoZbieral({ osoby, bezOsoby }: { osoby: OsobaZlapanych[]; bezOsoby: nu
         return <li key={o.sellasistId} className="inline-flex items-center gap-2">
           {wybor
             ? <>
-                <span className="text-slate-700">{etykieta}</span>
+                {bezImienia}
                 <select className="field w-44 text-sm" aria-label={`${etykieta} to`} value={o.userId ?? ""}
                   disabled={przypisz.isPending || !lista.data}
                   onChange={(e) => {

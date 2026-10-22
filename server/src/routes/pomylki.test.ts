@@ -209,7 +209,7 @@ test("kto zbierał złapane: osoby widzi całe biuro, numer Sellasist przypisuje
     assert.equal(dlaBiura.razem, 1);
     assert.equal(dlaBiura.bezOsoby, 0);
     assert.deepEqual(dlaBiura.osoby,
-      [{ sellasistId: 7, userId: null, nazwa: null, zlapanych: 1 }]);
+      [{ sellasistId: 7, userId: null, nazwa: null, login: null, zlapanych: 1 }]);
 
     const przypisz = (h: Record<string, string>, payload: unknown) =>
       app.inject({ method: "POST", url: "/api/pomylki/zlapane/pracownik", headers: h, payload: payload as object });
@@ -217,7 +217,7 @@ test("kto zbierał złapane: osoby widzi całe biuro, numer Sellasist przypisuje
     assert.equal((await przypisz(admin.naglowki, { sellasistId: 7, userId: 999999 })).statusCode, 400);
     assert.equal((await przypisz(admin.naglowki, { sellasistId: 7, userId: marek.userId })).statusCode, 200);
     assert.deepEqual((await odczyt(biuro.naglowki)).osoby,
-      [{ sellasistId: 7, userId: marek.userId, nazwa: "Marek P", zlapanych: 1 }]);
+      [{ sellasistId: 7, userId: marek.userId, nazwa: "Marek P", login: null, zlapanych: 1 }]);
   } finally {
     Object.assign(config.sellasist, bylo);
   }

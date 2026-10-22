@@ -109,11 +109,12 @@ export function sciezkaDziennika(odStempel: string, offset: number): string {
 }
 
 /**
- * Zmiany statusu wybranych zamówień, rosnąco i bez daty od. Pomyłka złapana
- * dziś bywa zebrana dzień wcześniej, przed oknem strumienia dziennika.
+ * Cały dziennik wybranych zamówień, rosnąco i bez daty od. Pomyłka złapana
+ * dziś bywa zebrana dzień wcześniej, przed oknem strumienia dziennika. Bez
+ * filtra tagu, bo wpisy WMS z loginem pracownika tagu nie mają.
  */
-export function sciezkaStatusowZamowien(ids: readonly number[], offset: number): string {
-  return `/orders_logs?orders=${ids.map((i) => Math.trunc(i)).join(",")}&operation_tag=order_status_change`
+export function sciezkaWpisowZamowien(ids: readonly number[], offset: number): string {
+  return `/orders_logs?orders=${ids.map((i) => Math.trunc(i)).join(",")}`
     + `&sort=asc&limit=${STRONA}&offset=${Math.max(0, Math.trunc(offset))}`;
 }
 
@@ -337,7 +338,7 @@ export interface WpisDziennika {
 /**
  * Wpisy dziennika BEZ `user_id`. Liczba zbiórek na dzień nie potrzebuje
  * osób, więc strumień ich nie niesie. Autora czyta wyłącznie
- * `mapujZmianyStatusu`, i tylko dla pomyłek złapanych przy pakowaniu.
+ * `mapujWpisyZamowien`, i tylko dla pomyłek złapanych przy pakowaniu.
  */
 export function mapujDziennik(v: unknown): WpisDziennika[] {
   return lista(v).flatMap((w) => {
@@ -351,26 +352,37 @@ export function mapujDziennik(v: unknown): WpisDziennika[] {
   });
 }
 
-export interface ZmianaStatusu {
+export interface WpisZamowienia {
   id: number;
   zamowienieId: number;
-  /** Status, w który weszło zamówienie (`object_id`). */
+  /** Status, w który weszło zamówienie (`object_id`); `null`, gdy wpis to nie zmiana statusu. */
   status: number | null;
-  /** `user_id` — numer pracownika Sellasist, który zmienił status; `null` = system. */
+  /** `user_id` — numer pracownika Sellasist, autor wpisu; `null` = system. */
   pracownik: number | null;
+  /** Login pracownika z tekstu akcji WMS, część przed `@`; `null`, gdy tekst go nie niesie. */
+  login: string | null;
 }
 
+/* Wpis WMS kończy się „… przez użytkownika jan@firma.pl", a jego `user_id`
+   to ten sam pracownik. Tak numer dostaje login, którego API inaczej nie
+   podaje. Bierzemy tylko część przed `@`: wystarcza, by poznać kolegę, a
+   adres e-mail nie wchodzi do bazy. Sama fraza, bo tekst akcji bywa też
+   o kliencie i jego adresie. */
+const LOGIN_W_AKCJI = /przez użytkownika\s+([A-Za-z0-9._%+-]{1,64})@/i;
+
 /**
- * Zmiany statusu Z AUTOREM — wyłącznie do ustalenia, kto zbierał pomyłkę
- * złapaną przy pakowaniu (decyzja właściciela, `schema.sql`). Inny wpis niż
- * zmiana statusu odpada, nawet gdyby filtr Sellasist go przepuścił.
+ * Wpisy dziennika Z AUTOREM — wyłącznie do ustalenia, kto zbierał pomyłkę
+ * złapaną przy pakowaniu (decyzja właściciela, `schema.sql`).
  */
-export function mapujZmianyStatusu(v: unknown): ZmianaStatusu[] {
+export function mapujWpisyZamowien(v: unknown): WpisZamowienia[] {
   return lista(v).flatMap((w) => {
     const id = calkowita(w.id);
     const zamowienieId = calkowita(w.order_id);
-    if (id === null || zamowienieId === null || tekst(w.operation_tag) !== "order_status_change") return [];
-    const pracownik = calkowita(w.user_id);
-    return [{ id, zamowienieId, status: calkowita(w.object_id), pracownik: pracownik && pracownik > 0 ? pracownik : null }];
+    if (id === null || zamowienieId === null) return [];
+    const u = calkowita(w.user_id);
+    const pracownik = u && u > 0 ? u : null;
+    const login = pracownik ? (tekst(w.action)?.match(LOGIN_W_AKCJI)?.[1].toLowerCase() ?? null) : null;
+    const status = tekst(w.operation_tag) === "order_status_change" ? calkowita(w.object_id) : null;
+    return [{ id, zamowienieId, status, pracownik, login }];
   });
 }

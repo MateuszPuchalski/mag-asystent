@@ -1001,6 +1001,9 @@ export function migrate(database: DatabaseSync) {
      w obu kolumnach, więc ustalenie zbierającego dopyta je samo. */
   addColumn("sellasist_pomylka_zlapana", "zbieral_sellasist_id", "INTEGER");
   addColumn("sellasist_pomylka_zlapana", "zbieral_sprawdzono_at", "TEXT");
+  /* Szukanie loginu zbierającego — patrz `sellasist_pracownik_login`. NULL
+     przy starych wierszach znaczy prawdę: loginu jeszcze nie szukano. */
+  addColumn("sellasist_pomylka_zlapana", "pracownik_szukano_at", "TEXT");
   /* Metoda dostawy zamówienia Sellasist — patrz `sellasist_zamowienie.dostawa`
      w `schema.sql`. NULL znaczy „lustro jej jeszcze nie czytało", a każda
      zmiana zamówienia czyta szczegół od nowa. */

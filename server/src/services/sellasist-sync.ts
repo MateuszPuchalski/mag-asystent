@@ -1,8 +1,8 @@
 import type { DatabaseSync } from "node:sqlite";
 import {
-  BladSellasist, mapujDziennik, mapujListeZamowien, mapujListyPrzewozowe, mapujZamowienie, mapujZmianyStatusu,
-  sciezkaDziennika, sciezkaPrzesylek, sciezkaStatusowZamowien, sciezkaZamowienia, sciezkaZamowienPoNumerze, STRONA,
-  zapytajSellasist, type ZamowienieSellasist, type ZapytanieSellasist, type ZmianaStatusu,
+  BladSellasist, mapujDziennik, mapujListeZamowien, mapujListyPrzewozowe, mapujWpisyZamowien, mapujZamowienie,
+  sciezkaDziennika, sciezkaPrzesylek, sciezkaWpisowZamowien, sciezkaZamowienia, sciezkaZamowienPoNumerze, STRONA,
+  zapytajSellasist, type WpisZamowienia, type ZamowienieSellasist, type ZapytanieSellasist,
 } from "../adapters/sellasist.http.js";
 import { BladLimitu } from "../adapters/limit.js";
 import { config } from "../config.js";
@@ -239,35 +239,48 @@ export const ZBIERAJACYCH_NA_PRZEBIEG = 10;
  * strumienia, a stare pomyłki bez osoby nadrabiają się tą samą drogą. Bez
  * ustawionych statusów „zebrane" nie pyta wcale, bo nie wie, czego szukać.
  * Wpis bez znalezionego zebrania dostaje datę sprawdzenia i więcej nie wraca.
+ *
+ * Ten sam odczyt zbiera loginy pracowników z wpisów WMS. Pomyłka, której
+ * zbierający nie ma jeszcze loginu, wraca raz po niego (`pracownik_szukano_at`):
+ * tak nadrabiają się pomyłki ustalone, zanim czytaliśmy loginy.
  */
 async function ustalZbierajacych(
   database: DatabaseSync, query: ZapytanieSellasist, statusyZebrane: readonly number[], teraz: Date,
 ): Promise<number> {
   if (statusyZebrane.length === 0) return 0;
-  const czekajace = database.prepare(`SELECT log_id, zamowienie_id FROM sellasist_pomylka_zlapana
-      WHERE zbieral_sprawdzono_at IS NULL ORDER BY at DESC, log_id DESC`).all() as Wiersz[];
+  const czekajace = database.prepare(`SELECT log_id, zamowienie_id, zbieral_sprawdzono_at IS NULL AS bez_osoby
+      FROM sellasist_pomylka_zlapana
+      WHERE zbieral_sprawdzono_at IS NULL
+         OR (pracownik_szukano_at IS NULL AND zbieral_sellasist_id IS NOT NULL
+             AND zbieral_sellasist_id NOT IN (SELECT sellasist_id FROM sellasist_pracownik_login))
+      ORDER BY bez_osoby DESC, at DESC, log_id DESC`).all() as Wiersz[];
   const ids = [...new Set(czekajace.map((w) => Number(w.zamowienie_id)))].slice(0, ZBIERAJACYCH_NA_PRZEBIEG);
   if (ids.length === 0) return 0;
-  const zmiany: ZmianaStatusu[] = [];
+  const wpisy: WpisZamowienia[] = [];
   for (let strona = 0; strona < STRON_DZIENNIKA; strona++) {
-    const wpisy = mapujZmianyStatusu(await query(sciezkaStatusowZamowien(ids, strona * STRONA)));
-    zmiany.push(...wpisy);
-    if (wpisy.length < STRONA) break;
+    const porcja = mapujWpisyZamowien(await query(sciezkaWpisowZamowien(ids, strona * STRONA)));
+    wpisy.push(...porcja);
+    if (porcja.length < STRONA) break;
   }
   const at = teraz.toISOString();
   transaction(database, () => {
+    const login = database.prepare(`INSERT INTO sellasist_pracownik_login(sellasist_id, login, widziano_at)
+        VALUES (?,?,?) ON CONFLICT(sellasist_id) DO UPDATE SET login = excluded.login, widziano_at = excluded.widziano_at`);
+    for (const w of wpisy) if (w.pracownik !== null && w.login !== null) login.run(w.pracownik, w.login, at);
     const ustaw = database.prepare(`UPDATE sellasist_pomylka_zlapana
-        SET zbieral_sellasist_id = ?, zbieral_sprawdzono_at = ? WHERE log_id = ?`);
+        SET zbieral_sellasist_id = ?, zbieral_sprawdzono_at = ?, pracownik_szukano_at = ? WHERE log_id = ?`);
+    const szukano = database.prepare("UPDATE sellasist_pomylka_zlapana SET pracownik_szukano_at = ? WHERE log_id = ?");
     for (const p of czekajace) {
       const zamowienie = Number(p.zamowienie_id);
       if (!ids.includes(zamowienie)) continue;
       const logId = Number(p.log_id);
-      let zebral: ZmianaStatusu | null = null;
-      for (const z of zmiany) {
+      if (Number(p.bez_osoby) !== 1) { szukano.run(at, logId); continue; }
+      let zebral: WpisZamowienia | null = null;
+      for (const z of wpisy) {
         if (z.zamowienieId !== zamowienie || z.id >= logId || z.status === null) continue;
         if (statusyZebrane.includes(z.status) && (zebral === null || z.id > zebral.id)) zebral = z;
       }
-      ustaw.run(zebral?.pracownik ?? null, at, logId);
+      ustaw.run(zebral?.pracownik ?? null, at, at, logId);
     }
   })();
   return ids.length;
@@ -457,7 +470,15 @@ export interface ZlapanePomylki {
   bezOsoby: number | null;
 }
 
-export interface OsobaZlapanych { sellasistId: number; userId: number | null; nazwa: string | null; zlapanych: number }
+export interface OsobaZlapanych {
+  sellasistId: number;
+  userId: number | null;
+  /** Imię z przypisania admina; `null` = numer bez przypisania. */
+  nazwa: string | null;
+  /** Login z wpisu WMS w dzienniku Sellasist; `null` = jeszcze nie wyczytany. */
+  login: string | null;
+  zlapanych: number;
+}
 
 /**
  * Pomyłki złapane przy pakowaniu na dobę — CZYSTY ODCZYT, bez pytania Sellasist.
@@ -489,8 +510,9 @@ export function zlapanePomylki(database: DatabaseSync, wlaczone: boolean, teraz 
   const osoby = new Map<number, OsobaZlapanych>();
   let bezOsoby = 0;
   const od = new Date(teraz.getTime() - (DNI_ZLAPANYCH + 1) * 24 * 60 * 60_000).toISOString();
-  for (const w of database.prepare(`SELECT z.at, z.zbieral_sellasist_id AS sid, p.user_id, p.nazwa
+  for (const w of database.prepare(`SELECT z.at, z.zbieral_sellasist_id AS sid, p.user_id, p.nazwa, l.login
       FROM sellasist_pomylka_zlapana z LEFT JOIN sellasist_pracownik p ON p.sellasist_id = z.zbieral_sellasist_id
+      LEFT JOIN sellasist_pracownik_login l ON l.sellasist_id = z.zbieral_sellasist_id
       WHERE z.at >= ?`).all(od) as Wiersz[]) {
     const d = dataLokalna(String(w.at));
     if (!licznik.has(d)) continue;
@@ -498,7 +520,7 @@ export function zlapanePomylki(database: DatabaseSync, wlaczone: boolean, teraz 
     if (w.sid == null) { bezOsoby++; continue; }
     const sid = Number(w.sid);
     const o = osoby.get(sid) ?? { sellasistId: sid, userId: w.user_id == null ? null : Number(w.user_id),
-      nazwa: tekst(w.nazwa), zlapanych: 0 };
+      nazwa: tekst(w.nazwa), login: tekst(w.login), zlapanych: 0 };
     o.zlapanych++;
     osoby.set(sid, o);
   }
