@@ -54,7 +54,7 @@ before(async () => {
 
 beforeEach(() => {
   const d = db();
-  for (const t of ["zdjecie_oferty_wybor", "zdjecie_wlasne", "sfera_queue", "device_session", "app_user", "events"]) {
+  for (const t of ["zdjecie_oferty_wybor", "offer_snapshot", "zdjecie_wlasne", "sfera_queue", "device_session", "app_user", "events"]) {
     d.prepare(`DELETE FROM ${t}`).run();
   }
   d.prepare(
@@ -67,13 +67,25 @@ beforeEach(() => {
     apiUrl: "https://api.test",
     query: async (url) => { adresy.push(url); return odpowiedz(url); },
     pobierz: async (url) => { pobrania.push(url); return { bajty: JPEG, mime: "image/jpeg" }; },
+    /* Subiekt atrapą: żadna sygnatura nie jest symbolem innej kartoteki. */
+    towary: async () => [],
   });
 });
 
 afterEach(() => {
   ustaw(null);
   config.zdjecia.dodawanie = "wertis";
+  config.allegro.clientId = "";
+  db().prepare("DELETE FROM allegro_token").run();
 });
+
+/* Indeks wymaga połączonego konta, więc jego testy stawiają token jak skrzynka. */
+function polacz(): void {
+  config.allegro.clientId = "klient-testowy";
+  db().prepare(`INSERT OR REPLACE INTO allegro_token(id,access_token,refresh_token,wygasa_at,srodowisko,
+    polaczono_at,polaczono_przez) VALUES (1,'tok','ref',?,?,'2026-09-01T00:00:00Z','test')`)
+    .run(new Date(Date.now() + 86_400_000).toISOString(), config.allegro.sandbox ? "sandbox" : "prod");
+}
 
 function sesja(rola: "biuro" | "admin" | "magazynier"): Record<string, string> {
   const u = createUser(`Osoba ${rola}`, rola);
@@ -107,8 +119,8 @@ test("dopasuj: jedna pozycja na symbol, w kształcie kontraktu", async () => {
     wlaczone: true,
     pozycje: [
       { symbol: "W08-0501", ofert: 2, oferta: {
-        id: "10", nazwa: "Oferta 10", status: "ACTIVE", startedAt: "2026-01-01T00:00:00Z", zdjecie: true } },
-      { symbol: "NIE-MA", ofert: 0, oferta: null },
+        id: "10", nazwa: "Oferta 10", status: "ACTIVE", startedAt: "2026-01-01T00:00:00Z", zdjecie: true }, po: "sygnatura", niejednoznaczny: false },
+      { symbol: "NIE-MA", ofert: 0, oferta: null, po: null, niejednoznaczny: false },
     ],
   });
   assert.equal(adresy.length, 1);
@@ -153,6 +165,104 @@ test("dopasuj i duże zdjęcie: magazynier dostaje 403", async () => {
   assert.equal((await dopasuj(h, { symbole: ["S-1"] })).statusCode, 403);
   assert.equal((await duze(h, "10")).statusCode, 403);
   assert.equal(adresy.length + pobrania.length, 0);
+});
+
+// ── Indeks kodów producenta ─────────────────────────────────────────────────
+
+const indeks = (headers: Record<string, string>) =>
+  app.inject({ method: "GET", url: "/api/zdjecia/allegro/indeks", headers });
+const lista = (headers: Record<string, string>, payload: unknown) =>
+  app.inject({ method: "POST", url: "/api/zdjecia/allegro/indeks/lista", headers, payload: payload as object });
+const parametry = (headers: Record<string, string>) =>
+  app.inject({ method: "POST", url: "/api/zdjecia/allegro/indeks/parametry", headers, payload: {} });
+
+test("indeks: lista, parametry i stan w kształcie kontraktu", async () => {
+  polacz();
+  const h = sesja("biuro");
+  odpowiedz = (url) => url.includes("/sale/product-offers/")
+    ? { parameters: [{ id: "224017", name: "Kod producenta", values: ["W08-0501"] }] }
+    : { offers: [oferta("30", "INNA")], totalCount: 1 };
+
+  const l = await lista(h, { offset: 0 });
+  assert.equal(l.statusCode, 200, l.payload);
+  assert.deepEqual(l.json(), { ofert: 1, razem: 1, nastepny: null });
+
+  const przed = await indeks(h);
+  assert.equal(przed.statusCode, 200);
+  assert.equal(przed.json().ofert, 1);
+  assert.equal(przed.json().zKodem, 0);
+  assert.equal(przed.json().doPobrania, 1);
+  assert.equal(typeof przed.json().listaAt, "string");
+
+  const p = await parametry(h);
+  assert.equal(p.statusCode, 200, p.payload);
+  assert.deepEqual(p.json(), { pobrano: 1, zostalo: 0 });
+  assert.deepEqual({ ...((await indeks(h)).json() as object), listaAt: null }, { ofert: 1, zKodem: 1, doPobrania: 0, listaAt: null });
+
+  /* Sygnatura INNA nie trafia, kod producenta tak. */
+  const d = await dopasuj(h, { symbole: ["W08-0501"] });
+  assert.equal(d.json().pozycje[0].po, "kod_producenta");
+  assert.equal(d.json().pozycje[0].oferta.id, "30");
+
+  const typy = (db().prepare("SELECT type FROM events ORDER BY id").all() as Array<{ type: string }>).map((z) => z.type);
+  assert.deepEqual(typy, ["zdjecia_allegro_indeks_lista", "zdjecia_allegro_indeks_parametry", "zdjecia_allegro_dopasowane"]);
+});
+
+test("indeks: GET to sam odczyt, bez Allegro i bez zapisu", async () => {
+  polacz();
+  const h = sesja("biuro");
+  const przed = (db().prepare("SELECT total_changes() AS n").get() as { n: number }).n;
+  const r = await indeks(h);
+  assert.equal(r.statusCode, 200);
+  assert.deepEqual(Object.keys(r.json()).sort(), ["doPobrania", "listaAt", "ofert", "zKodem"]);
+  assert.equal((db().prepare("SELECT total_changes() AS n").get() as { n: number }).n, przed);
+  assert.equal(adresy.length, 0);
+});
+
+test("indeks: zły offset to 400, 429 z czasem przerwy, inny błąd 502", async () => {
+  polacz();
+  const h = sesja("biuro");
+  assert.equal((await lista(h, { offset: -1 })).statusCode, 400);
+  assert.equal((await lista(h, { offset: "10" })).statusCode, 400);
+  assert.equal(adresy.length, 0);
+
+  odpowiedz = () => { throw new BladLimituAllegro("limit", 9000); };
+  const l = await lista(h, {});
+  assert.equal(l.statusCode, 429);
+  assert.equal(l.json().poIluMs, 9000);
+
+  odpowiedz = () => ({ offers: [oferta("31", "X")] });
+  await lista(h, {});
+  odpowiedz = () => { throw new BladLimituAllegro("limit", 4000); };
+  const p = await parametry(h);
+  assert.equal(p.statusCode, 429);
+  assert.equal(p.json().poIluMs, 4000);
+  odpowiedz = () => { throw new Error("ECONNRESET"); };
+  assert.equal((await parametry(h)).statusCode, 502);
+});
+
+test("indeks: wyłączone dodawanie albo niepołączone konto to 409 bez żądań do Allegro", async () => {
+  const h = sesja("biuro");
+  /* Konto niepołączone: client_id stoi, tokena nie ma. */
+  config.allegro.clientId = "klient-testowy";
+  for (const r of [await indeks(h), await lista(h, {}), await parametry(h)]) {
+    assert.equal(r.statusCode, 409);
+    assert.match(r.json().error, /niepołączone/);
+  }
+  polacz();
+  config.zdjecia.dodawanie = "";
+  assert.equal((await indeks(h)).statusCode, 409);
+  assert.equal((await lista(h, {})).statusCode, 409);
+  assert.equal((await parametry(h)).statusCode, 409);
+  assert.equal(adresy.length, 0);
+});
+
+test("indeks: magazynier dostaje 403 na każdej trasie", async () => {
+  const h = sesja("magazynier");
+  assert.equal((await indeks(h)).statusCode, 403);
+  assert.equal((await lista(h, {})).statusCode, 403);
+  assert.equal((await parametry(h)).statusCode, 403);
+  assert.equal(adresy.length, 0);
 });
 
 // ── GET /api/zdjecia/allegro/oferta/:offerId/zdjecie ───────────────────────

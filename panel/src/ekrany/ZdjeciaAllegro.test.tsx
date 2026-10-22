@@ -6,7 +6,7 @@ import { MemoryRouter } from "react-router-dom";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { atrapaZapisow } from "../test/zapisy";
 import { Zdjecia } from "./Zdjecia";
-import type { ListaBezZdjecia, PozycjaBezZdjecia, PozycjaOferty } from "../api/zdjecia";
+import type { ListaBezZdjecia, PozycjaBezZdjecia, PozycjaOferty, StanIndeksu } from "../api/zdjecia";
 
 /* ── Zdjęcia kartotek z ofert Allegro ──────────────────────────────────────
    1. Otwarcie ekranu i okna to zero zapisów: pytanie Allegro idzie dopiero
@@ -15,6 +15,10 @@ import type { ListaBezZdjecia, PozycjaBezZdjecia, PozycjaOferty } from "../api/z
    3. Podsumowanie liczy cztery klasy; odznaczony towar nie idzie.
    4. Zdjęcie idzie z `zrodlo: "allegro"` i `plik: "oferta <id>"`.
    5. 429: przerwa i jedno ponowienie paczki; drugie 429 zatrzymuje ze zdaniem.
+   6. Indeks naszych ofert: lista stronami, kody producenta aż „zostało 0”.
+      Zatrzymany albo przerwany indeks pozwala dopasować z tym, co jest.
+   7. Oferta po kodzie producenta liczy się osobno i ma znacznik; kod
+      w kilku towarach to osobny wiersz, nie „bez oferty”.
 
    Płótno podmieniamy jak w `ZdjeciaImport.test.tsx`. */
 const m = vi.hoisted(() => ({ maly: false }));
@@ -37,9 +41,18 @@ const OFERTY: Record<string, PozycjaOferty["oferta"]> = {
   "T-3": { id: "9003", nazwa: "Grabie", status: "ACTIVE", startedAt: null, zdjecie: false },
 };
 
+/** Oferty, które serwer znalazł po kodzie producenta, i symbole z kodem w kilku towarach. */
+let KODY: Record<string, PozycjaOferty["oferta"]>;
+let NIEJEDNOZNACZNE: Set<string>;
+
+type Odp = { status: number; cialo: unknown };
 /** Kolejne odpowiedzi `dopasuj`, zanim zacznie oddawać dopasowanie; `null` = zwykła odpowiedź. */
-let przerwy: Array<{ status: number; cialo: unknown }>;
+let przerwy: Odp[];
 let wylaczone: string | null;
+/** Kolejne odpowiedzi kroków indeksu; pusta lista = jedna strona i nic do odczytu. Obietnica wstrzymuje krok. */
+let strony: Array<Odp | Promise<Odp>>;
+let kroki: Array<Odp | Promise<Odp>>;
+const INDEKS: StanIndeksu = { ofert: 12, zKodem: 5, doPobrania: 7, listaAt: "2026-10-20T10:00:00Z" };
 
 const strona = (url: string): ListaBezZdjecia | undefined => {
   if (!url.startsWith("/api/zdjecia/bez-zdjecia")) return undefined;
@@ -52,19 +65,33 @@ const OK = { status: 200, cialo: { queueId: 1, etag: "e", bajtow: 900, wSubiekci
 
 function atrapa() {
   const stan = atrapaZapisow(
-    (url) => strona(url) ?? (/^\/api\/zdjecia\/allegro\/oferta\/\d+\/zdjecie$/.test(url) ? { obraz: url } : undefined),
+    (url) => strona(url) ?? (url === "/api/zdjecia/allegro/indeks" ? INDEKS : undefined)
+      ?? (/^\/api\/zdjecia\/allegro\/oferta\/\d+\/zdjecie$/.test(url) ? { obraz: url } : undefined),
     (url) => (/^\/api\/products\/\d+\/zdjecie\/gotowe$/.test(url) ? OK : undefined));
   /* Odpowiedź `dopasuj` zależy od ciała, którego atrapa zapisów nie widzi —
      owijamy ją, a zapis dalej liczy się w `stan.wyslane`. */
   const pod = vi.mocked(fetch).getMockImplementation()!;
+  const odpowiedz = (o: Odp) => new Response(JSON.stringify(o.cialo), { status: o.status });
   vi.stubGlobal("fetch", vi.fn(async (url: string, init?: RequestInit) => {
     const odp = await pod(url, init);
+    if (url === "/api/zdjecia/allegro/indeks/lista") {
+      const s = strony.shift();
+      return s ? odpowiedz(await s) : odpowiedz({ status: 200, cialo: { ofert: 3, razem: 3, nastepny: null } });
+    }
+    if (url === "/api/zdjecia/allegro/indeks/parametry") {
+      const k = kroki.shift();
+      return k ? odpowiedz(await k) : odpowiedz({ status: 200, cialo: { pobrano: 0, zostalo: 0 } });
+    }
     if (url !== "/api/zdjecia/allegro/dopasuj") return odp;
     const p = przerwy.shift();
-    if (p) return new Response(JSON.stringify(p.cialo), { status: p.status });
+    if (p) return odpowiedz(p);
     if (wylaczone) return new Response(JSON.stringify({ wlaczone: false, powod: wylaczone, pozycje: [] }));
     const { symbole } = JSON.parse(String(init!.body)) as { symbole: string[] };
-    const pozycje: PozycjaOferty[] = symbole.map((s) => ({ symbol: s, ofert: OFERTY[s] ? 1 : 0, oferta: OFERTY[s] ?? null }));
+    const pozycje: PozycjaOferty[] = symbole.map((s): PozycjaOferty =>
+      OFERTY[s] ? { symbol: s, ofert: 1, oferta: OFERTY[s], po: "sygnatura" }
+        : KODY[s] ? { symbol: s, ofert: 1, oferta: KODY[s], po: "kod_producenta" }
+        : NIEJEDNOZNACZNE.has(s) ? { symbol: s, ofert: 0, oferta: null, po: null, niejednoznaczny: true }
+        : { symbol: s, ofert: 0, oferta: null, po: null });
     return new Response(JSON.stringify({ wlaczone: true, pozycje }));
   }));
   return stan;
@@ -96,6 +123,10 @@ beforeEach(() => {
   TOWARY[204] = towar(204, { oczekuje: true });
   przerwy = [];
   wylaczone = null;
+  strony = [];
+  kroki = [];
+  KODY = {};
+  NIEJEDNOZNACZNE = new Set();
 });
 afterEach(() => { vi.unstubAllGlobals(); });
 
@@ -133,7 +164,8 @@ describe("Zdjęcia z ofert Allegro", () => {
     /* Podgląd: wiersz na towar, zaznaczony domyślnie, z nazwą oferty. */
     expect(within(okno).getByRole("checkbox", { name: "Dodaj zdjęcie do T-1" })).toBeChecked();
     expect(within(okno).getByText("Oferta: Nożyce do żywopłotu")).toBeInTheDocument();
-    expect(stan.wyslane.every((w) => w === "POST /api/zdjecia/allegro/dopasuj")).toBe(true);
+    expect(new Set(stan.wyslane)).toEqual(new Set(["POST /api/zdjecia/allegro/indeks/lista",
+      "POST /api/zdjecia/allegro/indeks/parametry", "POST /api/zdjecia/allegro/dopasuj"]));
     expect(stan.nieznane).toEqual([]);
   });
 
@@ -157,8 +189,8 @@ describe("Zdjęcia z ofert Allegro", () => {
     const wiersze = within(okno).getAllByRole("row").slice(1)
       .map((w) => within(w).getAllByRole("cell").map((c) => c.textContent));
     expect(wiersze).toEqual([
-      ["T-1", "Towar 1", "Sekator ogrodowy (9001)", "kolejka do Subiekta"],
-      ["T-2", "Towar 2", "Nożyce do żywopłotu (9002)", "kolejka do Subiekta"],
+      ["T-1", "Towar 1", "Sekator ogrodowy (9001)", "sygnatura", "kolejka do Subiekta"],
+      ["T-2", "Towar 2", "Nożyce do żywopłotu (9002)", "sygnatura", "kolejka do Subiekta"],
     ]);
     expect(within(okno).getByRole("button", { name: "Kopiuj listę do arkusza" })).toBeInTheDocument();
     expect(within(okno).getByText(/2 zdjęcia ma poniżej 300 px/)).toBeInTheDocument();
@@ -209,6 +241,116 @@ describe("Zdjęcia z ofert Allegro", () => {
     await u.click(within(okno).getByRole("button", { name: "Sprawdź oferty" }));
     expect(await within(okno).findByText("Konto Allegro nie jest połączone.")).toBeInTheDocument();
     expect(within(okno).queryByRole("button", { name: /^Dodaj/ })).not.toBeInTheDocument();
-    await waitFor(() => expect(stan.wyslane).toEqual(["POST /api/zdjecia/allegro/dopasuj"]));
+    await waitFor(() => expect(stan.wyslane).toEqual(["POST /api/zdjecia/allegro/indeks/lista",
+      "POST /api/zdjecia/allegro/indeks/parametry", "POST /api/zdjecia/allegro/dopasuj"]));
+  });
+});
+
+describe("Zdjęcia z ofert Allegro — kod producenta", () => {
+  it("otwarcie okna czyta sam stan indeksu i nic nie zapisuje", async () => {
+    const stan = atrapa();
+    const { okno } = await otworzOkno();
+    expect(await within(okno).findByText("Znamy 12 naszych ofert, kody producenta: 5, do odczytu: 7.")).toBeInTheDocument();
+    expect(vi.mocked(fetch).mock.calls.some(([a]) => a === "/api/zdjecia/allegro/indeks")).toBe(true);
+    expect(stan.wyslane).toEqual([]);
+    expect(stan.nieznane).toEqual([]);
+  });
+
+  it("indeks: lista stronami, kody aż „zostało 0”, potem dopasowanie", async () => {
+    strony = [{ status: 200, cialo: { ofert: 1000, razem: 1500, nastepny: 1000 } },
+      { status: 200, cialo: { ofert: 500, razem: 1500, nastepny: null } }];
+    kroki = [{ status: 200, cialo: { pobrano: 10, zostalo: 5 } }, { status: 200, cialo: { pobrano: 5, zostalo: 0 } }];
+    const stan = atrapa();
+    const { u, okno } = await otworzOkno();
+    await u.click(within(okno).getByRole("button", { name: "Sprawdź oferty" }));
+    await within(okno).findByRole("button", { name: "Dodaj 2 zdjęcia" });
+    expect(ciala("/api/zdjecia/allegro/indeks/lista")).toEqual([{ offset: 0 }, { offset: 1000 }]);
+    expect(ciala("/api/zdjecia/allegro/indeks/parametry")).toEqual([{}, {}]);
+    /* Kolejność: indeks cały przed pierwszym pytaniem o dopasowanie. */
+    const pierwszeDopasuj = stan.wyslane.indexOf("POST /api/zdjecia/allegro/dopasuj");
+    expect(stan.wyslane.lastIndexOf("POST /api/zdjecia/allegro/indeks/parametry")).toBeLessThan(pierwszeDopasuj);
+  });
+
+  it("„Zatrzymaj” w czytaniu kodów zostawia wybór: dopasuj z tym, co jest", async () => {
+    let pusc!: (o: Odp) => void;
+    kroki = [{ status: 200, cialo: { pobrano: 10, zostalo: 20 } }, new Promise<Odp>((r) => { pusc = r; })];
+    const stan = atrapa();
+    const { u, okno } = await otworzOkno();
+    await u.click(within(okno).getByRole("button", { name: "Sprawdź oferty" }));
+    expect(await within(okno).findByText("Czytam kody producenta: pobrano 10, zostało 20…")).toBeInTheDocument();
+    await u.click(within(okno).getByRole("button", { name: "Zatrzymaj" }));
+    pusc({ status: 200, cialo: { pobrano: 10, zostalo: 10 } });
+    expect(await within(okno).findByText(/Zatrzymano czytanie naszych ofert/)).toBeInTheDocument();
+    expect(ciala("/api/zdjecia/allegro/indeks/parametry")).toHaveLength(2);
+    expect(stan.wyslane).not.toContain("POST /api/zdjecia/allegro/dopasuj");
+
+    await u.click(within(okno).getByRole("button", { name: "Dopasuj z tym, co jest" }));
+    await within(okno).findByRole("button", { name: "Dodaj 2 zdjęcia" });
+    expect(ciala("/api/zdjecia/allegro/indeks/parametry")).toHaveLength(2);
+  });
+
+  it("oferta po kodzie producenta liczy się osobno, ma znacznik i kolumnę w wyniku", async () => {
+    KODY = { "T-7": { id: "9007", nazwa: "Kosz na liście", status: "ACTIVE", startedAt: null, zdjecie: true } };
+    atrapa();
+    const { u, okno } = await otworzOkno();
+    await u.click(within(okno).getByRole("button", { name: "Sprawdź oferty" }));
+    await within(okno).findByRole("button", { name: "Dodaj 3 zdjęcia" });
+    expect(liczba(okno, "Oferta ze zdjęciem — do dodania")).toBe("3");
+    expect(within(okno).getByText("po sygnaturze 2 · po kodzie producenta 1")).toBeInTheDocument();
+    const wiersz = within(okno).getByRole("checkbox", { name: "Dodaj zdjęcie do T-7" }).closest("label")!;
+    expect(within(wiersz).getByText("kod producenta")).toBeInTheDocument();
+    const t1 = within(okno).getByRole("checkbox", { name: "Dodaj zdjęcie do T-1" }).closest("label")!;
+    expect(within(t1).queryByText("kod producenta")).not.toBeInTheDocument();
+
+    await u.click(within(okno).getByRole("button", { name: "Dodaj 3 zdjęcia" }));
+    await within(okno).findByText(/Dodano 3, pominięto 0, błędy 0\./);
+    const wiersze = within(okno).getAllByRole("row").slice(1)
+      .map((w) => within(w).getAllByRole("cell").map((c) => c.textContent));
+    expect(wiersze[2]).toEqual(["T-7", "Towar 7", "Kosz na liście (9007)", "kod producenta", "kolejka do Subiekta"]);
+    expect(within(okno).getByRole("columnheader", { name: "Dopasowanie" })).toBeInTheDocument();
+  });
+
+  it("kod producenta w kilku towarach to osobny wiersz, nie „bez oferty”", async () => {
+    NIEJEDNOZNACZNE = new Set(["T-8", "T-9"]);
+    atrapa();
+    const { u, okno } = await otworzOkno();
+    await u.click(within(okno).getByRole("button", { name: "Sprawdź oferty" }));
+    await within(okno).findByRole("button", { name: "Dodaj 2 zdjęcia" });
+    expect(liczba(okno, "Kod producenta w kilku towarach — dodaj ręcznie")).toBe("2");
+    expect(liczba(okno, "Bez oferty Allegro")).toBe("199");
+    expect(within(okno).getByText("T-8 — Towar 8")).toBeInTheDocument();
+  });
+
+  it("429 w czytaniu kodów: przerwa i jedno ponowienie kroku", async () => {
+    kroki = [{ status: 429, cialo: { error: "Limit Allegro", poIluMs: 400 } }, { status: 200, cialo: { pobrano: 3, zostalo: 0 } }];
+    atrapa();
+    const { u, okno } = await otworzOkno();
+    await u.click(within(okno).getByRole("button", { name: "Sprawdź oferty" }));
+    expect(await within(okno).findByText(/Allegro prosi o przerwę\. Pytam znowu za \d s\./)).toBeInTheDocument();
+    await within(okno).findByRole("button", { name: "Dodaj 2 zdjęcia" }, { timeout: 3000 });
+    expect(ciala("/api/zdjecia/allegro/indeks/parametry")).toHaveLength(2);
+  });
+
+  it("drugie 429 w czytaniu kodów zatrzymuje indeks ze zdaniem, a dopasowanie dalej jest możliwe", async () => {
+    const limit = { status: 429, cialo: { error: "Limit Allegro", poIluMs: 10 } };
+    kroki = [limit, limit];
+    const stan = atrapa();
+    const { u, okno } = await otworzOkno();
+    await u.click(within(okno).getByRole("button", { name: "Sprawdź oferty" }));
+    expect(await within(okno).findByText(/Allegro dalej prosi o przerwę przy czytaniu naszych ofert/)).toBeInTheDocument();
+    expect(ciala("/api/zdjecia/allegro/indeks/parametry")).toHaveLength(2);
+    expect(stan.wyslane).not.toContain("POST /api/zdjecia/allegro/dopasuj");
+    await u.click(within(okno).getByRole("button", { name: "Dopasuj z tym, co jest" }));
+    await within(okno).findByRole("button", { name: "Dodaj 2 zdjęcia" });
+  });
+
+  it("krok kodów bez postępu nie kręci się w miejscu", async () => {
+    kroki = [{ status: 200, cialo: { pobrano: 0, zostalo: 4 } }];
+    atrapa();
+    const { u, okno } = await otworzOkno();
+    await u.click(within(okno).getByRole("button", { name: "Sprawdź oferty" }));
+    await within(okno).findByRole("button", { name: "Dodaj 2 zdjęcia" });
+    expect(ciala("/api/zdjecia/allegro/indeks/parametry")).toHaveLength(1);
+    expect(within(okno).getByText(/Kodów producenta z 4 ofert nie udało się teraz odczytać/)).toBeInTheDocument();
   });
 });

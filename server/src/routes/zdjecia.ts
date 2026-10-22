@@ -1,6 +1,7 @@
 import type { FastifyInstance, FastifyReply } from "fastify";
 import { autorOperacji, sesjaZadania, subiekt } from "../context.js";
 import { listaBezZdjecia } from "../services/zdjecia-bez.js";
+import { odswiezListeOfert, pobierzParametryOfert, powodBrakuIndeksu, stanIndeksu } from "../services/zdjecia-allegro-indeks.js";
 import { dopasujSymbole, symboleZCiala } from "../services/zdjecia-import.js";
 import {
   bajtyZeZdjecia,
@@ -39,6 +40,20 @@ function odmowa(reply: FastifyReply, czego = "Listę towarów bez zdjęcia") {
 function awariaBazy(reply: FastifyReply, e: unknown) {
   const powod = e instanceof Error ? e.message : String(e);
   return reply.code(503).send({ error: `Nie da się odczytać kartoteki z Subiekta (${powod}).` });
+}
+
+/* Limit Allegro to 429 z czasem przerwy, bo panel odczekuje i ponawia sam.
+   Każdy inny błąd to 502: odmówiło cudze API, nie nasz serwer. */
+function bladAllegro(reply: FastifyReply, e: unknown) {
+  if (e instanceof BladLimituAllegro) {
+    return reply.code(429).send({
+      error: "Allegro prosi o chwilę przerwy — spróbuj za minutę.",
+      poIluMs: e.poIluMs,
+    });
+  }
+  return reply.code(502).send({
+    error: `Allegro nie odpowiedziało: ${e instanceof Error ? e.message : String(e)}`,
+  });
 }
 
 /** Nazwa pliku do audytu. Przycięta, bo przychodzi z dysku człowieka, nie z naszej listy. */
@@ -134,15 +149,46 @@ export async function zdjeciaRoutes(app: FastifyInstance) {
     try {
       return await dopasujOfertyAllegro(wejscie.symbole, autorOperacji(req).nazwa);
     } catch (e) {
-      if (e instanceof BladLimituAllegro) {
-        return reply.code(429).send({
-          error: "Allegro prosi o chwilę przerwy — spróbuj za minutę.",
-          poIluMs: e.poIluMs,
-        });
-      }
-      return reply.code(502).send({
-        error: `Allegro nie odpowiedziało: ${e instanceof Error ? e.message : String(e)}`,
-      });
+      return bladAllegro(reply, e);
+    }
+  });
+
+  /**
+   * Stan indeksu kodów producenta. Sam odczyt, bez Allegro. Ten sam 409 co
+   * w krokach, żeby panel powiedział powód, zanim zacznie budować indeks.
+   */
+  app.get("/api/zdjecia/allegro/indeks", async (_req, reply) => {
+    const nie = odmowa(reply, "Import zdjęć"); if (nie) return nie;
+    const powod = powodBrakuIndeksu();
+    if (powod) return reply.code(409).send({ error: powod });
+    return stanIndeksu();
+  });
+
+  /** Jedna strona naszej listy ofert do indeksu. Panel woła kolejne po `nastepny`. */
+  app.post<{ Body: { offset?: unknown } | undefined }>("/api/zdjecia/allegro/indeks/lista", async (req, reply) => {
+    const nie = odmowa(reply, "Import zdjęć"); if (nie) return nie;
+    const powod = powodBrakuIndeksu();
+    if (powod) return reply.code(409).send({ error: powod });
+    const surowy = req.body?.offset ?? 0;
+    if (typeof surowy !== "number" || !Number.isInteger(surowy) || surowy < 0) {
+      return reply.code(400).send({ error: "Pole offset musi być nieujemną liczbą całkowitą" });
+    }
+    try {
+      return await odswiezListeOfert(surowy, autorOperacji(req).nazwa);
+    } catch (e) {
+      return bladAllegro(reply, e);
+    }
+  });
+
+  /** Kod producenta dla kolejnych dziesięciu ofert. Panel woła w pętli, aż `zostalo` spadnie do zera. */
+  app.post("/api/zdjecia/allegro/indeks/parametry", async (req, reply) => {
+    const nie = odmowa(reply, "Import zdjęć"); if (nie) return nie;
+    const powod = powodBrakuIndeksu();
+    if (powod) return reply.code(409).send({ error: powod });
+    try {
+      return await pobierzParametryOfert(autorOperacji(req).nazwa);
+    } catch (e) {
+      return bladAllegro(reply, e);
     }
   });
 

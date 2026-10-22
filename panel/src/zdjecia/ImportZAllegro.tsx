@@ -2,8 +2,9 @@ import React, { useEffect, useRef, useState } from "react";
 import { Store, X } from "lucide-react";
 import { BrakPolaczenia, Konflikt, PrzerwaAllegro } from "../api/klient";
 import {
-  pobierzZdjecieOferty, useDopasujOferty, useImportGotowych, zbierzBezZdjecia,
-  type ListaBezZdjecia, type PozycjaBezZdjecia, type PozycjaOferty, type ZapisanieZdjecia,
+  pobierzZdjecieOferty, useBudujIndeks, useDopasujOferty, useImportGotowych, useStanIndeksu, zbierzBezZdjecia,
+  type DrogaDopasowania, type ListaBezZdjecia, type PostepIndeksu, type PozycjaBezZdjecia, type PozycjaOferty,
+  type StanIndeksu, type ZapisanieZdjecia,
 } from "../api/zdjecia";
 import { useOkno } from "../nawigacja/fokus";
 import { useZdjecieOferty } from "../towar/useZdjecie";
@@ -19,13 +20,22 @@ import { Nazwy, Wiersz } from "./ImportZFolderu";
 
    Trzy kroki, w każdym jedno główne działanie (ergonomia, punkt 2):
    sprawdzenie ofert, podsumowanie z podglądem, przebieg importu. Otwarcie
-   okna nie pyta o nic, bo pytanie Allegro kosztuje limit i zapisuje
-   wybór oferty na serwerze. Ekran liczy za agenta (punkt 5): towary bez
+   okna tylko czyta stan indeksu z naszej bazy. Pytanie Allegro kosztuje
+   limit i zapisuje indeks oraz wybór oferty, więc czeka na przycisk.
+
+   Oferta pasuje po sygnaturze (`external.id`) albo po kodzie producenta.
+   Kodu Allegro nie wyszukuje, więc „Sprawdź oferty” najpierw odświeża
+   lokalny indeks naszych ofert. Zatrzymany indeks nie blokuje dopasowania:
+   sygnatura działa bez niego, a resztę dokończy następne sprawdzenie,
+   bo przeczytane kody leżą już w bazie. Ekran liczy za agenta (punkt 5): towary bez
    oferty, z ofertą bez zdjęcia i z kolejką odsiewa sam, a agent tylko
    odznacza zdjęcia, które do kartoteki nie pasują (punkt 6). */
 
 /** Jeden towar do dodania: kartoteka i oferta, z której weźmiemy zdjęcie. */
-interface Kandydat { twId: number; symbol: string; towar: string; ofertaId: string; ofertaNazwa: string }
+interface Kandydat {
+  twId: number; symbol: string; towar: string; ofertaId: string; ofertaNazwa: string;
+  po: DrogaDopasowania | null;
+}
 
 interface Sprawdzenie {
   doDodania: Kandydat[];
@@ -33,6 +43,10 @@ interface Sprawdzenie {
   bezOferty: string[];
   czeka: string[];
   wieleKartotek: string[];
+  /** Kod producenta oferty trafia w kilka naszych symboli; zgadywanie dałoby zdjęcie złemu towarowi. */
+  kodWKilku: string[];
+  /** Zdanie o niepełnym indeksie kodów producenta; puste, gdy indeks jest pełny. */
+  uwaga: string;
   /** Ile towarów sprawdzono, gdy przebieg stanął przed końcem. */
   przerwane: { sprawdzono: number; wszystkich: number } | null;
   /** Zdanie o tym, dlaczego pytanie Allegro stanęło. */
@@ -42,6 +56,7 @@ interface Sprawdzenie {
 type Wynik = { stan: "dodane"; wSubiekcie: boolean } | { stan: "pominiete" | "blad"; powod: string };
 
 type Postep =
+  | PostepIndeksu
   | { faza: "zbieram"; z: number; razem: number | null }
   | { faza: "pytam"; z: number; ile: number }
   | { faza: "przerwa"; koniec: number };
@@ -56,8 +71,21 @@ const opisPrzerwy = (e: unknown): string =>
     : e instanceof BrakPolaczenia ? "Brak połączenia z serwerem. Sprawdź oferty jeszcze raz, gdy wróci."
     : `${e instanceof Error && e.message ? e.message : "Allegro nie odpowiedziało."} Sprawdź oferty jeszcze raz za chwilę.`;
 
+const opisIndeksu = (e: unknown): string =>
+  `${e instanceof PrzerwaAllegro ? "Allegro dalej prosi o przerwę przy czytaniu naszych ofert."
+    : e instanceof BrakPolaczenia ? "Brak połączenia z serwerem przy czytaniu naszych ofert."
+    : e instanceof Error && e.message ? e.message : "Allegro nie oddało listy naszych ofert."} Przeczytane oferty zostają.`;
+
+const zdanieIndeksu = (s: StanIndeksu) =>
+  `Znamy ${ile(s.ofert, "naszą ofertę", "nasze oferty", "naszych ofert")}, kody producenta: ${s.zKodem}, do odczytu: ${s.doPobrania}.`;
+
+const opisDrogi = (po: DrogaDopasowania | null) =>
+  po === "kod_producenta" ? "kod producenta" : po === "sygnatura" ? "sygnatura" : "—";
+
 const zdjec = (n: number) => ile(n, "zdjęcie", "zdjęcia", "zdjęć");
 const towarow = (n: number) => ile(n, "towar", "towary", "towarów");
+/** Ile kandydatów przyszło po kodzie producenta (`true`) albo inną drogą (`false`). */
+const poKodzie = (l: readonly Kandydat[], kod: boolean) => l.filter((k) => (k.po === "kod_producenta") === kod).length;
 const klucz = (s: string) => s.trim().toUpperCase();
 const nazwaPozycji = (symbol: string, nazwa: string) => `${symbol} — ${nazwa}`;
 
@@ -86,11 +114,15 @@ function Miniatura({ ofertaId, nazwa }: { ofertaId: string; nazwa: string }) {
 
 export function ImportZAllegro({ onZamknij }: { onZamknij: () => void }) {
   const dopasuj = useDopasujOferty();
+  const budujIndeks = useBudujIndeks();
+  const stanIndeksu = useStanIndeksu();
   const { wyslij, zakoncz } = useImportGotowych();
   const [postep, setPostep] = useState<Postep | null>(null);
   const [blad, setBlad] = useState("");
   const [wylaczone, setWylaczone] = useState<string | null>(null);
   const [spr, setSpr] = useState<Sprawdzenie | null>(null);
+  /** Zdanie, gdy indeks stanął przed końcem; agent decyduje, czy dopasować z tym, co jest. */
+  const [indeksStanal, setIndeksStanal] = useState<string | null>(null);
   const [odznaczone, setOdznaczone] = useState<ReadonlySet<number>>(() => new Set());
   const [lista, setLista] = useState<readonly Kandydat[]>([]);
   const [wyniki, setWyniki] = useState<ReadonlyMap<number, Wynik>>(() => new Map());
@@ -146,6 +178,31 @@ export function ImportZAllegro({ onZamknij }: { onZamknij: () => void }) {
     stop.current = false;
     setZatrzymuje(false);
     setBlad(""); setWylaczone(null); setSpr(null); setWyniki(new Map()); setOdznaczone(new Set());
+    setIndeksStanal(null);
+    setPostep({ faza: "lista", z: 0, razem: null });
+    await stanIndeksu.refetch();
+    if (!zywy.current) return;
+    const ix = await budujIndeks({
+      postep: (p) => { if (zywy.current) setPostep(p); },
+      czekaj,
+      stop: () => stop.current,
+    });
+    if (!zywy.current) return;
+    /* 409 to funkcja wyłączona: powie o tym dopasowanie, jednym zdaniem serwera. */
+    if (ix.zatrzymane || (ix.blad !== undefined && !(ix.blad instanceof Konflikt))) {
+      setPostep(null); setZatrzymuje(false);
+      setIndeksStanal(ix.zatrzymane ? "Zatrzymano czytanie naszych ofert. Przeczytane oferty zostają." : opisIndeksu(ix.blad));
+      return;
+    }
+    await dopasujWszystko(ix.nieodczytane
+      ? `Kodów producenta z ${ile(ix.nieodczytane, "oferty", "ofert", "ofert")} nie udało się teraz odczytać. Następne sprawdzenie spróbuje znowu.`
+      : "");
+  }
+
+  async function dopasujWszystko(uwaga: string) {
+    stop.current = false;
+    setZatrzymuje(false);
+    setIndeksStanal(null);
     setPostep({ faza: "zbieram", z: 0, razem: null });
     let towary: ListaBezZdjecia | null;
     try {
@@ -198,17 +255,20 @@ export function ImportZAllegro({ onZamknij }: { onZamknij: () => void }) {
     const odpowiedzi = new Map<string, PozycjaOferty>(p.pozycje.map((x) => [klucz(x.symbol), x]));
     const doDodania: Kandydat[] = [];
     const bezZdjecia: string[] = [];
+    const kodWKilku: string[] = [];
     for (const [k, t] of doPytania) {
       const o = odpowiedzi.get(k);
       /* Symbol, o który nie zdążyliśmy zapytać, nie jest „bez oferty”. */
       if (!o) continue;
-      if (!o.oferta) bezOferty.push(nazwaPozycji(t.symbol, t.nazwa));
+      if (!o.oferta) (o.niejednoznaczny ? kodWKilku : bezOferty).push(nazwaPozycji(t.symbol, t.nazwa));
       else if (!o.oferta.zdjecie) bezZdjecia.push(nazwaPozycji(t.symbol, t.nazwa));
-      else doDodania.push({ twId: t.twId, symbol: t.symbol, towar: t.nazwa, ofertaId: o.oferta.id, ofertaNazwa: o.oferta.nazwa });
+      else doDodania.push({
+        twId: t.twId, symbol: t.symbol, towar: t.nazwa, ofertaId: o.oferta.id, ofertaNazwa: o.oferta.nazwa, po: o.po ?? null,
+      });
     }
     const niepelne = p.zatrzymane || p.blad !== undefined;
     setSpr({
-      doDodania, bezZdjecia, bezOferty, czeka, wieleKartotek,
+      doDodania, bezZdjecia, bezOferty, czeka, wieleKartotek, kodWKilku, uwaga,
       przerwane: niepelne ? { sprawdzono: p.pozycje.length, wszystkich: symbole.length } : null,
       blad: p.blad !== undefined ? opisPrzerwy(p.blad) : "",
     });
@@ -273,8 +333,8 @@ export function ImportZAllegro({ onZamknij }: { onZamknij: () => void }) {
   });
   const gdzie = (wSubiekcie: boolean) => (wSubiekcie ? "kolejka do Subiekta" : "tylko WERTIS");
   /* Tabulatory, bo wklejone do Excela same rozkładają się na kolumny. */
-  const tsvDodanych = ["Symbol\tTowar\tOferta\tNazwa oferty\tGdzie", ...dodaneLista.map(({ k, wSubiekcie }) =>
-    [k.symbol, k.towar, k.ofertaId, k.ofertaNazwa, gdzie(wSubiekcie)].map((x) => x.replace(/\s+/g, " ")).join("\t"))].join("\n");
+  const tsvDodanych = ["Symbol\tTowar\tOferta\tNazwa oferty\tDopasowanie\tGdzie", ...dodaneLista.map(({ k, wSubiekcie }) =>
+    [k.symbol, k.towar, k.ofertaId, k.ofertaNazwa, opisDrogi(k.po), gdzie(wSubiekcie)].map((x) => x.replace(/\s+/g, " ")).join("\t"))].join("\n");
   const malych = lista.filter((k) => male.has(k.twId) && wyniki.get(k.twId)?.stan === "dodane").length;
 
   const przelacz = (twId: number) => setOdznaczone((s) => {
@@ -285,7 +345,12 @@ export function ImportZAllegro({ onZamknij }: { onZamknij: () => void }) {
 
   let tresc: React.ReactNode;
   if (postep) {
-    const zdanie = postep.faza === "zbieram"
+    const zdanie = postep.faza === "lista"
+      ? (postep.razem === null ? "Odświeżam listę naszych ofert…" : `Odświeżam listę naszych ofert: ${postep.z} z ${postep.razem}…`)
+      : postep.faza === "kody"
+      ? (postep.zostalo === null ? "Czytam kody producenta…"
+        : `Czytam kody producenta: pobrano ${postep.pobrano}, zostało ${postep.zostalo}…`)
+      : postep.faza === "zbieram"
       ? (postep.razem === null ? "Zbieram towary bez zdjęcia…" : `Zbieram towary bez zdjęcia: ${postep.z} z ${postep.razem}…`)
       : postep.faza === "pytam" ? `Pytam Allegro: ${postep.z} z ${postep.ile}…`
       : `Allegro prosi o przerwę. Pytam znowu za ${Math.max(0, Math.ceil((postep.koniec - teraz) / 1000))} s.`;
@@ -293,13 +358,22 @@ export function ImportZAllegro({ onZamknij }: { onZamknij: () => void }) {
       {zatrzymuje ? "Zatrzymuję sprawdzanie…" : zdanie}</p>;
   } else if (wylaczone) {
     tresc = <Blad>{wylaczone}</Blad>;
+  } else if (indeksStanal) {
+    /* Indeks stanął: sygnatura dalej działa, więc agent może dopasować teraz. */
+    tresc = <div className="flex flex-col gap-2">
+      <p role="status" className="text-sm text-slate-800">{indeksStanal}</p>
+      {stanIndeksu.data && <p className="text-sm text-slate-700">{zdanieIndeksu(stanIndeksu.data)}</p>}
+      <p className="text-sm text-slate-700">Możesz dopasować towary z tym, co już znamy. Resztę kodów
+        dokończy następne „Sprawdź oferty”.</p>
+    </div>;
   } else if (!spr) {
     /* Krok 1: wyjaśnienie i jeden przycisk na dole. Nic jeszcze nie pytamy. */
     tresc = <div className="flex flex-col items-center gap-3 rounded-xl border border-slate-200 bg-slate-50 p-6 text-center">
       <Store size={38} className="text-slate-500" aria-hidden="true" />
       <p className="text-tresc font-semibold text-slate-800">Zdjęcia kartotek z Twoich ofert na Allegro</p>
       <p className="text-sm text-slate-700">Sprawdzę każdy towar bez zdjęcia. Gdy ma ofertę o tym samym
-        symbolu, pokażę jej zdjęcie główne. Nic nie dodam, zanim nie klikniesz „Dodaj”.</p>
+        symbolu albo kodzie producenta, pokażę jej zdjęcie główne. Nic nie dodam, zanim nie klikniesz „Dodaj”.</p>
+      {stanIndeksu.data && <p className="text-sm text-slate-700">{zdanieIndeksu(stanIndeksu.data)}</p>}
       <p className="text-sm text-slate-600">Tła nie usuwamy. Zdjęcie idzie jako biały kwadrat.</p>
       <Blad>{blad}</Blad>
     </div>;
@@ -307,15 +381,21 @@ export function ImportZAllegro({ onZamknij }: { onZamknij: () => void }) {
     /* Krok 2: liczby, potem podgląd do odznaczenia. Jedna decyzja to przycisk na dole. */
     tresc = <div className="flex flex-col gap-3">
       {spr.blad && <Blad>{spr.blad}</Blad>}
+      {spr.uwaga && <p className="text-sm text-slate-700">{spr.uwaga}</p>}
       {spr.przerwane && <p className="text-sm text-slate-700">
         Sprawdzono {spr.przerwane.sprawdzono} z {towarow(spr.przerwane.wszystkich)}. Reszty nie liczę poniżej.</p>}
       <ul className="divide-y divide-slate-100">
-        <Wiersz etykieta="Oferta ze zdjęciem — do dodania" liczba={spr.doDodania.length} />
+        <Wiersz etykieta="Oferta ze zdjęciem — do dodania" liczba={spr.doDodania.length}>
+          {spr.doDodania.length > 0 && <p className="text-sm text-slate-600">
+            po sygnaturze {poKodzie(spr.doDodania, false)} · po kodzie producenta {poKodzie(spr.doDodania, true)}</p>}
+        </Wiersz>
         <Wiersz etykieta="Oferta bez zdjęcia" liczba={spr.bezZdjecia.length}><Nazwy nazwy={spr.bezZdjecia} /></Wiersz>
         <Wiersz etykieta="Bez oferty Allegro" liczba={spr.bezOferty.length}><Nazwy nazwy={spr.bezOferty} /></Wiersz>
         <Wiersz etykieta="Zdjęcie już czeka w kolejce" liczba={spr.czeka.length}><Nazwy nazwy={spr.czeka} /></Wiersz>
         {spr.wieleKartotek.length > 0 && <Wiersz etykieta="Kilka kartotek z tym symbolem — dodaj ręcznie w edytorze"
           liczba={spr.wieleKartotek.length}><Nazwy nazwy={spr.wieleKartotek} /></Wiersz>}
+        {spr.kodWKilku.length > 0 && <Wiersz etykieta="Kod producenta w kilku towarach — dodaj ręcznie"
+          liczba={spr.kodWKilku.length}><Nazwy nazwy={spr.kodWKilku} /></Wiersz>}
       </ul>
       {spr.doDodania.length > 0 && <section aria-labelledby="allegro-podglad">
         <h3 id="allegro-podglad" className="text-sm font-semibold text-slate-800">
@@ -327,7 +407,11 @@ export function ImportZAllegro({ onZamknij }: { onZamknij: () => void }) {
                 aria-label={`Dodaj zdjęcie do ${k.symbol}`} className="h-4 w-4 shrink-0" />
               <Miniatura ofertaId={k.ofertaId} nazwa={k.ofertaNazwa} />
               <span className="flex min-w-0 flex-col text-sm">
-                <span className="font-mono text-slate-800">{k.symbol}</span>
+                <span className="flex flex-wrap items-baseline gap-x-2">
+                  <span className="font-mono text-slate-800">{k.symbol}</span>
+                  {k.po === "kod_producenta" && <span className="rounded border border-slate-300 px-1 text-podpis text-slate-700">
+                    kod producenta</span>}
+                </span>
                 <span className="line-clamp-2 text-slate-900">{k.towar}</span>
                 <span className="truncate text-slate-600">Oferta: {k.ofertaNazwa}</span>
               </span>
@@ -369,6 +453,7 @@ export function ImportZAllegro({ onZamknij }: { onZamknij: () => void }) {
               <tr><th scope="col" className="py-1 pr-2 font-semibold">Symbol</th>
                 <th scope="col" className="py-1 pr-2 font-semibold">Towar</th>
                 <th scope="col" className="py-1 pr-2 font-semibold">Oferta</th>
+                <th scope="col" className="py-1 pr-2 font-semibold">Dopasowanie</th>
                 <th scope="col" className="py-1 font-semibold">Gdzie</th></tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
@@ -376,6 +461,7 @@ export function ImportZAllegro({ onZamknij }: { onZamknij: () => void }) {
                 <td className="py-1 pr-2 font-mono whitespace-nowrap">{k.symbol}</td>
                 <td className="py-1 pr-2 text-slate-900">{k.towar}</td>
                 <td className="py-1 pr-2 text-slate-700">{k.ofertaNazwa} <span className="font-mono">({k.ofertaId})</span></td>
+                <td className="py-1 pr-2 whitespace-nowrap text-slate-700">{opisDrogi(k.po)}</td>
                 <td className="py-1 whitespace-nowrap text-slate-700">{gdzie(wSubiekcie)}</td>
               </tr>)}
             </tbody>
@@ -408,6 +494,8 @@ export function ImportZAllegro({ onZamknij }: { onZamknij: () => void }) {
       {zatrzymuje ? "Zatrzymuję…" : "Zatrzymaj"}</Przycisk>;
   } else if (wylaczone) {
     glowny = null;
+  } else if (indeksStanal) {
+    glowny = <Przycisk wariant="glowny" onClick={() => void dopasujWszystko("")}>Dopasuj z tym, co jest</Przycisk>;
   } else if (!spr) {
     glowny = <Przycisk wariant="glowny" onClick={() => void sprawdz()}>Sprawdź oferty</Przycisk>;
   } else if (!trwa && !poImporcie) {
