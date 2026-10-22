@@ -10,6 +10,17 @@ z wersją monorepo" — i właśnie tak przestał być zgodny: `0.3.0` przetrwa�
 sześć zmergowanych zmian, w tym takie, które wymagały nowego uprawnienia SQL.
 Komentarz nie jest mechanizmem.
 
+## 0.610.0 — 22 października 2026
+
+**Poprawka Copilota widać w polu odpowiedzi, a nie w osobnym bloku.** Słowa,
+które Copilot dopisał, są podświetlone wprost w tekście. Miejsce, z którego
+coś usunął, ma znacznik, a usunięty tekst pokazuje się po najechaniu.
+Podświetlenie znika, gdy zaczniesz pisać sam.
+
+**Wymiana w „Dopytaj Copilota” zajmuje jedną linię.** Pełną różnicę rozwija
+się na żądanie. Różnica pokazuje całe zdanie jako zastąpione, gdy zmieniła
+się większość zdania, zamiast szatkować je słowo po słowie.
+
 ## 0.609.0 — 22 października 2026
 
 **Kolektor nie krzyczy błędem, gdy odłożenie już weszło.** Po przerwie
