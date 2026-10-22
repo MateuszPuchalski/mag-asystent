@@ -1,16 +1,18 @@
 import React, { useEffect, useRef, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
-import { ChevronDown, ChevronLeft, ChevronRight, PackageCheck, PackageX, Plus, ReceiptText } from "lucide-react";
+import {
+  ChevronDown, ChevronLeft, ChevronRight, PackageCheck, PackageX, Plus, ReceiptText, Trash2, UserPlus,
+} from "lucide-react";
 import { Konflikt } from "../api/klient";
 import {
-  pomylkaZKonfliktu, useNowaPomylka, useOsobyPomylek, usePomylki, usePozycjePomylki, useWznowPomylke,
-  useZakonczPomylke, useZlapanePomylki, useZmienPomylke, type FiltrPomylek, type OdpowiedzPomylek, type OsobaPomylki,
-  type Pomylka, type ZmianaPomylki,
+  pomylkaZKonfliktu, useNowaPomylka, useOsobyPomylek, usePomylki, usePozycjePomylki, useUsunPomylke,
+  useWznowPomylke, useZakonczPomylke, useZlapanePomylki, useZmienPomylke, type FiltrPomylek, type OsobaPomylki,
+  type PodsumowaniePomylek, type Pomylka, type ZmianaPomylki,
 } from "../api/pomylki";
 import { etykietaKodu } from "../zwroty/Pieniadze";
 import {
   Blad, FiltrSegmentowy, Karta, Plakietka, Przycisk, Pusto, Skopiuj, dataCyfrowa, dataLokalna,
-  dzienMiesiac, ile, miesiacSlownie,
+  dzienMiesiac, ile, miesiacKrotko, miesiacSlownie,
 } from "../ui";
 
 /* ── POMYŁKI WYSYŁKOWE ───────────────────────────────────────────────────────
@@ -27,6 +29,10 @@ import {
    uzupełnia kilka pomyłek pod rząd i okno kazałoby za każdym razem szukać
    wiersza od nowa. Każdy klik zapisuje się od razu, a pole tekstowe przy
    wyjściu z pola albo Enterze.
+
+   TABELA POKAZUJE TYLKO TO, PO CZYM SIĘ SZUKA: dzień, klient, co pomylono,
+   osoby i stan. Nowy towar, powrót i odmowa stoją w rozwiniętym wierszu, bo
+   w tabeli były głównie kreskami i spychały resztę w bok.
 
    WIERSZ NIE ZNIKA SPOD RĘKI. Zapis często przenosi pomyłkę poza bieżący
    filtr, np. z „Do uzupełnienia" do „W toku". Rozwinięty wiersz zostaje
@@ -61,6 +67,8 @@ function przesunMiesiac(m: string, krok: number): string {
 }
 
 const PRAWIDLOWY_MIESIAC = /^\d{4}-(0[1-9]|1[0-2])$/;
+
+const KOLUMNY = ["Data", "Klient", "Pomyłka", "Zbierał", "Pakował", "Stan"];
 
 export function Pomylki() {
   const [parametry, ustawParametry] = useSearchParams();
@@ -150,7 +158,7 @@ export function Pomylki() {
       setPrzypiety({ p, miejsce: 0 });
     }} />}
 
-    {lista.data && <Podsumowanie d={lista.data.podsumowanie} />}
+    {lista.data && <Podsumowanie d={lista.data.podsumowanie} onMiesiac={zmienMiesiac} />}
     <ZlapanePrzyPakowaniu />
 
     {lista.error && !lista.data
@@ -165,8 +173,7 @@ export function Pomylki() {
             <caption className="sr-only">Pomyłki wysyłkowe, {miesiacSlownie(miesiac)}</caption>
             <thead className="bg-slate-50 text-left text-podpis text-slate-600">
               <tr>
-                {["Data", "Klient", "Pomyłka", "Zbierał", "Pakował", "Nowy towar", "Towar wrócił",
-                  "Odmowa w Allegro", "Stan", "Zamówienie"].map((n) =>
+                {KOLUMNY.map((n) =>
                   <th key={n} scope="col" className="whitespace-nowrap px-3 py-2 font-semibold">{n}</th>)}
               </tr>
             </thead>
@@ -174,7 +181,8 @@ export function Pomylki() {
               {wiersze.map((p) => <Wiersz key={p.id} p={p} rozwiniety={rozwiniety === p.id}
                 pozaFiltrem={rozwiniety === p.id && !pasuje(filtr, p.stan)
                   ? FILTRY.find(([k]) => k === filtr)?.[1] ?? null : null}
-                onPrzelacz={() => przelacz(p.id)}
+                osobyReczne={lista.data?.osobyReczne ?? []}
+                onPrzelacz={() => przelacz(p.id)} onUsunieto={zwin}
                 onZapisano={(nowa) => setPrzypiety((s) => ({ p: nowa, miejsce: s?.miejsce ?? 0 }))} />)}
             </tbody>
           </table>
@@ -185,25 +193,93 @@ export function Pomylki() {
 }
 
 /* Kto ile razy był winny w miesiącu — pytanie, z którym właściciel otwierał
-   arkusz na koniec miesiąca. Liczby zbierał i pakował stoją w podpowiedzi,
+   arkusz na koniec miesiąca. Liczby zbierał i pakował stoją obok winy,
    bo bez nich „trzy razy winny" nie mówi, z ilu paczek.
 
    ZESTAWIENIE OSÓB WIDZI TYLKO ADMIN, decyzją właściciela: to monitoring
    pracowników. Innym rolom serwer oddaje pustą listę osób. Pusta lista nie
    znaczy więc „nikt nie zawinił" i ekran mówi wtedy samą liczbę pomyłek. */
-function Podsumowanie({ d }: { d: OdpowiedzPomylek["podsumowanie"] }) {
-  const winni = [...d.osoby].filter((o) => o.winny > 0).sort((a, b) => b.winny - a.winny);
-  return <Karta className="flex flex-wrap items-center gap-x-4 gap-y-1 px-4 py-2 text-sm" role="region"
+const ZRODLO: Record<Pomylka["zrodlo"], string> = {
+  odmowa: "z odmowy wypłaty", dosylka: "z dosyłki", recznie: "zgłoszone ręcznie",
+};
+
+/* Statystyki miesiąca w czterech kolumnach: stany, pół roku wstecz, mylone
+   towary i — dla admina — osoby. Wykres pół roku odpowiada na pytanie „lepiej
+   czy gorzej", którego jedna liczba miesiąca nie rozstrzyga. Słupek to
+   przycisk, bo następne pytanie brzmi zwykle „co było w tamtym miesiącu". */
+function Podsumowanie({ d, onMiesiac }: { d: PodsumowaniePomylek; onMiesiac: (m: string) => void }) {
+  const najwiecej = Math.max(1, ...d.trend.map((t) => t.razem));
+  const zrodla = (Object.keys(ZRODLO) as Array<Pomylka["zrodlo"]>).filter((z) => d.zrodla[z] > 0);
+  return <Karta className="grid gap-x-6 gap-y-4 px-4 py-3 text-sm md:grid-cols-2 xl:grid-cols-4" role="region"
     aria-label="Podsumowanie miesiąca">
-    <span>W miesiącu: <b className="tabular-nums">{ile(d.razem, "pomyłka", "pomyłki", "pomyłek")}</b></span>
-    {d.osoby.length === 0 ? null : winni.length === 0
-      ? <span className="text-slate-600">nikt nie jest jeszcze wskazany jako winny</span>
-      : <span className="flex flex-wrap gap-x-3 gap-y-1">
-          <span className="text-slate-600">Winni:</span>
-          {winni.map((o) => <span key={`${o.userId}-${o.nazwa}`}
-            title={`${o.nazwa}: zbierał ${o.zbieral}, pakował ${o.pakowal}, winny ${o.winny}`}>
-            <b>{o.nazwa}</b> <span className="tabular-nums text-ranga-zle">{o.winny}×</span></span>)}
-        </span>}
+    <div className="space-y-2">
+      <p>W miesiącu: <b className="tabular-nums">{ile(d.razem, "pomyłka", "pomyłki", "pomyłek")}</b></p>
+      <dl className="grid grid-cols-[1fr_auto] gap-x-3 gap-y-0.5 text-slate-700">
+        <dt>do uzupełnienia</dt><dd className="text-right font-semibold tabular-nums">{d.stany.do_uzupelnienia}</dd>
+        <dt>w toku</dt><dd className="text-right font-semibold tabular-nums">{d.stany.w_toku}</dd>
+        <dt>zakończone</dt><dd className="text-right font-semibold tabular-nums">{d.stany.zakonczona}</dd>
+      </dl>
+      {zrodla.length > 0 && <p className="text-podpis text-slate-600">
+        {zrodla.map((z) => `${d.zrodla[z]} ${ZRODLO[z]}`).join(" · ")}</p>}
+      {/* Osoba bez winy nie trafia do rachunku osób, więc liczba stoi osobno. */}
+      {d.bezWinnego > 0 && <p className="text-podpis text-slate-700">
+        {ile(d.bezWinnego, "pomyłka", "pomyłki", "pomyłek")} bez wskazanego winnego</p>}
+    </div>
+
+    <div>
+      <p className="mb-1 text-xs font-semibold text-slate-700">Ostatnie pół roku</p>
+      <ol aria-label="Pomyłki w ostatnich miesiącach" className="flex items-end gap-1.5">
+        {d.trend.map((t) => {
+          const biezacy = t.miesiac === d.miesiac;
+          return <li key={t.miesiac} className="flex-1">
+            <button type="button" onClick={() => onMiesiac(t.miesiac)} aria-current={biezacy ? "true" : undefined}
+              aria-label={`${miesiacSlownie(t.miesiac)}: ${ile(t.razem, "pomyłka", "pomyłki", "pomyłek")}`}
+              className="flex w-full flex-col items-center gap-0.5 rounded hover:bg-slate-50">
+              <span className={`text-podpis tabular-nums ${biezacy ? "font-semibold" : "text-slate-600"}`}>{t.razem}</span>
+              <span className="flex h-12 w-full items-end" aria-hidden="true">
+                <span className={`w-full rounded-t ${biezacy ? "bg-wertis-ink" : "bg-slate-300"}`}
+                  style={{ height: `${Math.max(4, (t.razem / najwiecej) * 100)}%` }} />
+              </span>
+              <span className="text-podpis text-slate-600" aria-hidden="true">{miesiacKrotko(t.miesiac)}</span>
+            </button>
+          </li>;
+        })}
+      </ol>
+    </div>
+
+    <div>
+      <p className="mb-1 text-xs font-semibold text-slate-700">Najczęściej mylone</p>
+      {d.towary.length === 0
+        ? <p className="text-slate-600">Żadna pomyłka nie ma jeszcze wpisanego towaru.</p>
+        : <ol aria-label="Najczęściej mylone towary" className="space-y-0.5">
+            {d.towary.map((t) => <li key={t.nazwa} className="flex gap-2">
+              <span className="min-w-0 flex-1 truncate" title={t.nazwa}>{t.nazwa}</span>
+              <span className="font-semibold tabular-nums">{t.ile}×</span>
+            </li>)}
+          </ol>}
+    </div>
+
+    {d.osoby.length > 0 && <div>
+      <p className="mb-1 text-xs font-semibold text-slate-700">Osoby</p>
+      <table className="w-full">
+        <caption className="sr-only">Osoby w pomyłkach miesiąca</caption>
+        <thead className="text-left text-podpis text-slate-600">
+          <tr><th scope="col" className="font-semibold">Kto</th>
+            <th scope="col" className="text-right font-semibold">zbierał</th>
+            <th scope="col" className="text-right font-semibold">pakował</th>
+            <th scope="col" className="text-right font-semibold">winny</th></tr>
+        </thead>
+        <tbody>
+          {d.osoby.map((o) => <tr key={`${o.userId}-${o.nazwa}`}>
+            <th scope="row" className="truncate text-left font-normal">{o.nazwa}</th>
+            <td className="text-right tabular-nums">{o.zbieral}</td>
+            <td className="text-right tabular-nums">{o.pakowal}</td>
+            <td className={`text-right font-semibold tabular-nums ${o.winny > 0 ? "text-ranga-zle" : "text-slate-600"}`}>
+              {o.winny}</td>
+          </tr>)}
+        </tbody>
+      </table>
+    </div>}
   </Karta>;
 }
 
@@ -290,9 +366,9 @@ const opisPowrotu = (w: string | null) => (w === null ? null : w === "nie_wraca"
 const opisOdmowy = (o: Pomylka["odmowa"]) =>
   (o.wartosc === "tak" ? (o.kod ? etykietaKodu(o.kod) : "zgłoszona") : o.wartosc === "nie_trzeba" ? "nie trzeba" : null);
 
-function Wiersz({ p, rozwiniety, pozaFiltrem, onPrzelacz, onZapisano }: {
-  p: Pomylka; rozwiniety: boolean; pozaFiltrem: string | null;
-  onPrzelacz: () => void; onZapisano: (p: Pomylka) => void;
+function Wiersz({ p, rozwiniety, pozaFiltrem, osobyReczne, onPrzelacz, onZapisano, onUsunieto }: {
+  p: Pomylka; rozwiniety: boolean; pozaFiltrem: string | null; osobyReczne: string[];
+  onPrzelacz: () => void; onZapisano: (p: Pomylka) => void; onUsunieto: () => void;
 }) {
   const ref = useRef<HTMLTableRowElement>(null);
   /* Wejście z adresu rozwija wiersz, który bywa daleko w dole listy. */
@@ -323,23 +399,16 @@ function Wiersz({ p, rozwiniety, pozaFiltrem, onPrzelacz, onZapisano }: {
       </td>
       <td className="whitespace-nowrap px-3 py-2"><Osoba o={p.zbieral} winny={p.winaZbierajacego} /></td>
       <td className="whitespace-nowrap px-3 py-2"><Osoba o={p.pakowal} winny={p.winaPakujacego} /></td>
-      <td className="px-3 py-2"><Fakt tekst={p.nowyTowar.wartosc ? NOWY_TOWAR[p.nowyTowar.wartosc] : null}
-        zKolejki={p.nowyTowar.zKolejki} /></td>
-      <td className="px-3 py-2"><Fakt tekst={opisPowrotu(p.towarWrocil.wartosc)} zKolejki={p.towarWrocil.zKolejki} /></td>
-      <td className="px-3 py-2"><Fakt tekst={opisOdmowy(p.odmowa)} zKolejki={p.odmowa.zKolejki} /></td>
       <td className="whitespace-nowrap px-3 py-2">
         <Plakietka status={STAN[p.stan].status}>{STAN[p.stan].slowo}</Plakietka>
         {p.zakonczonaRecznie && <span className="block text-podpis text-slate-600">ręcznie</span>}
-      </td>
-      <td className="whitespace-nowrap px-3 py-2">
-        {p.zamowienie
-          ? <span className="font-mono text-xs" title={p.zamowienie}>{p.zamowienie.slice(0, 8)}</span>
-          : <span className="text-slate-600">paragon</span>}
+        {!p.zamowienie && <span className="block text-podpis text-slate-600">paragon</span>}
       </td>
     </tr>
     {rozwiniety && <tr id={idPanelu} className="bg-slate-50">
-      <td colSpan={10} className="px-4 pb-4 pt-1">
-        <Uzupelnianie key={p.id} p={p} pozaFiltrem={pozaFiltrem} onZapisano={onZapisano} onZwin={onPrzelacz} />
+      <td colSpan={KOLUMNY.length} className="px-4 pb-4 pt-1">
+        <Uzupelnianie key={p.id} p={p} pozaFiltrem={pozaFiltrem} osobyReczne={osobyReczne}
+          onZapisano={onZapisano} onZwin={onPrzelacz} onUsunieto={onUsunieto} />
       </td>
     </tr>}
   </>;
@@ -383,12 +452,53 @@ function PoleZapisu({ id, etykieta, wartosc, podpowiedz, onZapisz }: {
 
 type Rola = "zbieral" | "pakowal";
 
-function Uzupelnianie({ p, pozaFiltrem, onZapisano, onZwin }: {
-  p: Pomylka; pozaFiltrem: string | null; onZapisano: (p: Pomylka) => void; onZwin: () => void;
+const POLA_ROLI = {
+  zbieral: { id: "zbieralUserId", nazwa: "zbieralNazwa", wina: "winaZbierajacego" },
+  pakowal: { id: "pakowalUserId", nazwa: "pakowalNazwa", wina: "winaPakujacego" },
+} as const;
+
+/** Ta sama osoba: po koncie, a bez konta po imieniu bez wielkości liter — tak liczy serwer. */
+const taSama = (a: OsobaPomylki, b: OsobaPomylki) =>
+  a.userId !== null || b.userId !== null ? a.userId === b.userId : a.nazwa.toLowerCase() === b.nazwa.toLowerCase();
+
+/* Osoba bez konta w systemie, np. sezonowa. Pole otwiera się na klik, bo
+   zwykle wystarcza lista, a stale otwarte pole kusi, żeby wpisać kogoś, kto
+   na liście już stoi. */
+function InnaOsoba({ etykieta, onDodaj }: { etykieta: string; onDodaj: (nazwa: string) => void }) {
+  const [otwarte, setOtwarte] = useState(false);
+  const [tekst, setTekst] = useState("");
+  const dodaj = () => {
+    const czysty = tekst.trim();
+    if (!czysty) return;
+    onDodaj(czysty);
+    setTekst("");
+    setOtwarte(false);
+  };
+  if (!otwarte) {
+    return <Wybor wybrany={false} onClick={() => setOtwarte(true)} title={`${etykieta}: osoba spoza listy`}>
+      <UserPlus size={14} aria-hidden="true" />inna osoba</Wybor>;
+  }
+  return <span className="inline-flex items-center gap-2">
+    <input className="field w-44 text-sm" value={tekst} maxLength={60} autoFocus
+      aria-label={`${etykieta}: imię osoby spoza listy`} placeholder="Imię i nazwisko"
+      onChange={(e) => setTekst(e.target.value)}
+      onKeyDown={(e) => {
+        if (e.key === "Enter") { e.preventDefault(); dodaj(); }
+        if (e.key === "Escape") setOtwarte(false);
+      }} />
+    <Wybor wybrany={false} disabled={!tekst.trim()} onClick={dodaj}>Dodaj</Wybor>
+  </span>;
+}
+
+function Uzupelnianie({ p, pozaFiltrem, osobyReczne, onZapisano, onZwin, onUsunieto }: {
+  p: Pomylka; pozaFiltrem: string | null; osobyReczne: string[];
+  onZapisano: (p: Pomylka) => void; onZwin: () => void; onUsunieto: () => void;
 }) {
   const zmien = useZmienPomylke();
   const zakoncz = useZakonczPomylke();
   const wznow = useWznowPomylke();
+  const usun = useUsunPomylke();
+  const [potwierdz, setPotwierdz] = useState(false);
   const osoby = useOsobyPomylek();
   const pozycje = usePozycjePomylki(p.zamowienie ? p.id : null);
   const [info, setInfo] = useState<string | null>(null);
@@ -425,47 +535,54 @@ function Uzupelnianie({ p, pozaFiltrem, onZapisano, onZwin }: {
     });
   };
 
-  /* Trzy stany jednym przyciskiem, jak czerwone tło w arkuszu: pierwszy klik
-     wybiera osobę, klik w wybraną robi ją winną, trzeci zdejmuje wybór.
-     Osobne pole „winny" byłoby drugą decyzją o tej samej osobie. */
-  const klikOsoby = (rola: Rola, userId: number | null) => {
+  /* Klik w imię wybiera osobę, klik w wybraną odznacza. Winę wskazuje się
+     osobno, w „Kto zawinił": trzy stany na jednym przycisku trzeba było
+     znać, a pytanie „kto zawinił" czyta się samo. Zmiana osoby zdejmuje winę,
+     bo wina należała do poprzedniej. */
+  const klikOsoby = (rola: Rola, o: OsobaPomylki) => {
     const obecna = rola === "zbieral" ? p.zbieral : p.pakowal;
-    const winna = rola === "zbieral" ? p.winaZbierajacego : p.winaPakujacego;
-    const kluczId = rola === "zbieral" ? "zbieralUserId" : "pakowalUserId";
-    const kluczWiny = rola === "zbieral" ? "winaZbierajacego" : "winaPakujacego";
-    if (!obecna || obecna.userId !== userId) wyslij({ [kluczId]: userId, [kluczWiny]: false });
-    else if (!winna) wyslij({ [kluczWiny]: true });
-    else wyslij({ [kluczId]: null, [kluczWiny]: false });
+    const k = POLA_ROLI[rola];
+    if (obecna && taSama(obecna, o)) wyslij({ [k.id]: null, [k.wina]: false });
+    else if (o.userId !== null) wyslij({ [k.id]: o.userId, [k.wina]: false });
+    else wyslij({ [k.nazwa]: o.nazwa, [k.wina]: false });
   };
 
-  const bladZapisu = [zmien.error, zakoncz.error, wznow.error]
+  const bladZapisu = [zmien.error, zakoncz.error, wznow.error, usun.error]
     .find((e) => e && !(e instanceof Konflikt)) as Error | undefined;
   const bladOsob = osoby.error ? "Nie udało się wczytać listy magazynierów." : null;
 
   const rzadOsob = (rola: Rola, etykieta: string) => {
     const obecna = rola === "zbieral" ? p.zbieral : p.pakowal;
-    const winna = rola === "zbieral" ? p.winaZbierajacego : p.winaPakujacego;
-    const lista = osoby.data ?? [];
-    /* Osoba spoza listy (konto skasowane albo nie z hali) i tak ma stać:
-       inaczej zapisany wybór byłby na ekranie niewidoczny. */
-    const wszyscy = obecna && !lista.some((o) => o.userId === obecna.userId) ? [...lista, obecna] : lista;
+    /* Konta, potem imiona wpisane ręcznie przy innych pomyłkach. Osoba
+       spoza obu list (konto skasowane) i tak ma stać: inaczej zapisany
+       wybór byłby na ekranie niewidoczny. */
+    const wszyscy: OsobaPomylki[] = [...(osoby.data ?? [])];
+    for (const nazwa of osobyReczne) {
+      const o = { userId: null, nazwa };
+      if (!wszyscy.some((x) => taSama(x, o))) wszyscy.push(o);
+    }
+    if (obecna && !wszyscy.some((x) => taSama(x, obecna))) wszyscy.push(obecna);
     return <div role="group" aria-label={etykieta}>
       <p className="mb-1 text-xs font-semibold text-slate-700">{etykieta}</p>
-      <div className="flex flex-wrap gap-2">
+      <div className="flex flex-wrap items-center gap-2">
         {wszyscy.map((o) => {
-          /* Konto skasowane ma `userId: null`, więc rozpoznaje się je po imieniu. */
-          const wybrany = obecna !== null && (obecna.userId !== null
-            ? obecna.userId === o.userId : o.userId === null && obecna.nazwa === o.nazwa);
-          const winny = wybrany && winna;
-          return <Wybor key={`${o.userId}-${o.nazwa}`} wybrany={wybrany} winny={winny}
-            title={!wybrany ? `${etykieta}: ${o.nazwa}` : !winny ? "Kliknij jeszcze raz: winny" : "Kliknij jeszcze raz: odznacz"}
-            onClick={() => klikOsoby(rola, o.userId)}>
-            {o.nazwa}{winny && <span className="text-podpis font-bold">· winny</span>}</Wybor>;
+          const wybrany = obecna !== null && taSama(obecna, o);
+          return <Wybor key={`${o.userId}-${o.nazwa}`} wybrany={wybrany}
+            title={wybrany ? "Kliknij jeszcze raz: odznacz" : `${etykieta}: ${o.nazwa}`}
+            onClick={() => klikOsoby(rola, o)}>{o.nazwa}</Wybor>;
         })}
         {osoby.isLoading && <span className="text-sm text-slate-600">Wczytuję osoby…</span>}
+        <InnaOsoba etykieta={etykieta}
+          onDodaj={(nazwa) => wyslij({ [POLA_ROLI[rola].nazwa]: nazwa, [POLA_ROLI[rola].wina]: false })} />
       </div>
     </div>;
   };
+
+  /* Wina per rola, nie per osoba: kto zbierał i pakował tę samą paczkę,
+     mógł zawinić tylko przy jednym z tych kroków. */
+  const winni: Array<{ rola: Rola; kto: OsobaPomylki; winna: boolean; slowo: string }> = [];
+  if (p.zbieral) winni.push({ rola: "zbieral", kto: p.zbieral, winna: p.winaZbierajacego, slowo: "zbierał" });
+  if (p.pakowal) winni.push({ rola: "pakowal", kto: p.pakowal, winna: p.winaPakujacego, slowo: "pakował" });
 
   const lista = pozycje.data?.pozycje ?? [];
   const wrocil = p.towarWrocil.wartosc;
@@ -500,7 +617,16 @@ function Uzupelnianie({ p, pozaFiltrem, onZapisano, onZwin }: {
       {rzadOsob("zbieral", "Zbierał")}
       {rzadOsob("pakowal", "Pakował")}
     </div>
-    <p className="text-podpis text-slate-600">Klik w imię wybiera osobę, drugi klik oznacza ją jako winną, trzeci odznacza.</p>
+    <div role="group" aria-label="Kto zawinił">
+      <p className="mb-1 text-xs font-semibold text-slate-700">Kto zawinił</p>
+      {winni.length === 0
+        ? <p className="text-sm text-slate-600">Najpierw wybierz, kto zbierał albo pakował.</p>
+        : <div className="flex flex-wrap gap-2">
+            {winni.map((w) => <Wybor key={w.rola} wybrany={w.winna} winny={w.winna}
+              onClick={() => wyslij({ [POLA_ROLI[w.rola].wina]: !w.winna })}>
+              {w.kto.nazwa} <span className="font-normal">({w.slowo})</span></Wybor>)}
+          </div>}
+    </div>
 
     <div className="grid gap-4 md:grid-cols-3">
       <div role="group" aria-label="Nowy towar">
@@ -557,8 +683,24 @@ function Uzupelnianie({ p, pozaFiltrem, onZapisano, onZwin }: {
       {p.zamowienie && <span className="inline-flex items-center gap-1 text-slate-700">
         zamówienie <span className="font-mono text-xs">{p.zamowienie}</span>
         <Skopiuj tekst={p.zamowienie} tytul="Kopiuj numer zamówienia" /></span>}
-      <button type="button" onClick={onZwin} className="ml-auto font-semibold text-slate-700 underline underline-offset-2">
-        Zwiń</button>
+      <span className="ml-auto inline-flex items-center gap-3">
+        {/* Usunięcie pyta drugi raz w tym samym miejscu, bez okna: pomyłki
+            nie da się przywrócić, a okno zasłoniłoby, którą się kasuje. */}
+        {potwierdz
+          ? <span role="group" aria-label="Potwierdź usunięcie" className="inline-flex items-center gap-2">
+              <span className="text-slate-700">Usunąć tę pomyłkę na stałe?</span>
+              <Przycisk disabled={usun.isPending} onClick={() => usun.mutate({ id: p.id, wersja: wersja.current }, {
+                onSuccess: onUsunieto,
+                onError: (e) => { setPotwierdz(false); naKonflikt(e); },
+              })}>Tak, usuń</Przycisk>
+              <Przycisk onClick={() => setPotwierdz(false)}>Nie</Przycisk>
+            </span>
+          : <button type="button" onClick={() => setPotwierdz(true)} title="Np. gdy klient nie miał racji"
+              className="inline-flex items-center gap-1 font-semibold text-ranga-zle underline underline-offset-2">
+              <Trash2 size={14} aria-hidden="true" />Usuń pomyłkę</button>}
+        <button type="button" onClick={onZwin} className="font-semibold text-slate-700 underline underline-offset-2">
+          Zwiń</button>
+      </span>
     </div>
   </div>;
 }
