@@ -268,10 +268,9 @@ test("koszyk ZWIĄZANY z dokumentem otwiera się z własnej etykiety (0.376.0)",
 });
 
 test("skan numeru z kartki WIĄŻE czekający koszyk, zamiast zakładać sobowtóra", () => {
-  /* 0.377.0. Worker wiąże koszyki co minutę, a magazynier bywa szybszy niż
-     jego takt. Skan w tej luce zakładał NOWY kosz na dokument należący do
-     czekającego koszyka — czyli dokładnie tego sobowtóra, którego 0.376.0
-     miało się pozbyć. */
+  /* Koszyk dostaje dokument dopiero przy skanie. Gdyby skan kartki szukał
+     tylko kosza z `mm_dok_id`, zakładałby NOWY kosz na dokument należący do
+     czekającego koszyka — sobowtóra tego samego kartonu. */
   const d = db();
   const teraz = new Date().toISOString();
   const q = Number(d.prepare(`INSERT INTO sfera_queue(type, status, payload, sgt_doc_number, created_at, created_by)
@@ -291,4 +290,48 @@ test("skan numeru z kartki WIĄŻE czekający koszyk, zamiast zakładać sobowt�
     "i nie zakłada drugiego kosza na ten sam karton");
   assert.equal((d.prepare("SELECT mm_dok_id FROM kosz WHERE id=?").get(koszykId) as
     { mm_dok_id: number }).mm_dok_id, DOK);
+});
+
+test("skan ETYKIETY wiąże koszyk, gdy jego MM jest już w read-modelu", () => {
+  /* Wiązanie stoi tylko na drodze skanu, więc etykieta koszyka musi wiązać
+     tak samo jak kartka. Inaczej `Z-11` odsyłałby do numeru z kartki,
+     choć dokument jest już znany. */
+  const d = db();
+  const teraz = new Date().toISOString();
+  const q = Number(d.prepare(`INSERT INTO sfera_queue(type, status, payload, sgt_doc_number, created_at, created_by)
+     VALUES ('mm', 'done', '{}', 'MM 1209/MAG/2026', ?, 'Biuro')`).run(teraz).lastInsertRowid);
+  const koszykId = Number(d.prepare(
+    `INSERT INTO kosz(kod, status, rodzaj, utworzono_at, utworzono_przez,
+       zamknieto_at, zamknieto_przez, mm_queue_id)
+     VALUES ('Z-11', 'zamkniety', 'zwroty', ?, 'Biuro', ?, 'Biuro', ?)`)
+    .run(teraz, teraz, q).lastInsertRowid);
+
+  assert.equal(P.otworzPrzyjecie("z-11", "Jan").id, koszykId);
+  assert.equal((d.prepare("SELECT mm_dok_id FROM kosz WHERE id=?").get(koszykId) as
+    { mm_dok_id: number }).mm_dok_id, DOK);
+  assert.equal(P.otworzPrzyjecie("1209", "Ewa").id, koszykId, "kartka trafia w ten sam kosz");
+  assert.equal((d.prepare("SELECT COUNT(*) AS n FROM kosz").get() as { n: number }).n, 1);
+});
+
+test("stary sobowtór wygrywa z koszykiem — skan nie zakłada trzeciego kosza", () => {
+  /* Dokument, który ma już kosz hali, zostaje przy nim: koszyk obok
+     dawałby dwa wiersze w liście przyjęć i drugie MM powrotne. */
+  const d = db();
+  const teraz = new Date().toISOString();
+  const q = Number(d.prepare(`INSERT INTO sfera_queue(type, status, payload, sgt_doc_number, created_at, created_by)
+     VALUES ('mm', 'done', '{}', 'MM 1209/MAG/2026', ?, 'Biuro')`).run(teraz).lastInsertRowid);
+  const koszykId = Number(d.prepare(
+    `INSERT INTO kosz(kod, status, rodzaj, utworzono_at, utworzono_przez,
+       zamknieto_at, zamknieto_przez, mm_queue_id)
+     VALUES ('Z-11', 'zamkniety', 'zwroty', ?, 'Biuro', ?, 'Biuro', ?)`)
+    .run(teraz, teraz, q).lastInsertRowid);
+  const halaId = Number(d.prepare(
+    `INSERT INTO kosz(kod, status, rodzaj, mm_dok_id, utworzono_at, utworzono_przez)
+     VALUES ('1209', 'zamkniety', 'zwroty', ?, ?, 'Jan')`).run(DOK, teraz).lastInsertRowid);
+
+  assert.equal(P.otworzPrzyjecie("1209", "Ewa").id, halaId);
+  assert.equal(P.otworzPrzyjecie("Z-11", "Ewa").id, halaId, "etykieta prowadzi do tego samego pudła");
+  assert.equal((d.prepare("SELECT mm_dok_id FROM kosz WHERE id=?").get(koszykId) as
+    { mm_dok_id: number | null }).mm_dok_id, null);
+  assert.equal((d.prepare("SELECT COUNT(*) AS n FROM kosz").get() as { n: number }).n, 2);
 });

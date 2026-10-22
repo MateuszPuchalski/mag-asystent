@@ -120,6 +120,9 @@ export function Skrzynka() {
   /* Czy pole trzyma szkic Copilota (0.499.0) — nad polem stoi wtedy zdanie
      „Szkic Copilota w polu", a pod nim to, na czym szkic stoi. */
   const [zCopilota, setZCopilota] = useState(false);
+  /* Ostatnia wersja z dopytania i tekst pola sprzed niej. Pole podświetla
+     poprawkę, dopóki agent jej nie ruszy (`PoprawkaWPolu.tsx`). */
+  const [poprawka, setPoprawka] = useState<{ przed: string; po: string } | null>(null);
   /* Pasek „Cofnij" po czynności jednym kliknięciem — powód w `Cofniecie.tsx`. */
   const [doCofniecia, setDoCofniecia] = useState<DoCofniecia | null>(null);
   /* Szkice, które już raz weszły do pola: `rozmowa:czas szkicu`. Ref, nie
@@ -184,6 +187,7 @@ export function Skrzynka() {
     const zapamietany = wybranaId === null ? null : pamietanySzkic(PAMIEC_ODPOWIEDZI, wybranaId);
     setKomentarz(wybranaId === null ? "" : pamietanySzkic(PAMIEC_NOTATKI, wybranaId) ?? "");
     setWzmianki([]);
+    setPoprawka(null);
     /* SZKIC COPILOTA DO PUSTEGO POLA (0.499.0) — reguła i jej granice przy
        `szkicNaStart`. To stan ekranu, nie zapis: otwarcie niczego nie mutuje.
        Klucz z czasu szkicu pamięta, że ten szkic już raz wszedł — agent, który
@@ -531,10 +535,15 @@ export function Skrzynka() {
     const ustaw = (v: string) => { setSzkic(v); zapamietajSzkic(PAMIEC_ODPOWIEDZI, id, v); };
     ustaw(tresc);
     setZCopilota(true);
+    /* Ta sama podstawa dla wstawienia samego i z przycisku wersji: tekst,
+       który agent miał w polu chwilę wcześniej. Różnica mówi wtedy, co
+       zmieniło się w JEGO polu, a nie względem tekstu wysłanego do modelu. */
+    setPoprawka({ przed: poprzedni, po: tresc });
     setDoCofniecia({ klucz: Date.now(), opis, cofnij: () => {
       if (wybranaIdTeraz.current !== id || szkicTeraz.current !== tresc) return;
       ustaw(poprzedni);
       setZCopilota(poprzedniZCopilota);
+      setPoprawka(null);
     } });
   }
 
@@ -705,6 +714,7 @@ export function Skrzynka() {
         blad: bladSzkicu,
         maSzkicAgenta: szkic.trim() !== "",
         wPolu: zCopilota,
+        poprawka,
         /* Cudza rozmowa = cudzy szkic: ten sam warunek, którym edytor blokuje pole. */
         wylaczony: rozmowa.data?.rozmowa.wlascicielId != null
           && rozmowa.data.rozmowa.wlascicielId !== (ja.data?.user.userId ?? null),
@@ -794,7 +804,9 @@ export function Skrzynka() {
       onUsunZalacznik={(id) => wybranaId && usunZalacznik.mutate(
         { id: wybranaId, zalacznikId: id },
         { onError: (e) => setBladZalacznika(e instanceof Error ? e.message : String(e)) })}
-      onSzkic={(v) => { ustawSzkic(v); if (v === "") setZCopilota(false); zglosPisanie(); }}
+      /* Zmiana od agenta zdejmuje podświetlenie poprawki na stałe: tekst jest
+         już jego, także gdy wpisze z powrotem to samo słowo. */
+      onSzkic={(v) => { ustawSzkic(v); setPoprawka(null); if (v === "") setZCopilota(false); zglosPisanie(); }}
       onZapiszSzkic={() => {
         if (!rozmowa.data) return;
         const ostatnia = [...rozmowa.data.os].reverse().find((w) => w.messageId)?.messageId ?? null;
