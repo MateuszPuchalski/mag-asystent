@@ -47,7 +47,7 @@ export const zlapane = (n: Partial<ZlapanePomylki> = {}): ZlapanePomylki => {
   ];
   const puste = dni.length === 0;
   return { wlaczone: true, dni, razem: puste ? null : dni.reduce((s, d) => s + d.zlapanych, 0),
-    doKlienta: puste ? null : 1, ...n };
+    doKlienta: puste ? null : 1, osoby: [], bezOsoby: null, ...n };
 };
 
 /** Odczyty ekranu pomyłek dla `atrapaZapisow`; nieznany adres → `undefined`. */
@@ -55,6 +55,8 @@ export const odczytPomylek = (pomylki: Pomylka[], zlapanePakowania: ZlapanePomyl
   if (url.startsWith("/api/pomylki?")) return lista(pomylki);
   if (url === "/api/pomylki/zlapane") return zlapanePakowania;
   if (url === "/api/users") return { users: MAGAZYNIERZY };
+  /* Admin, bo tylko on przypisuje numer pracownika Sellasist; test biura podmienia to sam. */
+  if (url === "/api/auth/me") return { user: { userId: 1, name: "Szef", role: "admin" } };
   const poz = url.match(/^\/api\/pomylki\/(\d+)\/pozycje$/);
   if (poz) return { pozycje: [{ nazwa: "Lampa LED 12V", ilosc: 1, sku: "LMP-12" },
     { nazwa: "Lampa LED 24V", ilosc: 2, sku: "LMP-24" }], podpowiedz: "lampa 24V" };

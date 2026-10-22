@@ -54,7 +54,7 @@ export interface OsobaPodsumowania {
 export interface PodsumowaniePomylek {
   miesiac: string;
   razem: number;
-  /** Pusta dla roli innej niż admin — to nie znaczy „nikt nie zawinił". */
+  /** Osoby z pomyłek miesiąca; pusta, gdy nikogo jeszcze nie wpisano. */
   osoby: OsobaPodsumowania[];
   stany: Record<StanPomylki, number>;
   zrodla: Record<Pomylka["zrodlo"], number>;
@@ -150,7 +150,16 @@ export interface ZlapanePomylki {
   razem: number | null;
   /** Pomyłki z rejestru zgłoszone w tych samych dobach; `null` przy pustej liście. */
   doKlienta: number | null;
+  /**
+   * Kto zbierał złapane, z dziennika Sellasist, dla całego biura.
+   * `nazwa: null` = numer Sellasist, któremu admin nie przypisał jeszcze osoby.
+   */
+  osoby: OsobaZlapanych[];
+  /** Złapane bez ustalonej osoby; `null`, gdy blok nie ma danych. */
+  bezOsoby: number | null;
 }
+
+export interface OsobaZlapanych { sellasistId: number; userId: number | null; nazwa: string | null; zlapanych: number }
 
 /* Pod kluczem rejestru, bo nowa pomyłka w rejestrze zmienia liczbę „do
    klienta”. Odczyt idzie z bazy serwera, nie z Sellasist, więc odświeżenie
@@ -274,5 +283,18 @@ export function useUsunPomylke() {
       { method: "POST", body: JSON.stringify({ wersja: v.wersja }) }),
     onError: (e) => { const p = pomylkaZKonfliktu(e); if (p) wstawDoList(qc, p); },
     onSettled: () => poZapisie(qc),
+  });
+}
+
+/**
+ * Numer pracownika Sellasist jako osoba z naszych kont; `userId: null` zdejmuje
+ * przypisanie. Tylko admin — serwer odmawia innym rolom.
+ */
+export function usePrzypiszPracownikaSellasist() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (v: { sellasistId: number; userId: number | null }) => api<{ zapisano: true }>(
+      "/api/pomylki/zlapane/pracownik", { method: "POST", body: JSON.stringify(v) }),
+    onSettled: () => qc.invalidateQueries({ queryKey: [KLUCZ_POMYLEK, "zlapane"] }),
   });
 }

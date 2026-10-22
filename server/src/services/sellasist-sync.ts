@@ -1,8 +1,8 @@
 import type { DatabaseSync } from "node:sqlite";
 import {
-  BladSellasist, mapujDziennik, mapujListeZamowien, mapujListyPrzewozowe, mapujZamowienie, sciezkaDziennika,
-  sciezkaPrzesylek, sciezkaZamowienia, sciezkaZamowienPoNumerze, STRONA, zapytajSellasist,
-  type ZamowienieSellasist, type ZapytanieSellasist,
+  BladSellasist, mapujDziennik, mapujListeZamowien, mapujListyPrzewozowe, mapujZamowienie, mapujZmianyStatusu,
+  sciezkaDziennika, sciezkaPrzesylek, sciezkaStatusowZamowien, sciezkaZamowienia, sciezkaZamowienPoNumerze, STRONA,
+  zapytajSellasist, type ZamowienieSellasist, type ZapytanieSellasist, type ZmianaStatusu,
 } from "../adapters/sellasist.http.js";
 import { BladLimitu } from "../adapters/limit.js";
 import { config } from "../config.js";
@@ -226,6 +226,53 @@ async function czytajDziennik(
   return zmian;
 }
 
+/** Zamówień z pomyłką na jedno pytanie o zbierającego. Przy złych dniach kilka przebiegów nadrobi resztę. */
+export const ZBIERAJACYCH_NA_PRZEBIEG = 10;
+
+/**
+ * Kto zbierał pomyłkę złapaną przy pakowaniu: autor OSTATNIEGO wejścia
+ * w status zebranego przed wejściem w status pomyłki. Ostatniego, bo po
+ * „ponownej kompletacji" zbiera kto inny. Porządek po numerze wpisu, bo
+ * stempel Sellasist ma tylko sekundy, a numery rosną z czasem.
+ *
+ * Pyta dziennik samych tych zamówień, bez daty: zebranie bywa sprzed okna
+ * strumienia, a stare pomyłki bez osoby nadrabiają się tą samą drogą. Bez
+ * ustawionych statusów „zebrane" nie pyta wcale, bo nie wie, czego szukać.
+ * Wpis bez znalezionego zebrania dostaje datę sprawdzenia i więcej nie wraca.
+ */
+async function ustalZbierajacych(
+  database: DatabaseSync, query: ZapytanieSellasist, statusyZebrane: readonly number[], teraz: Date,
+): Promise<number> {
+  if (statusyZebrane.length === 0) return 0;
+  const czekajace = database.prepare(`SELECT log_id, zamowienie_id FROM sellasist_pomylka_zlapana
+      WHERE zbieral_sprawdzono_at IS NULL ORDER BY at DESC, log_id DESC`).all() as Wiersz[];
+  const ids = [...new Set(czekajace.map((w) => Number(w.zamowienie_id)))].slice(0, ZBIERAJACYCH_NA_PRZEBIEG);
+  if (ids.length === 0) return 0;
+  const zmiany: ZmianaStatusu[] = [];
+  for (let strona = 0; strona < STRON_DZIENNIKA; strona++) {
+    const wpisy = mapujZmianyStatusu(await query(sciezkaStatusowZamowien(ids, strona * STRONA)));
+    zmiany.push(...wpisy);
+    if (wpisy.length < STRONA) break;
+  }
+  const at = teraz.toISOString();
+  transaction(database, () => {
+    const ustaw = database.prepare(`UPDATE sellasist_pomylka_zlapana
+        SET zbieral_sellasist_id = ?, zbieral_sprawdzono_at = ? WHERE log_id = ?`);
+    for (const p of czekajace) {
+      const zamowienie = Number(p.zamowienie_id);
+      if (!ids.includes(zamowienie)) continue;
+      const logId = Number(p.log_id);
+      let zebral: ZmianaStatusu | null = null;
+      for (const z of zmiany) {
+        if (z.zamowienieId !== zamowienie || z.id >= logId || z.status === null) continue;
+        if (statusyZebrane.includes(z.status) && (zebral === null || z.id > zebral.id)) zebral = z;
+      }
+      ustaw.run(zebral?.pracownik ?? null, at, logId);
+    }
+  })();
+  return ids.length;
+}
+
 /**
  * Jeden przebieg tickera. Woła go `main()` przez `uruchomTakt`, nigdy
  * `buildApp()`. 429 idzie wyżej, żeby takt odczekał `Retry-After`. Inny błąd
@@ -258,6 +305,14 @@ export async function synchronizujSellasist(
         database.prepare("DELETE FROM sellasist_do_pobrania WHERE zamowienie_id = ? AND proby >= ?").run(id, MAX_PROB);
         console.warn(`[sellasist] zamówienie ${id}: ${e instanceof BladSellasist ? e.message : "nie do odczytu"}`);
       }
+    }
+    /* Zbierający to dodatek do liczby złapanych: jego błąd nie zatrzymuje
+       przebiegu, a wpis czeka do następnego. 429 idzie wyżej jak wszędzie. */
+    try {
+      await ustalZbierajacych(database, query, statusyZebrane, teraz);
+    } catch (e) {
+      if (e instanceof BladLimitu) throw e;
+      console.warn(`[sellasist] kto zbierał: ${e instanceof BladSellasist ? e.message : "dziennik nie do odczytu"}`);
     }
     const zbiorek = przeniesZbiorki(database);
     /* Wpis tylko przy nowych zbiórkach: to one zmieniają ranking strefy
@@ -343,6 +398,38 @@ export function stanSellasist(database: DatabaseSync, wlaczony: boolean, teraz =
 
 /* ── Pomyłki złapane przy pakowaniu ─────────────────────────────────────── */
 
+/** Zła wartość albo nieznane konto — trasa oddaje 400 ze zdaniem. */
+export class BladPracownika extends Error {
+  constructor(message: string) { super(message); this.name = "BladPracownika"; }
+}
+
+/**
+ * Numer pracownika Sellasist jako osoba z naszych kont, albo zdjęcie
+ * przypisania (`userId: null`). Imię kopiujemy z kartoteki, bo konto bywa
+ * kasowane, a zestawienie ma dalej mówić imieniem.
+ */
+export function przypiszPracownikaSellasist(
+  sellasistId: unknown, userId: unknown, autor: { id: number; name: string },
+  database: DatabaseSync = defaultDb(), teraz = new Date(),
+): void {
+  if (!Number.isInteger(sellasistId) || Number(sellasistId) <= 0) {
+    throw new BladPracownika("Pole „sellasistId” musi być dodatnią liczbą całkowitą");
+  }
+  const sid = Number(sellasistId);
+  if (userId === null) {
+    database.prepare("DELETE FROM sellasist_pracownik WHERE sellasist_id = ?").run(sid);
+  } else {
+    if (!Number.isInteger(userId)) throw new BladPracownika("Pole „userId” musi być liczbą całkowitą albo null");
+    const u = database.prepare("SELECT name FROM app_user WHERE user_id = ?").get(Number(userId)) as Wiersz | undefined;
+    if (!u) throw new BladPracownika("Nie ma takiego pracownika");
+    database.prepare(`INSERT INTO sellasist_pracownik(sellasist_id, user_id, nazwa, zmieniono_at) VALUES (?,?,?,?)
+        ON CONFLICT(sellasist_id) DO UPDATE SET user_id = excluded.user_id, nazwa = excluded.nazwa,
+        zmieniono_at = excluded.zmieniono_at`).run(sid, Number(userId), String(u.name), teraz.toISOString());
+  }
+  logEvent("sellasist_pracownik_przypisany", autor.name, null, { sellasistId: sid, userId: userId ?? null },
+    autor.id, database);
+}
+
 /** Ile ostatnich dób pokazuje zakładka „Pomyłki". Dwa tygodnie to dwa cykle pracy. */
 export const DNI_ZLAPANYCH = 14;
 
@@ -361,7 +448,16 @@ export interface ZlapanePomylki {
    * pakowanie przepuściło do klienta; `null` przy pustej liście.
    */
   doKlienta: number | null;
+  /**
+   * Kto zbierał złapane z tych samych dób, najczęstsi pierwsi.
+   * `nazwa: null` = numer Sellasist, którego admin jeszcze nie przypisał osobie.
+   */
+  osoby: OsobaZlapanych[];
+  /** Złapane z tych dób bez ustalonej osoby: jeszcze nie pytane albo bez zebrania w dzienniku. */
+  bezOsoby: number | null;
 }
+
+export interface OsobaZlapanych { sellasistId: number; userId: number | null; nazwa: string | null; zlapanych: number }
 
 /**
  * Pomyłki złapane przy pakowaniu na dobę — CZYSTY ODCZYT, bez pytania Sellasist.
@@ -376,7 +472,7 @@ export interface ZlapanePomylki {
  * paczki, choć zgłoszenie przychodzi kilka dni po wysyłce.
  */
 export function zlapanePomylki(database: DatabaseSync, wlaczone: boolean, teraz = new Date()): ZlapanePomylki {
-  const pusto = { wlaczone, dni: [], razem: null, doKlienta: null };
+  const pusto = { wlaczone, dni: [], razem: null, doKlienta: null, osoby: [], bezOsoby: null };
   if (!wlaczone) return pusto;
   const s = database.prepare("SELECT pomylki_od_at, last_success_at FROM sellasist_sync_state WHERE id = 1").get() as
     Wiersz | undefined;
@@ -390,14 +486,27 @@ export function zlapanePomylki(database: DatabaseSync, wlaczone: boolean, teraz 
     .filter((d) => d > dataLokalna(odAt) && d <= koniec);
   if (doby.length === 0) return pusto;
   const licznik = new Map(doby.map((d) => [d, 0]));
+  const osoby = new Map<number, OsobaZlapanych>();
+  let bezOsoby = 0;
   const od = new Date(teraz.getTime() - (DNI_ZLAPANYCH + 1) * 24 * 60 * 60_000).toISOString();
-  for (const w of database.prepare("SELECT at FROM sellasist_pomylka_zlapana WHERE at >= ?").all(od) as Wiersz[]) {
+  for (const w of database.prepare(`SELECT z.at, z.zbieral_sellasist_id AS sid, p.user_id, p.nazwa
+      FROM sellasist_pomylka_zlapana z LEFT JOIN sellasist_pracownik p ON p.sellasist_id = z.zbieral_sellasist_id
+      WHERE z.at >= ?`).all(od) as Wiersz[]) {
     const d = dataLokalna(String(w.at));
-    if (licznik.has(d)) licznik.set(d, licznik.get(d)! + 1);
+    if (!licznik.has(d)) continue;
+    licznik.set(d, licznik.get(d)! + 1);
+    if (w.sid == null) { bezOsoby++; continue; }
+    const sid = Number(w.sid);
+    const o = osoby.get(sid) ?? { sellasistId: sid, userId: w.user_id == null ? null : Number(w.user_id),
+      nazwa: tekst(w.nazwa), zlapanych: 0 };
+    o.zlapanych++;
+    osoby.set(sid, o);
   }
   const dni = doby.map((data) => ({ data, zlapanych: licznik.get(data)! }));
   return {
     wlaczone, dni, razem: dni.reduce((a, d) => a + d.zlapanych, 0),
     doKlienta: zgloszonychWDobach(doby[0], doby[doby.length - 1], database),
+    osoby: [...osoby.values()].sort((a, b) => b.zlapanych - a.zlapanych || a.sellasistId - b.sellasistId),
+    bezOsoby,
   };
 }

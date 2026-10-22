@@ -108,6 +108,15 @@ export function sciezkaDziennika(odStempel: string, offset: number): string {
   return `/orders_logs?date_from=${q(odStempel)}&sort=asc&limit=${STRONA}&offset=${Math.max(0, Math.trunc(offset))}`;
 }
 
+/**
+ * Zmiany statusu wybranych zamówień, rosnąco i bez daty od. Pomyłka złapana
+ * dziś bywa zebrana dzień wcześniej, przed oknem strumienia dziennika.
+ */
+export function sciezkaStatusowZamowien(ids: readonly number[], offset: number): string {
+  return `/orders_logs?orders=${ids.map((i) => Math.trunc(i)).join(",")}&operation_tag=order_status_change`
+    + `&sort=asc&limit=${STRONA}&offset=${Math.max(0, Math.trunc(offset))}`;
+}
+
 export const sciezkaZamowienia = (id: number): string => `/orders/${Math.trunc(id)}`;
 
 /** Zamówienia Sellasist po numerze ze źródła — dla Allegro to numer formularza zakupu. */
@@ -326,9 +335,9 @@ export interface WpisDziennika {
 }
 
 /**
- * Wpisy dziennika BEZ `user_id`. Kto zebrał albo spakował paczkę, to
- * monitoring pracowniczy (art. 22² KP), a liczba zbiórek na dzień go nie
- * potrzebuje. Ta sama zasada co przy `pominiecia_dzien` w `schema.sql`.
+ * Wpisy dziennika BEZ `user_id`. Liczba zbiórek na dzień nie potrzebuje
+ * osób, więc strumień ich nie niesie. Autora czyta wyłącznie
+ * `mapujZmianyStatusu`, i tylko dla pomyłek złapanych przy pakowaniu.
  */
 export function mapujDziennik(v: unknown): WpisDziennika[] {
   return lista(v).flatMap((w) => {
@@ -339,5 +348,29 @@ export function mapujDziennik(v: unknown): WpisDziennika[] {
       id, zamowienieId, tag: tekst(w.operation_tag), obiekt: calkowita(w.object_id),
       at: dataSellasist(w.date),
     }];
+  });
+}
+
+export interface ZmianaStatusu {
+  id: number;
+  zamowienieId: number;
+  /** Status, w który weszło zamówienie (`object_id`). */
+  status: number | null;
+  /** `user_id` — numer pracownika Sellasist, który zmienił status; `null` = system. */
+  pracownik: number | null;
+}
+
+/**
+ * Zmiany statusu Z AUTOREM — wyłącznie do ustalenia, kto zbierał pomyłkę
+ * złapaną przy pakowaniu (decyzja właściciela, `schema.sql`). Inny wpis niż
+ * zmiana statusu odpada, nawet gdyby filtr Sellasist go przepuścił.
+ */
+export function mapujZmianyStatusu(v: unknown): ZmianaStatusu[] {
+  return lista(v).flatMap((w) => {
+    const id = calkowita(w.id);
+    const zamowienieId = calkowita(w.order_id);
+    if (id === null || zamowienieId === null || tekst(w.operation_tag) !== "order_status_change") return [];
+    const pracownik = calkowita(w.user_id);
+    return [{ id, zamowienieId, status: calkowita(w.object_id), pracownik: pracownik && pracownik > 0 ? pracownik : null }];
   });
 }

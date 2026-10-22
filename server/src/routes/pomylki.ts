@@ -9,7 +9,7 @@ import {
 } from "../services/pomylki.js";
 import { sellasistWlaczony } from "../adapters/sellasist.http.js";
 import { config } from "../config.js";
-import { zlapanePomylki } from "../services/sellasist-sync.js";
+import { BladPracownika, przypiszPracownikaSellasist, zlapanePomylki } from "../services/sellasist-sync.js";
 import { ROLE_BIUROWE } from "../services/users.js";
 
 /* ── Pomyłki wysyłkowe: trasy zakładki ───────────────────────────────────────
@@ -19,10 +19,10 @@ import { ROLE_BIUROWE } from "../services/users.js";
    BRAMKA ROLI TAKŻE NA ODCZYCIE. Pomyłka niesie login klienta, numer
    zamówienia i imiona pracowników — dane biura, nie hali.
 
-   ZESTAWIENIE NA OSOBĘ WIDZI WYŁĄCZNIE ADMIN. Rachunek win per pracownik to
-   monitoring pracowniczy (art. 22² KP), decyzja właściciela w polityce danych
-   sprawy klienta (`docs/obsluga-klienta.md`). Biuro widzi imiona i winę przy
-   pojedynczej pomyłce, bo bez nich wiersza nie da się uzupełnić.
+   ZESTAWIENIE NA OSOBĘ WIDZI CAŁE BIURO, decyzją właściciela z 22
+   października 2026 (`docs/obsluga-klienta.md`). Kto zbierał i kto zawinił
+   to dane potrzebne biuru do pracy, tak jak w arkuszu. Przypisanie numeru
+   pracownika Sellasist zostaje adminowi, bo zmienia imię w każdym wierszu.
 
    Listę osób do wyboru panel bierze z istniejącego `GET /api/users`: zwraca
    rolę i aktywność, a widzi ją biuro. Druga lista rozjechałaby się z nią. */
@@ -57,21 +57,37 @@ export async function pomylkiRoutes(app: FastifyInstance) {
     try {
       const pomylki = listaPomylek({ stan: req.query.stan, miesiac: req.query.miesiac }, db());
       const podsumowanie = podsumowanieMiesiaca(req.query.miesiac ?? biezacyMiesiac(), db());
-      if (sesjaZadania()!.user.role !== "admin") podsumowanie.osoby = [];
       return { pomylki, podsumowanie, doUzupelnienia: licznikDoUzupelnienia(db()), osobyReczne: osobyReczne(db()) };
     } catch (e) {
       return blad(reply, e);
     }
   });
 
-  /* Pomyłki złapane przy pakowaniu, z Sellasist. Liczba na dobę bez osób,
-     więc widzi ją całe biuro, nie tylko admin. Czysty odczyt lustra.
-     Zatrzymane lustro wyłącza blok, bo nie czyta dziennika. */
+  /* Pomyłki złapane przy pakowaniu, z Sellasist: liczba na dobę i kto
+     zbierał, dla całego biura. Czysty odczyt lustra. Zatrzymane lustro
+     wyłącza blok. */
   app.get("/api/pomylki/zlapane", async (_req, reply) => {
     const nie = odmowa(reply); if (nie) return nie;
     const s = config.sellasist;
     return zlapanePomylki(db(), sellasistWlaczony() && s.syncMs > 0 && s.statusyPomylka.length > 0);
   });
+
+  /* Numer pracownika Sellasist jako osoba z naszych kont. Tylko admin, bo
+     jedno przypisanie zmienia imię przy każdej złapanej pomyłce tej osoby. */
+  app.post<{ Body: { sellasistId?: unknown; userId?: unknown } }>("/api/pomylki/zlapane/pracownik",
+    async (req, reply) => {
+      const nie = odmowa(reply); if (nie) return nie;
+      if (sesjaZadania()!.user.role !== "admin") {
+        return reply.code(403).send({ error: "Pracowników Sellasist przypisuje admin" });
+      }
+      try {
+        przypiszPracownikaSellasist(req.body?.sellasistId, req.body?.userId ?? null, autor(), db());
+        return { zapisano: true };
+      } catch (e) {
+        if (e instanceof BladPracownika) return reply.code(400).send({ error: e.message });
+        throw e;
+      }
+    });
 
   app.get("/api/pomylki/licznik", async (_req, reply) => {
     const nie = odmowa(reply);

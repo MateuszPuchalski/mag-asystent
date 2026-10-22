@@ -13,7 +13,7 @@ process.env.SGT_MODE = "seeded";
 /* Trasy pomyłek pilnują tu tego, czego serwis nie widzi:
    1. bramka roli na KAŻDEJ trasie, także odczytu, i 401 przed 403;
    2. zero zapisu przy patrzeniu — trzy odczyty nie ruszają bazy;
-   3. zestawienie win na osobę widzi wyłącznie admin (art. 22² KP);
+   3. zestawienie win na osobę widzi całe biuro, a przypisanie numeru Sellasist tylko admin;
    4. tłumaczenie błędów serwisu: 400, 404 i 409 z bieżącym stanem. */
 
 let app: FastifyInstance;
@@ -145,9 +145,8 @@ test("błędy serwisu: 400 przy złych danych, 404 bez pomyłki", async () => {
   assert.equal(r.statusCode, 400, "nieistniejący pracownik");
 });
 
-test("zestawienie win na osobę widzi tylko admin; biuro dostaje pustą listę osób", async () => {
+test("zestawienie win na osobę widzi całe biuro", async () => {
   const biuro = login("biuro", "Ala");
-  const admin = login("admin", "Szef");
   const marek = login("magazynier", "Marek");
   const p = (await app.inject({ method: "POST", url: "/api/pomylki", headers: biuro.naglowki,
     payload: { login: "x" } })).json().pomylka;
@@ -157,11 +156,7 @@ test("zestawienie win na osobę widzi tylko admin; biuro dostaje pustą listę o
   const dlaBiura = (await app.inject({ method: "GET", url: "/api/pomylki", headers: biuro.naglowki })).json();
   assert.equal(dlaBiura.podsumowanie.razem, 1);
   assert.match(dlaBiura.podsumowanie.miesiac, /^\d{4}-\d{2}$/);
-  assert.deepEqual(dlaBiura.podsumowanie.osoby, []);
-  assert.equal(dlaBiura.pomylki[0].pakowal.nazwa, "Marek", "imię przy pojedynczej pomyłce biuro widzi");
-
-  const dlaAdmina = (await app.inject({ method: "GET", url: "/api/pomylki", headers: admin.naglowki })).json();
-  assert.deepEqual(dlaAdmina.podsumowanie.osoby,
+  assert.deepEqual(dlaBiura.podsumowanie.osoby,
     [{ userId: marek.userId, nazwa: "Marek", zbieral: 0, pakowal: 1, winny: 1 }]);
 });
 
@@ -172,7 +167,7 @@ test("złapane przy pakowaniu: bramka biura, a bez Sellasist pusta odpowiedź be
   const biuro = login("biuro", "Ola Z");
   const r = await app.inject({ method: "GET", url: "/api/pomylki/zlapane", headers: biuro.naglowki });
   assert.equal(r.statusCode, 200);
-  assert.deepEqual(r.json(), { wlaczone: false, dni: [], razem: null, doKlienta: null });
+  assert.deepEqual(r.json(), { wlaczone: false, dni: [], razem: null, doKlienta: null, osoby: [], bezOsoby: null });
 });
 
 test("złapane przy pakowaniu: włączone tylko z kontem, chodzącym lustrem i statusem pomyłki", async () => {
@@ -188,6 +183,41 @@ test("złapane przy pakowaniu: włączone tylko z kontem, chodzącym lustrem i s
     assert.equal(await wlaczone(), false, "bez statusu pomyłki nie ma czego liczyć");
     Object.assign(config.sellasist, { statusyPomylka: [30], syncMs: 0 });
     assert.equal(await wlaczone(), false, "zatrzymane lustro nie czyta dziennika");
+  } finally {
+    Object.assign(config.sellasist, bylo);
+  }
+});
+
+test("kto zbierał złapane: osoby widzi całe biuro, numer Sellasist przypisuje tylko admin", async () => {
+  const { config } = await import("../config.js");
+  const bylo = { ...config.sellasist };
+  const d = db();
+  d.exec("DELETE FROM sellasist_sync_state; DELETE FROM sellasist_pomylka_zlapana; DELETE FROM sellasist_pracownik");
+  const teraz = Date.now();
+  d.prepare("INSERT INTO sellasist_sync_state(id, pomylki_od_at, last_success_at) VALUES (1, ?, ?)")
+    .run(new Date(teraz - 4 * 86_400_000).toISOString(), new Date(teraz).toISOString());
+  d.prepare(`INSERT INTO sellasist_pomylka_zlapana(log_id, zamowienie_id, at, zbieral_sellasist_id, zbieral_sprawdzono_at)
+      VALUES (1, 800, ?, 7, ?)`).run(new Date(teraz - 86_400_000).toISOString(), new Date(teraz).toISOString());
+  const biuro = login("biuro", "Ola P");
+  const admin = login("admin", "Szef P");
+  const marek = login("magazynier", "Marek P");
+  const odczyt = async (h: Record<string, string>) =>
+    (await app.inject({ method: "GET", url: "/api/pomylki/zlapane", headers: h })).json();
+  try {
+    Object.assign(config.sellasist, { konto: "firma", apiKey: "k", syncMs: 251_000, statusyPomylka: [30] });
+    const dlaBiura = await odczyt(biuro.naglowki);
+    assert.equal(dlaBiura.razem, 1);
+    assert.equal(dlaBiura.bezOsoby, 0);
+    assert.deepEqual(dlaBiura.osoby,
+      [{ sellasistId: 7, userId: null, nazwa: null, zlapanych: 1 }]);
+
+    const przypisz = (h: Record<string, string>, payload: unknown) =>
+      app.inject({ method: "POST", url: "/api/pomylki/zlapane/pracownik", headers: h, payload: payload as object });
+    assert.equal((await przypisz(biuro.naglowki, { sellasistId: 7, userId: marek.userId })).statusCode, 403);
+    assert.equal((await przypisz(admin.naglowki, { sellasistId: 7, userId: 999999 })).statusCode, 400);
+    assert.equal((await przypisz(admin.naglowki, { sellasistId: 7, userId: marek.userId })).statusCode, 200);
+    assert.deepEqual((await odczyt(biuro.naglowki)).osoby,
+      [{ sellasistId: 7, userId: marek.userId, nazwa: "Marek P", zlapanych: 1 }]);
   } finally {
     Object.assign(config.sellasist, bylo);
   }

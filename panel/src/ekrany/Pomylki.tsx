@@ -4,9 +4,11 @@ import {
   ChevronDown, ChevronLeft, ChevronRight, PackageCheck, PackageX, Plus, ReceiptText, Trash2, UserPlus,
 } from "lucide-react";
 import { Konflikt } from "../api/klient";
+import { useJa } from "../api/rozmowy";
 import {
-  pomylkaZKonfliktu, useNowaPomylka, useOsobyPomylek, usePomylki, usePozycjePomylki, useUsunPomylke,
-  useWznowPomylke, useZakonczPomylke, useZlapanePomylki, useZmienPomylke, type FiltrPomylek, type OsobaPomylki,
+  pomylkaZKonfliktu, useNowaPomylka, useOsobyPomylek, usePomylki, usePozycjePomylki, usePrzypiszPracownikaSellasist,
+  useUsunPomylke, useWznowPomylke, useZakonczPomylke, useZlapanePomylki, useZmienPomylke, type FiltrPomylek,
+  type OsobaPomylki, type OsobaZlapanych,
   type PodsumowaniePomylek, type Pomylka, type ZmianaPomylki,
 } from "../api/pomylki";
 import { etykietaKodu } from "../zwroty/Pieniadze";
@@ -196,21 +198,26 @@ export function Pomylki() {
    arkusz na koniec miesiąca. Liczby zbierał i pakował stoją obok winy,
    bo bez nich „trzy razy winny" nie mówi, z ilu paczek.
 
-   ZESTAWIENIE OSÓB WIDZI TYLKO ADMIN, decyzją właściciela: to monitoring
-   pracowników. Innym rolom serwer oddaje pustą listę osób. Pusta lista nie
-   znaczy więc „nikt nie zawinił" i ekran mówi wtedy samą liczbę pomyłek. */
+   ZESTAWIENIE OSÓB WIDZI CAŁE BIURO, decyzją właściciela z 22 października
+   2026: kto zbierał i kto zawinił to wiedza do pracy, jak w arkuszu. Pusta
+   lista znaczy, że nikogo jeszcze nie wpisano, i tabela wtedy nie staje. */
 const ZRODLO: Record<Pomylka["zrodlo"], string> = {
   odmowa: "z odmowy wypłaty", dosylka: "z dosyłki", recznie: "zgłoszone ręcznie",
 };
 
 /* Statystyki miesiąca w czterech kolumnach: stany, pół roku wstecz, mylone
-   towary i — dla admina — osoby. Wykres pół roku odpowiada na pytanie „lepiej
+   towary i osoby. Wykres pół roku odpowiada na pytanie „lepiej
    czy gorzej", którego jedna liczba miesiąca nie rozstrzyga. Słupek to
-   przycisk, bo następne pytanie brzmi zwykle „co było w tamtym miesiącu". */
+   przycisk, bo następne pytanie brzmi zwykle „co było w tamtym miesiącu".
+
+   KOLUMNY Z MIEJSCA, NIE Z OKNA. Karta stoi obok paska bocznego, więc
+   szerokość okna nie mówi, ile ma miejsca. Progi okna ucinały czwartą
+   kolumnę, a `auto-fit` łamie ją do następnego rzędu. */
 function Podsumowanie({ d, onMiesiac }: { d: PodsumowaniePomylek; onMiesiac: (m: string) => void }) {
   const najwiecej = Math.max(1, ...d.trend.map((t) => t.razem));
   const zrodla = (Object.keys(ZRODLO) as Array<Pomylka["zrodlo"]>).filter((z) => d.zrodla[z] > 0);
-  return <Karta className="grid gap-x-6 gap-y-4 px-4 py-3 text-sm md:grid-cols-2 xl:grid-cols-4" role="region"
+  return <Karta className="grid grid-cols-[repeat(auto-fit,minmax(13rem,1fr))] gap-x-6 gap-y-4 px-4 py-3 text-sm
+    [&>*]:min-w-0" role="region"
     aria-label="Podsumowanie miesiąca">
     <div className="space-y-2">
       <p>W miesiącu: <b className="tabular-nums">{ile(d.razem, "pomyłka", "pomyłki", "pomyłek")}</b></p>
@@ -289,8 +296,10 @@ function Podsumowanie({ d, onMiesiac }: { d: PodsumowaniePomylek; onMiesiac: (m:
    Jedna liczba z obu mieszałaby złapane z przepuszczonymi. Obie stoją więc
    obok siebie w zdaniu, z tych samych dni: tak widać, czy kontrola działa.
 
-   BEZ OSÓB. Dziennik zna konto, które zmieniło status, ale mapowanie je
-   odrzuca: kto zbierał źle, to monitoring pracowniczy (art. 22² KP).
+   KTO ZBIERAŁ WIDZI CAŁE BIURO, decyzją właściciela z 22 października
+   2026, ta sama reguła co rachunek win rejestru. Serwer zna z dziennika
+   Sellasist sam numer pracownika, bo API nie wystawia listy pracowników.
+   Admin przypisuje numer osobie raz, a potem wszyscy widzą imię.
 
    BRAK DANYCH TO NIE ZERO. Pusta lista dni znaczy, że Sellasist nie oddał
    jeszcze żadnej pełnej doby. Padnięte zapytanie daje błąd zamiast bloku.
@@ -344,7 +353,61 @@ function ZlapanePrzyPakowaniu() {
         <span className={`tabular-nums ${d.zlapanych > 0 ? "font-semibold" : "text-slate-600"}`}>{d.zlapanych}</span>
       </li>)}
     </ol>
+    {z.data.osoby.length > 0 && <KtoZbieral osoby={z.data.osoby} bezOsoby={z.data.bezOsoby ?? 0} />}
   </Karta>;
+}
+
+/* Kto zbierał złapane, najczęstsi pierwsi. Numer bez przypisania ma u admina
+   obok wybór osoby, bo bez niego nikt nie wie, kogo dotyczy liczba. Reszta
+   biura widzi wtedy sam numer: przypisanie zmienia imię w każdym wierszu,
+   więc robi je jedna osoba. Wybór otwiera się klikiem w „zmień", rzadko. */
+function KtoZbieral({ osoby, bezOsoby }: { osoby: OsobaZlapanych[]; bezOsoby: number }) {
+  const admin = useJa().data?.user.role === "admin";
+  const lista = useOsobyPomylek();
+  const przypisz = usePrzypiszPracownikaSellasist();
+  const [zmieniany, setZmieniany] = useState<number | null>(null);
+  return <div className="space-y-1 pl-6 pt-1" role="group" aria-label="Kto zbierał złapane">
+    <p className="text-xs font-semibold text-slate-700">Kto zbierał</p>
+    <ul className="flex flex-wrap gap-x-4 gap-y-1">
+      {osoby.map((o) => {
+        const etykieta = `Pracownik Sellasist nr ${o.sellasistId}`;
+        if (!admin) {
+          return <li key={o.sellasistId} className="inline-flex items-center gap-2">
+            {o.nazwa ? <b>{o.nazwa}</b>
+              : <span className="text-slate-700" title="Imię przypisze admin">{etykieta}</span>}
+            <span className="font-semibold tabular-nums text-ranga-zle">{o.zlapanych}×</span>
+          </li>;
+        }
+        const wybor = o.nazwa === null || zmieniany === o.sellasistId;
+        return <li key={o.sellasistId} className="inline-flex items-center gap-2">
+          {wybor
+            ? <>
+                <span className="text-slate-700">{etykieta}</span>
+                <select className="field w-44 text-sm" aria-label={`${etykieta} to`} value={o.userId ?? ""}
+                  disabled={przypisz.isPending || !lista.data}
+                  onChange={(e) => {
+                    const userId = e.target.value ? Number(e.target.value) : null;
+                    przypisz.mutate({ sellasistId: o.sellasistId, userId }, { onSuccess: () => setZmieniany(null) });
+                  }}>
+                  <option value="">— kto to? —</option>
+                  {(lista.data ?? []).map((u) => <option key={u.userId} value={u.userId ?? ""}>{u.nazwa}</option>)}
+                </select>
+              </>
+            : <>
+                <b>{o.nazwa}</b>
+                <button type="button" onClick={() => setZmieniany(o.sellasistId)} title={etykieta}
+                  className="text-xs text-sky-700 underline underline-offset-2">zmień</button>
+              </>}
+          <span className="font-semibold tabular-nums text-ranga-zle">{o.zlapanych}×</span>
+        </li>;
+      })}
+    </ul>
+    {/* Bez ustalonej osoby: dziennik jeszcze nie pytany albo bez zebrania,
+        np. status przestawił system. Liczba osobno, żeby suma się zgadzała. */}
+    {bezOsoby > 0 && <p className="text-podpis text-slate-600">
+      {ile(bezOsoby, "pomyłka", "pomyłki", "pomyłek")} bez ustalonej osoby</p>}
+    <Blad>{(przypisz.error as Error | null)?.message}</Blad>
+  </div>;
 }
 
 /** Osoba w komórce: imię, a winny słowem i czerwienią — sama barwa nie wystarczy (WCAG 1.4.1). */

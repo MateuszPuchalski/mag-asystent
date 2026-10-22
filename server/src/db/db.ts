@@ -996,6 +996,11 @@ export function migrate(database: DatabaseSync) {
      `sellasist_sync_state.pomylki_od_at` w `schema.sql`. Tabela stoi już na
      produkcji, a NULL znaczy prawdę: z kluczem jeszcze nic nie przeczytano. */
   addColumn("sellasist_sync_state", "pomylki_od_at", "TEXT");
+  /* Kto zbierał pomyłkę złapaną przy pakowaniu — patrz
+     `sellasist_pomylka_zlapana` w `schema.sql`. Stare wiersze mają NULL
+     w obu kolumnach, więc ustalenie zbierającego dopyta je samo. */
+  addColumn("sellasist_pomylka_zlapana", "zbieral_sellasist_id", "INTEGER");
+  addColumn("sellasist_pomylka_zlapana", "zbieral_sprawdzono_at", "TEXT");
   /* Metoda dostawy zamówienia Sellasist — patrz `sellasist_zamowienie.dostawa`
      w `schema.sql`. NULL znaczy „lustro jej jeszcze nie czytało", a każda
      zmiana zamówienia czyta szczegół od nowa. */

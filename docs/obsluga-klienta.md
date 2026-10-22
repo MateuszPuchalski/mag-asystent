@@ -610,9 +610,9 @@ działania stoją w `docs/sellasist.md`.
   dzień etykiety i braki, bez numeru.
 - **Notatek z Sellasist nie zapisujemy.** Piszą je ludzie, więc bywa w nich
   adres albo telefon. Profil czyta je na żywo przy rozwinięciu zamówienia.
-- **Bez pracownika.** Dziennik zmian Sellasist niesie `user_id`, a mapowanie
-  go odrzuca. Kto zebrał albo spakował paczkę, to monitoring pracowniczy
-  (art. 22² Kodeksu pracy); liczba paczek na dzień go nie potrzebuje.
+- **Pracownik tylko przy pomyłce złapanej.** Strumień dziennika zmian
+  Sellasist odrzuca `user_id`, bo liczba paczek na dzień go nie potrzebuje.
+  Czyta go wyłącznie ustalenie, kto zbierał pomyłkę złapaną przy pakowaniu.
 - **Notatka agenta to jedyny zapis do Sellasist.** Dostaje podpis autora
   w treści. Dziennik `sellasist_notatka` niesie numer zamówienia, bez treści.
 - **Retencji nie ma**, jak przy zamówieniach Allegro. Zamówienie skasowane
@@ -647,16 +647,21 @@ Tabela `pomylka_wysylki` trzyma jeden wiersz na zamówienie.
 - **Statystyki miesiąca** liczą stany, źródła, pół roku wstecz i towary po
   „co zamówił”. Towar nie mówi nic o kliencie ani pracowniku, więc widzi je
   całe biuro.
-- **Zestawienie win na osobę widzi wyłącznie admin**, decyzją właściciela.
-  Dla reszty biura byłoby monitoringiem pracowniczym (art. 22² Kodeksu
-  pracy), tak jak zestawienie spraw w polityce sprawy klienta.
+- **Zestawienie win na osobę widzi całe biuro**, decyzją właściciela
+  z 22 października 2026. Wcześniej widział je tylko admin, a złapane przy
+  pakowaniu szły bez osób. Właściciel uznał tamtą decyzję za błędną: kto
+  zbierał i kto zawinił to wiedza do pracy, jak w arkuszu.
 - **Dziennik nie dostaje loginu ani opisu.** Zdarzenia pomyłek niosą jej
   numer. Pomyłki nie wychodzą do Copilota, CSV, migawki ani raportu tygodnia.
-- **Pomyłki złapane przy pakowaniu** (z Sellasist) to sam numer wpisu,
-  zamówienie i chwila, bez pracownika. Zakładka pokazuje całemu biuru liczbę
-  na dobę, tak jak Strefa złota. Doba z jedną osobą na zbieraniu bywa liczbą
-  tej osoby, bo biuro zna grafik. Właściciel zostawił mimo to dobę całemu
-  biuru, decyzją z 19 października 2026.
+- **Pomyłki złapane przy pakowaniu** (z Sellasist) to numer wpisu,
+  zamówienie i chwila. Zakładka pokazuje całemu biuru liczbę na dobę, tak jak
+  Strefa złota. Doba z jedną osobą na zbieraniu bywa liczbą tej osoby, bo
+  biuro zna grafik. Właściciel zostawił mimo to dobę całemu biuru, decyzją
+  z 19 października 2026.
+- **Kto zbierał złapaną pomyłkę widzi całe biuro**, tą samą decyzją.
+  Serwer bierze z dziennika Sellasist numer pracownika, który przestawił
+  zamówienie w status zebranego. API Sellasist nie podaje imion, więc admin
+  przypisuje numer do osoby z naszych kont, raz na osobę.
 - **Retencji nie ma**, jak w sprawie klienta. O archiwizacji decyduje właściciel.
   Kopia anonimizowana (`tools/anonimizuj-baze.mjs`) zamienia login i imiona.
 
