@@ -2531,6 +2531,16 @@ SPRAWDZA wynik w kodzie: każdy cytowany fakt musi istnieć, a długość nie mo
 przekroczyć limitu wysyłki.
 Odwołania „(F3)" znikają z treści dopiero po tym sprawdzeniu (0.232.1) —
 model pisze je zawsze, klient nie widzi ich nigdy.
+
+**Skąd szkic bierze ofertę (@wydanie).** Ofertę rozmowy wybiera ta sama
+funkcja co panel, `services/oferta-rozmowy.ts`, z trzech źródeł po kolei.
+Najpierw wskazanie agenta, potem numer oferty z wiadomości, na końcu jedyna
+pozycja zamówienia rozmowy. Powód: zrzut właściciela z rozmowy o braku
+w paczce, bez aukcji w wiadomości. Panel pokazywał ofertę i kartotekę
+z zamówienia, a szkic znał tylko fakt o doręczeniu. Odtąd fakty niosą też
+pozycje zamówienia z ilością, najwyżej trzy, każdą z kartoteką. Przy kilku
+pozycjach oferty rozmowy nie ma, więc szkic nie ciągnie treści żadnej aukcji.
+Gdy oferta nie ma jeszcze kopii, szkic zakłada ją jednym żądaniem, a błąd zostawia szkic bez treści.
 **Wiedza własna modelu: swoboda kupiona jawnością (0.253.0).** Do 0.252.0
 reguła brzmiała „model nie zna dopasowań z pamięci", a każdy numer spoza
 faktów odrzucał cały szkic. Właściciel zdjął ten zakaz i postawił warunek:

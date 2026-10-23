@@ -14,7 +14,10 @@ import {
 import { drogaZakupu, sprawyZakupu, type PrzystanekDrogi, type SprawaZakupu }
   from "./droga-klienta.js";
 import { linkOferty, linkZamowienia } from "./allegro-linki.js";
-import { kartotekaOferty, type Dopasowanie } from "./dopasowanie-sku.js";
+import type { Dopasowanie } from "./dopasowanie-sku.js";
+import {
+  kartotekaOfertyRozmowy, ofertaWskazana, wybierzOferteRozmowy, type OfertaWskazana,
+} from "./oferta-rozmowy.js";
 import { stanZdjeciaOferty, type StanZdjeciaOferty } from "./zdjecia-ofert.js";
 import { zgodnoscOferty, type ZgodnoscOferty } from "./zgodnosc-oferty.js";
 import { szkicCopilota, type SzkicCopilota } from "./copilot-szkic.js";
@@ -743,7 +746,6 @@ export function osRozmowy(id: number): {
      go niesie (wątek dotyczy jednego zakupu), a gdy klient go nie podał —
      z najnowszej naszej. Treść jest, gdy ticker już dociągnął; odczyt niczego
      nie pobiera („zero zapisu przy patrzeniu"). */
-  const zNumerem = [...wiadomosci].reverse();
   /* ── WSKAZANIE RĘCZNE JAKO ZAPASOWA DROGA (0.397.0) ─────────────────────────
      Zgłoszenie właściciela: klient napisał pod OFERTĄ o braku w paczce, a
      rozmowa nie miała zamówienia wcale. Ładunek wątku niesie JEDEN obiekt
@@ -764,47 +766,26 @@ export function osRozmowy(id: number): {
     przesylka: przesylkaRozmowy(kontoZamowienia, numerZamowienia),
   } : null;
 
-  /* JEDNA oferta na rozmowę, tą samą regułą co zamówienie: numer z najnowszej
-     wiadomości KLIENTA, która go niesie. Snapshot doczytujemy, gdy ticker już
-     go zapisał — odczyt niczego nie pobiera („zero zapisu przy patrzeniu”). */
-  const zrodloOferty = zNumerem.find((m) => String(m.typ ?? "") === "OFFER" && m.oferta != null
-      && String(m.direction) === "incoming")
-    ?? zNumerem.find((m) => String(m.typ ?? "") === "OFFER" && m.oferta != null);
+  /* JEDNA oferta na rozmowę. Regułę trzech źródeł i zapas SKU z pozycji
+     trzyma `oferta-rozmowy.ts`, bo te same fakty składa szkic Copilota,
+     a dwie kopie reguły rozjechały się już raz. Snapshot doczytujemy, gdy
+     ticker już go zapisał — odczyt niczego nie pobiera („zero zapisu przy
+     patrzeniu”). */
   const kontoRozmowy = Number((db().prepare("SELECT channel_account_id AS konto FROM conversation WHERE id=?")
     .get(id) as { konto: number }).konto);
-  /* SKU z pozycji zamówienia o tym numerze oferty — zapas na czas, gdy
-     snapshotu jeszcze nie ma. Pozycja ma SKU od razu, z formularza zakupu,
-     więc kartoteka nie musi czekać na takt ofert; dotyczy każdej z trzech
-     dróg, bo wskazanie ręczne bywa właśnie kliknięciem przy pozycji. */
-  const skuZPozycji = (ofertaId: string) =>
-    zamowienie?.pobrane?.pozycje.find((p) => p.offerId === ofertaId)?.sku ?? null;
-  const zOferty = (konto: number, ofertaId: string, zrodlo: OfertaRozmowy["zrodlo"]): OfertaRozmowy => {
-    const pobrana = snapshotOferty(konto, ofertaId);
-    const skuZapas = skuZPozycji(ofertaId);
+  const pozycjeZamowienia = zamowienie?.pobrane?.pozycje ?? null;
+  const wybrana = wybierzOferteRozmowy(id, pozycjeZamowienia, db());
+  const oferta: OfertaRozmowy | null = wybrana ? (() => {
+    const pobrana = snapshotOferty(wybrana.konto, wybrana.ofertaId);
     return {
-      externalId: ofertaId,
-      link: linkOferty(ofertaId),
-      zrodlo,
-      zgodnosc: zgodnoscOferty(db(), konto, ofertaId),
+      externalId: wybrana.ofertaId,
+      link: linkOferty(wybrana.ofertaId),
+      zrodlo: wybrana.zrodlo,
+      zgodnosc: zgodnoscOferty(db(), wybrana.konto, wybrana.ofertaId),
       pobrana,
-      /* `undefined` zamiast `null`, gdy snapshotu nie ma wcale: mostek odróżnia
-         „oferty jeszcze nie pobrano" od „oferta nie ma sygnatury", a to dwa
-         różne zdania na ekranie i dwie różne rzeczy do zrobienia. Oferta
-         z zamówienia ma zapas: SKU pozycji z formularza zakupu jest od razu. */
-      kartoteka: kartotekaOferty(db(), konto, ofertaId, pobrana ? pobrana.sku : (skuZapas ?? undefined)),
+      kartoteka: kartotekaOfertyRozmowy(db(), wybrana, pobrana, pozycjeZamowienia),
     };
-  };
-  /* Ręczne wskazanie bije numer z wiadomości, bo człowiek widział więcej
-     niż parser. Trzecia droga jest nowa (0.215.0): zamówienie z JEDNĄ
-     pozycją nie ma czego mylić, więc jego oferta jest ofertą rozmowy. Przy
-     kilku pozycjach rozstrzyga człowiek — przyciskiem przy pozycji. */
-  const reczna = ofertaWskazana(id);
-  const jedynaPozycja = zamowienie?.pobrane?.pozycje.length === 1 && zamowienie.pobrane.pozycje[0].offerId
-    ? zamowienie.pobrane.pozycje[0] : null;
-  const oferta: OfertaRozmowy | null = reczna ? zOferty(kontoRozmowy, reczna.ofertaId, "reczne")
-    : zrodloOferty ? zOferty(Number(zrodloOferty.konto), String(zrodloOferty.oferta), "wiadomosc")
-    : jedynaPozycja ? zOferty(kontoRozmowy, String(jedynaPozycja.offerId), "zamowienie")
-    : null;
+  })() : null;
 
   /* ── ZLECENIE I WYNIK TO DWA WPISY (0.226.0) ────────────────────────────
      Do 0.224.0 oś pokazywała sam WYNIK z hali. Zlecenie — czyli moment,
@@ -1010,18 +991,6 @@ export function osRozmowy(id: number): {
 }
 
 export interface Szkic { body: string; wersja: number; expectedLastMessageId: number | null }
-
-/** Oferta wskazana RĘCZNIE przez agenta — wybór człowieka, nie fakt z Allegro. */
-export interface OfertaWskazana { ofertaId: string; autor: string }
-
-export function ofertaWskazana(id: number): OfertaWskazana | null {
-  const w = db().prepare(`SELECT payload FROM conversation_event
-    WHERE conversation_id=? AND event_type='offer_linked_manually'
-    ORDER BY id DESC LIMIT 1`).get(id) as { payload: string | null } | undefined;
-  if (!w?.payload) return null;
-  const p = JSON.parse(w.payload) as { ofertaId?: string; autor?: string };
-  return p.ofertaId ? { ofertaId: p.ofertaId, autor: p.autor ?? "agent" } : null;
-}
 
 export function szkicRozmowy(id: number): Szkic | null {
   const s = db().prepare(

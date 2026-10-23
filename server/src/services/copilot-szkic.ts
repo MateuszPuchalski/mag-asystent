@@ -10,8 +10,10 @@ import {
   zamaskujWatek, zostalyDaneOsobowe, type TrescBezpieczna, type WiadomoscWatku,
 } from "./copilot-maskowanie.js";
 import type { Tokeny } from "./copilot-koszt.js";
-import { kartotekaOferty } from "./dopasowanie-sku.js";
+import { kartotekaOfertyRozmowy, wybierzOferteRozmowy } from "./oferta-rozmowy.js";
+import { zamowienieRozmowy, type PozycjaZamowienia } from "./zamowienia.js";
 import { dociagnijTresc } from "./allegro-oferta-tresc.js";
+import { zapewnijSnapshotOferty } from "./allegro-oferty-sync.js";
 import { buildProductCard } from "./stock.js";
 import { podzielStopke } from "./stopka.js";
 import { LIMIT_ZNAKOW } from "./wysylka.js";
@@ -87,7 +89,11 @@ export type RodzajFaktu =
   /* Realizacja zamówienia przed nadaniem (`realizacja-zamowienia.ts`):
      płatność, termin nadania, dokument z Subiekta i werdykt „wyślemy dziś".
      Osobny rodzaj, bo jako jedyny niesie gotowe zdanie dla klienta o terminie. */
-  | "realizacja";
+  | "realizacja"
+  /* Pozycja zamówienia rozmowy: towar, który klient KUPIŁ, z ilością.
+     Osobny rodzaj, bo „oferta” znaczy towar, o który klient pyta, a przy
+     braku w paczce liczy się to, co przyszło, nie to, co oglądał. */
+  | "pozycja";
 
 export interface Fakt { id: string; rodzaj: RodzajFaktu; zdanie: string }
 
@@ -419,27 +425,26 @@ export function numeryNiezadeklarowane(
     .filter((n) => !zWiedzy.includes(zwin(n).toUpperCase()));
 }
 
-/** Oferta, o którą chodzi: ręczne wskazanie bije numer z wiadomości. */
-function ofertaRozmowy(database: DatabaseSync, conversationId: number): { konto: number; ofertaId: string } | null {
-  const konto = database.prepare("SELECT channel_account_id AS konto FROM conversation WHERE id=?")
-    .get(conversationId) as { konto: number } | undefined;
-  if (!konto) throw new Error("Nie znaleziono rozmowy");
-  const reczna = database.prepare(`SELECT payload FROM conversation_event
-    WHERE conversation_id=? AND event_type='offer_linked_manually' ORDER BY id DESC LIMIT 1`)
-    .get(conversationId) as { payload: string | null } | undefined;
-  if (reczna?.payload) {
-    const p = JSON.parse(reczna.payload) as { ofertaId?: string };
-    if (p.ofertaId) return { konto: Number(konto.konto), ofertaId: p.ofertaId };
-  }
-  /* Ta sama reguła co w `osRozmowy`: numer z najnowszej wiadomości KLIENTA,
-     a gdy klient go nie podał — z najnowszej naszej. Najnowszej PO CZASIE:
-     `id` starych wierszy nie rośnie z czasem. */
-  const m = database.prepare(`SELECT related_object_id AS oferta FROM message
-    WHERE conversation_id=? AND related_object_type='OFFER' AND related_object_id IS NOT NULL
-    ORDER BY (direction='incoming') DESC, sent_at DESC, id DESC LIMIT 1`)
-    .get(conversationId) as { oferta: string } | undefined;
-  return m ? { konto: Number(konto.konto), ofertaId: String(m.oferta) } : null;
+/**
+ * Pozycje zamówienia rozmowy, gdy ticker już je pobrał. Czysty odczyt.
+ *
+ * Ofertę rozmowy wybiera `wybierzOferteRozmowy`, ta sama funkcja, z której
+ * panel pokazuje „ofertę z zamówienia”. Szkic, który widzi inną ofertę niż
+ * agent, pisze o czymś innym niż ekran obok.
+ */
+function pozycjeZamowieniaRozmowy(conversationId: number): PozycjaZamowienia[] {
+  const numer = numerZamowieniaRozmowy(conversationId);
+  return numer ? zamowienieRozmowy(numer.konto, numer.externalId, db())?.pozycje ?? [] : [];
 }
+
+/**
+ * Ile pozycji zamówienia wchodzi do faktów.
+ *
+ * Każda pozycja to jedno zdanie z kartoteką, więc trzy kosztują mniej niż
+ * jeden opis oferty. Zamówienia u nas mają zwykle jedną do trzech pozycji,
+ * a dłuższe dostają informację, ile ich pominięto, jak lista zgodności.
+ */
+const SUFIT_POZYCJI = 3;
 
 /** Login rozmówcy z WĄTKU Allegro — nie z tematu, bo temat bywa tytułem oferty. */
 export function loginRozmowcy(conversationId: number): string | null {
@@ -597,24 +602,36 @@ export function kontekstSzkicu(
      przebieg po to samo rozjechałby się z pierwszym. */
   const kartoteki = new Map<string, Kartoteka>();
 
-  const oferta = ofertaRozmowy(db(), conversationId);
+  const numerZam = numerZamowieniaRozmowy(conversationId);
+  const pozycje = numerZam ? zamowienieRozmowy(numerZam.konto, numerZam.externalId, db())?.pozycje ?? [] : [];
+  /* Trzy źródła oferty w kolejności panelu: wskazanie ręczne, numer
+     z wiadomości, jedyna pozycja zamówienia. Bez trzeciego szkic rozmowy
+     o zamówieniu nie znał kupionego towaru, choć panel obok go pokazywał. */
+  const oferta = wybierzOferteRozmowy(conversationId, pozycje, db());
+  const zZamowienia = oferta?.zrodlo === "zamowienie";
   let nazwaOferty: string | null = null;
   if (oferta) {
     const snap = db().prepare(`SELECT nazwa, sku FROM offer_snapshot
         WHERE channel_account_id=? AND external_id=?`).get(oferta.konto, oferta.ofertaId) as
       { nazwa: string; sku: string | null } | undefined;
-    if (snap) {
+    /* Oferta z zamówienia nie dostaje zdania „o którą pyta klient”: klient
+       pyta o zakup, a towar nazywa fakt pozycji niżej. Nazwa z pozycji jest
+       od razu, więc intake zna typ części także bez snapshotu oferty. */
+    if (zZamowienia) {
+      nazwaOferty = snap?.nazwa ?? pozycje.find((p) => p.offerId === oferta.ofertaId)?.nazwa ?? null;
+    } else if (snap) {
       nazwaOferty = snap.nazwa;
       dodaj("oferta", `Oferta, o którą pyta klient: „${snap.nazwa}"`);
     }
     faktyZTresciOferty(db(), oferta.konto, oferta.ofertaId, dodaj);
-    const k = kartotekaOferty(db(), oferta.konto, oferta.ofertaId, snap?.sku ?? undefined);
+    const k = kartotekaOfertyRozmowy(db(), oferta, snap ?? null, pozycje);
     if (k.twId !== null) {
       const karta = buildProductCard(subiekt, k.twId);
       if (karta) {
         kartoteki.set(zwin(karta.sym), { twId: k.twId, symbol: karta.sym, nazwa: karta.name });
         const numery = karta.identyfikatory.map((i) => i.wartosc).join(", ");
-        dodaj("kartoteka", `Kartoteka oferty: ${karta.sym} — ${karta.name}; EAN ${karta.ean || "brak"};`
+        dodaj("kartoteka", `${zZamowienia ? "Kartoteka kupionego towaru (jedynej pozycji zamówienia)" : "Kartoteka oferty"}:`
+          + ` ${karta.sym} — ${karta.name}; EAN ${karta.ean || "brak"};`
           + ` numery: ${numery || "brak"}; ${dostepnosc(karta.mag.avail, karta.unit)}`
           + `${kiedyBedzie(karta) ? `; ${kiedyBedzie(karta)}` : ""} (${k.zrodlo})`);
       }
@@ -622,6 +639,38 @@ export function kontekstSzkicu(
       dodaj("oferta", `Oferta bez kartoteki w Subiekcie: ${k.zrodlo}`);
     }
   }
+
+  /* POZYCJE ZAMÓWIENIA: co klient KUPIŁ i ile. Zrzut właściciela: klient
+     pisał o braku drugiego łańcucha w paczce, a szkic nie wiedział, co było
+     w zamówieniu. Pozycje stoją przy każdym zamówieniu, nie tylko przy
+     jednej pozycji, bo „czego brakuje” rozstrzyga się porównaniem z listą.
+
+     Przy kilku pozycjach żadna nie zostaje ofertą rozmowy, tak jak w panelu:
+     nie wiemy, o którą pyta klient, więc nie ciągniemy treści żadnej aukcji.
+     Każda pozycja niesie za to swoją kartotekę ze stanem, jednym zdaniem. */
+  const pokazane = pozycje.slice(0, SUFIT_POZYCJI);
+  pokazane.forEach((p, i) => {
+    const naglowek = pozycje.length > 1 ? `Pozycja ${i + 1} z ${pozycje.length}` : "Jedyna pozycja";
+    let zdanie = `${naglowek} zamówienia klienta (towar KUPIONY, nie pytanie o ofertę): „${p.nazwa}", ilość ${p.ilosc}`;
+    if (oferta && p.offerId === oferta.ofertaId) {
+      /* Kartotekę tej pozycji podał już fakt oferty wyżej; drugi zapis
+         kazałby modelowi sprawdzać, czy oba mówią to samo. */
+      zdanie += "; to oferta tej rozmowy, jej kartoteka stoi wyżej";
+    } else if (p.twId !== null) {
+      const karta = buildProductCard(subiekt, p.twId);
+      if (karta) {
+        kartoteki.set(zwin(karta.sym), { twId: p.twId, symbol: karta.sym, nazwa: karta.name });
+        zdanie += `; kartoteka ${karta.sym} „${karta.name}"; ${dostepnosc(karta.mag.avail, karta.unit)}`
+          + ` (${p.twZrodlo ?? "dopasowanie z pozycji"})`;
+      }
+    } else {
+      zdanie += "; bez kartoteki w Subiekcie";
+    }
+    if (i === pokazane.length - 1 && pozycje.length > pokazane.length) {
+      zdanie += `; pozostałych ${pozycje.length - pokazane.length} pozycji nie podajemy, są w zamówieniu`;
+    }
+    dodaj("pozycja", zdanie);
+  });
 
   /* ROZPOZNANIE BIEŻĄCEJ PROŚBY (22 września 2026). Specyfikacja: szkic
      dostaje znormalizowaną decyzję klasyfikatora. Do tej wersji szkic był
@@ -653,7 +702,6 @@ export function kontekstSzkicu(
      „gdzie paczka": pytanie o fakturę czy zwrot też bywa odpowiadane
      zdaniem „paczka jest jeszcze w drodze". Czytamy ZAPISANY stan — świeży
      dociąga `ulozSzkic`, bo ta funkcja zostaje czystym odczytem. */
-  const numerZam = numerZamowieniaRozmowy(conversationId);
   const idZam = numerZam ? idZamowienia(db(), numerZam.konto, numerZam.externalId) : null;
   const paczka = idZam === null ? null : przesylkaZamowienia(db(), idZam);
   const zdanieP = paczka ? zdaniePrzesylki(paczka) : null;
@@ -908,6 +956,14 @@ export async function ulozSzkic(
   nadaj: NadawcaSzkicu, subiekt: SubiektAdapter, teraz = new Date(),
   pobierzZdjecie?: Pobieracz, przesylka?: PrzesylkaDeps,
 ): Promise<SzkicCopilota> {
+  /* ZAMÓWIENIE I STAN PACZKI PRZED KONTEKSTEM, bo żądania do Allegro wolno
+     wysłać tylko stąd, a nie z otwarcia rozmowy. Zamówienie idzie pierwsze, bo płatność i termin nadania stoją
+     pod werdyktem „wyślemy dziś". Odmowa Allegro nie przerywa szkicu:
+     zostaje stan zapisany wcześniej albo milczenie. */
+  await odswiezZamowienieRozmowy(conversationId, przesylka, teraz.getTime());
+  await odswiezPrzesylke(conversationId, przesylka);
+  await odswiezSellasistRozmowy(conversationId, teraz);
+
   /* TREŚĆ OFERTY PRZED KONTEKSTEM (0.253.0). Opis, parametry i lista
      zgodności kosztują żądanie NA OFERTĘ, więc idą po nie wyłącznie stąd:
      z kliknięcia „Ułóż odpowiedź", gdzie zapis i tak już jest. `kontekstSzkicu`
@@ -916,17 +972,21 @@ export async function ulozSzkic(
 
      Odmowa nie przerywa szkicu: bez opisu jest on wart tyle, ile był wart
      do 0.252.0. Limit z Allegro przerywa, bo drugie żądanie pogłębia przerwę. */
-  const oferta = ofertaRozmowy(db(), conversationId);
-  if (oferta) await dociagnijTresc(oferta.konto, oferta.ofertaId);
-
-  /* ZAMÓWIENIE I STAN PACZKI PRZED KONTEKSTEM, z tego samego powodu co treść
-     oferty: żądania do Allegro wolno wysłać tylko stąd, a nie z otwarcia
-     rozmowy. Zamówienie idzie pierwsze, bo płatność i termin nadania stoją
-     pod werdyktem „wyślemy dziś". Odmowa Allegro nie przerywa szkicu:
-     zostaje stan zapisany wcześniej albo milczenie. */
-  await odswiezZamowienieRozmowy(conversationId, przesylka, teraz.getTime());
-  await odswiezPrzesylke(conversationId, przesylka);
-  await odswiezSellasistRozmowy(conversationId, teraz);
+  /* Oferta tą samą regułą co fakty niżej, więc także jedyna pozycja
+     zamówienia. Stoi PO odświeżeniu zamówienia, bo zamówienie dociągnięte
+     przed chwilą też ma pozycje. Przy kilku pozycjach oferty nie ma, więc
+     nie ma też żądania. Deps Allegro z testów idą także tutaj, bo to ta
+     sama droga szkicu. */
+  const oferta = wybierzOferteRozmowy(conversationId, pozycjeZamowieniaRozmowy(conversationId), db());
+  if (oferta) {
+    const allegro = przesylka ? { query: przesylka.query, apiUrl: przesylka.apiUrl } : {};
+    /* Bez kopii oferty treść nie ma gdzie się zapisać, a pierwszy szkic
+       przychodzi zwykle przed taktem ofert. Kopię zakładamy więc stąd, jednym
+       żądaniem i tylko przy jej braku. Każdy błąd, także limit, kończy się
+       szkicem bez treści: tyle był on wart, zanim kopię zakładaliśmy. */
+    await zapewnijSnapshotOferty(oferta.konto, oferta.ofertaId, allegro).catch(() => false);
+    await dociagnijTresc(oferta.konto, oferta.ofertaId, allegro);
+  }
 
   const kontekst = kontekstSzkicu(conversationId, subiekt, teraz);
 

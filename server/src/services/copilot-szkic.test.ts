@@ -51,7 +51,7 @@ beforeEach(() => {
   /* Kolejność to dziecko przed rodzicem, bo klucze obce. */
   for (const t of ["szkic_copilota", "copilot_wywolanie", "towar_identyfikator",
     "conversation_event", "message", "conversation", "offer_snapshot", "allegro_inbox_thread",
-    "zamowienie_klienta", "channel_account", "events", "app_user"]) {
+    "zamowienie_klienta_pozycja", "zamowienie_klienta", "channel_account", "events", "app_user"]) {
     d.prepare(`DELETE FROM ${t}`).run();
   }
   biuro = Number(d.prepare("INSERT INTO app_user(login,name,role) VALUES ('ala','A. Lewandowska','biuro')").run().lastInsertRowid);
@@ -264,6 +264,162 @@ test("zamówienie, którego Allegro nie oddało, dostaje fakt z lustra Sellasist
   } finally {
     db().exec("DELETE FROM sellasist_zamowienie");
   }
+});
+
+/* ── Oferta z zamówienia rozmowy ─────────────────────────────────────────────
+   Zrzut właściciela: klient pisał o braku w paczce pod zamówieniem, bez
+   oferty w wiadomości. Panel pokazywał ofertę i kartotekę „z zamówienia”,
+   a szkic dostał tylko fakt o doręczeniu. Ofertę wybiera teraz ta sama
+   funkcja co panel, a pozycje zamówienia stoją w faktach.               */
+
+/** Rozmowa pod zamówieniem `ord-z`, bez oferty w wiadomości; pozycje: [offerId, nazwa, sku, ilość]. */
+function rozmowaZZamowieniem(pozycje: Array<[string, string, string, number]>) {
+  const d = db();
+  d.prepare(`UPDATE message SET related_object_type=NULL, related_object_id=NULL, related_order_id='ord-z'
+    WHERE id=?`).run(pytanie);
+  const zam = Number(d.prepare(`INSERT INTO zamowienie_klienta(channel_account_id,external_id,status,synced_at)
+    VALUES (?,'ord-z','READY_FOR_PROCESSING','2026-10-06T07:00:00Z')`).run(konto).lastInsertRowid);
+  for (const [oferta, nazwa, sku, ilosc] of pozycje) {
+    d.prepare(`INSERT INTO zamowienie_klienta_pozycja(zamowienie_id,offer_id,nazwa,sku,ilosc,cena_grosze,waluta)
+      VALUES (?,?,?,?,?,1000,'PLN')`).run(zam, oferta, nazwa, sku, ilosc);
+  }
+}
+
+test("jedyna pozycja zamówienia daje fakt pozycji i kartotekę ze stanem, bez oferty w wiadomości", () => {
+  /* Snapshotu oferty nie ma, jak na zrzucie („treść oferty jeszcze nie
+     pobrana”). Kartoteka idzie z SKU pozycji, tak jak w panelu. */
+  rozmowaZZamowieniem([["of-zam", "Łańcuch tnący 3/8 52 ogniwa", "LC170430140-0001", 2]]);
+  const k = S.kontekstSzkicu(rozmowa, subiekt);
+  const f = String(k.tekstFaktow);
+  assert.match(f, /Jedyna pozycja zamówienia klienta \(towar KUPIONY[^)]*\): „Łańcuch tnący 3\/8 52 ogniwa", ilość 2/);
+  assert.match(f, /Kartoteka kupionego towaru \(jedynej pozycji zamówienia\): LC170430140-0001/);
+  assert.match(f, /dostępne dziś: 3/);
+  assert.equal(f.includes("o którą pyta klient"), false, "towar z zamówienia to zakup, nie pytanie o ofertę");
+  assert.ok(k.kartoteki.has("lc1704301400001"), "kartoteka kupionego towaru idzie po link do naszej aukcji");
+});
+
+test("oferta z zamówienia: treść aukcji dociąga szkic, a fakty mają opis z oferty", async () => {
+  rozmowaZZamowieniem([["of-zam", "Łańcuch tnący 3/8 52 ogniwa", "LC170430140-0001", 1]]);
+  db().prepare(`INSERT INTO offer_snapshot(channel_account_id,external_id,nazwa,sku,synced_at)
+    VALUES (?,'of-zam','Łańcuch 3/8 52 ogniwa do pilarki','LC170430140-0001','2026-10-06T07:00:00Z')`).run(konto);
+  const wolane: string[] = [];
+  let fakty = "";
+  const odp = nadawca({ tresc: "Dzień dobry, sprawdzamy paczkę (F1)." });
+  await S.ulozSzkic(rozmowa, KTO(), async (w, f, z) => { fakty = String(f); return odp(w, f, z); },
+    subiekt, new Date("2026-10-06T08:00:00Z"), undefined, {
+      apiUrl: "https://api.test", teraz: () => "2026-10-06T08:00:00Z",
+      query: async (url) => {
+        wolane.push(url);
+        if (url.endsWith("/sale/product-offers/of-zam")) {
+          return { description: { sections: [{ items: [{ type: "TEXT", content: "<p>Podziałka 3/8, prowadnica 35 cm</p>" }] }] } };
+        }
+        return { shipments: [] };
+      },
+    });
+  assert.ok(wolane.some((u) => u.endsWith("/sale/product-offers/of-zam")), "treści oferty z zamówienia nie dociągnięto");
+  assert.match(fakty, /Podziałka 3\/8, prowadnica 35 cm/);
+  assert.match(fakty, /Jedyna pozycja zamówienia klienta/);
+});
+
+test("bez kopii oferty szkic najpierw ją zakłada, a potem czyta opis aukcji", async () => {
+  /* Dokładnie stan ze zrzutu: „treść oferty jeszcze nie pobrana”, a klient
+     pyta o to, co stoi w opisie zestawu. Bez kopii treść nie miała gdzie się
+     zapisać i pierwszy szkic opisu nie widział wcale. */
+  rozmowaZZamowieniem([["of-zam", "Prowadnica z łańcuchem", "LC170430140-0001", 1]]);
+  const wolane: string[] = [];
+  let fakty = "";
+  const odp = nadawca({ tresc: "Dzień dobry, sprawdzamy paczkę (F1)." });
+  await S.ulozSzkic(rozmowa, KTO(), async (w, f, z) => { fakty = String(f); return odp(w, f, z); },
+    subiekt, new Date("2026-10-06T08:00:00Z"), undefined, {
+      apiUrl: "https://api.test", teraz: () => "2026-10-06T08:00:00Z",
+      query: async (url) => {
+        wolane.push(url);
+        if (url.includes("/sale/offers?offer.id=of-zam")) {
+          return { offers: [{ id: "of-zam", name: "Prowadnica 35 cm + 2 łańcuchy", external: { id: "LC170430140-0001" } }] };
+        }
+        if (url.endsWith("/sale/product-offers/of-zam")) {
+          return { description: { sections: [{ items: [{ type: "TEXT", content: "<p>W zestawie dwa łańcuchy</p>" }] }] } };
+        }
+        return { shipments: [] };
+      },
+    });
+  const kopia = wolane.findIndex((u) => u.includes("/sale/offers?offer.id=of-zam"));
+  const tresc = wolane.findIndex((u) => u.endsWith("/sale/product-offers/of-zam"));
+  assert.ok(kopia >= 0 && tresc > kopia, "kopia oferty ma powstać przed żądaniem o treść");
+  assert.ok(db().prepare("SELECT 1 FROM offer_snapshot WHERE external_id='of-zam'").get(), "kopii nie założono");
+  assert.match(fakty, /W zestawie dwa łańcuchy/);
+});
+
+test("błąd przy zakładaniu kopii oferty, także limit, zostawia szkic bez treści", async () => {
+  const { BladLimituAllegro } = await import("../adapters/allegro.js");
+  rozmowaZZamowieniem([["of-zam", "Prowadnica z łańcuchem", "LC170430140-0001", 1]]);
+  const wolane: string[] = [];
+  let fakty = "";
+  const odp = nadawca({ tresc: "Dzień dobry, sprawdzamy paczkę (F1)." });
+  const s = await S.ulozSzkic(rozmowa, KTO(), async (w, f, z) => { fakty = String(f); return odp(w, f, z); },
+    subiekt, new Date("2026-10-06T08:00:00Z"), undefined, {
+      apiUrl: "https://api.test", teraz: () => "2026-10-06T08:00:00Z",
+      query: async (url) => {
+        wolane.push(url);
+        if (url.includes("/sale/offers?offer.id=")) throw new BladLimituAllegro("429", 60);
+        return { shipments: [] };
+      },
+    });
+  assert.ok(s.tresc.length > 0, "szkic ma powstać mimo odmowy Allegro");
+  assert.equal(wolane.some((u) => u.includes("/sale/product-offers/")), false, "bez kopii nie ma po co pytać o treść");
+  assert.match(fakty, /Jedyna pozycja zamówienia klienta/);
+  assert.match(fakty, /Kartoteka kupionego towaru/, "kartoteka z SKU pozycji nie czeka na kopię oferty");
+});
+
+test("ręczne wskazanie dalej wygrywa z pozycją zamówienia, a pozycja zostaje faktem", () => {
+  rozmowaZZamowieniem([["of-zam", "Łańcuch tnący 3/8 52 ogniwa", "LC170430140-0001", 1]]);
+  db().prepare(`INSERT INTO conversation_event(conversation_id,event_type,payload)
+    VALUES (?,'offer_linked_manually',?)`).run(rozmowa, JSON.stringify({ ofertaId: "of-1", autor: "ala" }));
+  const f = String(S.kontekstSzkicu(rozmowa, subiekt).tekstFaktow);
+  assert.match(f, /Oferta, o którą pyta klient: „Gaźnik Honda GX160 z kranikiem"/);
+  assert.match(f, /Kartoteka oferty: W09-0211/);
+  assert.match(f, /Jedyna pozycja zamówienia klienta[^\n]*kartoteka LC170430140-0001/);
+});
+
+test("oferta z wiadomości dalej wygrywa z pozycją zamówienia", () => {
+  rozmowaZZamowieniem([["of-zam", "Łańcuch tnący 3/8 52 ogniwa", "LC170430140-0001", 1]]);
+  db().prepare("UPDATE message SET related_object_type='OFFER', related_object_id='of-1' WHERE id=?").run(pytanie);
+  const f = String(S.kontekstSzkicu(rozmowa, subiekt).tekstFaktow);
+  assert.match(f, /Oferta, o którą pyta klient: „Gaźnik Honda GX160 z kranikiem"/);
+  assert.match(f, /Kartoteka oferty: W09-0211/);
+  assert.equal(f.includes("Kartoteka kupionego towaru"), false);
+});
+
+test("kilka pozycji: każda jest faktem ze swoją kartoteką, oferty rozmowy nie ma i treści się nie ciągnie", async () => {
+  /* Jak w panelu: przy kilku pozycjach automat nie zgaduje, o którą pyta
+     klient. Brak w paczce rozstrzyga się jednak porównaniem z listą. */
+  rozmowaZZamowieniem([
+    ["of-a", "Prowadnica 35 cm", "W09-0211", 1],
+    ["of-b", "Łańcuch tnący 3/8 52 ogniwa", "LC170430140-0001", 2],
+  ]);
+  const k = S.kontekstSzkicu(rozmowa, subiekt);
+  const f = String(k.tekstFaktow);
+  assert.match(f, /Pozycja 1 z 2 zamówienia klienta[^\n]*„Prowadnica 35 cm", ilość 1; kartoteka W09-0211/);
+  assert.match(f, /Pozycja 2 z 2 zamówienia klienta[^\n]*ilość 2; kartoteka LC170430140-0001[^\n]*dostępne dziś: 3/);
+  assert.equal(k.fakty.some((x) => x.rodzaj === "oferta" || x.rodzaj === "kartoteka"), false);
+  assert.equal(k.kartoteki.size, 2);
+
+  const wolane: string[] = [];
+  await S.ulozSzkic(rozmowa, KTO(), nadawca(), subiekt, new Date("2026-10-06T08:00:00Z"), undefined, {
+    apiUrl: "https://api.test", teraz: () => "2026-10-06T08:00:00Z",
+    query: async (url) => { wolane.push(url); return { shipments: [] }; },
+  });
+  assert.equal(wolane.some((u) => u.includes("/sale/product-offers/")), false, "treść aukcji bez oferty rozmowy");
+});
+
+test("pozycje ponad sufit nie wchodzą, a ostatni fakt mówi, ile pominięto", () => {
+  rozmowaZZamowieniem([
+    ["of-a", "Prowadnica", "W09-0211", 1], ["of-b", "Łańcuch", "LC170430140-0001", 1],
+    ["of-c", "Pilnik", "BRAK-1", 1], ["of-d", "Olej", "BRAK-2", 1],
+  ]);
+  const poz = S.kontekstSzkicu(rozmowa, subiekt).fakty.filter((x) => x.rodzaj === "pozycja");
+  assert.equal(poz.length, 3);
+  assert.match(poz[2].zdanie, /„Pilnik"[^\n]*bez kartoteki w Subiekcie; pozostałych 1 pozycji nie podajemy/);
 });
 
 /* ── Linki do naszych aktywnych aukcji (0.270.0) ─────────────────────────── */

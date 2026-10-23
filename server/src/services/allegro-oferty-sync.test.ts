@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import fs from "node:fs";
 import { DatabaseSync } from "node:sqlite";
 import { migrate, type Db } from "../db/db.js";
-import { brakujaceOferty, uzupelnijOferty } from "./allegro-oferty-sync.js";
+import { brakujaceOferty, uzupelnijOferty, zapewnijSnapshotOferty } from "./allegro-oferty-sync.js";
 import { BladLimituAllegro, BladOdpowiedziAllegro } from "../adapters/allegro.js";
 
 /* Kształt oferty wzięty ze schematów `OffersSearchResultDto`, `OfferListingDto`
@@ -258,4 +258,49 @@ test("snapshot, o który JUŻ pytaliśmy i obrazu nie ma, nie wraca w kółko", 
      a „nikt jeszcze nie pytał". Bez niej pętla byłaby wieczna. */
   assert.equal(zapisane.url, "");
   assert.deepEqual(brakujaceOferty(d, 20), [], "drugi raz już nie pytamy");
+});
+
+/* ── Jedna oferta na żądanie szkicu ──────────────────────────────────────────
+   Szkic Copilota nie czeka na takt: bez kopii oferty treść aukcji nie ma
+   gdzie się zapisać. Kopię zakłada ten sam pisarz tabeli, jednym numerem. */
+
+test("brak kopii: jedno żądanie po `offer.id` zakłada snapshot na koncie rozmowy", async () => {
+  const d = stanowisko();
+  const wolane: string[] = [];
+  const jest = await zapewnijSnapshotOferty(1, "12096815384", {
+    database: d, apiUrl: "https://api", now: () => new Date("2026-10-06T08:00:00Z"),
+    query: async (url) => { wolane.push(url); return { offers: [oferta("12096815384")] }; },
+  });
+  assert.equal(jest, true);
+  assert.deepEqual(wolane, ["https://api/sale/offers?offer.id=12096815384&limit=1"]);
+  const w = d.prepare("SELECT nazwa, sku, synced_at FROM offer_snapshot WHERE external_id='12096815384'").get() as
+    { nazwa: string; sku: string; synced_at: string };
+  assert.equal(w.sku, "NOZ-STIGA-43");
+  assert.equal(w.synced_at, "2026-10-06T08:00:00.000Z");
+});
+
+test("istniejąca kopia nie kosztuje żądania", async () => {
+  const d = stanowisko();
+  d.prepare(`INSERT INTO offer_snapshot(channel_account_id,external_id,nazwa,synced_at)
+    VALUES (1,'12096815384','x','2026-01-01T00:00:00Z')`).run();
+  let wolan = 0;
+  assert.equal(await zapewnijSnapshotOferty(1, "12096815384", {
+    database: d, apiUrl: "https://api", query: async () => { wolan += 1; return null; },
+  }), true);
+  assert.equal(wolan, 0);
+});
+
+test("oferta, której Allegro nie oddało, i błąd odpowiedzi kończą się brakiem kopii, nie wyjątkiem", async () => {
+  const d = stanowisko();
+  assert.equal(await zapewnijSnapshotOferty(1, "1", {
+    database: d, apiUrl: "https://api", query: async () => ({ offers: [oferta("2")] }),
+  }), false, "cudza oferta w odpowiedzi nie zakłada kopii pytanej");
+  assert.equal(await zapewnijSnapshotOferty(1, "1", {
+    database: d, apiUrl: "https://api",
+    query: async () => { throw new BladOdpowiedziAllegro("403 brak uprawnienia", 403); },
+  }), false);
+  assert.equal((d.prepare("SELECT COUNT(*) c FROM offer_snapshot").get() as { c: number }).c, 0);
+  await assert.rejects(() => zapewnijSnapshotOferty(1, "1", {
+    database: d, apiUrl: "https://api", query: async () => { throw new BladLimituAllegro("429", 60); },
+  }), BladLimituAllegro, "limit decyduje wołający");
 });

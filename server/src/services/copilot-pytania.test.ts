@@ -54,7 +54,7 @@ before(async () => {
 beforeEach(() => {
   const d = db();
   for (const t of ["copilot_pytanie", "szkic_copilota", "copilot_wywolanie", "message",
-    "conversation", "offer_snapshot", "allegro_inbox_thread", "channel_account", "events", "app_user"]) {
+    "conversation", "offer_snapshot", "zamowienie_klienta_pozycja", "zamowienie_klienta", "allegro_inbox_thread", "channel_account", "events", "app_user"]) {
     d.prepare(`DELETE FROM ${t}`).run();
   }
   biuro = Number(d.prepare(
@@ -137,6 +137,28 @@ test("odpowiedź wolno oprzeć na numerze SPOZA faktów — po to agent pyta", a
   assert.ok(w.odpowiedz.includes("17211-ZL8-023"));
   assert.equal(w.twierdzenia.length, 1);
   assert.equal(w.twierdzenia[0]!.pewnosc, "niepewne", "sufit źródła `model` obowiązuje tak samo");
+});
+
+test("dopytanie widzi ofertę z jedynej pozycji zamówienia: pozycję, kartotekę i treść z kopii", async () => {
+  /* Zrzut właściciela: dopytanie o rozmowę pod zamówieniem odpowiadało, że
+     fakty nie mówią, co klient kupił. Treści dopytanie nie dociąga, bo to
+     żądanie na ofertę należy do szkicu; czyta kopię, którą szkic zostawił. */
+  const d = db();
+  d.prepare("UPDATE message SET related_order_id='ord-z' WHERE conversation_id=?").run(rozmowa);
+  const zam = Number(d.prepare(`INSERT INTO zamowienie_klienta(channel_account_id,external_id,synced_at)
+    VALUES (?,'ord-z','2026-09-14T09:00:00Z')`).run(konto).lastInsertRowid);
+  d.prepare(`INSERT INTO zamowienie_klienta_pozycja(zamowienie_id,offer_id,nazwa,sku,ilosc,cena_grosze,waluta)
+    VALUES (?,'of-zam','Gaźnik Honda GX160','W09-0211',1,9900,'PLN')`).run(zam);
+  d.prepare(`INSERT INTO offer_snapshot(channel_account_id,external_id,nazwa,sku,opis,tresc_synced_at,synced_at)
+    VALUES (?,'of-zam','Gaźnik GX160','W09-0211','Gaźnik z uszczelką 46 mm','2026-09-14T09:00:00Z',
+    '2026-09-14T09:00:00Z')`).run(konto);
+
+  const n = nadawca();
+  await Q.zadajPytanie(rozmowa, "Co klient kupił?", KTO(), n.nadaj, subiekt);
+  const f = String(n.widziane.ostatni?.fakty);
+  assert.match(f, /Jedyna pozycja zamówienia klienta[^\n]*„Gaźnik Honda GX160", ilość 1/);
+  assert.match(f, /Kartoteka kupionego towaru \(jedynej pozycji zamówienia\): W09-0211/);
+  assert.match(f, /Gaźnik z uszczelką 46 mm/);
 });
 
 test("poprawka NIE rusza szkicu Copilota ani jednym znakiem; wersja żyje w wymianie", async () => {
