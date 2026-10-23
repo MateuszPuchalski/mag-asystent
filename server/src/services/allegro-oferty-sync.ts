@@ -191,6 +191,43 @@ export async function uzupelnijOferty(deps: OfertySyncDeps = {}): Promise<number
 }
 
 /**
+ * Zakłada snapshot JEDNEJ oferty, gdy go nie ma. Zwraca `true`, gdy wiersz
+ * po wywołaniu istnieje.
+ *
+ * Powód: szkic Copilota nie czekał na takt. Zrzut właściciela: klient pytał
+ * o opis aukcji z zamówienia, a kopii oferty jeszcze nie było, więc treść
+ * nie miała gdzie się zapisać. Ta sama końcówka i ten sam pisarz tabeli co
+ * przebieg wyżej, tylko z jednym numerem i kontem rozmowy.
+ *
+ * Istniejący wiersz nie kosztuje żądania. Każdy błąd poza limitem zostaje
+ * ostrzeżeniem, a limit leci do wołającego, który sam decyduje, czy go
+ * połknąć.
+ */
+export async function zapewnijSnapshotOferty(
+  konto: number, ofertaId: string, deps: Omit<OfertySyncDeps, "accountId" | "naPrzebieg"> = {},
+): Promise<boolean> {
+  const database = deps.database ?? defaultDb();
+  const jest = () => Boolean(database.prepare(
+    "SELECT 1 FROM offer_snapshot WHERE channel_account_id=? AND external_id=?").get(konto, ofertaId));
+  if (jest()) return true;
+  const query = deps.query ?? zapytajAllegro;
+  const apiUrl = deps.apiUrl ?? config.allegro.apiUrl;
+  const now = deps.now ?? (() => new Date());
+  let oferta: Oferta | undefined;
+  try {
+    const body = (await query(urlOfertSprzedawcy(apiUrl, [ofertaId]))) as Odpowiedz | null;
+    oferta = (body?.offers ?? []).find((o) => o?.id === ofertaId);
+  } catch (e) {
+    if (e instanceof BladLimituAllegro) throw e;
+    console.warn(`[allegro-oferty] ${ofertaId}: ${e instanceof Error ? e.message : e}`);
+    return false;
+  }
+  if (!oferta) return false;
+  zapiszSnapshotOferty(database, oferta, konto, now().toISOString());
+  return jest();
+}
+
+/**
  * Snapshot jednej oferty z `/sale/offers`. Eksportowany od 0.270.0, bo
  * czytelników tej samej odpowiedzi jest odtąd dwóch: ten przebieg (pytanie
  * po `offer.id`) i `allegro-oferty-po-sygnaturze.ts` (pytanie po
