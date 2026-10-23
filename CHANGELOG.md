@@ -10,6 +10,13 @@ z wersją monorepo" — i właśnie tak przestał być zgodny: `0.3.0` przetrwa�
 sześć zmergowanych zmian, w tym takie, które wymagały nowego uprawnienia SQL.
 Komentarz nie jest mechanizmem.
 
+## 0.611.2 — 23 października 2026
+
+**Copilot widzi ofertę z zamówienia rozmowy.** Gdy klient pisze bez wskazania
+aukcji, a rozmowa ma zamówienie, szkic i dopytanie dostają ofertę i kartotekę
+z pozycji zamówienia, razem z treścią aukcji. Do tej pory widziały ofertę tylko
+wtedy, gdy Allegro dołączyło ją do wiadomości albo agent wskazał ją ręcznie.
+
 ## 0.611.1 — 22 października 2026
 
 **Przy pomyłkach złapanych przy pakowaniu stoi login pracownika z Sellasist.**

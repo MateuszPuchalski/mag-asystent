@@ -2532,7 +2532,7 @@ przekroczyć limitu wysyłki.
 Odwołania „(F3)" znikają z treści dopiero po tym sprawdzeniu (0.232.1) —
 model pisze je zawsze, klient nie widzi ich nigdy.
 
-**Skąd szkic bierze ofertę (@wydanie).** Ofertę rozmowy wybiera ta sama
+**Skąd szkic bierze ofertę (0.611.2).** Ofertę rozmowy wybiera ta sama
 funkcja co panel, `services/oferta-rozmowy.ts`, z trzech źródeł po kolei.
 Najpierw wskazanie agenta, potem numer oferty z wiadomości, na końcu jedyna
 pozycja zamówienia rozmowy. Powód: zrzut właściciela z rozmowy o braku
