@@ -6326,7 +6326,7 @@ zapisać tak, żeby kolejka go znalazła.
 
 ## 25c. Dyskusje
 
-**Wycofane w @wydanie.** Od 28 października 2026 Allegro zakłada nowe sprawy
+**Wycofane w 0.612.0.** Od 28 października 2026 Allegro zakłada nowe sprawy
 kupujących jako Problemy z zakupem w Centrum Wiadomości, czyli w skrzynce
 (§10). Ekran, trasy, alarm i pobieranie `DISPUTE` zniknęły. Wiersze
 w `reklamacja_klienta` zostały w bazie nietknięte, więc decyzję da się
@@ -7288,8 +7288,8 @@ stoi. W tym repo zdarzyło się to już dwa razy.
 | Komplet rozbity na paragonie | **działa** od 0.328.0 | `services/komplety.ts`, `oferta_komplet`; kartoteka z dokumentu, ilość ze zwrotu |
 | Reklamacje — odczyt, kolejka i czat | **działa** od 0.222.0 | `services/reklamacje.ts`, `services/allegro-reklamacje-sync.ts`, `panel/src/reklamacje/` |
 | Termin decyzji przy reklamacji | **z Allegro** od 0.222.0 | `decisionDueDate`; sprzed 0.140.0 liczyliśmy go sami i było to błędem |
-| Dyskusje (`type: "DISPUTE"`) | **wycofane** w @wydanie | §25c; nowe sprawy idą przez skrzynkę, wiersze zostają w bazie |
-| Prośba o zakończenie dyskusji (`END_REQUEST`) | **wycofane** w @wydanie | razem z ekranem dyskusji |
+| Dyskusje (`type: "DISPUTE"`) | **wycofane** w 0.612.0 | §25c; nowe sprawy idą przez skrzynkę, wiersze zostają w bazie |
+| Prośba o zakończenie dyskusji (`END_REQUEST`) | **wycofane** w 0.612.0 | razem z ekranem dyskusji |
 | Odpowiedź w czacie reklamacji | **działa** od 0.224.0 | `services/reklamacje-wysylka.ts`, `reklamacja_outbox`, `reklamacje/Edytor.tsx`; `type: "REGULAR"`, sam tekst, limit 20 000 znaków |
 | Klucz idempotencji wspólny dla skrzynki i reklamacji | **działa** od 0.224.0 | `services/idempotencja.ts`; liczy go SERWER, format `snd-` nietknięty |
 | Świeżość liczona od ostatniej NIE naszej wiadomości | **działa** od 0.224.0 | rola inna niż `SELLER`, więc także doradcy Allegro |

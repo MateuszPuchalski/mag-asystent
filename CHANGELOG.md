@@ -10,6 +10,15 @@ z wersją monorepo" — i właśnie tak przestał być zgodny: `0.3.0` przetrwa�
 sześć zmergowanych zmian, w tym takie, które wymagały nowego uprawnienia SQL.
 Komentarz nie jest mechanizmem.
 
+## 0.612.0 — 28 października 2026
+
+**Dyskusji nie ma już w panelu.** Allegro zakłada nowe sprawy kupujących jako
+Problemy z zakupem w Centrum Wiadomości, więc trafiają do skrzynki. Zniknęła
+zakładka „Dyskusje", jej czerwony licznik i pasek alarmu oraz pozycja
+„Odpowiedzieć w dyskusji" w „Do zrobienia". Serwer nie pobiera już dyskusji
+z Allegro. Stare dyskusje zostają w bazie nietknięte, tylko żaden ekran ich
+nie pokazuje.
+
 ## 0.611.2 — 23 października 2026
 
 **Copilot widzi ofertę z zamówienia rozmowy.** Gdy klient pisze bez wskazania
