@@ -36,7 +36,7 @@ export interface PrzekrojTowaru {
   /** Oferty powiązane z kartoteką — po nich idą sprawy i rozmowy. */
   oferty: Array<{ konto: number; ofertaId: string; nazwa: string | null }>;
   otwarteZwroty: Array<{ id: number; numer: string | null; at: string; ilosc: number }>;
-  otwarteSprawy: Array<{ id: number; typ: "CLAIM" | "DISPUTE"; numer: string | null; at: string }>;
+  otwarteSprawy: Array<{ id: number; typ: "CLAIM"; numer: string | null; at: string }>;
   otwarteRozmowy: Array<{ id: number; temat: string | null; at: string }>;
   okno: {
     /** Faktyczne okno: krótsze od `OKNO_PRZEKROJU_DNI`, gdy kopia sprzedaży sięga mniej. */
@@ -81,11 +81,11 @@ export function przekrojTowaru(
     .map((w) => ({ id: Number(w.id), numer: (w.numer as string) ?? null, at: String(w.at), ilosc: Number(w.ilosc) }));
 
   const sprawy = database.prepare(`
-    SELECT id, typ, reference_number AS numer, otwarto_at AS at, status_allegro AS status
-      FROM reklamacja_klienta WHERE ${naPary("channel_account_id", "offer_id")}
+    SELECT id, reference_number AS numer, otwarto_at AS at, status_allegro AS status
+      FROM reklamacja_klienta WHERE typ = 'CLAIM' AND ${naPary("channel_account_id", "offer_id")}
      ORDER BY otwarto_at DESC`).all(...argPary) as W[];
   const otwarteSprawy = sprawy.filter((w) => sprawaOtwarta((w.status as string) ?? null)).slice(0, 10)
-    .map((w) => ({ id: Number(w.id), typ: String(w.typ) === "DISPUTE" ? "DISPUTE" as const : "CLAIM" as const,
+    .map((w) => ({ id: Number(w.id), typ: "CLAIM" as const,
       numer: (w.numer as string) ?? null, at: String(w.at) }));
 
   /* Rozmowa jest „o towarze", gdy klient pisał spod jego oferty. Stan liczy
@@ -128,7 +128,7 @@ export function przekrojTowaru(
     SELECT COALESCE(SUM(p.ilosc), 0) AS n
       FROM zwrot_klienta_pozycja p JOIN zwrot_klienta z ON z.id = p.zwrot_id
      WHERE p.tw_id = ? AND z.created_at >= ?`).get(twId, od) as { n: number }).n);
-  const reklamacji = sprawy.filter((w) => String(w.typ) === "CLAIM" && String(w.at) >= od).length;
+  const reklamacji = sprawy.filter((w) => String(w.at) >= od).length;
 
   return {
     twId, oferty: pary, otwarteZwroty, otwarteSprawy, otwarteRozmowy,

@@ -598,7 +598,7 @@ export function osRozmowy(id: number): {
    */
   zwroty: WierszZwrotu[];
   /**
-   * Reklamacje i dyskusje TEGO zamówienia (S1 spoiwa,
+   * Reklamacje TEGO zamówienia (S1 spoiwa,
    * `docs/obsluga-klienta-calosc.md`). Ten sam mostek co przy zwrotach i ten
    * sam powód, tylko mocniejszy: agent pisał odpowiedź, nie wiedząc, że
    * klient ma u nas otwartą reklamację o ten sam towar. Odpowiedź udająca
@@ -606,7 +606,7 @@ export function osRozmowy(id: number): {
    */
   sprawy: SprawaZakupu[];
   /**
-   * Droga tego zakupu przez kolejki (S3 spoiwa) — pytanie, dyskusja,
+   * Droga tego zakupu przez kolejki (S3 spoiwa) — pytanie,
    * reklamacja, zwrot w kolejności czasu. ODCZYT, nie zapis: przeskok wylicza
    * się z momentów, które i tak leżą w bazie.
    */

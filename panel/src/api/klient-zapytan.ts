@@ -9,7 +9,7 @@ import { BrakSesji, zglosBrakPolaczenia, zglosBrakSesji } from "./klient";
    ten sam klient i sprawdzić odświeżenie wspólnych kluczy niżej. */
 
 /* ── ODŚWIEŻENIE PO KAŻDEJ ZMIANIE, NA KAŻDYM EKRANIE (0.502.0) ────────────
-   Mutacja w zwrotach, reklamacjach albo dyskusjach odświeżała tylko swoją
+   Mutacja w zwrotach albo reklamacjach odświeżała tylko swoją
    kolejkę. „Do zrobienia" i otwarta rozmowa dowiadywały się o niej dopiero
    po 10–30 sekundach, więc wiersz „do decyzji" wisiał nad sprawą już
    rozstrzygniętą. Te dwa klucze czyta pośrednio KAŻDY ekran (licznik

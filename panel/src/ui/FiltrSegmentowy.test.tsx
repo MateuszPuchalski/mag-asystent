@@ -21,8 +21,7 @@ const ZRODLA = import.meta.glob(["../**/*.tsx", "!../**/*.test.tsx", "!../ui/ind
         `ui/index.tsx`. To jest DOKŁADNIE łańcuch wybranej i niewybranej
         pigułki; nigdzie indziej te dwie klasy nie stoją obok siebie.
      2. Bursztyn jako stan wybrany, rozpoznany po sąsiedztwie z `text-slate-600`
-        — czyli po kształcie, który miały kubełki zwrotów, reklamacji
-        i dyskusji.
+        — czyli po kształcie, który miały kubełki zwrotów i reklamacji.
 
    CZEGO NIE PILNUJE. Nie wie, czy nowy filtr w ogóle powstał: da się dołożyć
    rząd przycisków w zupełnie nowych barwach i bramka tego nie zobaczy. Nie

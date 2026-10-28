@@ -224,8 +224,8 @@ export function Kolejka({ rozmowy, stan, copilot, klasyfikacja, onRozpoznaj = ()
   };
 
   /* ── KLAWIATURA W SKRZYNCE (0.383.0) ─────────────────────────────────
-     Cztery kolejki obsługi, trzy chodziły z klawiatury od 0.245.0 — zwroty,
-     reklamacje i dyskusje. Skrzynka nie miała ANI JEDNEGO klawisza, a to na
+     Trzy kolejki obsługi, dwie chodziły z klawiatury od 0.245.0 — zwroty
+     i reklamacje. Skrzynka nie miała ANI JEDNEGO klawisza, a to na
      niej agent siedzi najdłużej z całego panelu (patrz `Edytor.tsx`, 0.247.0).
      Żadna decyzja tego nie wybrała; po prostu nikt jej tu nie dorobił.
 
@@ -453,8 +453,8 @@ export function Kolejka({ rozmowy, stan, copilot, klasyfikacja, onRozpoznaj = ()
           className="rounded bg-violet-100 px-1.5 py-0.5 text-podpis font-bold text-violet-900">
           REKLAMACYJNA</span>);
         /* PROBLEM Z ZAKUPEM tuż obok, ale w BŁĘKICIE, nie w fiolecie. Fiolet
-           to nasza flaga i przypuszczenie Copilota. Błękit niesie w kolejkach
-           reklamacji i dyskusji obecność Allegro, a ta sprawa też jest Allegro:
+           to nasza flaga i przypuszczenie Copilota. Błękit niesie w kolejce
+           reklamacji obecność Allegro, a ta sprawa też jest Allegro:
            zakłada ją kupujący i biuro jej nie zdejmie.
 
            Powód stoi SŁOWEM, nie w dymku, bo od niego zależy pierwszy ruch,

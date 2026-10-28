@@ -52,7 +52,7 @@ export interface WierszCzasu {
    nie wiemy, że to podziękowanie. Ile takich było, mówi osobna liczba, żeby
    nikt nie czytał wyniku jako czystszego, niż jest. Odpowiedź młodsza niż
    siedem dni bez powrotu klienta jeszcze nie ma wyniku i do udziału nie
-   wchodzi. Powrót przez dyskusję albo reklamację liczy osobno miara
+   wchodzi. Powrót przez reklamację liczy osobno miara
    eskalacji (S5), nie ta. */
 
 /** Ile dni po odpowiedzi czekamy na powrót klienta. */

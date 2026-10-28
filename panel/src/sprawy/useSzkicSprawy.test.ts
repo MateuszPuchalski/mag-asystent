@@ -39,11 +39,11 @@ describe("useSzkicSprawy", () => {
     expect(result.current.tresc).toBe("zdanie o szarpaku");
   });
 
-  it("reklamacja 7 i dyskusja 7 to dwa różne szkice", () => {
+  it("reklamacja 7 i zwrot 7 to dwa różne szkice", () => {
     /* Kolejki numerują się niezależnie, więc sam numer nie jest kluczem. */
     const { result, rerender } = daj("reklamacja", 7);
     act(() => result.current.ustaw("z reklamacji"));
-    rerender({ k: "dyskusja", i: 7 });
+    rerender({ k: "zwrot", i: 7 });
     expect(result.current.tresc).toBe("");
   });
 

@@ -450,10 +450,10 @@ export type CenaPoziomu = {
    różnych tras. Komponent, który by je posiadał, kazałby `api/` importować
    z warstwy widoku — a wtedy zmiana układu bloku ruszałaby kontrakt HTTP. */
 
-/** Reklamacja albo dyskusja tego samego zakupu — wiersz lekki, do czytania. */
+/** Reklamacja tego samego zakupu — wiersz lekki, do czytania. */
 export interface SprawaZakupu {
   id: number;
-  /** `CLAIM` albo `DISPUTE`; jedna plakietka na oba to blizna 0.121.0. */
+  /** Rodzaj sprawy w Allegro; panel prowadzi reklamacje (`CLAIM`). */
   typ: string;
   numer: string | null;
   temat: string | null;
@@ -476,13 +476,13 @@ export interface SprawaZakupu {
  * `MojaSprawa` z `services/droga-klienta.ts`.
  */
 export interface MojaSprawa {
-  kolejka: "rozmowa" | "reklamacja" | "dyskusja" | "klient";
+  kolejka: "rozmowa" | "reklamacja" | "klient";
   id: number;
   /** Przy sprawie klienta: „{login}: {krok}". */
   opis: string;
   /** Ostatni ruch przy sprawie — zegar opisowy, nie termin. */
   at: string;
-  /** Termin z Allegro; `null` przy rozmowie i dyskusji. Przy sprawie klienta — termin kroku,
+  /** Termin z Allegro; `null` przy rozmowie. Przy sprawie klienta — termin kroku,
    *  ale tylko w toku: obudzona zakończona ma `null`, bo jej krok już nie biegnie. */
   terminDo: string | null;
   /* Pola poniżej niesie WYŁĄCZNIE wiersz sprawy klienta. Opcjonalne, bo
@@ -505,7 +505,7 @@ export interface MiesiacEskalacji {
   miesiac: string;
   /** Zakupy, przy których klient napisał do skrzynki. */
   zRozmowa: number;
-  /** Z nich: ile skończyło się dyskusją albo reklamacją PO naszej rozmowie. */
+  /** Z nich: ile skończyło się reklamacją PO naszej rozmowie. */
   eskalowane: number;
 }
 
@@ -549,7 +549,7 @@ export interface DosylkaPrzesylki {
 /** Jeden przystanek drogi zakupu przez kolejki, z momentem wejścia. */
 export interface PrzystanekDrogi {
   /* `pomylka` to rejestr złych paczek, wiązany po numerze zamówienia jak zwrot. */
-  rodzaj: "rozmowa" | "dyskusja" | "reklamacja" | "zwrot" | "pomylka";
+  rodzaj: "rozmowa" | "reklamacja" | "zwrot" | "pomylka";
   id: number;
   at: string;
   opis: string | null;
@@ -587,7 +587,7 @@ export type OsRozmowy = {
   /** Zwroty TEGO zamówienia (0.221.0) — ten sam wiersz, co w kolejce zwrotów. */
   zwroty: Zwrot[];
   /* Spoiwo kolejek (S1 i S3, `docs/obsluga-klienta-calosc.md`): reklamacje
-     i dyskusje tego zakupu oraz jego droga przez kolejki. */
+     tego zakupu oraz jego droga przez kolejki. */
   sprawy: SprawaZakupu[];
   droga: PrzystanekDrogi[];
   /** Propozycja Copilota (§14.6) — osobny byt, nie szkic agenta. `null` = nikt nie prosił. */
@@ -748,10 +748,10 @@ export type RodzajIdentyfikatora = "oem" | "nr_oryg" | "katalog_obcy" | "stare_s
 export type WpisHistorii = {
   /* Trzy rodzaje doszły w S2 spoiwa (`docs/obsluga-klienta-calosc.md`).
      Zakładka obiecywała historię klienta, a znała wyłącznie zakupy i rozmowy:
-     zwrot, reklamacja i dyskusja tego samego kupującego nie docierały tu
+     zwrot i reklamacja tego samego kupującego nie docierały tu
      wcale, więc agent czytał „nic się nie działo" o kliencie, który miesiąc
      wcześniej odesłał towar. */
-  rodzaj: "zakup" | "rozmowa" | "zwrot" | "reklamacja" | "dyskusja";
+  rodzaj: "zakup" | "rozmowa" | "zwrot" | "reklamacja";
   at: string; tresc: string;
   zamowienieId: string | null; link: string | null; rozmowaId: number | null;
   /** Identyfikator sprawy albo zwrotu u nas; `null` przy zakupie i rozmowie. */
@@ -783,7 +783,7 @@ export interface NoweZdarzenie {
   /* Dwa rodzaje dosyłki (0.536.0) nie przychodzą od klienta, tylko od
      przewoźnika przez Allegro. Budzą sprawę, bo to na ten fakt czeka krok
      dosyłki — `cel` mają zawsze `null`, bo dosyłka nie ma własnego ekranu. */
-  rodzaj: "rozmowa" | "zwrot_nowy" | "zwrot_nadany" | "zwrot_dotarl" | "reklamacja" | "dyskusja"
+  rodzaj: "rozmowa" | "zwrot_nowy" | "zwrot_nadany" | "zwrot_dotarl" | "reklamacja"
     | "wiadomosc_sprawy" | "dosylka_doreczona" | "dosylka_problem";
   tekst: string;
   at: string | null;
@@ -923,14 +923,6 @@ export type Zdrowie = {
   allegro?: { stan?: string };
   /** Zdania „co zrobić" z trasy zdrowia — pusta lista nie przyjeżdża wcale. */
   problemy?: string[];
-  /**
-   * Ile dyskusji czeka na nas i czy któraś przekroczyła próg alarmu. Same
-   * liczby: trasa jest publiczna, więc nie ma tu loginu ani zamówienia.
-   */
-  dyskusje?: {
-    czekaNaNas: number;
-    alarm: { ile: number; najstarszaGodzin: number; progGodzin: number } | null;
-  };
   allegroInbox: {
     status: StatusSynchronizacji;
     alarm: boolean;
@@ -1237,8 +1229,8 @@ export interface Zwrot {
   zrodlo: string;
   /* PROWADZĄCEGO I TAGÓW ZWROT JUŻ NIE NIESIE (0.370.0). Serwer ich nie
      wysyła, więc typ nie ma prawa ich obiecywać — pole zadeklarowane, a nigdy
-     nieprzychodzące, jest `undefined` udającym `null`. Reklamacja i dyskusja
-     mają jedno i drugie dalej. */
+     nieprzychodzące, jest `undefined` udającym `null`. Reklamacja
+     ma jedno i drugie dalej. */
   /** Notatka biura — od 0.313.0 przy KAŻDYM zwrocie, nie tylko przy paczce. */
   notatka: string | null;
   notatkaAt: string | null;
@@ -1556,15 +1548,14 @@ export interface KoszZwrotow {
 
 /* ── Reklamacje klienckie (0.222.0) ──────────────────────────────────────────
    Panel prowadzi wyłącznie reklamacje (`type: "CLAIM"` z `/sale/issues`).
-   Dyskusje odsiewa synchronizator, więc tu ich nie ma. */
+   Dyskusje odsiewa synchronizator, więc tu ich nie ma i nie ma ich w panelu. */
 
 export type KubelekReklamacji = "decyzja" | "odpowiedz" | "zamknieta" | "bez_ruchu";
 
 /**
  * Co próg daty schował przed kolejką.
  *
- * Jedzie przy OBU kolejkach — reklamacji i dyskusji — bo obie karmi ta sama
- * tabela i ten sam próg. `zdjety` mówi, czy patrzymy właśnie na komplet:
+ * `zdjety` mówi, czy patrzymy właśnie na komplet:
  * przełącznik musi umieć narysować się w obie strony.
  */
 export interface ProgKolejki {
@@ -1637,10 +1628,7 @@ export interface Reklamacja {
   /* ── Kiedy to kupiono (0.282.0) ──────────────────────────────────────────
      Dwa zegary i dwie etykiety: `zamowienie` to `boughtAt` z pełnego
      zamówienia, `sprawa` to `checkoutForm.createdAt` z ładunku reklamacji,
-     czyli złożenie koszyka. Nazwanie jednego drugim to blizna 0.121.0.
-
-     Dyskusja tego pola NIE MA i to nie jest przeoczenie: nie ma też Copilota,
-     a bez niego data byłaby ozdobą na ekranie, którego nikt o nią nie prosił. */
+     czyli złożenie koszyka. Nazwanie jednego drugim to blizna 0.121.0. */
   kupionoAt: string | null;
   kupionoZrodlo: "zamowienie" | "sprawa" | null;
   /* ── Wiek zakupu (0.413.0) ───────────────────────────────────────────────
@@ -1752,10 +1740,7 @@ export interface WiadomoscReklamacji {
   zalaczniki: ZalacznikReklamacji[];
 }
 
-export interface StanReklamacji extends StanZwrotow {
-  /** Ile spraw z ostatniego przebiegu było dyskusjami. Nie jest to błąd. */
-  dyskusjiPominietych: number | null;
-}
+export type StanReklamacji = StanZwrotow;
 
 /**
  * Liczba w kaflu i to, ile było tydzień temu.
@@ -1944,110 +1929,6 @@ export interface RadaMaszyny {
   uzasadnienie: PoleKarty;
   pewnosc: string;
   czegoNieWiem: string[];
-}
-
-/* ── Dyskusje (0.245.0) ──────────────────────────────────────────────────────
-   Ten sam zasób Allegro co reklamacje, ta sama tabela i ten sam czat — więc
-   `WiadomoscReklamacji` i `ZalacznikReklamacji` obsługują oba ekrany. Różni
-   się WIERSZ: dyskusja nie ma numeru, terminu, prawa, powodu, oczekiwania,
-   kwoty ani oferty. Schemat mówi przy każdym z tych pól `Null for disputes`,
-   więc powtórzenie ich tutaj jako `null` byłoby obietnicą pustych kolumn. */
-
-export type KubelekDyskusji = "odpowiedz" | "klient" | "zamknieta";
-
-export type SygnalDyskusji =
-  | "klient_czeka" | "doradca" | "czat_zamkniety"
-  | "nierozstrzygnieta" | "status_nieznany";
-
-export interface Dyskusja {
-  id: number;
-  externalId: string;
-  orderId: string | null;
-  kupujacyLogin: string | null;
-  temat: string | null;
-  opis: string | null;
-  /** DISPUTE_ONGOING, DISPUTE_CLOSED albo DISPUTE_UNRESOLVED. */
-  statusAllegro: string | null;
-  czatAktywny: boolean;
-  wiadomosciIle: number;
-  /** Czy rozmowę urwał NASZ bezpiecznik stron (0.273.0). */
-  czatUrwany: boolean;
-  ostatniaWiadomoscStatus: string | null;
-  ostatniaWiadomoscAt: string | null;
-  /** Czy ruch należy do nas — z niego biorą się kubełek i czas czekania. */
-  ruchNasz: boolean;
-  /**
-   * Ile dni piłka jest po naszej stronie; `null`, gdy nie jest.
-   *
-   * TO NIE JEST TERMIN i ekran nie ma prawa tak tego nazwać. Allegro dla
-   * dyskusji zegara nie oddaje — to jest fakt o naszej skrzynce.
-   *
-   * Liczone od pytania, na które nie odpowiedzieliśmy, nie od ostatniej
-   * wiadomości: odpowiedź doradcy Allegro nie zeruje licznika.
-   */
-  czekaOdDni: number | null;
-  /** Ta sama miara w godzinach; ekran pokazuje ją poniżej doby. */
-  czekaOdGodzin: number | null;
-  /** Od kiedy pytanie czeka na nasze słowo. */
-  bezOdpowiedziOd: string | null;
-  /** Czekanie przekroczyło próg alarmu z `DYSKUSJE_ALARM_GODZIN`. */
-  pilna: boolean;
-  dlugoCzeka: boolean;
-  otwartoAt: string;
-  prowadzi: string | null;
-  /** Tożsamość prowadzącego — po NIEJ liczy się sito „Moje" (0.278.0). */
-  prowadziId: number | null;
-  prowadziAt: string | null;
-  /** Tagi biura (0.279.0). Zawężają listę, NIGDY nie przestawiają kolejki. */
-  tagi: TagSprawy[];
-  /* ── Droga powrotna z notatki (0.280.0) ──────────────────────────────────
-     Poprzedniej TREŚCI panel nie dostaje i nie potrzebuje: cofnięcie jest
-     zamianą, więc drugie kliknięcie przywraca stan sprzed pierwszego. */
-  notatkaAt: string | null;
-  notatkaPrzez: string | null;
-  maPoprzedniaNotatke: boolean;
-  notatka: string | null;
-  /** Los NASZEJ prośby o zakończenie. Stan dyskusji mówi `statusAllegro`. */
-  zakonczenieStatus: "sent" | "send_uncertain" | null;
-  zakonczenieAt: string | null;
-  zakonczeniePrzez: string | null;
-  wersja: number;
-  kubelek: KubelekDyskusji;
-  sygnaly: SygnalDyskusji[];
-  /** Sama dyskusja w Centrum Sprzedaży; `null`, gdy wzorzec jest pusty. */
-  link: string | null;
-  linkZamowienia: string | null;
-}
-
-export interface KolejkaDyskusji {
-  dyskusje: Dyskusja[];
-  liczniki: Record<KubelekDyskusji, number>;
-  /** Próg jest WSPÓLNY z reklamacjami — jedna tabela, jedna granica widoku. */
-  prog: ProgKolejki;
-  /** Pasek synchronizacji jest WSPÓLNY: obie sprawy jadą jedną listą. */
-  stan: StanReklamacji;
-}
-
-export interface SzczegolDyskusji {
-  dyskusja: Dyskusja;
-  czat: WiadomoscReklamacji[];
-  zalaczniki: ZalacznikReklamacji[];
-  zwroty: Zwrot[];
-  rozmowy: Array<{ id: number; temat: string | null; status: string; ostatniaAt: string | null }>;
-  /* Spoiwo kolejek (S1 i S3): rodzeństwo posprzedażowe BEZ tej sprawy oraz
-     droga zakupu przez kolejki. */
-  sprawy: SprawaZakupu[];
-  droga: PrzystanekDrogi[];
-  /** Zamówienie z pozycjami i cenami (0.393.0). */
-  zamowienie: Zamowienie | null;
-  /** Gdzie jest paczka do klienta (0.393.0). */
-  przesylka: StanPrzesylki | null;
-}
-
-/** Wynik prośby o zakończenie — los próby, nie potwierdzenie zamknięcia. */
-export interface WynikZakonczenia {
-  status: "sent" | "send_uncertain";
-  wersja: number;
 }
 
 /** Wynik wysyłki odpowiedzi w reklamacji (0.224.0). */

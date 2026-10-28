@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import {
-  ArrowLeft, ExternalLink, MessageSquare, MessagesSquare, Package, Scale, Search, ShoppingBag,
+  ArrowLeft, ExternalLink, MessageSquare, Package, Scale, Search, ShoppingBag,
   Truck, Undo2, UserRound,
 } from "lucide-react";
 import { useSzukajWszedzie, type RodzajTrafienia, type Trafienie } from "../api/spoiwo";
@@ -29,7 +29,6 @@ const RODZAJE: Record<RodzajTrafienia, { nazwa: string; ikona: React.ComponentTy
   rozmowa: { nazwa: "Rozmowa", ikona: MessageSquare },
   zwrot: { nazwa: "Zwrot", ikona: Undo2 },
   reklamacja: { nazwa: "Reklamacja", ikona: Scale },
-  dyskusja: { nazwa: "Dyskusja", ikona: MessagesSquare },
   dostawa: { nazwa: "Dostawa", ikona: Truck },
   towar: { nazwa: "Towar", ikona: Package },
   zamowienie: { nazwa: "Zamówienie", ikona: ShoppingBag },

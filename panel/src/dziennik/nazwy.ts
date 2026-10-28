@@ -237,7 +237,8 @@ export const NAZWA_ZDARZENIA: Record<string, string> = {
   reklamacja_zalacznik_bez_location: "Załącznik reklamacji bez adresu",
   reklamacje_synchronizacja_reczna: "Reklamacje odświeżone ręcznie",
 
-  /* Dyskusje */
+  /* Dyskusje: ekranu już nie ma, ale stare zdarzenia leżą w bazie, więc
+     dziennik dalej opisuje je po polsku zamiast surowym kluczem. */
   dyskusja_prowadzi: "Dyskusja przejęta",
   dyskusja_odswiezenie: "Dyskusja odświeżona z Allegro",
   dyskusja_odpowiedz: "Odpowiedź w dyskusji",

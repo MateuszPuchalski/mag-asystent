@@ -92,7 +92,7 @@ const TRASY = () => [
   { method: "POST" as const, url: `/api/obsluga/zwroty/${zwrot}/notatka/cofnij` },
   { method: "GET" as const, url: "/api/obsluga/zwroty/rozjazdy" },
   /* PROWADZĄCEGO, TAGÓW I EKSPORTU CSV TU JUŻ NIE MA (0.370.0) — właściciel
-     wskazał je wprost jako niepotrzebne przy zwrotach. Reklamacje i dyskusje
+     wskazał je wprost jako niepotrzebne przy zwrotach. Reklamacje
      mają jedno i drugie dalej, z własnymi bramkami. */
   /* Paczki klienta (0.367.0) — ODCZYT, ale POST-em, bo uchwytem bywa nazwisko
      z naklejki, a adres ląduje w logu żądań. Bramka roli ta sama: to lista

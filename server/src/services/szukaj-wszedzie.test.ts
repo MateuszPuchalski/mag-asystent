@@ -57,7 +57,7 @@ test("numer zamówienia prowadzi do zakupu, rozmowy, zwrotu i reklamacji naraz",
   assert.ok(r.includes("zamowienie:29f8e1a0-aaaa-bbbb"));
   assert.ok(t.some((x) => x.rodzaj === "zwrot"));
   assert.ok(t.some((x) => x.rodzaj === "reklamacja" && x.cel?.startsWith("/obsluga/reklamacje/")));
-  assert.ok(!t.some((x) => x.rodzaj === "dyskusja"), "cudze zamówienie nie trafia");
+  assert.ok(!t.some((x) => x.id === "2"), "cudze zamówienie nie trafia");
 });
 
 test("login kupującego trafia w rozmowę po loginie rozmówcy, bez wielkości liter", () => {
@@ -69,13 +69,20 @@ test("login kupującego trafia w rozmowę po loginie rozmówcy, bez wielkości l
   assert.equal(t.find((x) => x.rodzaj === "zwrot")?.dlaczego, "login kupującego");
 });
 
-test("list przewozowy zwrotu, końcówka telefonu i numer dyskusji bez numeru Allegro", () => {
+test("list przewozowy zwrotu i końcówka telefonu", () => {
   assert.equal(S.szukajWszedzie("RET9988776", null, db()).find((x) => x.rodzaj === "zwrot")?.dlaczego,
     "list przewozowy");
   const tel = S.szukajWszedzie("600 111 222", null, db());
   assert.equal(tel.find((x) => x.rodzaj === "zamowienie")?.dlaczego, "telefon odbiorcy");
-  assert.ok(S.szukajWszedzie("inne-zamowienie-1", null, db()).some((x) => x.rodzaj === "dyskusja"
-    && x.cel?.startsWith("/obsluga/dyskusje/")));
+});
+
+test("wiersz dawnej dyskusji w tabeli nie wychodzi w szukajce ani jako sprawa, ani jako klient", () => {
+  /* `r-2` to DISPUTE z bazy sprzed wycofania dyskusji. Nie może udawać
+     reklamacji z odnośnikiem do ekranu reklamacji. */
+  for (const fraza of ["inne-zamowienie-1", "ktos", "Brak paczki"]) {
+    const t = S.szukajWszedzie(fraza, null, db());
+    assert.deepEqual(t.filter((x) => x.rodzaj === "reklamacja" || x.rodzaj === "klient"), [], fraza);
+  }
 });
 
 test("towar z wstrzykniętej kartoteki, a fraza krótsza niż trzy znaki nie szuka niczego", () => {

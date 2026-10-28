@@ -12,7 +12,7 @@ const STAN = {
   status: "current", alarm: false, ostatniaProba: null,
   ostatniaUdanaSynchronizacja: "2026-10-09T12:05:00.000Z", kodOstatniegoBledu: null,
   liczbaBledow: 0, opoznienieMs: 0, nastepnaProba: null, interwalMs: 180000,
-  pozostaloDoPobrania: 0, dyskusjiPominietych: 0,
+  pozostaloDoPobrania: 0,
 } as unknown as StanReklamacji;
 
 describe("Synchronizacja reklamacji", () => {

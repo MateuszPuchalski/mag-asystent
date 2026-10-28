@@ -64,8 +64,8 @@ export const ZWLOKA_KLAWISZA_MS = 1000;
  * SAMYM elementem w tym samym rodzicu, więc przy rozwinięciu nie traci
  * fokusu w pół słowa. Notatkę otwiera N z tła strony albo przycisk w rzędzie.
  *
- * ── JEDEN EDYTOR TRZECH KOLEJEK (0.549.0) ─────────────────────────────────
- * Decyzja właściciela z 28 września: reklamacje i dyskusje odpowiadają tym
+ * ── JEDEN EDYTOR DWÓCH KOLEJEK (0.549.0) ─────────────────────────────────
+ * Decyzja właściciela z 28 września: reklamacje odpowiadają tym
  * samym edytorem, w tym samym miejscu wątku. Osobny edytor sprawy rozjeżdżał
  * się z tym przy każdym wydaniu: nie miał zwiniętego rzędu, czyszczenia
  * z cofnięciem, Entera z tła ani Ctrl+Enter spoza pola. To, co w sprawie
@@ -192,7 +192,7 @@ export function Edytor({
   klawisz.current = (e: KeyboardEvent) => {
     /* N — NOTATKA (0.548.0). Pusty edytor chowa przełącznik zakładek, więc
        notatka potrzebuje drogi z klawiatury. N nie jest zajęte w skrzynce.
-       W reklamacjach i dyskusjach znaczy „niczyje”, a tam notatki w edytorze
+       W reklamacjach znaczy „niczyje”, a tam notatki w edytorze
        nie ma, więc warunek `zNotatka` oddaje klawisz ekranowi. */
     if ((e.key === "n" || e.key === "N") && zNotatka && !wKomentarzu && !e.ctrlKey && !e.metaKey && !e.altKey
       && !e.isComposing && !klawiszZajety(e.target)) {

@@ -16,7 +16,7 @@ afterEach(cleanup);
 Element.prototype.scrollIntoView = vi.fn();
 
 /* ── MAGAZYN KARTY CZYŚCI SIĘ MIĘDZY TESTAMI (0.423.0) ───────────────────────
-   Od kiedy szkic odpowiedzi w reklamacji i dyskusji trwa w `sessionStorage`
+   Od kiedy szkic odpowiedzi w reklamacji trwa w `sessionStorage`
    (`sprawy/useSzkicSprawy.ts`), pisanie w jednym teście dopisywało się do
    pola w następnym: jsdom trzyma magazyn przez cały plik, a obie sprawy mają
    ten sam numer. Dwa testy ekranu reklamacji zobaczyły przez to treść

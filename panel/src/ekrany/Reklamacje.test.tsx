@@ -18,11 +18,9 @@ import type {
       mutacji, a wejście w sprawę — dokładnie jedno odświeżenie z Allegro.
    2. PRZEŁĄCZENIE KUBEŁKA PRZESTAWIA KURSOR. Inaczej lista się zmienia,
       a zaznaczenie zostaje na sprawie z poprzedniego kubełka.
-   3. LICZBA ODSIANYCH DYSKUSJI jest do znalezienia. Bez niej ktoś szukałby
-      reklamacji, która nigdy reklamacją nie była.
-   4. PUNKT ODNIESIENIA ŚWIEŻOŚCI liczy się z osi, a własna odpowiedź go NIE
+   3. PUNKT ODNIESIENIA ŚWIEŻOŚCI liczy się z osi, a własna odpowiedź go NIE
       przesuwa — inaczej druga wiadomość z rzędu wyglądałaby na spóźnioną.
-   5. BRAK DANYCH TO „—”, nie zero: przy awarii serwera kafle i pigułki
+   4. BRAK DANYCH TO „—”, nie zero: przy awarii serwera kafle i pigułki
       kubełków nie mówią „nic nie czeka”.                                            */
 
 const rek = (id: number, kubelek: KubelekReklamacji, numer: string): Reklamacja => ({
@@ -202,7 +200,7 @@ function pokaz(adres = "/obsluga/reklamacje", czat: WiadomoscReklamacji[] = [wia
     status: "current", alarm: false, ostatniaProba: null,
     ostatniaUdanaSynchronizacja: "2026-09-07T11:00:00.000Z", kodOstatniegoBledu: null,
     liczbaBledow: 0, opoznienieMs: 0, nastepnaProba: null, interwalMs: 180000,
-    pozostaloDoPobrania: 0, dyskusjiPominietych: 35, ...stan,
+    pozostaloDoPobrania: 0, ...stan,
   };
   const klient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   return render(
@@ -545,12 +543,11 @@ describe("Filtr za przyciskiem przy tytule", () => {
     expect(screen.getByText("Najpilniejsze na górze")).toBeInTheDocument();
   });
 
-  it("okno filtra niesie porządek, tagi i zakres z liczbą odsianych dyskusji", async () => {
+  it("okno filtra niesie porządek, tagi i zakres z progiem daty", async () => {
     pokaz();
     const okno = await otworzFiltr();
     expect(within(okno).getByTitle(/^Kolejność:/)).toBeInTheDocument();
     expect(within(okno).getByTitle("Sprawy z tagiem „czeka na część”")).toHaveTextContent("1");
-    expect(within(okno).getByText(/pominiętych dyskusji 35/)).toBeInTheDocument();
     expect(within(okno).getByRole("button", { name: "pokaż starsze" })).toBeInTheDocument();
     await userEvent.keyboard("{Escape}");
     expect(screen.queryByRole("dialog", { name: "Filtr i porządek kolejki" })).not.toBeInTheDocument();

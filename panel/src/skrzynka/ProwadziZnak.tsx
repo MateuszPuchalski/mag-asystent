@@ -4,7 +4,7 @@ import { UserRound } from "lucide-react";
 /**
  * Prowadzący rozmowę jako kółko w nagłówku (23 września 2026).
  *
- * Wspólny `sprawy/Prowadzi.tsx` zostaje w reklamacjach i dyskusjach, bo tam
+ * Wspólny `sprawy/Prowadzi.tsx` zostaje w reklamacjach, bo tam
  * niesie przycisk wzięcia sprawy. W skrzynce przycisku nie ma od 0.395.0 —
  * rozmowę przypisuje pierwsza odpowiedź — więc zostawał sam napis na całą
  * linię. Kółko mówi to samo jednym znakiem: przerywane i puste, gdy nikt;

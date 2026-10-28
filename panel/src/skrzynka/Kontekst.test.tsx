@@ -315,7 +315,7 @@ describe("kolumna kontekstu", () => {
   it("droga zakupu nie stoi w kolumnie", () => {
     const at = "2026-09-28T10:00:00Z";
     rysuj(dane({ droga: [{ rodzaj: "rozmowa", id: 4821, at, opis: null },
-      { rodzaj: "dyskusja", id: 7, at, opis: null }, { rodzaj: "zwrot", id: 9, at, opis: null }] }));
+      { rodzaj: "reklamacja", id: 7, at, opis: null }, { rodzaj: "zwrot", id: 9, at, opis: null }] }));
     expect(screen.queryByRole("region", { name: "Droga tego zakupu" })).toBeNull();
   });
 
@@ -326,7 +326,7 @@ describe("kolumna kontekstu", () => {
     expect(within(swieci()).getByRole("heading", { name: "Wymaga Ciebie · 2" })).toBeInTheDocument();
   });
 
-  /* Reklamacje i dyskusje mówi przystanek paska drogi w karcie. W kolumnie
+  /* Reklamację mówi przystanek paska drogi w karcie. W kolumnie
      nie świecą, nie wchodzą do licznika i nie mają wiersza „Zamknięte". */
   it("sprawy zakupu, otwarte i zamknięte, nie mają w kolumnie żadnego domu", () => {
     const sprawa = (id: number, otwarta: boolean) => ({ id, typ: "CLAIM", numer: `R-${id}`,

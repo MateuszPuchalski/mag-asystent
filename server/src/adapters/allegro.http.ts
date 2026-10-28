@@ -359,7 +359,10 @@ export function urlWnioskuORabat(apiUrl: string, claimId: string): string {
 }
 
 /**
- * URL listy dyskusji i reklamacji (`/sale/issues`, Accept beta.v1).
+ * URL listy spraw posprzedażowych (`/sale/issues`, Accept beta.v1).
+ *
+ * Lista niesie też dyskusje, a specyfikacja nie ma filtra po `type`, więc
+ * odsiewa je wołający.
  *
  * `statusy` zawężają przebieg do spraw, które jeszcze żyją (0.273.0).
  * Specyfikacja wymienia ten parametr przy `getListOfIssuesUsingGET` jako
@@ -370,7 +373,7 @@ export function urlWnioskuORabat(apiUrl: string, claimId: string): string {
  * Serializacja tablicy: `form` z `explode`, czyli parametr powtórzony —
  * OpenAPI 3 nie każe jej deklarować, bo to wartość domyślna.
  */
-export function urlDyskusji(apiUrl: string, offset: number, statusy: readonly string[] = []): string {
+export function urlListySpraw(apiUrl: string, offset: number, statusy: readonly string[] = []): string {
   const filtr = statusy.map((s) => `&status=${encodeURIComponent(s)}`).join("");
   return `${apiUrl}/sale/issues?limit=100&offset=${Math.max(0, Math.trunc(offset))}${filtr}`;
 }
@@ -408,7 +411,7 @@ export function urlOpinii(apiUrl: string, offset: number): string {
  * przestrzeń". Dzielą: specyfikacja opisuje `issueId` jako „Dispute or claim
  * identifier". Zgadnięte było co innego — sam adres.
  */
-export function urlWiadomosciDyskusji(apiUrl: string, id: string, offset = 0): string {
+export function urlWiadomosciSprawy(apiUrl: string, id: string, offset = 0): string {
   /* `limit` JAWNIE, bo specyfikacja daje przy tej końcówce domyślne 10 — a nie
      100 jak przy listach obok. Bez tego próbka sondy była cicho przycięta
      i nikt by się nie dowiedział, że rozmowa ma dalszy ciąg. */

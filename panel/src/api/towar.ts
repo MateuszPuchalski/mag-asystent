@@ -7,7 +7,7 @@ export interface PrzekrojTowaru {
   twId: number;
   oferty: Array<{ konto: number; ofertaId: string; nazwa: string | null }>;
   otwarteZwroty: Array<{ id: number; numer: string | null; at: string; ilosc: number }>;
-  otwarteSprawy: Array<{ id: number; typ: "CLAIM" | "DISPUTE"; numer: string | null; at: string }>;
+  otwarteSprawy: Array<{ id: number; typ: string; numer: string | null; at: string }>;
   otwarteRozmowy: Array<{ id: number; temat: string | null; at: string }>;
   okno: { dni: number; sprzedanych: number; zwroconych: number; reklamacji: number; udzialZwrotow: number | null };
 }

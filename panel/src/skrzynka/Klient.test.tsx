@@ -82,7 +82,7 @@ describe("zakładka klienta", () => {
     expect(screen.getByText(/Pierwszy kontakt/)).toBeInTheDocument();
   });
 
-  it("zwrot, reklamacja i dyskusja stoją na osi i prowadzą do swoich kolejek", async () => {
+  it("zwrot i reklamacja stoją na osi i prowadzą do swoich kolejek, a dyskusja ze starej bazy znika", async () => {
     /* S2 spoiwa: zakładka obiecywała historię, a pokazywała jej połowę.
        Wiersz prowadzi na ekran właściwej kolejki, bo tam stoją bramki sprawy. */
     pokaz(dane({ wpisy: [
@@ -90,15 +90,15 @@ describe("zakładka klienta", () => {
         zamowienieId: "ord-1", link: null, rozmowaId: null, sprawaId: 11 },
       { rodzaj: "reklamacja", at: "2026-08-09T12:00:00Z", tresc: "Nie działa",
         zamowienieId: "ord-1", link: null, rozmowaId: null, sprawaId: 22 },
-      { rodzaj: "dyskusja", at: "2026-08-08T12:00:00Z", tresc: "Gdzie paczka",
+      { rodzaj: "dyskusja" as never, at: "2026-08-08T12:00:00Z", tresc: "Gdzie paczka",
         zamowienieId: "ord-1", link: null, rozmowaId: null, sprawaId: 33 },
     ] }));
 
     expect(screen.getByRole("link", { name: /Z-77/ })).toHaveAttribute("href", "/obsluga/zwroty/11");
     expect(screen.getByRole("link", { name: /Nie działa/ }))
       .toHaveAttribute("href", "/obsluga/reklamacje/22");
-    expect(screen.getByRole("link", { name: /Gdzie paczka/ }))
-      .toHaveAttribute("href", "/obsluga/dyskusje/33");
+    /* Dyskusje nie mają ekranu: wiersz nie ma dokąd prowadzić. */
+    expect(screen.queryByText(/Gdzie paczka/)).toBeNull();
   });
 
   it("historia przy źródle niesie sprawę klienta i prowadzi do profilu", () => {

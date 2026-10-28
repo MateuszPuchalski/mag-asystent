@@ -74,23 +74,26 @@ const zwrot = (at: string, zam: string | null = ZAM, kto = konto) =>
     order_id,created_at,synced_at) VALUES (?,?,'Z-1',?,?,'2026-09-17T00:00:00Z')`)
     .run(kto, `z-${at}-${kto}`, zam, at).lastInsertRowid);
 
-test("skrzynka widzi sprawę posprzedażową tego zakupu — siedem brakujących wiązań", () => {
+test("skrzynka widzi reklamację tego zakupu, a wiersz dawnej dyskusji nie jest jej rodzeństwem", () => {
   const rek = sprawa("CLAIM", "2026-09-10T08:00:00Z");
+  /* Dyskusja z bazy sprzed wycofania: leży w tabeli, ale nie pokazuje się
+     nigdzie, bo panel nie ma już jej ekranu. */
   sprawa("DISPUTE", "2026-09-05T08:00:00Z");
 
   const lista = sprawyZakupu(db(), konto, ZAM);
-  assert.deepEqual(lista.map((s) => s.typ), ["CLAIM", "DISPUTE"]);
+  assert.deepEqual(lista.map((s) => s.typ), ["CLAIM"]);
   assert.equal(lista[0]!.id, rek);
-  /* Numer nadaje Allegro wyłącznie reklamacji — dyskusja go nie ma (§25c.1). */
   assert.equal(lista[0]!.numer, "12/2026");
-  assert.equal(lista[1]!.numer, null);
 });
 
-test("sprawa nie pokazuje w rodzeństwie samej siebie", () => {
+test("reklamacja nie pokazuje w rodzeństwie samej siebie", () => {
   const rek = sprawa("CLAIM", "2026-09-10T08:00:00Z");
-  sprawa("DISPUTE", "2026-09-05T08:00:00Z");
+  sprawa("CLAIM", "2026-09-05T08:00:00Z", ZAM, konto, "CLAIM_ACCEPTED");
+  sprawa("DISPUTE", "2026-09-04T08:00:00Z");
 
-  assert.deepEqual(sprawyZakupu(db(), konto, ZAM, rek).map((s) => s.typ), ["DISPUTE"]);
+  const rodzenstwo = sprawyZakupu(db(), konto, ZAM, rek);
+  assert.equal(rodzenstwo.length, 1);
+  assert.ok(rodzenstwo.every((s) => s.id !== rek && s.typ === "CLAIM"));
 });
 
 test("sprawa z cudzego konta nie wchodzi na nasz ekran", () => {
@@ -102,7 +105,7 @@ test("sprawa z cudzego konta nie wchodzi na nasz ekran", () => {
 
 test("zamknięta sprawa przestaje być otwarta, a nieznany status jej nie zamyka", () => {
   sprawa("CLAIM", "2026-09-10T08:00:00Z", ZAM, konto, "CLAIM_ACCEPTED");
-  sprawa("DISPUTE", "2026-09-05T08:00:00Z", ZAM, konto, "NOWY_STATUS_ALLEGRO");
+  sprawa("CLAIM", "2026-09-05T08:00:00Z", ZAM, konto, "NOWY_STATUS_ALLEGRO");
 
   const lista = sprawyZakupu(db(), konto, ZAM);
   assert.equal(lista[0]!.otwarta, false);
@@ -115,8 +118,9 @@ test("droga układa przystanki w kolejności czasu, a nie kolejek", () => {
   sprawa("CLAIM", "2026-09-06T08:00:00Z");
   zwrot("2026-09-08T08:00:00Z");
 
+  /* Dawna dyskusja nie ma przystanku: nie udaje też reklamacji. */
   assert.deepEqual(drogaZakupu(db(), konto, ZAM).map((p) => p.rodzaj),
-    ["rozmowa", "dyskusja", "reklamacja", "zwrot"]);
+    ["rozmowa", "reklamacja", "zwrot"]);
 });
 
 test("rozmowa wchodzi na drogę PIERWSZĄ wiadomością o tym zakupie", () => {
@@ -156,7 +160,6 @@ test("eskalacja liczy zakupy, nie sprawy i nie wiadomości", () => {
   wiadomosc("2026-09-02T08:00:00Z");
   wiadomosc("2026-09-03T08:00:00Z");
   sprawa("CLAIM", "2026-09-04T08:00:00Z");
-  sprawa("DISPUTE", "2026-09-05T08:00:00Z");
 
   assert.deepEqual(eskalacje(db(), konto), [
     { miesiac: "2026-09", zRozmowa: 1, eskalowane: 1 },
@@ -211,9 +214,9 @@ test("zwrot, którego nie ma, oddaje pustkę zamiast wyjątku", () => {
 });
 
 /* ── S4 spoiwa: jedno „Moje" ponad kolejkami ────────────────────────────────
-   Agent miał cztery sita „Moje" i musiał odwiedzić każde z osobna.         */
+   Agent miał kilka sit „Moje" i musiał odwiedzić każde z osobna.         */
 
-test("moje sprawy schodzą z trzech kolejek w jedną listę", () => {
+test("moje sprawy schodzą z kolejek w jedną listę, a dawna dyskusja w niej nie występuje", () => {
   const d = db();
   d.prepare("UPDATE conversation SET assigned_user_id=?, status='open' WHERE id=?")
     .run(agent, rozmowa);
@@ -223,7 +226,9 @@ test("moje sprawy schodzą z trzech kolejek w jedną listę", () => {
     .run(agent, rek, dys);
 
   const moje = mojeSprawy(d, agent);
-  assert.deepEqual(moje.map((m) => m.kolejka).sort(), ["dyskusja", "reklamacja", "rozmowa"]);
+  assert.deepEqual(moje.map((m) => m.kolejka).sort(), ["reklamacja", "rozmowa"]);
+  assert.equal(moje.filter((m) => m.kolejka === "reklamacja").length, 1,
+    "wiersz DISPUTE nie udaje reklamacji");
 });
 
 test("cudza sprawa nie wchodzi na moją listę", () => {
@@ -248,11 +253,11 @@ test("sprawa zamknięta i rozmowa zamknięta schodzą z listy roboczej", () => {
 });
 
 test("sprawa z terminem staje NAD sprawą ruszoną dawniej, bez terminu", () => {
-  /* Jedno pole na oba zegary postawiłoby dyskusję ruszoną 1 września nad
+  /* Jedno pole na oba zegary postawiłoby reklamację ruszoną 1 września nad
      reklamacją z terminem 2 września. To jest blizna 0.121.0 w miniaturze. */
   const d = db();
   const pilna = sprawa("CLAIM", "2026-09-06T08:00:00Z");
-  const luzna = sprawa("DISPUTE", "2026-09-01T08:00:00Z");
+  const luzna = sprawa("CLAIM", "2026-09-01T08:00:00Z");
   d.prepare("UPDATE reklamacja_klienta SET prowadzi_user_id=? WHERE id IN (?,?)")
     .run(agent, pilna, luzna);
   d.prepare("UPDATE reklamacja_klienta SET decyzja_do='2026-09-02T00:00:00Z' WHERE id=?")

@@ -147,7 +147,7 @@ describe("boczny pasek menu", () => {
 
   it("za kreską stoi praca na kartotece: Dostawy, a po nich Zdjęcia jako ostatnia zakładka", () => {
     const zakladki = tsx.slice(tsx.indexOf("const ZAKLADKI"), tsx.indexOf("\n];", tsx.indexOf("const ZAKLADKI")));
-    expect(zakladki.match(/\{ do: "/g)).toHaveLength(9);
+    expect(zakladki.match(/\{ do: "/g)).toHaveLength(8);
     expect(zakladki).toMatch(/do: "\/obsluga\/dostawy".*kreska: true/);
     expect(zakladki.indexOf('"/obsluga/zdjecia"')).toBeGreaterThan(zakladki.indexOf('"/obsluga/dostawy"'));
     expect(zakladki).toMatch(/do: "\/obsluga\/zdjecia".*kreska: false/);

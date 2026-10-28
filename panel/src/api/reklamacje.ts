@@ -56,8 +56,6 @@ export function useReklamacja(id: number | null) {
  */
 export interface WynikSynchronizacji {
   reklamacji: number;
-  /** Ile spraw odsialiśmy jako dyskusje. Nie jest to błąd, tylko zakres panelu. */
-  dyskusji: number;
   czatow: number;
 }
 

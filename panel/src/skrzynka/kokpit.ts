@@ -83,7 +83,7 @@ export function ofertaWKarcie(dane: OsRozmowy): boolean {
    Serwer (`klient-historia.ts`) pomija w historii tylko bieżącą rozmowę.
    Klient z jedynym zakupem dostawał więc „Wcześniej u nas: 1 zakup" o tym
    samym zakupie, o który właśnie pisze. Zakup, jego zwrot, reklamacja
-   i dyskusja niosą numer zamówienia rozmowy i mają dom w karcie zakupu.
+   niosą numer zamówienia rozmowy i mają dom w karcie zakupu.
 
    Rozmowy zostają: inna rozmowa to wcześniejszy kontakt, a nie ten zakup.
    Serwer daje im dziś pusty numer zamówienia, a człon `rodzaj === "rozmowa"`
@@ -130,8 +130,8 @@ export type Swiatlo = "zwrot" | "paczka" | "pozycja";
 /**
  * Co świeci, w kolejności pilności. Zwrot ma zegar Allegro, więc idzie
  * pierwszy; paczka poza zwykłą drogą — za nim. Wskazanie pozycji to praca
- * bez terminu. Reklamacji i dyskusji tu nie ma: ich stan, termin i prowadzącego
- * mówi przystanek paska drogi, a ich praca stoi na własnych ekranach.
+ * bez terminu. Reklamacji tu nie ma: jej stan, termin i prowadzącego
+ * mówi przystanek paska drogi, a jej praca stoi na własnym ekranie.
  */
 export function coSwieci(dane: OsRozmowy): Swiatlo[] {
   const s: Swiatlo[] = [];
@@ -151,8 +151,8 @@ export function coSwieci(dane: OsRozmowy): Swiatlo[] {
 
    Zwija się wyłącznie przy zwrocie w toku. Wtedy temat rozmowy to decyzja
    z terminem, a karta towaru jest tłem, które spychało decyzję w połowę
-   przewijania. Otwarta reklamacja czy dyskusja towaru nie zwija: kolumna nie
-   niesie już ich wierszy, więc zwinięcie nie miałoby na ekranie powodu. */
+   przewijania. Otwarta reklamacja towaru nie zwija: kolumna nie
+   niesie już jej wiersza, więc zwinięcie nie miałoby na ekranie powodu. */
 export function towarOtwartyNaStart(swiatla: Swiatlo[], kategoria: Kategoria | null = null): boolean {
   if (swiatla.includes("zwrot")) return false;
   /* ── TYLKO PRZY PYTANIU O TOWAR (0.506.0) ────────────────────────────────

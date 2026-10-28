@@ -149,7 +149,7 @@ export async function reklamacjeRoutes(app: FastifyInstance) {
       const w = db().prepare(`SELECT z.id AS id FROM reklamacja_klienta r
         JOIN zamowienie_klienta z ON z.channel_account_id = r.channel_account_id
           AND z.external_id = r.order_id
-        WHERE r.id = ?`).get(Number(req.params.id)) as { id: number } | undefined;
+        WHERE r.id = ? AND r.typ = 'CLAIM'`).get(Number(req.params.id)) as { id: number } | undefined;
       if (!w) {
         return reply.code(400).send({
           error: "Zamówienia tej sprawy jeszcze nie pobraliśmy — nie ma czego szukać.",

@@ -12,7 +12,7 @@ import { PasekPorzadku, posortuj, type OsPorzadku } from "./Porzadek";
       najmniej pilna — jest sprawą, o której ta oś nic nie mówi.
    2. TERMIN ROŚNIE, reszta maleje. Przy terminie pytanie brzmi „co się pali",
       przy dacie i kwocie — „co najnowsze" i „co najdroższe".
-   3. OŚ, KTÓREJ EKRAN NIE DEKLARUJE, nie przestawia listy. Dyskusja nie ma
+   3. OŚ, KTÓREJ EKRAN NIE DEKLARUJE, nie przestawia listy. Skrzynka nie ma
       terminu ani kwoty.
    4. PASEK NIE RYSUJE SIĘ przy jednej osi — wybór z jednego elementu to nie
       wybór.                                                                 */
@@ -57,7 +57,7 @@ describe("porządek kolejki", () => {
   });
 
   it("oś, której ekran NIE deklaruje, zostawia listę w spokoju", () => {
-    /* Dyskusja nie ma terminu ani kwoty — i nie ma prawa udawać, że sortuje. */
+    /* Skrzynka nie ma terminu ani kwoty — i nie ma prawa udawać, że sortuje. */
     const lista = [s(1), s(2)];
     const bezTerminu = { otwarto: (x: ReturnType<typeof s>) => x.otwarto };
     expect(posortuj(lista, "termin", bezTerminu).map((x) => x.id)).toEqual([1, 2]);

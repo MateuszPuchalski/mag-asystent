@@ -2,7 +2,7 @@ import React, { useState } from "react";
 import { Link } from "react-router-dom";
 import {
   AlertTriangle, Barcode, ChevronRight, CircleCheck, Inbox, ListChecks, MessageSquareReply,
-  FlaskConical, MessagesSquare, Package, PackageSearch, PlugZap, ShieldQuestion, Truck, Undo2,
+  FlaskConical, Package, PackageSearch, PlugZap, ShieldQuestion, Truck, Undo2,
   ClipboardList, AtSign, Briefcase, PackageX, ExternalLink,
 } from "lucide-react";
 import {
@@ -42,7 +42,7 @@ import { Wzmianki } from "./Wzmianki";
 const IKONY: Record<ZrodloDecyzji, React.ComponentType<{ size?: number; className?: string }>> = {
   dostawy: Truck, odpowiedzi: MessageSquareReply, kosze: Package, zapisy: AlertTriangle,
   kody: Barcode, allegro: PlugZap, reklamacje: ShieldQuestion, zwroty: Undo2,
-  skrzynka: Inbox, dyskusje: MessagesSquare, sonda: FlaskConical,
+  skrzynka: Inbox, sonda: FlaskConical,
   /* Zadanie odesłane przez halę (0.502.0) — `odeslaneZadania` w `do-decyzji.ts`. */
   zadania: ClipboardList,
   dosylki: PackageSearch,
@@ -54,7 +54,7 @@ const IKONY: Record<ZrodloDecyzji, React.ComponentType<{ size?: number; classNam
 const NAZWY: Record<ZrodloDecyzji, string> = {
   dostawy: "Dostawy", odpowiedzi: "Odpowiedź z hali", kosze: "Kosze", zapisy: "Zapis do Subiekta",
   kody: "Kody kreskowe", allegro: "Konto Allegro", reklamacje: "Reklamacje", zwroty: "Zwroty",
-  skrzynka: "Skrzynka", dyskusje: "Dyskusje", sonda: "Test na żywo", zadania: "Zadanie hali",
+  skrzynka: "Skrzynka", sonda: "Test na żywo", zadania: "Zadanie hali",
   dosylki: "Dosyłka", braki: "Brak z kompletacji", sellasist: "Sellasist",
 };
 
@@ -74,7 +74,7 @@ function Wiek({ p }: { p: PozycjaDecyzji }) {
     ? <span className="shrink-0 rounded bg-red-100 px-2 py-0.5 text-xs font-bold text-ranga-zle">pilne</span>
     : null;
   const ms = Math.max(0, Date.now() - Date.parse(p.od));
-  /* Młodsze niż doba w GODZINACH, jak „9 godz." w dyskusjach. Minuty w pastylce
+  /* Młodsze niż doba w GODZINACH, jak „9 godz." w skrzynce. Minuty w pastylce
      wieku nie zmieniają decyzji, a „22 g 27 min" czyta się wolniej niż „22 godz.".
      Pod godziną i od doby zostaje `wiek()`: tam minuty albo dni niosą informację,
      a sama funkcja ma osiem innych wołających (alarm synchronizacji liczy minuty). */
@@ -241,7 +241,11 @@ export function DoDecyzji() {
   const poZalozeniu = (w: DosylkaZalozona) => {
     if (w.zastapil) setZastapione((z) => [...z, w]);
   };
-  const pozycje = (dane.data?.pozycje ?? []).filter((p) => filtr === "wszystko" || p.obszar === filtr);
+  /* Źródło spoza słownika (dawne „dyskusje") nie ma ikony ani nazwy grupy,
+     więc je pomijamy zamiast wywracać listę na brakującej ikonie. */
+  const pozycje = (dane.data?.pozycje ?? [])
+    .filter((p) => Object.hasOwn(NAZWY, p.zrodlo))
+    .filter((p) => filtr === "wszystko" || p.obszar === filtr);
   const l = dane.data?.liczniki;
 
   /* ── PUSTE SEKCJE JEDNĄ LINIJKĄ (0.545.0) ─────────────────────────────

@@ -114,7 +114,7 @@ export function Kosze() {
         <nav className="flex shrink-0 flex-wrap gap-1 p-2">
           {/* „Rozłożone" i „Anulowane" pod „Więcej" (0.526.0): oba to
               „Tylko wgląd", a stały pigułką równą koszom w pracy. Ten sam
-              komponent co w Skrzynce, reklamacjach i dyskusjach. */}
+              komponent co w Skrzynce i reklamacjach. */}
           <FiltrZWiecej<KubelekKoszy> wybrany={kubelek} onWybierz={setKubelek}
             wiecej={WIECEJ_KOSZY}
             pozycje={KUBELKI_KOSZY.map((k) => ({ klucz: k.id, etykieta: k.etykieta,

@@ -5,7 +5,7 @@ import userEvent from "@testing-library/user-event";
 import { FiltrZWiecej } from "./FiltrZWiecej";
 
 /* Kubełki przeglądania pod „Więcej" (0.522.0). Klucz `null` jest tu celowo:
-   tak wygląda „Wszystkie" w reklamacjach i dyskusjach, a `<select>` zna
+   tak wygląda „Wszystkie" w reklamacjach, a `<select>` zna
    wyłącznie napisy — pomyłka w przekładzie zgubiłaby właśnie ten kubełek. */
 type K = "praca" | "wglad" | null;
 

@@ -1088,7 +1088,7 @@ export async function zwrotyRoutes(app: FastifyInstance) {
      prowadzi całe biuro — i tego samego dnia przywróciło go z powrotem. Bez
      tego zdania następna sesja „naprawi" to trzeci raz.
 
-     Reklamacje i dyskusje ZOSTAJĄ z jednym i drugim: tam sprawę bierze
+     Reklamacje ZOSTAJĄ z jednym i drugim: tam sprawę bierze
      konkretna osoba, więc pytanie „czyje to" jest prawdziwe. Zniknęło
      wiązanie zwrotów, nie maszyneria — `trasyTagowSprawy` i `stempelProwadzi*`
      stoją nietknięte. */
@@ -1185,7 +1185,7 @@ export async function zwrotyRoutes(app: FastifyInstance) {
          zwrot, nie raz na pozycję: dokument jest jeden, a kopiowanie go przy
          każdej pozycji rozdęłoby odpowiedź o to samo. */
       wierszeDokumentu: wierszeDokumentuZwrotu(db(), id),
-      /* Reklamacje, dyskusje i droga tego zakupu (S1 i S3 spoiwa,
+      /* Reklamacje i droga tego zakupu (S1 i S3 spoiwa,
          `docs/obsluga-klienta-calosc.md`). Zwrot widział rozmowy od 0.169.0,
          a spraw posprzedażowych nie widział wcale — biuro oddawało pieniądze,
          nie wiedząc o otwartej reklamacji o ten sam towar.

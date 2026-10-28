@@ -1,8 +1,8 @@
 import { useCallback, useState } from "react";
 
 /* ── Szkic odpowiedzi przeżywa przełączenie sprawy (0.423.0) ─────────────────
-   USTERKA, KTÓRĄ ZNALAZŁ POMIAR, NIE ZGŁOSZENIE. Reklamacje i dyskusje
-   trzymały treść w `useState`, a `useEffect` na `[wybrana]` robił
+   USTERKA, KTÓRĄ ZNALAZŁ POMIAR, NIE ZGŁOSZENIE. Reklamacje trzymały
+   treść w `useState`, a `useEffect` na `[wybrana]` robił
    `setTresc("")`. Agent pisał odpowiedź, wchodziła sprawa pilniejsza, wracał —
    pole było puste. Bez ostrzeżenia i bez cofnięcia.
 
@@ -10,7 +10,7 @@ import { useCallback, useState } from "react";
    pisany do jednej sprawy wyjeżdżałby do drugiej po strzałce w kolejce. Ten
    hook daje jedno i drugie, bo szkic jest PRZYPISANY DO SPRAWY, a nie do pola.
 
-   JEDEN HOOK NA OBIE KOLEJKI. Skrzynka ma własny mechanizm — trzyma szkic na
+   JEDEN HOOK NA WSZYSTKIE KOLEJKI. Skrzynka ma własny mechanizm — trzyma szkic na
    serwerze z wersją, bo tam to kupuje także pracę w dwóch przeglądarkach.
    Tutaj serwer nie ma kolumny i ten przyrost jej nie dokłada; to jest zmiana
    po stronie ekranu i tyle ma zasięgu, ile ma.
@@ -76,8 +76,8 @@ export interface SzkicSprawy {
 /**
  * Szkic odpowiedzi przypisany do sprawy, nie do pola.
  *
- * @param kolejka Człon klucza, żeby reklamacja numer 7 i dyskusja numer 7 nie
- *   dzieliły jednego szkicu. Dwie kolejki numerują się niezależnie.
+ * @param kolejka Człon klucza, żeby reklamacja numer 7 i zwrot numer 7 nie
+ *   dzieliły jednego szkicu. Kolejki numerują się niezależnie.
  * @param sprawaId `null`, gdy nic nie wybrano — pole jest wtedy puste i głuche.
  */
 export function useSzkicSprawy(kolejka: string, sprawaId: number | null): SzkicSprawy {

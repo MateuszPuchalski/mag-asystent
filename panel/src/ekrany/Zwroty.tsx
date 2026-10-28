@@ -461,7 +461,7 @@ export function Zwroty() {
      spacjach i zna przewoźnika razem z nazwami z naklejki, więc lista
      rozwijana odpowiadała na pytanie, na które odpowiada już pole wyżej.
 
-     Sito i tagi ZOSTAJĄ przy reklamacjach i dyskusjach — `sprawy/Moje.tsx`
+     Sito i tagi ZOSTAJĄ przy reklamacjach — `sprawy/Moje.tsx`
      i `sprawy/Tagi.tsx` stoją nietknięte. Zeszło UŻYCIE, nie komponent. */
   const wKubelku = useMemo(() => kubelek === null
     ? (data?.zwroty ?? [])

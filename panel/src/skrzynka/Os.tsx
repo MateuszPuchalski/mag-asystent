@@ -138,8 +138,8 @@ function Autoodpowiedz({ wpis }: { wpis: WpisOsi }) {
    na jej NAJSTARSZEJ wiadomości i kazało szukać pytania ręcznie — za każdym
    razem. Nawet przycisk „Pokaż" pod banerem nowej wiadomości tylko odświeżał
    dane i zostawiał widok tam, gdzie stał, czyli obiecywał ruch, którego nie
-   robił. Trzy inne kolejki tego panelu doganiają kursor od 0.165.0
-   (`zwroty/`, `reklamacje/`, `dyskusje/`); oś rozmowy po prostu nigdy tego
+   robił. Dwie inne kolejki tego panelu doganiają kursor od 0.165.0
+   (`zwroty/`, `reklamacje/`); oś rozmowy po prostu nigdy tego
    nie dostała.
 
    CELEM JEST DÓŁ LISTY, a nie ostatnie pytanie klienta. Skok na pytanie
@@ -495,7 +495,7 @@ type Zdarzenie = WpisOsi & { cel: string | null };
 
 /* ── ZDARZEŃ ZAKUPU NA OSI NIE MA ────────────────────────────────────────────
    Złożone, opłacone, doręczone i inne sprawy tego zakupu (zwrot, reklamacja,
-   dyskusja, druga rozmowa) mówi wyłącznie pasek drogi klienta w karcie nad
+   druga rozmowa) mówi wyłącznie pasek drogi klienta w karcie nad
    osią. Ten sam fakt w dwóch domach kazał sprawdzać, czy oba mówią to samo.
    Oś zostaje chronologią tej rozmowy: wiadomości, komentarze, zlecenia,
    wyniki hali i zmiany stanu w pasku przebiegu. */

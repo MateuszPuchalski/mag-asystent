@@ -5,8 +5,8 @@ import { useNoweZadanie } from "../api/rozmowy";
 import { Przycisk } from "../ui";
 
 /* ── „ZLEĆ HALI" ZE SPRAWY (0.502.0) ────────────────────────────────────────
-   Do tego wydania zlecić hali dało się tylko z rozmowy (pomiar). Zwrot,
-   reklamacja i dyskusja kazały przejść do Zadań, przepisać sprawę
+   Do tego wydania zlecić hali dało się tylko z rozmowy (pomiar). Zwrot
+   i reklamacja kazały przejść do Zadań, przepisać sprawę
    w tytuł i wrócić — a zadanie nie wiedziało, skąd przyszło. Tu zlecenie
    niesie `zrodlo` i numer sprawy: karta zadania prowadzi z powrotem, wynik
    ze zwrotu staje na jego osi, a odesłanie — w Do zrobienia.
@@ -20,7 +20,7 @@ import { Przycisk } from "../ui";
    a stałe pole kosztowałoby miejsce przy każdym otwarciu (dekalog, pkt 2). */
 
 /* Bez dostawy: ona ma „notatkę do hali" — powód w `zadania-terenowe.ts`. */
-export type ZrodloZlecenia = "zwrot" | "reklamacja" | "dyskusja";
+export type ZrodloZlecenia = "zwrot" | "reklamacja";
 
 /** Jedna znana kartoteka sprawy albo `null` — przy kilku nie zgadujemy. */
 export function jedynaKartoteka(twIds: Array<number | null>): number | null {

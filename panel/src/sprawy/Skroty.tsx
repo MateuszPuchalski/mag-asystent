@@ -2,7 +2,7 @@ import React, { useState } from "react";
 import { Klawisz } from "../nawigacja/Klawisz";
 
 /* ── Skróty klawiszowe NA EKRANIE (0.281.0) ──────────────────────────────────
-   Kolejka reklamacji i dyskusji chodzi z klawiatury od 0.245.0: strzałki albo
+   Kolejka reklamacji chodzi z klawiatury od 0.245.0: strzałki albo
    `j`/`k` po wierszach, cyfry po kubełkach, a od 0.278.0 także `m` i `n` po
    sitach. Do tego wydania NIE BYŁO TEGO NIGDZIE WIDAĆ. Klawisz stał wyłącznie
    w podpowiedzi pod kursorem, czyli tam, gdzie trafia się przypadkiem.
@@ -54,7 +54,7 @@ export function SkrotyKlawiszy({ zMoje, kubelkow, sita = true, zWszystkimi = tru
   /**
    * Czy „Wszystkie" jest DOKLEJONE za kubełkami (0.383.0).
    *
-   * Zwroty, reklamacje i dyskusje trzymają je poza tablicą kubełków, więc
+   * Zwroty i reklamacje trzymają je poza tablicą kubełków, więc
    * ostatnią cyfrą jest `kubelkow + 1`. Skrzynka ma je jako kubełek PIERWSZY
    * (§10.1), więc cyfry kończą się na `kubelkow`. Bez tego przełącznika
    * skrzynka musiałaby podać o jeden za mało i pasek kłamałby czytelnikowi

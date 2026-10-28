@@ -1,7 +1,7 @@
 import React, { useState } from "react";
 import { FiltrSegmentowy } from "../ui";
 
-/* ── Sito „Moje" dla reklamacji i dyskusji (0.278.0) ─────────────────────────
+/* ── Sito „Moje" dla reklamacji (0.278.0) ─────────────────────────
    POWSTAŁO Z JEDNEGO ZDANIA WŁAŚCICIELA: „chodziło mi, abym łatwiej mógł
    znaleźć reklamacje, którymi się zajmuję". Do tego wydania nie dało się tego
    zrobić wcale — kolejka miała kubełki etapu i szukanie po numerze, a po
@@ -13,10 +13,9 @@ import { FiltrSegmentowy } from "../ui";
    decyzji". Ten sam podział co przy kategoriach w skrzynce — kubełek mówi
    „czyje to", kategoria „o czym to" — tylko role są tu odwrócone.
 
-   FOLDER `sprawy/`, bo `reklamacja_klienta` to JEDEN wiersz na reklamację
-   i dyskusję, rozróżniany przez `typ`. Edytor i czat mieszkają w `reklamacje/`
-   i są stamtąd wołane przez dyskusje, ale tam pierworodztwo jest prawdziwe:
-   tamte komponenty powstały dla reklamacji. To sito powstaje dla obu naraz. */
+   FOLDER `sprawy/`, bo `reklamacja_klienta` to JEDEN wiersz na sprawę
+   Allegro, a stare dyskusje zostają w nim poza ekranami. Sito nie zna
+   rodzaju sprawy i działa na każdej liście z prowadzącym. */
 
 /* ── DRUGA POŁOWA PYTANIA (0.281.0) ──────────────────────────────────────────
    „Które sprawy są moje" ma bliźniacze pytanie, bez którego pierwsze nie

@@ -19,8 +19,7 @@ import { FiltrTagow } from "../sprawy/Tagi";
    OKNO NIEMODALNE. Stoi obok pracy, więc skróty kolejki działają dalej,
    a Escape i kliknięcie obok je zamykają. */
 
-export function FiltrKolejki({ wgTagow, tag, onTag, porzadek, osie, onPorzadek, prog, onPrzelaczProg,
-  stanTekst }: {
+export function FiltrKolejki({ wgTagow, tag, onTag, porzadek, osie, onPorzadek, prog, onPrzelaczProg }: {
   wgTagow: Array<[TagSprawy, number]>;
   tag: number | null;
   onTag: (id: number | null) => void;
@@ -30,8 +29,6 @@ export function FiltrKolejki({ wgTagow, tag, onTag, porzadek, osie, onPorzadek, 
   onPorzadek: (p: OsPorzadku) => void;
   prog?: ProgKolejki | null;
   onPrzelaczProg: (zdejmij: boolean) => void;
-  /** Zdanie o zakresie listy, np. ile dyskusji synchronizacja odsiała. */
-  stanTekst?: string;
 }) {
   const [otwarte, setOtwarte] = useState(false);
   const wyzwalacz = useRef<HTMLButtonElement | null>(null);
@@ -39,7 +36,7 @@ export function FiltrKolejki({ wgTagow, tag, onTag, porzadek, osie, onPorzadek, 
   const wlaczony = tag !== null || porzadek !== osie[0] || Boolean(prog?.zdjety);
   /* Ten sam warunek co w `PasekTla`: gdy pasek milczy, zdanie mówi, że lista
      jest pełna, zamiast zostawić sekcję pustą. */
-  const mowiOZakresie = Boolean(stanTekst || (prog?.od && (prog.zdjety || prog.ukrytych > 0)));
+  const mowiOZakresie = Boolean(prog?.od && (prog.zdjety || prog.ukrytych > 0));
   return <div className="relative">
     <button ref={wyzwalacz} type="button" aria-expanded={otwarte} aria-controls={otwarte ? idOkna : undefined}
       aria-label={`Filtr tagów i sortowanie${wlaczony ? " (włączony)" : ""}`}
@@ -60,7 +57,7 @@ export function FiltrKolejki({ wgTagow, tag, onTag, porzadek, osie, onPorzadek, 
       </div>}
       <div className="flex flex-col gap-1.5">
         <NaglowekSekcji jako="p">Zakres listy</NaglowekSekcji>
-        <PasekTla prog={prog} onPrzelaczProg={onPrzelaczProg} stanTekst={stanTekst} />
+        <PasekTla prog={prog} onPrzelaczProg={onPrzelaczProg} />
         {!mowiOZakresie && <p className="px-1 text-podpis text-slate-600">Lista pokazuje wszystkie sprawy.</p>}
       </div>
     </OknoFiltra>}

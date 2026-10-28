@@ -45,7 +45,7 @@ const OBSZARY: Array<[string, string]> = [
   ["klient_notatka", "Profil klienta"], ["klient_sprawa", "Profil klienta"], ["klient_dosylka", "Profil klienta"],
   ["klient_", "Skrzynka"], ["copilot_", "Copilot"], ["klasyfikacja_", "Copilot"], ["przeplyw_", "Copilot"],
   ["kosz_", "Kosze"], ["zwrot", "Zwroty"], ["oferta_komplet", "Zwroty"],
-  ["reklamacj", "Reklamacje"], ["dyskusja_", "Dyskusje"], ["sprawa_tag", "Tagi spraw"],
+  ["reklamacj", "Reklamacje"], ["sprawa_tag", "Tagi spraw"],
   ["delivery_", "Dostawy"], ["przyjecie_", "Dostawy"], ["notatka_", "Dostawy"],
   ["zadanie_terenowe", "Zadania"], ["brak_na_serwis", "Zadania"],
   ["putaway", "Kolektor"], ["karton_", "Kolektor"], ["location_", "Kolektor"],

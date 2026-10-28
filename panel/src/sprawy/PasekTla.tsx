@@ -45,7 +45,7 @@ export function PasekTla({ prog, onPrzelaczProg, stanTekst, onSynchronizuj, trwa
   onPrzelaczProg?: (zdejmij: boolean) => void;
   /** Jedno zdanie o kanale, np. „synchronizacja działa”. Może nieść odnośnik. */
   stanTekst?: React.ReactNode;
-  /** Bez niej wiersz nie rysuje przycisku — ekran dyskusji go nie ma. */
+  /** Bez niej wiersz nie rysuje przycisku synchronizacji. */
   onSynchronizuj?: () => void;
   trwaSync?: boolean;
 }) {

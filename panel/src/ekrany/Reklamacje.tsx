@@ -408,8 +408,6 @@ export function Reklamacje() {
   /* PRÓG, KTÓRY CHOWA PRACĘ, WOŁA NAD LISTĄ. W ciszy próg mieszka w filtrze,
      ale sprawy sprzed progu z żywym terminem to praca, a nie archiwum. */
   const progAlarmuje = Boolean(data?.prog && !data.prog.zdjety && data.prog.ukrytychZTerminem > 0);
-  const stanTekst = data?.stan?.dyskusjiPominietych
-    ? `pominiętych dyskusji ${data.stan.dyskusjiPominietych}` : undefined;
   const nazwaTagu = tag === null ? null : wgTagow.find(([t]) => t.id === tag)?.[0].nazwa ?? null;
 
   const d = szczegol.data;
@@ -437,7 +435,7 @@ export function Reklamacje() {
             </div>
             <FiltrKolejki wgTagow={wgTagow} tag={tag} onTag={setTag}
               porzadek={porzadek} osie={OSIE} onPorzadek={ustawPorzadek}
-              prog={data?.prog} onPrzelaczProg={setBezProgu} stanTekst={stanTekst} />
+              prog={data?.prog} onPrzelaczProg={setBezProgu} />
           </div>
           <label className="flex h-11 min-w-0 items-center gap-2 rounded-lg border border-slate-200 bg-slate-100 px-3">
             <Search size={18} aria-hidden="true" className="shrink-0 text-slate-600" />

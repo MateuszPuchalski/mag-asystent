@@ -99,6 +99,7 @@ export async function sondujRzeczywistosc(z: ZaleznosciSondy = {}): Promise<Stan
     }],
     ["sprawa", async () => {
       const w = database.prepare(`SELECT external_id FROM reklamacja_klienta
+        WHERE typ = 'CLAIM'
         ORDER BY otwarto_at DESC, id DESC LIMIT 1`).get() as { external_id: string } | undefined;
       if (!w) return { wynik: "pominiety", szczegol: "Brak sprawy posprzedażowej w bazie" };
       const b = await zapytaj(urlSprawy(apiUrl, String(w.external_id))) as { id?: unknown } | null;

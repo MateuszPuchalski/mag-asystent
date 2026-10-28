@@ -110,7 +110,7 @@ describe("Rozmowa: karta nad osią i oś bez zdarzeń zakupu", () => {
     const d = {
       rozmowa: rozmowa(), szkicCopilota: null, ofertaWskazana: null, przeplyw: [],
       os: [wiadomosc("m1", "2026-10-03T10:00:00.000Z")],
-      droga: [{ rodzaj: "dyskusja", id: 7, at: "2026-10-03T12:00:00.000Z", opis: null }],
+      droga: [{ rodzaj: "reklamacja", id: 7, at: "2026-10-03T12:00:00.000Z", opis: null }],
       oferta: null,
       zamowienie: { externalId: "17147703077", link: null, przesylka: null, pobrane: {
         externalId: "17147703077", status: "READY_FOR_PROCESSING", platnoscTyp: "ONLINE",
@@ -127,6 +127,6 @@ describe("Rozmowa: karta nad osią i oś bez zdarzeń zakupu", () => {
     expect(kolejnosc).toEqual(["m1"]);
     expect(screen.queryByText(/Zamówienie 17147703077 złożone/)).toBeNull();
     expect(screen.queryByText(/Paczka dostarczona/)).toBeNull();
-    expect(screen.queryByText(/Dyskusja otwarta/)).toBeNull();
+    expect(screen.queryByText(/Reklamacja otwarta/)).toBeNull();
   });
 });

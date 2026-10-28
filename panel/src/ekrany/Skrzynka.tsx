@@ -31,7 +31,7 @@ import { useSygnaly } from "../skrzynka/Sygnaly";
 import { useZglosPominiecie } from "../api/wglad";
 import { pamietanySzkic, zapamietajSzkic } from "../sprawy/useSzkicSprawy";
 
-/* Człony klucza magazynu karty — ten sam magazyn co reklamacje i dyskusje
+/* Człony klucza magazynu karty — ten sam magazyn co reklamacje
    (`sprawy/useSzkicSprawy.ts`), osobno odpowiedź i notatka, bo to dwa pola. */
 const PAMIEC_ODPOWIEDZI = "rozmowa";
 const PAMIEC_NOTATKI = "rozmowa-notatka";

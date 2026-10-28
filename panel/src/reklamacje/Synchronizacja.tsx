@@ -7,8 +7,8 @@ import { godzina } from "../ui";
    Stoi przy kolejce, bo synchronizacja odświeża właśnie tę listę. Pełny rząd
    nad kolumnami oddał przez to wysokość pracy.
 
-   PRZYCISK JEST DOKŁADNIE JEDEN. Ekran dyskusji odsyła tutaj, a drugi
-   przycisk byłby drugą drogą do limitu 429 u Allegro.
+   PRZYCISK JEST DOKŁADNIE JEDEN. Drugi przycisk byłby drugą drogą do
+   limitu 429 u Allegro.
 
    W CISZY MÓWI GODZINĘ, W AWARII STAN. Zła synchronizacja barwi zdanie na
    czerwono, bo cicha lista z wczoraj wygląda jak lista z teraz. */

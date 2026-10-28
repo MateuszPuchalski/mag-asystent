@@ -151,7 +151,7 @@ const dane = (kandydaci: unknown[]): OsRozmowy => ({
   droga: [
     { rodzaj: "rozmowa", id: 4821, at: "2026-09-29T08:00:00.000Z", opis: null },
     { rodzaj: "zwrot", id: 77, at: "2026-09-30T15:05:00.000Z", opis: "ZW/2026/10/0077" },
-    { rodzaj: "dyskusja", id: 311, at: "2026-10-03T19:20:00.000Z", opis: "Zwrot pieniędzy" },
+    { rodzaj: "reklamacja", id: 311, at: "2026-10-03T19:20:00.000Z", opis: "Zwrot pieniędzy" },
   ],
 } as unknown as OsRozmowy);
 
@@ -239,7 +239,7 @@ describe("Fakt z karty zakupu nie wraca do prawej kolumny", () => {
 });
 
 /* ── Sprawy zakupu mówi pasek, nie kolumna ───────────────────────────────────
-   Reklamacja, dyskusja i zwrot tego zakupu mają dom w przystankach paska drogi
+   Reklamacja i zwrot tego zakupu mają dom w przystankach paska drogi
    w karcie: rodzaj, data, stan, termin i prowadzący. Kolumna zostawia sobie
    tylko to, czego przystanek nie powie: plakietki, termin i pozycje zwrotu
    w toku oraz wynik zamkniętego zwrotu. */
@@ -251,7 +251,7 @@ describe("Sprawy zakupu nie wracają do kolumny", () => {
     notatka: null, linkZwrotu: null, waluta: "PLN", ...n,
   });
   const sprawy = [
-    { id: 311, typ: "DISPUTE", numer: null, temat: "Zwrot pieniędzy za nóż", statusAllegro: null,
+    { id: 311, typ: "CLAIM", numer: null, temat: "Zwrot pieniędzy za nóż", statusAllegro: null,
       decyzjaDo: null, otwartoAt: "2026-10-03T19:20:00.000Z", prowadzi: "Ola Kowalska", otwarta: true },
     { id: 12, typ: "CLAIM", numer: "REK-12/2026", temat: "Pęknięta rączka", statusAllegro: null,
       decyzjaDo: "2026-10-17T00:00:00.000Z", otwartoAt: "2026-10-01T10:00:00.000Z", prowadzi: null, otwarta: false },
@@ -267,7 +267,7 @@ describe("Sprawy zakupu nie wracają do kolumny", () => {
     await waitFor(() => expect(qc.isFetching()).toBe(0));
   }
 
-  it("reklamacje i dyskusje nie mają w kolumnie wierszy ani w ramie, ani jako zamknięte", async () => {
+  it("reklamacje nie mają w kolumnie wierszy ani w ramie, ani jako zamknięte", async () => {
     await otworz({ ...dane([BIEZACY_ZAKUP]), sprawy } as unknown as OsRozmowy);
     const k = kolumna();
     expect(within(k).queryByText(/Zamknięte sprawy/)).toBeNull();

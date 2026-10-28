@@ -349,19 +349,6 @@ export type OperacjaUprzywilejowana =
    */
   | "reklamacja_werdykt"
   /**
-   * Prośba o zakończenie dyskusji (`MessageRequest.type = "END_REQUEST"`).
-   *
-   * WŁASNA nazwa, nie `reklamacja_werdykt`, choć rola jest ta sama. Ślad
-   * `privileged` ma mówić, CO się stało: „wydał werdykt" i „poprosił
-   * o zakończenie dyskusji" to dwie różne rzeczy wobec dwóch różnych spraw,
-   * a `events` nie ma retencji i czyta się je po latach.
-   *
-   * Uprzywilejowana z tego samego powodu co werdykt: prośba trafia do
-   * kupującego natychmiast i drugiej nie wyślemy — pierwsza mogła dojść.
-   * Allegro nigdzie przy tym nie obiecuje, że dyskusja się od niej zamknie.
-   */
-  | "dyskusja_zakonczenie"
-  /**
    * Operacje ratunkowe serwera: pełny resync z Subiekta i zapomnienie braków
    * zdjęć (0.431.0). Do tej wersji stały za SAMĄ sesją — resync na produkcji
    * to pełny import z Subiekta, a mógł go wywołać magazynier z kolektora.
@@ -413,10 +400,6 @@ const WYMAGANA_ROLA: Record<OperacjaUprzywilejowana, readonly Rola[]> = {
      a werdykt zamknięty dla admina znaczyłby, że orzeka ktoś, kto nie czytał
      sprawy. Magazynier zostaje poza — on ocenia towar, nie roszczenie. */
   reklamacja_werdykt: ["biuro", "admin"],
-  /* To samo co werdykt i z tego samego powodu: dyskusje prowadzi biuro
-     codziennie, a prośba zamknięta dla admina znaczyłaby, że o zakończenie
-     prosi ktoś, kto nie czytał rozmowy. */
-  dyskusja_zakonczenie: ["biuro", "admin"],
   /* Biuro, bo to ono widzi skutek w STANIE SYSTEMU i ono dzwoni, gdy dostawy
      z Subiekta nie ma na liście. Hala zostaje poza: resync nie jest czynnością
      przy półce. */

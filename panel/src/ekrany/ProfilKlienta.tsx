@@ -2,7 +2,7 @@ import React, { useEffect, useId, useRef, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import {
   AlertTriangle, BellDot, CalendarClock, ChevronDown, ChevronRight, ClipboardList, ExternalLink,
-  MessageSquare, MessagesSquare, PackageX, Scale, ShoppingBag, StickyNote, Truck, Undo2, UserRound, Warehouse,
+  MessageSquare, PackageX, Scale, ShoppingBag, StickyNote, Truck, Undo2, UserRound, Warehouse,
 } from "lucide-react";
 import { adresPomylki, type Pomylka } from "../api/pomylki";
 import { ZlaPaczka } from "../pomylki/ZlaPaczka";
@@ -43,10 +43,10 @@ import {
    dokładnie jeden ekran. */
 
 const IKONY: Record<RodzajSprawyKlienta, React.ComponentType<{ size?: number; className?: string }>> = {
-  rozmowa: MessageSquare, zwrot: Undo2, reklamacja: Scale, dyskusja: MessagesSquare,
+  rozmowa: MessageSquare, zwrot: Undo2, reklamacja: Scale,
 };
 const NAZWY: Record<RodzajSprawyKlienta, string> = {
-  rozmowa: "Rozmowa", zwrot: "Zwrot", reklamacja: "Reklamacja", dyskusja: "Dyskusja",
+  rozmowa: "Rozmowa", zwrot: "Zwrot", reklamacja: "Reklamacja"
 };
 
 export function ProfilKlienta() {
@@ -109,13 +109,12 @@ function Naglowek({ d }: { d: Profil }) {
       {l.pierwszyZakup && <span className="text-sm text-slate-600">
         klient od {dzien(l.pierwszyZakup)}</span>}
     </div>
-    <div className="mt-3 grid grid-cols-3 gap-4 sm:grid-cols-6">
+    <div className="mt-3 grid grid-cols-3 gap-4 sm:grid-cols-5">
       <Liczba ile={l.zamowien} podpis="zamówienia" />
       <Liczba ile={zlote(l.wydanoGrosze, l.waluta ?? "PLN")} podpis="zapłacone" />
       <Liczba ile={l.rozmow} podpis="rozmowy" />
       <Liczba ile={l.zwrotow} podpis="zwroty" />
       <Liczba ile={l.reklamacji} podpis="reklamacje" />
-      <Liczba ile={l.dyskusji} podpis="dyskusje" />
     </div>
     {ostatnie && <div className="mt-3 border-t border-slate-200 pt-3">
       <p className="mb-2 text-podpis text-slate-600">Ostatnie zamówienie</p>

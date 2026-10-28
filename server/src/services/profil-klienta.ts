@@ -35,7 +35,7 @@ import { pomylkiKlienta, type Pomylka } from "./pomylki.js";
    każdej zmianie sprawy, a wyliczony gaśnie razem z przyczyną — ta sama zasada
    co lista „Do decyzji”. */
 
-export type RodzajSprawyKlienta = "rozmowa" | "zwrot" | "reklamacja" | "dyskusja";
+export type RodzajSprawyKlienta = "rozmowa" | "zwrot" | "reklamacja";
 
 export interface SygnalKlienta {
   /** `zle` woła o ruch dziś, `uwaga` każe wiedzieć przed odpowiedzią. */
@@ -87,7 +87,6 @@ export interface ProfilKlienta {
     waluta: string | null;
     zwrotow: number;
     reklamacji: number;
-    dyskusji: number;
     rozmow: number;
     pierwszyZakup: string | null;
     ostatniZakup: string | null;
@@ -140,7 +139,7 @@ const data = (at: string) => at.slice(0, 10).split("-").reverse().join(".");
 
 const SCIEZKA: Record<RodzajSprawyKlienta, string> = {
   rozmowa: "/obsluga/skrzynka", zwrot: "/obsluga/zwroty",
-  reklamacja: "/obsluga/reklamacje", dyskusja: "/obsluga/dyskusje",
+  reklamacja: "/obsluga/reklamacje",
 };
 
 /** Stan rozmowy dla człowieka — tylko te, które znaczą „sprawa trwa”. */
@@ -216,21 +215,19 @@ export function profilKlienta(
       od: String(z.created_at), stan: "w toku", cel: `${SCIEZKA.zwrot}/${z.id}` });
   }
 
-  for (const r of database.prepare(`SELECT id, typ, reference_number, temat, status_allegro, decyzja_do,
-      otwarto_at FROM reklamacja_klienta WHERE kupujacy_login = ? COLLATE NOCASE`).all(q) as Wiersz[]) {
+  for (const r of database.prepare(`SELECT id, reference_number, temat, status_allegro, decyzja_do,
+      otwarto_at FROM reklamacja_klienta WHERE typ = 'CLAIM' AND kupujacy_login = ? COLLATE NOCASE`).all(q) as Wiersz[]) {
     if (!sprawaOtwarta(tekst(r.status_allegro))) continue;
-    const rodzaj = String(r.typ) === "DISPUTE" ? "dyskusja" as const : "reklamacja" as const;
+    const rodzaj = "reklamacja" as const;
     const termin = tekst(r.decyzja_do);
     const opis = tekst(r.temat) ?? tekst(r.reference_number) ?? "Sprawa bez tematu";
     const cel = `${SCIEZKA[rodzaj]}/${r.id}`;
     otwarte.push({ rodzaj, id: Number(r.id), opis, od: String(r.otwarto_at),
       stan: termin ? `termin ${data(termin)}` : "otwarta", cel });
-    /* Otwarta reklamacja i dyskusja to sygnał ZŁY: każda odpowiedź klientowi
-       w innej sprawie może ją pogorszyć, a termin biegnie. */
+    /* Otwarta reklamacja to sygnał ZŁY: każda odpowiedź klientowi w innej
+       sprawie może ją pogorszyć, a termin biegnie. */
     sygnaly.push({ ton: "zle", cel,
-      tekst: rodzaj === "reklamacja"
-        ? `Otwarta reklamacja${termin ? `, termin ${data(termin)}` : ""}`
-        : "Otwarta dyskusja w Allegro" });
+      tekst: `Otwarta reklamacja${termin ? `, termin ${data(termin)}` : ""}` });
   }
   otwarte.sort((a, b) => b.od.localeCompare(a.od));
 
@@ -276,7 +273,7 @@ export function profilKlienta(
       zamowien: zamowienia.length,
       wydanoGrosze: zaplacone.reduce((s, z) => s + (z.sumaGrosze ?? 0), 0),
       waluta: zaplacone.find((z) => z.waluta)?.waluta ?? null,
-      zwrotow: ile("zwrot"), reklamacji: ile("reklamacja"), dyskusji: ile("dyskusja"),
+      zwrotow: ile("zwrot"), reklamacji: ile("reklamacja"),
       rozmow: ile("rozmowa"),
       pierwszyZakup: daty[0] ?? null, ostatniZakup: daty[daty.length - 1] ?? null,
     },

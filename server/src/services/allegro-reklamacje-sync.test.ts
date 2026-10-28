@@ -10,7 +10,7 @@ import {
 import { stanReklamacji } from "./allegro-reklamacje-sync-state.js";
 
 /* Ten plik pilnuje trzech rzeczy, których nie da się sprawdzić na ekranie:
-   że dyskusje NIE wchodzą do rejestru i są policzone, że drugi przebieg nie
+   że dyskusje NIE wchodzą do rejestru, że drugi przebieg nie
    robi duplikatów (blizna 0.128.0) oraz że rozmowy dociągają się z limitem,
    a nie po jednym żądaniu na sprawę.
 
@@ -72,13 +72,11 @@ function api(issues: unknown[], czat: unknown[] = []) {
   return { query, wywolania };
 }
 
-test("dyskusje WCHODZĄ do rejestru z własnym typem i są policzone (0.245.0)", async () => {
-  /* Do 0.244.0 ten test pilnował rzeczy odwrotnej: dyskusje leciały do kosza
-     w pamięci, bo panel prowadził wyłącznie reklamacje. Właściciel odwrócił tę
-     decyzję 9 września 2026, więc obie gałęzie lądują w bazie, a rozróżnia je
-     kolumna `typ`. Licznik `dyskusji` ZOSTAŁ i zmienił znaczenie z „ile
-     wyrzuciliśmy" na „ile przyjechało" — jest teraz kontrolą krzyżową dla
-     licznika kolejki dyskusji. */
+test("dyskusje NIE wchodzą do rejestru ani do lądowiska, a reklamacje tak", async () => {
+  /* Nowe sprawy kupujących Allegro zakłada jako Problemy z zakupem w skrzynce,
+     więc panel prowadzi wyłącznie reklamacje. Specyfikacja nie ma filtra po
+     `type`, więc dyskusje przychodzą na liście i odsiewamy je po naszej
+     stronie. */
   const d = baza();
   const { query } = api([
     sprawa(),
@@ -88,36 +86,46 @@ test("dyskusje WCHODZĄ do rejestru z własnym typem i są policzone (0.245.0)",
 
   const wynik = await synchronizujAllegroReklamacje({ database: d, query, czatow: 0 });
 
-  assert.equal(wynik.reklamacji, 1, "licznik reklamacji nie liczy dyskusji");
-  assert.equal(wynik.dyskusji, 2);
+  assert.equal(wynik.reklamacji, 1);
+  assert.ok(!("dyskusji" in wynik), "licznik dyskusji zniknął z wyniku przebiegu");
   /* `node:sqlite` oddaje wiersze BEZ prototypu, a `deepEqual` ze `strict`
      porównuje także prototyp — stąd rozłożenie na zwykły obiekt. */
   const w = (d.prepare("SELECT external_id, typ FROM reklamacja_klienta ORDER BY external_id")
     .all() as Array<Record<string, unknown>>).map((r) => ({ ...r }));
-  assert.deepEqual(w, [
-    { external_id: "i-1", typ: "CLAIM" },
-    { external_id: "i-2", typ: "DISPUTE" },
-    { external_id: "i-3", typ: "DISPUTE" },
-  ], "typ bierze się z ładunku Allegro, nie z gałęzi kodu");
-  assert.equal(stanReklamacji(d).dyskusji, 2);
+  assert.deepEqual(w, [{ external_id: "i-1", typ: "CLAIM" }]);
+  const lad = (d.prepare("SELECT id FROM allegro_reklamacja ORDER BY id")
+    .all() as Array<{ id: string }>).map((r) => r.id);
+  assert.deepEqual(lad, ["i-1"], "lądowisko też nie dostaje dyskusji");
+  assert.equal(stanReklamacji(d).pozostalo, 0);
 });
 
-test("dyskusja bez pól reklamacyjnych zapisuje się pustymi kolumnami, nie zgadywanymi", async () => {
-  /* Schemat mówi `Null for disputes` przy `referenceNumber`, `decisionDueDate`,
-     `reason`, `right` i `expectations`. Podstawienie tam czegokolwiek zrobiłoby
-     z dyskusji reklamację bez tytułu prawnego. */
+test("wiersz dawnej dyskusji zostaje w bazie nietknięty i nie dostaje rozmowy", async () => {
+  /* Dane zostają: przebieg niczego nie kasuje ani nie nadpisuje. Rozmowy
+     wiersza już nie dociągamy, choć licznik Allegro rozjeżdża się z naszym. */
   const d = baza();
-  const { query } = api([sprawa({
-    id: "d-1", type: "DISPUTE", referenceNumber: null, right: null,
-    decisionDueDate: null, reason: null, expectations: null,
-  })]);
-  await synchronizujAllegroReklamacje({ database: d, query, czatow: 0 });
-  const w = d.prepare("SELECT * FROM reklamacja_klienta WHERE external_id='d-1'")
-    .get() as Record<string, unknown>;
+  const konto = Number(d.prepare(`INSERT INTO channel_account(channel,external_account_id)
+    VALUES ('allegro','cl')`).run().lastInsertRowid);
+  const id = Number(d.prepare(`INSERT INTO reklamacja_klienta(channel_account_id,external_id,typ,
+    otwarto_at,synced_at,wiadomosci_ile,status_allegro) VALUES (?,'stara','DISPUTE',
+    '2026-08-01T00:00:00Z','2026-08-01T00:00:00Z',5,'DISPUTE_ONGOING')`).run(konto).lastInsertRowid);
+
+  assert.deepEqual(czatyDoUzupelnienia(d, konto), [], "dyskusja nie czeka na rozmowę");
+
+  const wywolania: string[] = [];
+  const query = async (url: string) => {
+    wywolania.push(url);
+    return { issues: [] };
+  };
+  await synchronizujAllegroReklamacje({ database: d, query, czatow: 5 });
+  assert.ok(wywolania.every((u) => !u.includes("/chat")), "żadnego żądania o rozmowę dyskusji");
+  const w = d.prepare("SELECT typ, status_allegro, wiadomosci_ile FROM reklamacja_klienta WHERE id=?")
+    .get(id) as Record<string, unknown>;
   assert.equal(w.typ, "DISPUTE");
-  for (const kolumna of ["reference_number", "decyzja_do", "prawo", "powod_typ", "oczekiwanie"]) {
-    assert.equal(w[kolumna], null, kolumna);
-  }
+  assert.equal(w.status_allegro, "DISPUTE_ONGOING");
+  assert.equal(w.wiadomosci_ile, 5);
+  assert.equal(await odswiezSprawe(id, { database: d, query }), false,
+    "odświeżenie sprawy nie sięga po dyskusję");
+  assert.ok(wywolania.every((u) => !u.includes(`/sale/issues/stara`)));
 });
 
 test("mapowanie bierze zegar Z ALLEGRO, nie liczy go samo", async () => {
@@ -490,8 +498,7 @@ test("przebieg pyta NAJPIERW o sprawy otwarte, potem o całą listę", async () 
 
   const listy = wywolania.filter((u) => u.includes("/sale/issues?"));
   assert.match(listy[0], /status=CLAIM_SUBMITTED/);
-  assert.match(listy[0], /status=DISPUTE_ONGOING/);
-  assert.match(listy[0], /status=DISPUTE_UNRESOLVED/);
+  assert.ok(!/status=DISPUTE/.test(listy[0]), "statusów dyskusji nie pytamy");
   assert.ok(!listy[listy.length - 1].includes("status="),
     "przelot pełny zostaje bez filtra — to on domyka sprawy rozstrzygnięte");
   /* Sprawa widziana w obu przelotach zapisuje się RAZ i liczy się raz. */

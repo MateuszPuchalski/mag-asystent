@@ -3,7 +3,7 @@ import { createRoot } from "react-dom/client";
 import { BrowserRouter, Link, Navigate, Route, Routes, useLocation } from "react-router-dom";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { nowyKlientZapytan } from "./api/klient-zapytan";
-import { ClipboardList, ImagePlus, Inbox, ListChecks, MessagesSquare, PackageX, PanelLeftClose, PanelLeftOpen, ShieldQuestion, Truck, Undo2 } from "lucide-react";
+import { ClipboardList, ImagePlus, Inbox, ListChecks, PackageX, PanelLeftClose, PanelLeftOpen, ShieldQuestion, Truck, Undo2 } from "lucide-react";
 import logoBiale from "./assets/wertis-logo-biale.png";
 import { SESJA_WYGASLA, token, wyczyscToken } from "./api/klient";
 import { useJa, useWzmianki } from "./api/rozmowy";
@@ -15,14 +15,12 @@ import { Logowanie } from "./ekrany/Logowanie";
 import { Skrzynka } from "./ekrany/Skrzynka";
 import { Zwroty } from "./ekrany/Zwroty";
 import { Reklamacje } from "./ekrany/Reklamacje";
-import { Dyskusje } from "./ekrany/Dyskusje";
 import { Zadania } from "./ekrany/Zadania";
 import { Pomylki } from "./ekrany/Pomylki";
 import { useLicznikPomylek } from "./api/pomylki";
 import { SzukajIKlawisze } from "./nawigacja/Klawisze";
 import { WskaznikSynchronizacji } from "./nawigacja/Synchronizacja";
 import { PasekPolaczenia } from "./nawigacja/Polaczenie";
-import { LicznikAlarmuDyskusji, PasekAlarmuDyskusji } from "./nawigacja/AlarmDyskusji";
 import { USTAWIENIA, Wiecej } from "./nawigacja/Wiecej";
 import { useZwinietyPasek } from "./nawigacja/ZwinietyPasek";
 import { Ustawienia } from "./ekrany/Ustawienia";
@@ -61,13 +59,8 @@ const ZAKLADKI = [
   { do: "/obsluga/skrzynka", etykieta: "Skrzynka", ikona: <Inbox size={16} />, korzen: false, kreska: false },
   { do: "/obsluga/zwroty", etykieta: "Zwroty", ikona: <Undo2 size={16} />, korzen: false, kreska: false },
   { do: "/obsluga/reklamacje", etykieta: "Reklamacje", ikona: <ShieldQuestion size={16} />, korzen: false, kreska: false },
-  /* DYSKUSJE OBOK REKLAMACJI, nie w nich. Allegro trzyma oba rodzaje spraw pod
-     jednym zasobem, ale to dwie różne prace: reklamacja ma zegar i werdykt,
-     dyskusja nie ma ani jednego. Wspólny ekran kazałby najpierw rozpoznać
-     rodzaj sprawy, żeby wiedzieć, co się na nim da zrobić — blizna 0.121.0. */
-  { do: "/obsluga/dyskusje", etykieta: "Dyskusje", ikona: <MessagesSquare size={16} />, korzen: false, kreska: false },
   /* POMYŁKI OBOK KOLEJEK KLIENTA: zła paczka przychodzi zwrotem, rozmową
-     albo dyskusją i tam się ją rozpoznaje. Rejestr uzupełnia się codziennie,
+     albo reklamacją i tam się ją rozpoznaje. Rejestr uzupełnia się codziennie,
      więc stoi w zakładkach pracy, a nie w menu „Więcej". */
   { do: "/obsluga/pomylki", etykieta: "Pomyłki", ikona: <PackageX size={16} />, korzen: false, kreska: false },
   { do: "/obsluga/zadania", etykieta: "Zadania", ikona: <ClipboardList size={16} />, korzen: false, kreska: false },
@@ -169,10 +162,6 @@ function PasekBoczny({ wyloguj }: { wyloguj: () => void }) {
               aktywna ? "bg-wertis-amber text-wertis-ink" : "text-slate-300 hover:bg-white/10"}`}>
             {z.ikona}<span className={zwiniety ? "sr-only" : "max-[899px]:sr-only"}>{z.etykieta}</span>
             {z.do === "/obsluga/" && <LicznikDoZrobienia />}
-            {/* Czerwony alarm dyskusji stoi przy zakładce na każdym ekranie,
-                także na reklamacjach, gdzie paska nad pracą nie ma. Powód
-                i barwa przy `nawigacja/AlarmDyskusji.tsx`. */}
-            {z.do === "/obsluga/dyskusje" && <LicznikAlarmuDyskusji />}
             {z.do === "/obsluga/pomylki" && <LicznikPomylek />}</Link>
         </React.Fragment>;
       })}
@@ -277,12 +266,6 @@ function Rama({ wyloguj }: { wyloguj: () => void }) {
         wydaniu. Powód w `coNowego/CoNowego.tsx`.
         Pasek braku połączenia stoi NAD nim: awaria jest ważniejsza niż nowość. */}
     <PasekPolaczenia />
-    {/* Dyskusja bez odpowiedzi grozi blokadą konta Allegro, więc alarm stoi
-        nad nowościami: nowość może poczekać, odpowiedź nie. Pasek pokazuje
-        się sam tylko na ekranach dyskusji, a na pozostałych alarm niesie
-        czerwony licznik zakładki „Dyskusje".
-        Warunek mieszka w komponencie, bo tam sprawdza go test. */}
-    <PasekAlarmuDyskusji />
     <CoNowego />
     {/* BEZ `max-w` i bez `mx-auto` (0.198.0). Ogranicznik 1500 px przyszedł
         z makiety i nikt go nigdy nie uzasadnił w kodzie. Na monitorze 1920
@@ -319,8 +302,6 @@ function Rama({ wyloguj }: { wyloguj: () => void }) {
             odświeżenie jej nie gubi, a link do sprawy da się wkleić koledze. */}
         <Route path="/obsluga/reklamacje" element={<Reklamacje />} />
         <Route path="/obsluga/reklamacje/:id" element={<Reklamacje />} />
-    <Route path="/obsluga/dyskusje" element={<Dyskusje />} />
-    <Route path="/obsluga/dyskusje/:id" element={<Dyskusje />} />
         <Route path="/obsluga/stan" element={<Stan />} />
         <Route path="/obsluga/dziennik" element={<Dziennik />} />
         <Route path="/obsluga/analiza" element={<Analiza />} />

@@ -62,7 +62,7 @@ test("każdy adres wołany z panel/src/api/*.ts ma trasę na serwerze", async ()
   assert.ok(trasy.length >= 100, `drzewo tras się nie czyta — ${trasy.length} tras`);
   const jest = (metoda: string, url: string) => trasy.some((t) => t.metody.includes(metoda) && t.wzor.test(url));
   /* Szablon panelu bywa zmienny w miejscu STAŁEGO członu trasy —
-     `/api/obsluga/${v.rodzaj}/…` to raz reklamacje, raz dyskusje. Jedynka
+     `/api/obsluga/${v.rodzaj}/…` to raz jeden zasób, raz drugi. Jedynka
      w tym miejscu nie pasuje do niczego, więc taki adres porównujemy odwrotnie:
      szablon jako wzorzec przyłożony do ścieżek tras. */
   const pasujeSzablon = (metoda: string, szablon: string) => {

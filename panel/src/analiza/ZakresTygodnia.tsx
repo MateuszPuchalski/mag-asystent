@@ -49,7 +49,7 @@ function wiersze(r: RaportTygodnia, p: RaportTygodnia | null): Array<{ grupa: st
       ["Klienci czekający na zamknięcie tygodnia", r.obsluga.klientCzekaNaKoniec.n, p?.obsluga.klientCzekaNaKoniec.n],
       ["Zwroty nowe", r.obsluga.zwrotyNowe, p?.obsluga.zwrotyNowe],
       ["Zwroty zamknięte", r.obsluga.zwrotyZamkniete, p?.obsluga.zwrotyZamkniete],
-      ["Reklamacje i dyskusje nowe", r.obsluga.reklamacjeNowe, p?.obsluga.reklamacjeNowe],
+      ["Reklamacje nowe", r.obsluga.reklamacjeNowe, p?.obsluga.reklamacjeNowe],
       ["Reklamacje rozstrzygnięte", r.obsluga.reklamacjeRozstrzygniete, p?.obsluga.reklamacjeRozstrzygniete],
     ] },
     { grupa: "Copilot i system", wiersze: [

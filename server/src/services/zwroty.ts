@@ -2805,7 +2805,7 @@ function wersjaSieZgadza(w: Record<string, unknown>, wersja: number | undefined)
    pytanie — a tego samego dnia przywróciło znacznik z powrotem. Właściciel
    wskazał go teraz wprost jako niepotrzebny przy prośbie o wymagane minimum.
 
-   REKLAMACJA I DYSKUSJA ZOSTAJĄ ZE ZNACZNIKIEM (0.278.0) i to nie jest
+   REKLAMACJA ZOSTAJE ZE ZNACZNIKIEM (0.278.0) i to nie jest
    niekonsekwencja: tam sprawę bierze konkretna osoba i prowadzi rozmowę
    z klientem, więc pytanie „czyje to" jest prawdziwe. Zwrot przechodzi przez
    biuro jako kolejka decyzji, nie jako czyjaś sprawa.

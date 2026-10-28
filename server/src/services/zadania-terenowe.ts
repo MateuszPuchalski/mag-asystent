@@ -65,10 +65,9 @@ export interface ZadanieTerenowe {
    wiersze: „reczne", „panel") po prostu nie ma odnośnika. */
 const CEL_ZRODLA: Record<string, string> = {
  skrzynka: "/obsluga/skrzynka/", zwrot: "/obsluga/zwroty/", reklamacja: "/obsluga/reklamacje/",
- dyskusja: "/obsluga/dyskusje/",
 };
 /** Źródła, które panel zleca spoza skrzynki — każde z numerem sprawy. */
-export const ZRODLA_SPRAW = ["zwrot", "reklamacja", "dyskusja"] as const;
+export const ZRODLA_SPRAW = ["zwrot", "reklamacja"] as const;
 export function celZadania(zrodlo: string, ref: string | null): string | null {
  return CEL_ZRODLA[zrodlo] && ref && /^\d+$/.test(ref) ? `${CEL_ZRODLA[zrodlo]}${ref}` : null;
 }
@@ -77,12 +76,12 @@ function sprawdzZrodlo(zrodlo: string, ref: string | null): void {
  if (!(ZRODLA_SPRAW as readonly string[]).includes(zrodlo)) return;
  if (!ref || !/^\d+$/.test(ref)) throw new Error("Zadanie ze sprawy wymaga jej numeru");
  const jest = zrodlo === "zwrot" ? db().prepare("SELECT 1 FROM zwrot_klienta WHERE id=?").get(ref)
-  : db().prepare("SELECT 1 FROM reklamacja_klienta WHERE id=? AND typ=?").get(ref, zrodlo === "reklamacja" ? "CLAIM" : "DISPUTE");
+  : db().prepare("SELECT 1 FROM reklamacja_klienta WHERE id=? AND typ='CLAIM'").get(ref);
  if (!jest) throw new Error("Nie znaleziono sprawy, z której zlecasz zadanie");
 }
 /**
  * Wynik albo odesłanie wraca na oś ZWROTU tak jak na oś rozmowy (0.142.0).
- * Reklamacja i dyskusja nie mają własnej osi zdarzeń biura — tam
+ * Reklamacja nie ma własnej osi zdarzeń biura — tam
  * wynik czyta się z karty zadania, do której prowadzi odnośnik.
  */
 function wrocDoZwrotu(id: number, rodzaj: "zadanie_wynik" | "zadanie_odeslane", tresc: string, autor: { id: number; name: string }): void {

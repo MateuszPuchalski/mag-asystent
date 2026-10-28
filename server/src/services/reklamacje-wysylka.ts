@@ -4,9 +4,7 @@ import { wyslijWiadomoscSprawy, type TypWiadomosciSprawy } from "../adapters/all
 import { logEvent } from "./events.js";
 import { kluczWysylki, niejednoznaczny } from "./idempotencja.js";
 import { zalacznikiDoWyslania } from "./reklamacje-zalaczniki.js";
-import {
-  BladReklamacji, NAZWA_SPRAWY, ReklamacjaConflict, type TypSprawy,
-} from "./reklamacje.js";
+import { BladReklamacji, ReklamacjaConflict } from "./reklamacje.js";
 
 /* ── Odpowiedź w reklamacji (0.224.0) ────────────────────────────────────────
    PIERWSZY zapis tego modułu wychodzący do Allegro. Wzorzec w całości
@@ -67,17 +65,6 @@ export interface ZadanieOdpowiedzi {
   mimoNowejWiadomosci?: boolean;
   /** `MessageRequest.type`; brak znaczy zwykłą wiadomość. */
   typ?: TypOdpowiedzi;
-  /**
-   * RODZAJ SPRAWY — reklamacja czy dyskusja (0.245.0).
-   *
-   * Ten moduł obsługuje oba ekrany, bo wysyłka jest identyczna: ta sama
-   * końcówka, ta sama bramka `czat_aktywny`, ta sama świeżość i ten sam klucz
-   * idempotencji. Rodzaj robi dokładnie dwie rzeczy i obie są konieczne:
-   * bramkuje odczyt wiersza (wysyłka z ekranu dyskusji nie ma prawa dosięgnąć
-   * reklamacji) i nazywa zdarzenie w dzienniku. `reklamacja_odpowiedz` przy
-   * dyskusji byłoby wpisem nieprawdziwym, a `events` nie ma retencji.
-   */
-  rodzaj?: TypSprawy;
   database?: Db;
   wyslij?: WyslijWiadomosc;
 }
@@ -97,12 +84,14 @@ interface Kontekst {
   lastMessageId: number | null;
 }
 
-function kontekst(database: Db, reklamacjaId: number, rodzaj: TypSprawy): Kontekst {
+/* `typ='CLAIM'` w zapytaniu: wiersz dawnej dyskusji, który został w tabeli,
+   nie ma prawa dostać wiadomości z tego ekranu. */
+function kontekst(database: Db, reklamacjaId: number): Kontekst {
   const r = database.prepare(
     `SELECT external_id, wersja, czat_aktywny, prowadzi FROM reklamacja_klienta
-      WHERE id=? AND typ=?`,
-  ).get(reklamacjaId, rodzaj) as Record<string, unknown> | undefined;
-  if (!r) throw new BladReklamacji(`${NAZWA_SPRAWY[rodzaj]} ${reklamacjaId} nie istnieje`, 404);
+      WHERE id=? AND typ='CLAIM'`,
+  ).get(reklamacjaId) as Record<string, unknown> | undefined;
+  if (!r) throw new BladReklamacji(`Reklamacja ${reklamacjaId} nie istnieje`, 404);
 
   /* NIE NASZA, a nie „od kupującego". Rozmowa bywa trójstronna, więc punkt
      odniesienia przesuwa też doradca Allegro. Własna odpowiedź go NIE
@@ -161,21 +150,17 @@ export async function odpowiedzWSprawie(z: ZadanieOdpowiedzi): Promise<WynikOdpo
       wyslijWiadomoscSprawy(config.allegro.apiUrl, id, tekst, typ, zal ?? []));
   const typ: TypOdpowiedzi = z.typ ?? "REGULAR";
 
-  const rodzaj: TypSprawy = z.rodzaj ?? "CLAIM";
-
   const tresc = (z.tresc ?? "").trim();
   if (!tresc) throw new BladReklamacji("Pusta odpowiedź nie idzie do Allegro");
   if (tresc.length > LIMIT_ZNAKOW) {
     /* Bramka PRZED kolejką i przed siecią. Agent ma zobaczyć liczbę, a nie
-       stracić tekst i dostać kod błędu z Allegro. Zdanie nazywa RODZAJ sprawy,
-       bo ten sam moduł obsługuje dwa ekrany i „przy reklamacji" na ekranie
-       dyskusji byłoby komunikatem o czymś innym, niż widzi agent. */
+       stracić tekst i dostać kod błędu z Allegro. */
     throw new BladReklamacji(
-      `Allegro przyjmuje przy sprawie „${NAZWA_SPRAWY[rodzaj].toLowerCase()}" `
+      `Allegro przyjmuje przy sprawie „reklamacja" `
       + `najwyżej ${LIMIT_ZNAKOW} znaków, a odpowiedź ma ${tresc.length}`);
   }
 
-  const k = kontekst(database, z.reklamacjaId, rodzaj);
+  const k = kontekst(database, z.reklamacjaId);
 
   /* Rozmowa zamknięta przez Allegro. 409, nie 400: to nie jest błąd agenta,
      tylko stan sprawy, który mógł się zmienić, odkąd otworzył ekran. */
@@ -335,7 +320,7 @@ export async function odpowiedzWSprawie(z: ZadanieOdpowiedzi): Promise<WynikOdpo
        wysyłki, więc bez tego ekran natychmiast skłamałby „ta rozmowa jest
        niepełna" — porównuje liczbę z Allegro z liczbą wierszy u nas. */
     /* bez typu: wiersz przeszedł przez bramkę `kontekst()` na początku tej
-       operacji, więc rodzaj sprawy jest już rozstrzygnięty. */
+       operacji, więc jest reklamacją. */
     database.prepare(
       `UPDATE reklamacja_klienta
           SET wiadomosci_ile = wiadomosci_ile + 1,
@@ -367,7 +352,7 @@ export async function odpowiedzWSprawie(z: ZadanieOdpowiedzi): Promise<WynikOdpo
 
     /* Do dziennika idzie DŁUGOŚĆ, nigdy treść: `events` nie ma retencji.
        Załączniki liczbą i numerami — nazwy poszły już przy dodawaniu. */
-    logEvent(rodzaj === "DISPUTE" ? "dyskusja_odpowiedz" : "reklamacja_odpowiedz",
+    logEvent("reklamacja_odpowiedz",
       z.autor.name, null,
       { id: z.reklamacjaId, znakow: tresc.length, externalMessageId, typ,
         zalacznikow: idZalacznikow.length },

@@ -38,7 +38,6 @@ import { skrzynkaRoutes } from "./routes/skrzynka.js";
 import { copilotRoutes } from "./routes/copilot.js";
 import { zwrotyRoutes } from "./routes/zwroty.js";
 import { reklamacjeRoutes } from "./routes/reklamacje.js";
-import { dyskusjeRoutes } from "./routes/dyskusje.js";
 import { tagiRoutes } from "./routes/tagi.js";
 import { ustawieniaRoutes } from "./routes/ustawienia.js";
 import { koszeRoutes } from "./routes/kosze.js";
@@ -89,7 +88,6 @@ import { uruchomTakt } from "./services/takt.js";
 import { sledzDosylki } from "./services/dosylka.js";
 import { czytajStan, problemyKopii } from "./services/kopie-bazy.js";
 import { liniaLogu, stanPamieci, zapiszProbke } from "./services/pamiec-procesu.js";
-import { problemDyskusji, stanDyskusjiHealth } from "./services/dyskusje.js";
 import { przebiegNocny, TAKT_NOCNY_MS } from "./services/przebieg-nocny.js";
 import { sprzatnijWejscia } from "./services/copilot-wejscie.js";
 import { przebiegRaportow, TAKT_RAPORTOW_MS } from "./services/raport-tygodnia.js";
@@ -329,7 +327,6 @@ export async function buildApp(opcje: {
     const audyt = bez("audyt", statystykiAudytu);
     const kopie = bez("kopie bazy", () => czytajStan());
     const pamiec = bez("pamięć procesu", () => stanPamieci());
-    const dyskusje = bez("dyskusje bez odpowiedzi", () => stanDyskusjiHealth());
 
     const problemy = [
       worker.problem,
@@ -432,16 +429,6 @@ export async function buildApp(opcje: {
          starej wersji i wygląda zdrowo — bez tego zdania nikt by nie wiedział. */
       bez("aktualizacja", () => problemAktualizacji(stanZadania())),
       ...awarie,
-      /* Dyskusja bez odpowiedzi grozi blokadą konta Allegro. Zdanie wchodzi do
-         `problemy` dla ekranu stanu, a pole `dyskusje` niżej karmi pasek na
-         każdym ekranie poza reklamacjami i czerwony licznik na zakładce
-         Dyskusje. Na reklamacjach alarm niesie sam licznik, bo pasek nad
-         trzema kolumnami zabiera miejsce pracy. Instalator
-         wycofuje wydanie po wersji w odpowiedzi, nie po `ok`, więc zaległa
-         dyskusja nie zatrzyma aktualizacji. NA KOŃCU listy: baner awarii
-         synchronizacji czyta `problemy[0]` i nie ma brać za jej powód zdania
-         o dyskusjach. */
-      problemDyskusji(dyskusje),
     ].filter((x): x is string => x !== null);
     return {
       ok: problemy.length === 0,
@@ -508,9 +495,6 @@ export async function buildApp(opcje: {
       /* Pamięć procesu i trend jej dna. Same liczby, więc trasa może zostać
          publiczna. Trend nie wchodzi do `problemy`: powód w `pamiec-procesu.ts`. */
       pamiec,
-      /* Ile dyskusji czeka na nas i czy któraś przekroczyła próg alarmu. Same
-         liczby, bez loginu i numeru zamówienia: trasa jest publiczna. */
-      dyskusje,
       /* Liczby cache'u zdjęć — po to, żeby ZDJECIA_MAX_KB dobierać na danych
          z własnej bazy, a nie na przypuszczeniu, ile waży typowe zdjęcie. */
       ...(config.zdjecia.zrodlo ? { zdjecia: statystykiZdjec() } : {}),
@@ -593,7 +577,6 @@ export async function buildApp(opcje: {
   await app.register(copilotRoutes);
   await app.register(zwrotyRoutes);
   await app.register(reklamacjeRoutes);
-  await app.register(dyskusjeRoutes);
   await app.register(pomylkiRoutes);
   await app.register(tagiRoutes);
   await app.register(ustawieniaRoutes);

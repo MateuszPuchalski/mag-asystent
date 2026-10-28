@@ -14,9 +14,10 @@
    w routes/device.ts. Czego nie ma w rejestrze, a jest w dzienniku, raport
    pokazuje osobno — nic nie ginie po cichu.
 
-   Typów doboru i bazy wiedzy tu nie ma, choć dziennik je niesie. Funkcji,
-   która je pisała, już nie ma, więc raport „czego nikt nie używa" nie ma
-   o co pytać. Stare wiersze trafiają do listy spoza rejestru. */
+   Typów doboru, bazy wiedzy i dyskusji (`dyskusja_*`) tu nie ma, choć dziennik
+   je niesie. Funkcji, która je pisała, już nie ma, więc raport „czego nikt
+   nie używa" nie ma o co pytać. Stare wiersze trafiają do listy spoza
+   rejestru. */
 
 export const ZDARZENIA: readonly string[] = [
   "allegro_polaczono", "allegro_rozlaczono", "allegro_zamowienie_brak",
@@ -29,9 +30,7 @@ export const ZDARZENIA: readonly string[] = [
   "delivery_done",
   "delivery_external", "delivery_external_undo", "delivery_finished", "delivery_note_added",
   "delivery_note_answered", "delivery_open", "delivery_reopened", "device_drop",
-  "dyskusja_notatka", "dyskusja_notatka_cofnieta", "dyskusja_odpowiedz", "dyskusja_odswiezenie",
-  "dyskusja_zalacznik_dodany", "dyskusja_zalacznik_zdjety", "dyskusja_prowadzi",
-  "dyskusja_przesylka_reczna", "dyskusja_zakonczenie", "ean_conflict", "ean_conflict_autoresolved",
+  "ean_conflict", "ean_conflict_autoresolved",
   "ean_kolizja_rozstrzygnieta", "ean_set", "firma_zapis", "http_rejected", "karton_anulowany",
   "karton_ilosc", "karton_pozycja", "karton_pozycja_usunieta", "karton_zalozony",
   "karton_zatwierdzony", "klasyfikacja_mapowanie_do_przegladu", "konfiguracja_zmieniona",

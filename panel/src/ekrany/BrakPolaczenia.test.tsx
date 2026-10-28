@@ -7,7 +7,6 @@ import { Dostawy } from "./Dostawy";
 import { Kosze } from "./Kosze";
 import { Skrzynka } from "./Skrzynka";
 import { Zwroty } from "./Zwroty";
-import { Dyskusje } from "./Dyskusje";
 
 /* ── BRAK POŁĄCZENIA TO NIE BRAK PRACY (0.546.0) ────────────────────────────
    Pomiar z zabitym serwerem: Dostawy mówiły „Nic nie czeka na biuro — hala
@@ -72,15 +71,6 @@ describe("zerwane połączenie przy otwarciu ekranu", () => {
     bezCyfr(/Wszystkie/);
     // Kafle zostają na ekranie: awaria zdejmuje liczby, nie nawigację.
     expect(screen.getAllByRole("button", { name: /Do oceny/ }).length).toBeGreaterThan(0);
-    expect(zapisy).toEqual([]);
-  });
-
-  it("Dyskusje: błąd przy liście zamiast „kubełek jest pusty” i bez zer w pigułkach", async () => {
-    pokaz(<Dyskusje />, "/obsluga/dyskusje");
-    expect((await screen.findAllByText("Brak połączenia z serwerem.")).length).toBeGreaterThan(0);
-    expect(screen.queryByText(/kubełek jest pusty/)).toBeNull();
-    bezCyfr(/Do odpowiedzi/);
-    expect(screen.getByLabelText("Szukaj dyskusji")).toBeInTheDocument();
     expect(zapisy).toEqual([]);
   });
 });

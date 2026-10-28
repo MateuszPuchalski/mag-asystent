@@ -36,9 +36,9 @@ describe("co świeci w kolumnie kontekstu", () => {
     }
   });
 
-  /* Reklamację i dyskusję mówi przystanek paska drogi, ze stanem i terminem.
+  /* Reklamację mówi przystanek paska drogi, ze stanem i terminem.
      Kolumna nie ma już ich wierszy, więc nie ma czym świecić ani czego zwijać. */
-  it("otwarta reklamacja albo dyskusja nie świeci w kolumnie i nie zwija towaru", () => {
+  it("otwarta reklamacja nie świeci w kolumnie i nie zwija towaru", () => {
     const otwarta = dane({ sprawy: [{ otwarta: true } as never] });
     expect(coSwieci(otwarta)).toEqual([]);
     expect(towarOtwartyNaStart(coSwieci(otwarta))).toBe(true);
@@ -121,9 +121,9 @@ describe("historia bez tego zakupu", () => {
   const sprawa = { id: 5, stan: "w_toku" } as never;
   const h = (n: Partial<HistoriaKlienta> = {}): HistoriaKlienta => ({ login: "pasikonik5", wpisy: [], ...n });
 
-  it("wycina zakup, zwrot, reklamację i dyskusję tego zamówienia; resztę zostawia", () => {
+  it("wycina zakup, zwrot i reklamację tego zamówienia; resztę zostawia", () => {
     const pelna = h({
-      wpisy: [wpis("zakup", "z"), wpis("zwrot", "z"), wpis("reklamacja", "z"), wpis("dyskusja", "z"),
+      wpisy: [wpis("zakup", "z"), wpis("zwrot", "z"), wpis("reklamacja", "z"),
         wpis("rozmowa", null), wpis("zakup", "inne"), wpis("rozmowa", "z")],
       sprawa,
     });

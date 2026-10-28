@@ -6,7 +6,7 @@ import { DrogaSprawy, Numer, type BiezacaSprawa } from "../reklamacje/DrogaSpraw
 
 /* ── PASEK DROGI KLIENTA NA EKRANIE SPRAWY ───────────────────────────────────
    Cienka powłoka: pobiera drogę po numerze zamówienia i oddaje ją jednemu
-   paskowi, tak samo na zwrotach, dyskusjach, w skrzynce i na profilu.
+   paskowi, tak samo na zwrotach, w skrzynce i na profilu.
    Reklamacje karmią pasek własnym szczegółem i tej powłoki nie używają.
 
    NIC NIE ZAPISUJE. „Sprawdź" przesyłkę pyta Allegro, więc zostaje na ekranie

@@ -335,8 +335,9 @@ test("każde źródło po stronie klienta budzi swoim zdaniem, także zwrot zsyn
   const rek = sprawaAllegro("kl", "CLAIM");
   assert.deepEqual(nowe(za(6)).map((n) => [n.tekst, n.cel]), [["Nowa reklamacja", `/obsluga/reklamacje/${rek}`]]);
   potwierdz("kl", za(6));
+  /* Wiersz dawnej dyskusji nie budzi sprawy: tych spraw panel nie prowadzi. */
   const dys = sprawaAllegro("kl", "DISPUTE");
-  assert.deepEqual(nowe(za(7)).map((n) => [n.tekst, n.cel]), [["Nowa dyskusja", `/obsluga/dyskusje/${dys}`]]);
+  assert.deepEqual(nowe(za(7)), []);
   potwierdz("kl", za(7));
 
   /* Nasza wiadomość w sprawie nie budzi; klienta i doradcy Allegro — tak. */
@@ -346,8 +347,10 @@ test("każde źródło po stronie klienta budzi swoim zdaniem, także zwrot zsyn
   assert.deepEqual(nowe(za(10)).map((n) => [n.tekst, n.cel]),
     [["Klient napisał w reklamacji", `/obsluga/reklamacje/${rek}`]]);
   potwierdz("kl", za(10));
-  wiadomoscSprawy(dys, "ADMIN", iso(11));
-  assert.deepEqual(nowe(za(12)).map((n) => n.tekst), ["Allegro napisało w dyskusji"]);
+  wiadomoscSprawy(dys, "BUYER", iso(11));
+  assert.deepEqual(nowe(za(12)), [], "wiadomość w dawnej dyskusji nie budzi");
+  wiadomoscSprawy(rek, "ADMIN", iso(12));
+  assert.deepEqual(nowe(za(13)).map((n) => n.tekst), ["Allegro napisało w reklamacji"]);
 });
 
 test("kilka zdarzeń naraz idzie od najnowszego", () => {

@@ -231,13 +231,16 @@ describe("Inne sprawy tego zakupu stoją na drodze", () => {
     expect(screen.queryByRole("link", { name: /^Reklamacja/ })).not.toBeInTheDocument();
   });
 
-  it("dyskusja z rodzeństwa i z drogi staje raz", () => {
+  it("dyskusja ze starej bazy nie staje przystankiem ani nie wywraca paska", () => {
+    /* Dyskusje nie mają ekranu. Gdyby serwer przysłał taki przystanek albo
+       wiersz rodzeństwa, pasek ma je pominąć, nie rysować łącza w próżnię. */
     const dyskusja = { id: 8, typ: "DISPUTE", numer: null, temat: null, statusAllegro: null,
       decyzjaDo: null, otwartoAt: "2026-09-21T10:00:00.000Z", prowadzi: null, otwarta: true };
-    pokaz(szczegol({}, { droga: [przystanek("dyskusja", 8, "2026-09-21T10:00:00.000Z"), przystanek("reklamacja", 5)],
+    pokaz(szczegol({}, { droga: [przystanek("dyskusja" as never, 8, "2026-09-21T10:00:00.000Z"), przystanek("reklamacja", 5)],
       sprawy: [dyskusja] }));
-    expect(screen.getAllByRole("link", { name: /^Dyskusja/ })).toHaveLength(1);
-    expect(screen.getByRole("link", { name: /^Dyskusja/ })).toHaveAttribute("href", "/obsluga/dyskusje/8");
+    expect(screen.queryByRole("link", { name: /^Dyskusja/ })).not.toBeInTheDocument();
+    expect(document.querySelector('[data-przystanek="dyskusja"]')).toBeNull();
+    expect(screen.getAllByRole("listitem")).toHaveLength(6);
   });
 
   it("bez innych spraw droga jest jak była — sześć kroków, żadnego przystanku", () => {
@@ -273,7 +276,7 @@ describe("Inne sprawy tego zakupu stoją na drodze", () => {
 });
 
 /* ── Pasek bez szczegółu reklamacji ──────────────────────────────────────────
-   Zwroty, dyskusje, skrzynka i profil karmią pasek `DaneDrogi` z drogi
+   Zwroty, skrzynka i profil karmią pasek `DaneDrogi` z drogi
    klienta, a nie szczegółem reklamacji. Pilnujemy trzech rzeczy: brak
    reklamacji nie udaje reklamacji, sprawa ekranu zostaje na pasku jako
    „tu jesteś” bez łącza, a reklamacja z krokami nie staje drugi raz. */
@@ -391,7 +394,7 @@ describe("Droga klienta bez szczegółu reklamacji", () => {
 describe("Przystanek ze stanem sprawy", () => {
   const droga = (rodzaj: PrzystanekDrogi["rodzaj"], id: number, opis: string | null = null): PrzystanekDrogi =>
     ({ rodzaj, id, at: "2026-09-25T10:00:00.000Z", opis });
-  const sprawa = (n: Record<string, unknown>) => ({ id: 8, typ: "DISPUTE", numer: null, temat: "Gdzie paczka",
+  const sprawa = (n: Record<string, unknown>) => ({ id: 8, typ: "CLAIM", numer: null, temat: "Gdzie paczka",
     statusAllegro: null, decyzjaDo: null, otwartoAt: "2026-09-25T10:00:00.000Z", prowadzi: null, otwarta: true, ...n });
   const bez = (n: Partial<SzczegolReklamacji>) =>
     ({ ...szczegol({}, n), reklamacja: null }) as unknown as import("./DrogaSprawy").DaneDrogi;
@@ -403,9 +406,9 @@ describe("Przystanek ze stanem sprawy", () => {
   afterEach(() => vi.useRealTimers());
 
   it("zamknięta sprawa mówi o tym słowem i nie ma terminu", () => {
-    pokazDane(bez({ droga: [droga("dyskusja", 8)],
+    pokazDane(bez({ droga: [droga("reklamacja", 8)],
       sprawy: [sprawa({ otwarta: false, decyzjaDo: "2026-09-30T00:00:00.000Z" })] as never }));
-    const li = document.querySelector('[data-przystanek="dyskusja"]') as HTMLElement;
+    const li = document.querySelector('[data-przystanek="reklamacja"]') as HTMLElement;
     expect(li).toHaveTextContent("zamknięta");
     expect(li.textContent).not.toMatch(/do \d/);
     expect(within(li).getByRole("link").getAttribute("aria-label")).toContain("zamknięta");
@@ -413,7 +416,7 @@ describe("Przystanek ze stanem sprawy", () => {
 
   it("otwarta sprawa z terminem pokazuje czerwone „do dd.mm”, prowadzącego i temat w nazwie łącza", () => {
     pokazDane(bez({ droga: [droga("reklamacja", 8)],
-      sprawy: [sprawa({ typ: "CLAIM", numer: "REK-8/2026", decyzjaDo: "2026-10-12T00:00:00.000Z",
+      sprawy: [sprawa({ numer: "REK-8/2026", decyzjaDo: "2026-10-12T00:00:00.000Z",
         prowadzi: "Ola Kowalska" })] as never }));
     const li = document.querySelector('[data-przystanek="reklamacja"]') as HTMLElement;
     const termin = within(li).getByText(`do ${dzienMiesiac("2026-10-12T00:00:00.000Z")}`);
@@ -427,7 +430,7 @@ describe("Przystanek ze stanem sprawy", () => {
 
   it("otwarta sprawa po terminie mówi „po terminie” czerwonym słowem pod datą", () => {
     pokazDane(bez({ droga: [droga("reklamacja", 8)],
-      sprawy: [sprawa({ typ: "CLAIM", numer: "REK-8/2026", decyzjaDo: "2026-09-28T00:00:00.000Z" })] as never }));
+      sprawy: [sprawa({ numer: "REK-8/2026", decyzjaDo: "2026-09-28T00:00:00.000Z" })] as never }));
     const li = document.querySelector('[data-przystanek="reklamacja"]') as HTMLElement;
     const stan = within(li).getByText("po terminie");
     expect(stan.className).toContain("text-ranga-zle");
@@ -438,9 +441,9 @@ describe("Przystanek ze stanem sprawy", () => {
     expect(stan.className).toContain("text-xs");
   });
 
-  it("dyskusja bez terminu jest po prostu „otwarta”, bez zegara", () => {
-    pokazDane(bez({ droga: [droga("dyskusja", 8)], sprawy: [sprawa({})] as never }));
-    const li = document.querySelector('[data-przystanek="dyskusja"]') as HTMLElement;
+  it("reklamacja bez terminu jest po prostu „otwarta”, bez zegara", () => {
+    pokazDane(bez({ droga: [droga("reklamacja", 8)], sprawy: [sprawa({})] as never }));
+    const li = document.querySelector('[data-przystanek="reklamacja"]') as HTMLElement;
     expect(within(li).getByText("otwarta")).toBeVisible();
     expect(li.textContent).not.toMatch(/zamknięta|do \d|po terminie/);
     expect(within(li).getByRole("link").getAttribute("aria-label")).toContain("Gdzie paczka");
@@ -456,10 +459,10 @@ describe("Przystanek ze stanem sprawy", () => {
   });
 
   it("przystanek „tu jesteś” nie niesie stanu, bo agent stoi na tej sprawie", () => {
-    pokazDane(bez({ droga: [droga("dyskusja", 8)],
+    pokazDane(bez({ droga: [droga("reklamacja", 8)],
       sprawy: [sprawa({ decyzjaDo: "2026-10-12T00:00:00.000Z" })] as never }),
-      { biezaca: { rodzaj: "dyskusja", id: 8 } });
-    const li = document.querySelector('[data-przystanek="dyskusja"]') as HTMLElement;
+      { biezaca: { rodzaj: "reklamacja", id: 8 } });
+    const li = document.querySelector('[data-przystanek="reklamacja"]') as HTMLElement;
     expect(li.textContent).not.toMatch(/zamknięta|do \d/);
   });
 

@@ -220,8 +220,6 @@ export const KLUCZE: readonly Klucz[] = [
     opis: "Wzorzec adresu zwrotu w Centrum Sprzedaży." },
   { klucz: "ALLEGRO_PANEL_REKLAMACJA", grupa: "allegro", kto: "zaawansowane",
     opis: "Wzorzec adresu reklamacji w Centrum Sprzedaży." },
-  { klucz: "ALLEGRO_PANEL_DYSKUSJA", grupa: "allegro", kto: "zaawansowane",
-    opis: "Wzorzec adresu dyskusji w Centrum Sprzedaży." },
 
   // ── Zwroty i reklamacje ───────────────────────────────────────────────────
   { klucz: "ALLEGRO_ZWROTY_OD", grupa: "zwroty", kto: "wlasciciel", edycja: DATA,
@@ -230,9 +228,6 @@ export const KLUCZE: readonly Klucz[] = [
   { klucz: "REKLAMACJE_OD", grupa: "zwroty", kto: "wlasciciel", edycja: DATA,
     nazwa: "Reklamacje od",
     opis: "Od kiedy kolejka reklamacji pokazuje sprawy; puste = bez progu." },
-  { klucz: "DYSKUSJE_ALARM_GODZIN", grupa: "zwroty", kto: "wlasciciel", edycja: LICZBA,
-    nazwa: "Alarm dyskusji po", jednostka: ["godzinie", "godzinach", "godzinach"],
-    opis: "Po ilu godzinach bez odpowiedzi dyskusja zapala alarm w panelu; liczba większa od zera." },
   { klucz: "ZWROT_ROZLICZONE_OD", grupa: "zwroty", kto: "wlasciciel", edycja: DATA,
     nazwa: "Rekoncyliacja zwrotów od",
     opis: "Od kiedy rekoncyliacja zgłasza zwrot rozliczony poza aplikacją." },

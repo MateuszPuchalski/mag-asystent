@@ -63,7 +63,7 @@ export function faktySprawy(database: DatabaseSync, reklamacjaId: number): Fakty
       ON o.channel_account_id = r.channel_account_id AND o.external_id = r.offer_id
     LEFT JOIN zamowienie_klienta zk
       ON zk.channel_account_id = r.channel_account_id AND zk.external_id = r.order_id
-   WHERE r.id = ?`).get(reklamacjaId) as Record<string, unknown> | undefined;
+   WHERE r.id = ? AND r.typ = 'CLAIM'`).get(reklamacjaId) as Record<string, unknown> | undefined;
   if (!w) return null;
   const zZamowienia = tekst(w.kupiono_at);
   const zeSprawy = tekst(w.zamowienie_at);

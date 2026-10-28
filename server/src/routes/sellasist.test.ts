@@ -6,7 +6,7 @@ import path from "node:path";
 import type { FastifyInstance } from "fastify";
 import type { Rola } from "../services/users.js";
 
-/* Serwisy dynamicznie — powód przy `dyskusje.test.ts`: statyczny import
+/* Serwisy dynamicznie: statyczny import
    biegnie przed ustawieniem `DB_PATH`. Sellasist celowo WYŁĄCZONY: trasa
    bez klucza nie ma prawa wyjść do sieci, a test tego pilnuje. */
 process.env.DB_PATH = path.join(fs.mkdtempSync(path.join(os.tmpdir(), "wertis-sellasist-tras-")), "t.db");

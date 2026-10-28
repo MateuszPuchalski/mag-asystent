@@ -12,14 +12,13 @@ import {
    a trzy definicje tego samego słowa rozjechałyby się przy pierwszej
    poprawce jednej z nich.
 
-   DWIE RÓŻNICE WOBEC ZWROTÓW, obie wymuszone przez API:
+   RÓŻNICA WOBEC ZWROTÓW, wymuszona przez API:
 
-   1. NIE MA KURSORA. `getListOfIssuesUsingGET` nie przyjmuje ani `from`, ani
+   NIE MA KURSORA. `getListOfIssuesUsingGET` nie przyjmuje ani `from`, ani
       granicy dat — wyłącznie `offset`, `limit`, `status` i `checkoutForm.id`.
       Każdy przebieg czyta listę od początku, więc nie ma czego zapamiętać.
-   2. JEST LICZNIK ODSIANYCH. Ta sama lista niesie dyskusje, których panel nie
-      prowadzi (decyzja właściciela). Bez tej liczby ktoś szukałby kiedyś
-      „zaginionych" reklamacji, które nigdy reklamacjami nie były.          */
+   Kolumna `dyskusji` zostaje w schemacie, bo stare bazy ją mają, ale nikt jej
+   już nie zapisuje ani nie czyta: dyskusje nie są pobierane.             */
 
 export interface AllegroReklamacjeSyncState {
   lastSuccessAt: string | null;
@@ -36,18 +35,16 @@ export interface AllegroReklamacjeSyncState {
    * po tamtej stronie.
    */
   pozostalo: number | null;
-  /** Ile spraw z ostatniego przebiegu było dyskusjami. Nie jest to błąd. */
-  dyskusji: number | null;
 }
 
 const PUSTY: AllegroReklamacjeSyncState = {
   lastSuccessAt: null, lastAttemptAt: null, lastErrorCode: null,
-  errorCount: 0, nextAttemptAt: null, pozostalo: null, dyskusji: null,
+  errorCount: 0, nextAttemptAt: null, pozostalo: null,
 };
 
 export function stanReklamacji(db: Db): AllegroReklamacjeSyncState {
   const row = db.prepare(`SELECT last_success_at, last_attempt_at, last_error_code,
-    error_count, next_attempt_at, pozostalo, dyskusji
+    error_count, next_attempt_at, pozostalo
     FROM allegro_reklamacje_sync_state WHERE id=1`).get() as Record<string, unknown> | undefined;
   if (!row) return PUSTY;
   return {
@@ -57,7 +54,6 @@ export function stanReklamacji(db: Db): AllegroReklamacjeSyncState {
     errorCount: Number(row.error_count ?? 0),
     nextAttemptAt: (row.next_attempt_at as string) ?? null,
     pozostalo: row.pozostalo == null ? null : Number(row.pozostalo),
-    dyskusji: row.dyskusji == null ? null : Number(row.dyskusji),
   };
 }
 
@@ -95,6 +91,5 @@ export function stanReklamacjiHealth(
     nastepnaProba: s.nextAttemptAt,
     interwalMs,
     pozostaloDoPobrania: s.pozostalo,
-    dyskusjiPominietych: s.dyskusji,
   };
 }
