@@ -4,7 +4,7 @@ import {
   rodzinaKoncowki,
   scopeDlaUrl,
   urlWnioskuORabat,
-  urlDyskusji,
+  urlListySpraw,
   urlListyZwrotow,
   urlOdswiezeniaZwrotow,
   urlRoszczenProwizji,
@@ -13,7 +13,7 @@ import {
   urlOstatnichZamowien,
   urlWatkow,
   urlWiadomosci,
-  urlWiadomosciDyskusji,
+  urlWiadomosciSprawy,
   pobierzZalacznik,
   urlZwrotu,
   urlNowejWiadomosciSprawy,
@@ -57,15 +57,15 @@ test("URL wątków trzyma limit Allegro i nie przyjmuje ujemnego offsetu", () =>
 test("identyfikator w ścieżce jest kodowany — ukośnik nie dokłada segmentu", () => {
   /* Sonda podstawia identyfikatory prosto z listy. Niekodowany ukośnik
      zrobiłby z jednej sprawy dwa segmenty ścieżki, czyli 404 wyglądające
-     jak „Allegro nie zna tej dyskusji". */
+     jak „Allegro nie zna tej sprawy". */
   assert.equal(
-    urlWiadomosciDyskusji("https://api.allegro.pl", "a/b"),
+    urlWiadomosciSprawy("https://api.allegro.pl", "a/b"),
     "https://api.allegro.pl/sale/issues/a%2Fb/chat?limit=100"
   );
 });
 
 test("listy stronicują setkami i nie przyjmują ujemnego offsetu", () => {
-  assert.match(urlDyskusji("https://api.allegro.pl", -3), /limit=100&offset=0$/);
+  assert.match(urlListySpraw("https://api.allegro.pl", -3), /limit=100&offset=0$/);
   assert.match(urlOpinii("https://api.allegro.pl", 0), /user-ratings\?limit=100&offset=0$/);
   assert.match(urlListyZwrotow("https://api.allegro.pl", null, 0), /customer-returns\?limit=100/);
 });
@@ -124,7 +124,7 @@ test("rodzina końcówki rozdziela wersje zasobów — beta jednej nie przestawi
     rodzinaKoncowki(urlListyZwrotow("https://api.allegro.pl", null, 0)),
     "customer-returns"
   );
-  assert.equal(rodzinaKoncowki(urlDyskusji("https://api.allegro.pl", 0)), "issues");
+  assert.equal(rodzinaKoncowki(urlListySpraw("https://api.allegro.pl", 0)), "issues");
   assert.equal(rodzinaKoncowki(urlWatkow("https://api.allegro.pl", 0)), "threads");
   assert.equal(rodzinaKoncowki(urlOpinii("https://api.allegro.pl", 0)), "user-ratings");
   assert.equal(
@@ -182,7 +182,7 @@ test("adres rozmowy w sprawie istnieje w specyfikacji Allegro", () => {
      `docs/allegro/swagger.yaml` nie ma ani jednej ścieżki `/sale/disputes`.
      Sonda oddawała zero rekordów przy sprawach, które miały `messagesCount`
      większy od zera. */
-  const url = urlWiadomosciDyskusji("https://api.allegro.pl", "abc-1");
+  const url = urlWiadomosciSprawy("https://api.allegro.pl", "abc-1");
   assert.equal(url, "https://api.allegro.pl/sale/issues/abc-1/chat?limit=100");
   assert.equal(url.includes("/sale/disputes"), false);
   /* `limit` JAWNIE (0.164.0): przy tej jednej końcówce specyfikacja daje

@@ -245,7 +245,7 @@ export async function rozpoznajSprawe(z: ZadanieRozpoznania): Promise<KartaSpraw
   const teraz = (z.now ?? (() => new Date()))();
 
   const sprawa = database.prepare(
-    "SELECT id, kupujacy_login FROM reklamacja_klienta WHERE id=?").get(z.reklamacjaId) as
+    "SELECT id, kupujacy_login FROM reklamacja_klienta WHERE id=? AND typ='CLAIM'").get(z.reklamacjaId) as
     { id: number; kupujacy_login: string | null } | undefined;
   if (!sprawa) throw new Error("Nie znaleziono reklamacji");
 

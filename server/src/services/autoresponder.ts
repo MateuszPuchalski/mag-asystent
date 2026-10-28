@@ -54,19 +54,19 @@ export function czyAutoresponder(tresc: string): boolean {
 
 /**
  * Zdanie autoodpowiedzi, którą Allegro wysyła z NASZEGO konta w sprawach
- * posprzedażowych. Treść podał właściciel z żywej dyskusji.
+ * posprzedażowych. Treść podał właściciel z żywej sprawy.
  */
 const PODPISY_SPRAWY = [
   "dziekujemy za wiadomosc odpowiemy najszybciej jak to tylko bedzie mozliwe",
 ] as const;
 
 /**
- * Czy wiadomość SPRZEDAWCY w dyskusji jest autoodpowiedzią.
+ * Czy wiadomość SPRZEDAWCY w sprawie jest autoodpowiedzią.
  *
  * ── PO CO ─────────────────────────────────────────────────────────────────
  * Allegro podpisuje ją rolą `SELLER` i przestawia status ostatniej wiadomości
  * na `SELLER_REPLIED`, czyli na „odpowiedzieliśmy". Allegro jednak pisze
- * w tych samych dyskusjach, że „wiadomości automatyczne nie są uznawane" —
+ * w tych samych sprawach, że „wiadomości automatyczne nie są uznawane" —
  * po autoodpowiedzi sprawa dalej czeka na nas, a zegar blokady konta biegnie.
  *
  * WYSTARCZY, ŻE ZDANIE STOI W TREŚCI, nie musi być całą treścią: podpis albo

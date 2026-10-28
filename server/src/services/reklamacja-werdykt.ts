@@ -101,7 +101,7 @@ function wiersz(database: Db, id: number): Wiersz {
      WHERE r.id=? AND r.typ='CLAIM'`).get(id) as Wiersz | undefined;
   /* Warunek na `typ` jest BRAMKĄ CAŁEJ ŚCIEŻKI WERDYKTU, nie ozdobą zapytania.
      Allegro odmawia werdyktu na dyskusji („Not a valid operation for
-     disputes"), a od 0.245.0 obie sprawy leżą w jednej tabeli — bez tego
+     disputes"), a w tabeli zostały wiersze dawnych dyskusji — bez tego
      warunku panel wysłałby żądanie, o którym z góry wiadomo, że wróci błędem,
      i zostawiłby po nim `werdykt_status='send_failed'` na sprawie, która
      werdyktu mieć nie może. Zapisy niżej działają na wierszu, który przeszedł

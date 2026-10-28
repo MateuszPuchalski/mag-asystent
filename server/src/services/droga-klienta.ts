@@ -3,9 +3,11 @@ import { sprawaOtwarta } from "./statusy-spraw.js";
 import { statusRozmowy } from "./conversations.js";
 import { opisPomylki } from "./pomylki.js";
 
-/* ── Droga klienta przez cztery kolejki (`docs/obsluga-klienta-calosc.md`) ───
-   Panel prowadzi CZTERY kolejki: skrzynkę, zwroty, reklamacje i dyskusje.
-   Klient ma jedną sprawę i przechodzi przez nie po kolei. Podział jest NASZ,
+/* ── Droga klienta przez kolejki (`docs/obsluga-klienta-calosc.md`) ───
+   Panel prowadzi TRZY kolejki: skrzynkę, zwroty i reklamacje. Nowe sprawy
+   kupujących Allegro zakłada jako Problemy z zakupem w Centrum Wiadomości,
+   czyli w skrzynce. Klient ma jedną sprawę i przechodzi przez kolejki po
+   kolei. Podział jest NASZ,
    nie jego — i to jest punkt 1 dekalogu.
 
    Wiązania istniały przed tym plikiem, ale niepełne: pięć przejść z dwunastu
@@ -79,13 +81,13 @@ const tekst = (v: unknown): string | null => {
  */
 export interface SprawaZakupu {
   id: number;
-  /** `CLAIM` albo `DISPUTE` — ekran pisze to słowem, nie jedną plakietką. */
+  /** Rodzaj sprawy z Allegro; odczyt zwraca wyłącznie `CLAIM`. */
   typ: string;
-  /** `referenceNumber`; przy dyskusji Allegro go NIE nadaje (§25c.1). */
+  /** `referenceNumber` z Allegro. */
   numer: string | null;
   temat: string | null;
   statusAllegro: string | null;
-  /** Termin decyzji z Allegro; dyskusja nie ma go z definicji. */
+  /** Termin decyzji z Allegro. */
   decyzjaDo: string | null;
   otwartoAt: string;
   prowadzi: string | null;
@@ -107,7 +109,7 @@ const naSprawe = (w: Wiersz): SprawaZakupu => ({
 });
 
 /**
- * Reklamacje i dyskusje TEGO zamówienia (S1 spoiwa).
+ * Reklamacje TEGO zamówienia (S1 spoiwa).
  *
  * `pomin` wycina sprawę, z której ekran pyta — inaczej reklamacja pokazywałaby
  * w rodzeństwie samą siebie. Skrzynka i zwroty nie mają czego pomijać
@@ -122,15 +124,13 @@ export function sprawyZakupu(
   pomin: number | null = null,
 ): SprawaZakupu[] {
   if (!orderId) return [];
-  /* bez typu: ten odczyt CHCE obu rodzajów i oddaje `typ` wprost w wierszu.
-     Warunek na typ zabrałby dyskusję z rodzeństwa reklamacji, czyli dokładnie
-     to przejście, dla którego blok powstał. Plakietki nie sklejamy — blizna
-     0.121.0 mówi o jednej etykiecie na dwa byty, a tu etykieta jest polem. */
+  /* Wiersz dawnej dyskusji, który został w tabeli, nie jest rodzeństwem
+     reklamacji: panel tych spraw nie prowadzi. */
   return (database.prepare(`
     SELECT id, typ, reference_number, temat, status_allegro, decyzja_do,
            otwarto_at, prowadzi
       FROM reklamacja_klienta
-     WHERE channel_account_id = ? AND order_id = ? AND id IS NOT ?
+     WHERE typ = 'CLAIM' AND channel_account_id = ? AND order_id = ? AND id IS NOT ?
      ORDER BY otwarto_at DESC`).all(konto, orderId, pomin) as Wiersz[]).map(naSprawe);
 }
 
@@ -141,7 +141,7 @@ export function sprawyZakupu(
  * Kolejność przystanków JEST drogą i nic poza nią nie trzeba zapisywać.
  */
 export interface PrzystanekDrogi {
-  rodzaj: "rozmowa" | "dyskusja" | "reklamacja" | "zwrot" | "pomylka";
+  rodzaj: "rozmowa" | "reklamacja" | "zwrot" | "pomylka";
   id: number;
   at: string;
   opis: string | null;
@@ -175,14 +175,11 @@ export function drogaZakupu(
     if (at) przystanki.push({ rodzaj: "rozmowa", id: Number(w.id), at, opis: tekst(w.subject) });
   }
 
-  /* bez typu: droga ma pokazać PRZEJŚCIE z dyskusji w reklamację, więc pyta
-     o oba rodzaje naraz. Rozdziela je linijka niżej, po kolumnie `typ`:
-     przystanek nazywa się „dyskusja" albo „reklamacja", nigdy wspólnie. */
   for (const w of database.prepare(`
-    SELECT id, typ, temat, otwarto_at FROM reklamacja_klienta
-     WHERE order_id = ? AND channel_account_id = ?`).all(orderId, konto) as Wiersz[]) {
+    SELECT id, temat, otwarto_at FROM reklamacja_klienta
+     WHERE typ = 'CLAIM' AND order_id = ? AND channel_account_id = ?`).all(orderId, konto) as Wiersz[]) {
     przystanki.push({
-      rodzaj: String(w.typ) === "DISPUTE" ? "dyskusja" : "reklamacja",
+      rodzaj: "reklamacja",
       id: Number(w.id), at: String(w.otwarto_at), opis: tekst(w.temat),
     });
   }
@@ -218,7 +215,7 @@ export interface MiesiacEskalacji {
   miesiac: string;
   /** Zakupy, przy których klient napisał do skrzynki. */
   zRozmowa: number;
-  /** Z tych zakupów: ile skończyło się dyskusją albo reklamacją. */
+  /** Z tych zakupów: ile skończyło się reklamacją. */
   eskalowane: number;
 }
 
@@ -249,12 +246,9 @@ export function eskalacje(
      GROUP BY rz.numer`).all(...(konto === null ? [] : [konto])) as Wiersz[];
 
   const sprawy = new Map<string, string>();
-  /* bez typu: eskalacją jest KAŻDE wyjście klienta poza skrzynkę — dyskusja
-     tak samo jak reklamacja. Liczenie samych reklamacji przemilczałoby ten
-     ruch, który zwykle jest pierwszy. */
   for (const w of database.prepare(`
     SELECT order_id AS zam, MIN(otwarto_at) AS pierwsza FROM reklamacja_klienta
-     WHERE order_id IS NOT NULL ${konto === null ? "" : "AND channel_account_id = ?"}
+     WHERE typ = 'CLAIM' AND order_id IS NOT NULL ${konto === null ? "" : "AND channel_account_id = ?"}
      GROUP BY order_id`).all(...(konto === null ? [] : [konto])) as Wiersz[]) {
     const at = tekst(w.pierwsza);
     if (at) sprawy.set(String(w.zam), at);
@@ -299,20 +293,20 @@ export function kontekstZwrotu(
 
 /** Jedna pozycja listy „Moje" — z której kolejki i co to za sprawa. */
 export interface MojaSprawa {
-  /* Trzy kolejki, nie cztery: zwrot nie ma prowadzącego od 0.370.0. Powód
+  /* Dwie kolejki, nie trzy: zwrot nie ma prowadzącego od 0.370.0. Powód
      stoi przy zapytaniach w `mojeSprawy`.
 
      `klient` to sprawa klienta (S6, 0.535.0) — nie kolejka, tylko nasz
      następny krok przy kliencie. Wiersze dokłada `mojaLista`
      w `prowadzenie-klienta.ts`; ten plik zna wyłącznie TYP, bo import
      w drugą stronę zamknąłby cykl (blizna `statusy-spraw.ts`). */
-  kolejka: "rozmowa" | "reklamacja" | "dyskusja" | "klient";
+  kolejka: "rozmowa" | "reklamacja" | "klient";
   id: number;
   /** Zdanie na wiersz: temat rozmowy, numer zwrotu albo temat sprawy. */
   opis: string;
   /** Ostatni ruch przy sprawie — zegar opisowy, nie termin. */
   at: string;
-  /** Termin z Allegro albo ustawowy; `null` przy rozmowie i dyskusji. Przy
+  /** Termin z Allegro albo ustawowy; `null` przy rozmowie. Przy
    *  sprawie klienta — termin kroku, gdy sprawa jest w toku. */
   terminDo: string | null;
   /* Pola niżej niesie WYŁĄCZNIE wiersz `klient`. Wiersz kolejki prowadzi na
@@ -333,7 +327,7 @@ export interface MojaSprawa {
 }
 
 /**
- * Wszystko, co prowadzi jedna osoba — trzy kolejki jedną listą (S4 spoiwa).
+ * Wszystko, co prowadzi jedna osoba — kolejki jedną listą (S4 spoiwa).
  * Sprawy klienta (S6, 0.535.0) dokłada do niej `mojaLista`
  * w `prowadzenie-klienta.ts` i to ją woła trasa „Moje”, nie tę funkcję.
  *
@@ -375,18 +369,15 @@ export function mojeSprawy(
     });
   }
 
-  /* bez typu: obie kolejki naraz, bo to jest właśnie sens tej listy — jedno
-     miejsce zamiast czterech. Rodzaj wychodzi w kolumnie `kolejka` niżej,
-     więc plakietki nie sklejamy (blizna 0.121.0). */
   for (const w of database.prepare(`
-    SELECT id, typ, reference_number, temat, decyzja_do, otwarto_at,
+    SELECT id, reference_number, temat, decyzja_do, otwarto_at,
            ostatnia_wiadomosc_at, status_allegro
       FROM reklamacja_klienta
-     WHERE prowadzi_user_id = ?`).all(userId) as Wiersz[]) {
+     WHERE typ = 'CLAIM' AND prowadzi_user_id = ?`).all(userId) as Wiersz[]) {
     if (!sprawaOtwarta(tekst(w.status_allegro))) continue;
     const termin = tekst(w.decyzja_do);
     lista.push({
-      kolejka: String(w.typ) === "DISPUTE" ? "dyskusja" : "reklamacja",
+      kolejka: "reklamacja",
       id: Number(w.id),
       opis: tekst(w.temat) ?? tekst(w.reference_number) ?? "Sprawa bez tematu",
       at: tekst(w.ostatnia_wiadomosc_at) ?? String(w.otwarto_at),

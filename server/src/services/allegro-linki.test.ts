@@ -1,7 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { config } from "../config.js";
-import { linkDyskusji, linkReklamacji, zWzorca } from "./allegro-linki.js";
+import { linkReklamacji, zWzorca } from "./allegro-linki.js";
 
 /* Link, który trafia w 404, kosztuje kliknięcie i zaufanie do ekranu —
    a numer zwrotu bywa postaci `4R50/2026`, więc kodowanie nie jest tu
@@ -123,18 +123,3 @@ test("brak sprawy to brak odnośnika, mimo znanego sprzedawcy", () => {
   });
 });
 
-test("dyskusja otwiera się na własnej stronie, nie na stronie reklamacji", () => {
-  /* Adres podany przez właściciela z paska przeglądarki. `/claims/{id}`
-     przy dyskusji to inna strona, więc wspólny wzorzec byłby zgadywaniem. */
-  const b = { w: config.allegro.panelDyskusja, s: config.allegro.sellerId };
-  config.allegro.panelDyskusja = "https://salescenter.allegro.com/discussions-with-buyers/{id}";
-  config.allegro.sellerId = "37755893";
-  try {
-    assert.equal(linkDyskusji(UUID),
-      `https://salescenter.allegro.com/discussions-with-buyers/${UUID}?sellerId=37755893`);
-    assert.equal(linkDyskusji(null), null);
-  } finally {
-    config.allegro.panelDyskusja = b.w;
-    config.allegro.sellerId = b.s;
-  }
-});

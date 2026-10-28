@@ -100,10 +100,12 @@ function Szuflada({ twId, onZamknij }: { twId: number; onZamknij: () => void }) 
           <Lista tytul="Otwarte zwroty" ikona={<Undo2 size={14} />}
             wiersze={p.otwarteZwroty.map((z) => ({ klucz: `z${z.id}`, do: `/obsluga/zwroty/${z.id}`,
               napis: `${z.numer ?? `#${z.id}`} · ${z.ilosc} szt.`, at: z.at }))} onIdz={onZamknij} />
-          <Lista tytul="Otwarte reklamacje i dyskusje" ikona={<Scale size={14} />}
-            wiersze={p.otwarteSprawy.map((s) => ({ klucz: `s${s.id}`,
-              do: `/obsluga/${s.typ === "DISPUTE" ? "dyskusje" : "reklamacje"}/${s.id}`,
-              napis: `${s.typ === "DISPUTE" ? "dyskusja" : "reklamacja"} ${s.numer ?? `#${s.id}`}`, at: s.at }))}
+          <Lista tytul="Otwarte reklamacje" ikona={<Scale size={14} />}
+            wiersze={p.otwarteSprawy
+              /* Dawna dyskusja nie ma ekranu, więc łącze prowadziłoby w próżnię. */
+              .filter((s) => s.typ !== "DISPUTE")
+              .map((s) => ({ klucz: `s${s.id}`, do: `/obsluga/reklamacje/${s.id}`,
+                napis: `reklamacja ${s.numer ?? `#${s.id}`}`, at: s.at }))}
             onIdz={onZamknij} />
           <Lista tytul="Otwarte rozmowy o tym towarze" ikona={<MessageSquare size={14} />}
             wiersze={p.otwarteRozmowy.map((r) => ({ klucz: `r${r.id}`, do: `/obsluga/skrzynka/${r.id}`,

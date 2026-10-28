@@ -519,7 +519,7 @@ export async function skrzynkaRoutes(app: FastifyInstance) {
     });
 
   /* ── PACZKA ZAMÓWIENIA ROZMOWY NA KLIKNIĘCIE (23 września 2026) ─────────────
-     Bliźniak tras reklamacji i dyskusji z 0.393.0. Rozmowa pod zamówieniem
+     Bliźniak trasy reklamacji z 0.393.0. Rozmowa pod zamówieniem
      pyta najczęściej „gdzie paczka", a blok zamówienia tego nie mówił.
      Dwa żądania do Allegro, więc na JAWNE kliknięcie: otwarcie rozmowy czyta
      wyłącznie stan zapisany wcześniej (zero zapisu przy patrzeniu). */

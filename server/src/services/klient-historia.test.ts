@@ -120,7 +120,7 @@ test("wątek bez loginu daje pustą historię, nie zgadywanie", () => {
    zakupy i rozmowy. Agent czytał „nic się nie działo" o kliencie, który
    miesiąc wcześniej odesłał towar i złożył reklamację.                      */
 
-test("zwrot, reklamacja i dyskusja wchodzą na oś historii klienta", () => {
+test("zwrot i reklamacja wchodzą na oś historii klienta, a wiersz dawnej dyskusji nie", () => {
   const zw = zwrotKlienta("zielony_ogrod", "Z-77", "2026-08-10T08:00:00.000Z");
   const rek = sprawaKlienta("zielony_ogrod", "CLAIM", "Nie działa", "2026-08-12T08:00:00.000Z");
   const dys = sprawaKlienta("zielony_ogrod", "DISPUTE", "Gdzie paczka", "2026-08-11T08:00:00.000Z");
@@ -129,11 +129,12 @@ test("zwrot, reklamacja i dyskusja wchodzą na oś historii klienta", () => {
   const wg = (r: string) => wpisy.find((w) => w.rodzaj === r);
   assert.equal(wg("zwrot")!.sprawaId, zw);
   assert.equal(wg("reklamacja")!.sprawaId, rek);
-  assert.equal(wg("dyskusja")!.sprawaId, dys);
+  /* Dyskusja z bazy sprzed wycofania nie udaje reklamacji. */
+  assert.ok(!wpisy.some((w) => w.sprawaId === dys));
   /* Oś jest jedna i ułożona czasem — najnowsze u góry, jak zakupy i rozmowy. */
   assert.deepEqual(
     wpisy.filter((w) => w.sprawaId !== null).map((w) => w.rodzaj),
-    ["reklamacja", "dyskusja", "zwrot"]);
+    ["reklamacja", "zwrot"]);
 });
 
 test("zwrot i sprawa CUDZEGO klienta nie wchodzą do tej historii", () => {
@@ -143,11 +144,11 @@ test("zwrot i sprawa CUDZEGO klienta nie wchodzą do tej historii", () => {
   assert.deepEqual(historiaKlienta(biezaca).wpisy.filter((w) => w.sprawaId !== null), []);
 });
 
-test("dyskusja bez tematu bierze podpis, a nie pustą linię", () => {
-  sprawaKlienta("zielony_ogrod", "DISPUTE", "", "2026-08-11T08:00:00.000Z");
+test("reklamacja bez tematu bierze numer, a nie pustą linię", () => {
+  sprawaKlienta("zielony_ogrod", "CLAIM", "", "2026-08-11T08:00:00.000Z");
 
-  const w = historiaKlienta(biezaca).wpisy.find((x) => x.rodzaj === "dyskusja")!;
-  assert.equal(w.tresc, "Sprawa bez tematu");
+  const w = historiaKlienta(biezaca).wpisy.find((x) => x.rodzaj === "reklamacja")!;
+  assert.equal(w.tresc, "9/2026");
 });
 
 /* ── Historia ze zwrotu i ze sprawy (23 września 2026) ───────────────────────
@@ -180,7 +181,7 @@ test("ze zwrotu: zakupy, sprawy i rozmowy obiema drogami, bez samego zwrotu", ()
 });
 
 test("sprawa bez loginu kupującego daje pustą historię", () => {
-  const rk = sprawaKlienta("", "DISPUTE", "x", "2026-09-06T10:00:00Z");
+  const rk = sprawaKlienta("", "CLAIM", "x", "2026-09-06T10:00:00Z");
   assert.deepEqual(historiaSprawy("sprawa", rk, db()).wpisy, []);
 });
 

@@ -1,7 +1,7 @@
 import { config } from "../config.js";
 import { db as defaultDb, transaction, type Db } from "../db/db.js";
 import {
-  urlDyskusji, urlSprawy, urlWiadomosciDyskusji, zapytajAllegro,
+  urlListySpraw, urlSprawy, urlWiadomosciSprawy, zapytajAllegro,
 } from "../adapters/allegro.http.js";
 import { BladLimituAllegro, BladOdpowiedziAllegro } from "../adapters/allegro.js";
 import { kontoKanalu } from "./kanal-konto.js";
@@ -27,16 +27,12 @@ import { odkodujEncje } from "../tekst.js";
       `status` i `checkoutForm.id` — ani `from`, ani granicy dat. Lista jest
       posortowana malejąco po dacie otwarcia, więc każdy przebieg czyta ją od
       początku i po prostu nadpisuje to, co już zna.
-   2. KLASYFIKUJEMY, A NIE ODSIEWAMY (od 0.245.0). Ta sama końcówka niesie
-      `DISPUTE` i `CLAIM`. Do 0.244.0 dyskusje leciały do kosza w pamięci:
-      panel prowadził wyłącznie reklamacje, decyzją właściciela z 6 września
-      2026. Właściciel odwrócił ją 9 września i dyskusje mają własny ekran
-      (§25c), więc obie gałęzie idą do bazy, a `typ` bierze się z ładunku.
-
-      Licznik `dyskusji` w stanie synchronizacji ZOSTAJE i zmienia znaczenie
-      z „ile wyrzuciliśmy" na „ile przyjechało". Jest wtedy kontrolą krzyżową
-      dla licznika kolejki dyskusji: rozjazd tych dwóch liczb znaczy, że coś
-      nie doszło do zapisu.
+   2. ODSIEWAMY DYSKUSJE. Ta sama końcówka niesie `DISPUTE` i `CLAIM`,
+      a specyfikacja nie ma filtra po `type`. Panel prowadzi wyłącznie
+      reklamacje: nowe sprawy kupujących Allegro zakłada jako Problemy
+      z zakupem w Centrum Wiadomości, czyli w skrzynce. Dyskusja z listy nie
+      trafia do bazy, a wiersze zapisane dawniej zostają nietknięte i żadne
+      zapytanie ich już nie pokazuje.
    3. CZAT DOCIĄGAMY OSOBNO I Z LIMITEM. Lista niesie samą PIERWSZĄ wiadomość
       (`chat.initialMessage`) oraz licznik i status ostatniej. Pełna rozmowa to
       jedno żądanie NA SPRAWĘ, więc pytamy tylko o te, w których licznik
@@ -106,7 +102,7 @@ const kodHttp = (error: unknown): number | null =>
  */
 const MAKS_STRON = 10;
 
-/** Ile rekordów prosi jedna strona; musi zgadzać się z `urlDyskusji`. */
+/** Ile rekordów prosi jedna strona; musi zgadzać się z `urlListySpraw`. */
 const NA_STRONE = 100;
 
 /**
@@ -130,16 +126,13 @@ export const CZATOW_NA_PRZEBIEG = 20;
 const MAKS_STRON_CZATU = 5;
 
 /**
- * Statusy spraw, które jeszcze żyją (0.273.0).
+ * Status reklamacji, która jeszcze żyje.
  *
- * Wartości z `PostPurchaseIssueStatus`; pozostałe trzy — `CLAIM_ACCEPTED`,
- * `CLAIM_REJECTED`, `DISPUTE_CLOSED` — są końcowe i po nich nikt już nie czeka
- * na ruch biura. Ta sama trójka końcowa rządzi doborem rozmów do uzupełnienia,
- * ale tam stoi w SQL-u: lista jedzie do Allegro, tamto pytanie do naszej bazy.
+ * Wartość z `PostPurchaseIssueStatus`; `CLAIM_ACCEPTED` i `CLAIM_REJECTED` są
+ * końcowe i po nich nikt już nie czeka na ruch biura. Statusy dyskusji
+ * pomijamy celowo: tych spraw nie pobieramy.
  */
-const STATUSY_OTWARTE = [
-  "CLAIM_SUBMITTED", "DISPUTE_ONGOING", "DISPUTE_UNRESOLVED",
-] as const;
+const STATUSY_OTWARTE = ["CLAIM_SUBMITTED"] as const;
 
 export interface ReklamacjeSyncDeps {
   database?: Db;
@@ -175,12 +168,12 @@ function liczba(value: unknown): number | null {
 /**
  * Czy sprawa jest reklamacją.
  *
- * Do 0.244.0 był to FILTR i wszystko, co nie było reklamacją, przepadało.
- * Dziś jest klasyfikatorem: obie gałęzie lądują w bazie, a ta funkcja mówi
- * już tylko, którą kolejkę sprawa zasili. Zapis bierze `typ` z ładunku,
- * nie stąd — jedno źródło prawdy o typie to samo pole, które przysłało Allegro.
+ * To jest FILTR: dyskusja przepada w pamięci i nie trafia ani do lądowiska,
+ * ani do kolejki. Odsiewamy wyłącznie `DISPUTE`. Sprawa bez pola `type`
+ * zostaje, bo zapis wpisuje jej `CLAIM`, jak zawsze, a schemat nie ma listy
+ * `required`, więc brak pola nie jest dowodem, że to dyskusja.
  */
-export const czyReklamacja = (s: Sprawa): boolean => s.type === "CLAIM";
+export const czyReklamacja = (s: Sprawa): boolean => s.type !== "DISPUTE";
 
 /**
  * Pierwsze oczekiwanie klienta i jego kwota.
@@ -202,7 +195,7 @@ export function pierwszeOczekiwanie(sprawa: Sprawa):
 /** Jeden przebieg. Sieć kończy się PRZED transakcją, więc wolne API nie blokuje SQLite. */
 export async function synchronizujAllegroReklamacje(
   deps: ReklamacjeSyncDeps = {},
-): Promise<{ reklamacji: number; dyskusji: number; czatow: number }> {
+): Promise<{ reklamacji: number; czatow: number }> {
   const database = deps.database ?? defaultDb();
   const query = deps.query ?? zapytajAllegro;
   const now = deps.now ?? (() => new Date());
@@ -210,11 +203,8 @@ export async function synchronizujAllegroReklamacje(
   const interval = deps.intervalMs ?? config.allegro.reklamacjeSyncMs;
   const budzetCzatow = deps.czatow ?? CZATOW_NA_PRZEBIEG;
 
-  /* JEDNA lista do zapisu, nie dwie. `typ` rozróżnia je w bazie, a rozdzielenie
-     ich tutaj kazałoby pamiętać o obu przy każdej zmianie zapisu.
-
-     MAPA, nie tablica (0.273.0): przebieg spraw otwartych i przebieg pełny
-     widzą te same wiersze, a licznik dyskusji ma liczyć sprawy, nie trafienia. */
+  /* MAPA, nie tablica: przebieg spraw otwartych i przebieg pełny widzą te same
+     wiersze, a zapis ma je wziąć raz. */
   const sprawy = new Map<string, Sprawa>();
   let pobrano = 0;
   let wszystkich: number | null = null;
@@ -229,12 +219,12 @@ export async function synchronizujAllegroReklamacje(
     let ile = 0;
     let count: number | null = null;
     for (let strona = 0; strona < MAKS_STRON; strona++) {
-      const body = await query(urlDyskusji(apiUrl, strona * NA_STRONE, statusy));
+      const body = await query(urlListySpraw(apiUrl, strona * NA_STRONE, statusy));
       const partia = tablica<Sprawa>(body, "issues");
       if (strona === 0) count = liczba(body);
       ile += partia.length;
       for (const sprawa of partia) {
-        if (typeof sprawa?.id !== "string") continue;
+        if (typeof sprawa?.id !== "string" || !czyReklamacja(sprawa)) continue;
         sprawy.set(sprawa.id, sprawa);
       }
       if (partia.length < NA_STRONE) return { komplet: true, pobrano: ile, wszystkich: count };
@@ -257,7 +247,6 @@ export async function synchronizujAllegroReklamacje(
     komplet = pelny.komplet;
     pobrano = pelny.pobrano;
     wszystkich = pelny.wszystkich;
-    const dyskusji = [...sprawy.values()].filter((s) => !czyReklamacja(s)).length;
 
     /* OGON, czyli czego ten przebieg NIE wziął. Lista domknięta własnym końcem
        nie ma ogona z definicji — nawet gdyby `count` mówił inaczej, bo między
@@ -272,12 +261,12 @@ export async function synchronizujAllegroReklamacje(
       for (const sprawa of sprawy.values()) zapisz(database, sprawa, konto, at);
       database.prepare(`INSERT INTO allegro_reklamacje_sync_state
         (id,last_success_at,last_attempt_at,last_error_code,error_count,
-         next_attempt_at,pozostalo,dyskusji)
-        VALUES(1,?,?,NULL,0,?,?,?) ON CONFLICT(id) DO UPDATE SET
+         next_attempt_at,pozostalo)
+        VALUES(1,?,?,NULL,0,?,?) ON CONFLICT(id) DO UPDATE SET
         last_success_at=excluded.last_success_at, last_attempt_at=excluded.last_attempt_at,
         last_error_code=NULL, error_count=0, next_attempt_at=excluded.next_attempt_at,
-        pozostalo=excluded.pozostalo, dyskusji=excluded.dyskusji`).run(
-        at, at, new Date(Date.parse(at) + interval).toISOString(), pozostalo, dyskusji);
+        pozostalo=excluded.pozostalo`).run(
+        at, at, new Date(Date.parse(at) + interval).toISOString(), pozostalo);
     })();
 
     /* Rozmowy idą PO transakcji, bo wychodzą do sieci: trzymanie otwartej
@@ -286,7 +275,7 @@ export async function synchronizujAllegroReklamacje(
     const czatow = await uzupelnijCzaty(database, konto, {
       query, apiUrl, limit: budzetCzatow,
     });
-    return { reklamacji: sprawy.size - dyskusji, dyskusji, czatow };
+    return { reklamacji: sprawy.size, czatow };
   } catch (error) {
     const wait = error instanceof BladLimituAllegro
       ? Math.max(interval, error.poIluMs ?? interval * 2)
@@ -309,22 +298,14 @@ export async function synchronizujAllegroReklamacje(
  * z liczbą wiadomości, które mamy, rozmowa jest kompletna i pytanie o nią byłoby
  * żądaniem bez treści.
  *
- * KOLEJNOŚĆ MA DWA CZŁONY, bo od 0.245.0 w tabeli stoją dwa rodzaje spraw.
- * Najpierw termin decyzji rosnąco: przy ciasnym budżecie pierwszeństwo ma
- * reklamacja, która się najbardziej pali. Dyskusja terminu NIE MA — Allegro
- * nie oddaje jej ani `decisionDueDate`, ani `statusDueDate` — więc sam ten
- * człon zsunąłby wszystkie dyskusje na koniec i przy dwudziestu reklamacjach
- * w toku żadna nie dostałaby rozmowy nigdy. Drugim członem jest więc data
- * ostatniej wiadomości rosnąco, czyli „kto czeka najdłużej".
+ * Kolejność: termin decyzji rosnąco, bo przy ciasnym budżecie pierwszeństwo
+ * ma reklamacja, która się najbardziej pali. Drugim członem jest data
+ * ostatniej wiadomości rosnąco, czyli „kto czeka najdłużej", na wypadek spraw
+ * bez terminu.
  *
- * Zaległość pierwszego przebiegu po zdjęciu filtru domyka się sama: przy
- * budżecie dwudziestu rozmów i takcie trzech minut trzydzieści pięć dyskusji
- * schodzi w dwóch taktach.
- *
- * Sprawy rozstrzygnięte odpadają: ich rozmowa już niczego nie zmieni, a każde
- * żądanie to koszt u Allegro. Dla dyskusji stanem końcowym jest
- * `DISPUTE_CLOSED`; bez niego zamknięte dyskusje wracałyby po rozmowę przy
- * każdym przebiegu, dopóki Allegro nie odda kompletu wiadomości.
+ * Sprawy rozstrzygnięte nie odpadają statusem — powód stoi niżej: pilnuje ich
+ * licznik wiadomości. Stare wiersze dyskusji w tabeli odpadają typem: tych
+ * spraw już nie pobieramy.
  */
 export function czatyDoUzupelnienia(
   database: Db, konto: number, limit = CZATOW_NA_PRZEBIEG,
@@ -352,6 +333,7 @@ export function czatyDoUzupelnienia(
     SELECT r.id, r.external_id
       FROM reklamacja_klienta r
      WHERE r.channel_account_id = ?
+       AND r.typ = 'CLAIM'
        AND r.wiadomosci_ile >
            (SELECT COUNT(*) FROM reklamacja_wiadomosc w WHERE w.reklamacja_id = r.id)
        /* Sprawa z rozmową urwaną przez NASZ bezpiecznik odpada (0.273.0):
@@ -402,7 +384,7 @@ async function pobierzCzat(
 ): Promise<boolean> {
   {
     /* STRONICUJEMY, a nie bierzemy pierwszej setki (0.273.0). Do 0.272.0 to
-       żądanie szło RAZ, bez offsetu, choć `urlWiadomosciDyskusji` umiał go od
+       żądanie szło RAZ, bez offsetu, choć `urlWiadomosciSprawy` umiał go od
        początku. Rozmowa dłuższa niż sto wiadomości była przez to przycięta na
        zawsze — a ekran obiecywał przy niej, że „reszta dojdzie następną
        synchronizacją". Nie dochodziła nigdy.
@@ -428,7 +410,7 @@ async function pobierzCzat(
       let body: unknown | null;
       try {
         body = await opcje.query(
-          urlWiadomosciDyskusji(opcje.apiUrl, sprawa.externalId, strona * NA_STRONE));
+          urlWiadomosciSprawy(opcje.apiUrl, sprawa.externalId, strona * NA_STRONE));
       } catch (e) {
         if (e instanceof BladLimituAllegro) throw e;
         /* Błąd przy JEDNEJ stronie kończy tę sprawę, nie przebieg — reszta
@@ -452,6 +434,8 @@ async function pobierzCzat(
     if (!wzieto) return false;
     /* ZNAK TRWAŁEGO OGONA. Bez niego wiersz wracałby do kolejki uzupełnień po
        każdym przebiegu, a ekran obiecywałby resztę, która nie ma skąd przyjść. */
+    /* bez typu: numer sprawy przyszedł z `czatyDoUzupelnienia` albo z
+       `odswiezSprawe`, a oba biorą wyłącznie reklamacje. */
     if (urwaneLimitem) {
       database.prepare("UPDATE reklamacja_klienta SET czat_urwany=1 WHERE id=?").run(sprawa.id);
     } else {
@@ -541,6 +525,8 @@ function zapisz(database: Db, sprawa: Sprawa, konto: number, at: string): void {
      niżej: potwierdzenie werdyktu, którego los był niejednoznaczny. */
   potwierdzWerdykt(database, konto, sprawa.id, stan.status ?? null);
 
+  /* bez typu: wiersz powstał kilka linii wyżej z tej samej sprawy, a do
+     `zapisz` dochodzą wyłącznie reklamacje (`czyReklamacja`). */
   const id = Number((database.prepare(
     "SELECT id FROM reklamacja_klienta WHERE channel_account_id=? AND external_id=?",
   ).get(konto, sprawa.id) as { id: number }).id);
@@ -583,9 +569,11 @@ function potwierdzWerdykt(database: Db, konto: number, externalId: string, statu
   if (!galaz) return;
   const w = database.prepare(
     `SELECT id, werdykt FROM reklamacja_klienta
-      WHERE channel_account_id=? AND external_id=? AND werdykt_status='send_uncertain'`,
+      WHERE channel_account_id=? AND external_id=? AND typ='CLAIM'
+        AND werdykt_status='send_uncertain'`,
   ).get(konto, externalId) as { id: number; werdykt: string | null } | undefined;
   if (!w?.werdykt) return;
+  /* bez typu: wiersz `w` przeszedł wyżej przez warunek `typ='CLAIM'`. */
   if (w.werdykt.startsWith(galaz)) {
     database.prepare(
       "UPDATE reklamacja_klienta SET werdykt_status='sent', werdykt_blad=NULL WHERE id=?",
@@ -663,7 +651,7 @@ export async function odswiezSprawe(
   const apiUrl = deps.apiUrl ?? config.allegro.apiUrl;
 
   const wiersz = database.prepare(
-    "SELECT external_id, channel_account_id FROM reklamacja_klienta WHERE id=?",
+    "SELECT external_id, channel_account_id FROM reklamacja_klienta WHERE id=? AND typ='CLAIM'",
   ).get(reklamacjaId) as { external_id: string; channel_account_id: number } | undefined;
   if (!wiersz) return false;
 
@@ -685,7 +673,7 @@ export async function odswiezSprawe(
   const braki = database.prepare(`SELECT
       r.wiadomosci_ile - (SELECT COUNT(*) FROM reklamacja_wiadomosc w
                            WHERE w.reklamacja_id = r.id) AS brakuje
-    FROM reklamacja_klienta r WHERE r.id=?`).get(reklamacjaId) as { brakuje: number } | undefined;
+    FROM reklamacja_klienta r WHERE r.id=? AND r.typ='CLAIM'`).get(reklamacjaId) as { brakuje: number } | undefined;
   if ((braki?.brakuje ?? 0) > 0) {
     await pobierzCzat(database, { id: reklamacjaId, externalId: String(wiersz.external_id) },
       { query, apiUrl });

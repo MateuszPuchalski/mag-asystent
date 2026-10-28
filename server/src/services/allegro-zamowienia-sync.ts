@@ -179,6 +179,7 @@ export function brakujaceZamowienia(
 
          Backticków tu nie ma świadomie — blok stoi w literale szablonowym. */
       SELECT order_id, channel_account_id, otwarto_at FROM reklamacja_klienta
+       WHERE typ = 'CLAIM'
       UNION ALL
       /* Tylko kształt UUID: Allegro odpowiada na inny numer 422, a negatyw
          zapisujemy wyłącznie przy 404, więc zły numer wracałby co przebieg. */

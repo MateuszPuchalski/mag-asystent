@@ -14,7 +14,6 @@ const NAZWA_KROKU: Record<KrokSondy, string> = {
 };
 import { listaZwrotow } from "./zwroty.js";
 import { listaReklamacji, progKolejki } from "./reklamacje.js";
-import { listaDyskusji } from "./dyskusje.js";
 import { listaRozmow } from "./skrzynka.js";
 import { listaZadan } from "./zadania-terenowe.js";
 import { odmowyBezDosylki } from "./odmowy-dosylki.js";
@@ -58,7 +57,7 @@ export type Obszar = "magazyn" | "obsluga";
 
 export type ZrodloDecyzji =
   | "dostawy" | "odpowiedzi" | "kosze" | "zapisy" | "kody" | "allegro"
-  | "reklamacje" | "zwroty" | "skrzynka" | "dyskusje" | "sonda" | "zadania" | "dosylki" | "braki" | "sellasist";
+  | "reklamacje" | "zwroty" | "skrzynka" | "sonda" | "zadania" | "dosylki" | "braki" | "sellasist";
 
 /**
  * Dokąd prowadzi wiersz — adres w panelu. Do 0.441.0 był tu też wariant
@@ -359,18 +358,6 @@ function kolejkiKlienta(teraz: number): PozycjaDecyzji[] {
     });
   }
 
-  const prog = progKolejki(db(), teraz, config.allegro.reklamacjeOd, "DISPUTE");
-  const dyskusje = listaDyskusji(db(), teraz, prog.od).filter((d) => d.kubelek === "odpowiedz");
-  if (dyskusje.length) {
-    wiersze.push({
-      klucz: "kolejka:dyskusje", obszar: "obsluga", zrodlo: "dyskusje",
-      pytanie: "Odpowiedzieć w dyskusji",
-      co: `${ile(dyskusje.length, "dyskusja czeka", "dyskusje czekają", "dyskusji czeka")} na nas`,
-      od: najstarsza(dyskusje.map((d) => d.bezOdpowiedziOd ?? d.ostatniaWiadomoscAt ?? d.otwartoAt)),
-      pilne: dyskusje.some((d) => d.dlugoCzeka || d.pilna),
-      cel: { panel: "/obsluga/dyskusje" },
-    });
-  }
   return wiersze;
 }
 

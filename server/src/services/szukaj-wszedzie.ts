@@ -25,7 +25,7 @@ import { ROZMOWA_ZAMOWIENIA } from "./droga-klienta.js";
    bez wielkości liter. */
 
 export type RodzajTrafienia =
-  | "klient" | "rozmowa" | "zwrot" | "reklamacja" | "dyskusja" | "dostawa" | "towar" | "zamowienie";
+  | "klient" | "rozmowa" | "zwrot" | "reklamacja" | "dostawa" | "towar" | "zamowienie";
 
 export interface Trafienie {
   rodzaj: RodzajTrafienia;
@@ -88,7 +88,7 @@ export function szukajWszedzie(
     SELECT login FROM (
       SELECT kupujacy_login AS login FROM zamowienie_klienta WHERE kupujacy_login LIKE ? ESCAPE '\\'
       UNION SELECT kupujacy_login FROM zwrot_klienta WHERE kupujacy_login LIKE ? ESCAPE '\\'
-      UNION SELECT kupujacy_login FROM reklamacja_klienta WHERE kupujacy_login LIKE ? ESCAPE '\\'
+      UNION SELECT kupujacy_login FROM reklamacja_klienta WHERE typ = 'CLAIM' AND kupujacy_login LIKE ? ESCAPE '\\'
       UNION SELECT interlocutor_login FROM allegro_inbox_thread WHERE interlocutor_login LIKE ? ESCAPE '\\')
      GROUP BY lower(login)
      ORDER BY (login = ? COLLATE NOCASE) DESC, login LIMIT 5`).all(like, like, like, like, q) as Wiersz[]) {
@@ -197,26 +197,24 @@ export function szukajWszedzie(
     });
   }
 
-  /* bez typu: reklamacje i dyskusje jednym zapytaniem, bo fraza nie zna
-     rodzaju sprawy — rozdziela je kolumna `typ` przy budowie trafienia. */
   for (const w of database.prepare(`
-    SELECT id, typ, reference_number, temat, kupujacy_login, order_id,
+    SELECT id, reference_number, temat, kupujacy_login, order_id,
            CASE
              WHEN reference_number LIKE ? ESCAPE '\\' THEN 'numer sprawy'
              WHEN kupujacy_login LIKE ? ESCAPE '\\' THEN 'login kupującego'
              ELSE 'zamówienie' END AS dlaczego
       FROM reklamacja_klienta
-     WHERE reference_number LIKE ? ESCAPE '\\'
-        OR kupujacy_login LIKE ? ESCAPE '\\'
-        OR order_id IN (${zamLista.map(() => "?").join(",")})
+     WHERE typ = 'CLAIM'
+       AND (reference_number LIKE ? ESCAPE '\\'
+            OR kupujacy_login LIKE ? ESCAPE '\\'
+            OR order_id IN (${zamLista.map(() => "?").join(",")}))
      ORDER BY (kupujacy_login = ? COLLATE NOCASE) DESC, otwarto_at DESC LIMIT ?`)
     .all(like, like, like, like, ...zamLista, q, NA_RODZAJ) as Wiersz[]) {
-    const dyskusja = String(w.typ) === "DISPUTE";
     const dl = String(w.dlaczego) === "zamówienie" ? String(dlaczegoNumeru(String(w.order_id))) : String(w.dlaczego);
     dodaj({
-      rodzaj: dyskusja ? "dyskusja" : "reklamacja", id: String(w.id),
+      rodzaj: "reklamacja", id: String(w.id),
       tytul: tekst(w.temat) ?? tekst(w.reference_number) ?? "Sprawa bez tematu",
-      dlaczego: dl, cel: `/obsluga/${dyskusja ? "dyskusje" : "reklamacje"}/${w.id}`, link: null,
+      dlaczego: dl, cel: `/obsluga/reklamacje/${w.id}`, link: null,
     });
   }
 

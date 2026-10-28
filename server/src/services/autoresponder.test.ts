@@ -53,7 +53,7 @@ test("pusta treść nie jest odbiciem", () => {
 });
 
 test("autoodpowiedź w sprawie Allegro rozpoznaje się mimo interpunkcji i dopisków", () => {
-  /* Treść podał właściciel z żywej dyskusji. Podpis albo godziny pracy dopisane
+  /* Treść podał właściciel z żywej sprawy. Podpis albo godziny pracy dopisane
      w ustawieniach Allegro nie mają wyłączać rozpoznania. */
   assert.ok(czyAutoodpowiedzSprawy(
     "Dziękujemy za wiadomość, odpowiemy najszybciej jak to tylko będzie możliwe."));

@@ -1,7 +1,7 @@
 import { BladLimitu } from "../adapters/limit.js";
 
 /* ── Takt tickerów Allegro — jeden rytm, trzy pętle ──────────────────────────
-   Zapowiedzi, pytania i dyskusje tykały dotąd trzema `setInterval` o wspólnej
+   Zapowiedzi, pytania i kolejne zadania tykały dotąd trzema `setInterval` o wspólnej
    bazie: startowały w tej samej sekundzie i biły w Allegro równym, zegarowym
    rytmem z jednego adresu. Dokładnie taka sygnatura maszyny skończyła się
    w sierpniu 2026 blokadą IP przy parowaniu — anti-bot nie pyta, czy ruch

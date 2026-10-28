@@ -22,17 +22,13 @@ import {
 } from "./reklamacja-dowody.js";
 
 /* ── Reklamacje klienckie — model pracy biura (0.222.0) ──────────────────────
-   TEN PLIK PROWADZI WYŁĄCZNIE REKLAMACJE (`typ = 'CLAIM'`) i od 0.245.0 musi
-   to mówić KAŻDYM zapytaniem. Do 0.244.0 dyskusje nie docierały do bazy, bo
-   odsiewał je synchronizator, więc zapytanie bez warunku było bezpieczne.
-   Po zdjęciu tamtego filtru `reklamacja_klienta` trzyma oba rodzaje spraw
-   i pominięcie warunku pokazałoby dyskusję w kolejce reklamacji — z pustym
-   paskiem werdyktu i pustą kolumną terminu.
-
-   To jest dokładnie blizna 0.121.0: „CLAIM miał tę samą plakietkę co zwykła
-   dyskusja". Pilnuje tego strażnik w `dyskusje.test.ts`, który czyta ŹRÓDŁO
-   tego pliku i wymaga warunku na `typ` przy każdym `FROM reklamacja_klienta`.
-   Dyskusje prowadzi `services/dyskusje.ts`.
+   TEN PLIK PROWADZI WYŁĄCZNIE REKLAMACJE (`typ = 'CLAIM'`) i musi to mówić
+   KAŻDYM zapytaniem. Tabela `reklamacja_klienta` trzyma też wiersze dawnych
+   dyskusji (`DISPUTE`), których nikt już nie pobiera ani nie pokazuje, ale
+   nikt ich też nie usunął. Pominięcie warunku pokazałoby taki wiersz
+   w kolejce reklamacji — z pustym paskiem werdyktu i pustą kolumną terminu.
+   Pilnuje tego strażnik w `reklamacje.test.ts`, który czyta ŹRÓDŁO tego
+   pliku i wymaga warunku na `typ` przy każdym `FROM reklamacja_klienta`.
 
    ZEGAR CZYTAMY, NIE LICZYMY. `decisionDueDate` z Allegro jest terminem na
    uznanie albo odrzucenie reklamacji. Implementacja skasowana w 0.140.0
@@ -80,22 +76,6 @@ export class ReklamacjaConflict extends Error {
  * i własny licznik — ta sama reguła co przy zwrotach rozliczonych (0.339.0).
  */
 export type Kubelek = "decyzja" | "odpowiedz" | "zamknieta" | "bez_ruchu";
-
-/**
- * Rodzaj sprawy posprzedażowej — rozróżnik kolumny `typ`.
- *
- * Allegro trzyma dyskusje i reklamacje pod jednym zasobem `/sale/issues`
- * i pod jedną przestrzenią identyfikatorów, więc trzyma je też jedna tabela.
- * Ten typ jest jedynym, co je w kodzie rozdziela — i dlatego stoi w sygnaturze
- * każdej funkcji, która sięga do tabeli po identyfikatorze.
- */
-export type TypSprawy = "CLAIM" | "DISPUTE";
-
-/** Nazwa rodzaju sprawy w zdaniu błędu; kod w komunikacie nie jest komunikatem. */
-export const NAZWA_SPRAWY: Record<TypSprawy, string> = {
-  CLAIM: "Reklamacja",
-  DISPUTE: "Dyskusja",
-};
 
 export type Sygnal =
   | "termin"
@@ -873,7 +853,7 @@ function zParagonuNaWiersz(
      symbol.
 
    Złączenia stoją w stałej, a FROM z warunkiem na typ w samym zapytaniu.
-   Dzięki temu strażnik źródła w `dyskusje.test.ts` widzi warunek, a nie
+   Dzięki temu strażnik źródła w `reklamacje-typ.test.ts` widzi warunek, a nie
    musi wierzyć komentarzowi. W stałych nie ma backticków, bo to literały
    szablonowe. */
 const KOLUMNY_WIERSZA = `r.*, o.nazwa AS oferta_nazwa, o.primary_image_url AS oferta_zdjecie,
@@ -953,16 +933,10 @@ export interface ProgKolejki {
  * sprawy, które próg PRZEPUŚCIŁ. Stąd osobne zapytanie z warunkiem
  * zanegowanym.
  *
- * JEDNA FUNKCJA NA OBA EKRANY, z rodzajem sprawy w parametrze. Dyskusje mają
- * ten sam próg i tę samą tabelę; druga kopia tego zapytania rozjechałaby się
- * z pierwszą przy pierwszej poprawce. `ukrytychZTerminem` przy dyskusji wyjdzie
- * zerem z natury rzeczy — `decisionDueDate` jest wedle schematu „null for
- * disputes" — i to jest prawdziwa odpowiedź, a nie luka w liczeniu.
  */
 export function progKolejki(
   database: Db = defaultDb(), teraz = Date.now(),
   od: string | null = config.allegro.reklamacjeOd,
-  typ: TypSprawy = "CLAIM",
 ): ProgKolejki {
   if (!od) return { od: null, ukrytych: 0, ukrytychZTerminem: 0 };
   /* Listy statusów wchodzą do SQL-a ZE STAŁYCH, nie przepisane ręką. Druga
@@ -977,8 +951,8 @@ export function progKolejki(
                      AND COALESCE(r.werdykt_status,'') NOT IN (${wydane})
                     THEN 1 ELSE 0 END) AS z_terminem
       FROM reklamacja_klienta r
-     WHERE r.typ = ? AND r.otwarto_at < ?`)
-    .get(new Date(teraz).toISOString(), ...STATUSY_KONCOWE, ...WERDYKT_WYDANY, typ, od) as Wiersz;
+     WHERE r.typ = 'CLAIM' AND r.otwarto_at < ?`)
+    .get(new Date(teraz).toISOString(), ...STATUSY_KONCOWE, ...WERDYKT_WYDANY, od) as Wiersz;
   return {
     od,
     ukrytych: Number(w?.ile ?? 0),
@@ -1199,7 +1173,7 @@ export interface SzczegolReklamacji {
   zwroty: WierszZwrotu[];
   /** Rozmowy o tym samym zakupie; po loginie kupującego NIE dobieramy. */
   rozmowy: RozmowaZakupu[];
-  /** Dyskusje i inne reklamacje tego zakupu — bez tej sprawy (S1 spoiwa). */
+  /** Inne reklamacje tego zakupu — bez tej sprawy (S1 spoiwa). */
   sprawy: SprawaZakupu[];
   /** Droga zakupu przez cztery kolejki, w kolejności czasu (S3 spoiwa). */
   droga: PrzystanekDrogi[];
@@ -1233,11 +1207,8 @@ export interface SzczegolReklamacji {
 /**
  * Co jeszcze wiemy o TYM ZAMÓWIENIU — zwroty i rozmowy.
  *
- * Wspólne dla reklamacji i dyskusji (0.245.0), bo obie sprawy wiszą przy
- * zamówieniu i obie odpowiadają na to samo pytanie biura: „czy ten klient
- * pisał już w tej sprawie gdzie indziej". Druga kopia tego mostka rozjechałaby
- * się z pierwszą przy pierwszym nowym polu — dokładnie tak, jak ostrzega
- * komentarz przy `szczegolReklamacji`.
+ * Odpowiada na pytanie biura: „czy ten klient pisał już w tej sprawie
+ * gdzie indziej".
  *
  * Zero nowych żądań do Allegro: numer zamówienia sprawa ma od pierwszej
  * synchronizacji, a wiadomości leżą już w naszej bazie. Grupujemy po rozmowie,
@@ -1251,10 +1222,8 @@ export function kontekstZamowienia(
 ): {
   zwroty: WierszZwrotu[]; rozmowy: RozmowaZakupu[];
   /* Rodzeństwo posprzedażowe i droga zakupu (S1 i S3 spoiwa,
-     `docs/obsluga-klienta-calosc.md`). Reklamacja i dyskusja leżą w JEDNEJ
-     tabeli i do tego wydania nie widziały się nawzajem — dyskusja, która
-     urosła w reklamację, była osobnym wierszem bez śladu po przejściu.
-     To najważniejszy moment całej obsługi i nie zostawiał go nic. */
+     `docs/obsluga-klienta-calosc.md`). Reklamacja i rozmowa ze skrzynki
+     wiążą się po numerze zamówienia w obie strony. */
   sprawy: SprawaZakupu[]; droga: PrzystanekDrogi[];
   /* ── CO KLIENT KUPIŁ I ZA ILE (0.393.0) ──────────────────────────────────
      Zgłoszenie właściciela: „dodaj ceny produktów". Kolumna dowodów miała
@@ -1307,7 +1276,7 @@ export interface SladHistorii {
  * Czy to się już zdarzało — przy TYM towarze i przy TYM kliencie (0.413.0).
  *
  * `null` znaczy „nie mamy po czym liczyć", nigdy „zero": sprawa bez
- * potwierdzonej kartoteki nie ma towaru, po którym szukać, a dyskusja bywa
+ * potwierdzonej kartoteki nie ma towaru, po którym szukać, a sprawa bywa
  * bez loginu. Zero i brak wiedzy to dwie różne odpowiedzi — zasada
  * nadrzędna 9 projektu panelu (§27).
  */
@@ -1408,9 +1377,8 @@ export function reklamacjaZeSzczegolu(
 
 /**
  * Najnowsza reklamacja (typ CLAIM) zamówienia w kształcie szczegółu; `null`,
- * gdy zakup jej nie ma. Dyskusja, która urosła w reklamację, to dwa wiersze
- * tego samego zamówienia — tu interesuje nas ten, który ma werdykt.
- * Konto w warunku, bo `order_id` nie jest rozłączny między kontami.
+ * gdy zakup jej nie ma. Zamówienie bywa objęte kilkoma wierszami — tu
+ * interesuje nas najnowszy. Konto w warunku, bo `order_id` nie jest rozłączny między kontami.
  */
 export function najnowszaReklamacjaZamowienia(
   database: Db, konto: number, orderId: string, teraz: number,
@@ -1435,9 +1403,9 @@ export function szczegolReklamacji(
 ): SzczegolReklamacji {
   /* Skład wiersza jest TEN SAM, co w kolejce — `wierszeReklamacji`. */
   const w = wierszeReklamacji(database, "r.id = ?", id)[0];
-  /* Dyskusja pod tym identyfikatorem to dla TEGO ekranu brak, a nie sprawa
-     bez werdyktu: `/api/reklamacje/7` przy dyskusji ma oddać 404, żeby nie
-     dało się jej otworzyć ekranem, który obiecuje uznanie i odrzucenie. */
+  /* Wiersz dawnej dyskusji pod tym identyfikatorem to dla TEGO ekranu brak,
+     a nie sprawa bez werdyktu: `wierszeReklamacji` go nie zwraca, więc trasa
+     oddaje 404. */
   if (!w) throw new BladReklamacji(`Reklamacja ${id} nie istnieje`, 404);
   const reklamacja = reklamacjaZeSzczegolu(database, w, teraz);
   const konto = Number(w.channel_account_id);
@@ -1488,28 +1456,22 @@ export function szczegolReklamacji(
 }
 
 /**
- * Wiersz do mutacji plus kontrola wersji. Wspólne dla obu zapisów niżej
- * ORAZ dla dyskusji (`services/dyskusje.ts`), stąd `typ` jako parametr.
+ * Wiersz do mutacji plus kontrola wersji.
  *
  * Warunek na `typ` stoi przy ZAPISIE, nie tylko przy odczycie, i to jest
- * sedno: bez niego trasa reklamacji przyjęłaby werdykt na dyskusji, której
- * Allegro werdyktu nie przyjmie („Not a valid operation for disputes"),
- * a trasa dyskusji poprosiłaby o zakończenie reklamacji, gdzie `END_REQUEST`
- * jest niedozwolone.
- *
- * Zdanie w błędzie mówi RODZAJ sprawy, nie samo „nie istnieje": agent, który
- * wkleił numer z drugiego ekranu, ma się dowiedzieć, że pomylił ekran,
- * a nie że sprawa zniknęła.
+ * sedno: bez niego trasa reklamacji przyjęłaby werdykt na wierszu dawnej
+ * dyskusji, której Allegro werdyktu nie przyjmie („Not a valid operation for
+ * disputes").
  */
 export function doZapisu(
-  database: Db, id: number, wersja: number | undefined, typ: TypSprawy = "CLAIM",
+  database: Db, id: number, wersja: number | undefined,
 ) {
   const w = database.prepare(
-    "SELECT id, wersja, prowadzi, prowadzi_user_id FROM reklamacja_klienta WHERE id=? AND typ=?",
-  ).get(id, typ) as
+    "SELECT id, wersja, prowadzi, prowadzi_user_id FROM reklamacja_klienta WHERE id=? AND typ='CLAIM'",
+  ).get(id) as
     { id: number; wersja: number; prowadzi: string | null; prowadzi_user_id: number | null }
     | undefined;
-  if (!w) throw new BladReklamacji(`${NAZWA_SPRAWY[typ]} ${id} nie istnieje`, 404);
+  if (!w) throw new BladReklamacji(`Reklamacja ${id} nie istnieje`, 404);
   if (wersja !== undefined && Number(w.wersja) !== Number(wersja)) {
     throw new ReklamacjaConflict({ wersja: Number(w.wersja), prowadzi: w.prowadzi });
   }
@@ -1567,7 +1529,7 @@ export function zapiszNotatke(
 ): WierszReklamacji {
   return transaction(database, () => {
     doZapisu(database, id, wersja);
-    pisanieNotatki(database, id, notatka, autor, "CLAIM", "reklamacja_notatka");
+    pisanieNotatki(database, id, notatka, autor);
     return zWiersza(
       database.prepare("SELECT * FROM reklamacja_klienta WHERE id=? AND typ='CLAIM'")
         .get(id) as Wiersz,
@@ -1576,33 +1538,28 @@ export function zapiszNotatke(
 }
 
 /**
- * Zapis notatki wspólny dla reklamacji i dyskusji (0.280.0).
+ * Zapis notatki.
  *
  * POPRZEDNIA TREŚĆ ZOSTAJE NA WIERSZU, żeby zmianę dało się cofnąć. Notatka
- * jest polem swobodnym, które nadpisuje ten, kto pisze ostatni — do tego
- * wydania nie było jak odzyskać zdania skasowanego przez pomyłkę.
- *
- * Nazwa zdarzenia jest PARAMETREM, a nie wyliczeniem z `typ`: ślad audytowy ma
- * mówić, z którego ekranu padło kliknięcie, i tę samą zasadę niesie
- * `stempelProwadziDyskusje` od 0.245.0.
+ * jest polem swobodnym, które nadpisuje ten, kto pisze ostatni.
  */
-export function pisanieNotatki(
+function pisanieNotatki(
   database: Db, id: number, notatka: string | null,
-  autor: { id: number; name: string }, typ: TypSprawy, zdarzenie: string,
+  autor: { id: number; name: string },
 ): void {
   const wartosc = (notatka ?? "").trim() || null;
   const w = database.prepare(
-    "SELECT notatka FROM reklamacja_klienta WHERE id=? AND typ=?")
-    .get(id, typ) as { notatka: string | null } | undefined;
+    "SELECT notatka FROM reklamacja_klienta WHERE id=? AND typ='CLAIM'")
+    .get(id) as { notatka: string | null } | undefined;
   database.prepare(`UPDATE reklamacja_klienta
     SET notatka=?, notatka_poprzednia=?, notatka_at=?, notatka_przez=?, notatka_user_id=?,
         wersja=wersja+1
-    WHERE id=? AND typ=?`)
-    .run(wartosc, w?.notatka ?? null, new Date().toISOString(), autor.name, autor.id, id, typ);
+    WHERE id=? AND typ='CLAIM'`)
+    .run(wartosc, w?.notatka ?? null, new Date().toISOString(), autor.name, autor.id, id);
   /* Do dziennika idzie DŁUGOŚĆ, nigdy treść — ani bieżąca, ani poprzednia.
      `events` nie ma retencji (§9 architektury), a notatka bywa zdaniem
      o kliencie. */
-  logEvent(zdarzenie, autor.name, null, { id, znakow: wartosc?.length ?? 0 },
+  logEvent("reklamacja_notatka", autor.name, null, { id, znakow: wartosc?.length ?? 0 },
     autor.id, database);
 }
 
@@ -1616,20 +1573,19 @@ export function pisanieNotatki(
  * `false` znaczy „nie ma do czego wracać" i NIE jest błędem: wiersz zastany
  * sprzed 0.280.0 nie zna swojej poprzedniej treści, bo nikt jej nie zapisywał.
  */
-export function cofnijNotatkeSprawy(
+function cofnijNotatkeSprawy(
   database: Db, id: number, autor: { id: number; name: string },
-  typ: TypSprawy, zdarzenie: string,
 ): boolean {
   const w = database.prepare(
-    "SELECT notatka, notatka_poprzednia FROM reklamacja_klienta WHERE id=? AND typ=?")
-    .get(id, typ) as { notatka: string | null; notatka_poprzednia: string | null } | undefined;
+    "SELECT notatka, notatka_poprzednia FROM reklamacja_klienta WHERE id=? AND typ='CLAIM'")
+    .get(id) as { notatka: string | null; notatka_poprzednia: string | null } | undefined;
   if (!w || w.notatka_poprzednia === null) return false;
   database.prepare(`UPDATE reklamacja_klienta
     SET notatka=?, notatka_poprzednia=?, notatka_at=?, notatka_przez=?, notatka_user_id=?,
         wersja=wersja+1
-    WHERE id=? AND typ=?`)
-    .run(w.notatka_poprzednia, w.notatka, new Date().toISOString(), autor.name, autor.id, id, typ);
-  logEvent(zdarzenie, autor.name, null,
+    WHERE id=? AND typ='CLAIM'`)
+    .run(w.notatka_poprzednia, w.notatka, new Date().toISOString(), autor.name, autor.id, id);
+  logEvent("reklamacja_notatka_cofnieta", autor.name, null,
     { id, znakow: w.notatka_poprzednia.length }, autor.id, database);
   return true;
 }
@@ -1640,7 +1596,7 @@ export function cofnijNotatke(
 ): WierszReklamacji {
   return transaction(database, () => {
     doZapisu(database, id, wersja);
-    if (!cofnijNotatkeSprawy(database, id, autor, "CLAIM", "reklamacja_notatka_cofnieta")) {
+    if (!cofnijNotatkeSprawy(database, id, autor)) {
       throw new BladReklamacji("Ta notatka nie ma poprzedniej wersji", 409);
     }
     return zWiersza(

@@ -1,12 +1,12 @@
 import React from "react";
-import { MessageSquare, MessagesSquare, Scale, Briefcase, UserRound } from "lucide-react";
+import { MessageSquare, Scale, Briefcase, UserRound } from "lucide-react";
 import { Link } from "react-router-dom";
 import { useMojeSprawy } from "../api/rozmowy";
 import type { MojaSprawa } from "../api/typy";
 import { Blad, Karta, NaglowekSekcji, czas, termin } from "../ui";
 
 /* ── Jedno „Moje" ponad kolejkami (S4 spoiwa, `docs/obsluga-klienta-calosc.md`)
-   Sita „Moje" były trzy — w skrzynce, w reklamacjach i w dyskusjach — i każde
+   Sita „Moje" były dwa — w skrzynce i w reklamacjach — i każde
    trzeba było odwiedzić osobno. Sprawa z terminem w kolejce, do której agent
    akurat nie zaglądał, czekała aż ktoś tam zajrzy.
 
@@ -27,7 +27,6 @@ import { Blad, Karta, NaglowekSekcji, czas, termin } from "../ui";
 
 const KOLEJKI = {
   rozmowa: { nazwa: "pytanie", ikona: MessageSquare, sciezka: "/obsluga/skrzynka" },
-  dyskusja: { nazwa: "dyskusja", ikona: MessagesSquare, sciezka: "/obsluga/dyskusje" },
   reklamacja: { nazwa: "reklamacja", ikona: Scale, sciezka: "/obsluga/reklamacje" },
   klient: { nazwa: "klient", ikona: UserRound, sciezka: "/obsluga/klient" },
 } as const;

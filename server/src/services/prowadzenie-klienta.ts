@@ -67,7 +67,7 @@ import {
    w S6, do oceny właściciela. */
 
 export interface NoweZdarzenie {
-  rodzaj: "rozmowa" | "zwrot_nowy" | "zwrot_nadany" | "zwrot_dotarl" | "reklamacja" | "dyskusja"
+  rodzaj: "rozmowa" | "zwrot_nowy" | "zwrot_nadany" | "zwrot_dotarl" | "reklamacja"
     | "wiadomosc_sprawy" | "dosylka_doreczona" | "dosylka_problem";
   /** Zdanie panelu, jego słowami: „Klient napisał 26.09 14:10”, „Zwrot dotarł”. */
   tekst: string;
@@ -158,9 +158,7 @@ interface Odcisk {
   d: number;
   /** Reklamacje. */
   r: number;
-  /** Dyskusje. */
-  s: number;
-  /** Wiadomości klienta albo doradcy Allegro w reklamacjach i dyskusjach. */
+  /** Wiadomości klienta albo doradcy Allegro w reklamacjach. */
   w: number;
   /** Doręczenia dosyłek (0.536.1): suma liczników PRZEJŚĆ z wierszy, która
    *  nigdy nie maleje. Druga doręczona budzi, choć pierwszą ktoś potwierdził,
@@ -219,7 +217,7 @@ function ostatniaWiadomoscKlienta(database: DatabaseSync, login: string): Wiadom
 type Licznik = keyof Omit<Odcisk, "m">;
 
 /**
- * Osiem liczników odcisku jako wyrażenia SQL po loginie `l` — parametrze
+ * Siedem liczników odcisku jako wyrażenia SQL po loginie `l` — parametrze
  * albo kolumnie. JEDNA definicja dla odcisku i dla sita „Moje” (`wierszeMoich`):
  * sito z drugiej, ręcznie przepisanej kopii mogłoby odrzucić sprawę, którą
  * odcisk budzi, a takie obudzenie przepadłoby bez śladu.
@@ -227,8 +225,8 @@ type Licznik = keyof Omit<Odcisk, "m">;
  * Po loginie na wszystkich kontach naraz — tak samo jak liczby profilu.
  * SZTUKI, nie daty: kasowanie zwrotów rozliczonych (ręczne i rzadkie) może
  * zjeść jedno obudzenie, a zmyślona data budziłaby przy każdej synchronizacji.
- * Licznik `w` jest bez typu: wiadomość klienta liczy się w reklamacji i w
- * dyskusji jednakowo, bo obie czekają na naszą odpowiedź.
+ * Reklamacje liczą się wyłącznie z `typ = 'CLAIM'`: wiersze dawnych dyskusji
+ * zostały w tabeli i nie mają budzić sprawy klienta.
  *
  * `k` i `q` (0.536.1) sumują liczniki przejść dosyłek tego loginu, także
  * archiwalnych. Dosyłkę zakłada biuro, ale doręczenie i kłopot zgłasza
@@ -246,10 +244,9 @@ const LICZNIKI = (l: string): Record<Licznik, string> => ({
         WHERE kupujacy_login = ${l} COLLATE NOCASE AND zrodlo = 'allegro' AND dostarczono_at IS NOT NULL)`,
   r: `(SELECT count(*) FROM reklamacja_klienta
         WHERE kupujacy_login = ${l} COLLATE NOCASE AND typ = 'CLAIM')`,
-  s: `(SELECT count(*) FROM reklamacja_klienta
-        WHERE kupujacy_login = ${l} COLLATE NOCASE AND typ = 'DISPUTE')`,
   w: `(SELECT count(*) FROM reklamacja_wiadomosc rw JOIN reklamacja_klienta rk ON rk.id = rw.reklamacja_id
-        WHERE rk.kupujacy_login = ${l} COLLATE NOCASE AND rw.autor_rola IN ('BUYER','ADMIN'))`,
+        WHERE rk.kupujacy_login = ${l} COLLATE NOCASE AND rk.typ = 'CLAIM'
+          AND rw.autor_rola IN ('BUYER','ADMIN'))`,
   k: `(SELECT coalesce(sum(kd.doreczen), 0) FROM klient_dosylka kd JOIN klient_prowadzenie kp ON kp.id = kd.sprawa_id
         WHERE kp.login = ${l} COLLATE NOCASE)`,
   q: `(SELECT coalesce(sum(kd.problemow), 0) FROM klient_dosylka kd JOIN klient_prowadzenie kp ON kp.id = kd.sprawa_id
@@ -265,7 +262,7 @@ function policzOdcisk(
   return {
     odcisk: {
       m: wiadomosc?.wstawiono ?? null,
-      z: Number(n.z), p: Number(n.p), d: Number(n.d), r: Number(n.r), s: Number(n.s), w: Number(n.w),
+      z: Number(n.z), p: Number(n.p), d: Number(n.d), r: Number(n.r), w: Number(n.w),
       k: Number(n.k), q: Number(n.q),
     },
     wiadomosc,
@@ -276,7 +273,7 @@ function policzOdcisk(
    napis: ekran otwarty w chwili aktualizacji dostaje raz 409 ze świeżą
    sprawą. Zapamiętany odcisk bez tych kluczy nie budzi (`noweZdarzenia`). */
 const naNapis = (o: Odcisk): string =>
-  JSON.stringify({ m: o.m, z: o.z, p: o.p, d: o.d, r: o.r, s: o.s, w: o.w, k: o.k, q: o.q });
+  JSON.stringify({ m: o.m, z: o.z, p: o.p, d: o.d, r: o.r, w: o.w, k: o.k, q: o.q });
 
 /** Odcisk faktów po stronie klienta w tej chwili (JSON) — ten sam, który niesie `SprawaKlienta.odcisk`. */
 export function odciskTeraz(login: string, database: DatabaseSync = defaultDb()): string {
@@ -336,30 +333,23 @@ function noweZdarzenia(
     nowe.push({ rodzaj: "zwrot_dotarl", tekst: "Zwrot dotarł", at: tekst(w?.at),
       cel: w ? `/obsluga/zwroty/${w.id}` : null });
   }
-  /* Reklamacja i dyskusja mają osobne liczniki i osobne zdania — to dwa
-     różne byty, a jedna etykieta na oba to blizna 0.121.0. */
-  for (const [k, typ, rodzaj, zdanie, sciezka] of [
-    ["r", "CLAIM", "reklamacja", "Nowa reklamacja", "reklamacje"],
-    ["s", "DISPUTE", "dyskusja", "Nowa dyskusja", "dyskusje"],
-  ] as const) {
-    if (!urosl(k)) continue;
+  if (urosl("r")) {
     const w = database.prepare(`SELECT id, otwarto_at AS at FROM reklamacja_klienta
-      WHERE kupujacy_login = ? COLLATE NOCASE AND typ = ?
-      ORDER BY julianday(otwarto_at) DESC, id DESC LIMIT 1`).get(login, typ) as Wiersz | undefined;
-    nowe.push({ rodzaj, tekst: zdanie, at: tekst(w?.at), cel: w ? `/obsluga/${sciezka}/${w.id}` : null });
+      WHERE kupujacy_login = ? COLLATE NOCASE AND typ = 'CLAIM'
+      ORDER BY julianday(otwarto_at) DESC, id DESC LIMIT 1`).get(login) as Wiersz | undefined;
+    nowe.push({ rodzaj: "reklamacja", tekst: "Nowa reklamacja", at: tekst(w?.at),
+      cel: w ? `/obsluga/reklamacje/${w.id}` : null });
   }
   if (urosl("w")) {
-    /* bez typu: wiadomość klienta budzi sprawę tak samo w reklamacji jak
-       w dyskusji. Rodzaj wychodzi kolumną `typ` do zdania i do odnośnika. */
-    const w = najnowszy(database, `SELECT k.id, k.typ, w.autor_rola AS rola, w.utworzono_at AS at
+    const w = najnowszy(database, `SELECT k.id, w.autor_rola AS rola, w.utworzono_at AS at
       FROM reklamacja_wiadomosc w JOIN reklamacja_klienta k ON k.id = w.reklamacja_id
-      WHERE k.kupujacy_login = ? COLLATE NOCASE AND w.autor_rola IN ('BUYER','ADMIN')
+      WHERE k.kupujacy_login = ? COLLATE NOCASE AND k.typ = 'CLAIM'
+        AND w.autor_rola IN ('BUYER','ADMIN')
       ORDER BY julianday(w.utworzono_at) DESC, w.id DESC LIMIT 1`, login);
-    const dyskusja = String(w?.typ) === "DISPUTE";
     /* Doradca Allegro (`ADMIN`) to nie klient — zdanie mówi, kto pisał. */
     const kto = String(w?.rola) === "ADMIN" ? "Allegro napisało" : "Klient napisał";
-    nowe.push({ rodzaj: "wiadomosc_sprawy", tekst: `${kto} w ${dyskusja ? "dyskusji" : "reklamacji"}`,
-      at: tekst(w?.at), cel: w ? `/obsluga/${dyskusja ? "dyskusje" : "reklamacje"}/${w.id}` : null });
+    nowe.push({ rodzaj: "wiadomosc_sprawy", tekst: `${kto} w reklamacji`,
+      at: tekst(w?.at), cel: w ? `/obsluga/reklamacje/${w.id}` : null });
   }
   /* Dosyłka (0.536.0). Odnośnika nie ma: dosyłka stoi na karcie sprawy,
      a sprawa i tak prowadzi na profil — `cel: null` znaczy „tu, na profilu”. */
@@ -529,7 +519,7 @@ function tylkoDosylka(odcisk: string, biezacy: Odcisk): boolean {
   let ekran: Partial<Odcisk>;
   try { ekran = JSON.parse(odcisk) as Partial<Odcisk>; } catch { return false; }
   if (!ekran || typeof ekran !== "object" || typeof ekran.k !== "number" || typeof ekran.q !== "number") return false;
-  return (["m", "z", "p", "d", "r", "s", "w"] as const).every((k) => ekran[k] === biezacy[k]);
+  return (["m", "z", "p", "d", "r", "w"] as const).every((k) => ekran[k] === biezacy[k]);
 }
 
 /**

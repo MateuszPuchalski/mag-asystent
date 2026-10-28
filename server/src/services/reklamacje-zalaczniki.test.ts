@@ -141,13 +141,12 @@ test("cudzej sprawy nie da się okraść z załącznika po samym numerze", async
   assert.equal(zalacznikiDoWyslania(d, reklamacja).length, 1);
 });
 
-/* ── Ten sam załącznik przy DYSKUSJI (0.486.0) ───────────────────────────────
-   Zgłoszenie właściciela: „dyskusje zostały w tyle”. Specyfikacja Allegro
-   przyjmuje załącznik w wiadomości sprawy dowolnego rodzaju („Dispute or
-   claim identifier”). Trasa i tabela zostają wspólne, a dziennik mówi, z
-   którego ekranu padło kliknięcie. Sprawa, której nie ma, nie wgrywa pliku. */
-test("dyskusja dostaje własne zdarzenia, a sprawa, której nie ma, nie wgrywa pliku", async () => {
-  const { d } = stanowisko();
+/* ── Wiersz dawnej dyskusji ──────────────────────────────────────────────────
+   Dyskusje zostały w tabeli, ale panel ich nie prowadzi, więc plik do Allegro
+   nie ma prawa wyjść ani z ich numeru, ani spoza bazy. Reklamacja zostawia
+   zdarzenia ze swojej nazwy. */
+test("dyskusja i sprawa, której nie ma, nie wgrywają pliku; reklamacja nazywa zdarzenia po sobie", async () => {
+  const { d, reklamacja } = stanowisko();
   const konto = Number((d.prepare("SELECT id FROM channel_account").get() as { id: number }).id);
   const dyskusja = Number(d.prepare(`INSERT INTO reklamacja_klienta
     (channel_account_id,external_id,typ,otwarto_at,synced_at)
@@ -156,14 +155,20 @@ test("dyskusja dostaje własne zdarzenia, a sprawa, której nie ma, nie wgrywa p
   const w = wgrywacz();
 
   const z = await dodajZalacznikSprawy({
-    reklamacjaId: dyskusja, nazwa: "list.jpg", typ: "image/jpeg",
+    reklamacjaId: reklamacja, nazwa: "list.jpg", typ: "image/jpeg",
     dane: plik(32), autor, database: d, wgraj: w.wgraj,
   });
-  assert.ok(usunZalacznikSprawy(d, dyskusja, z.id, autor));
+  assert.ok(usunZalacznikSprawy(d, reklamacja, z.id, autor));
   const typy = (d.prepare("SELECT type FROM events ORDER BY id").all() as Array<{ type: string }>)
     .map((e) => e.type);
-  assert.deepEqual(typy, ["dyskusja_zalacznik_dodany", "dyskusja_zalacznik_zdjety"]);
+  assert.deepEqual(typy, ["reklamacja_zalacznik_dodany", "reklamacja_zalacznik_zdjety"]);
 
+  const przedWgraniem = w.wywolania.length;
+  await assert.rejects(() => dodajZalacznikSprawy({
+    reklamacjaId: dyskusja, nazwa: "x.jpg", typ: "image/jpeg",
+    dane: plik(8), autor, database: d, wgraj: w.wgraj,
+  }), /nie istnieje/);
+  assert.equal(w.wywolania.length, przedWgraniem, "do Allegro nic nie poszło");
   await assert.rejects(() => dodajZalacznikSprawy({
     reklamacjaId: 9999, nazwa: "x.jpg", typ: "image/jpeg",
     dane: plik(8), autor, database: d, wgraj: w.wgraj,

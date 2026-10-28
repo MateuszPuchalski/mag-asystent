@@ -5,7 +5,7 @@ import {
 import { config } from "../config.js";
 import { db } from "../db/db.js";
 import { logEvent } from "./events.js";
-import { BladReklamacji, type TypSprawy } from "./reklamacje.js";
+import { BladReklamacji } from "./reklamacje.js";
 import { LIMIT_ZALACZNIKA, TYPY_ZALACZNIKA, type WgrajZalacznik } from "./allegro-wysylka.js";
 import { DOZWOLONE_PO_LUDZKU, LIMIT_NASZ, MAKS_ZALACZNIKOW } from "./zalaczniki-wysylki.js";
 
@@ -99,17 +99,15 @@ export function zalacznikiDoWyslania(
 }
 
 /**
- * Rodzaj sprawy, do której idzie załącznik; brak sprawy to 404.
+ * Sprawa, do której idzie załącznik; brak reklamacji pod tym numerem to 404.
  *
- * Trasa jest wspólna dla reklamacji i dyskusji, tak jak trasy załączników
- * przychodzących (`routes/dyskusje.ts`, punkt 3). Rozstrzyga WIERSZ, nie
- * adres, bo adres mówi „reklamacje” także przy dyskusji.
+ * Wiersz starej dyskusji, który został w tabeli, też jest „brakiem": tych
+ * spraw panel nie prowadzi, więc nie wgrywa do nich plików do Allegro.
  */
-function rodzajSprawy(database: DatabaseSync, reklamacjaId: number): TypSprawy {
-  const r = database.prepare("SELECT typ FROM reklamacja_klienta WHERE id = ?")
-    .get(reklamacjaId) as { typ: string } | undefined;
+function wymagajReklamacji(database: DatabaseSync, reklamacjaId: number): void {
+  const r = database.prepare("SELECT 1 AS jest FROM reklamacja_klienta WHERE id = ? AND typ = 'CLAIM'")
+    .get(reklamacjaId);
   if (!r) throw new BladReklamacji(`Sprawa ${reklamacjaId} nie istnieje`, 404);
-  return r.typ === "DISPUTE" ? "DISPUTE" : "CLAIM";
 }
 
 export interface ZadanieZalacznikaSprawy {
@@ -135,11 +133,9 @@ export async function dodajZalacznikSprawy(
   const database = z.database ?? db();
   const wgraj = z.wgraj ?? wgrajZalacznikSprawy;
 
-  /* RODZAJ SPRAWY PRZED WSZYSTKIM (0.486.0). Od tego wydania tą samą trasą
-     dodaje załącznik także ekran dyskusji. Zdarzenie w dzienniku ma mówić,
-     z którego ekranu padło kliknięcie (§25c.9), a sprawa, której nie ma,
-     nie ma prawa wgrać pliku do Allegro. */
-  const typSprawy = rodzajSprawy(database, z.reklamacjaId);
+  /* SPRAWA PRZED WSZYSTKIM: sprawa, której nie ma, nie ma prawa wgrać pliku
+     do Allegro. */
+  wymagajReklamacji(database, z.reklamacjaId);
 
   const nazwa = z.nazwa.trim();
   if (!nazwa) throw new Error("Załącznik bez nazwy pliku");
@@ -175,7 +171,7 @@ export async function dodajZalacznikSprawy(
   /* Do dziennika idą NAZWA, TYP i ROZMIAR, nigdy bajty. Nazwa pliku bywa daną
      osobową i przyjmujemy to świadomie, tak samo jak przy załącznikach
      przychodzących (polityka danych 0.143.0). */
-  logEvent(typSprawy === "DISPUTE" ? "dyskusja_zalacznik_dodany" : "reklamacja_zalacznik_dodany",
+  logEvent("reklamacja_zalacznik_dodany",
     z.autor.name, null,
     { id: z.reklamacjaId, allegroId, nazwa, typ: z.typ, rozmiar: z.dane.byteLength },
     z.autor.id, database);
@@ -198,9 +194,9 @@ export function usunZalacznikSprawy(
     "SELECT allegro_id, nazwa FROM reklamacja_zalacznik_wysylki WHERE id=? AND reklamacja_id=?")
     .get(id, reklamacjaId) as { allegro_id: string; nazwa: string } | undefined;
   if (!w) return false;
-  const typSprawy = rodzajSprawy(database, reklamacjaId);
+  wymagajReklamacji(database, reklamacjaId);
   database.prepare("DELETE FROM reklamacja_zalacznik_wysylki WHERE id=?").run(id);
-  logEvent(typSprawy === "DISPUTE" ? "dyskusja_zalacznik_zdjety" : "reklamacja_zalacznik_zdjety",
+  logEvent("reklamacja_zalacznik_zdjety",
     autor.name, null,
     { id: reklamacjaId, allegroId: w.allegro_id, nazwa: w.nazwa }, autor.id, database);
   return true;

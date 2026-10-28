@@ -4,14 +4,14 @@ import { bezMigracji } from "./db/db.js";
 import { powodBrakuKonta, stanPolaczenia } from "./services/allegro-token.js";
 import { listaZOdpowiedzi, opiszKsztalt, raportKoncowki } from "./services/ksztalt.js";
 import {
-  urlDyskusji,
+  urlListySpraw,
   urlListyZwrotow,
   urlOpinii,
   urlRoszczenProwizji,
   urlOstatnichZamowien,
   urlWatkow,
   urlWiadomosci,
-  urlWiadomosciDyskusji,
+  urlWiadomosciSprawy,
   urlZwrotowPlatnosci,
   urlZwrotu,
   zapytajAllegro,
@@ -127,22 +127,22 @@ async function main(): Promise<void> {
   );
   sekcje.push(wiadomosci.md);
 
-  const dyskusje = await sekcja("`/sale/issues` — dyskusje", async () =>
-    tablica(await zapytajAllegro(urlDyskusji(api, 0)), "issues")
+  const sprawy = await sekcja("`/sale/issues` — sprawy posprzedażowe", async () =>
+    tablica(await zapytajAllegro(urlListySpraw(api, 0)), "issues")
   );
-  sekcje.push(dyskusje.md);
+  sekcje.push(sprawy.md);
 
   sekcje.push(
     (
-      await sekcja("`/sale/issues/{id}/chat` — rozmowa dyskusji", async () => {
+      await sekcja("`/sale/issues/{id}/chat` — rozmowa sprawy", async () => {
         const zebrane: unknown[] = [];
-        for (const id of idy(dyskusje.rekordy, ROZMOW)) {
+        for (const id of idy(sprawy.rekordy, ROZMOW)) {
           zebrane.push(
             /* `chat` PIERWSZY, bo tak nazywa listę schemat `PostPurchaseIssueChatResponse`.
                  `messages` zostaje za nim jako zapas — to po nim sonda pytała do 0.164.0
                  i dlatego ta sekcja raportu była pusta przy stu sprawach z niezerowym
                  `chat.messagesCount`. */
-              ...tablica(await zapytajAllegro(urlWiadomosciDyskusji(api, id)), "chat", "messages")
+              ...tablica(await zapytajAllegro(urlWiadomosciSprawy(api, id)), "chat", "messages")
           );
         }
         return zebrane;

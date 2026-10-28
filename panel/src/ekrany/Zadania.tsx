@@ -16,8 +16,11 @@ import { useOkno } from "../nawigacja/fokus";
 /** Napis odnośnika po drugim członie adresu sprawy (`/obsluga/<to>/<id>`). */
 const NAZWA_ZRODLA: Record<string, string> = {
   skrzynka: "Otwórz rozmowę", zwroty: "Otwórz zwrot", reklamacje: "Otwórz reklamację",
-  dyskusje: "Otwórz dyskusję",
 };
+
+/* Stare zadanie z dyskusji niesie adres, pod którym nie ma już ekranu, więc
+   odnośnika do niego nie rysujemy — kontekst zadania dalej mówi, skąd przyszło. */
+const maEkran = (cel: string) => !cel.startsWith("/obsluga/dyskusje");
 
 const Schemat = z.object({
   rodzaj: z.enum(["pomiar", "zdjecie", "weryfikacja", "inne"]),
@@ -260,7 +263,7 @@ export function Zadania() {
               pl-2 text-podpis text-slate-500">{t.kontekst}</p>}
             {/* ODNOŚNIK DO SPRAWY (0.502.0): kontekst mówił, skąd zadanie,
                 ale nie prowadził tam. Decyzja po wyniku zapada w sprawie. */}
-            {t.cel && <Link to={t.cel}
+            {t.cel && maEkran(t.cel) && <Link to={t.cel}
               className="mt-1 inline-flex items-center gap-1 text-podpis font-semibold text-sky-800 underline underline-offset-2">
               <ArrowUpRight size={12} aria-hidden="true" />{NAZWA_ZRODLA[t.cel.split("/")[2]] ?? "Otwórz sprawę"}</Link>}
           </div>

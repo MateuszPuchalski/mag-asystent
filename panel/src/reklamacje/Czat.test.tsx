@@ -34,8 +34,8 @@ vi.mock("../api/reklamacje", () => ({
 
 const { Czat } = await import("./Czat");
 
-/* Czat czyta ze sprawy kształt strukturalny — ten sam komponent rysuje
-   dyskusję, która nie ma ani powodu, ani oferty, ani terminu. */
+/* Czat czyta ze sprawy kształt strukturalny — czat nie zna całego
+   wiersza reklamacji, więc test podaje goły obiekt. */
 const sprawa = (n: Partial<React.ComponentProps<typeof Czat>["sprawa"]> = {}) => ({
   id: 1, opisZgloszenia: "Pękła obudowa po tygodniu" as string | null, czatAktywny: true,
   wiadomosciIle: 1, ...n,
@@ -124,9 +124,9 @@ describe("Nagłówek czatu", () => {
       czat={[wiad({ id: 1 }), wiad({ id: 2, autorRola: "SELLER", tresc: "Odpowiedź" })]} />);
     expect(screen.getByRole("heading", { name: "Czat reklamacji" })).toBeInTheDocument();
     expect(screen.getByText("2 wiadomości · czat otwarty")).toBeInTheDocument();
-    rerender(<Czat tytul="Czat dyskusji" sprawa={sprawa({ czatAktywny: false })} zalaczniki={[]}
+    rerender(<Czat tytul="Czat sprawy" sprawa={sprawa({ czatAktywny: false })} zalaczniki={[]}
       czat={[wiad()]} />);
-    expect(screen.getByRole("heading", { name: "Czat dyskusji" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Czat sprawy" })).toBeInTheDocument();
     expect(screen.getByText("1 wiadomość · czat zamknięty")).toBeInTheDocument();
   });
 
@@ -606,7 +606,7 @@ describe("Przesyłki na osi rozmowy", () => {
     expect(screen.getByRole("listitem", { name: "Przesyłka od klienta do nas" })).toBeInTheDocument();
   });
 
-  it("bez przesyłek oś jest taka jak dotąd (dyskusje)", () => {
+  it("bez przesyłek oś jest taka jak dotąd", () => {
     render(<Czat sprawa={sprawa()} zalaczniki={[]} czat={[wiad({ tresc: "pierwsza" })]} />);
     expect(screen.queryByRole("listitem", { name: /Przesyłka/ })).not.toBeInTheDocument();
   });

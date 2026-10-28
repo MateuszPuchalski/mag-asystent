@@ -63,7 +63,7 @@ export function useZwrot(id: number | null) {
       /* Wiersze paragonu — materiał do RĘCZNEGO składu (0.336.0). Jeden raz na
          zwrot, bo dokument jest jeden. */
       wierszeDokumentu: WierszDokumentu[];
-      /* Spoiwo kolejek (S1 i S3): reklamacje i dyskusje tego zakupu oraz jego
+      /* Spoiwo kolejek (S1 i S3): reklamacje tego zakupu oraz jego
          droga. Tylko w szczególe — powód ten sam, co przy składach wyżej. */
       sprawy: SprawaZakupu[];
       droga: PrzystanekDrogi[];

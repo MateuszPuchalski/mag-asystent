@@ -77,7 +77,7 @@ describe("zamknięty Problem z zakupem", () => {
     await userEvent.click(screen.getByRole("button", { name: "Notatka wewnętrzna" }));
     const pole = screen.getByLabelText(/Notatka wewnętrzna — zobaczy ją tylko zespół/);
     expect(document.activeElement).toBe(pole);
-    await userEvent.keyboard("klient pisze teraz przez dyskusję");
+    await userEvent.keyboard("klient pisze teraz przez telefon");
     await userEvent.click(screen.getByRole("button", { name: /Dodaj notatkę/ }));
     expect(onDodajKomentarz).toHaveBeenCalledTimes(1);
     /* W trybie notatki wysyłki i tak nie ma — tu ani w pasku działań. */
@@ -117,7 +117,7 @@ describe("otwarty edytor bez zmian", () => {
 });
 
 describe("edytor spraw Allegro bez zmian", () => {
-  /* Reklamacje i dyskusje nie mają notatki w edytorze. Zamknięty czat to
+  /* Reklamacje nie mają notatki w edytorze. Zamknięty czat to
      tam dalej samo zdanie, bez przycisku „Notatka”, który by tam nic nie znaczył. */
   it("zamknięty czat: samo zdanie, bez notatki i bez wysyłki", () => {
     render(<EdytorSprawy tresc="Szkic" wysyla={false} blad="" czatAktywny={false}

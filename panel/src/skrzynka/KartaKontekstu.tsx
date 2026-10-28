@@ -238,7 +238,7 @@ export function KartaKontekstu({ dane, historia }: { dane: OsRozmowy; historia?:
         </div>}
 
     {/* DROGA KLIENTA JEST JEDYNYM DOMEM ZDARZEŃ ZAKUPU. Złożone, opłacone,
-        doręczone i inne sprawy tego zakupu (zwrot, reklamacja, dyskusja,
+        doręczone i inne sprawy tego zakupu (zwrot, reklamacja,
         druga rozmowa) stoją tylko tutaj, ze stanem i terminem na przystanku.
         Numer zamówienia stoi wyżej, a przesyłka w bloku „Paczka zamówienia”,
         więc pasek ich nie powtarza. Staje przy samym numerze, także gdy treść

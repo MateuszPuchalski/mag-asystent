@@ -138,7 +138,7 @@ export function brakujaceOferty(database: Db, ile: number, teraz = new Date()): 
       SELECT r.channel_account_id AS konto, r.offer_id AS id,
              2 AS rzad, MAX(r.otwarto_at) AS kiedy
         FROM reklamacja_klienta r
-       WHERE r.offer_id IS NOT NULL AND TRIM(r.offer_id) <> ''
+       WHERE r.typ = 'CLAIM' AND r.offer_id IS NOT NULL AND TRIM(r.offer_id) <> ''
        GROUP BY r.channel_account_id, r.offer_id
     )
     SELECT s.id AS id

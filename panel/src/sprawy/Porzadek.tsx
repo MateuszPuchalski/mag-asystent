@@ -2,20 +2,19 @@ import React, { useState } from "react";
 import { ArrowDownWideNarrow, Check } from "lucide-react";
 
 /* ── Porządek kolejek obsługi (0.401.0) ──────────────────────────────────────
-   Zgłoszenie właściciela: „dodaj sortowanie po dacie etc". Reklamacje,
-   dyskusje i zwroty miały kolejność ZASZYTĄ — najpierw termin, potem data
+   Zgłoszenie właściciela: „dodaj sortowanie po dacie etc". Reklamacje
+   i zwroty miały kolejność ZASZYTĄ — najpierw termin, potem data
    otwarcia malejąco — i ani jednego przełącznika. Agent szukający „co przyszło
    wczoraj" przewijał listę.
 
-   OSIE SĄ DEKLAROWANE PRZEZ EKRAN, nie wspólne dla wszystkich. Dyskusja NIE MA
-   terminu (Allegro nie oddaje przy niej ani `decisionDueDate`, ani
-   `statusDueDate` — patrz `dyskusje/Fakty.tsx`) ani kwoty, więc pokazanie jej
-   tych dwóch pigułek byłoby obietnicą sortowania po polu, którego nie ma.
+   OSIE SĄ DEKLAROWANE PRZEZ EKRAN, nie wspólne dla wszystkich. Skrzynka NIE MA
+   terminu ani kwoty, więc pokazanie jej tych dwóch pigułek byłoby obietnicą
+   sortowania po polu, którego nie ma.
    Przełącznik, który nic nie robi, uczy, że przełączniki nic nie robią.
 
    WYBÓR JEST PAMIĘTANY, osobno dla każdej kolejki — decyzja właściciela i ten
    sam nawyk, co przy porządku w skrzynce od 0.259.0. Osobno, bo „po kwocie"
-   ma sens w reklamacjach i nie ma go w dyskusjach; wspólny klucz przenosiłby
+   ma sens w reklamacjach i nie ma go w skrzynce; wspólny klucz przenosiłby
    wybór tam, gdzie tej osi nie ma.
 
    SORTOWANIE JEST STABILNE i liczy się W PAMIĘCI EKRANU. Lista i tak
@@ -39,7 +38,7 @@ const PODPISY: Record<OsPorzadku, { napis: string; podpowiedz: string }> = {
   ruch: { napis: "Ostatni ruch", podpowiedz: "Kiedy w sprawie ostatnio cokolwiek się wydarzyło" },
   termin: { napis: "Termin", podpowiedz: "Najbliższy termin decyzji na górze — co się pali" },
   kwota: { napis: "Kwota", podpowiedz: "Najdroższe sprawy na górze" },
-  /* Oś skrzynki i dyskusji: ani rozmowa, ani dyskusja nie ma terminu, więc
+  /* Oś skrzynki: rozmowa nie ma terminu, więc
      jedyną miarą pilności jest to, jak długo piłka leży po naszej stronie. */
   czekanie: { napis: "Najdłużej czeka", podpowiedz: "Jak długo pytanie klienta leży po naszej stronie" },
 };

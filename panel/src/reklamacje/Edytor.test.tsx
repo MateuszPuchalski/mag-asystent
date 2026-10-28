@@ -172,8 +172,7 @@ describe("sprawa odpowiada edytorem skrzynki", () => {
   });
 
   it("ekran reklamacji podaje napis z makiety — „Wyślij do klienta”", () => {
-    /* Dyskusje zostają przy domyślnym napisie; zmienia go tylko ekran, który
-       o to prosi, bo odbiorcą w dyskusji bywa doradca Allegro. */
+    /* Domyślny napis zostaje, a zmienia go tylko ekran, który o to prosi. */
     render(<Edytor {...props()} etykietaWyslij="Wyślij do klienta" />);
     expect(screen.getByRole("button", { name: "Wyślij do klienta" })).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Wyślij odpowiedź" })).toBeNull();

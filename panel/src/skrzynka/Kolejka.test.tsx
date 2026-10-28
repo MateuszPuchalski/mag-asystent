@@ -548,8 +548,8 @@ describe("Kolejka: klawiatura", () => {
 
   it("cyfra przełącza kubełek, a pierwszy i domyślny jest „Do odpowiedzi”", async () => {
     /* Od 0.533.0 pierwszy kubełek to praca, nie przeglądanie — „Wszystkie"
-       zeszło pod „Więcej" jako ostatnie, jak w zwrotach, reklamacjach
-       i dyskusjach. Cyfra dalej mapuje się wprost na indeks listy. */
+       zeszło pod „Więcej" jako ostatnie, jak w zwrotach
+       i reklamacjach. Cyfra dalej mapuje się wprost na indeks listy. */
     zKlawiszami(null, vi.fn());
     expect(screen.getByRole("button", { name: /Do odpowiedzi/ })).toHaveAttribute("aria-pressed", "true");
     await userEvent.keyboard("2");

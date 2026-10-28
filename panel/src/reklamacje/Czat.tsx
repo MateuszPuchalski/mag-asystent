@@ -13,7 +13,7 @@ import { kopiujDoSchowka } from "../ui/kopiuj";
 import { PLAKIETKA_PRZESYLKI, type ZdarzeniePrzesylki } from "./przesylki";
 import { rozbierzFormularz, Tresc, zawieraOpis } from "./tresc";
 
-/* ── Czat sprawy Allegro: reklamacji i dyskusji ──────────────────────────────
+/* ── Czat sprawy Allegro: reklamacji ──────────────────────────────────────────
    Treść zgłoszenia i rozmowa są tym, po co agent otwiera ten ekran, więc stoją
    w GŁÓWNYM oknie. Kolumna obok niesie fakty o sprawie, nie jej treść.
 
@@ -65,12 +65,12 @@ function Kafle({ reklamacjaId, lista }: { reklamacjaId: number; lista: Zalacznik
 /**
  * Tyle o sprawie, ile ten komponent naprawdę czyta.
  *
- * KSZTAŁT STRUKTURALNY, nie `Reklamacja`, bo ten sam czat rysuje dyskusję,
- * a dyskusja nie ma ani powodu, ani oferty, ani terminu.
+ * KSZTAŁT STRUKTURALNY, nie `Reklamacja`, żeby czat nie znał całego wiersza
+ * reklamacji i dawał się testować gołym obiektem.
  *
- * `opisZgloszenia` i `powod` skleja WOŁAJĄCY: przy reklamacji opis to
- * `powodOpis` z zejściem na `opis`, przy dyskusji sam `opis`. Rozstrzyganie
- * tego tutaj wymagałoby z powrotem wiedzy o rodzaju sprawy.
+ * `opisZgloszenia` i `powod` skleja WOŁAJĄCY: opis to `powodOpis`
+ * z zejściem na `opis`. Rozstrzyganie tego tutaj wymagałoby z powrotem
+ * wiedzy o tym, skąd sprawa pochodzi.
  */
 export interface SprawaCzatu {
   id: number;
@@ -87,7 +87,7 @@ export interface SprawaCzatu {
   login?: string | null;
   /** Kiedy klient zgłosił sprawę — chwila dymka zgłoszenia spoza rozmowy. */
   zgloszonoAt?: string | null;
-  /** Linia „Powód: … · chce …” nad zdaniem klienta; dyskusja jej nie ma. */
+  /** Linia „Powód: … · chce …” nad zdaniem klienta; bywa pusta. */
   powod?: string | null;
 }
 
@@ -497,7 +497,7 @@ function liczbaWNaglowku(mamy: number, wszystkich: number): string {
 export function Czat({ sprawa, czat, zalaczniki, edytor, zdarzenia = [], tytul = "Czat" }: {
   sprawa: SprawaCzatu;
   czat: WiadomoscReklamacji[];
-  /** Nagłówek rozmowy: „Czat reklamacji” albo „Czat dyskusji”. */
+  /** Nagłówek rozmowy; domyślnie „Czat reklamacji”. */
   tytul?: string;
   /** Przesyłki sprawy (`zdarzeniaPrzesylek`) — staną na osi według chwili. */
   zdarzenia?: ZdarzeniePrzesylki[];
@@ -578,7 +578,7 @@ export function Czat({ sprawa, czat, zalaczniki, edytor, zdarzenia = [], tytul =
     </div>
     {/* ── ROZMOWA PRZEWIJA SIĘ SAMA ─────────────────────────────────────────
         Przewija się wyłącznie rozmowa z odpowiedzią. Wszystko, co ma stać
-        w miejscu, jak werdykt reklamacji czy pasek zakończenia dyskusji,
+        w miejscu, jak werdykt reklamacji,
         rysuje ekran poza tym komponentem. */}
     <div className="flex min-h-0 flex-1 flex-col gap-3.5 overflow-y-auto px-5 pb-5 pt-1">
       {(osobneZgloszenie || wpisy.length > 0) && <ol aria-label="Wiadomości" className="flex flex-col gap-3.5">

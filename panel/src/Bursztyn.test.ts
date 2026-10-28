@@ -14,7 +14,7 @@ const ZRODLA = import.meta.glob(["./**/*.tsx", "!./**/*.test.tsx"],
    Najostrzejszy przypadek dało się pokazać na jednej wartości. `bg-amber-50`
    (`#FFFBEB`) malowało jednocześnie:
 
-     wybrany wiersz    cztery kolejki: skrzynka, zwroty, reklamacje, dyskusje
+     wybrany wiersz    trzy kolejki: skrzynka, zwroty, reklamacje
      ostrzeżenie       brak powiązania z ofertą, konflikt przejęcia, Copilot
      notatkę wewnętrzną blok komentarza na osi rozmowy
      formularz pomiaru pasmo pod osią

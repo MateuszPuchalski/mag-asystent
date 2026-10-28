@@ -2,16 +2,15 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "./klient";
 import type { Tag } from "./typy";
 import { kluczeReklamacji } from "./reklamacje";
-import { kluczeDyskusji } from "./dyskusje";
 import { kluczeZwrotow } from "./zwroty";
 
 /* ── Słownik tagów i przypięcia (0.279.0) ────────────────────────────────────
-   SŁOWNIK JEST JEDEN dla reklamacji i dyskusji, więc ma własny klucz cache
+   SŁOWNIK JEST JEDEN dla reklamacji i zwrotów, więc ma własny klucz cache
    i własny plik. Przypięcie idzie pod adres SPRAWY, bo tam stoi bramka roli
    i tam sprawa ma swój rodzaj.
 
    Unieważniamy OBIE kolejki po każdej zmianie. Tag zmieniony przy reklamacji
-   bywa tym samym tagiem, który filtruje dyskusje — a kolejka pokazująca starą
+   bywa tym samym tagiem, który filtruje zwroty — a kolejka pokazująca starą
    nazwę byłaby drugą wersją prawdy, nie opóźnieniem.                        */
 
 export const kluczeTagow = { slownik: ["tagi"] as const };
@@ -24,22 +23,17 @@ export function useTagi() {
 }
 
 /** Rodzaj sprawy rozstrzyga tylko ADRES — reszta jest wspólna. */
-export type RodzajSprawy = "reklamacje" | "dyskusje" | "zwroty";
+export type RodzajSprawy = "reklamacje" | "zwroty";
 
 function useOdswiezWszystko() {
   const qc = useQueryClient();
   return (id: number, rodzaj: RodzajSprawy) => {
     void qc.invalidateQueries({ queryKey: kluczeTagow.slownik });
     void qc.invalidateQueries({ queryKey: kluczeReklamacji.kolejka });
-    void qc.invalidateQueries({ queryKey: kluczeDyskusji.kolejka });
-    /* Kolejka zwrotów dochodzi w 0.315.0. Unieważniamy WSZYSTKIE TRZY, bo tag
-       zmieniony przy reklamacji bywa tym samym tagiem, który filtruje zwroty —
-       a kolejka ze starą nazwą byłaby drugą wersją prawdy, nie opóźnieniem. */
     void qc.invalidateQueries({ queryKey: kluczeZwrotow.kolejka });
     void qc.invalidateQueries({
       queryKey: rodzaj === "reklamacje" ? kluczeReklamacji.reklamacja(id)
-        : rodzaj === "dyskusje" ? kluczeDyskusji.dyskusja(id)
-          : kluczeZwrotow.zwrot(id),
+        : kluczeZwrotow.zwrot(id),
     });
   };
 }
@@ -98,7 +92,7 @@ export function useZmienTag() {
     onSettled: () => {
       void qc.invalidateQueries({ queryKey: kluczeTagow.slownik });
       void qc.invalidateQueries({ queryKey: kluczeReklamacji.kolejka });
-      void qc.invalidateQueries({ queryKey: kluczeDyskusji.kolejka });
+      void qc.invalidateQueries({ queryKey: kluczeZwrotow.kolejka });
     },
   });
 }

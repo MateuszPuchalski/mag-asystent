@@ -107,8 +107,8 @@ function Kolumna({ dane, onWstawDoSzkicu, onOtworzRozmowe }: {
   const paczkaSwieci = swiatla.includes("paczka");
   const pozycjaSwieci = swiatla.includes("pozycja");
   /* Licznik liczy każdą narysowaną pozycję osobno. Dwa zwroty pod jedną
-     liczbą mówiły „1", a agent szukał drugiego na ślepo. Reklamacji i dyskusji
-     nie liczy: ich wiersze zeszły z kolumny, a stan niesie pasek drogi. */
+     liczbą mówiły „1", a agent szukał drugiego na ślepo. Reklamacji
+     nie liczy: jej wiersz zszedł z kolumny, a stan niesie pasek drogi. */
   const ileSwieci = zwrotyWToku.length + (paczkaSwieci ? 1 : 0) + (pozycjaSwieci ? 1 : 0);
 
   const zamowienieId = dane.zamowienie?.externalId ?? null;
@@ -219,8 +219,8 @@ function Kolumna({ dane, onWstawDoSzkicu, onOtworzRozmowe }: {
 
       {/* ZAMKNIĘTE ZWROTY ZOSTAJĄ, bo ich werdykt, kwotę i numer korekty mówi
           tylko ten wiersz: przystanek paska drogi zwrotu nie ma stanu. Zamknięte
-          reklamacje i dyskusje zeszły stąd: pasek mówi, że są zamknięte, a ich
-          przebieg stoi na własnych ekranach, jedno kliknięcie dalej. */}
+          reklamacje zeszły stąd: pasek mówi, że są zamknięte, a ich
+          przebieg stoi na własnym ekranie, jedno kliknięcie dalej. */}
       {zwrotyZamkniete.length > 0 &&
         <Wiersz tytul="Zamknięte zwroty" streszczenie={streszczenieZamknietych(zwrotyZamkniete.length)}
           otwarty={otwarte.has("zamkniete")} onPrzelacz={() => przelacz("zamkniete")}>
@@ -367,7 +367,6 @@ const RODZAJ_HISTORII: Record<string, [string, string, string]> = {
   rozmowa: ["rozmowa", "rozmowy", "rozmów"],
   zwrot: ["zwrot", "zwroty", "zwrotów"],
   reklamacja: ["reklamacja", "reklamacje", "reklamacji"],
-  dyskusja: ["dyskusja", "dyskusje", "dyskusji"],
 };
 
 /**

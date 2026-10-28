@@ -1094,7 +1094,7 @@ describe("Pasek rozjazdów", () => {
 });
 
 /* ── Sito i tagi (0.315.0) ───────────────────────────────────────────────────
-   Reklamacje i dyskusje mają je od 0.278.0 i 0.279.0. Zwroty dostały je
+   Reklamacje mają je od 0.278.0 i 0.279.0. Zwroty dostały je
    decyzją właściciela z 13 września — razem z prowadzącym, którego ta sama
    rozmowa najpierw odrzuciła, a potem przywróciła.                          */
 describe("Czego w kolejce zwrotów JUŻ NIE MA (0.370.0)", () => {

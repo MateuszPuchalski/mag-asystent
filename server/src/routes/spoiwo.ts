@@ -70,7 +70,7 @@ export async function spoiwoRoutes(app: FastifyInstance) {
     catch (e) { return reply.code(404).send({ error: (e as Error).message }); }
   });
 
-  /* Reklamacja i dyskusja to jedna tabela — jedna trasa, rodzaj zna wiersz. */
+  /* Historia klienta ze sprawy posprzedażowej (reklamacji). */
   app.get<{ Params: { id: string } }>("/api/obsluga/sprawy/:id/klient", async (req, reply) => {
     const nie = odmowa(reply); if (nie) return nie;
     try { return zeSprawa(historiaSprawy("sprawa", Number(req.params.id))); }

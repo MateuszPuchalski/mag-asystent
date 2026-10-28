@@ -163,17 +163,11 @@ test("sprawy nieistniejącej nie da się otagować, a numer tagu nie jest przepu
   assert.throws(() => przypnijTag(d, TAGI_REKLAMACJI, id, 9999, ALA), /Tag 9999 nie istnieje/);
 });
 
-test("dyskusja i reklamacja mają własne tagi mimo JEDNEJ tabeli", () => {
+test("wiersz dawnej dyskusji nie dostaje tagu: dla tej osi sprawy nie ma", () => {
   const { d, sprawa } = stanowisko();
-  const rek = sprawa("i-1", "CLAIM");
   const dys = sprawa("d-1", "DISPUTE");
   const a = utworzTag(d, "czeka na część", ALA);
-  const b = utworzTag(d, "do decyzji właściciela", ALA);
-  przypnijTag(d, TAGI_REKLAMACJI, rek, a.id, ALA);
-  przypnijTag(d, TAGI_REKLAMACJI, dys, b.id, ALA);
-
-  assert.deepEqual(tagiSprawy(d, TAGI_REKLAMACJI, rek).map((t) => t.nazwa), ["czeka na część"]);
-  assert.deepEqual(tagiSprawy(d, TAGI_REKLAMACJI, dys).map((t) => t.nazwa), ["do decyzji właściciela"]);
+  assert.throws(() => przypnijTag(d, TAGI_REKLAMACJI, dys, a.id, ALA), /nie istnieje/);
 });
 
 test("tagi całej kolejki jadą JEDNYM zapytaniem, alfabetycznie", () => {

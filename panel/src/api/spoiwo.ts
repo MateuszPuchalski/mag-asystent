@@ -12,7 +12,14 @@ export type { DosylkaSprawy, NoweZdarzenie, SprawaKlienta, ZrodloNumeruDosylki }
    zapisuje. */
 
 export type RodzajTrafienia =
-  | "klient" | "rozmowa" | "zwrot" | "reklamacja" | "dyskusja" | "dostawa" | "towar" | "zamowienie";
+  | "klient" | "rozmowa" | "zwrot" | "reklamacja" | "dostawa" | "towar" | "zamowienie";
+
+/* Serwer mógłby jeszcze przysłać rodzaj, którego panel nie rysuje (dawne
+   dyskusje nie mają już ekranu), więc nieznany rodzaj odsiewamy zamiast
+   wywracać listę na brakującej ikonie. */
+const ZNANE_RODZAJE: ReadonlySet<string> = new Set<RodzajTrafienia>([
+  "klient", "rozmowa", "zwrot", "reklamacja", "dostawa", "towar", "zamowienie",
+]);
 
 export interface Trafienie {
   rodzaj: RodzajTrafienia;
@@ -29,6 +36,7 @@ export function useSzukajWszedzie(fraza: string) {
     queryKey: ["szukaj", fraza],
     queryFn: () => api<{ trafienia: Trafienie[] }>(`/api/obsluga/szukaj?q=${encodeURIComponent(fraza)}`),
     enabled: fraza.trim().length >= 3,
+    select: (d) => ({ trafienia: d.trafienia.filter((t) => ZNANE_RODZAJE.has(t.rodzaj)) }),
     placeholderData: (poprzednie) => poprzednie,
     staleTime: 30_000,
   });
@@ -53,13 +61,13 @@ export function useHistoriaSprawy(rodzaj: "zwrot" | "sprawa", id: number, wlaczo
 
 /* ── Profil klienta (24 września 2026) — kształt z `services/profil-klienta.ts` */
 
-export type RodzajSprawyKlienta = "rozmowa" | "zwrot" | "reklamacja" | "dyskusja";
+export type RodzajSprawyKlienta = "rozmowa" | "zwrot" | "reklamacja";
 
 export interface ProfilKlienta {
   login: string;
   liczby: {
     zamowien: number; wydanoGrosze: number; waluta: string | null;
-    zwrotow: number; reklamacji: number; dyskusji: number; rozmow: number;
+    zwrotow: number; reklamacji: number; rozmow: number;
     pierwszyZakup: string | null; ostatniZakup: string | null;
   };
   sygnaly: Array<{ ton: "zle" | "uwaga"; tekst: string; cel: string | null }>;

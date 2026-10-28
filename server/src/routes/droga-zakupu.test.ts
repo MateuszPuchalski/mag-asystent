@@ -86,20 +86,25 @@ test("zakup z reklamacją: reklamacja w kształcie ekranu reklamacji", async () 
   assert.deepEqual(b.reklamacja, szczegol.reklamacja);
 });
 
-test("dyskusja, która urosła w reklamację: obie w sprawach, reklamacja to CLAIM", async () => {
+test("wiersz dawnej dyskusji nie wchodzi do spraw zakupu, a reklamacja zostaje CLAIM", async () => {
   zamowienie();
   sprawa("DISPUTE", "d-1", "2026-09-05T08:00:00Z");
   const rek = sprawa("CLAIM", "c-1", "2026-09-06T08:00:00Z");
   const b = (await pobierz(login("admin", "Adam"))).json();
-  assert.deepEqual(b.sprawy.map((s: { typ: string }) => s.typ).sort(), ["CLAIM", "DISPUTE"]);
+  assert.deepEqual(b.sprawy.map((s: { typ: string }) => s.typ), ["CLAIM"]);
   assert.equal(b.reklamacja.id, rek);
 });
 
-test("sama dyskusja nie daje reklamacji, a konto da się odczytać bez zamówienia", async () => {
+test("sama dyskusja nie tworzy zakupu: konta nie da się z niej odczytać", async () => {
   sprawa("DISPUTE", "d-1", "2026-09-05T08:00:00Z");
   const r = await pobierz(login("biuro", "Ala"));
+  assert.equal(r.statusCode, 404);
+});
+
+test("sama reklamacja pozwala odczytać konto bez zamówienia", async () => {
+  sprawa("CLAIM", "c-1", "2026-09-05T08:00:00Z");
+  const r = await pobierz(login("biuro", "Ala"));
   assert.equal(r.statusCode, 200);
-  assert.equal(r.json().reklamacja, null);
   assert.equal(r.json().sprawy.length, 1);
 });
 

@@ -206,7 +206,7 @@ describe("Cele klikalne w kolejkach mają 24 px", () => {
        postawić sześć linii nad klasą, to i znacznik wolno tam szukać. */
     const winne: string[] = [];
     for (const [plik, zrodlo] of Object.entries(ZRODLA)) {
-      if (!/Kolejka|Zwroty|Reklamacje|Dyskusje/.test(plik)) continue;
+      if (!/Kolejka|Zwroty|Reklamacje/.test(plik)) continue;
       const linie = bezKomentarzy(zrodlo).split("\n");
       const surowe = zrodlo.split("\n");
       linie.forEach((l, i) => {

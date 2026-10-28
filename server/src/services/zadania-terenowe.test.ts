@@ -80,7 +80,7 @@ test("skasowanie zadania zabiera jego zdjęcia — załącznik bez zadania nic n
 });
 
 /* ── Zadanie ze sprawy: skąd i dokąd wraca (0.502.0) ───────────────────────
-   Zwrot, reklamacja, dyskusja i dostawa zlecają hali z numerem sprawy.
+   Zwrot, reklamacja i dostawa zlecają hali z numerem sprawy.
    Karta zadania prowadzi z powrotem, wynik i odesłanie wracają na oś zwrotu,
    a odesłane zadanie staje w Do zrobienia.                                */
 const zwrot = () => {

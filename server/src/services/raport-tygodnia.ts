@@ -221,8 +221,8 @@ export function zbudujRaport(poniedzialek: string, database: Db = defaultDb()): 
       klientCzekaNaKoniec: czas.czekaTeraz,
       zwrotyNowe: ile(database, `SELECT COUNT(*) AS n FROM zwrot_klienta WHERE ${wOknie("created_at")}`, od, doChwili),
       zwrotyZamkniete: ile(database, `SELECT COUNT(*) AS n FROM zwrot_klienta WHERE ${wOknie("zamkniety_at")}`, od, doChwili),
-      reklamacjeNowe: ile(database, `SELECT COUNT(*) AS n FROM reklamacja_klienta WHERE ${wOknie("otwarto_at")}`, od, doChwili),
-      reklamacjeRozstrzygniete: ile(database, `SELECT COUNT(*) AS n FROM reklamacja_klienta WHERE ${wOknie("werdykt_at")}`, od, doChwili),
+      reklamacjeNowe: ile(database, `SELECT COUNT(*) AS n FROM reklamacja_klienta WHERE typ = 'CLAIM' AND ${wOknie("otwarto_at")}`, od, doChwili),
+      reklamacjeRozstrzygniete: ile(database, `SELECT COUNT(*) AS n FROM reklamacja_klienta WHERE typ = 'CLAIM' AND ${wOknie("werdykt_at")}`, od, doChwili),
     },
     copilot: {
       wywolan: wywolania.length,

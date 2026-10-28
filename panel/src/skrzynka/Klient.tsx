@@ -37,7 +37,7 @@ export function Klient({ rozmowaId, onOtworzRozmowe, zamowienieId = null, pomin 
   if (h.isLoading) return <Pusto waga="lista">Szukam historii klienta…</Pusto>;
 
   /* HISTORIA BEZ TEGO ZAKUPU. Wpisy tego zakupu — sam zakup, jego zwrot,
-     reklamacja i dyskusja — mają dom w karcie zakupu, w ramie „Wymaga
+     reklamacja — mają dom w karcie zakupu, w ramie „Wymaga
      Ciebie", w „Zamkniętych sprawach" i w osi rozmowy. Tutaj byłyby
      czwartym zapisem tego samego. Reguła w `kokpit.ts`. */
   const poza = historiaPozaZakupem(h.data, zamowienieId);
@@ -78,15 +78,15 @@ export function Klient({ rozmowaId, onOtworzRozmowe, zamowienieId = null, pomin 
 
 /**
  * Sama historia, bez pobierania — rysuje ją wiersz „Klient" w skrzynce i szuflada
- * historii przy zwrocie, reklamacji i dyskusji (23 września 2026). Jeden widok
- * na cztery wejścia: agent czyta klienta tak samo, skądkolwiek przyszedł.
+ * historii przy zwrocie i reklamacji (23 września 2026). Jeden widok
+ * na trzy wejścia: agent czyta klienta tak samo, skądkolwiek przyszedł.
  */
 export function WidokHistorii({ historia, onOtworzRozmowe, bezProfilu = false, bezLoginu = false,
   wKolumnie = false, pustaOs }: {
   historia: HistoriaKlienta & { login: string };
   /**
    * Widok w wierszu „Klient" prawej kolumny skrzynki. Profil i szuflady przy
-   * zwrocie, reklamacji i dyskusji stawiają go samodzielnie, z wcięciem
+   * zwrocie i reklamacji stawiają go samodzielnie, z wcięciem
    * i nagłówkiem. W kolumnie oddech daje wiersz, a tytuł wiersza mówi już
    * „Klient".
    */
@@ -166,18 +166,20 @@ function LiniaSprawy({ login, sprawa: s }: { login: string; sprawa: SprawaKlient
   </Link>;
 }
 
-/* Sprawa z trzech pozostałych kolejek: dokąd prowadzi wiersz i czym się
+/* Sprawa z pozostałych kolejek: dokąd prowadzi wiersz i czym się
    przedstawia. Jedno miejsce, żeby nazwy nie rozjechały się z blokiem spoiwa. */
 const SPRAWY_OSI = {
   zwrot: { nazwa: "Zwrot", ikona: Undo2, sciezka: "/obsluga/zwroty" },
   reklamacja: { nazwa: "Reklamacja", ikona: Scale, sciezka: "/obsluga/reklamacje" },
-  dyskusja: { nazwa: "Dyskusja", ikona: MessagesSquare, sciezka: "/obsluga/dyskusje" },
 } as const;
 
 /** Jeden wiersz osi: zakup prowadzi do zamówienia, rozmowa — do rozmowy. */
 function Wpis({ wpis, onOtworzRozmowe }: {
   wpis: WpisHistorii; onOtworzRozmowe: (id: number) => void;
 }) {
+  /* Wpis rodzaju, którego panel nie zna (dawna dyskusja), nie ma dokąd
+     prowadzić — pomijamy go zamiast udawać rozmowę albo wywracać oś. */
+  if (wpis.rodzaj !== "zakup" && wpis.rodzaj !== "rozmowa" && !Object.hasOwn(SPRAWY_OSI, wpis.rodzaj)) return null;
   return <li className="flex gap-2 border-t border-slate-100 py-1.5 text-xs first:border-t-0">
     {/* Data w jednej linii: przy `w-20` część dat łamała się na dwie,
         a sąsiednie nie, i kolumna dat skakała z wiersza na wiersz. */}
@@ -185,7 +187,7 @@ function Wpis({ wpis, onOtworzRozmowe }: {
     <span className="min-w-0 flex-1">
       {wpis.rodzaj !== "zakup" && wpis.rodzaj !== "rozmowa" && wpis.sprawaId !== null
         ? (() => {
-            /* Trzy kolejki doszły w S2 spoiwa. Wiersz prowadzi na ekran
+            /* Kolejki doszły w S2 spoiwa. Wiersz prowadzi na ekran
                właściwej kolejki, bo tam stoją bramki tej sprawy — historia
                jest czytaniem, nigdy pracą. */
             const { nazwa, ikona: Ikona, sciezka } = SPRAWY_OSI[wpis.rodzaj];

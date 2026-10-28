@@ -81,7 +81,7 @@ describe("lista skrótów pod ?", () => {
     await userEvent.keyboard("?");
     const okno = screen.getByRole("dialog", { name: "Skróty klawiszowe" });
     const sekcje = within(okno).getAllByRole("region").map((s) => s.getAttribute("aria-label"));
-    expect(sekcje.slice(0, 3)).toEqual(["Wszędzie", "Skrzynka, zwroty, reklamacje, dyskusje", "Zwroty"]);
+    expect(sekcje.slice(0, 3)).toEqual(["Wszędzie", "Skrzynka, zwroty, reklamacje", "Zwroty"]);
     expect(within(okno).getByText(/tu jesteś/)).toBeTruthy();
     await userEvent.keyboard("{Escape}");
     expect(screen.queryByRole("dialog")).toBeNull();

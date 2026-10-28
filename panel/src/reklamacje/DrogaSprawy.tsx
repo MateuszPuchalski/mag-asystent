@@ -38,15 +38,15 @@ import { rozstrzygniecie } from "./statusy";
    WĄSKI EKRAN PRZEWIJA RZĄD W POZIOMIE. Sześć kroków po 104 px nie mieści się
    w kolumnie telefonu, a zawinięty rząd przestaje czytać się jak droga.
 
-   INNE SPRAWY ZAKUPU STOJĄ NA DRODZE, w swoim miejscu w czasie. Pytanie,
-   zwrot czy dyskusja tego zamówienia są częścią historii klienta, więc agent
+   INNE SPRAWY ZAKUPU STOJĄ NA DRODZE, w swoim miejscu w czasie. Pytanie
+   albo zwrot tego zamówienia są częścią historii klienta, więc agent
    widzi je tam, gdzie się wydarzyły. Wiązanie po numerze zamówienia działa
    w obie strony: przystanek jest łączem do tamtej sprawy.
 
    PRZYSTANEK NIE JEST KROKIEM tej sprawy. Ma mniejszą kropkę z ikoną rodzaju
    w barwie łącza i nie ma stanu, bo nie mówi, ile tej reklamacji zostało.
 
-   PASEK NIE NALEŻY DO REKLAMACJI. Czytają go też zwroty, dyskusje, skrzynka
+   PASEK NIE NALEŻY DO REKLAMACJI. Czytają go też zwroty, skrzynka
    i profil klienta, więc karmi go `DaneDrogi`, a nie szczegół reklamacji.
    Szczegół reklamacji spełnia ten kształt wprost, więc ekran reklamacji nie
    pyta serwera o nic drugi raz.
@@ -76,7 +76,7 @@ export interface DaneDrogi {
 
 /** Sprawa, na której stoi ekran — rodzaj jak w `KOLEJKI`. */
 export interface BiezacaSprawa {
-  rodzaj: "rozmowa" | "dyskusja" | "reklamacja" | "zwrot";
+  rodzaj: "rozmowa" | "reklamacja" | "zwrot";
   id: number;
 }
 

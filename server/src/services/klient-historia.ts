@@ -33,14 +33,14 @@ import { ROZMOWA_ZAMOWIENIA } from "./droga-klienta.js";
 export interface WpisHistorii {
   /* ── Trzy rodzaje doszły w S2 spoiwa (`docs/obsluga-klienta-calosc.md`) ────
      Zakładka obiecywała HISTORIĘ KLIENTA, a pokazywała jej połowę: zakupy
-     i rozmowy. Zwrot, reklamacja i dyskusja tego samego kupującego leżały
+     i rozmowy. Zwrot i reklamacja tego samego kupującego leżały
      w bazie i nie docierały tu wcale, więc agent czytał „nic się nie działo"
      o kliencie, który miesiąc temu odesłał towar.
 
      Wiązanie idzie po LOGINIE, bo to oś tej zakładki. Zwrot i sprawa niosą
      `kupujacy_login` wprost z Allegro, a rozmowy — login z wątku
      (`interlocutor_login`). To jedno i to samo pole kupującego. */
-  rodzaj: "zakup" | "rozmowa" | "zwrot" | "reklamacja" | "dyskusja";
+  rodzaj: "zakup" | "rozmowa" | "zwrot" | "reklamacja";
   at: string;
   /** Zdanie na oś: „Zakup szarpaka SZR-148/82" albo temat rozmowy. */
   tresc: string;
@@ -104,8 +104,8 @@ export function historiaKlienta(
 /**
  * Historia kupującego ZE ZWROTU albo ze SPRAWY posprzedażowej (23 września 2026).
  *
- * Z rozmowy do historii klienta był jeden klik od S2 spoiwa; ze zwrotu,
- * reklamacji i dyskusji — żaden. Agent przy zwrocie nie wiedział, że ten sam
+ * Z rozmowy do historii klienta był jeden klik od S2 spoiwa; ze zwrotu
+ * i reklamacji — żaden. Agent przy zwrocie nie wiedział, że ten sam
  * kupujący pisał tydzień temu o tej samej części.
  *
  * LOGIN BIERZE SIĘ Z SAMEJ SPRAWY, nie z wątku. `kupujacy_login` zwrotu
@@ -120,7 +120,7 @@ export function historiaSprawy(
 ): HistoriaKlienta {
   const w = database.prepare(rodzaj === "zwrot"
     ? "SELECT channel_account_id, kupujacy_login, order_id FROM zwrot_klienta WHERE id=?"
-    : "SELECT channel_account_id, kupujacy_login, order_id, typ FROM reklamacja_klienta WHERE id=?",
+    : "SELECT channel_account_id, kupujacy_login, order_id FROM reklamacja_klienta WHERE id=? AND typ='CLAIM'",
   ).get(id) as Record<string, unknown> | undefined;
   if (!w) throw new Error(rodzaj === "zwrot" ? "Nie ma takiego zwrotu" : "Nie ma takiej sprawy");
   const konto = Number(w.channel_account_id);
@@ -148,7 +148,7 @@ export function historiaSprawy(
 
   const pomin = rodzaj === "zwrot"
     ? { rodzaj: "zwrot" as const, id }
-    : { rodzaj: String(w.typ) === "DISPUTE" ? ("dyskusja" as const) : ("reklamacja" as const), id };
+    : { rodzaj: "reklamacja" as const, id };
   return zbierz(database, konto, login, rozmowy, pomin);
 }
 
@@ -170,7 +170,7 @@ export function kontaLoginu(
   return (database.prepare(`
     SELECT channel_account_id AS k, kupujacy_login AS l FROM zamowienie_klienta WHERE kupujacy_login = ?1 COLLATE NOCASE
     UNION SELECT channel_account_id, kupujacy_login FROM zwrot_klienta WHERE kupujacy_login = ?1 COLLATE NOCASE
-    UNION SELECT channel_account_id, kupujacy_login FROM reklamacja_klienta WHERE kupujacy_login = ?1 COLLATE NOCASE
+    UNION SELECT channel_account_id, kupujacy_login FROM reklamacja_klienta WHERE typ = 'CLAIM' AND kupujacy_login = ?1 COLLATE NOCASE
     UNION SELECT c.channel_account_id, t.interlocutor_login FROM conversation c
       JOIN allegro_inbox_thread t ON t.id = c.external_conversation_id
      WHERE t.interlocutor_login = ?1 COLLATE NOCASE`).all(login) as Array<Record<string, unknown>>)
@@ -289,9 +289,9 @@ function zbierz(
      ORDER BY created_at DESC`).all(konto, login) as Array<Record<string, unknown>>;
 
   const sprawy = database.prepare(`
-    SELECT id, typ, reference_number, temat, order_id, otwarto_at
+    SELECT id, reference_number, temat, order_id, otwarto_at
       FROM reklamacja_klienta
-     WHERE channel_account_id = ? AND kupujacy_login = ? COLLATE NOCASE
+     WHERE typ = 'CLAIM' AND channel_account_id = ? AND kupujacy_login = ? COLLATE NOCASE
      ORDER BY otwarto_at DESC`).all(konto, login) as Array<Record<string, unknown>>;
 
   const wpisy: WpisHistorii[] = [
@@ -323,7 +323,7 @@ function zbierz(
       sprawaId: Number(z.id),
     })),
     ...sprawy.map((r) => ({
-      rodzaj: String(r.typ) === "DISPUTE" ? ("dyskusja" as const) : ("reklamacja" as const),
+      rodzaj: "reklamacja" as const,
       at: String(r.otwarto_at),
       tresc: tekst(r.temat) ?? tekst(r.reference_number) ?? "Sprawa bez tematu",
       zamowienieId: tekst(r.order_id),

@@ -47,12 +47,6 @@ const num = (v: string | undefined, def: number, name?: string) => {
   return n;
 };
 
-/** Liczba większa od zera: próg zerowy zapalałby alarm przy każdej dyskusji. */
-const dodatnia = (n: number, name: string): number => {
-  if (!(n > 0)) throw new Error(`${name}=${n} — oczekiwano liczby większej od zera. Popraw w wertis.env.`);
-  return n;
-};
-
 /**
  * Granica czasu z `wertis.env` jako ISO. Data ma być USTAWIENIEM, nie stałą
  * w kodzie: zabetonowana w źródle jest datą, której nikt nie przesunie bez
@@ -492,16 +486,6 @@ export const config = {
      */
     reklamacjeOd: data(process.env.REKLAMACJE_OD, "2026-06-30T22:00:00Z", "REKLAMACJE_OD"),
     /**
-     * Po ilu godzinach bez odpowiedzi dyskusja zapala alarm w panelu.
-     *
-     * To NASZA decyzja, nie termin Allegro: dla dyskusji schemat terminu nie
-     * ma. Domyślna doba jest ostrożna, bo blokada konta kosztuje więcej niż
-     * nadmiarowy pasek. Właściciel skraca ją w ustawieniach, gdy zna okno
-     * z komunikatu Allegro.
-     */
-    dyskusjeAlarmGodzin: dodatnia(num(process.env.DYSKUSJE_ALARM_GODZIN, 24, "DYSKUSJE_ALARM_GODZIN"),
-      "DYSKUSJE_ALARM_GODZIN"),
-    /**
      * Ile dni ma sprzedawca na OBSŁUŻENIE zwrotu od jego otrzymania.
      *
      * SIEDEM, OD DORĘCZENIA PACZKI (0.339.0) — regulamin Allegro. Do 0.338.0
@@ -649,18 +633,6 @@ export const config = {
       (process.env.ALLEGRO_SANDBOX === "1"
         ? "https://allegro.pl.allegrosandbox.pl/moje-allegro/sprzedaz/dyskusje"
         : "https://salescenter.allegro.com/claims/{id}"),
-    /**
-     * Dyskusja w Centrum Sprzedaży — adres ZWERYFIKOWANY kliknięciem właściciela.
-     *
-     * Dyskusja ma WŁASNĄ stronę, inną niż reklamacja, choć obie przychodzą
-     * jedną listą `/sale/issues`. Adresuje się ją tym samym UUID zasobu,
-     * a `sellerId` dokleja `linkDyskusji`, z tego samego powodu co wyżej.
-     */
-    panelDyskusja:
-      process.env.ALLEGRO_PANEL_DYSKUSJA ??
-      (process.env.ALLEGRO_SANDBOX === "1"
-        ? "https://allegro.pl.allegrosandbox.pl/moje-allegro/sprzedaz/dyskusje"
-        : "https://salescenter.allegro.com/discussions-with-buyers/{id}"),
     /**
      * Identyfikator sprzedawcy do adresów Centrum Sprzedaży (0.226.1).
      *

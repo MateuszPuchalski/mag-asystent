@@ -46,7 +46,7 @@ describe("przycisk historii klienta", () => {
     expect(screen.queryByRole("dialog")).toBeNull();
   });
 
-  it("reklamacja i dyskusja pytają jedną trasą spraw", async () => {
+  it("sprawa pyta jedną trasą spraw", async () => {
     pokaz("sprawa");
     await userEvent.click(screen.getByRole("button", { name: /Historia/ }));
     await screen.findByText("gdzie paczka");

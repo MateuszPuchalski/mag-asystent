@@ -35,7 +35,7 @@ export interface DrogaZakupuOdpowiedz {
 export function kontoZamowienia(database: Db, orderId: string): number | null {
   const zapytania = [
     "SELECT channel_account_id AS konto FROM zamowienie_klienta WHERE external_id = ?",
-    "SELECT channel_account_id AS konto FROM reklamacja_klienta WHERE order_id = ?",
+    "SELECT channel_account_id AS konto FROM reklamacja_klienta WHERE typ = 'CLAIM' AND order_id = ?",
     "SELECT channel_account_id AS konto FROM zwrot_klienta WHERE order_id = ?",
     `SELECT c.channel_account_id AS konto
        FROM ${ROZMOWA_ZAMOWIENIA} rz JOIN conversation c ON c.id = rz.conversation_id

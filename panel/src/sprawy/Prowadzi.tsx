@@ -25,7 +25,7 @@ import { Przycisk } from "../ui";
 
    Razem z nim zeszły `mocny`, `etykietaWez`, `etykietaOddaj` i `mozeOddac` —
    cztery przełączniki, które istniały wyłącznie dla tamtego jednego wołania.
-   Reklamacja i dyskusja nigdy żadnego z nich nie podały. Przełącznik bez
+   Reklamacja nigdy żadnego z nich nie podała. Przełącznik bez
    wołającego to nie jest zapas na przyszłość, tylko kod, którego nikt nie
    sprawdza; wracając po niego, wróć razem z ekranem, który go potrzebuje.   */
 

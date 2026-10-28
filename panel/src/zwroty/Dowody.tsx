@@ -406,7 +406,7 @@ export function Dowody({ zwrot, kandydaciFaktury = [], fakturaTrwa = false,
     </Sekcja>
 
     {/* SEKCJI „TEN ZAKUP U NAS" TU JUŻ NIE MA. Inne sprawy tego zakupu
-        (rozmowy, dyskusje, reklamacje, drugi zwrot) mówi wyłącznie pasek drogi
+        (rozmowy, reklamacje, drugi zwrot) mówi wyłącznie pasek drogi
         klienta pod nagłówkiem, ze stanem, terminem i prowadzącym na przystanku.
         Ten sam fakt w dwóch miejscach kazał sprawdzać, czy oba mówią to samo. */}
 
@@ -445,7 +445,7 @@ export function Dowody({ zwrot, kandydaciFaktury = [], fakturaTrwa = false,
     {/* SEKCJI „PRACA BIURA" TU JUŻ NIE MA (0.370.0). Stała tu od 0.315.0 ze
         znacznikiem prowadzącego i tagami sprawy; zgłoszenie właściciela
         „uprość panel zwrotów do wymaganego minimum" zdjęło oba przy zwrotach.
-        Przy reklamacji i dyskusji zostają — tam prowadzący odpowiada na
+        Przy reklamacji zostają — tam prowadzący odpowiada na
         prawdziwe pytanie, bo sprawę bierze konkretna osoba. */}
 
     {onNotatka && <Sekcja ikona={<NotebookPen size={14} />} tytul="Notatka biura">

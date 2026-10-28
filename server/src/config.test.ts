@@ -386,14 +386,6 @@ test("COPILOT_PRZED_PRACA_OKNO: zły zapis i okno przez północ to błąd, kluc
   }
 });
 
-test("próg alarmu dyskusji ma domyślnie dobę i jest dodatni", () => {
-  /* Zero albo wartość ujemna zapalałaby alarm przy każdej dyskusji, więc start
-     takiej konfiguracji kończy się błędem (`dodatnia` w config.ts). Sam błąd
-     wymaga świeżego procesu, bo config czyta środowisko przy imporcie. */
-  assert.equal(config.allegro.dyskusjeAlarmGodzin, 24);
-  assert.ok(config.allegro.dyskusjeAlarmGodzin > 0);
-});
-
 test("Sellasist: połowa pary to ostrzeżenie, nie błąd — panel zapisuje jeden klucz naraz", () => {
   const c = (s: Partial<typeof config.sellasist>) =>
     ({ ...config, sellasist: { ...config.sellasist, ...s } } as typeof config);

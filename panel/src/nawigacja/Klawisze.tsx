@@ -38,7 +38,7 @@ export const SKROTY: ReadonlyArray<SekcjaSkrotow> = [
   ] },
   /* Kosze nie mają klawiatury, więc tytuł wylicza kolejki, w których te
      klawisze działają. */
-  { tytul: "Skrzynka, zwroty, reklamacje, dyskusje", sciezka: null, klawisze: [
+  { tytul: "Skrzynka, zwroty, reklamacje", sciezka: null, klawisze: [
     ["j k", "następna / poprzednia sprawa"],
     ["1–9", "kubełek"],
   ] },
@@ -60,13 +60,6 @@ export const SKROTY: ReadonlyArray<SekcjaSkrotow> = [
     ["R", "odrzuć szkic Copilota"],
   ] },
   { tytul: "Reklamacje", sciezka: "/obsluga/reklamacje", klawisze: [
-    /* Ten sam edytor co w skrzynce (0.549.0), więc te same klawisze. */
-    ["Enter", "pisz odpowiedź (kursor w polu)"],
-    ["Ctrl Enter", "wyślij odpowiedź"],
-    ["m", "moje sprawy"],
-    ["n", "niczyje sprawy"],
-  ] },
-  { tytul: "Dyskusje", sciezka: "/obsluga/dyskusje", klawisze: [
     /* Ten sam edytor co w skrzynce (0.549.0), więc te same klawisze. */
     ["Enter", "pisz odpowiedź (kursor w polu)"],
     ["Ctrl Enter", "wyślij odpowiedź"],

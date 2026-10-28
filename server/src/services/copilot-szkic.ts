@@ -792,7 +792,7 @@ export function dopiszLinkiOfert(
 /**
  * Dociąga stan paczki zamówienia rozmowy, gdy zapisany jest pusty albo stary.
  *
- * Bez sparowanego konta nie pytamy — wzorzec tras reklamacji i dyskusji. Deps
+ * Bez sparowanego konta nie pytamy — wzorzec tras reklamacji. Deps
  * przekazane jawnie (testy) omijają ten wyłącznik, bo wstrzykują własne
  * zapytanie i nie dotykają sieci.
  */

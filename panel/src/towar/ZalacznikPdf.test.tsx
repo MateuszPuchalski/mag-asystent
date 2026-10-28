@@ -250,7 +250,7 @@ describe("PDF w karcie skrzynki", () => {
   });
 });
 
-describe("PDF w czacie reklamacji i dyskusji", () => {
+describe("PDF w czacie reklamacji", () => {
   it("czat podaje trasę podglądu sprawy, a pole `pdf` z serwera decyduje o układzie", async () => {
     const stan = atrapaZapisow((url) => (url === SCIEZKA ? "%PDF-1.7" : undefined));
     const wiad: WiadomoscReklamacji = {

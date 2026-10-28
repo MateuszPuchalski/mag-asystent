@@ -30,22 +30,31 @@ const sprawa = (n: Partial<MojaSprawa> = {}): MojaSprawa => ({
 beforeEach(() => moje.mockReset());
 
 describe("Ekran Moje", () => {
-  it("składa trzy kolejki w jedną listę i prowadzi do właściwej", () => {
+  it("składa kolejki w jedną listę i prowadzi do właściwej", () => {
     moje.mockReturnValue({ data: { sprawy: [
       sprawa({ kolejka: "reklamacja", id: 7 }),
-      sprawa({ kolejka: "dyskusja", id: 9, opis: "Gdzie paczka" }),
       sprawa({ kolejka: "rozmowa", id: 11, opis: "Czy pasuje" }),
     ] }, isLoading: false });
 
     render(<MemoryRouter><Moje /></MemoryRouter>);
     expect(screen.getAllByRole("link").map((a) => a.getAttribute("href")))
-      .toEqual(["/obsluga/reklamacje/7", "/obsluga/dyskusje/9", "/obsluga/skrzynka/11"]);
+      .toEqual(["/obsluga/reklamacje/7", "/obsluga/skrzynka/11"]);
+  });
+
+  it("dyskusja ze starej bazy nie ma ekranu, więc nie trafia na listę", () => {
+    moje.mockReturnValue({ data: { sprawy: [
+      sprawa({ kolejka: "dyskusja" as never, id: 9, opis: "Gdzie paczka" }),
+      sprawa({ kolejka: "reklamacja", id: 7 }),
+    ] }, isLoading: false });
+
+    render(<MemoryRouter><Moje /></MemoryRouter>);
+    expect(screen.getAllByRole("link").map((a) => a.getAttribute("href"))).toEqual(["/obsluga/reklamacje/7"]);
   });
 
   it("sprawa z terminem mówi o nim wprost, reszta mówi o ostatnim ruchu", () => {
     moje.mockReturnValue({ data: { sprawy: [
       sprawa({ id: 7, terminDo: "2026-09-20T00:00:00Z" }),
-      sprawa({ kolejka: "dyskusja", id: 9, terminDo: null }),
+      sprawa({ kolejka: "rozmowa", id: 9, terminDo: null }),
     ] }, isLoading: false });
 
     render(<MemoryRouter><Moje /></MemoryRouter>);

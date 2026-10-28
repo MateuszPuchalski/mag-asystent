@@ -14,7 +14,7 @@ import v8 from "node:v8";
    Trend jest DANĄ w `/api/health`, nigdy zdaniem w `problemy`. Progi są
    konwencją, a zdanie w `problemy` zapala pasek stanu na każdym ekranie
    panelu. Fałszywy alarm o pamięci zagłuszałby alarmy, które wymagają
-   działania tego samego dnia, np. dyskusję bez odpowiedzi.                   */
+   działania tego samego dnia, np. wiadomość bez odpowiedzi.                */
 
 const MB = 1024 * 1024;
 

@@ -15,9 +15,9 @@
    gorsza niż dzisiejsza: dopisanie drugiego słowa ROZSZERZAŁOBY wynik, więc
    im więcej człowiek wie o paczce, tym dłuższą dostawałby listę.
 
-   TRZY EKRANY, JEDNA KOPIA. Reklamacje, dyskusje i zwroty trzymały ten sam
-   `useMemo` przepisany znak w znak. Pomocnik i tak musiał gdzieś zamieszkać,
-   więc trzy kopie schodzą do jednej przy okazji, a nie osobnym wydaniem.     */
+   DWA EKRANY, JEDNA KOPIA. Reklamacje i zwroty trzymały ten sam `useMemo`
+   przepisany znak w znak. Pomocnik i tak musiał gdzieś zamieszkać, więc
+   kopie schodzą do jednej przy okazji, a nie osobnym wydaniem.               */
 
 /**
  * Czy sprawa o tych uchwytach pasuje do wpisanej frazy.
@@ -44,7 +44,7 @@ export function rozbij(fraza: string): string[] {
    w „Gaźnik" — magazynier wpisuje z klawiatury bez polskich znaków, a nazwy
    z Allegro je mają. Ta sama mapa co po stronie serwera (`server/src/tekst.ts`):
    jawna, bo `ł` nie ma rozkładu kanonicznego i NFD by go przepuściło. Działa
-   na obie strony porównania, więc reklamacje i dyskusje zyskują to samo. */
+   na obie strony porównania, więc reklamacje i zwroty zyskują to samo. */
 const LITERY: Record<string, string> = {
   ą: "a", ć: "c", ę: "e", ł: "l", ń: "n", ó: "o", ś: "s", ź: "z", ż: "z",
 };

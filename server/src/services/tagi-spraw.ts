@@ -38,7 +38,7 @@ export interface TagSprawy {
 
 /* ── DWIE OSIE, JEDEN SŁOWNIK (0.315.0) ──────────────────────────────────────
    Tagi weszły w 0.279.0 wyłącznie dla `reklamacja_klienta` — jednego wiersza
-   na reklamację i dyskusję. Zwrot mieszka we własnej tabeli, więc dostaje
+   na reklamację. Zwrot mieszka we własnej tabeli, więc dostaje
    własną tabelę wiązań, a nie własny słownik: „gwarancja" znaczy to samo przy
    reklamacji i przy zwrocie, a dwa słowniki znaczyłyby dwa ekrany ustawień
    i dwa sufity aktywnych nazw.
@@ -55,10 +55,14 @@ export interface OsTagow {
   wiazania: string;
   /** Kolumna wiązania wskazująca sprawę. */
   kolumna: string;
+  /** Stały warunek SQL na wiersz sprawy; sprawa spoza niego „nie istnieje". */
+  warunek?: string;
 }
 
 export const TAGI_REKLAMACJI: OsTagow = {
   sprawy: "reklamacja_klienta", wiazania: "reklamacja_tag_sprawy", kolumna: "reklamacja_id",
+  /* Wiersze dawnych dyskusji zostały w tabeli, ale tagów już nie dostają. */
+  warunek: "typ = 'CLAIM'",
 };
 /* OSI TAGÓW ZWROTU JUŻ NIE MA (0.370.0) — patrz komentarz przy tabeli
    `zwrot_tag_sprawy` w `schema.sql`. Zeszła oś, nie mechanizm: `OsTagow`
@@ -190,7 +194,7 @@ export function przelaczTag(
 
 /** Czy sprawa o tym numerze w ogóle istnieje — numer tagu nie jest przepustką. */
 function sprawaIstnieje(database: DatabaseSync, os: OsTagow, sprawaId: number): boolean {
-  return database.prepare(`SELECT 1 FROM ${os.sprawy} WHERE id=?`)
+  return database.prepare(`SELECT 1 FROM ${os.sprawy} WHERE id=?${os.warunek ? ` AND ${os.warunek}` : ""}`)
     .get(sprawaId) !== undefined;
 }
 

@@ -665,9 +665,10 @@ krzyżową dla licznika kolejki.
 
 Dyskusja nie ma terminu w schemacie: `decisionDueDate` i `currentState.statusDueDate`
 są opisane jako `Null for disputes`. Okna odpowiedzi, po którym Allegro nakłada
-sankcję na konto, nie podaje żaden plik w repo. Próg alarmu to nasza decyzja
-(`DYSKUSJE_ALARM_GODZIN`, domyślnie 24 godziny) i czeka na potwierdzenie
-z komunikatu Allegro o blokadzie. Zegar „bez odpowiedzi od" liczymy sami
+sankcję na konto, nie podaje żaden plik w repo. Próg alarmu był naszą
+decyzją (24 godziny) i nie doczekał się potwierdzenia z komunikatu Allegro
+o blokadzie. Alarm zniknął razem z ekranem dyskusji, bo nowe sprawy
+kupujących idą przez skrzynkę. Zegar „bez odpowiedzi od" liczyliśmy sami
 z wiadomości, od najstarszej po naszej ostatniej odpowiedzi.
 
 Identyfikatory obu bytów żyją w JEDNEJ przestrzeni: specyfikacja opisuje
@@ -1326,7 +1327,8 @@ listą `/sale/issues`:
 `https://salescenter.allegro.com/discussions-with-buyers/{id}?sellerId={sprzedawca}`
 
 `{id}` to `PostPurchaseIssue.id`, a `sellerId` dokleja kod, jak przy
-reklamacji. Wzorzec stoi w `ALLEGRO_PANEL_DYSKUSJA`.
+reklamacji. Panel nie linkuje już do dyskusji, więc wzorzec
+`ALLEGRO_PANEL_DYSKUSJA` zniknął z konfiguracji.
 
 Hosta Centrum Sprzedaży dla SANDBOKSU nie znamy, więc `ALLEGRO_SANDBOX=1`
 zostaje przy dawnym wzorcu. Zgadywanie go kosztowałoby tyle samo, co przy

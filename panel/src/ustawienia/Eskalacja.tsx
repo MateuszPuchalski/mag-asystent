@@ -4,7 +4,7 @@ import { Pusto } from "../ui";
 import { KartaWgladu, Tabela, Td } from "../ui/wglad";
 
 /* ── Miara eskalacji (S5 spoiwa, `docs/obsluga-klienta-calosc.md`) ───────────
-   Po ilu rozmowach klient szedł dalej — w dyskusję albo w reklamację. Klient,
+   Po ilu rozmowach klient szedł dalej — w reklamację. Klient,
    który po pytaniu składa reklamację, powiedział coś o naszej odpowiedzi.
 
    KOLEJKA PUSTA PRZY ROSNĄCEJ ESKALACJI JEST MIARĄ, KTÓRA KŁAMIE, a do 0.386.0
@@ -28,8 +28,8 @@ export function Eskalacja({ miesiace }: { miesiace: MiesiacEskalacji[] | undefin
   if (miesiace?.length === 0) return <KartaWgladu tytul="Eskalacja po rozmowie"
     pusta="Brak rozmów powiązanych z zamówieniem — nie ma z czego liczyć." />;
   return <KartaWgladu tytul="Eskalacja po rozmowie"
-    opis={"Zakupy, przy których klient najpierw napisał do nas, a potem otworzył dyskusję "
-      + "albo reklamację. Liczone po zakupach, nie po wiadomościach — inaczej miara "
+    opis={"Zakupy, przy których klient najpierw napisał do nas, a potem otworzył "
+      + "reklamację. Liczone po zakupach, nie po wiadomościach — inaczej miara "
       + "nagradzałaby milczenie agenta."}>
     {miesiace === undefined
       ? <Pusto waga="lista">Wczytuję…</Pusto>

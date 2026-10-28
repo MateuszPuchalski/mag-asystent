@@ -117,8 +117,8 @@ export const Plakietka = ({ status, children, className = "" }:
    Rząd pigułek, z których jedna jest wybrana, stał w panelu SZEŚĆ RAZY
    w TRZECH kształtach. Atrament na szarej bieżni (kubełki skrzynki, zakładki
    kontekstu), atrament bez tła nieaktywnego na własnej białej bieżni (filtr
-   zadań) i bursztyn bez tła nieaktywnego (kubełki zwrotów, reklamacji
-   i dyskusji — ten sam kod przepisany trzy razy, znak w znak). Do tego trzy
+   zadań) i bursztyn bez tła nieaktywnego (kubełki zwrotów i reklamacji
+   — ten sam kod przepisany dwa razy, znak w znak). Do tego trzy
    rozmiary pisma, dwa promienie i dwie wagi.
 
    Agent przechodzący ze Skrzynki na Zwroty musiał za każdym razem odczytać na

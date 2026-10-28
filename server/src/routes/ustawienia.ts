@@ -31,7 +31,7 @@ export async function ustawieniaRoutes(app: FastifyInstance) {
     odmowa(reply) ?? pokrycieSygnatur(db()));
 
   /* MIARA ESKALACJI (S5 spoiwa, `docs/obsluga-klienta-calosc.md`): po ilu
-     rozmowach klient szedł dalej — w dyskusję albo w reklamację. Kolejka pusta
+     rozmowach klient szedł dalej — w reklamację. Kolejka pusta
      przy rosnącej eskalacji jest miarą, która kłamie, a do tego wydania biuro
      nie miało tej liczby wcale.
 

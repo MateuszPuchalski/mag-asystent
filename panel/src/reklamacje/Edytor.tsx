@@ -3,7 +3,7 @@ import type { ZalacznikSzkicu } from "../api/rozmowy";
 import { Edytor as EdytorOdpowiedzi } from "../skrzynka/Edytor";
 
 /* ── Edytor odpowiedzi w sprawie Allegro: USTAWIENIA, NIE KOPIA (0.549.0) ──
-   Reklamacje i dyskusje odpowiadają tym samym edytorem co skrzynka, decyzją
+   Reklamacje odpowiadają tym samym edytorem co skrzynka, decyzją
    właściciela z 28 września. Osobny edytor sprawy rozjeżdżał się ze skrzynką
    przy każdym wydaniu, bo każdą poprawkę trzeba było pamiętać dwa razy.
 
@@ -41,7 +41,7 @@ export function Edytor({
   czatAktywny: boolean;
   onZmiana: (v: string) => void;
   onWyslij: () => void;
-  /** Napis przycisku wysyłki; domyślny zostaje dla dyskusji. */
+  /** Napis przycisku wysyłki; domyślny to „Wyślij odpowiedź”. */
   etykietaWyslij?: string;
 }) {
   return <EdytorOdpowiedzi szkic={tresc} wysyla={wysyla} blad={blad}

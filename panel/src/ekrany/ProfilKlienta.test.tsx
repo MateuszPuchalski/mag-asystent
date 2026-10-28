@@ -26,7 +26,7 @@ import { pomylka } from "../test/pomylki";
 
 const PROFIL: Profil = {
   login: "Chrzanowski1234",
-  liczby: { zamowien: 2, wydanoGrosze: 15000, waluta: "PLN", zwrotow: 1, reklamacji: 1, dyskusji: 0,
+  liczby: { zamowien: 2, wydanoGrosze: 15000, waluta: "PLN", zwrotow: 1, reklamacji: 1,
     rozmow: 1, pierwszyZakup: "2026-08-15T10:00:00Z", ostatniZakup: "2026-09-19T10:00:00Z" },
   sygnaly: [{ ton: "zle", tekst: "Otwarta reklamacja, termin 30.09.2026", cel: "/obsluga/reklamacje/3" }],
   otwarte: [{ rodzaj: "rozmowa", id: 41, opis: "Czy pasuje?", od: "2026-09-23T10:00:00Z",

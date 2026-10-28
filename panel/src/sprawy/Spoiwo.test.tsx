@@ -6,8 +6,8 @@ import { adresPrzystanku, inneSprawyZakupu, KOLEJKI } from "./Spoiwo";
    Słownik kolejek i składanie ich spraw w przystanki paska drogi. Testy
    pilnują tego, co przy kopiowaniu w kilku miejscach rozjechałoby się pierwsze:
 
-   1. DYSKUSJA NIE JEST REKLAMACJĄ. Jedna plakietka na oba byty to błąd,
-      który kosztował już jedno wydanie.
+   1. DYSKUSJA ZE STAREJ BAZY NIE MA EKRANU. Wiersz typu `DISPUTE` nie staje
+      przystankiem, bo łącze prowadziłoby w próżnię.
    2. SPRAWA Z DROGI I Z RODZEŃSTWA STOI RAZ, i niesie stan z wiersza rodzeństwa.
    3. STAN NIE JEST ZGADYWANY. Zwrot i rozmowa nie mają wiersza rodzeństwa, więc
       zostają bez „otwarta”, bo brak stanu to nie jest stan otwarty.             */
@@ -22,12 +22,12 @@ const przystanek = (n: Partial<PrzystanekDrogi> = {}): PrzystanekDrogi => ({
 });
 
 describe("inneSprawyZakupu", () => {
-  it("rozróżnia dyskusję od reklamacji po kolumnie `typ`", () => {
-    const inne = inneSprawyZakupu([], [
+  it("pomija dyskusję ze starej bazy, reklamacja zostaje", () => {
+    const inne = inneSprawyZakupu([przystanek({ rodzaj: "dyskusja" as never, id: 4 })], [
       sprawa({ id: 7, typ: "CLAIM" }), sprawa({ id: 9, typ: "DISPUTE", numer: null }),
     ], null);
-    expect(inne.map((s) => `${s.rodzaj}-${s.id}`)).toEqual(["reklamacja-7", "dyskusja-9"]);
-    expect(Object.keys(KOLEJKI)).toEqual(["rozmowa", "dyskusja", "reklamacja", "zwrot", "pomylka"]);
+    expect(inne.map((s) => `${s.rodzaj}-${s.id}`)).toEqual(["reklamacja-7"]);
+    expect(Object.keys(KOLEJKI)).toEqual(["rozmowa", "reklamacja", "zwrot", "pomylka"]);
   });
 
   it("sprawa z drogi i z rodzeństwa staje raz, ze stanem, terminem i prowadzącym", () => {

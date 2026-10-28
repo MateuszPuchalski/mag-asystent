@@ -46,7 +46,7 @@ export function SlownikTagow({ tagi, trwa, blad, onNazwa, onAktywny }: {
   };
 
   return <KartaWgladu tytul="Tagi spraw"
-    opis="Tag zawęża kolejkę reklamacji i dyskusji. Kolejności nie przestawia: o niej rozstrzyga termin i czas czekania.">
+    opis="Tag zawęża kolejkę reklamacji. Kolejności nie przestawia: o niej rozstrzyga termin i czas czekania.">
     {!tagi.length && <p className="text-sm text-slate-600">Słownik jest pusty.</p>}
 
     <ul className="divide-y divide-slate-200">

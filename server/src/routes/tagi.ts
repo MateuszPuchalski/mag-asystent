@@ -8,10 +8,9 @@ import {
 import { ROLE_BIUROWE } from "../services/users.js";
 
 /* ── Trasy tagów spraw (0.279.0) ─────────────────────────────────────────────
-   SŁOWNIK JEST WSPÓLNY dla reklamacji i dyskusji, więc trasy słownika stoją
+   SŁOWNIK JEST WSPÓLNY dla reklamacji i zwrotów, więc trasy słownika stoją
    osobno, a nie pod `/reklamacje`. Przypięcie do sprawy zostaje tam, gdzie
-   sprawa — w `routes/reklamacje.ts` i `routes/dyskusje.ts` — bo tamte trasy
-   znają już swój `typ` i własną bramkę.
+   sprawa — w `routes/reklamacje.ts` — bo tamta trasa zna już swoją bramkę.
 
    Bramka roli na KAŻDEJ trasie, także na odczycie. Nazwa tagu jest zdaniem
    biura o sprawie klienta; magazyn nie ma po co jej czytać.
@@ -79,10 +78,9 @@ export async function tagiRoutes(app: FastifyInstance) {
 /**
  * Przypięcie i zdjęcie tagu przy sprawie.
  *
- * JEDNA PARA TRAS NA OBA EKRANY, wołana z `routes/reklamacje.ts`
- * i `routes/dyskusje.ts` z ich własną bramką. Klucz jest tym samym wierszem
- * tej samej tabeli, a zdublowanie tras zdublowałoby też walidację numeru
- * sprawy — ta sama decyzja co przy załącznikach dyskusji w 0.245.0.
+ * JEDNA PARA TRAS dla każdego ekranu spraw, wołana z jego pliku tras z jego
+ * własną bramką. Klucz jest tym samym wierszem tabeli wiązań, a zdublowanie
+ * tras zdublowałoby też walidację numeru sprawy.
  */
 export function trasyTagowSprawy(app: FastifyInstance, sciezka: string, os: OsTagow) {
   app.post<{ Params: { id: string; tagId: string } }>(
