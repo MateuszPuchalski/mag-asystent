@@ -6326,6 +6326,12 @@ zapisać tak, żeby kolejka go znalazła.
 
 ## 25c. Dyskusje
 
+**Wycofane w @wydanie.** Od 28 października 2026 Allegro zakłada nowe sprawy
+kupujących jako Problemy z zakupem w Centrum Wiadomości, czyli w skrzynce
+(§10). Ekran, trasy, alarm i pobieranie `DISPUTE` zniknęły. Wiersze
+w `reklamacja_klienta` zostały w bazie nietknięte, więc decyzję da się
+odwrócić. Poniżej historia projektu, nie opis działającego ekranu.
+
 Zaprojektowane 9 września 2026, zbudowane w 0.245.0. Jeden przyrost, nie trzy:
 maszyneria reklamacji stała już gotowa, więc do napisania został model pracy
 i ekran, a nie integracja.
@@ -7282,8 +7288,8 @@ stoi. W tym repo zdarzyło się to już dwa razy.
 | Komplet rozbity na paragonie | **działa** od 0.328.0 | `services/komplety.ts`, `oferta_komplet`; kartoteka z dokumentu, ilość ze zwrotu |
 | Reklamacje — odczyt, kolejka i czat | **działa** od 0.222.0 | `services/reklamacje.ts`, `services/allegro-reklamacje-sync.ts`, `panel/src/reklamacje/` |
 | Termin decyzji przy reklamacji | **z Allegro** od 0.222.0 | `decisionDueDate`; sprzed 0.140.0 liczyliśmy go sami i było to błędem |
-| Dyskusje (`type: "DISPUTE"`) | **działa** od 0.245.0 | §25c; `services/dyskusje.ts`, `panel/src/dyskusje/` |
-| Prośba o zakończenie dyskusji (`END_REQUEST`) | **działa** od 0.245.0, `[WERYFIKUJ]` | `services/dyskusja-zakonczenie.ts` |
+| Dyskusje (`type: "DISPUTE"`) | **wycofane** w @wydanie | §25c; nowe sprawy idą przez skrzynkę, wiersze zostają w bazie |
+| Prośba o zakończenie dyskusji (`END_REQUEST`) | **wycofane** w @wydanie | razem z ekranem dyskusji |
 | Odpowiedź w czacie reklamacji | **działa** od 0.224.0 | `services/reklamacje-wysylka.ts`, `reklamacja_outbox`, `reklamacje/Edytor.tsx`; `type: "REGULAR"`, sam tekst, limit 20 000 znaków |
 | Klucz idempotencji wspólny dla skrzynki i reklamacji | **działa** od 0.224.0 | `services/idempotencja.ts`; liczy go SERWER, format `snd-` nietknięty |
 | Świeżość liczona od ostatniej NIE naszej wiadomości | **działa** od 0.224.0 | rola inna niż `SELLER`, więc także doradcy Allegro |
@@ -7303,7 +7309,7 @@ stoi. W tym repo zdarzyło się to już dwa razy.
 | Towar razem z werdyktem | **działa** od 0.564.0 | pole `towar` w `…/werdykt`; walidacja przed werdyktem, wysyłka tylko po `sent`, jedno `autoryzuj()`; krok po werdykcie zostaje jako droga zapasowa |
 | Podgląd załącznika reklamacji na osi | **działa** od 0.223.0, wyrównane w 0.246.0 | typ z SYGNATURY pliku (`rozpoznajMime` × `TYPY_PODGLADU`); przechodzą JPEG, PNG, GIF; od 0.246.0 ta sama powłoka co w skrzynce (`towar/Zalacznik.tsx`), odmowa Allegro 502 / awaria drogi 503 ze zdaniem i „Spróbuj ponownie" (`routes/pobranie.ts`), błąd pobrania widoczny |
 | Zdjęcie oferty i kartoteki przy reklamacji | **działa** od 0.223.0 | `offer_snapshot` i `oferta_kartoteka` w kolejce, dwa kafle w dowodach |
-| Spoiwo czterech kolejek — sprawy i droga zakupu | **działa** od 0.387.0 | `services/droga-klienta.ts`, `panel/src/sprawy/Spoiwo.tsx`; mostek po `order_id`, blok wspólny dla skrzynki, zwrotów, reklamacji i dyskusji; w skrzynce od 0.558.0 bez czipów drogi, bo mówią ją linie zakupu w osi (§10.2g) |
+| Spoiwo kolejek — sprawy i droga zakupu | **działa** od 0.387.0 | `services/droga-klienta.ts`, `panel/src/sprawy/Spoiwo.tsx`; mostek po `order_id`, blok wspólny dla skrzynki, zwrotów i reklamacji; w skrzynce od 0.558.0 bez czipów drogi, bo mówią ją linie zakupu w osi (§10.2g) |
 | Historia klienta ze zwrotami i sprawami | **działa** od 0.387.0 | `services/klient-historia.ts`; pięć rodzajów wpisu, wiązanie po `kupujacy_login` — wolno, bo zwrot i sprawa niosą go z Allegro |
 | Profil klienta: liczby, sygnały, otwarte sprawy, zamówienia, notatka | **działa** od 0.484.0 | `services/profil-klienta.ts`, `GET /api/obsluga/klient/:login`, `panel/src/ekrany/ProfilKlienta.tsx`; login przez konta, bez wielkości liter; sygnały wyliczane; zapisy tylko na kliknięcie: `klient_notatka` z cofnięciem i od 0.535.0 sprawa klienta; karta „Otwarte sprawy” nazywa się od 0.535.0 „Otwarte w kolejkach” |
 | Sprawa klienta: kto prowadzi, następny krok z terminem, zakończenie | **działa** od 0.535.0 (pierwszy przyrost S6) | `services/prowadzenie-klienta.ts`, tabela `klient_prowadzenie`, cztery `POST /api/obsluga/klient/:login/sprawa/…` (`krok`, `zakoncz`, `wznow`, `przejmij`), karta na profilu, linijka przy historii klienta, wiersz w „Moje”; dwa stany, krok jako jedyna droga założenia i wznowienia, „nowe” z odcisku przy odczycie, obudzenie zakończonej przez 30 dni od zakończenia, `wersja` i odcisk pilnują świeżości każdego zapisu; w dzienniku numer sprawy, nigdy login ani krok; Ctrl+K po numerze zamówienia daje wiersz kupującego (`szukajWszedzie`), żeby brak w dostawie był o krok od sprawy (`docs/obsluga-klienta-calosc.md` S6, `docs/obsluga-klienta.md`) |

@@ -36,7 +36,9 @@ Stan pomyłki liczy się przy odczycie z dosyłki i zwrotu, nie z przepisanej ko
 
 **Problem z zakupem jest rozmową w skrzynce, nie piątą kolejką.** Od
 28 października 2026 Allegro zakłada nowe sprawy kupujących w Centrum
-Wiadomości zamiast w dyskusjach. Stare dyskusje zostają w swojej kolejce.
+Wiadomości zamiast w dyskusjach. Dyskusji nie ma już w panelu, a serwer
+nie pobiera ich z Allegro. Stare wiersze zostają w bazie, żaden ekran ich
+nie pokazuje.
 Problem wiąże się z drogą przez ten sam mostek: wiadomość bez numeru dostaje
 numer zamówienia wątku, gdy jest jedno. Kształt i powody stoją
 w `docs/allegro-ksztalt.md`, rozdział o Problemach z zakupem.

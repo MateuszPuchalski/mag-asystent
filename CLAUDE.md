@@ -65,12 +65,12 @@ Każda zasada: co robić, dlaczego i kto tego pilnuje.
   *Strażnik: `panel/src/ZeroZapisu.test.ts`* — każda trasa z `main.tsx` musi
   mieć test, który liczy zapisy przy otwarciu. Nowy ekran bez takiego testu
   zatrzyma CI. Najprościej napisać go atrapą z `panel/src/test/zapisy.ts`.
-  **Wyjątki, decyzją właściciela:** wejście w reklamację i w dyskusję
-  odświeża sprawę z Allegro jednym POST-em. Powód: po wysyłce odpowiedzi
-  albo werdyktu stan u Allegro dochodzi do nas dopiero pełnym przebiegiem,
-  co trzy minuty, a agent patrzy na ekran teraz. *Strażnik wyjątków:
-  `ekrany/Reklamacje.test.tsx` i `ekrany/Dyskusje.test.tsx`* — dokładnie
-  jedna mutacja przy wejściu, zero przy samym otwarciu ekranu.
+  **Wyjątek, decyzją właściciela:** wejście w reklamację odświeża sprawę
+  z Allegro jednym POST-em. Powód: po wysyłce odpowiedzi albo werdyktu stan
+  u Allegro dochodzi do nas dopiero pełnym przebiegiem, co trzy minuty,
+  a agent patrzy na ekran teraz. *Strażnik wyjątku:
+  `ekrany/Reklamacje.test.tsx`* — dokładnie jedna mutacja przy wejściu,
+  zero przy samym otwarciu ekranu.
 
 - **Reguła klienta HTTP.** Żądanie bez ciała nie deklaruje typu treści.
   Serwer i tak czyta pusty JSON jak brak ciała (parser w `buildApp()`), więc
@@ -121,8 +121,9 @@ Każda zasada: co robić, dlaczego i kto tego pilnuje.
   albo pola nie dokładasz. *Strażnik: `server/src/db/prywatnosc-schematu.test.ts`
   (każda tabela) i testy mapowania zamówień.*
 
-- **Obsługa klienta to JEDNA droga, nie cztery kolejki.** Kolejki —
-  skrzynka, zwroty, reklamacje, dyskusje — są NASZE, nie klienta. Nowa
+- **Obsługa klienta to JEDNA droga, nie trzy kolejki.** Kolejki —
+  skrzynka, zwroty, reklamacje — są NASZE, nie klienta. Dyskusji nie ma:
+  nowe sprawy kupujących Allegro zakłada w skrzynce. Nowa
   kolejka albo ekran dopisuje się do `services/droga-klienta.ts`, wiązaniem
   po numerze zamówienia w obie strony. Wiązanie jednostronne to wiązanie,
   którego nie ma. Klientem jest login Allegro porównywany bez wielkości liter.

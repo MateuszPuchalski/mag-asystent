@@ -1010,9 +1010,7 @@ biura: <https://ifconfig.me>. Ten sam adres w obu miejscach znaczy wspólne
 
 - `ALLEGRO_INBOX_OD`, `ALLEGRO_ZWROTY_OD` — od kiedy skrzynka i zwroty są
   w bazie. Starsze dane znikają przy starcie; granica skrzynki działa na wątek.
-- `REKLAMACJE_OD` — próg WIDOKU reklamacji i dyskusji; pusty wyłącza próg.
-- `DYSKUSJE_ALARM_GODZIN` — po ilu godzinach bez odpowiedzi dyskusja zapala
-  alarm w panelu; domyślnie 24. To nasz próg, nie termin Allegro.
+- `REKLAMACJE_OD` — próg WIDOKU reklamacji; pusty wyłącza próg.
 - `ALLEGRO_PANEL_ZAMOWIENIE`, `_OFERTA`, `_ZWROT`, `_REKLAMACJA` — wzorce
   odnośników do panelu sprzedawcy. Odnośnik w 404 poprawia się wzorcem.
 - `ALLEGRO_SELLER_ID` — zmienia się tylko przy innym koncie (`sellerId=`

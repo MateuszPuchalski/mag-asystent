@@ -269,8 +269,8 @@ kopiowanie w trybie WAL gubi zapisy.
 z `docs/allegro/swagger.yaml`, nie z pamięci. Dane lądują w surowych tabelach
 `allegro_*`, a do spraw przechodzą tylko pola opisane w
 `docs/obsluga-klienta.md`. Wysyłki idą przez `outbox`, jeden wiersz na próbę,
-żeby niejednoznaczny timeout miał gdzie zostać. Kolejki — skrzynka, zwroty,
-reklamacje, dyskusje — są NASZE, nie klienta. `services/droga-klienta.ts`
+żeby niejednoznaczny timeout miał gdzie zostać. Kolejki — skrzynka, zwroty
+i reklamacje — są NASZE, nie klienta. `services/droga-klienta.ts`
 wiąże je po numerze zamówienia w obie strony (`docs/obsluga-klienta-calosc.md`).
 
 ## 11. Copilot
