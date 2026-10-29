@@ -18,9 +18,9 @@ process.env.MSSQL_SERVER = "127.0.0.1";
 process.env.MSSQL_DATABASE = "nieuzywana";
 process.env.MSSQL_USER = "wertis";
 process.env.MSSQL_PASSWORD = "nieuzywane";
-process.env.WYMIARY_POLE_DLUGOSC = "tw_Pole4";
-process.env.WYMIARY_POLE_SZEROKOSC = "tw_Pole5";
-process.env.WYMIARY_POLE_WYSOKOSC = "tw_Pole6";
+process.env.WYMIARY_POLE_DLUGOSC = "pwd_Tekst03";
+process.env.WYMIARY_POLE_SZEROKOSC = "pwd_Tekst02";
+process.env.WYMIARY_POLE_WYSOKOSC = "pwd_Tekst01";
 process.env.TLO_URL = "";
 
 type S = typeof import("../services/wymiary.js");
@@ -59,9 +59,9 @@ beforeEach(() => {
 
 afterEach(() => {
   ustawZrodla(null);
-  config.wymiary.poleDlugosc = "tw_Pole4";
-  config.wymiary.poleSzerokosc = "tw_Pole5";
-  config.wymiary.poleWysokosc = "tw_Pole6";
+  config.wymiary.poleDlugosc = "pwd_Tekst03";
+  config.wymiary.poleSzerokosc = "pwd_Tekst02";
+  config.wymiary.poleWysokosc = "pwd_Tekst01";
 });
 
 function sesja(rola: "biuro" | "admin" | "magazynier"): Record<string, string> {

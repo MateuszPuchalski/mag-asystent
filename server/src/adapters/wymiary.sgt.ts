@@ -11,9 +11,18 @@ import { DNI_SPRZEDAZY, PORZADEK, wzorzecLike, zrodloSprzedazy, type SortBezZdje
    lista bez zdjęcia: nasz read-model kartoteki tych kolumn nie niesie.
 
    Waga brutto siedzi w `tw_Masa`, netto w `tw_MasaNetto` (kg, money) — pola
-   „Masa brutto/netto towaru w kg" z zakładki Miary. Wymiary siedzą w polach własnych
-   `tw_PoleN` (varchar(50)), wskazanych kluczami `WYMIARY_POLE_*`. Pole własne
-   to TEKST, więc piszemy go tak, jak wpisałby człowiek w Subiekcie: „12,5". */
+   „Masa brutto/netto towaru w kg" z zakładki Miary.
+
+   Wymiary siedzą gdzie indziej: w polach własnych zakładki „Własne", czyli
+   w `pw_Dane`, w wierszu `pwd_TypObiektu = -14` (towar) i `pwd_IdObiektu =
+   tw_Id`. Kolumny `pwd_TekstNN` wskazują klucze `WYMIARY_POLE_*`, bo który
+   tekst jest którym wymiarem, mówi definicja w `pw_Pole` danej firmy. Pole
+   to TEKST, więc piszemy go tak, jak wpisałby człowiek w Subiekcie: „12,5".
+   Sprawdzone na bazie firmy: Wysokość = Tekst01, Szerokość = Tekst02,
+   Długość = Tekst03, wartości „5", „21,5", „22". */
+
+/** `pwd_TypObiektu` kartoteki towarowej w polach własnych — z `pw_Pole` bazy firmy. */
+export const TYP_TOWARU_PW = -14;
 
 /** Klucze pól wymiarów w kolejności, w jakiej mierzy się paczkę. */
 export const WYMIARY = ["dlugosc", "szerokosc", "wysokosc"] as const;
@@ -72,25 +81,79 @@ export function polaWymiarow(): Record<Wymiar, string> {
 }
 
 /**
- * UPDATE pomiaru — tylko kolumny, które człowiek zmierzył.
+ * UPDATE wag kartoteki — tylko te, które człowiek zważył; `null`, gdy żadnej.
  *
  * Pole pominięte w pomiarze zostaje nietknięte, a nie wyczyszczone. Towar
  * z wagą wpisaną przez dostawcę dostaje same wymiary i nie traci wagi.
- * Zwraca `null`, gdy nie ma czego zapisać.
  */
-export function budujZapytanieZapisu(p: Pomiar, pola: Record<Wymiar, string>): string | null {
+export function budujZapytanieWag(p: Pomiar): string | null {
   const ustaw: string[] = [];
   if (p.bruttoKg !== null) ustaw.push("tw_Masa = @brutto");
   if (p.nettoKg !== null) ustaw.push("tw_MasaNetto = @netto");
-  for (const w of WYMIARY) {
-    if (p[w] !== null) ustaw.push(`${assertSafeColumn(pola[w])} = @${w}`);
-  }
   if (ustaw.length === 0) return null;
   return `UPDATE tw__Towar SET ${ustaw.join(", ")} WHERE tw_Id = @id`;
 }
 
+/**
+ * Zapis wymiarów do `pw_Dane` — UPDATE wiersza towaru albo INSERT, gdy go nie ma.
+ *
+ * Towar bez żadnego pola własnego nie ma wiersza wcale, a to właśnie towary
+ * bez wymiarów. Blokada `UPDLOCK, HOLDLOCK` na sprawdzeniu nie pozwala dwóm
+ * zadaniom dopisać dwóch wierszy temu samemu towarowi.
+ *
+ * `zLicznika`: klucz `pwd_Id` nie jest IDENTITY i numer wydaje licznik
+ * Subiekta w `ins_ident`, jak przy zdjęciach (`budujZapytanieInsert`
+ * w `sfera.sql.ts`). Licznik spóźniony względem tabeli dogania `MAX + 1`.
+ * Przy kolumnie IDENTITY numer nadaje baza, a licznika nie ruszamy.
+ */
+export function budujZapytanieWymiarow(p: Pomiar, pola: Record<Wymiar, string>, zLicznika: boolean): string | null {
+  const zmierzone = WYMIARY.filter((w) => p[w] !== null);
+  if (zmierzone.length === 0) return null;
+  const kolumny = zmierzone.map((w) => assertSafeColumn(pola[w]));
+  const wartosci = zmierzone.map((w) => `@${w}`);
+  const gdzie = "pwd_TypObiektu = @typ AND pwd_IdObiektu = @id";
+  const wstaw = zLicznika
+    ? [
+        "  DECLARE @maks int, @nowe int;",
+        "  SELECT @maks = ISNULL(MAX(pwd_Id), 0) FROM pw_Dane WITH (UPDLOCK, HOLDLOCK);",
+        "  SELECT @nowe = ido_wartosc FROM ins_ident WITH (UPDLOCK, HOLDLOCK) WHERE ido_nazwa = 'pw_Dane';",
+        "  IF @nowe IS NULL OR @nowe <= @maks SET @nowe = @maks + 1;",
+        "  UPDATE ins_ident SET ido_wartosc = @nowe + 1 WHERE ido_nazwa = 'pw_Dane';",
+        `  INSERT INTO pw_Dane (pwd_Id, pwd_TypObiektu, pwd_IdObiektu, ${kolumny.join(", ")}) ` +
+          `VALUES (@nowe, @typ, @id, ${wartosci.join(", ")});`,
+      ]
+    : [
+        `  INSERT INTO pw_Dane (pwd_TypObiektu, pwd_IdObiektu, ${kolumny.join(", ")}) ` +
+          `VALUES (@typ, @id, ${wartosci.join(", ")});`,
+      ];
+  return [
+    `IF EXISTS (SELECT 1 FROM pw_Dane WITH (UPDLOCK, HOLDLOCK) WHERE ${gdzie})`,
+    `  UPDATE pw_Dane SET ${kolumny.map((k, i) => `${k} = ${wartosci[i]}`).join(", ")} WHERE ${gdzie};`,
+    "ELSE",
+    "BEGIN",
+    ...wstaw,
+    "END",
+  ].join("\n");
+}
+
+/**
+ * Wymiary towaru z `pw_Dane` jako kolumny `pw.dlugosc`, `pw.szerokosc`, `pw.wysokosc`.
+ *
+ * OUTER APPLY z TOP 1, a nie złączenie: drugi wiersz pól własnych tego samego
+ * towaru zdublowałby go na liście i w liczniku. Brak wiersza daje NULL-e,
+ * czyli „brak wymiarów", bo tak wygląda towar, któremu nikt nic nie wpisał.
+ */
+export function zrodloWymiarow(pola: Record<Wymiar, string>): string {
+  const [d, s, w] = WYMIARY.map((k) => assertSafeColumn(pola[k]));
+  return (
+    `OUTER APPLY (SELECT TOP 1 ${d} AS dlugosc, ${s} AS szerokosc, ${w} AS wysokosc ` +
+    `FROM pw_Dane WITH (NOLOCK) WHERE pwd_TypObiektu = ${TYP_TOWARU_PW} AND pwd_IdObiektu = t.tw_Id ` +
+    "ORDER BY pwd_Id) pw"
+  );
+}
+
 /* Puste pole własne to NULL albo same spacje; waga zero to brak wagi. */
-const pustyTekst = (k: string) => `LTRIM(RTRIM(ISNULL(t.${k}, ''))) = ''`;
+const pustyTekst = (k: Wymiar) => `LTRIM(RTRIM(ISNULL(pw.${k}, ''))) = ''`;
 
 /**
  * Strona i licznik kartotek, którym brakuje którejś wagi albo wymiaru.
@@ -106,9 +169,9 @@ export function budujZapytanieBezWymiarow(opts: {
   sprzedane?: boolean;
   sprzedaz?: { fs: number; pa: number; odnosnik?: string };
 }): { strona: string; razem: string } {
-  const pola = WYMIARY.map((w) => assertSafeColumn(opts.pola[w]));
+  const wymiary = zrodloWymiarow(opts.pola);
   const zrodlo = zrodloSprzedazy(opts.sprzedaz ?? { fs: 2, pa: 21 });
-  const brak = ["ISNULL(t.tw_Masa, 0) <= 0", "ISNULL(t.tw_MasaNetto, 0) <= 0", ...pola.map(pustyTekst)]
+  const brak = ["ISNULL(t.tw_Masa, 0) <= 0", "ISNULL(t.tw_MasaNetto, 0) <= 0", ...WYMIARY.map(pustyTekst)]
     .join(" OR ");
   const warunki = ["t.tw_Zablokowany = 0", `(${brak})`];
   if (opts.zFiltrem) {
@@ -130,15 +193,14 @@ export function budujZapytanieBezWymiarow(opts: {
     `LEFT JOIN (SELECT p.ob_TowId, SUM(p.ob_IloscMag) AS sprzedaz ${zrodlo} GROUP BY p.ob_TowId) sp ` +
     "ON sp.ob_TowId = t.tw_Id";
   const porzadek = PORZADEK[opts.sortuj ?? "sprzedaz"] ?? PORZADEK.sprzedaz;
-  const [d, s, w] = pola;
   return {
     strona:
       "SELECT t.tw_Id AS twId, t.tw_Symbol AS symbol, t.tw_Nazwa AS nazwa, " +
       "t.tw_PodstKodKresk AS ean, ISNULL(s.stan, 0) AS stan, ISNULL(sp.sprzedaz, 0) AS sprzedaz, " +
-      `t.tw_Masa AS brutto, t.tw_MasaNetto AS netto, t.${d} AS dlugosc, t.${s} AS szerokosc, t.${w} AS wysokosc ` +
-      `FROM tw__Towar t WITH (NOLOCK) ${stan} ${sprzedaz} ${gdzie} ` +
+      "t.tw_Masa AS brutto, t.tw_MasaNetto AS netto, pw.dlugosc, pw.szerokosc, pw.wysokosc " +
+      `FROM tw__Towar t WITH (NOLOCK) ${wymiary} ${stan} ${sprzedaz} ${gdzie} ` +
       `ORDER BY ${porzadek} OFFSET @offset ROWS FETCH NEXT @limit ROWS ONLY`,
-    razem: `SELECT COUNT(*) AS razem FROM tw__Towar t WITH (NOLOCK) ${gdzie}`,
+    razem: `SELECT COUNT(*) AS razem FROM tw__Towar t WITH (NOLOCK) ${wymiary} ${gdzie}`,
   };
 }
 
@@ -219,15 +281,15 @@ export type StanKartoteki = Pick<TowarBezWymiarow, "twId" | "symbol" | "brutto" 
  * przed" ma mówić o bazie firmy, nie o tym, co pamiętała przeglądarka.
  */
 export async function stanKartoteki(twId: number): Promise<StanKartoteki | null> {
-  const [d, s, w] = WYMIARY.map((k) => polaWymiarow()[k]);
   const pool = await mssqlPool();
   const r = await pool
     .request()
     .input("id", sql.Int, twId)
     .query<WierszListy>(
       "SELECT t.tw_Id AS twId, t.tw_Symbol AS symbol, t.tw_Nazwa AS nazwa, t.tw_PodstKodKresk AS ean, " +
-        `0 AS stan, 0 AS sprzedaz, t.tw_Masa AS brutto, t.tw_MasaNetto AS netto, t.${d} AS dlugosc, t.${s} AS szerokosc, t.${w} AS wysokosc ` +
-        "FROM tw__Towar t WITH (NOLOCK) WHERE t.tw_Id = @id"
+        "0 AS stan, 0 AS sprzedaz, t.tw_Masa AS brutto, t.tw_MasaNetto AS netto, " +
+        "pw.dlugosc, pw.szerokosc, pw.wysokosc " +
+        `FROM tw__Towar t WITH (NOLOCK) ${zrodloWymiarow(polaWymiarow())} WHERE t.tw_Id = @id`
     );
   const wiersz = r.recordset[0];
   return wiersz ? naPozycje(wiersz) : null;

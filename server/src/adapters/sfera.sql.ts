@@ -5,7 +5,9 @@ import { mssqlPool, assertSafeColumn } from "../db/mssql.js";
 import { config } from "../config.js";
 import type { MmItem, SferaAdapter } from "./sfera.js";
 import { oznaczWSubiekcie, wlasneZdjecie } from "../services/zdjecia-wlasne.js";
-import { WYMIARY, budujZapytanieZapisu, polaWymiarow, tekstWymiaru, type Pomiar } from "./wymiary.sgt.js";
+import {
+  TYP_TOWARU_PW, WYMIARY, budujZapytanieWag, budujZapytanieWymiarow, polaWymiarow, tekstWymiaru, type Pomiar,
+} from "./wymiary.sgt.js";
 
 /**
  * Zapis „plan B" ze spec §9 — bezpośredni UPDATE w bazie MSSQL Subiekta GT,
@@ -57,6 +59,38 @@ function opiszBladZdjecia(e: unknown, tabela: string): string {
     `— potem PONÓW to zadanie. Zdjęcie NIE ZGINĘŁO: leży w bazie WERTIS ` +
     `i widać je na karcie towaru. Komunikat serwera SQL: ${tresc}`
   );
+}
+
+/** Zapis wymiarów potrzebuje kilku praw naraz, więc polecenie wymienia je wszystkie. */
+function opiszBladWymiarow(e: unknown, kolumnyPw: string[]): string {
+  const tresc = e instanceof Error ? e.message : String(e);
+  if (!/permission was denied|odmowa|denied/i.test(tresc)) return tresc;
+  return (
+    "Konto SQL nie ma prawa zapisu wagi albo wymiarów. Wykonaj w SSMS na bazie podmiotu: " +
+    "GRANT UPDATE ON dbo.tw__Towar (tw_Masa, tw_MasaNetto) TO wertis; " +
+    `GRANT SELECT, INSERT ON dbo.pw_Dane TO wertis; GRANT UPDATE ON dbo.pw_Dane (${kolumnyPw.join(", ")}) TO wertis; ` +
+    "GRANT SELECT ON dbo.ins_ident TO wertis; GRANT UPDATE ON dbo.ins_ident (ido_wartosc) TO wertis; " +
+    `— potem PONÓW to zadanie. Komunikat serwera SQL: ${tresc}`
+  );
+}
+
+class BrakTowaru extends Error {
+  constructor(twId: number) { super(`tw_Id=${twId}`); }
+}
+
+/**
+ * Czy `pw_Dane.pwd_Id` numeruje sama baza. Pytamy raz na proces: od tego
+ * zależy, czy INSERT bierze numer z licznika Subiekta, a zgadnięcie źle
+ * kończy się albo kolizją klucza, albo odmową wpisania IDENTITY.
+ */
+let pwdIdentity: boolean | null = null;
+async function pwdIdJestIdentity(pool: sql.ConnectionPool): Promise<boolean> {
+  if (pwdIdentity === null) {
+    const r = await pool.request()
+      .query("SELECT COLUMNPROPERTY(OBJECT_ID('dbo.pw_Dane'), 'pwd_Id', 'IsIdentity') AS ident");
+    pwdIdentity = Number(r.recordset[0]?.ident) === 1;
+  }
+  return pwdIdentity;
 }
 
 /**
@@ -185,36 +219,51 @@ export class SqlSferaAdapter implements SferaAdapter {
   }
 
   /**
-   * Wagi i wymiary — jeden UPDATE na wszystkie zmierzone kolumny.
+   * Wagi i wymiary w jednej transakcji: wagi do `tw__Towar`, wymiary do `pw_Dane`.
    *
-   * Jeden, a nie cztery: pomiar to jedna czynność i ma wejść cały albo
+   * Jedna transakcja, bo pomiar to jedna czynność i ma wejść cały albo
    * wcale. Kartoteka z wagą bez wymiarów wypadłaby z listy braków dopiero
    * po drugim zadaniu, a ponowienie w środku pisałoby połowę drugi raz.
+   *
+   * Istnienie towaru sprawdzamy na początku, bo sam zapis wymiarów to INSERT
+   * do `pw_Dane` i dopisałby pola własne kartotece, której nie ma.
    *
    * Lustra w `sgt_towar` nie ma, bo lista braków czyta Subiekt wprost.
    */
   async applySetWymiary(twId: number, pomiar: Pomiar): Promise<void> {
     const pola = polaWymiarow();
-    const zapytanie = budujZapytanieZapisu(pomiar, pola);
-    if (!zapytanie) return;
-    const kolumny = ["tw_Masa", "tw_MasaNetto", ...WYMIARY.map((w) => pola[w])].join(", ");
+    const wagi = budujZapytanieWag(pomiar);
     const pool = await mssqlPool();
-    const req = pool.request().input("id", sql.Int, twId);
-    /* Obie wagi to money(19,4) — cztery miejsca po przecinku mieszczą gram bez zaokrąglenia. */
-    if (pomiar.bruttoKg !== null) req.input("brutto", sql.Money, pomiar.bruttoKg);
-    if (pomiar.nettoKg !== null) req.input("netto", sql.Money, pomiar.nettoKg);
-    for (const w of WYMIARY) {
-      const cm = pomiar[w];
-      if (cm !== null) req.input(w, sql.VarChar(50), tekstWymiaru(cm));
-    }
-    let res;
+    const zLicznika = !(await pwdIdJestIdentity(pool));
+    const wymiary = budujZapytanieWymiarow(pomiar, pola, zLicznika);
+    if (!wagi && !wymiary) return;
+
+    const trans = pool.transaction();
+    await trans.begin();
     try {
-      res = await req.query(zapytanie);
+      const jest = await trans.request().input("id", sql.Int, twId)
+        .query("SELECT COUNT(*) AS ile FROM tw__Towar WHERE tw_Id = @id");
+      if (!Number(jest.recordset[0]?.ile)) throw new BrakTowaru(twId);
+      if (wagi) {
+        const req = trans.request().input("id", sql.Int, twId);
+        /* Obie wagi to money(19,4) — cztery miejsca po przecinku mieszczą gram bez zaokrąglenia. */
+        if (pomiar.bruttoKg !== null) req.input("brutto", sql.Money, pomiar.bruttoKg);
+        if (pomiar.nettoKg !== null) req.input("netto", sql.Money, pomiar.nettoKg);
+        await req.query(wagi);
+      }
+      if (wymiary) {
+        const req = trans.request().input("id", sql.Int, twId).input("typ", sql.Int, TYP_TOWARU_PW);
+        for (const w of WYMIARY) {
+          const cm = pomiar[w];
+          if (cm !== null) req.input(w, sql.VarChar(255), tekstWymiaru(cm));
+        }
+        await req.query(wymiary);
+      }
+      await trans.commit();
     } catch (e) {
-      throw new Error(opiszBlad(e, kolumny));
-    }
-    if (!res.rowsAffected[0]) {
-      throw new Error(`Nie znaleziono towaru tw_Id=${twId} w bazie Subiekta`);
+      await trans.rollback().catch(() => undefined);
+      if (e instanceof BrakTowaru) throw new Error(`Nie znaleziono towaru tw_Id=${twId} w bazie Subiekta`);
+      throw new Error(opiszBladWymiarow(e, WYMIARY.map((w) => pola[w])));
     }
   }
 

@@ -1267,37 +1267,53 @@ przez maskowanie, więc nie pisze się w nim danych klienta. Polityka:
 
 Zakładka **Wymiary** w panelu pokazuje towary bez wagi albo bez wymiaru.
 Pomiar idzie kolejką do Subiekta. Waga brutto trafia do `tw_Masa`, a netto
-do `tw_MasaNetto` (kg, zakładka „Miary" kartoteki). Wymiary trafiają do trzech
-pól własnych (cm, tekst z przecinkiem, np. `12,5`). Puste pole formularza
-zostaje w kartotece bez zmian.
+do `tw_MasaNetto` (kg, zakładka „Miary" kartoteki). Wymiary trafiają do pól
+własnych z zakładki „Własne", czyli do tabeli `pw_Dane` (cm, tekst
+z przecinkiem, np. `12,5`). Puste pole formularza zostaje bez zmian.
 
-**1. Wskaż pola własne.** Które pole trzyma który wymiar, wie tylko firma.
-Zajętość pól pokazuje zapytanie z `docs/subiekt-gt-struktura.md`
-(„Lokalizacja: pola własne"). Wpisz w `wertis.env`:
-
-```bash
-export WYMIARY_POLE_DLUGOSC=tw_Pole4
-export WYMIARY_POLE_SZEROKOSC=tw_Pole5
-export WYMIARY_POLE_WYSOKOSC=tw_Pole6
-```
-
-Dozwolone są tylko `tw_Pole1` … `tw_Pole8`, trzy różne i żadne nie jest
-polem lokalizacji. Inaczej `wertis-api` nie wstanie i powie, co poprawić.
-Bez kluczy zakładka mówi, że czeka na konfigurację.
-
-**2. Nadaj prawo zapisu.** W SSMS, na bazie podmiotu, z polami z kroku 1:
+**1. Wskaż kolumny pól własnych.** Który tekst jest którym wymiarem, mówi
+definicja pól towaru (`pwp_TypObiektu = -14`):
 
 ```sql
-GRANT UPDATE ON dbo.tw__Towar (tw_Masa, tw_MasaNetto, tw_Pole4, tw_Pole5, tw_Pole6) TO wertis;
+SELECT pwp_Pole, pwp_Nazwa FROM dbo.pw_Pole WHERE pwp_TypObiektu = -14;
 ```
 
-Instalator tego grantu jeszcze nie nadaje. Bez niego zadanie kończy się
+W bazie firmy: Wysokość = `pwd_Tekst01`, Szerokość = `pwd_Tekst02`,
+Długość = `pwd_Tekst03`. Wpisz w `wertis.env`:
+
+```bash
+export WYMIARY_POLE_DLUGOSC=pwd_Tekst03
+export WYMIARY_POLE_SZEROKOSC=pwd_Tekst02
+export WYMIARY_POLE_WYSOKOSC=pwd_Tekst01
+```
+
+Dozwolone są tylko `pwd_Tekst01` … `pwd_Tekst10`, trzy różne. Inaczej
+`wertis-api` nie wstanie i powie, co poprawić. Bez kluczy zakładka mówi, że
+czeka na konfigurację. **Nie wpisuj tu `tw_PoleN`** — to lokalizacje i inne
+pola kartoteki, a nie wymiary.
+
+**2. Nadaj prawa.** W SSMS, na bazie podmiotu:
+
+```sql
+GRANT UPDATE ON dbo.tw__Towar (tw_Masa, tw_MasaNetto) TO wertis;
+GRANT SELECT, INSERT ON dbo.pw_Dane TO wertis;
+GRANT UPDATE ON dbo.pw_Dane (pwd_Tekst01, pwd_Tekst02, pwd_Tekst03) TO wertis;
+GRANT SELECT ON dbo.ins_ident TO wertis;
+GRANT UPDATE ON dbo.ins_ident (ido_wartosc) TO wertis;
+```
+
+`INSERT` jest potrzebny, bo towar bez żadnego pola własnego nie ma wiersza
+w `pw_Dane`. Numer nowego wiersza bierze się z licznika Subiekta, stąd
+`ins_ident`. Dwie ostatnie linie mogą już stać od zdjęć. Grant na pola
+`tw_PoleN` nadany pod wymiary nie jest potrzebny i można go cofnąć.
+Instalator tych grantów jeszcze nie nadaje. Bez nich zadanie kończy się
 w kolejce błędem z gotowym poleceniem do wklejenia.
 
-**3. Sprawdź na kartotece próbnej.** Zmierz jeden towar testowy i otwórz
-go w Subiekcie. Na zakładce „Miary" brutto i netto mają stać w kilogramach,
-a wymiary w wybranych polach.
-Dopiero potem mierz towary sprzedawane.
+**3. Sprawdź na kartotece próbnej.** Zmierz towar testowy, który **nie ma**
+żadnego pola własnego, i drugi, który je ma. Otwórz oba w Subiekcie. Na
+zakładce „Miary" brutto i netto mają stać w kilogramach, a na „Własne"
+wymiary w swoich polach. Pierwszy towar sprawdza dopisanie wiersza, drugi
+jego poprawkę. Dopiero potem mierz towary sprzedawane.
 
 ## 7. Backup i utrzymanie
 

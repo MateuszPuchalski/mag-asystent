@@ -57,9 +57,9 @@ export function powodWylaczenia(): string | null {
   const w = config.wymiary;
   if (w.poleDlugosc && w.poleSzerokosc && w.poleWysokosc) return null;
   return (
-    "Wymiary czekają na konfigurację: wpisz w wertis.env, w których polach własnych Subiekta " +
+    "Wymiary czekają na konfigurację: wpisz w wertis.env, w których kolumnach pól własnych " +
     "firma trzyma długość, szerokość i wysokość (WYMIARY_POLE_DLUGOSC, WYMIARY_POLE_SZEROKOSC, " +
-    "WYMIARY_POLE_WYSOKOSC, np. tw_Pole4)."
+    "WYMIARY_POLE_WYSOKOSC, np. pwd_Tekst03) — DEPLOY §6j."
   );
 }
 

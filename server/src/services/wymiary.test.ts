@@ -49,17 +49,19 @@ test("śmieci, zero i rząd wielkości za dużo — odmowa ze zdaniem o polu", (
   assert.match(odmowa(null), /co najmniej jedną/);
 });
 
-const POLA = { poleDlugosc: "tw_Pole4", poleSzerokosc: "tw_Pole5", poleWysokosc: "tw_Pole6" };
+const POLA = { poleDlugosc: "pwd_Tekst03", poleSzerokosc: "pwd_Tekst02", poleWysokosc: "pwd_Tekst01" };
 
 test("pola wymiarów: puste to brak funkcji, komplet poprawnych przechodzi", () => {
-  assert.deepEqual(bledyPolWymiarow({ poleDlugosc: "", poleSzerokosc: "", poleWysokosc: "" }, "tw_Pole1"), []);
-  assert.deepEqual(bledyPolWymiarow(POLA, "tw_Pole1"), []);
+  assert.deepEqual(bledyPolWymiarow({ poleDlugosc: "", poleSzerokosc: "", poleWysokosc: "" }), []);
+  assert.deepEqual(bledyPolWymiarow(POLA), []);
+  assert.deepEqual(bledyPolWymiarow({ ...POLA, poleDlugosc: "pwd_Tekst10" }), []);
 });
 
-test("pola wymiarów: niekomplet, obce kolumny, lokalizacja i duplikaty odpadają", () => {
-  assert.match(bledyPolWymiarow({ ...POLA, poleWysokosc: "" }, "tw_Pole1").join(), /WYMIARY_POLE_WYSOKOSC/);
-  assert.match(bledyPolWymiarow({ ...POLA, poleDlugosc: "tw_Nazwa" }, "tw_Pole1").join(), /tylko pola własne/);
-  assert.match(bledyPolWymiarow({ ...POLA, poleDlugosc: "tw_Pole9" }, "tw_Pole1").join(), /tylko pola własne/);
-  assert.match(bledyPolWymiarow(POLA, "tw_Pole5").join(), /pole lokalizacji/);
-  assert.match(bledyPolWymiarow({ ...POLA, poleWysokosc: "tw_Pole4" }, "tw_Pole1").join(), /trzy różne pola/);
+test("pola wymiarów: niekomplet, kolumny spoza tekstów pól własnych i duplikaty odpadają", () => {
+  assert.match(bledyPolWymiarow({ ...POLA, poleWysokosc: "" }).join(), /WYMIARY_POLE_WYSOKOSC/);
+  /* tw_PoleN to pola kartoteki z lokalizacją i „Zamówione" — nie wymiary. */
+  assert.match(bledyPolWymiarow({ ...POLA, poleDlugosc: "tw_Pole4" }).join(), /tylko pwd_Tekst01/);
+  assert.match(bledyPolWymiarow({ ...POLA, poleDlugosc: "pwd_Liczba01" }).join(), /tylko pwd_Tekst01/);
+  assert.match(bledyPolWymiarow({ ...POLA, poleDlugosc: "pwd_Tekst11" }).join(), /tylko pwd_Tekst01/);
+  assert.match(bledyPolWymiarow({ ...POLA, poleWysokosc: "pwd_Tekst03" }).join(), /trzy różne pola/);
 });

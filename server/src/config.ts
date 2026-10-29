@@ -786,10 +786,11 @@ export const config = {
   /**
    * Waga i wymiary kartoteki — ekran „Wymiary" w panelu.
    *
-   * Waga idzie do `tw_Masa`, kolumny rdzeniowej kartoteki, więc nie ma tu czego
-   * wybierać. Długość, szerokość i wysokość firma trzyma w polach własnych
-   * `tw_Pole1..8`, a które to pola, wie tylko ona. Puste klucze znaczą „funkcji
-   * nie ma": zgadnięte pole nadpisałoby dane firmy, jak przy lokalizacji.
+   * Wagi idą do `tw_Masa` i `tw_MasaNetto`, kolumn rdzeniowych kartoteki, więc
+   * nie ma tu czego wybierać. Długość, szerokość i wysokość firma trzyma
+   * w polach własnych zakładki „Własne" (`pw_Dane.pwd_TekstNN`), a który tekst
+   * jest którym wymiarem, mówi jej `pw_Pole`. Puste klucze znaczą „funkcji nie
+   * ma": zgadnięte pole nadpisałoby dane firmy, np. „Zamiennik" albo „Aukcję".
    */
   wymiary: {
     poleDlugosc: process.env.WYMIARY_POLE_DLUGOSC ?? "",
@@ -1281,17 +1282,14 @@ assertMode("SGT_MODE", config.sgtMode, ["seeded", "mssql"]);
 assertMode("COPILOT_MODE", config.copilot.mode, ["off", "anthropic"]);
 
 /**
- * Pola własne na wymiary: wszystkie trzy albo żadne, każde inne i żadne
- * z nich nie jest lokalizacją.
+ * Pola własne na wymiary: wszystkie trzy albo żadne i każde inne.
  *
- * Wymagamy wprost nazwy `tw_PoleN`, a nie dowolnego identyfikatora. Zapis
- * leci UPDATE-em do kartoteki firmy, a literówka w innej kolumnie nadpisałaby
- * rdzeń towaru. Pole lokalizacji odpada z tego samego powodu: pomiar starłby
- * adresy półek, a magazynier szukałby towaru po wymiarach.
+ * Wymagamy wprost kolumny tekstowej `pwd_Tekst01` … `pwd_Tekst10`, a nie
+ * dowolnego identyfikatora. Zapis leci UPDATE-em do `pw_Dane`, a literówka
+ * w innej kolumnie nadpisałaby datę, liczbę albo klucz obcy pola własnego.
  */
 export function bledyPolWymiarow(
   w: { poleDlugosc: string; poleSzerokosc: string; poleWysokosc: string },
-  poleLokalizacji: string,
 ): string[] {
   const pola = [
     ["WYMIARY_POLE_DLUGOSC", w.poleDlugosc],
@@ -1309,12 +1307,10 @@ export function bledyPolWymiarow(
   }
   const bledy: string[] = [];
   for (const [klucz, v] of pola) {
-    if (!/^tw_Pole[1-8]$/.test(v)) {
-      bledy.push(`${klucz}=${bezpiecznaWartosc(v)} — dozwolone tylko pola własne tw_Pole1 … tw_Pole8.`);
-    } else if (v.toLowerCase() === poleLokalizacji.toLowerCase()) {
+    if (!/^pwd_Tekst(0[1-9]|10)$/.test(v)) {
       bledy.push(
-        `${klucz}=${v} to pole lokalizacji (MSSQL_LOC_COLUMN) — pomiar nadpisałby adresy półek. ` +
-          "Wybierz inne pole własne.",
+        `${klucz}=${bezpiecznaWartosc(v)} — dozwolone tylko pwd_Tekst01 … pwd_Tekst10 ` +
+          "(kolumna pola własnego z pw_Pole, DEPLOY §6j).",
       );
     }
   }
@@ -1495,7 +1491,7 @@ export function bledyKonfiguracji(c: Config = config): string[] {
      WERTIS — a do kartoteki nic nie wchodzi, bo zadanie ląduje w błędzie.
      Praca wygląda na wykonaną i nikt nie sprawdza kolejki. Dlatego niepełna
      konfiguracja zatrzymuje start, zamiast czekać na pierwsze zadanie. */
-  bledy.push(...bledyPolWymiarow(c.wymiary, c.mssql.locColumn));
+  bledy.push(...bledyPolWymiarow(c.wymiary));
 
   if (!["", "wertis", "subiekt"].includes(c.zdjecia.dodawanie)) {
     bledy.push(

@@ -1,13 +1,17 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { budujZapytanieBezWymiarow, budujZapytanieZapisu, tekstWymiaru } from "./wymiary.sgt.js";
+import {
+  budujZapytanieBezWymiarow, budujZapytanieWag, budujZapytanieWymiarow, tekstWymiaru, zrodloWymiarow,
+} from "./wymiary.sgt.js";
 
-/* ── Zapytania wymiarów — jedyna logika tego adaptera bez serwera MSSQL ──────
-   Pilnujemy trzech rzeczy: formatu tekstu w polu własnym, tego, że UPDATE
-   dotyka WYŁĄCZNIE zmierzonych kolumn, i że nazwy pól z konfiguracji nie
-   wejdą do SQL bez sprawdzenia. */
+/* ── Zapytania wag i wymiarów — jedyna logika tego adaptera bez serwera MSSQL ─
+   Pilnujemy formatu tekstu w polu własnym, tego, że zapis dotyka WYŁĄCZNIE
+   zmierzonych kolumn, że towar bez wiersza pól własnych dostaje nowy wiersz,
+   i że nazwy kolumn z konfiguracji nie wejdą do SQL bez sprawdzenia. */
 
-const POLA = { dlugosc: "tw_Pole4", szerokosc: "tw_Pole5", wysokosc: "tw_Pole6" };
+/* Układ z bazy firmy: Wysokość = Tekst01, Szerokość = Tekst02, Długość = Tekst03. */
+const POLA = { dlugosc: "pwd_Tekst03", szerokosc: "pwd_Tekst02", wysokosc: "pwd_Tekst01" };
+const NIC = { bruttoKg: null, nettoKg: null, dlugosc: null, szerokosc: null, wysokosc: null };
 
 test("wymiar to centymetry z przecinkiem, bez „,0” przy pełnych", () => {
   assert.equal(tekstWymiaru(12.5), "12,5");
@@ -17,39 +21,61 @@ test("wymiar to centymetry z przecinkiem, bez „,0” przy pełnych", () => {
   assert.equal(tekstWymiaru(0.5), "0,5");
 });
 
-test("UPDATE niesie tylko zmierzone kolumny", () => {
+test("wagi idą do tw__Towar i tylko te zważone", () => {
   assert.equal(
-    budujZapytanieZapisu({ bruttoKg: 1.2, nettoKg: 1, dlugosc: 30, szerokosc: 20, wysokosc: 10 }, POLA),
-    "UPDATE tw__Towar SET tw_Masa = @brutto, tw_MasaNetto = @netto, tw_Pole4 = @dlugosc, tw_Pole5 = @szerokosc, tw_Pole6 = @wysokosc WHERE tw_Id = @id"
+    budujZapytanieWag({ ...NIC, bruttoKg: 1.2, nettoKg: 1, dlugosc: 30 }),
+    "UPDATE tw__Towar SET tw_Masa = @brutto, tw_MasaNetto = @netto WHERE tw_Id = @id"
   );
-  assert.equal(
-    budujZapytanieZapisu({ bruttoKg: null, nettoKg: null, dlugosc: null, szerokosc: 4, wysokosc: null }, POLA),
-    "UPDATE tw__Towar SET tw_Pole5 = @szerokosc WHERE tw_Id = @id"
-  );
-  assert.equal(budujZapytanieZapisu({ bruttoKg: null, nettoKg: null, dlugosc: null, szerokosc: null, wysokosc: null }, POLA), null);
-  assert.equal(
-    budujZapytanieZapisu({ bruttoKg: null, nettoKg: 0.5, dlugosc: null, szerokosc: null, wysokosc: null }, POLA),
-    "UPDATE tw__Towar SET tw_MasaNetto = @netto WHERE tw_Id = @id"
-  );
+  assert.equal(budujZapytanieWag({ ...NIC, nettoKg: 0.5 }), "UPDATE tw__Towar SET tw_MasaNetto = @netto WHERE tw_Id = @id");
+  assert.equal(budujZapytanieWag({ ...NIC, dlugosc: 30 }), null, "same wymiary nie ruszają tw__Towar");
 });
 
-test("nazwa pola spoza identyfikatorów nie wchodzi do SQL", () => {
-  const zle = { ...POLA, wysokosc: "tw_Pole6; DROP TABLE tw__Towar" };
-  assert.throws(() => budujZapytanieZapisu({ bruttoKg: null, nettoKg: null, dlugosc: null, szerokosc: null, wysokosc: 3 }, zle));
+test("wymiary: UPDATE wiersza towaru w pw_Dane, a bez wiersza INSERT z numerem z licznika", () => {
+  const z = budujZapytanieWymiarow({ ...NIC, szerokosc: 4, wysokosc: 2 }, POLA, true)!;
+  assert.match(z, /^IF EXISTS \(SELECT 1 FROM pw_Dane WITH \(UPDLOCK, HOLDLOCK\) WHERE pwd_TypObiektu = @typ AND pwd_IdObiektu = @id\)/);
+  assert.ok(z.includes("UPDATE pw_Dane SET pwd_Tekst02 = @szerokosc, pwd_Tekst01 = @wysokosc WHERE pwd_TypObiektu = @typ AND pwd_IdObiektu = @id;"));
+  assert.ok(!z.includes("pwd_Tekst03"), "niezmierzona długość zostaje nietknięta");
+  assert.ok(z.includes("SELECT @nowe = ido_wartosc FROM ins_ident WITH (UPDLOCK, HOLDLOCK) WHERE ido_nazwa = 'pw_Dane';"));
+  assert.ok(z.includes("IF @nowe IS NULL OR @nowe <= @maks SET @nowe = @maks + 1;"), "licznik spóźniony dogania MAX + 1");
+  assert.ok(z.includes(
+    "INSERT INTO pw_Dane (pwd_Id, pwd_TypObiektu, pwd_IdObiektu, pwd_Tekst02, pwd_Tekst01) VALUES (@nowe, @typ, @id, @szerokosc, @wysokosc);"
+  ));
+});
+
+test("wymiary przy pwd_Id IDENTITY: INSERT bez numeru i bez licznika", () => {
+  const z = budujZapytanieWymiarow({ ...NIC, dlugosc: 22 }, POLA, false)!;
+  assert.ok(z.includes("INSERT INTO pw_Dane (pwd_TypObiektu, pwd_IdObiektu, pwd_Tekst03) VALUES (@typ, @id, @dlugosc);"));
+  assert.ok(!z.includes("ins_ident"));
+  assert.equal(budujZapytanieWymiarow({ ...NIC, bruttoKg: 1 }, POLA, true), null, "same wagi nie ruszają pw_Dane");
+});
+
+test("nazwa kolumny spoza identyfikatorów nie wchodzi do SQL", () => {
+  const zle = { ...POLA, wysokosc: "pwd_Tekst01; DROP TABLE pw_Dane" };
+  assert.throws(() => budujZapytanieWymiarow({ ...NIC, wysokosc: 3 }, zle, true));
+  assert.throws(() => zrodloWymiarow(zle));
   assert.throws(() => budujZapytanieBezWymiarow({ pola: zle, zFiltrem: false }));
+});
+
+test("wymiary czyta jeden wiersz pól własnych towaru — drugi nie dubluje towaru na liście", () => {
+  assert.equal(
+    zrodloWymiarow(POLA),
+    "OUTER APPLY (SELECT TOP 1 pwd_Tekst03 AS dlugosc, pwd_Tekst02 AS szerokosc, pwd_Tekst01 AS wysokosc " +
+      "FROM pw_Dane WITH (NOLOCK) WHERE pwd_TypObiektu = -14 AND pwd_IdObiektu = t.tw_Id ORDER BY pwd_Id) pw"
+  );
 });
 
 test("lista łapie brak którejś wagi albo któregokolwiek wymiaru, tylko niezablokowane", () => {
   const { strona, razem } = budujZapytanieBezWymiarow({ pola: POLA, zFiltrem: false });
   const brak =
-    "(ISNULL(t.tw_Masa, 0) <= 0 OR ISNULL(t.tw_MasaNetto, 0) <= 0 OR LTRIM(RTRIM(ISNULL(t.tw_Pole4, ''))) = '' " +
-    "OR LTRIM(RTRIM(ISNULL(t.tw_Pole5, ''))) = '' OR LTRIM(RTRIM(ISNULL(t.tw_Pole6, ''))) = '')";
+    "(ISNULL(t.tw_Masa, 0) <= 0 OR ISNULL(t.tw_MasaNetto, 0) <= 0 OR LTRIM(RTRIM(ISNULL(pw.dlugosc, ''))) = '' " +
+    "OR LTRIM(RTRIM(ISNULL(pw.szerokosc, ''))) = '' OR LTRIM(RTRIM(ISNULL(pw.wysokosc, ''))) = '')";
   for (const z of [strona, razem]) {
     assert.ok(z.includes("t.tw_Zablokowany = 0"), z);
     assert.ok(z.includes(brak), z);
+    assert.ok(z.includes(zrodloWymiarow(POLA)), "licznik też widzi pola własne");
     assert.ok(!z.includes("@q"), "bez szukania nie ma parametru @q");
   }
-  assert.ok(strona.includes("t.tw_Pole4 AS dlugosc, t.tw_Pole5 AS szerokosc, t.tw_Pole6 AS wysokosc"));
+  assert.ok(strona.includes("t.tw_Masa AS brutto, t.tw_MasaNetto AS netto, pw.dlugosc, pw.szerokosc, pw.wysokosc"));
   /* Stronicowanie bez pełnego porządku gubi wiersze — domyka je tw_Id. */
   assert.match(strona, /ORDER BY .*t\.tw_Id OFFSET @offset ROWS FETCH NEXT @limit ROWS ONLY$/);
 });
