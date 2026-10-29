@@ -15,6 +15,8 @@ export interface PozycjaBezWymiarow {
   stan: number;
   /** Sztuki sprzedane na FS i PA w ostatnich 30 dniach. */
   sprzedaz: number;
+  /** Adresy półek z kartoteki, rozdzielone spacją; `null` = brak. */
+  lokalizacja: string | null;
   /** Wagi z kartoteki w kg (`tw_Masa`, `tw_MasaNetto`); `null` = brak. */
   brutto: number | null;
   netto: number | null;
@@ -44,7 +46,10 @@ export interface Pomiar {
 
 export const NA_STRONIE = 50;
 
-export function useBezWymiarow(q: string, offset: number, sortuj: SortBezZdjecia = "sprzedaz",
+/** Porządki listy wymiarów: te z listy bez zdjęcia i obchód po regałach. */
+export type SortWymiarow = SortBezZdjecia | "lokalizacja";
+
+export function useBezWymiarow(q: string, offset: number, sortuj: SortWymiarow = "sprzedaz",
   naStanie = false, sprzedane = false) {
   const p = new URLSearchParams({ q, limit: String(NA_STRONIE), offset: String(offset), sortuj });
   if (naStanie) p.set("naStanie", "1");

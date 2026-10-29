@@ -1,7 +1,7 @@
 import { db } from "../db/db.js";
 import { config } from "../config.js";
-import { SORTOWANIA_BEZ_ZDJECIA, type SortBezZdjecia } from "../adapters/zdjecia.sgt.js";
 import {
+  SORTOWANIA_WYMIAROW,
   WYMIARY,
   stanKartoteki,
   stanKartotekiDemo,
@@ -9,6 +9,8 @@ import {
   towaryBezWymiarow,
   towaryBezWymiarowDemo,
   type Pomiar,
+  type SortWymiarow,
+  type StanKartoteki,
   type TowarBezWymiarow,
 } from "../adapters/wymiary.sgt.js";
 import { enqueueSetWymiary } from "./queue.js";
@@ -103,8 +105,8 @@ export async function listaBezWymiarow(zapytanie: {
   const limit = calkowita(zapytanie.limit, LIMIT_DOMYSLNY, 1, LIMIT_MAX);
   const offset = calkowita(zapytanie.offset, 0, 0, Number.MAX_SAFE_INTEGER);
   /* Nieznana nazwa wraca do domyślnej: stara zakładka nie wywróci ekranu błędem 400. */
-  const sortuj = (SORTOWANIA_BEZ_ZDJECIA as readonly string[]).includes(String(zapytanie.sortuj))
-    ? (zapytanie.sortuj as SortBezZdjecia)
+  const sortuj = (SORTOWANIA_WYMIAROW as readonly string[]).includes(String(zapytanie.sortuj))
+    ? (zapytanie.sortuj as SortWymiarow)
     : "sprzedaz";
   const tak = (v: unknown) => v === "1" || v === "true";
 
@@ -113,6 +115,27 @@ export async function listaBezWymiarow(zapytanie: {
   });
   const czeka = oczekujace(pozycje.map((p) => p.twId));
   return { wlaczone: true, razem, pozycje: pozycje.map((p) => ({ ...p, oczekuje: czeka.has(p.twId) })) };
+}
+
+export interface TowarDoPomiaru {
+  wlaczone: boolean;
+  powod?: string;
+  /** `null`, gdy funkcja wyłączona; brak towaru to 404 na trasie. */
+  towar: StanKartoteki | null;
+  /** Pomiar tego towaru czeka w kolejce i jeszcze nie wszedł do Subiekta. */
+  oczekuje: boolean;
+}
+
+/**
+ * Jeden towar z obecną wagą i wymiarami — dla karty towaru w kolektorze.
+ * `null` = nie ma takiego towaru. Odczyt i nic więcej.
+ */
+export async function towarDoPomiaru(twId: number): Promise<TowarDoPomiaru | null> {
+  const powod = powodWylaczenia();
+  if (powod) return { wlaczone: false, powod, towar: null, oczekuje: false };
+  const towar = await stanZrodla()(twId);
+  if (!towar) return null;
+  return { wlaczone: true, towar, oczekuje: oczekujace([twId]).has(twId) };
 }
 
 /* Granice pomiaru. Nie są fizyką, tylko sitem na pomyłkę rzędu wielkości:

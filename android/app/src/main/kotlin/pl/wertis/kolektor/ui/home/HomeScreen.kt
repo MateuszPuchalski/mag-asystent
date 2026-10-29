@@ -187,6 +187,13 @@ fun HomeScreen(graph: AppGraph) {
                 graph.nav.openLocation("")
             }
 
+            /* Praca seryjna z wagą i miarką: towary bez wagi albo wymiaru,
+               po kolei regałami. Stoi tu, a nie w zakładce dolnego paska, bo
+               to czynność od czasu do czasu, nie codzienny przepływ towaru. */
+            OutlineButton("DO ZMIERZENIA", modifier = Modifier.fillMaxWidth()) {
+                graph.nav.openDoZmierzenia()
+            }
+
             if (recent.isNotEmpty()) {
                 SectionLabel("Ostatnio skanowane")
                 recent.forEach { r ->

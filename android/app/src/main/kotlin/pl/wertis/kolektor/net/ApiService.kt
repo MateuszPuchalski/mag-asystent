@@ -68,6 +68,11 @@ import pl.wertis.kolektor.core.net.AnulowanieKartonu
 import pl.wertis.kolektor.core.net.DodajDoKartonuBody
 import pl.wertis.kolektor.core.net.DodanieDoKartonu
 import pl.wertis.kolektor.core.net.IloscKartonuBody
+import pl.wertis.kolektor.core.net.ListaBezWymiarow
+import pl.wertis.kolektor.core.net.PomiarBody
+import pl.wertis.kolektor.core.net.WymiaryTowaru
+import pl.wertis.kolektor.core.net.ZapisPomiaruResponse
+import pl.wertis.kolektor.core.wymiary.WYMIARY_NA_STRONIE
 import okhttp3.ResponseBody
 import retrofit2.Response
 import retrofit2.http.Body
@@ -493,4 +498,28 @@ interface ApiService {
     /** Czy ktoś szuka TEGO kolektora — serwer zna go po nagłówku `x-device`. */
     @GET("api/kolektor/wezwanie")
     suspend fun mojeWezwanie(): pl.wertis.kolektor.core.net.WezwanieResponse
+
+    /* ── Wagi i wymiary kartotek ──────────────────────────────────────────
+       Lista prosi o porządek obchodu regałów: magazynier idzie alejką,
+       a nie po rankingu sprzedaży, który ma biuro.
+
+       Zapis BEZ BUFORA OFFLINE, tak jak nadanie kodu. Pomiar jest czynnością
+       rzadką, a odmowa serwera (netto ponad brutto, zła jednostka) ma paść,
+       gdy towar jeszcze leży na wadze i da się go zważyć drugi raz. */
+    @GET("api/wymiary/bez-wymiarow")
+    suspend fun bezWymiarow(
+        @Query("offset") offset: Int,
+        @Query("limit") limit: Int = WYMIARY_NA_STRONIE,
+        @Query("sortuj") sortuj: String = "lokalizacja",
+        @Query("q") q: String = "",
+    ): ListaBezWymiarow
+
+    @GET("api/wymiary/{twId}")
+    suspend fun wymiaryTowaru(@Path("twId") twId: Long): WymiaryTowaru
+
+    @POST("api/wymiary/{twId}")
+    suspend fun zapiszPomiar(
+        @Path("twId") twId: Long,
+        @Body body: PomiarBody,
+    ): ZapisPomiaruResponse
 }

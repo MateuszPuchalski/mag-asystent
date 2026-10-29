@@ -45,6 +45,7 @@ import pl.wertis.kolektor.core.net.LocAction
 import pl.wertis.kolektor.core.net.LocationsInfo
 import pl.wertis.kolektor.core.net.MovementEntry
 import pl.wertis.kolektor.core.net.SetLocationBody
+import pl.wertis.kolektor.core.net.WymiaryTowaru
 import pl.wertis.kolektor.core.product.adresHero
 import pl.wertis.kolektor.core.recent.RecentEntry
 import pl.wertis.kolektor.core.recent.etykietaAdresu
@@ -66,6 +67,7 @@ import pl.wertis.kolektor.ui.theme.AmberLine
 import pl.wertis.kolektor.ui.theme.BarlowCond
 import pl.wertis.kolektor.ui.theme.BorderCol
 import pl.wertis.kolektor.ui.przesuniecie.PrzesuniecieSheet
+import pl.wertis.kolektor.ui.wymiary.PomiarSheet
 import pl.wertis.kolektor.ui.theme.CardWhite
 import pl.wertis.kolektor.ui.theme.Ink
 import pl.wertis.kolektor.ui.theme.InkMute
@@ -136,6 +138,28 @@ fun ProductScreen(graph: AppGraph) {
     /* Licznik, nie flaga: po zapisie slot ma pobrać zdjęcie od nowa, a drugie
        zdjęcie tej samej kartoteki musi zadziałać tak samo jak pierwsze. */
     var zdjecieOdswiez by remember(id) { mutableStateOf(0) }
+    /** Arkusz pomiaru wagi i wymiarów. */
+    var pomiarOtwarty by remember(id) { mutableStateOf(false) }
+    /* Licznik jak przy zdjęciu: po zapisie stan pomiaru pobiera się od nowa
+       i przycisk mówi „w kolejce", zamiast zapraszać do drugiego pomiaru. */
+    var wymiaryOdswiez by remember(id) { mutableStateOf(0) }
+    /* Wagi i wymiary osobnym żądaniem, raz na wejście, nie w pętli karty.
+       `null` = nie wiem (wczytuje się, starszy serwer, brak sieci) i wtedy
+       przycisku nie ma — tak samo jak „+" przy zdjęciu, gdy serwer funkcji
+       nie zgłasza. Przycisk, który po dotknięciu mówi „wyłączone", byłby
+       decyzją bez wyboru na każdej karcie. */
+    val wymiary by produceState<WymiaryTowaru?>(null, id, wymiaryOdswiez) {
+        value = try {
+            apiCall { graph.api.wymiaryTowaru(id) }
+        } catch (_: Exception) {
+            null
+        }
+    }
+    /* Tylko odpowiedź o TEN towar. `produceState` trzyma poprzednią wartość
+       do przyjścia nowej, a przejście towar→towar zostawiłoby na sekundę
+       dane poprzedniej kartoteki pod przyciskiem, a arkusz otwarty w tej
+       sekundzie zapisałby pomiar do cudzego `twId`. */
+    val pomiar = wymiary?.takeIf { it.wlaczone && it.towar?.twId == id }
 
     val p = poll.data
 
@@ -411,6 +435,15 @@ fun ProductScreen(graph: AppGraph) {
 
            Przeprowadzka idzie teraz jedną drogą: skan półki na karcie. */
 
+        // pomiar z karty: towar jest już w ręku, bo kartę otworzył jego skan
+        pomiar?.let { w ->
+            OutlineButton(
+                if (w.oczekuje) "POMIAR W KOLEJCE DO SUBIEKTA" else "ZWAŻ I ZMIERZ",
+                enabled = !w.oczekuje,
+                modifier = Modifier.fillMaxWidth(),
+            ) { pomiarOtwarty = true }
+        }
+
         HistoriaSekcja(history, "hist" in otwarte) { toggle("hist") }
         MagazynySekcja(p, "mag" in otwarte, { toggle("mag") }) { magId, rola, dostepne ->
             przesun = Zrodlo(magId, rola, dostepne)
@@ -460,6 +493,23 @@ fun ProductScreen(graph: AppGraph) {
                    teraz, przez alias. Komunikat mówi wprost o tej różnicy,
                    zamiast udawać, że kartoteka zmieniła się natychmiast. */
                 graph.effects.toast("Kod nadany — skan działa od razu, kartoteka po zapisie")
+            },
+        )
+    }
+
+    val towarPomiaru = pomiar?.towar
+    if (pomiarOtwarty && towarPomiaru != null) {
+        PomiarSheet(
+            graph = graph,
+            towar = towarPomiaru,
+            onClose = { pomiarOtwarty = false },
+            onZapisano = {
+                pomiarOtwarty = false
+                wymiaryOdswiez++
+            },
+            onWylaczone = {
+                pomiarOtwarty = false
+                wymiaryOdswiez++
             },
         )
     }

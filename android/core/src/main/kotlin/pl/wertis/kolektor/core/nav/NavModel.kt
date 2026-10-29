@@ -27,6 +27,8 @@ enum class Screen {
     POLACZENIE,
     // szukanie zgubionego kolektora: lista urządzeń i przycisk ZADZWOŃ
     KOLEKTORY,
+    // towary bez wagi albo wymiaru, w kolejności obchodu regałów
+    DO_ZMIERZENIA,
 }
 
 private val BACK: Map<Screen, Screen> = mapOf(
@@ -43,6 +45,7 @@ private val BACK: Map<Screen, Screen> = mapOf(
     Screen.SETUP to Screen.SETTINGS,
     Screen.POLACZENIE to Screen.SETTINGS,
     Screen.KOLEKTORY to Screen.SETTINGS,
+    Screen.DO_ZMIERZENIA to Screen.HOME,
 )
 
 /** Cel przycisku wstecz; null = brak (splash i home pokazują logo). */
@@ -69,4 +72,5 @@ val SCREEN_TITLES: Map<Screen, String> = mapOf(
     Screen.SETUP to "KONTA",
     Screen.POLACZENIE to "POŁĄCZENIE",
     Screen.KOLEKTORY to "ZNAJDŹ KOLEKTOR",
+    Screen.DO_ZMIERZENIA to "DO ZMIERZENIA",
 )

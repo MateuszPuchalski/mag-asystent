@@ -53,7 +53,7 @@ test("nazwa kolumny spoza identyfikatorów nie wchodzi do SQL", () => {
   const zle = { ...POLA, wysokosc: "pwd_Tekst01; DROP TABLE pw_Dane" };
   assert.throws(() => budujZapytanieWymiarow({ ...NIC, wysokosc: 3 }, zle, true));
   assert.throws(() => zrodloWymiarow(zle));
-  assert.throws(() => budujZapytanieBezWymiarow({ pola: zle, zFiltrem: false }));
+  assert.throws(() => budujZapytanieBezWymiarow({ pola: zle, lokalizacja: "tw_Pole1", zFiltrem: false }));
 });
 
 test("wymiary czyta jeden wiersz pól własnych towaru — drugi nie dubluje towaru na liście", () => {
@@ -65,7 +65,7 @@ test("wymiary czyta jeden wiersz pól własnych towaru — drugi nie dubluje tow
 });
 
 test("lista łapie brak którejś wagi albo któregokolwiek wymiaru, tylko niezablokowane", () => {
-  const { strona, razem } = budujZapytanieBezWymiarow({ pola: POLA, zFiltrem: false });
+  const { strona, razem } = budujZapytanieBezWymiarow({ pola: POLA, lokalizacja: "tw_Pole1", zFiltrem: false });
   const brak =
     "(ISNULL(t.tw_Masa, 0) <= 0 OR ISNULL(t.tw_MasaNetto, 0) <= 0 OR LTRIM(RTRIM(ISNULL(pw.dlugosc, ''))) = '' " +
     "OR LTRIM(RTRIM(ISNULL(pw.szerokosc, ''))) = '' OR LTRIM(RTRIM(ISNULL(pw.wysokosc, ''))) = '')";
@@ -75,14 +75,14 @@ test("lista łapie brak którejś wagi albo któregokolwiek wymiaru, tylko nieza
     assert.ok(z.includes(zrodloWymiarow(POLA)), "licznik też widzi pola własne");
     assert.ok(!z.includes("@q"), "bez szukania nie ma parametru @q");
   }
-  assert.ok(strona.includes("t.tw_Masa AS brutto, t.tw_MasaNetto AS netto, pw.dlugosc, pw.szerokosc, pw.wysokosc"));
+  assert.ok(strona.includes("t.tw_Pole1 AS lokalizacja, t.tw_Masa AS brutto, t.tw_MasaNetto AS netto, pw.dlugosc, pw.szerokosc, pw.wysokosc"));
   /* Stronicowanie bez pełnego porządku gubi wiersze — domyka je tw_Id. */
   assert.match(strona, /ORDER BY .*t\.tw_Id OFFSET @offset ROWS FETCH NEXT @limit ROWS ONLY$/);
 });
 
 test("szukanie, stan i sprzedaż dokładają swoje warunki do strony i licznika", () => {
   const { strona, razem } = budujZapytanieBezWymiarow({
-    pola: POLA, zFiltrem: true, naStanie: true, sprzedane: true, sortuj: "symbol",
+    pola: POLA, lokalizacja: "tw_Pole1", zFiltrem: true, naStanie: true, sprzedane: true, sortuj: "symbol",
   });
   for (const z of [strona, razem]) {
     assert.ok(z.includes("t.tw_Symbol LIKE @q ESCAPE '!'"));
@@ -90,4 +90,12 @@ test("szukanie, stan i sprzedaż dokładają swoje warunki do strony i licznika"
     assert.ok(z.includes("p.ob_IloscMag > 0"));
   }
   assert.ok(strona.includes("ORDER BY t.tw_Symbol, t.tw_Id"));
+});
+
+test("obchód po regałach: porządek po lokalizacji, towary bez adresu na końcu", () => {
+  const { strona } = budujZapytanieBezWymiarow({ pola: POLA, lokalizacja: "tw_Pole1", zFiltrem: false, sortuj: "lokalizacja" });
+  assert.ok(strona.includes(
+    "ORDER BY CASE WHEN LTRIM(RTRIM(ISNULL(t.tw_Pole1, ''))) = '' THEN 1 ELSE 0 END, t.tw_Pole1, t.tw_Id OFFSET"
+  ), strona);
+  assert.throws(() => budujZapytanieBezWymiarow({ pola: POLA, lokalizacja: "tw_Pole1;--", zFiltrem: false }));
 });
