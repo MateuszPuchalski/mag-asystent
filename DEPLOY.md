@@ -1266,7 +1266,8 @@ przez maskowanie, więc nie pisze się w nim danych klienta. Polityka:
 ## 6j. Waga i wymiary kartotek
 
 Zakładka **Wymiary** w panelu pokazuje towary bez wagi albo bez wymiaru.
-Pomiar idzie kolejką do Subiekta: waga do `tw_Masa` (kg), wymiary do trzech
+Pomiar idzie kolejką do Subiekta. Waga brutto trafia do `tw_Masa`, a netto
+do `tw_MasaNetto` (kg, zakładka „Miary" kartoteki). Wymiary trafiają do trzech
 pól własnych (cm, tekst z przecinkiem, np. `12,5`). Puste pole formularza
 zostaje w kartotece bez zmian.
 
@@ -1287,14 +1288,15 @@ Bez kluczy zakładka mówi, że czeka na konfigurację.
 **2. Nadaj prawo zapisu.** W SSMS, na bazie podmiotu, z polami z kroku 1:
 
 ```sql
-GRANT UPDATE ON dbo.tw__Towar (tw_Masa, tw_Pole4, tw_Pole5, tw_Pole6) TO wertis;
+GRANT UPDATE ON dbo.tw__Towar (tw_Masa, tw_MasaNetto, tw_Pole4, tw_Pole5, tw_Pole6) TO wertis;
 ```
 
 Instalator tego grantu jeszcze nie nadaje. Bez niego zadanie kończy się
 w kolejce błędem z gotowym poleceniem do wklejenia.
 
 **3. Sprawdź na kartotece próbnej.** Zmierz jeden towar testowy i otwórz
-go w Subiekcie. Waga ma stać w kilogramach, a wymiary w wybranych polach.
+go w Subiekcie. Na zakładce „Miary" brutto i netto mają stać w kilogramach,
+a wymiary w wybranych polach.
 Dopiero potem mierz towary sprzedawane.
 
 ## 7. Backup i utrzymanie

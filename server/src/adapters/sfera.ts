@@ -174,7 +174,8 @@ export interface SferaAdapter {
    */
   applySetZdjecie(twId: number): Promise<void>;
   /**
-   * Waga i wymiary kartoteki — `tw_Masa` i trzy pola własne `WYMIARY_POLE_*`.
+   * Wagi i wymiary kartoteki — `tw_Masa` (brutto), `tw_MasaNetto` i trzy pola
+   * własne `WYMIARY_POLE_*`.
    *
    * CZWARTE rozszerzenie granicy zapisu, tego samego rodzaju co lokalizacja:
    * UPDATE kolumn istniejącej kartoteki, bez dokumentu i bez nowego wiersza.

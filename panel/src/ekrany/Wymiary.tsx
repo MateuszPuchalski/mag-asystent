@@ -8,7 +8,7 @@ import { nastepnyWolny, sasiad } from "./Zdjecia";
 
 /* ── WYMIARY: TOWARY BEZ WAGI ALBO WYMIARÓW ──────────────────────────────────
    Praca seryjna przy wadze i miarce: kartoteki Subiekta, którym brakuje wagi
-   albo choć jednego wymiaru, jedna po drugiej. Lewa kolumna to lista, prawa
+   brutto, netto albo choć jednego wymiaru, jedna po drugiej. Lewa kolumna to lista, prawa
    to formularz pomiaru. Po zapisie ekran sam przechodzi do następnego towaru
    i stawia kursor w pierwszym polu (ergonomia, punkt 1).
 
@@ -30,26 +30,29 @@ const SORTOWANIA: Array<{ wartosc: SortBezZdjecia; etykieta: string }> = [
 const LICZBA = new Intl.NumberFormat("pl-PL", { maximumFractionDigits: 3 });
 
 const POLA: Array<{ klucz: keyof Pomiar; etykieta: string; jednostka: string }> = [
-  { klucz: "masaKg", etykieta: "Waga", jednostka: "kg" },
+  { klucz: "bruttoKg", etykieta: "Waga brutto", jednostka: "kg" },
+  { klucz: "nettoKg", etykieta: "Waga netto", jednostka: "kg" },
   { klucz: "dlugosc", etykieta: "Długość", jednostka: "cm" },
   { klucz: "szerokosc", etykieta: "Szerokość", jednostka: "cm" },
   { klucz: "wysokosc", etykieta: "Wysokość", jednostka: "cm" },
 ];
 
-const PUSTY: Pomiar = { masaKg: "", dlugosc: "", szerokosc: "", wysokosc: "" };
+const PUSTY: Pomiar = { bruttoKg: "", nettoKg: "", dlugosc: "", szerokosc: "", wysokosc: "" };
 
 /** Co kartoteka już ma w danym polu, jako tekst; `null` = brak. */
 function obecne(p: PozycjaBezWymiarow, klucz: keyof Pomiar): string | null {
-  if (klucz === "masaKg") return p.masa === null ? null : LICZBA.format(p.masa);
+  if (klucz === "bruttoKg") return p.brutto === null ? null : LICZBA.format(p.brutto);
+  if (klucz === "nettoKg") return p.netto === null ? null : LICZBA.format(p.netto);
   return p[klucz];
 }
 
-/** Czego brakuje, krótko — „wymiary" zamiast trzech nazw, gdy brak wszystkich. */
+/** Czego brakuje, krótko — „waga" i „wymiary" zamiast pojedynczych nazw, gdy brak wszystkich. */
 export function braki(p: PozycjaBezWymiarow): string {
   const wymiary = (["dlugosc", "szerokosc", "wysokosc"] as const).filter((k) => !p[k]);
   const nazwy = { dlugosc: "długość", szerokosc: "szerokość", wysokosc: "wysokość" };
   return [
-    p.masa === null ? "waga" : null,
+    p.brutto === null && p.netto === null ? "waga"
+      : p.brutto === null ? "brutto" : p.netto === null ? "netto" : null,
     ...(wymiary.length === 3 ? ["wymiary"] : wymiary.map((k) => nazwy[k])),
   ].filter(Boolean).join(", ");
 }

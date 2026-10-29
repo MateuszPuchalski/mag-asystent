@@ -189,7 +189,7 @@ export function enqueueSetWymiary(
   twId: number,
   pomiar: Pomiar,
   base: EnqueueBase,
-  przed: { masa: number | null; dlugosc: string | null; szerokosc: string | null; wysokosc: string | null }
+  przed: { brutto: number | null; netto: number | null; dlugosc: string | null; szerokosc: string | null; wysokosc: string | null }
 ): number {
   const queueId = insert("set_wymiary", { twId, pomiar }, base);
   logEvent("wymiary_set", base.createdBy, twId, { przed, pomiar, queueId }, base.createdByRef ?? currentUserRef());

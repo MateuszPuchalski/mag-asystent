@@ -34,9 +34,9 @@ let ustawZrodla: S["ustawZrodlaWymiarow"];
 /** Udawana kartoteka Subiekta. Towar 2 ma wagę, ale nie ma wymiarów. */
 const KARTOTEKA = [
   { twId: 1, symbol: "A-01", nazwa: "Kosa", ean: "590123", stan: 4, sprzedaz: 7,
-    masa: null, dlugosc: null, szerokosc: null, wysokosc: null },
+    brutto: null, netto: null, dlugosc: null, szerokosc: null, wysokosc: null },
   { twId: 2, symbol: "B-02", nazwa: "Grabie", ean: null, stan: 0, sprzedaz: 0,
-    masa: 1.4, dlugosc: "150", szerokosc: null, wysokosc: null },
+    brutto: 1.4, netto: 1.2, dlugosc: "150", szerokosc: null, wysokosc: null },
 ];
 
 before(async () => {
@@ -96,7 +96,7 @@ test("biuro dostaje stronę w kształcie kontraktu", async () => {
 test("magazynier dostaje 403, bez sesji 401 — na liście i przy zapisie", async () => {
   assert.equal((await lista(sesja("magazynier"))).statusCode, 403);
   assert.equal((await lista({})).statusCode, 401);
-  assert.equal((await zapisz(sesja("magazynier"), 1, { masaKg: 1 })).statusCode, 403);
+  assert.equal((await zapisz(sesja("magazynier"), 1, { bruttoKg: 1 })).statusCode, 403);
   assert.equal(zadania().length, 0);
 });
 
@@ -106,13 +106,13 @@ test("bez kluczy WYMIARY_POLE_* ekran mówi, co ustawić, a zapis dostaje 409", 
   const r = (await lista(h)).json();
   assert.equal(r.wlaczone, false);
   assert.match(r.powod, /WYMIARY_POLE_DLUGOSC/);
-  assert.equal((await zapisz(h, 1, { masaKg: 1 })).statusCode, 409);
+  assert.equal((await zapisz(h, 1, { bruttoKg: 1 })).statusCode, 409);
   assert.equal(zadania().length, 0);
 });
 
 test("pomiar idzie do kolejki z opisem i audytem „przed”; lista widzi go jako oczekujący", async () => {
   const h = sesja("biuro");
-  const r = await zapisz(h, 2, { masaKg: "", dlugosc: "150", szerokosc: "12,5", wysokosc: 8 });
+  const r = await zapisz(h, 2, { bruttoKg: "", dlugosc: "150", szerokosc: "12,5", wysokosc: 8 });
   assert.equal(r.statusCode, 200, r.payload);
   const z = zadania();
   assert.equal(z.length, 1);
@@ -121,11 +121,11 @@ test("pomiar idzie do kolejki z opisem i audytem „przed”; lista widzi go jak
   assert.equal(z[0].label, "Wymiary · B-02");
   assert.equal(z[0].detail, "150 × 12,5 × 8 cm");
   assert.deepEqual(JSON.parse(z[0].payload), {
-    twId: 2, pomiar: { masaKg: null, dlugosc: 150, szerokosc: 12.5, wysokosc: 8 },
+    twId: 2, pomiar: { bruttoKg: null, nettoKg: null, dlugosc: 150, szerokosc: 12.5, wysokosc: 8 },
   });
   const zdarzenie = db().prepare("SELECT type, payload FROM events WHERE type = 'wymiary_set'").get() as
     { type: string; payload: string };
-  assert.deepEqual(JSON.parse(zdarzenie.payload).przed, { masa: 1.4, dlugosc: "150", szerokosc: null, wysokosc: null });
+  assert.deepEqual(JSON.parse(zdarzenie.payload).przed, { brutto: 1.4, netto: 1.2, dlugosc: "150", szerokosc: null, wysokosc: null });
 
   const po = (await lista(h)).json();
   assert.deepEqual(po.pozycje.map((p: { twId: number; oczekuje: boolean }) => [p.twId, p.oczekuje]), [[1, false], [2, true]]);
@@ -136,8 +136,8 @@ test("zły pomiar to 400, nieznany towar 404, zły numer 400 — i nic w kolejce
   const zly = await zapisz(h, 1, { dlugosc: "dużo" });
   assert.equal(zly.statusCode, 400);
   assert.match(zly.json().error, /Długość/);
-  assert.equal((await zapisz(h, 99, { masaKg: 1 })).statusCode, 404);
-  assert.equal((await zapisz(h, "abc", { masaKg: 1 })).statusCode, 400);
+  assert.equal((await zapisz(h, 99, { bruttoKg: 1 })).statusCode, 404);
+  assert.equal((await zapisz(h, "abc", { bruttoKg: 1 })).statusCode, 400);
   assert.equal(zadania().length, 0);
 });
 
@@ -147,6 +147,6 @@ test("awaria bazy Subiekta to 503 z powodem, nie pusta lista", async () => {
   const r = await lista(h);
   assert.equal(r.statusCode, 503);
   assert.match(r.json().error, /timeout/);
-  assert.equal((await zapisz(h, 1, { masaKg: 1 })).statusCode, 503);
+  assert.equal((await zapisz(h, 1, { bruttoKg: 1 })).statusCode, 503);
   assert.equal(zadania().length, 0);
 });

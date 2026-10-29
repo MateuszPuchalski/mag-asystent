@@ -215,6 +215,7 @@ export function migrate(database: DatabaseSync) {
   /* Waga i wymiary demo — patrz `sgt_towar` w `schema.sql`. NULL znaczy
      „nie zmierzono", więc demo startuje z pełną listą do pomiaru. */
   addColumn("sgt_towar", "masa", "REAL");
+  addColumn("sgt_towar", "masa_netto", "REAL");
   addColumn("sgt_towar", "wym_dlugosc", "TEXT");
   addColumn("sgt_towar", "wym_szerokosc", "TEXT");
   addColumn("sgt_towar", "wym_wysokosc", "TEXT");

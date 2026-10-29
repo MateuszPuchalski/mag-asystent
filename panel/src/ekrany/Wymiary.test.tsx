@@ -16,7 +16,7 @@ import type { ListaBezWymiarow, PozycjaBezWymiarow } from "../api/wymiary";
    5. Towar w kolejce jest wyszarzony i nie da się go wybrać. */
 
 const poz = (twId: number, symbol: string, nazwa: string, inne: Partial<PozycjaBezWymiarow> = {}): PozycjaBezWymiarow =>
-  ({ twId, symbol, nazwa, ean: null, stan: 2, sprzedaz: 0, masa: null, dlugosc: null, szerokosc: null,
+  ({ twId, symbol, nazwa, ean: null, stan: 2, sprzedaz: 0, brutto: null, netto: null, dlugosc: null, szerokosc: null,
     wysokosc: null, oczekuje: false, ...inne });
 
 const LISTA: ListaBezWymiarow = {
@@ -24,7 +24,7 @@ const LISTA: ListaBezWymiarow = {
   pozycje: [
     poz(1, "KOSA-1", "Kosa spalinowa"),
     poz(2, "KON-2", "Konewka 10 l", { oczekuje: true }),
-    poz(3, "GRA-3", "Grabie metalowe", { masa: 1.4, dlugosc: "150" }),
+    poz(3, "GRA-3", "Grabie metalowe", { brutto: 1.4, netto: 1.2, dlugosc: "150" }),
   ],
 };
 
@@ -70,12 +70,12 @@ describe("Wymiary", () => {
     const u = userEvent.setup();
     pokaz();
     await screen.findByRole("heading", { name: "Kosa spalinowa" });
-    /* Kursor stoi w pierwszym polu, którego kartoteka nie ma — tu w wadze. */
-    await waitFor(() => expect(screen.getByLabelText("Waga (kg)")).toHaveFocus());
-    await u.keyboard("2,5{Enter}40{Enter}12,5{Enter}8{Enter}");
+    /* Kursor stoi w pierwszym polu, którego kartoteka nie ma — tu w wadze brutto. */
+    await waitFor(() => expect(screen.getByLabelText("Waga brutto (kg)")).toHaveFocus());
+    await u.keyboard("2,5{Enter}2,2{Enter}40{Enter}12,5{Enter}8{Enter}");
 
     await waitFor(() => expect(stan.wyslane).toEqual(["POST /api/wymiary/1"]));
-    expect(cialo("/api/wymiary/1")).toEqual({ masaKg: "2,5", dlugosc: "40", szerokosc: "12,5", wysokosc: "8" });
+    expect(cialo("/api/wymiary/1")).toEqual({ bruttoKg: "2,5", nettoKg: "2,2", dlugosc: "40", szerokosc: "12,5", wysokosc: "8" });
     expect(await screen.findByRole("status")).toHaveTextContent("Zapisano pomiar KOSA-1");
     /* Konewka czeka w kolejce, więc następny jest towar 3. */
     expect(await screen.findByRole("heading", { name: "Grabie metalowe" })).toBeInTheDocument();
@@ -87,6 +87,7 @@ describe("Wymiary", () => {
     pokaz();
     await u.click(await screen.findByRole("button", { name: /GRA-3/ }));
     expect(screen.getByText("W Subiekcie: 1,4 kg")).toBeInTheDocument();
+    expect(screen.getByText("W Subiekcie: 1,2 kg")).toBeInTheDocument();
     expect(screen.getByText("W Subiekcie: 150 cm")).toBeInTheDocument();
     /* Pierwszy brak to szerokość, więc tam stoi kursor. */
     await waitFor(() => expect(screen.getByLabelText("Szerokość (cm)")).toHaveFocus());
@@ -107,7 +108,8 @@ describe("Wymiary", () => {
 
   it("braki mówią krótko, czego nie ma", () => {
     expect(braki(poz(1, "A", "a"))).toBe("waga, wymiary");
-    expect(braki(poz(1, "A", "a", { masa: 2, dlugosc: "10" }))).toBe("szerokość, wysokość");
+    expect(braki(poz(1, "A", "a", { brutto: 2, netto: 1.8, dlugosc: "10" }))).toBe("szerokość, wysokość");
     expect(braki(poz(1, "A", "a", { dlugosc: "1", szerokosc: "2", wysokosc: "3" }))).toBe("waga");
+    expect(braki(poz(1, "A", "a", { brutto: 2, dlugosc: "1", szerokosc: "2", wysokosc: "3" }))).toBe("netto");
   });
 });

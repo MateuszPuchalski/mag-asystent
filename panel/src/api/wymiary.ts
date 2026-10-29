@@ -15,8 +15,9 @@ export interface PozycjaBezWymiarow {
   stan: number;
   /** Sztuki sprzedane na FS i PA w ostatnich 30 dniach. */
   sprzedaz: number;
-  /** Waga z kartoteki w kg; `null` = brak. */
-  masa: number | null;
+  /** Wagi z kartoteki w kg (`tw_Masa`, `tw_MasaNetto`); `null` = brak. */
+  brutto: number | null;
+  netto: number | null;
   /** Surowa treść pól własnych z Subiekta; `null` = puste. */
   dlugosc: string | null;
   szerokosc: string | null;
@@ -34,7 +35,8 @@ export interface ListaBezWymiarow {
 
 /** Pomiar z formularza: tekst tak, jak wpisał człowiek. Puste = pole zostaje w Subiekcie. */
 export interface Pomiar {
-  masaKg: string;
+  bruttoKg: string;
+  nettoKg: string;
   dlugosc: string;
   szerokosc: string;
   wysokosc: string;

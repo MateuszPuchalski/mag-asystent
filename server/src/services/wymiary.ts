@@ -121,7 +121,8 @@ export const MASA_MAX_KG = 2000;
 export const WYMIAR_MAX_CM = 1000;
 
 const NAZWY: Record<keyof Pomiar, string> = {
-  masaKg: "Waga",
+  bruttoKg: "Waga brutto",
+  nettoKg: "Waga netto",
   dlugosc: "Długość",
   szerokosc: "Szerokość",
   wysokosc: "Wysokość",
@@ -146,16 +147,17 @@ export function pomiarZCiala(cialo: unknown):
   | { ok: true; pomiar: Pomiar }
   | { ok: false; error: string } {
   const c = (cialo && typeof cialo === "object" ? cialo : {}) as Record<string, unknown>;
-  const pomiar: Pomiar = { masaKg: null, dlugosc: null, szerokosc: null, wysokosc: null };
-  for (const k of ["masaKg", ...WYMIARY] as const) {
+  const pomiar: Pomiar = { bruttoKg: null, nettoKg: null, dlugosc: null, szerokosc: null, wysokosc: null };
+  for (const k of WAGI_I_WYMIARY) {
     const n = liczbaPola(c[k]);
     if (n === "zle") return { ok: false, error: `${NAZWY[k]}: wpisz liczbę, np. 12,5.` };
     if (n === null) continue;
-    const max = k === "masaKg" ? MASA_MAX_KG : WYMIAR_MAX_CM;
-    const jednostka = k === "masaKg" ? "kg" : "cm";
+    const waga = k === "bruttoKg" || k === "nettoKg";
+    const max = waga ? MASA_MAX_KG : WYMIAR_MAX_CM;
+    const jednostka = waga ? "kg" : "cm";
     /* Zaokrąglamy PRZED progiem zera: „0,04" cm to po zaokrągleniu zero,
        a zero w polu znaczy „nie zmierzono", nie pomiar. */
-    const r = k === "masaKg" ? Math.round(n * 1000) / 1000 : Math.round(n * 10) / 10;
+    const r = waga ? Math.round(n * 1000) / 1000 : Math.round(n * 10) / 10;
     if (r <= 0) return { ok: false, error: `${NAZWY[k]} musi być większa od zera.` };
     if (r > max) return { ok: false, error: `${NAZWY[k]} ponad ${max} ${jednostka} — sprawdź jednostkę.` };
     pomiar[k] = r;
@@ -163,7 +165,22 @@ export function pomiarZCiala(cialo: unknown):
   if (Object.values(pomiar).every((v) => v === null)) {
     return { ok: false, error: "Wpisz co najmniej jedną wartość pomiaru." };
   }
+  const zle = nettoPonadBrutto(pomiar.bruttoKg, pomiar.nettoKg);
+  if (zle) return { ok: false, error: zle };
   return { ok: true, pomiar };
+}
+
+const WAGI_I_WYMIARY = ["bruttoKg", "nettoKg", ...WYMIARY] as const;
+
+/**
+ * Netto większe od brutto to pomyłka pól, nie pomiar: opakowanie nie waży
+ * mniej niż zero. Sprawdzamy też względem kartoteki, bo człowiek może
+ * wpisać samo netto obok brutto, które już stoi w Subiekcie.
+ */
+function nettoPonadBrutto(brutto: number | null, netto: number | null): string | null {
+  if (brutto === null || netto === null || netto <= brutto) return null;
+  const kg = (v: number) => String(v).replace(".", ",");
+  return `Waga netto (${kg(netto)} kg) większa od brutto (${kg(brutto)} kg) — sprawdź, czy pola nie są zamienione.`;
 }
 
 export type WynikZapisu =
@@ -189,8 +206,12 @@ export async function zapiszPomiar(
   if (!przed) return { ok: false, kod: 404, error: `Nie ma w Subiekcie towaru o tw_Id=${twId}.` };
 
   const p = wejscie.pomiar;
+  const zle = nettoPonadBrutto(p.bruttoKg ?? przed.brutto, p.nettoKg ?? przed.netto);
+  if (zle) return { ok: false, kod: 400, error: zle };
+  const kg = (v: number) => String(v).replace(".", ",");
   const opis = [
-    p.masaKg !== null ? `${String(p.masaKg).replace(".", ",")} kg` : null,
+    p.bruttoKg !== null ? `brutto ${kg(p.bruttoKg)} kg` : null,
+    p.nettoKg !== null ? `netto ${kg(p.nettoKg)} kg` : null,
     WYMIARY.some((w) => p[w] !== null)
       ? WYMIARY.map((w) => { const cm = p[w]; return cm === null ? "–" : tekstWymiaru(cm); }).join(" × ") + " cm"
       : null,
@@ -199,7 +220,7 @@ export async function zapiszPomiar(
     twId,
     p,
     { createdBy: autor.nazwa, createdByRef: autor.ref, twId, label: "Wymiary · " + przed.symbol, detail: opis },
-    { masa: przed.masa, dlugosc: przed.dlugosc, szerokosc: przed.szerokosc, wysokosc: przed.wysokosc }
+    { brutto: przed.brutto, netto: przed.netto, dlugosc: przed.dlugosc, szerokosc: przed.szerokosc, wysokosc: przed.wysokosc }
   );
   return { ok: true, queueId, pomiar: p };
 }

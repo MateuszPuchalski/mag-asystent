@@ -19,26 +19,30 @@ test("wymiar to centymetry z przecinkiem, bez „,0” przy pełnych", () => {
 
 test("UPDATE niesie tylko zmierzone kolumny", () => {
   assert.equal(
-    budujZapytanieZapisu({ masaKg: 1.2, dlugosc: 30, szerokosc: 20, wysokosc: 10 }, POLA),
-    "UPDATE tw__Towar SET tw_Masa = @masa, tw_Pole4 = @dlugosc, tw_Pole5 = @szerokosc, tw_Pole6 = @wysokosc WHERE tw_Id = @id"
+    budujZapytanieZapisu({ bruttoKg: 1.2, nettoKg: 1, dlugosc: 30, szerokosc: 20, wysokosc: 10 }, POLA),
+    "UPDATE tw__Towar SET tw_Masa = @brutto, tw_MasaNetto = @netto, tw_Pole4 = @dlugosc, tw_Pole5 = @szerokosc, tw_Pole6 = @wysokosc WHERE tw_Id = @id"
   );
   assert.equal(
-    budujZapytanieZapisu({ masaKg: null, dlugosc: null, szerokosc: 4, wysokosc: null }, POLA),
+    budujZapytanieZapisu({ bruttoKg: null, nettoKg: null, dlugosc: null, szerokosc: 4, wysokosc: null }, POLA),
     "UPDATE tw__Towar SET tw_Pole5 = @szerokosc WHERE tw_Id = @id"
   );
-  assert.equal(budujZapytanieZapisu({ masaKg: null, dlugosc: null, szerokosc: null, wysokosc: null }, POLA), null);
+  assert.equal(budujZapytanieZapisu({ bruttoKg: null, nettoKg: null, dlugosc: null, szerokosc: null, wysokosc: null }, POLA), null);
+  assert.equal(
+    budujZapytanieZapisu({ bruttoKg: null, nettoKg: 0.5, dlugosc: null, szerokosc: null, wysokosc: null }, POLA),
+    "UPDATE tw__Towar SET tw_MasaNetto = @netto WHERE tw_Id = @id"
+  );
 });
 
 test("nazwa pola spoza identyfikatorów nie wchodzi do SQL", () => {
   const zle = { ...POLA, wysokosc: "tw_Pole6; DROP TABLE tw__Towar" };
-  assert.throws(() => budujZapytanieZapisu({ masaKg: null, dlugosc: null, szerokosc: null, wysokosc: 3 }, zle));
+  assert.throws(() => budujZapytanieZapisu({ bruttoKg: null, nettoKg: null, dlugosc: null, szerokosc: null, wysokosc: 3 }, zle));
   assert.throws(() => budujZapytanieBezWymiarow({ pola: zle, zFiltrem: false }));
 });
 
-test("lista łapie brak wagi albo któregokolwiek wymiaru, tylko niezablokowane", () => {
+test("lista łapie brak którejś wagi albo któregokolwiek wymiaru, tylko niezablokowane", () => {
   const { strona, razem } = budujZapytanieBezWymiarow({ pola: POLA, zFiltrem: false });
   const brak =
-    "(ISNULL(t.tw_Masa, 0) <= 0 OR LTRIM(RTRIM(ISNULL(t.tw_Pole4, ''))) = '' " +
+    "(ISNULL(t.tw_Masa, 0) <= 0 OR ISNULL(t.tw_MasaNetto, 0) <= 0 OR LTRIM(RTRIM(ISNULL(t.tw_Pole4, ''))) = '' " +
     "OR LTRIM(RTRIM(ISNULL(t.tw_Pole5, ''))) = '' OR LTRIM(RTRIM(ISNULL(t.tw_Pole6, ''))) = '')";
   for (const z of [strona, razem]) {
     assert.ok(z.includes("t.tw_Zablokowany = 0"), z);

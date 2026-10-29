@@ -21,13 +21,15 @@ before(async () => {
 });
 
 test("pomiar przyjmuje przecinek, kropkę i liczby; puste zostawia pole", () => {
-  const w = pomiarZCiala({ masaKg: "1,25", dlugosc: 30, szerokosc: " 20.5 ", wysokosc: "" });
-  assert.deepEqual(w, { ok: true, pomiar: { masaKg: 1.25, dlugosc: 30, szerokosc: 20.5, wysokosc: null } });
+  const w = pomiarZCiala({ bruttoKg: "1,25", nettoKg: "1,1", dlugosc: 30, szerokosc: " 20.5 ", wysokosc: "" });
+  assert.deepEqual(w, {
+    ok: true, pomiar: { bruttoKg: 1.25, nettoKg: 1.1, dlugosc: 30, szerokosc: 20.5, wysokosc: null },
+  });
 });
 
 test("waga do grama, wymiar do milimetra", () => {
-  const w = pomiarZCiala({ masaKg: "0,12345", dlugosc: "12,349" });
-  assert.deepEqual(w, { ok: true, pomiar: { masaKg: 0.123, dlugosc: 12.3, szerokosc: null, wysokosc: null } });
+  const w = pomiarZCiala({ nettoKg: "0,12345", dlugosc: "12,349" });
+  assert.deepEqual(w, { ok: true, pomiar: { bruttoKg: null, nettoKg: 0.123, dlugosc: 12.3, szerokosc: null, wysokosc: null } });
 });
 
 test("śmieci, zero i rząd wielkości za dużo — odmowa ze zdaniem o polu", () => {
@@ -37,10 +39,11 @@ test("śmieci, zero i rząd wielkości za dużo — odmowa ze zdaniem o polu", (
     return w.ok ? "" : w.error;
   };
   assert.match(odmowa({ dlugosc: "12cm" }), /^Długość: wpisz liczbę/);
-  assert.match(odmowa({ masaKg: "-1" }), /^Waga: wpisz liczbę/);
+  assert.match(odmowa({ bruttoKg: "-1" }), /^Waga brutto: wpisz liczbę/);
   assert.match(odmowa({ wysokosc: 0 }), /^Wysokość musi być większa od zera/);
   assert.match(odmowa({ szerokosc: "0,04" }), /większa od zera/, "zero po zaokrągleniu to też zero");
-  assert.match(odmowa({ masaKg: 2500 }), /ponad 2000 kg/);
+  assert.match(odmowa({ nettoKg: 2500 }), /^Waga netto ponad 2000 kg/);
+  assert.match(odmowa({ bruttoKg: "0,5", nettoKg: "0,6" }), /netto \(0,6 kg\) większa od brutto \(0,5 kg\)/);
   assert.match(odmowa({ dlugosc: 1200 }), /ponad 1000 cm/);
   assert.match(odmowa({}), /co najmniej jedną/);
   assert.match(odmowa(null), /co najmniej jedną/);

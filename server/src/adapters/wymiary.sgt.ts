@@ -10,7 +10,8 @@ import { DNI_SPRZEDAZY, PORZADEK, wzorzecLike, zrodloSprzedazy, type SortBezZdje
    pomiar z panelu. Lista braków pyta Subiekt wprost, z tego samego powodu co
    lista bez zdjęcia: nasz read-model kartoteki tych kolumn nie niesie.
 
-   Waga siedzi w `tw_Masa` (kg, liczba). Wymiary siedzą w polach własnych
+   Waga brutto siedzi w `tw_Masa`, netto w `tw_MasaNetto` (kg, money) — pola
+   „Masa brutto/netto towaru w kg" z zakładki Miary. Wymiary siedzą w polach własnych
    `tw_PoleN` (varchar(50)), wskazanych kluczami `WYMIARY_POLE_*`. Pole własne
    to TEKST, więc piszemy go tak, jak wpisałby człowiek w Subiekcie: „12,5". */
 
@@ -26,7 +27,10 @@ export type Wymiar = (typeof WYMIARY)[number];
  * i nie rozjedzie się między kolejką, audytem i demo.
  */
 export interface Pomiar {
-  masaKg: number | null;
+  /** Waga z opakowaniem — `tw_Masa`. */
+  bruttoKg: number | null;
+  /** Waga samego towaru — `tw_MasaNetto`. */
+  nettoKg: number | null;
   dlugosc: number | null;
   szerokosc: number | null;
   wysokosc: number | null;
@@ -39,8 +43,9 @@ export interface TowarBezWymiarow {
   ean: string | null;
   stan: number;
   sprzedaz: number;
-  /** Waga z kartoteki w kg; `null`, gdy pusta albo zero. */
-  masa: number | null;
+  /** Wagi z kartoteki w kg; `null`, gdy pusta albo zero. */
+  brutto: number | null;
+  netto: number | null;
   /** Surowa treść pól własnych; `null`, gdy puste. Panel podpowiada z nich to, co już jest. */
   dlugosc: string | null;
   szerokosc: string | null;
@@ -75,7 +80,8 @@ export function polaWymiarow(): Record<Wymiar, string> {
  */
 export function budujZapytanieZapisu(p: Pomiar, pola: Record<Wymiar, string>): string | null {
   const ustaw: string[] = [];
-  if (p.masaKg !== null) ustaw.push("tw_Masa = @masa");
+  if (p.bruttoKg !== null) ustaw.push("tw_Masa = @brutto");
+  if (p.nettoKg !== null) ustaw.push("tw_MasaNetto = @netto");
   for (const w of WYMIARY) {
     if (p[w] !== null) ustaw.push(`${assertSafeColumn(pola[w])} = @${w}`);
   }
@@ -87,7 +93,7 @@ export function budujZapytanieZapisu(p: Pomiar, pola: Record<Wymiar, string>): s
 const pustyTekst = (k: string) => `LTRIM(RTRIM(ISNULL(t.${k}, ''))) = ''`;
 
 /**
- * Strona i licznik kartotek, którym brakuje wagi albo choć jednego wymiaru.
+ * Strona i licznik kartotek, którym brakuje którejś wagi albo wymiaru.
  *
  * Ten sam kształt co lista bez zdjęcia: tylko niezablokowane, stan i sprzedaż
  * sumowane w podzapytaniach, porządek domknięty `tw_Id`.
@@ -102,7 +108,8 @@ export function budujZapytanieBezWymiarow(opts: {
 }): { strona: string; razem: string } {
   const pola = WYMIARY.map((w) => assertSafeColumn(opts.pola[w]));
   const zrodlo = zrodloSprzedazy(opts.sprzedaz ?? { fs: 2, pa: 21 });
-  const brak = ["ISNULL(t.tw_Masa, 0) <= 0", ...pola.map(pustyTekst)].join(" OR ");
+  const brak = ["ISNULL(t.tw_Masa, 0) <= 0", "ISNULL(t.tw_MasaNetto, 0) <= 0", ...pola.map(pustyTekst)]
+    .join(" OR ");
   const warunki = ["t.tw_Zablokowany = 0", `(${brak})`];
   if (opts.zFiltrem) {
     warunki.push(
@@ -128,7 +135,7 @@ export function budujZapytanieBezWymiarow(opts: {
     strona:
       "SELECT t.tw_Id AS twId, t.tw_Symbol AS symbol, t.tw_Nazwa AS nazwa, " +
       "t.tw_PodstKodKresk AS ean, ISNULL(s.stan, 0) AS stan, ISNULL(sp.sprzedaz, 0) AS sprzedaz, " +
-      `t.tw_Masa AS masa, t.${d} AS dlugosc, t.${s} AS szerokosc, t.${w} AS wysokosc ` +
+      `t.tw_Masa AS brutto, t.tw_MasaNetto AS netto, t.${d} AS dlugosc, t.${s} AS szerokosc, t.${w} AS wysokosc ` +
       `FROM tw__Towar t WITH (NOLOCK) ${stan} ${sprzedaz} ${gdzie} ` +
       `ORDER BY ${porzadek} OFFSET @offset ROWS FETCH NEXT @limit ROWS ONLY`,
     razem: `SELECT COUNT(*) AS razem FROM tw__Towar t WITH (NOLOCK) ${gdzie}`,
@@ -146,15 +153,16 @@ export interface ZapytanieListy {
 
 type WierszListy = {
   twId: number; symbol: string; nazwa: string; ean: string | null;
-  stan: number | string | null; sprzedaz: number | string | null; masa: number | string | null;
+  stan: number | string | null; sprzedaz: number | string | null;
+  brutto: number | string | null; netto: number | string | null;
   dlugosc: string | null; szerokosc: string | null; wysokosc: string | null;
 };
 
 const tekstLubNull = (v: string | null) => (v && v.trim() ? v.trim() : null);
 
 function naPozycje(w: WierszListy): TowarBezWymiarow {
-  /* Decimal przychodzi ze sterownika liczbą albo tekstem — stąd Number(). */
-  const masa = Number(w.masa ?? 0) || 0;
+  /* Money przychodzi ze sterownika liczbą albo tekstem — stąd Number(). Zero to brak. */
+  const waga = (v: number | string | null) => { const n = Number(v ?? 0) || 0; return n > 0 ? n : null; };
   return {
     twId: w.twId,
     symbol: w.symbol,
@@ -162,7 +170,8 @@ function naPozycje(w: WierszListy): TowarBezWymiarow {
     ean: tekstLubNull(w.ean),
     stan: Number(w.stan ?? 0) || 0,
     sprzedaz: Number(w.sprzedaz ?? 0) || 0,
-    masa: masa > 0 ? masa : null,
+    brutto: waga(w.brutto),
+    netto: waga(w.netto),
     dlugosc: tekstLubNull(w.dlugosc),
     szerokosc: tekstLubNull(w.szerokosc),
     wysokosc: tekstLubNull(w.wysokosc),
@@ -202,7 +211,7 @@ export async function towaryBezWymiarow(z: ZapytanieListy): Promise<{ razem: num
 }
 
 /** Towar z obecną wagą i wymiarami — przed zapisem, do audytu. */
-export type StanKartoteki = Pick<TowarBezWymiarow, "twId" | "symbol" | "masa" | "dlugosc" | "szerokosc" | "wysokosc">;
+export type StanKartoteki = Pick<TowarBezWymiarow, "twId" | "symbol" | "brutto" | "netto" | "dlugosc" | "szerokosc" | "wysokosc">;
 
 /**
  * Obecna waga i wymiary jednej kartoteki z Subiekta; `null` = nie ma takiego
@@ -217,7 +226,7 @@ export async function stanKartoteki(twId: number): Promise<StanKartoteki | null>
     .input("id", sql.Int, twId)
     .query<WierszListy>(
       "SELECT t.tw_Id AS twId, t.tw_Symbol AS symbol, t.tw_Nazwa AS nazwa, t.tw_PodstKodKresk AS ean, " +
-        `0 AS stan, 0 AS sprzedaz, t.tw_Masa AS masa, t.${d} AS dlugosc, t.${s} AS szerokosc, t.${w} AS wysokosc ` +
+        `0 AS stan, 0 AS sprzedaz, t.tw_Masa AS brutto, t.tw_MasaNetto AS netto, t.${d} AS dlugosc, t.${s} AS szerokosc, t.${w} AS wysokosc ` +
         "FROM tw__Towar t WITH (NOLOCK) WHERE t.tw_Id = @id"
     );
   const wiersz = r.recordset[0];
@@ -240,7 +249,7 @@ const PORZADEK_DEMO: Record<SortBezZdjecia, string> = {
 
 export async function towaryBezWymiarowDemo(z: ZapytanieListy): Promise<{ razem: number; pozycje: TowarBezWymiarow[] }> {
   const warunki = [
-    "(IFNULL(t.masa, 0) <= 0 OR TRIM(IFNULL(t.wym_dlugosc, '')) = '' " +
+    "(IFNULL(t.masa, 0) <= 0 OR IFNULL(t.masa_netto, 0) <= 0 OR TRIM(IFNULL(t.wym_dlugosc, '')) = '' " +
       "OR TRIM(IFNULL(t.wym_szerokosc, '')) = '' OR TRIM(IFNULL(t.wym_wysokosc, '')) = '')",
   ];
   const parametry: Array<string | number> = [];
@@ -261,7 +270,7 @@ export async function towaryBezWymiarowDemo(z: ZapytanieListy): Promise<{ razem:
     .prepare(
       `SELECT t.tw_id AS twId, t.symbol, t.nazwa, t.ean,
               (SELECT IFNULL(SUM(stan), 0) FROM sgt_stan st WHERE st.tw_id = t.tw_id) AS stan,
-              0 AS sprzedaz, t.masa, t.wym_dlugosc AS dlugosc, t.wym_szerokosc AS szerokosc,
+              0 AS sprzedaz, t.masa AS brutto, t.masa_netto AS netto, t.wym_dlugosc AS dlugosc, t.wym_szerokosc AS szerokosc,
               t.wym_wysokosc AS wysokosc
        FROM sgt_towar t ${gdzie}
        ORDER BY ${PORZADEK_DEMO[z.sortuj] ?? PORZADEK_DEMO.sprzedaz} LIMIT ? OFFSET ?`
@@ -273,7 +282,7 @@ export async function towaryBezWymiarowDemo(z: ZapytanieListy): Promise<{ razem:
 export async function stanKartotekiDemo(twId: number): Promise<StanKartoteki | null> {
   const wiersz = db()
     .prepare(
-      `SELECT tw_id AS twId, symbol, nazwa, ean, 0 AS stan, 0 AS sprzedaz, masa,
+      `SELECT tw_id AS twId, symbol, nazwa, ean, 0 AS stan, 0 AS sprzedaz, masa AS brutto, masa_netto AS netto,
               wym_dlugosc AS dlugosc, wym_szerokosc AS szerokosc, wym_wysokosc AS wysokosc
        FROM sgt_towar WHERE tw_id = ?`
     )

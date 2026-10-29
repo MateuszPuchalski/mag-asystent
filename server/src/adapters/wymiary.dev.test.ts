@@ -53,7 +53,7 @@ test("demo działa bez kluczy WYMIARY_POLE_* i zaczyna od pełnej listy, stan na
 });
 
 test("pełny pomiar schodzi z listy dopiero po wykonaniu zadania", async () => {
-  const w = await S.zapiszPomiar(1, { masaKg: "3,2", dlugosc: "120", szerokosc: "30,5", wysokosc: 25 }, AUTOR);
+  const w = await S.zapiszPomiar(1, { bruttoKg: "3,2", nettoKg: "2,9", dlugosc: "120", szerokosc: "30,5", wysokosc: 25 }, AUTOR);
   assert.equal(w.ok, true);
   const przed = await S.listaBezWymiarow({});
   assert.equal(przed.pozycje.find((p) => p.twId === 1)?.oczekuje, true, "do wykonania towar stoi jako oczekujący");
@@ -61,18 +61,22 @@ test("pełny pomiar schodzi z listy dopiero po wykonaniu zadania", async () => {
   await wykonajKolejke();
   assert.deepEqual(await symbole(), ["GRAB-2"]);
   assert.deepEqual(
-    { ...(db().prepare("SELECT masa, wym_dlugosc, wym_szerokosc, wym_wysokosc FROM sgt_towar WHERE tw_id = 1").get() as object) },
-    { masa: 3.2, wym_dlugosc: "120", wym_szerokosc: "30,5", wym_wysokosc: "25" }
+    { ...(db().prepare("SELECT masa, masa_netto, wym_dlugosc, wym_szerokosc, wym_wysokosc FROM sgt_towar WHERE tw_id = 1").get() as object) },
+    { masa: 3.2, masa_netto: 2.9, wym_dlugosc: "120", wym_szerokosc: "30,5", wym_wysokosc: "25" }
   );
 });
 
 test("pomiar częściowy nie kasuje wcześniejszego, a brak jednego wymiaru trzyma towar na liście", async () => {
-  await S.zapiszPomiar(2, { masaKg: 0.8, dlugosc: 150, szerokosc: 10 }, AUTOR);
+  await S.zapiszPomiar(2, { bruttoKg: 0.8, dlugosc: 150, szerokosc: 10 }, AUTOR);
   await wykonajKolejke();
   const g = (await S.listaBezWymiarow({ q: "grab" })).pozycje[0];
-  assert.deepEqual([g.masa, g.dlugosc, g.szerokosc, g.wysokosc], [0.8, "150", "10", null]);
+  assert.deepEqual([g.brutto, g.netto, g.dlugosc, g.szerokosc, g.wysokosc], [0.8, null, "150", "10", null]);
 
-  await S.zapiszPomiar(2, { wysokosc: "4,5" }, AUTOR);
+  /* Samo netto większe od brutto, które już stoi w kartotece — odmowa przed kolejką. */
+  const zle = await S.zapiszPomiar(2, { nettoKg: "0,9" }, AUTOR);
+  assert.equal(zle.ok, false);
+
+  await S.zapiszPomiar(2, { nettoKg: "0,7", wysokosc: "4,5" }, AUTOR);
   await wykonajKolejke();
   assert.deepEqual(await symbole("grab"), []);
   assert.deepEqual(

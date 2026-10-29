@@ -166,7 +166,7 @@ test("pomiar wagi i wymiarów trafia do adaptera, nie w gałąź nieznanego typu
   /* `set_wymiary` to CZWARTY typ zapisu do bazy firmy. Literówka w dyspozytorze
      dałaby błąd po trzech próbach, a ekran wymiarów pokazywałby towar jako
      „w kolejce" aż do wyczerpania prób. */
-  const pomiar = { masaKg: 1.25, dlugosc: 30, szerokosc: 20.5, wysokosc: null };
+  const pomiar = { bruttoKg: 1.25, nettoKg: 1.1, dlugosc: 30, szerokosc: 20.5, wysokosc: null };
   const payload = { twId: 7, pomiar };
   const zapisane: unknown[] = [];
   const adapter: SferaAdapter = {

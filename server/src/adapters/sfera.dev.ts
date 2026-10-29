@@ -45,11 +45,11 @@ export class DevSferaAdapter implements SferaAdapter {
     const t = (cm: number | null) => (cm === null ? null : tekstWymiaru(cm));
     const res = db()
       .prepare(
-        `UPDATE sgt_towar SET masa = COALESCE(?, masa), wym_dlugosc = COALESCE(?, wym_dlugosc),
+        `UPDATE sgt_towar SET masa = COALESCE(?, masa), masa_netto = COALESCE(?, masa_netto), wym_dlugosc = COALESCE(?, wym_dlugosc),
            wym_szerokosc = COALESCE(?, wym_szerokosc), wym_wysokosc = COALESCE(?, wym_wysokosc)
          WHERE tw_id = ?`
       )
-      .run(pomiar.masaKg, t(pomiar.dlugosc), t(pomiar.szerokosc), t(pomiar.wysokosc), twId);
+      .run(pomiar.bruttoKg, pomiar.nettoKg, t(pomiar.dlugosc), t(pomiar.szerokosc), t(pomiar.wysokosc), twId);
     if (res.changes === 0) throw new Error(`Nie znaleziono towaru tw_id=${twId}`);
   }
 

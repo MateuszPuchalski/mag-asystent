@@ -185,7 +185,7 @@ export class SqlSferaAdapter implements SferaAdapter {
   }
 
   /**
-   * Waga i wymiary — jeden UPDATE na wszystkie zmierzone kolumny.
+   * Wagi i wymiary — jeden UPDATE na wszystkie zmierzone kolumny.
    *
    * Jeden, a nie cztery: pomiar to jedna czynność i ma wejść cały albo
    * wcale. Kartoteka z wagą bez wymiarów wypadłaby z listy braków dopiero
@@ -197,11 +197,12 @@ export class SqlSferaAdapter implements SferaAdapter {
     const pola = polaWymiarow();
     const zapytanie = budujZapytanieZapisu(pomiar, pola);
     if (!zapytanie) return;
-    const kolumny = ["tw_Masa", ...WYMIARY.map((w) => pola[w])].join(", ");
+    const kolumny = ["tw_Masa", "tw_MasaNetto", ...WYMIARY.map((w) => pola[w])].join(", ");
     const pool = await mssqlPool();
     const req = pool.request().input("id", sql.Int, twId);
-    /* `tw_Masa` to decimal; cztery miejsca po przecinku mieszczą gram bez zaokrąglenia. */
-    if (pomiar.masaKg !== null) req.input("masa", sql.Decimal(19, 4), pomiar.masaKg);
+    /* Obie wagi to money(19,4) — cztery miejsca po przecinku mieszczą gram bez zaokrąglenia. */
+    if (pomiar.bruttoKg !== null) req.input("brutto", sql.Money, pomiar.bruttoKg);
+    if (pomiar.nettoKg !== null) req.input("netto", sql.Money, pomiar.nettoKg);
     for (const w of WYMIARY) {
       const cm = pomiar[w];
       if (cm !== null) req.input(w, sql.VarChar(50), tekstWymiaru(cm));
