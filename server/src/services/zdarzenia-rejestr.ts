@@ -77,7 +77,7 @@ export const ZDARZENIA: readonly string[] = [
   "siec_przerwa", "skrzynka_synchronizacja_reczna", "sprawa_tag_nazwa", "sprawa_tag_przypiety",
   "sprawa_tag_utworzony", "sprawa_tag_wlaczony", "sprawa_tag_wylaczony", "sprawa_tag_zdjety",
   "strefa_zapis", "user_active_changed", "user_created", "user_haslo_changed",
-  "user_wylogowany_wszedzie", "wzmianka_odhaczona", "zadanie_terenowe_anulowane",
+  "user_wylogowany_wszedzie", "wymiary_set", "wzmianka_odhaczona", "zadanie_terenowe_anulowane",
   "zadanie_terenowe_oddane", "zadanie_terenowe_odeslane", "zadanie_terenowe_ponowione",
   "zadanie_terenowe_przejete", "zadanie_terenowe_utworzone", "zadanie_terenowe_wykonane",
   "zadanie_terenowe_zalacznik", "zamowienie_przesylka", "zbiorki_import", "zbiorki_z_sellasist", "zdjecie_dodane",

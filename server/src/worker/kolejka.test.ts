@@ -40,6 +40,9 @@ const padajacy = (msg = "Kartoteka w edycji"): SferaAdapter => ({
   applySetZdjecie: async () => {
     throw new Error(msg);
   },
+  applySetWymiary: async () => {
+    throw new Error(msg);
+  },
   createMM: async () => {
     throw new Error(msg);
   },
@@ -49,6 +52,7 @@ const udany = (): SferaAdapter => ({
   applySetLocation: async () => {},
   applySetEan: async () => {},
   applySetZdjecie: async () => {},
+  applySetWymiary: async () => {},
   createMM: async () => "MM 1/2026",
 });
 
@@ -120,6 +124,7 @@ test("kod kreskowy trafia do adaptera, nie w gałąź nieznanego typu", async ()
       zapisane.push([twId, ean]);
     },
     applySetZdjecie: async () => {},
+    applySetWymiary: async () => {},
     createMM: async () => "MM 1/2026",
   };
   const id = dodajZadanie("set_ean", payload);
@@ -145,6 +150,7 @@ test("zdjęcie kartoteki trafia do adaptera, nie w gałąź nieznanego typu", as
     applySetZdjecie: async (twId) => {
       zapisane.push(twId);
     },
+    applySetWymiary: async () => {},
     createMM: async () => "MM 1/2026",
   };
   const id = dodajZadanie("set_zdjecie", payload);
@@ -153,6 +159,28 @@ test("zdjęcie kartoteki trafia do adaptera, nie w gałąź nieznanego typu", as
     adapter,
   );
   assert.deepEqual(zapisane, [1]);
+  assert.equal(stan(id).status, "done");
+});
+
+test("pomiar wagi i wymiarów trafia do adaptera, nie w gałąź nieznanego typu", async () => {
+  /* `set_wymiary` to CZWARTY typ zapisu do bazy firmy. Literówka w dyspozytorze
+     dałaby błąd po trzech próbach, a ekran wymiarów pokazywałby towar jako
+     „w kolejce" aż do wyczerpania prób. */
+  const pomiar = { masaKg: 1.25, dlugosc: 30, szerokosc: 20.5, wysokosc: null };
+  const payload = { twId: 7, pomiar };
+  const zapisane: unknown[] = [];
+  const adapter: SferaAdapter = {
+    ...udany(),
+    applySetWymiary: async (twId, p) => {
+      zapisane.push([twId, p]);
+    },
+  };
+  const id = dodajZadanie("set_wymiary", payload);
+  await K.przetworzZadanie(
+    { id, type: "set_wymiary", payload: JSON.stringify(payload), attempts: 0, source_doc_id: null, ...AUDYT },
+    adapter,
+  );
+  assert.deepEqual(zapisane, [[7, pomiar]]);
   assert.equal(stan(id).status, "done");
 });
 

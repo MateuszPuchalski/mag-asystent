@@ -779,7 +779,14 @@ CREATE TABLE IF NOT EXISTS sgt_towar (
   -- nikt jej już nie czyta ani nie zapisuje.
   ordered     REAL NOT NULL DEFAULT 0,
   opis        TEXT,
-  lokalizacja TEXT NOT NULL DEFAULT ''          -- string rozdzielany spacją (wariant B, spec D1)
+  lokalizacja TEXT NOT NULL DEFAULT '',         -- string rozdzielany spacją (wariant B, spec D1)
+  -- Waga (kg) i wymiary (tekst pola własnego, cm) WYŁĄCZNIE dla demo. Import
+  -- z Subiekta ich nie wypełnia: na produkcji ekran wymiarów pyta bazę firmy
+  -- wprost (adapters/wymiary.sgt.ts), a te kolumny zapisuje tylko DevSferaAdapter.
+  masa          REAL,
+  wym_dlugosc   TEXT,
+  wym_szerokosc TEXT,
+  wym_wysokosc  TEXT
 );
 CREATE INDEX IF NOT EXISTS ix_towar_symbol ON sgt_towar(symbol);
 -- Szukanie po symbolu jest ZAWSZE bez rozróżniania wielkości liter (skan,

@@ -77,6 +77,11 @@ export const SKROTY: ReadonlyArray<SekcjaSkrotow> = [
     ["W", "wyrównaj kolory"],
     ["T", "usuń tło (w podglądzie)"],
   ] },
+  /* Ekran wymiarów: ręce przy wadze i miarce, więc pomiar idzie samą klawiaturą. */
+  { tytul: "Wymiary", sciezka: "/obsluga/wymiary", klawisze: [
+    ["j k", "następny / poprzedni towar bez wymiarów"],
+    ["Enter", "następne pole; w ostatnim zapisz pomiar"],
+  ] },
   /* Pełna lista klawiszy ekranu zwrotów, także tych, które pasek nad
      zwrotem pokazuje tylko przy pasującym stanie. Kompletności pilnuje test
      obok, porównując ją z `KLAWISZE_KUBELKA`. */

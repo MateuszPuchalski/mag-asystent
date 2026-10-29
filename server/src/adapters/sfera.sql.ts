@@ -5,6 +5,7 @@ import { mssqlPool, assertSafeColumn } from "../db/mssql.js";
 import { config } from "../config.js";
 import type { MmItem, SferaAdapter } from "./sfera.js";
 import { oznaczWSubiekcie, wlasneZdjecie } from "../services/zdjecia-wlasne.js";
+import { WYMIARY, budujZapytanieZapisu, polaWymiarow, tekstWymiaru, type Pomiar } from "./wymiary.sgt.js";
 
 /**
  * Zapis „plan B" ze spec §9 — bezpośredni UPDATE w bazie MSSQL Subiekta GT,
@@ -181,6 +182,39 @@ export class SqlSferaAdapter implements SferaAdapter {
       throw new Error(`Nie znaleziono towaru tw_Id=${twId} w bazie Subiekta`);
     }
     db().prepare("UPDATE sgt_towar SET ean = ? WHERE tw_id = ?").run(ean, twId);
+  }
+
+  /**
+   * Waga i wymiary — jeden UPDATE na wszystkie zmierzone kolumny.
+   *
+   * Jeden, a nie cztery: pomiar to jedna czynność i ma wejść cały albo
+   * wcale. Kartoteka z wagą bez wymiarów wypadłaby z listy braków dopiero
+   * po drugim zadaniu, a ponowienie w środku pisałoby połowę drugi raz.
+   *
+   * Lustra w `sgt_towar` nie ma, bo lista braków czyta Subiekt wprost.
+   */
+  async applySetWymiary(twId: number, pomiar: Pomiar): Promise<void> {
+    const pola = polaWymiarow();
+    const zapytanie = budujZapytanieZapisu(pomiar, pola);
+    if (!zapytanie) return;
+    const kolumny = ["tw_Masa", ...WYMIARY.map((w) => pola[w])].join(", ");
+    const pool = await mssqlPool();
+    const req = pool.request().input("id", sql.Int, twId);
+    /* `tw_Masa` to decimal; cztery miejsca po przecinku mieszczą gram bez zaokrąglenia. */
+    if (pomiar.masaKg !== null) req.input("masa", sql.Decimal(19, 4), pomiar.masaKg);
+    for (const w of WYMIARY) {
+      const cm = pomiar[w];
+      if (cm !== null) req.input(w, sql.VarChar(50), tekstWymiaru(cm));
+    }
+    let res;
+    try {
+      res = await req.query(zapytanie);
+    } catch (e) {
+      throw new Error(opiszBlad(e, kolumny));
+    }
+    if (!res.rowsAffected[0]) {
+      throw new Error(`Nie znaleziono towaru tw_Id=${twId} w bazie Subiekta`);
+    }
   }
 
   /**

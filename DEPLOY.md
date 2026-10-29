@@ -1263,6 +1263,40 @@ przychodzące ze statusem `SAFE`. Pytanie agenta do Copilota nie przechodzi
 przez maskowanie, więc nie pisze się w nim danych klienta. Polityka:
 [`docs/obsluga-klienta.md`](docs/obsluga-klienta.md).
 
+## 6j. Waga i wymiary kartotek
+
+Zakładka **Wymiary** w panelu pokazuje towary bez wagi albo bez wymiaru.
+Pomiar idzie kolejką do Subiekta: waga do `tw_Masa` (kg), wymiary do trzech
+pól własnych (cm, tekst z przecinkiem, np. `12,5`). Puste pole formularza
+zostaje w kartotece bez zmian.
+
+**1. Wskaż pola własne.** Które pole trzyma który wymiar, wie tylko firma.
+Zajętość pól pokazuje zapytanie z `docs/subiekt-gt-struktura.md`
+(„Lokalizacja: pola własne"). Wpisz w `wertis.env`:
+
+```bash
+export WYMIARY_POLE_DLUGOSC=tw_Pole4
+export WYMIARY_POLE_SZEROKOSC=tw_Pole5
+export WYMIARY_POLE_WYSOKOSC=tw_Pole6
+```
+
+Dozwolone są tylko `tw_Pole1` … `tw_Pole8`, trzy różne i żadne nie jest
+polem lokalizacji. Inaczej `wertis-api` nie wstanie i powie, co poprawić.
+Bez kluczy zakładka mówi, że czeka na konfigurację.
+
+**2. Nadaj prawo zapisu.** W SSMS, na bazie podmiotu, z polami z kroku 1:
+
+```sql
+GRANT UPDATE ON dbo.tw__Towar (tw_Masa, tw_Pole4, tw_Pole5, tw_Pole6) TO wertis;
+```
+
+Instalator tego grantu jeszcze nie nadaje. Bez niego zadanie kończy się
+w kolejce błędem z gotowym poleceniem do wklejenia.
+
+**3. Sprawdź na kartotece próbnej.** Zmierz jeden towar testowy i otwórz
+go w Subiekcie. Waga ma stać w kilogramach, a wymiary w wybranych polach.
+Dopiero potem mierz towary sprzedawane.
+
 ## 7. Backup i utrzymanie
 
 ### Kopia bazy aplikacji
