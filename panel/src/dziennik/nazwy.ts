@@ -32,6 +32,7 @@ export const NAZWA_ZDARZENIA: Record<string, string> = {
   ean_conflict_autoresolved: "Kolizja kodu rozstrzygnięta sama",
   ean_kolizja_rozstrzygnieta: "Kolizja kodu rozstrzygnięta przez biuro",
   zdjecie_dodane: "Zdjęcie dodane",
+  wymiary_set: "Waga i wymiary zmierzone",
   zdjecia_allegro_dopasowane: "Oferty Allegro dobrane do zdjęć",
   zdjecia_allegro_indeks_lista: "Lista naszych ofert Allegro odświeżona",
   zdjecia_allegro_indeks_parametry: "Kody producenta ofert Allegro odczytane",

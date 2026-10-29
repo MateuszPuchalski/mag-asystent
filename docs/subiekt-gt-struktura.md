@@ -148,6 +148,30 @@ jest ostrożnym założeniem, tylko realnym rozmiarem kolumny.
 `[WERYFIKUJ]` **które** z ośmiu pól firma przeznacza na lokalizację. Wybierz takie,
 którego nie używa do niczego innego — worker nadpisuje je bezwarunkowo.
 
+## Wagi i pola własne zakładki „Własne" — SPRAWDZONE 29 października 2026
+
+Zakładka „Miary" kartoteki trzyma dwie wagi w `tw__Towar`: „Masa brutto
+towaru w kg" to `tw_Masa`, a „Masa netto" to `tw_MasaNetto`. Obie mają typ
+`money(19,4)`. Obok stoi `tw_Objetosc` (m³), tego samego typu.
+
+Pola własne z zakładki „Własne" to NIE są `tw_Pole1..8`. Siedzą w dwóch
+tabelach. `pw_Pole` opisuje pole: typ obiektu (`pwp_TypObiektu`, towar to
+`-14`), kolumnę w `pw_Dane` (`pwp_Pole`, np. `pwd_Tekst01`) i nazwę
+(`pwp_Nazwa`). `pw_Dane` trzyma wartości: jeden wiersz na obiekt
+(`pwd_TypObiektu`, `pwd_IdObiektu` = `tw_Id`) i po dziesięć kolumn
+`pwd_TekstNN`, `pwd_LiczbaNN`, `pwd_KwotaNN`, `pwd_DataNN`, `pwd_FkNN`
+i `pwd_FlagaNN`. Towar bez żadnego pola własnego nie ma wiersza wcale.
+
+Pola towaru w bazie firmy: Wysokość [cm] = `pwd_Tekst01`, Szerokość [cm] =
+`pwd_Tekst02`, Długość [cm] = `pwd_Tekst03`, Zamiennik = `pwd_Tekst04`,
+Nr. OEM = `pwd_Tekst05`, Aukcja = `pwd_Tekst06`. Wymiary to tekst
+z przecinkiem, np. „21,5". Pozostałe pola z zakładki (Lokalizacja, ELE,
+Zamówione i inne) to `tw_PoleN` kartoteki.
+
+Nie ustalono, czy `pwd_Id` jest IDENTITY. Zapis wymiarów pyta o to bazę przy
+pierwszym dopisaniu wiersza. Bez IDENTITY bierze numer z licznika
+`ins_ident` o nazwie `pw_Dane`, a bez wiersza licznika — `MAX + 1`.
+
 ## Bufor: `dok_Status`
 
 ```

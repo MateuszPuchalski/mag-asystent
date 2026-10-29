@@ -153,6 +153,8 @@ export async function przetworzZadanie(task: Task, sfera: SferaAdapter): Promise
       await sfera.applySetEan(payload.twId, payload.ean);
     } else if (task.type === "set_zdjecie") {
       await sfera.applySetZdjecie(payload.twId);
+    } else if (task.type === "set_wymiary") {
+      await sfera.applySetWymiary(payload.twId, payload.pomiar);
     } else if (task.type === "mm") {
       docNo = await sfera.createMM(payload.magFrom, payload.magTo, payload.items as MmItem[]);
     } else {

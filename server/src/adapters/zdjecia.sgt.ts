@@ -289,7 +289,7 @@ export type SortBezZdjecia = (typeof SORTOWANIA_BEZ_ZDJECIA)[number];
 /* Klauzule z tej mapy, nigdy z wejścia: nazwa sortowania przychodzi
    z adresu, a ORDER BY nie przyjmuje parametru. Każda domyka się `tw_Id`,
    bo stronicowanie bez pełnego porządku gubi i dubluje wiersze. */
-const PORZADEK: Record<SortBezZdjecia, string> = {
+export const PORZADEK: Record<SortBezZdjecia, string> = {
   /* Remis w sprzedaży rozstrzyga stan: z dwóch równie chodliwych pierwszy
      ten, którego więcej leży na półce. */
   sprzedaz: "ISNULL(sp.sprzedaz, 0) DESC, ISNULL(s.stan, 0) DESC, t.tw_Symbol, t.tw_Id",

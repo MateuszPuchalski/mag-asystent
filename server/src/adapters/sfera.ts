@@ -58,6 +58,8 @@
  *
  * Sekwencyjność: COM Sfery nie jest thread-safe — przetwarzać po jednym zadaniu.
  */
+import type { Pomiar } from "./wymiary.sgt.js";
+
 export interface MmItem {
   twId: number;
   qty: number;
@@ -171,6 +173,18 @@ export interface SferaAdapter {
    * 300 kB odczytu co sekundę.
    */
   applySetZdjecie(twId: number): Promise<void>;
+  /**
+   * Wagi i wymiary kartoteki — `tw_Masa` (brutto), `tw_MasaNetto` i trzy pola
+   * własne w `pw_Dane`, wskazane kluczami `WYMIARY_POLE_*`.
+   *
+   * CZWARTE rozszerzenie granicy zapisu. Wagi to UPDATE kolumn kartoteki, jak
+   * lokalizacja. Wymiary to UPDATE wiersza pól własnych towaru albo jego
+   * DOPISANIE, gdy towar nie ma jeszcze żadnego pola własnego. Bez dokumentu.
+   * Pole z `null` w pomiarze zostaje nietknięte. Powód: biuro mierzy towary,
+   * którym kartoteka nie zna wagi albo wymiarów, a bez nich nie da się
+   * policzyć przesyłki ani wystawić oferty z gabarytem.
+   */
+  applySetWymiary(twId: number, pomiar: Pomiar): Promise<void>;
   /**
    * Utwórz dokument MM (magazyn źródłowy → docelowy), przesuń pozycje,
    * zwróć numer dokumentu MM (spec §5.3 / §9).

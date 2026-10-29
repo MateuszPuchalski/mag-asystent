@@ -2,6 +2,7 @@ import { db, type Db } from "../db/db.js";
 import { currentUserRef } from "../context.js";
 import { logEvent } from "./events.js";
 import type { MmItem, ZlecenieZw } from "../adapters/sfera.js";
+import type { Pomiar } from "../adapters/wymiary.sgt.js";
 
 export interface EnqueueBase {
   createdBy: string;
@@ -175,6 +176,23 @@ export function enqueueSetZdjecie(
     },
     base.createdByRef ?? currentUserRef()
   );
+  return queueId;
+}
+
+/**
+ * Zadanie zapisu wagi i wymiarów wraz z wpisem do audytu.
+ *
+ * `przed` niesie surową zawartość pól sprzed pomiaru, z tego samego powodu co
+ * `locsPrzed`: wycofanie to wpisanie z powrotem dokładnie tego, co stało.
+ */
+export function enqueueSetWymiary(
+  twId: number,
+  pomiar: Pomiar,
+  base: EnqueueBase,
+  przed: { brutto: number | null; netto: number | null; dlugosc: string | null; szerokosc: string | null; wysokosc: string | null }
+): number {
+  const queueId = insert("set_wymiary", { twId, pomiar }, base);
+  logEvent("wymiary_set", base.createdBy, twId, { przed, pomiar, queueId }, base.createdByRef ?? currentUserRef());
   return queueId;
 }
 

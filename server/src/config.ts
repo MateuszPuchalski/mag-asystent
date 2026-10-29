@@ -784,6 +784,21 @@ export const config = {
   strefaCzasu: process.env.STREFA_CZASU ?? "Europe/Warsaw",
 
   /**
+   * Waga i wymiary kartoteki — ekran „Wymiary" w panelu.
+   *
+   * Wagi idą do `tw_Masa` i `tw_MasaNetto`, kolumn rdzeniowych kartoteki, więc
+   * nie ma tu czego wybierać. Długość, szerokość i wysokość firma trzyma
+   * w polach własnych zakładki „Własne" (`pw_Dane.pwd_TekstNN`), a który tekst
+   * jest którym wymiarem, mówi jej `pw_Pole`. Puste klucze znaczą „funkcji nie
+   * ma": zgadnięte pole nadpisałoby dane firmy, np. „Zamiennik" albo „Aukcję".
+   */
+  wymiary: {
+    poleDlugosc: process.env.WYMIARY_POLE_DLUGOSC ?? "",
+    poleSzerokosc: process.env.WYMIARY_POLE_SZEROKOSC ?? "",
+    poleWysokosc: process.env.WYMIARY_POLE_WYSOKOSC ?? "",
+  },
+
+  /**
    * Zdjęcia kartotek na karcie towaru (0.30.0).
    *
    * `zrodlo` jest WYŁĄCZNIKIEM I KONFIGURACJĄ W JEDNYM — puste znaczy „funkcji
@@ -1267,6 +1282,45 @@ assertMode("SGT_MODE", config.sgtMode, ["seeded", "mssql"]);
 assertMode("COPILOT_MODE", config.copilot.mode, ["off", "anthropic"]);
 
 /**
+ * Pola własne na wymiary: wszystkie trzy albo żadne i każde inne.
+ *
+ * Wymagamy wprost kolumny tekstowej `pwd_Tekst01` … `pwd_Tekst10`, a nie
+ * dowolnego identyfikatora. Zapis leci UPDATE-em do `pw_Dane`, a literówka
+ * w innej kolumnie nadpisałaby datę, liczbę albo klucz obcy pola własnego.
+ */
+export function bledyPolWymiarow(
+  w: { poleDlugosc: string; poleSzerokosc: string; poleWysokosc: string },
+): string[] {
+  const pola = [
+    ["WYMIARY_POLE_DLUGOSC", w.poleDlugosc],
+    ["WYMIARY_POLE_SZEROKOSC", w.poleSzerokosc],
+    ["WYMIARY_POLE_WYSOKOSC", w.poleWysokosc],
+  ] as const;
+  const ustawione = pola.filter(([, v]) => v !== "");
+  if (ustawione.length === 0) return [];
+  if (ustawione.length < pola.length) {
+    return [
+      `Ustaw wszystkie trzy klucze WYMIARY_POLE_* albo żaden — brakuje ` +
+        pola.filter(([, v]) => v === "").map(([k]) => k).join(", ") +
+        ". Ekran wymiarów zapisuje komplet naraz.",
+    ];
+  }
+  const bledy: string[] = [];
+  for (const [klucz, v] of pola) {
+    if (!/^pwd_Tekst(0[1-9]|10)$/.test(v)) {
+      bledy.push(
+        `${klucz}=${bezpiecznaWartosc(v)} — dozwolone tylko pwd_Tekst01 … pwd_Tekst10 ` +
+          "(kolumna pola własnego z pw_Pole, DEPLOY §6j).",
+      );
+    }
+  }
+  if (new Set(pola.map(([, v]) => v.toLowerCase())).size < pola.length) {
+    bledy.push("WYMIARY_POLE_DLUGOSC/_SZEROKOSC/_WYSOKOSC muszą wskazywać trzy różne pola.");
+  }
+  return bledy;
+}
+
+/**
  * Reguły, które muszą być spełnione, żeby wdrożenie w ogóle mogło działać.
  *
  * Zwraca listę zdań zamiast rzucać — tej samej funkcji używa diagnostyka, a ta
@@ -1437,6 +1491,8 @@ export function bledyKonfiguracji(c: Config = config): string[] {
      WERTIS — a do kartoteki nic nie wchodzi, bo zadanie ląduje w błędzie.
      Praca wygląda na wykonaną i nikt nie sprawdza kolejki. Dlatego niepełna
      konfiguracja zatrzymuje start, zamiast czekać na pierwsze zadanie. */
+  bledy.push(...bledyPolWymiarow(c.wymiary));
+
   if (!["", "wertis", "subiekt"].includes(c.zdjecia.dodawanie)) {
     bledy.push(
       `ZDJECIA_DODAWANIE=${bezpiecznaWartosc(c.zdjecia.dodawanie)} — dozwolone: ` +

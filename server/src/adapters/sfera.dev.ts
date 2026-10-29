@@ -1,6 +1,7 @@
 import { db, nextMmNumber, transaction } from "../db/db.js";
 import type { MmItem, SferaAdapter } from "./sfera.js";
 import { oznaczWSubiekcie, wlasneZdjecie } from "../services/zdjecia-wlasne.js";
+import { tekstWymiaru, type Pomiar } from "./wymiary.sgt.js";
 
 /**
  * DEV — „zapis Sfery" realizowany jako mutacja tabel sgt_* (SQLite).
@@ -37,6 +38,19 @@ export class DevSferaAdapter implements SferaAdapter {
     if (!wlasneZdjecie(twId)) return;
     oznaczWSubiekcie(twId);
     db().prepare("DELETE FROM zdjecie_cache WHERE tw_id = ?").run(twId);
+  }
+
+  /** Waga i wymiary demo — te same reguły co w Subiekcie: `null` zostawia pole. */
+  async applySetWymiary(twId: number, pomiar: Pomiar): Promise<void> {
+    const t = (cm: number | null) => (cm === null ? null : tekstWymiaru(cm));
+    const res = db()
+      .prepare(
+        `UPDATE sgt_towar SET masa = COALESCE(?, masa), masa_netto = COALESCE(?, masa_netto), wym_dlugosc = COALESCE(?, wym_dlugosc),
+           wym_szerokosc = COALESCE(?, wym_szerokosc), wym_wysokosc = COALESCE(?, wym_wysokosc)
+         WHERE tw_id = ?`
+      )
+      .run(pomiar.bruttoKg, pomiar.nettoKg, t(pomiar.dlugosc), t(pomiar.szerokosc), t(pomiar.wysokosc), twId);
+    if (res.changes === 0) throw new Error(`Nie znaleziono towaru tw_id=${twId}`);
   }
 
   async createMM(magFrom: number, magTo: number, items: MmItem[]): Promise<string> {

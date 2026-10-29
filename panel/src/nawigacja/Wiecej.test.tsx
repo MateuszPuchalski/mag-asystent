@@ -145,11 +145,13 @@ describe("boczny pasek menu", () => {
     expect(bieznia).toContain("title={z.etykieta}");
   });
 
-  it("za kreską stoi praca na kartotece: Dostawy, a po nich Zdjęcia jako ostatnia zakładka", () => {
+  it("za kreską stoi praca na kartotece: Dostawy, po nich Zdjęcia, a na końcu Wymiary", () => {
     const zakladki = tsx.slice(tsx.indexOf("const ZAKLADKI"), tsx.indexOf("\n];", tsx.indexOf("const ZAKLADKI")));
-    expect(zakladki.match(/\{ do: "/g)).toHaveLength(8);
+    expect(zakladki.match(/\{ do: "/g)).toHaveLength(9);
     expect(zakladki).toMatch(/do: "\/obsluga\/dostawy".*kreska: true/);
     expect(zakladki.indexOf('"/obsluga/zdjecia"')).toBeGreaterThan(zakladki.indexOf('"/obsluga/dostawy"'));
     expect(zakladki).toMatch(/do: "\/obsluga\/zdjecia".*kreska: false/);
+    expect(zakladki.indexOf('"/obsluga/wymiary"')).toBeGreaterThan(zakladki.indexOf('"/obsluga/zdjecia"'));
+    expect(zakladki).toMatch(/do: "\/obsluga\/wymiary".*kreska: false/);
   });
 });

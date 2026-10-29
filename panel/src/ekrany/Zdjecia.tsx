@@ -32,17 +32,20 @@ const SORTOWANIA: Array<{ wartosc: SortBezZdjecia; etykieta: string }> = [
 
 const LICZBA = new Intl.NumberFormat("pl-PL", { maximumFractionDigits: 3 });
 
+/** Wiersz listy braków: tyle wystarczy, żeby chodzić po niej seryjnie (zdjęcia, wymiary). */
+type WierszBraku = { twId: number; oczekuje: boolean };
+
 /** Następny towar do zrobienia: pierwszy wolny za bieżącym, potem od góry listy. */
-export function nastepnyWolny(lista: PozycjaBezZdjecia[], biezacy: number, zrobione: ReadonlySet<number>):
-  PozycjaBezZdjecia | null {
-  const wolny = (p: PozycjaBezZdjecia) => !p.oczekuje && !zrobione.has(p.twId) && p.twId !== biezacy;
+export function nastepnyWolny<T extends WierszBraku>(lista: T[], biezacy: number, zrobione: ReadonlySet<number>):
+  T | null {
+  const wolny = (p: T) => !p.oczekuje && !zrobione.has(p.twId) && p.twId !== biezacy;
   const i = lista.findIndex((p) => p.twId === biezacy);
   return lista.slice(i + 1).find(wolny) ?? lista.slice(0, Math.max(0, i)).find(wolny) ?? null;
 }
 
 /** Sąsiad w liście dla `j`/`k`, z pominięciem towarów czekających w kolejce. */
-export function sasiad(lista: PozycjaBezZdjecia[], biezacy: number | null, krok: 1 | -1,
-  zrobione: ReadonlySet<number>): PozycjaBezZdjecia | null {
+export function sasiad<T extends WierszBraku>(lista: T[], biezacy: number | null, krok: 1 | -1,
+  zrobione: ReadonlySet<number>): T | null {
   const wolne = lista.filter((p) => !p.oczekuje && !zrobione.has(p.twId));
   if (wolne.length === 0) return null;
   const i = wolne.findIndex((p) => p.twId === biezacy);

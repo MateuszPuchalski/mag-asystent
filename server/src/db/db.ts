@@ -212,6 +212,13 @@ export function migrate(database: DatabaseSync) {
   addColumn("propozycja_przeplywu", "wykonana_at", "TEXT");
   addColumn("propozycja_przeplywu", "outbox_id", "INTEGER");
   addColumn("propozycja_przeplywu", "wykonanie_blad", "TEXT");
+  /* Waga i wymiary demo — patrz `sgt_towar` w `schema.sql`. NULL znaczy
+     „nie zmierzono", więc demo startuje z pełną listą do pomiaru. */
+  addColumn("sgt_towar", "masa", "REAL");
+  addColumn("sgt_towar", "masa_netto", "REAL");
+  addColumn("sgt_towar", "wym_dlugosc", "TEXT");
+  addColumn("sgt_towar", "wym_szerokosc", "TEXT");
+  addColumn("sgt_towar", "wym_wysokosc", "TEXT");
   /* Dopytanie Copilota (0.332.0). Tabela nowa, więc `schema.sql` załatwia
      świeże bazy; ta linia jest dla istniejących instalacji. */
   database.exec(`CREATE TABLE IF NOT EXISTS copilot_pytanie (
