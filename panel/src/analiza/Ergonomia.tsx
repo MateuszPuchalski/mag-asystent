@@ -31,6 +31,7 @@ export const NAZWA_EKRANU: Record<string, string> = {
   PRZYJECIA: "Rozkładanie zwrotów", KOSZ_LINES: "Kosz zwrotów", KARTONY: "Kartony", KARTON: "Karton",
   LOCATION: "Lokalizacja", SETTINGS: "Ustawienia", PROBLEMS: "Wyjątki", FIELD_TASKS: "Zadania z biura",
   SETUP: "Konta", POLACZENIE: "Połączenie", KOLEKTORY: "Znajdź kolektor",
+  DO_ZMIERZENIA: "Do zmierzenia",
 };
 
 /* Nazwy zdarzeń poprawek słowem — klucze z `CZYNNOSCI` w serwisie. */
