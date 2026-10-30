@@ -10,6 +10,17 @@ z wersją monorepo" — i właśnie tak przestał być zgodny: `0.3.0` przetrwa�
 sześć zmergowanych zmian, w tym takie, które wymagały nowego uprawnienia SQL.
 Komentarz nie jest mechanizmem.
 
+## 0.615.0 — 30 października 2026
+
+**Zakładka WYMIARY na dolnym pasku kolektora.** Lista „Do zmierzenia”
+otwiera się teraz z dolnego paska, zaraz obok KARTON. Przycisk z ekranu
+głównego zniknął.
+
+**Porządek i filtry listy do zmierzenia.** Na górze listy wybierasz
+porządek: regały, sprzedaż, stan albo najnowsze kartoteki. Obok są dwa
+przełączniki: „Na stanie” i „Sprzedane 30 dni”. Przy sprzedaży i stanie
+wiersz pokazuje „sprzedano · stan”, a pusta lista mówi, dlaczego jest pusta.
+
 ## 0.614.0 — 30 października 2026
 
 **Ważenie i mierzenie z kolektora.** Nowy ekran „Do zmierzenia” pokazuje
