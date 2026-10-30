@@ -50,6 +50,7 @@ import pl.wertis.kolektor.ui.settings.PolaczenieScreen
 import pl.wertis.kolektor.ui.settings.SettingsScreen
 import pl.wertis.kolektor.ui.tasks.FieldTasksScreen
 import pl.wertis.kolektor.ui.tasks.FieldTasksBanner
+import pl.wertis.kolektor.ui.wymiary.DoZmierzeniaScreen
 import pl.wertis.kolektor.ui.scan.globalScan
 import pl.wertis.kolektor.ui.setup.SetupScreen
 import pl.wertis.kolektor.ui.splash.SplashScreen
@@ -188,6 +189,7 @@ fun AppRoot(graph: AppGraph) {
                 Screen.KOLEKTORY -> KolektoryScreen(graph)
                 Screen.PROBLEMS -> ProblemsScreen(graph)
                 Screen.FIELD_TASKS -> FieldTasksScreen(graph)
+                Screen.DO_ZMIERZENIA -> DoZmierzeniaScreen(graph)
                 Screen.SPLASH -> {}
                 Screen.SETUP -> {}
             }

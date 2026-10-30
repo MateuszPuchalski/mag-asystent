@@ -103,6 +103,11 @@ fun WertisTextField(
     /** Maskowanie treści — hasło wpisuje się na hali, przy ludziach. */
     visualTransformation: VisualTransformation = VisualTransformation.None,
     onDone: () -> Unit = {},
+    /**
+     * „Dalej" na klawiaturze. `null` = fokus w dół, do pola pod spodem.
+     * Formularz z ustaloną kolejnością pól podaje tu następne pole wprost.
+     */
+    onNext: (() -> Unit)? = null,
     /** Zmiana fokusu — ekran bywa musi wiedzieć, że skaner właśnie milczy. */
     onFokus: (Boolean) -> Unit = {},
 ) {
@@ -135,7 +140,7 @@ fun WertisTextField(
         keyboardActions = KeyboardActions(
             onDone = { onDone(); focusManager.clearFocus() },
             onSearch = { onDone(); focusManager.clearFocus() },
-            onNext = { focusManager.moveFocus(FocusDirection.Down) },
+            onNext = { if (onNext != null) onNext() else focusManager.moveFocus(FocusDirection.Down) },
         ),
         colors = OutlinedTextFieldDefaults.colors(
             focusedBorderColor = Amber,

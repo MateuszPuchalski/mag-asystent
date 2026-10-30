@@ -3,7 +3,9 @@ import { db } from "../db/db.js";
 import { mssqlPool, assertSafeColumn } from "../db/mssql.js";
 import { config } from "../config.js";
 import { brakKolumnyKorekty } from "./subiekt.mssql.js";
-import { DNI_SPRZEDAZY, PORZADEK, wzorzecLike, zrodloSprzedazy, type SortBezZdjecia } from "./zdjecia.sgt.js";
+import {
+  DNI_SPRZEDAZY, PORZADEK, SORTOWANIA_BEZ_ZDJECIA, wzorzecLike, zrodloSprzedazy,
+} from "./zdjecia.sgt.js";
 
 /* ── Waga i wymiary kartoteki ────────────────────────────────────────────────
    Biuro mierzy towary, którym Subiekt nie zna wagi albo wymiarów, i wpisuje
@@ -45,6 +47,15 @@ export interface Pomiar {
   wysokosc: number | null;
 }
 
+/**
+ * Porządki listy wymiarów: te z listy bez zdjęcia i „lokalizacja".
+ *
+ * Lokalizacja jest dla kolektora. Magazynier mierzy przy regale, więc lista
+ * w kolejności adresów to obchód hali, a nie skakanie między alejkami.
+ */
+export const SORTOWANIA_WYMIAROW = [...SORTOWANIA_BEZ_ZDJECIA, "lokalizacja"] as const;
+export type SortWymiarow = (typeof SORTOWANIA_WYMIAROW)[number];
+
 export interface TowarBezWymiarow {
   twId: number;
   symbol: string;
@@ -52,6 +63,8 @@ export interface TowarBezWymiarow {
   ean: string | null;
   stan: number;
   sprzedaz: number;
+  /** Surowa zawartość pola lokalizacji (adresy rozdzielone spacją); `null`, gdy pusta. */
+  lokalizacja: string | null;
   /** Wagi z kartoteki w kg; `null`, gdy pusta albo zero. */
   brutto: number | null;
   netto: number | null;
@@ -163,8 +176,10 @@ const pustyTekst = (k: Wymiar) => `LTRIM(RTRIM(ISNULL(pw.${k}, ''))) = ''`;
  */
 export function budujZapytanieBezWymiarow(opts: {
   pola: Record<Wymiar, string>;
+  /** Kolumna lokalizacji (`MSSQL_LOC_COLUMN`) — do wiersza i do obchodu po regałach. */
+  lokalizacja: string;
   zFiltrem: boolean;
-  sortuj?: SortBezZdjecia;
+  sortuj?: SortWymiarow;
   naStanie?: boolean;
   sprzedane?: boolean;
   sprzedaz?: { fs: number; pa: number; odnosnik?: string };
@@ -192,11 +207,16 @@ export function budujZapytanieBezWymiarow(opts: {
   const sprzedaz =
     `LEFT JOIN (SELECT p.ob_TowId, SUM(p.ob_IloscMag) AS sprzedaz ${zrodlo} GROUP BY p.ob_TowId) sp ` +
     "ON sp.ob_TowId = t.tw_Id";
-  const porzadek = PORZADEK[opts.sortuj ?? "sprzedaz"] ?? PORZADEK.sprzedaz;
+  const loc = assertSafeColumn(opts.lokalizacja);
+  /* Towar bez adresu na końcu obchodu: nie ma do czego podejść. */
+  const porzadek = opts.sortuj === "lokalizacja"
+    ? `CASE WHEN LTRIM(RTRIM(ISNULL(t.${loc}, ''))) = '' THEN 1 ELSE 0 END, t.${loc}, t.tw_Id`
+    : PORZADEK[opts.sortuj ?? "sprzedaz"] ?? PORZADEK.sprzedaz;
   return {
     strona:
       "SELECT t.tw_Id AS twId, t.tw_Symbol AS symbol, t.tw_Nazwa AS nazwa, " +
       "t.tw_PodstKodKresk AS ean, ISNULL(s.stan, 0) AS stan, ISNULL(sp.sprzedaz, 0) AS sprzedaz, " +
+      `t.${loc} AS lokalizacja, ` +
       "t.tw_Masa AS brutto, t.tw_MasaNetto AS netto, pw.dlugosc, pw.szerokosc, pw.wysokosc " +
       `FROM tw__Towar t WITH (NOLOCK) ${wymiary} ${stan} ${sprzedaz} ${gdzie} ` +
       `ORDER BY ${porzadek} OFFSET @offset ROWS FETCH NEXT @limit ROWS ONLY`,
@@ -208,14 +228,14 @@ export interface ZapytanieListy {
   q: string;
   limit: number;
   offset: number;
-  sortuj: SortBezZdjecia;
+  sortuj: SortWymiarow;
   naStanie: boolean;
   sprzedane: boolean;
 }
 
 type WierszListy = {
   twId: number; symbol: string; nazwa: string; ean: string | null;
-  stan: number | string | null; sprzedaz: number | string | null;
+  stan: number | string | null; sprzedaz: number | string | null; lokalizacja: string | null;
   brutto: number | string | null; netto: number | string | null;
   dlugosc: string | null; szerokosc: string | null; wysokosc: string | null;
 };
@@ -232,6 +252,7 @@ function naPozycje(w: WierszListy): TowarBezWymiarow {
     ean: tekstLubNull(w.ean),
     stan: Number(w.stan ?? 0) || 0,
     sprzedaz: Number(w.sprzedaz ?? 0) || 0,
+    lokalizacja: tekstLubNull(w.lokalizacja),
     brutto: waga(w.brutto),
     netto: waga(w.netto),
     dlugosc: tekstLubNull(w.dlugosc),
@@ -248,6 +269,7 @@ export async function towaryBezWymiarow(z: ZapytanieListy): Promise<{ razem: num
   const odnosnik = m.korektaColumn && !brakKolumnyKorekty ? m.korektaColumn : undefined;
   const zapytania = budujZapytanieBezWymiarow({
     pola: polaWymiarow(),
+    lokalizacja: m.locColumn,
     zFiltrem: z.q !== "",
     sortuj: z.sortuj,
     naStanie: z.naStanie,
@@ -272,8 +294,11 @@ export async function towaryBezWymiarow(z: ZapytanieListy): Promise<{ razem: num
   };
 }
 
-/** Towar z obecną wagą i wymiarami — przed zapisem, do audytu. */
-export type StanKartoteki = Pick<TowarBezWymiarow, "twId" | "symbol" | "brutto" | "netto" | "dlugosc" | "szerokosc" | "wysokosc">;
+/** Towar z obecną wagą i wymiarami — do audytu przed zapisem i do karty w kolektorze. */
+export type StanKartoteki = Pick<
+  TowarBezWymiarow,
+  "twId" | "symbol" | "nazwa" | "ean" | "lokalizacja" | "brutto" | "netto" | "dlugosc" | "szerokosc" | "wysokosc"
+>;
 
 /**
  * Obecna waga i wymiary jednej kartoteki z Subiekta; `null` = nie ma takiego
@@ -287,7 +312,8 @@ export async function stanKartoteki(twId: number): Promise<StanKartoteki | null>
     .input("id", sql.Int, twId)
     .query<WierszListy>(
       "SELECT t.tw_Id AS twId, t.tw_Symbol AS symbol, t.tw_Nazwa AS nazwa, t.tw_PodstKodKresk AS ean, " +
-        "0 AS stan, 0 AS sprzedaz, t.tw_Masa AS brutto, t.tw_MasaNetto AS netto, " +
+        `0 AS stan, 0 AS sprzedaz, t.${assertSafeColumn(config.mssql.locColumn)} AS lokalizacja, ` +
+        "t.tw_Masa AS brutto, t.tw_MasaNetto AS netto, " +
         "pw.dlugosc, pw.szerokosc, pw.wysokosc " +
         `FROM tw__Towar t WITH (NOLOCK) ${zrodloWymiarow(polaWymiarow())} WHERE t.tw_Id = @id`
     );
@@ -301,7 +327,8 @@ export async function stanKartoteki(twId: number): Promise<StanKartoteki | null>
    przejść od listy do zapisu bez Subiekta. Sprzedaży demo nie zna, więc
    porządek „sprzedaż" schodzi do stanu. */
 
-const PORZADEK_DEMO: Record<SortBezZdjecia, string> = {
+const PORZADEK_DEMO: Record<SortWymiarow, string> = {
+  lokalizacja: "CASE WHEN TRIM(t.lokalizacja) = '' THEN 1 ELSE 0 END, t.lokalizacja, t.tw_id",
   sprzedaz: "stan DESC, t.symbol, t.tw_id",
   stan: "stan DESC, t.symbol, t.tw_id",
   symbol: "t.symbol, t.tw_id",
@@ -332,7 +359,7 @@ export async function towaryBezWymiarowDemo(z: ZapytanieListy): Promise<{ razem:
     .prepare(
       `SELECT t.tw_id AS twId, t.symbol, t.nazwa, t.ean,
               (SELECT IFNULL(SUM(stan), 0) FROM sgt_stan st WHERE st.tw_id = t.tw_id) AS stan,
-              0 AS sprzedaz, t.masa AS brutto, t.masa_netto AS netto, t.wym_dlugosc AS dlugosc, t.wym_szerokosc AS szerokosc,
+              0 AS sprzedaz, t.lokalizacja, t.masa AS brutto, t.masa_netto AS netto, t.wym_dlugosc AS dlugosc, t.wym_szerokosc AS szerokosc,
               t.wym_wysokosc AS wysokosc
        FROM sgt_towar t ${gdzie}
        ORDER BY ${PORZADEK_DEMO[z.sortuj] ?? PORZADEK_DEMO.sprzedaz} LIMIT ? OFFSET ?`
@@ -344,7 +371,7 @@ export async function towaryBezWymiarowDemo(z: ZapytanieListy): Promise<{ razem:
 export async function stanKartotekiDemo(twId: number): Promise<StanKartoteki | null> {
   const wiersz = db()
     .prepare(
-      `SELECT tw_id AS twId, symbol, nazwa, ean, 0 AS stan, 0 AS sprzedaz, masa AS brutto, masa_netto AS netto,
+      `SELECT tw_id AS twId, symbol, nazwa, ean, 0 AS stan, 0 AS sprzedaz, lokalizacja, masa AS brutto, masa_netto AS netto,
               wym_dlugosc AS dlugosc, wym_szerokosc AS szerokosc, wym_wysokosc AS wysokosc
        FROM sgt_towar WHERE tw_id = ?`
     )

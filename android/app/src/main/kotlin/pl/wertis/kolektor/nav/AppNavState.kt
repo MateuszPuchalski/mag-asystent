@@ -190,6 +190,8 @@ class AppNavState(private val recentStore: RecentStore) {
 
     fun openFieldTasks() = go(Screen.FIELD_TASKS)
 
+    fun openDoZmierzenia() = go(Screen.DO_ZMIERZENIA)
+
     fun start() = go(Screen.HOME) // Splash: „Zeskanuj badge" → home
 
     /**

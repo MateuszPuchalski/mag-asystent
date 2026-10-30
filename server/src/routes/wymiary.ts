@@ -1,17 +1,17 @@
 import type { FastifyInstance, FastifyReply } from "fastify";
 import { autorOperacji, sesjaZadania } from "../context.js";
-import { ROLE_BIUROWE } from "../services/users.js";
-import { listaBezWymiarow, zapiszPomiar } from "../services/wymiary.js";
+import { listaBezWymiarow, towarDoPomiaru, zapiszPomiar } from "../services/wymiary.js";
 
-/* ── Waga i wymiary kartotek widziane z biura ────────────────────────────────
-   Lista braków i zapis pomiaru. Logika siedzi w `services/wymiary.ts`. */
+/* ── Waga i wymiary kartotek — biuro i kolektor ──────────────────────────────
+   Lista braków, jeden towar i zapis pomiaru. Logika siedzi w
+   `services/wymiary.ts`.
+
+   Bez sprawdzania roli, sama sesja: mierzy ten, kto stoi przy wadze, a to
+   najczęściej magazynier z kolektorem. Biuro mierzy to samo z panelu.
+   Zapis i tak idzie kolejką z autorem i audytem „przed". */
 
 function odmowa(reply: FastifyReply) {
-  const s = sesjaZadania();
-  if (!s) return reply.code(401).send({ error: "Brak sesji — zaloguj się" });
-  if (!ROLE_BIUROWE.includes(s.user.role)) {
-    return reply.code(403).send({ error: "Wymiary towarów obsługuje biuro" });
-  }
+  if (!sesjaZadania()) return reply.code(401).send({ error: "Brak sesji — zaloguj się" });
   return null;
 }
 
@@ -33,6 +33,20 @@ export async function wymiaryRoutes(app: FastifyInstance) {
       }
     }
   );
+
+  /** Jeden towar dla karty w kolektorze: obecne wagi, wymiary i czy pomiar czeka. */
+  app.get<{ Params: { twId: string } }>("/api/wymiary/:twId", async (req, reply) => {
+    const nie = odmowa(reply); if (nie) return nie;
+    const twId = Number(req.params.twId);
+    if (!Number.isInteger(twId) || twId <= 0) return reply.code(400).send({ error: "Zły numer towaru" });
+    try {
+      const w = await towarDoPomiaru(twId);
+      if (!w) return reply.code(404).send({ error: `Nie ma w Subiekcie towaru o tw_Id=${twId}.` });
+      return w;
+    } catch (e) {
+      return awariaBazy(reply, e);
+    }
+  });
 
   app.post<{ Params: { twId: string }; Body: unknown }>("/api/wymiary/:twId", async (req, reply) => {
     const nie = odmowa(reply); if (nie) return nie;

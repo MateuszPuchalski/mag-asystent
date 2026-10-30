@@ -33,9 +33,9 @@ let ustawZrodla: S["ustawZrodlaWymiarow"];
 
 /** Udawana kartoteka Subiekta. Towar 2 ma wagę, ale nie ma wymiarów. */
 const KARTOTEKA = [
-  { twId: 1, symbol: "A-01", nazwa: "Kosa", ean: "590123", stan: 4, sprzedaz: 7,
+  { twId: 1, symbol: "A-01", nazwa: "Kosa", ean: "590123", stan: 4, sprzedaz: 7, lokalizacja: "A01-02-03",
     brutto: null, netto: null, dlugosc: null, szerokosc: null, wysokosc: null },
-  { twId: 2, symbol: "B-02", nazwa: "Grabie", ean: null, stan: 0, sprzedaz: 0,
+  { twId: 2, symbol: "B-02", nazwa: "Grabie", ean: null, stan: 0, sprzedaz: 0, lokalizacja: null,
     brutto: 1.4, netto: 1.2, dlugosc: "150", szerokosc: null, wysokosc: null },
 ];
 
@@ -93,11 +93,31 @@ test("biuro dostaje stronę w kształcie kontraktu", async () => {
   });
 });
 
-test("magazynier dostaje 403, bez sesji 401 — na liście i przy zapisie", async () => {
-  assert.equal((await lista(sesja("magazynier"))).statusCode, 403);
+test("magazynier z kolektora widzi listę i zapisuje — mierzy ten, kto stoi przy wadze", async () => {
+  const h = sesja("magazynier");
+  assert.equal((await lista(h)).statusCode, 200);
+  assert.equal((await zapisz(h, 1, { bruttoKg: 1 })).statusCode, 200);
+  assert.equal(zadania().length, 1);
+});
+
+test("bez sesji 401 — na liście, przy towarze i przy zapisie", async () => {
   assert.equal((await lista({})).statusCode, 401);
-  assert.equal((await zapisz(sesja("magazynier"), 1, { bruttoKg: 1 })).statusCode, 403);
+  assert.equal((await app.inject({ method: "GET", url: "/api/wymiary/1" })).statusCode, 401);
+  assert.equal((await zapisz({}, 1, { bruttoKg: 1 })).statusCode, 401);
   assert.equal(zadania().length, 0);
+});
+
+test("jeden towar dla karty w kolektorze: obecne wartości, oczekiwanie i 404", async () => {
+  const h = sesja("magazynier");
+  const jeden = (id: number | string) => app.inject({ method: "GET", url: `/api/wymiary/${id}`, headers: h });
+  const r = await jeden(2);
+  assert.equal(r.statusCode, 200, r.payload);
+  assert.deepEqual(r.json(), { wlaczone: true, towar: KARTOTEKA[1], oczekuje: false });
+  await zapisz(h, 2, { wysokosc: 3 });
+  assert.equal((await jeden(2)).json().oczekuje, true);
+  assert.equal((await jeden(99)).statusCode, 404);
+  assert.equal((await jeden("x")).statusCode, 400);
+  assert.equal(zadania().length, 1, "odczyt towaru niczego nie kolejkuje");
 });
 
 test("bez kluczy WYMIARY_POLE_* ekran mówi, co ustawić, a zapis dostaje 409", async () => {

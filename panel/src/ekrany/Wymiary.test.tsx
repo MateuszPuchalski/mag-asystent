@@ -16,7 +16,7 @@ import type { ListaBezWymiarow, PozycjaBezWymiarow } from "../api/wymiary";
    5. Towar w kolejce jest wyszarzony i nie da się go wybrać. */
 
 const poz = (twId: number, symbol: string, nazwa: string, inne: Partial<PozycjaBezWymiarow> = {}): PozycjaBezWymiarow =>
-  ({ twId, symbol, nazwa, ean: null, stan: 2, sprzedaz: 0, brutto: null, netto: null, dlugosc: null, szerokosc: null,
+  ({ twId, symbol, nazwa, ean: null, stan: 2, sprzedaz: 0, lokalizacja: null, brutto: null, netto: null, dlugosc: null, szerokosc: null,
     wysokosc: null, oczekuje: false, ...inne });
 
 const LISTA: ListaBezWymiarow = {

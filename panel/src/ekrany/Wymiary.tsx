@@ -1,7 +1,8 @@
 import React, { useEffect, useId, useRef, useState } from "react";
 import { Ruler } from "lucide-react";
-import { NA_STRONIE, useBezWymiarow, useZapiszPomiar, type PozycjaBezWymiarow, type Pomiar } from "../api/wymiary";
-import type { SortBezZdjecia } from "../api/zdjecia";
+import {
+  NA_STRONIE, useBezWymiarow, useZapiszPomiar, type PozycjaBezWymiarow, type Pomiar, type SortWymiarow,
+} from "../api/wymiary";
 import { Blad, EtykietaWartosci, Karta, Pole, Przycisk, Pusto, WierszKolejki, ile } from "../ui";
 import { klawiszZajety } from "../nawigacja/fokus";
 import { nastepnyWolny, sasiad } from "./Zdjecia";
@@ -19,12 +20,13 @@ import { nastepnyWolny, sasiad } from "./Zdjecia";
    Skan kodu w polu szukania, który trafi w jeden towar, od razu go wybiera:
    ręka z czytnikiem nie musi sięgać po mysz (punkt 5). */
 
-const SORTOWANIA: Array<{ wartosc: SortBezZdjecia; etykieta: string }> = [
+const SORTOWANIA: Array<{ wartosc: SortWymiarow; etykieta: string }> = [
   { wartosc: "sprzedaz", etykieta: "Najczęściej sprzedawane (30 dni)" },
   { wartosc: "stan", etykieta: "Największy stan" },
   { wartosc: "symbol", etykieta: "Symbol" },
   { wartosc: "nazwa", etykieta: "Nazwa" },
   { wartosc: "najnowsze", etykieta: "Najnowsze kartoteki" },
+  { wartosc: "lokalizacja", etykieta: "Lokalizacja (obchód regałów)" },
 ];
 
 const LICZBA = new Intl.NumberFormat("pl-PL", { maximumFractionDigits: 3 });
@@ -70,7 +72,8 @@ function Wiersz({ p, wybrany, wKolejce, onWybierz }: {
             {" · "}stan {LICZBA.format(p.stan)}</span>}
     </span>
     <span className={`line-clamp-2 text-sm ${wKolejce ? "text-slate-500" : "text-slate-900"}`}>{p.nazwa}</span>
-    {!wKolejce && <span className="text-sm text-slate-600">brak: {braki(p)}</span>}
+    {!wKolejce && <span className="text-sm text-slate-600">
+      {p.lokalizacja && <span className="font-mono text-slate-800">{p.lokalizacja} · </span>}brak: {braki(p)}</span>}
   </>;
   if (!wKolejce) return <WierszKolejki aktywny={wybrany} onKlik={onWybierz}>{tresc}</WierszKolejki>;
   return <li>
@@ -148,7 +151,7 @@ export function Wymiary() {
   /* Szukanie liczy serwer — ćwierć sekundy przerwy, jak na ekranie zdjęć. */
   const [q, setQ] = useState("");
   const [offset, setOffset] = useState(0);
-  const [sortuj, setSortuj] = useState<SortBezZdjecia>("sprzedaz");
+  const [sortuj, setSortuj] = useState<SortWymiarow>("sprzedaz");
   const [naStanie, setNaStanie] = useState(false);
   const [sprzedane, setSprzedane] = useState(false);
   useEffect(() => {
@@ -231,7 +234,7 @@ export function Wymiary() {
         {/* Zmiana porządku albo filtra wraca na pierwszą stronę. */}
         <label className="mt-2 flex items-center gap-2 text-sm text-slate-700">Kolejność
           <select className="field min-w-0 flex-1" value={sortuj}
-            onChange={(e) => { setSortuj(e.target.value as SortBezZdjecia); setOffset(0); }}>
+            onChange={(e) => { setSortuj(e.target.value as SortWymiarow); setOffset(0); }}>
             {SORTOWANIA.map((s) => <option key={s.wartosc} value={s.wartosc}>{s.etykieta}</option>)}
           </select>
         </label>
