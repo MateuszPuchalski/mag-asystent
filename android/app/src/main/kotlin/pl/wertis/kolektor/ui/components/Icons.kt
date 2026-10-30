@@ -133,4 +133,19 @@ object WIcons {
         lineTo(21f, 8f); lineTo(21f, 19f); lineTo(3f, 19f); close()
         circle(12f, 13f, 3.6f)
     }
+
+    /**
+     * WYMIARY — miarka ukośna z podziałką, jak `Ruler` w zakładce panelu.
+     *
+     * Pudło noszą już trzy zakładki. Miarka mówi o czynności, nie o towarze,
+     * a biuro widzi przy tej samej pracy ten sam kształt.
+     */
+    val Ruler: ImageVector = strokeIcon("ruler") {
+        // korpus miarki pod kątem 45°
+        moveTo(3.5f, 15.5f); lineTo(15.5f, 3.5f); lineTo(20.5f, 8.5f); lineTo(8.5f, 20.5f); close()
+        // podziałka
+        moveTo(7.5f, 11.5f); lineTo(9.5f, 13.5f)
+        moveTo(10.5f, 8.5f); lineTo(12.5f, 10.5f)
+        moveTo(13.5f, 5.5f); lineTo(15.5f, 7.5f)
+    }
 }

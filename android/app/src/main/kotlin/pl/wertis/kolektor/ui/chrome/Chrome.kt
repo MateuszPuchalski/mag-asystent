@@ -204,7 +204,7 @@ fun SferaPill(summary: QueueSummary?, onClick: () -> Unit) {
     }
 }
 
-/* ── Dolny pasek: SKAN · DOSTAWY · ZWROTY · KARTON · WSTECZ ──────────────────
+/* ── Dolny pasek: SKAN · DOSTAWY · ZWROTY · KARTON · WYMIARY · WSTECZ ────────
    WSTECZ stoi PO PRAWEJ, bo kolektor trzyma się w prawej dłoni i tam ląduje
    kciuk. Wcześniej był w lewym górnym rogu — najdalszym punkcie ekranu od
    kciuka przy dowolnym chwycie.
@@ -221,9 +221,19 @@ fun SferaPill(summary: QueueSummary?, onClick: () -> Unit) {
 
    KARTON doszedł czwarty (0.122.0) tym samym argumentem. Pudło z towarem źle
    zebranym nie ma dokumentu ani zwrotu, więc pod ZWROTAMI byłoby wpisem, do
-   którego nic nie pasuje. Cztery zakładki po `weight(1f)` plus stały slot
-   WSTECZ dają przy 360 dp około 71 dp na zakładkę — napisy w BarlowCond
-   mieszczą się, ale to jest granica i piąta zakładka jej nie zniesie.        */
+   którego nic nie pasuje.
+
+   WYMIARY doszły piąte, na życzenie właściciela: z ekranu głównego wejście
+   było przyciskiem pod wyszukiwarką, czyli w miejscu, gdzie nikt nie szuka
+   trybu pracy. Lista do zmierzenia to praca seryjna z własnym obchodem
+   regałów, więc należy do trybów, a nie do skrótów ekranu SKAN.
+
+   RACHUNEK SZEROKOŚCI przy 360 dp: 360 − 76 (WSTECZ) = 284 dp na pięć
+   zakładek, czyli około 56 dp każda. Cel dotyku: 56 × 62 dp, powyżej MinTap
+   w obu osiach. Pastylka ikony ma 23 + 2 × 16 = 55 dp, więc mieści się
+   na styk. Najdłuższe napisy to DOSTAWY i WYMIARY, po siedem liter — w
+   BarlowCond 12,5 sp około 50 dp. Szóstej zakładki ten pasek nie zniesie:
+   następny tryb musi zastąpić któryś z obecnych albo zmienić układ paska.   */
 
 /** Szerokość slotu WSTECZ — stała, bo rezerwacja miejsca jest tu całym sensem. */
 private val BackSlot = 76.dp
@@ -236,6 +246,7 @@ fun TabBar(
     onPutaway: () -> Unit,
     onZwroty: () -> Unit,
     onKarton: () -> Unit,
+    onWymiary: () -> Unit,
     onBack: () -> Unit,
 ) {
     val putawayActive = screen == Screen.DELIVERY_DOCS || screen == Screen.DELIVERY_LINES
@@ -243,7 +254,9 @@ fun TabBar(
     val kartonActive = screen == Screen.KARTONY || screen == Screen.KARTON
     /* Liczony przez NEGACJĘ, więc każdy nowy tryb trzeba tu dopisać — inaczej
        zapala się razem ze SKANEM i świecą dwie zakładki naraz. */
-    val homeActive = !putawayActive && !zwrotyActive && !kartonActive && screen != Screen.QUEUE
+    val wymiaryActive = screen == Screen.DO_ZMIERZENIA
+    val homeActive = !putawayActive && !zwrotyActive && !kartonActive && !wymiaryActive &&
+        screen != Screen.QUEUE
 
     Row(
         modifier = Modifier
@@ -257,6 +270,7 @@ fun TabBar(
         TabItem("DOSTAWY", WIcons.Box, putawayActive, Modifier.weight(1f), onPutaway)
         TabItem("ZWROTY", WIcons.Box, zwrotyActive, Modifier.weight(1f), onZwroty)
         TabItem("KARTON", WIcons.Karton, kartonActive, Modifier.weight(1f), onKarton)
+        TabItem("WYMIARY", WIcons.Ruler, wymiaryActive, Modifier.weight(1f), onWymiary)
         if (hasBack) {
             BackTab(Modifier.width(BackSlot), onBack)
         } else {
@@ -337,6 +351,10 @@ private fun TabItem(label: String, icon: ImageVector, active: Boolean, modifier:
             fontSize = 12.5.sp,
             letterSpacing = 0.4.sp,
             color = if (active) AmberInk else InkSoft,
+            /* Przy pięciu zakładkach napis stoi na granicy szerokości. Drugi
+               wiersz podniósłby pasek i przesunął cele pod kciukiem. */
+            maxLines = 1,
+            softWrap = false,
         )
     }
 }

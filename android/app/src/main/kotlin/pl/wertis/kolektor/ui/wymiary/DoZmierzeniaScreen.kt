@@ -4,6 +4,14 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.text.style.TextAlign
+import pl.wertis.kolektor.ui.theme.BorderCol
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
@@ -31,7 +39,14 @@ import pl.wertis.kolektor.core.net.PozycjaBezWymiarow
 import pl.wertis.kolektor.core.net.ScanResult
 import pl.wertis.kolektor.core.net.TowarDoPomiaru
 import pl.wertis.kolektor.core.scan.ScanKind
+import pl.wertis.kolektor.core.wymiary.FiltrWymiarow
+import pl.wertis.kolektor.core.wymiary.PorzadekWymiarow
 import pl.wertis.kolektor.core.wymiary.braki
+import pl.wertis.kolektor.core.wymiary.liczbyWiersza
+import pl.wertis.kolektor.core.wymiary.pokazLiczby
+import pl.wertis.kolektor.core.wymiary.pustaLista
+import pl.wertis.kolektor.core.wymiary.zapytanie
+import pl.wertis.kolektor.core.wymiary.zmianaFiltra
 import pl.wertis.kolektor.core.wymiary.dolaczStrone
 import pl.wertis.kolektor.core.wymiary.doPomiaru
 import pl.wertis.kolektor.core.wymiary.indeksRegalu
@@ -62,6 +77,12 @@ import pl.wertis.kolektor.ui.theme.cardSurface
 
    W wierszu najpierw ADRES, dużo większy od reszty: po niego człowiek idzie.
    Symbol, nazwa i to, czego brakuje, są drugorzędne (punkt 2).
+
+   PORZĄDEK I FILTRY stoją nad listą jako chipy, nie lista rozwijana: jedno
+   dotknięcie zamiast dwóch i cel na rękawicę. Domyślny zostaje obchód
+   regałów. Inne porządki dopisują w wierszu sprzedaż i stan, bo to one
+   tłumaczą, dlaczego towar stoi wysoko. Wybór żyje w `AppNavState`, więc
+   przetrwa zajrzenie do innej zakładki.
 
    Skan na tym ekranie:
      kod towaru  → formularz pomiaru tego towaru,
@@ -95,11 +116,24 @@ fun DoZmierzeniaScreen(graph: AppGraph) {
     /** Wiersz wskazany: następny do zmierzenia albo trafiony skanem regału. */
     var wskazany by remember { mutableStateOf<Long?>(null) }
     var formularz by remember { mutableStateOf<TowarDoPomiaru?>(null) }
+    var filtr by remember { mutableStateOf(graph.nav.filtrWymiarow) }
 
     suspend fun wczytaj(od: Int) {
+        val f = filtr
+        val z = f.zapytanie(od)
         ladowanie = true
         try {
-            val strona = apiCall { graph.api.bezWymiarow(offset = od) }
+            val strona = apiCall {
+                graph.api.bezWymiarow(
+                    offset = z.offset,
+                    sortuj = z.sortuj,
+                    naStanie = z.naStanie,
+                    sprzedane = z.sprzedane,
+                )
+            }
+            /* Odpowiedź pod wybór, który człowiek już zmienił, wkleiłaby
+               stary porządek pod nowy chip. Nowe żądanie jest już w drodze. */
+            if (f != filtr) return
             wlaczone = strona.wlaczone
             powod = strona.powod
             razem = strona.razem
@@ -123,12 +157,27 @@ fun DoZmierzeniaScreen(graph: AppGraph) {
 
     LaunchedEffect(Unit) { przeladuj() }
 
+    /** Nowy porządek albo filtr: lista od zera, stara znika od razu. */
+    fun zmienFiltr(nowy: FiltrWymiarow) {
+        zmianaFiltra(filtr, nowy) ?: return
+        filtr = nowy
+        graph.nav.filtrWymiarow = nowy
+        pozycje = emptyList()
+        razem = 0
+        offset = 0
+        wskazany = null
+        scope.launch {
+            przeladuj()
+            listState.scrollToItem(0)
+        }
+    }
+
     /* Wskazany wiersz ma być WIDOCZNY. Podświetlenie poza ekranem jest pamięcią
-       urządzenia, której człowiek nie widzi (ergonomia, punkt 2). Indeks +1
-       za nagłówkiem listy. */
+       urządzenia, której człowiek nie widzi (ergonomia, punkt 2). Indeks +2
+       za nagłówkiem i rzędem filtrów. */
     LaunchedEffect(wskazany) {
         val i = pozycje.indexOfFirst { it.twId == wskazany }
-        if (i >= 0) listState.animateScrollToItem(i + 1)
+        if (i >= 0) listState.animateScrollToItem(i + 2)
     }
 
     fun otworz(twId: Long) {
@@ -258,24 +307,28 @@ fun DoZmierzeniaScreen(graph: AppGraph) {
         item(key = "naglowek") {
             Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
                 Text("Do zmierzenia: $razem", fontSize = 20.sp, fontWeight = FontWeight.Bold, color = Ink)
-                Text("Po kolei regałami. Skan towaru otwiera pomiar.", fontSize = 12.sp, color = InkMute)
+                Text("Skan towaru otwiera pomiar.", fontSize = 12.sp, color = InkMute)
                 bladListy?.let { Text(it, fontSize = 12.sp, color = AmberInk, fontWeight = FontWeight.SemiBold) }
             }
         }
+        item(key = "filtry") { FiltryListy(filtr, ::zmienFiltr) }
         if (pozycje.isEmpty()) {
             item(key = "pusto") {
                 Text(
-                    "Wszystkie towary mają wagę i wymiary",
+                    // pusta lista mówi, dlaczego jest pusta przy tym filtrze
+                    if (ladowanie) "Wczytuję…" else pustaLista(filtr),
                     color = InkMute,
                     modifier = Modifier.fillMaxWidth().cardSurface().padding(16.dp),
                 )
             }
         }
+        val liczby = filtr.pokazLiczby()
         items(pozycje, key = { it.twId }) { p ->
             WierszDoZmierzenia(
                 p = p,
                 wolny = wolny(p, zapisane),
                 wskazany = p.twId == wskazany,
+                liczby = if (liczby) liczbyWiersza(p) else null,
             ) { otworz(p.twId) }
         }
         if (jestWiecej(offset, razem)) {
@@ -326,6 +379,8 @@ private fun WierszDoZmierzenia(
     p: PozycjaBezWymiarow,
     wolny: Boolean,
     wskazany: Boolean,
+    /** „sprzedano X · stan Y", gdy to one ustalają porządek; `null` = bez. */
+    liczby: String?,
     onClick: () -> Unit,
 ) {
     val tlo = when {
@@ -357,6 +412,7 @@ private fun WierszDoZmierzenia(
             fontSize = 14.sp,
             color = if (wolny) Ink else InkMute,
         )
+        liczby?.let { Text(it, fontSize = 12.sp, fontWeight = FontWeight.SemiBold, color = if (wolny) InkSoft else InkMute) }
         if (p.nazwa.isNotBlank()) {
             Text(
                 p.nazwa,
@@ -371,6 +427,63 @@ private fun WierszDoZmierzenia(
             fontSize = 12.sp,
             fontWeight = FontWeight.SemiBold,
             color = if (wolny) AmberInk else InkMute,
+        )
+    }
+}
+
+/**
+ * Porządek (cztery chipy w rzędzie) i dwa przełączniki filtrów pod spodem.
+ *
+ * Przy 360 dp chip porządku ma około 79 dp szerokości, przełącznik około
+ * 165 dp — oba wyżej niż MinTap. Wybrany ma obrys i znacznik ✓, nie tylko
+ * kolor: na słońcu przy bramie bursztyn od bieli bywa nie do odróżnienia
+ * (ergonomia, punkt 7).
+ */
+@Composable
+private fun FiltryListy(filtr: FiltrWymiarow, onZmiana: (FiltrWymiarow) -> Unit) {
+    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+        Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+            PorzadekWymiarow.entries.forEach { p ->
+                ChipWyboru(p.etykieta, filtr.porzadek == p, Modifier.weight(1f)) {
+                    onZmiana(filtr.copy(porzadek = p))
+                }
+            }
+        }
+        Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+            ChipWyboru("NA STANIE", filtr.naStanie, Modifier.weight(1f)) {
+                onZmiana(filtr.copy(naStanie = !filtr.naStanie))
+            }
+            ChipWyboru("SPRZEDANE 30 DNI", filtr.sprzedane, Modifier.weight(1f)) {
+                onZmiana(filtr.copy(sprzedane = !filtr.sprzedane))
+            }
+        }
+    }
+}
+
+@Composable
+private fun ChipWyboru(tekst: String, wybrany: Boolean, modifier: Modifier, onClick: () -> Unit) {
+    val ksztalt = RoundedCornerShape(10.dp)
+    Row(
+        modifier = modifier
+            .clip(ksztalt)
+            .background(if (wybrany) AmberBg else CardWhite)
+            .border(if (wybrany) 2.dp else 1.dp, if (wybrany) AmberInk else BorderCol, ksztalt)
+            .heightIn(min = MinTap)
+            .clickable(onClick = onClick)
+            .padding(horizontal = 6.dp, vertical = 8.dp),
+        horizontalArrangement = Arrangement.Center,
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(
+            if (wybrany) "✓ $tekst" else tekst,
+            fontFamily = BarlowCond,
+            fontWeight = if (wybrany) FontWeight.ExtraBold else FontWeight.SemiBold,
+            // 13 sp: „✓ SPRZEDAŻ" ma się zmieścić w chipie ~79 dp przy 360 dp
+            fontSize = 13.sp,
+            color = if (wybrany) AmberInk else InkSoft,
+            textAlign = TextAlign.Center,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
         )
     }
 }
