@@ -27,7 +27,7 @@ enum class Screen {
     POLACZENIE,
     // szukanie zgubionego kolektora: lista urządzeń i przycisk ZADZWOŃ
     KOLEKTORY,
-    // towary bez wagi albo wymiaru, w kolejności obchodu regałów
+    // towary bez wagi albo wymiaru — korzeń zakładki WYMIARY, więc bez powrotu
     DO_ZMIERZENIA,
 }
 
@@ -45,7 +45,6 @@ private val BACK: Map<Screen, Screen> = mapOf(
     Screen.SETUP to Screen.SETTINGS,
     Screen.POLACZENIE to Screen.SETTINGS,
     Screen.KOLEKTORY to Screen.SETTINGS,
-    Screen.DO_ZMIERZENIA to Screen.HOME,
 )
 
 /** Cel przycisku wstecz; null = brak (splash i home pokazują logo). */

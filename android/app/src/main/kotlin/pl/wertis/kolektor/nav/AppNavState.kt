@@ -7,6 +7,7 @@ import pl.wertis.kolektor.core.nav.backTarget
 import pl.wertis.kolektor.core.nav.ekranDoOpuszczenia
 import pl.wertis.kolektor.core.nav.wracacNaGlowny
 import pl.wertis.kolektor.core.recent.RecentEntry
+import pl.wertis.kolektor.core.wymiary.FiltrWymiarow
 import pl.wertis.kolektor.data.RecentStore
 
 /* ── Nawigacja UI — port web/src/lib/store.ts ───────────────────────────────
@@ -191,6 +192,14 @@ class AppNavState(private val recentStore: RecentStore) {
     fun openFieldTasks() = go(Screen.FIELD_TASKS)
 
     fun openDoZmierzenia() = go(Screen.DO_ZMIERZENIA)
+
+    /**
+     * Porządek i filtry listy „Do zmierzenia". Trzymane TU, a nie w ekranie,
+     * bo przełączenie zakładki zdejmuje ekran z kompozycji. Magazynier, który
+     * zajrzał do DOSTAW, ma wrócić do tej samej listy, a nie do obchodu
+     * regałów od nowa.
+     */
+    @Volatile var filtrWymiarow: FiltrWymiarow = FiltrWymiarow()
 
     fun start() = go(Screen.HOME) // Splash: „Zeskanuj badge" → home
 

@@ -204,6 +204,7 @@ fun AppRoot(graph: AppGraph) {
             onPutaway = { graph.nav.go(Screen.DELIVERY_DOCS) },
             onZwroty = { graph.nav.go(Screen.PRZYJECIA) },
             onKarton = { graph.nav.go(Screen.KARTONY) },
+            onWymiary = { graph.nav.openDoZmierzenia() },
             onBack = { graph.nav.goBack() },
         )
         WersjaBar(BuildConfig.VERSION_NAME, wersjaSerwera) {

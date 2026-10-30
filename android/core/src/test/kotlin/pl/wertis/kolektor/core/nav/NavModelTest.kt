@@ -21,8 +21,6 @@ class NavModelTest {
         assertEquals(Screen.SETTINGS, backTarget(Screen.POLACZENIE, null))
         // szukanie kolektora też — wejście do niego stoi w Ustawieniach
         assertEquals(Screen.SETTINGS, backTarget(Screen.KOLEKTORY, null))
-        // lista do zmierzenia otwiera się z ekranu głównego i tam wraca
-        assertEquals(Screen.HOME, backTarget(Screen.DO_ZMIERZENIA, null))
     }
 
     @Test fun `kazdy ekran ma tytul w pasku gornym`() {
@@ -42,6 +40,9 @@ class NavModelTest {
         assertNull(backTarget(Screen.PRZYJECIA, null))
         // korzeń zakładki „KARTON"
         assertNull(backTarget(Screen.KARTONY, null))
+        // korzeń zakładki „WYMIARY" — zakładka nie jest krokiem w głąb SKANU,
+        // więc WSTECZ nie ma tu dokąd prowadzić, tak jak przy KARTONACH
+        assertNull(backTarget(Screen.DO_ZMIERZENIA, null))
     }
 
     @Test fun `kolejka wraca tam skad ja otwarto`() {
