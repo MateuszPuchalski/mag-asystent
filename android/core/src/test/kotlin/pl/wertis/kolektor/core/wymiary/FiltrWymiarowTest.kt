@@ -90,4 +90,21 @@ class FiltrWymiarowTest {
             pustaLista(FiltrWymiarow(naStanie = true, symbolOd = "w")),
         )
     }
+
+    @Test fun `pilne jada jako 1 albo wcale i zaczynaja liste od zera`() {
+        assertNull(FiltrWymiarow().zapytanie(0).pilne)
+        assertEquals("1", FiltrWymiarow(pilne = true).zapytanie(0).pilne)
+        assertEquals(0, zmianaFiltra(FiltrWymiarow(), FiltrWymiarow(pilne = true))!!.offset)
+    }
+
+    @Test fun `przycisk pilnych tylko gdy cos czeka albo filtr wlaczony`() {
+        assertFalse(pokazPilne(FiltrWymiarow(), 0))
+        assertTrue(pokazPilne(FiltrWymiarow(), 3))
+        assertTrue(pokazPilne(FiltrWymiarow(pilne = true), 0))
+        assertEquals("PILNE · 3", etykietaPilnych(3))
+    }
+
+    @Test fun `pusta lista pilnych mowi o koncu pracy biura`() {
+        assertEquals("Wszystkie pilne towary mają wagę i wymiary.", pustaLista(FiltrWymiarow(pilne = true, naStanie = true)))
+    }
 }

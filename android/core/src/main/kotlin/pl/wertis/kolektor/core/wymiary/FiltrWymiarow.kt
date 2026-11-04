@@ -31,6 +31,8 @@ data class ZapytanieWymiarow(
     val offset: Int,
     /** Początek symbolu; `null` nie jedzie wcale. */
     val symbolOd: String? = null,
+    /** Tylko lista pilnych biura; ta sama konwencja co flagi wyżej. */
+    val pilne: String? = null,
 )
 
 /** Wybór człowieka na ekranie listy. */
@@ -41,7 +43,19 @@ data class FiltrWymiarow(
     val sprzedane: Boolean = false,
     /** Początek symbolu, np. „W" — cała grupa towarów do zmierzenia naraz. */
     val symbolOd: String = "",
+    /** Tylko towary z listy pilnych, którą ustala biuro. */
+    val pilne: Boolean = false,
 )
+
+/**
+ * Przycisk „PILNE" stoi tylko wtedy, gdy jest po co: biuro wskazało towary
+ * i któryś wciąż czeka. Włączony zostaje do wyłączenia, nawet przy zerze,
+ * bo inaczej znikałby spod palca razem z drogą powrotu do całej listy.
+ */
+fun pokazPilne(f: FiltrWymiarow, pilneRazem: Int): Boolean = f.pilne || pilneRazem > 0
+
+/** „PILNE · 12" — liczba mówi, ile zostało, zanim człowiek w ogóle dotknie. */
+fun etykietaPilnych(pilneRazem: Int): String = "PILNE · $pilneRazem"
 
 /** Najdłuższy początek symbolu, jaki przyjmuje serwer. */
 const val MAKS_ZNAKOW_SYMBOLU = 100
@@ -63,6 +77,7 @@ fun FiltrWymiarow.zapytanie(offset: Int): ZapytanieWymiarow = ZapytanieWymiarow(
     sprzedane = if (sprzedane) "1" else null,
     offset = offset,
     symbolOd = poczatekSymbolu(symbolOd).ifEmpty { null },
+    pilne = if (pilne) "1" else null,
 )
 
 /**
@@ -109,6 +124,8 @@ fun pustaLista(f: FiltrWymiarow): String {
         f.naStanie -> "Każdy towar na stanie ma wagę i wymiary."
         else -> "Każdy towar ma wagę i wymiary."
     }
+    // pusta lista pilnych to koniec pracy, o którą prosiło biuro — mówi to wprost
+    if (f.pilne) return "Wszystkie pilne towary mają wagę i wymiary."
     val symbol = poczatekSymbolu(f.symbolOd)
     // przy filtrze symbolu zdanie mówi o tej grupie, nie o całej kartotece
     return if (symbol.isEmpty()) ogolnie else "Symbole na „$symbol”: " + ogolnie.replaceFirstChar { it.lowercase() }

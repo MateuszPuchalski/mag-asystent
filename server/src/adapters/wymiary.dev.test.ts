@@ -30,7 +30,7 @@ before(async () => {
 
 beforeEach(() => {
   const d = db();
-  for (const t of ["sfera_queue", "events", "sgt_stan", "sgt_towar"]) d.prepare(`DELETE FROM ${t}`).run();
+  for (const t of ["sfera_queue", "events", "sgt_stan", "sgt_towar", "wymiary_pilne"]) d.prepare(`DELETE FROM ${t}`).run();
   const t = d.prepare("INSERT INTO sgt_towar(tw_id, symbol, nazwa, ean) VALUES (?,?,?,?)");
   t.run(1, "KOSA-1", "Kosa spalinowa", "5901");
   t.run(2, "GRAB-2", "Grabie", null);
@@ -93,4 +93,14 @@ test("filtr po początku symbolu: „W” łapie W-…, nie łapie symbolu z W w
   const l = await S.listaBezWymiarow({ symbolOd: " w " });
   assert.deepEqual(l.pozycje.map((p) => p.symbol).sort(), ["W-10", "w-11"]);
   assert.equal(l.razem, 2, "licznik liczy ten sam filtr co strona");
+});
+
+test("pilne w demo: tylko symbole z listy, bez wielkości liter; pusta lista to pusty wynik", async () => {
+  const pusto = await S.listaBezWymiarow({ pilne: "1" });
+  assert.deepEqual([pusto.razem, pusto.pilneRazem], [0, 0]);
+  S.ustawPilne({ symbole: ["grab-2", "NIE-MA"] }, AUTOR);
+  const l = await S.listaBezWymiarow({ pilne: "1" });
+  assert.deepEqual(l.pozycje.map((p) => p.symbol), ["GRAB-2"]);
+  assert.equal(l.pilneRazem, 1);
+  assert.equal((await S.listaBezWymiarow({})).razem, 2, "bez filtra lista zostaje cała");
 });

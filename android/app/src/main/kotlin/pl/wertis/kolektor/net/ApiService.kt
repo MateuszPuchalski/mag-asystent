@@ -518,6 +518,8 @@ interface ApiService {
         @Query("naStanie") naStanie: String? = null,
         /** Sprzedane w ostatnich 30 dniach — ta sama konwencja co wyżej. */
         @Query("sprzedane") sprzedane: String? = null,
+        /** Tylko lista pilnych biura — ta sama konwencja co wyżej. */
+        @Query("pilne") pilne: String? = null,
     ): ListaBezWymiarow
 
     @GET("api/wymiary/{twId}")

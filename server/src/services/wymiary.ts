@@ -1,5 +1,6 @@
-import { db } from "../db/db.js";
+import { db, transaction } from "../db/db.js";
 import { config } from "../config.js";
+import { logEvent } from "./events.js";
 import {
   SORTOWANIA_WYMIAROW,
   WYMIARY,
@@ -30,6 +31,63 @@ export interface ListaBezWymiarow {
   powod?: string;
   razem: number;
   pozycje: PozycjaBezWymiarow[];
+  /** Ile towarów z listy pilnych wciąż nie ma wagi albo wymiaru. 0 = przycisk „PILNE" znika. */
+  pilneRazem: number;
+}
+
+/* ── Lista pilnych ───────────────────────────────────────────────────────────
+   Biuro wkleja symbole z arkusza, a kolektor pokazuje je osobnym przyciskiem,
+   dopóki któryś czeka na pomiar. Zapis podmienia CAŁĄ listę: wklejenie nowej
+   to „teraz te", nie „dołóż te". Lista przyrastająca bez końca przestałaby
+   cokolwiek wyróżniać. */
+
+export const PILNE_MAX = 500;
+const SYMBOL_MAX = 50;
+
+/** Symbole z listy pilnych, w kolejności wklejenia. */
+export function pilneSymbole(): string[] {
+  return (db().prepare("SELECT symbol FROM wymiary_pilne ORDER BY rowid").all() as Array<{ symbol: string }>)
+    .map((w) => w.symbol);
+}
+
+/**
+ * Wpis biura → lista symboli. Wielkie litery, bez duplikatów i pustych.
+ * Nagłówek kolumny z arkusza („Wertis NO.") przejdzie jako dwa słowa, ale
+ * nie pasuje do żadnego towaru, więc niczego nie wyróżni.
+ */
+export function oczyscPilne(wejscie: unknown): string[] | null {
+  if (!Array.isArray(wejscie)) return null;
+  const wynik: string[] = [];
+  const byly = new Set<string>();
+  for (const w of wejscie) {
+    if (typeof w !== "string") return null;
+    for (const czesc of w.split(/[\s,;]+/)) {
+      const s = czesc.trim().toUpperCase().slice(0, SYMBOL_MAX);
+      if (s && !byly.has(s)) { byly.add(s); wynik.push(s); }
+    }
+  }
+  return wynik;
+}
+
+export type WynikPilnych = { ok: true; symbole: string[] } | { ok: false; kod: 400; error: string };
+
+/** Podmienia listę pilnych. Mutacja, więc ślad w dzienniku biura z obiema listami. */
+export function ustawPilne(cialo: unknown, autor: { nazwa: string; ref: number | null }): WynikPilnych {
+  const symbole = oczyscPilne((cialo as { symbole?: unknown } | null)?.symbole);
+  if (!symbole) return { ok: false, kod: 400, error: "Lista pilnych to tablica symboli" };
+  if (symbole.length > PILNE_MAX) {
+    return { ok: false, kod: 400, error: `Lista pilnych ma ${symbole.length} symboli, a mieści ${PILNE_MAX}` };
+  }
+  const d = db();
+  const przed = pilneSymbole();
+  const teraz = new Date().toISOString();
+  transaction(d, () => {
+    d.prepare("DELETE FROM wymiary_pilne").run();
+    const wstaw = d.prepare("INSERT INTO wymiary_pilne(symbol, dodano_at) VALUES (?, ?)");
+    for (const s of symbole) wstaw.run(s, teraz);
+    logEvent("wymiary_pilne", autor.nazwa, null, { przed, po: symbole }, autor.ref, d);
+  })();
+  return { ok: true, symbole };
 }
 
 type Zrodlo = typeof towaryBezWymiarow;
@@ -98,9 +156,10 @@ export async function listaBezWymiarow(zapytanie: {
   sortuj?: unknown;
   naStanie?: unknown;
   sprzedane?: unknown;
+  pilne?: unknown;
 }): Promise<ListaBezWymiarow> {
   const powod = powodWylaczenia();
-  if (powod) return { wlaczone: false, powod, razem: 0, pozycje: [] };
+  if (powod) return { wlaczone: false, powod, razem: 0, pozycje: [], pilneRazem: 0 };
 
   const q = String(zapytanie.q ?? "").trim().slice(0, 100);
   const symbolOd = String(zapytanie.symbolOd ?? "").trim().slice(0, 100);
@@ -112,11 +171,20 @@ export async function listaBezWymiarow(zapytanie: {
     : "sprzedaz";
   const tak = (v: unknown) => v === "1" || v === "true";
 
+  const pilne = pilneSymbole();
   const { razem, pozycje } = await listaZrodla()({
     q, symbolOd, limit, offset, sortuj, naStanie: tak(zapytanie.naStanie), sprzedane: tak(zapytanie.sprzedane),
+    pilne: tak(zapytanie.pilne) ? pilne : undefined,
   });
+  /* Licznik pilnych bez reszty filtrów: przycisk mówi „tyle zostało z listy
+     biura", a nie „tyle pasuje do tego, co akurat zaznaczyłeś". */
+  const pilneRazem = pilne.length === 0 ? 0 : (await listaZrodla()({
+    q: "", symbolOd: "", limit: 1, offset: 0, sortuj, naStanie: false, sprzedane: false, pilne,
+  })).razem;
   const czeka = oczekujace(pozycje.map((p) => p.twId));
-  return { wlaczone: true, razem, pozycje: pozycje.map((p) => ({ ...p, oczekuje: czeka.has(p.twId) })) };
+  return {
+    wlaczone: true, razem, pozycje: pozycje.map((p) => ({ ...p, oczekuje: czeka.has(p.twId) })), pilneRazem,
+  };
 }
 
 export interface TowarDoPomiaru {
