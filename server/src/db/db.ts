@@ -949,6 +949,7 @@ export function migrate(database: DatabaseSync) {
   bezBrygadzisty(database);
   ziarnoStrefyZlotej(database);
   ziarnoTagowSpraw(database);
+  ziarnoPilnychWymiarow(database);
   bezObslugiKlienta(database);
   pozycjaZwrotuBezReadModelu(database);
   indeksKluczaPozycji(database);
@@ -2490,6 +2491,33 @@ function bezObslugiKlienta(database: DatabaseSync) {
  * złotej. Biuro, które raz zmieniło nazwę albo wyłączyło tag, nie ma prawa
  * dostać wartości fabrycznych z powrotem przy restarcie procesu.
  */
+/**
+ * Pierwsza lista pilnych do zmierzenia, podana przez właściciela razem z samą
+ * funkcją. Bez niej przycisk „PILNE" czekałby, aż ktoś w biurze wklei listę.
+ *
+ * WSIEWAMY RAZ: tylko do pustej tabeli i tylko, gdy w dzienniku nie ma
+ * jeszcze żadnej zmiany listy. Sama pusta tabela nie wystarczy, bo biuro,
+ * które listę wyczyściło, dostałoby ją z powrotem przy restarcie. Wpis
+ * w dzienniku idzie surowym SQL-em z tego samego powodu co w
+ * `sprzatnijSprzedGranicy`: `services/events.ts` importuje ten moduł.
+ */
+const PILNE_OD_WLASCICIELA = [
+  "W37-0401", "W37-0407", "W09-1304", "W09-1101", "W37-0403", "W09-0409", "W09-0410",
+  "W09-0411", "W09-0407", "W09-0507", "W09-0501", "W09-1601", "W09-0405", "W09-0505",
+  "W09-1311", "W02-1301", "W02-0506", "W02-0405", "W09-0818", "W09-0406",
+];
+
+function ziarnoPilnychWymiarow(database: DatabaseSync) {
+  const jest = database.prepare("SELECT 1 FROM wymiary_pilne LIMIT 1").get();
+  const zmieniana = database.prepare("SELECT 1 FROM events WHERE type = 'wymiary_pilne' LIMIT 1").get();
+  if (jest || zmieniana) return;
+  const teraz = new Date().toISOString();
+  const ins = database.prepare("INSERT INTO wymiary_pilne(symbol, dodano_at) VALUES (?, ?)");
+  for (const s of PILNE_OD_WLASCICIELA) ins.run(s, teraz);
+  database.prepare("INSERT INTO events(type, user_id, payload) VALUES (?,?,?)")
+    .run("wymiary_pilne", "migracja", JSON.stringify({ przed: [], po: PILNE_OD_WLASCICIELA }));
+}
+
 function ziarnoTagowSpraw(database: DatabaseSync) {
   const n = (database.prepare("SELECT COUNT(*) AS n FROM reklamacja_tag").get() as { n: number }).n;
   if (n > 0) return;
