@@ -10,6 +10,15 @@ z wersją monorepo" — i właśnie tak przestał być zgodny: `0.3.0` przetrwa�
 sześć zmergowanych zmian, w tym takie, które wymagały nowego uprawnienia SQL.
 Komentarz nie jest mechanizmem.
 
+## 0.616.0 — 4 listopada 2026
+
+**Wymiary filtrują po początku symbolu, na kolektorze i w panelu.**
+Wpisz „W", a zostaną tylko towary, których symbol zaczyna się na W.
+
+**Formularz pomiaru nie zamyka się od przesunięcia palcem.** Wpisanych
+liczb nie skasuje już ruch w dół, dotknięcie obok ani przycisk Wstecz.
+Formularz zamyka zapis albo „Anuluj".
+
 ## 0.615.0 — 30 października 2026
 
 **Zakładka WYMIARY na dolnym pasku kolektora.** Lista „Do zmierzenia”
