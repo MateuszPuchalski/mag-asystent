@@ -512,6 +512,8 @@ interface ApiService {
         @Query("limit") limit: Int = WYMIARY_NA_STRONIE,
         @Query("sortuj") sortuj: String = "lokalizacja",
         @Query("q") q: String = "",
+        /** Początek symbolu (np. „W"); `null` nie jedzie wcale. */
+        @Query("symbolOd") symbolOd: String? = null,
         /** `"1"` albo `null`; Retrofit nie wysyła parametru `null` wcale. */
         @Query("naStanie") naStanie: String? = null,
         /** Sprzedane w ostatnich 30 dniach — ta sama konwencja co wyżej. */

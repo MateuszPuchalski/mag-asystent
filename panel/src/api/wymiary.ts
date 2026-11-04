@@ -49,13 +49,18 @@ export const NA_STRONIE = 50;
 /** Porządki listy wymiarów: te z listy bez zdjęcia i obchód po regałach. */
 export type SortWymiarow = SortBezZdjecia | "lokalizacja";
 
+/** Początek symbolu jak na kolektorze: bez spacji z brzegów, wielkimi literami. */
+export const poczatekSymbolu = (wpis: string) => wpis.trim().toUpperCase().slice(0, 100);
+
 export function useBezWymiarow(q: string, offset: number, sortuj: SortWymiarow = "sprzedaz",
-  naStanie = false, sprzedane = false) {
+  naStanie = false, sprzedane = false, symbolOd = "") {
   const p = new URLSearchParams({ q, limit: String(NA_STRONIE), offset: String(offset), sortuj });
   if (naStanie) p.set("naStanie", "1");
   if (sprzedane) p.set("sprzedane", "1");
+  // pusty początek nie jedzie wcale, tak jak flagi: serwer czyta brak jako „bez filtra"
+  if (symbolOd) p.set("symbolOd", symbolOd);
   return useQuery({
-    queryKey: ["wymiary", "bez-wymiarow", q, offset, sortuj, naStanie, sprzedane],
+    queryKey: ["wymiary", "bez-wymiarow", q, offset, sortuj, naStanie, sprzedane, symbolOd],
     queryFn: () => api<ListaBezWymiarow>(`/api/wymiary/bez-wymiarow?${p}`),
     /* Poprzednia strona zostaje na ekranie do przyjścia następnej — pusta
        lista na ułamek sekundy przesuwałaby wiersze pod kursorem. */

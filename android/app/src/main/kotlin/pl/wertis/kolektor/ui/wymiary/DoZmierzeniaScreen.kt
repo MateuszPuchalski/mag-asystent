@@ -29,6 +29,7 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -40,8 +41,10 @@ import pl.wertis.kolektor.core.net.ScanResult
 import pl.wertis.kolektor.core.net.TowarDoPomiaru
 import pl.wertis.kolektor.core.scan.ScanKind
 import pl.wertis.kolektor.core.wymiary.FiltrWymiarow
+import pl.wertis.kolektor.core.wymiary.MAKS_ZNAKOW_SYMBOLU
 import pl.wertis.kolektor.core.wymiary.PorzadekWymiarow
 import pl.wertis.kolektor.core.wymiary.braki
+import pl.wertis.kolektor.core.wymiary.poczatekSymbolu
 import pl.wertis.kolektor.core.wymiary.liczbyWiersza
 import pl.wertis.kolektor.core.wymiary.pokazLiczby
 import pl.wertis.kolektor.core.wymiary.pustaLista
@@ -53,11 +56,13 @@ import pl.wertis.kolektor.core.wymiary.indeksRegalu
 import pl.wertis.kolektor.core.wymiary.jestWiecej
 import pl.wertis.kolektor.core.wymiary.nastepnyWolny
 import pl.wertis.kolektor.core.wymiary.wolny
+import pl.wertis.kolektor.core.wymiary.wygladaNaKod
 import pl.wertis.kolektor.net.apiCall
 import pl.wertis.kolektor.scan.ScanHandlerEffect
 import pl.wertis.kolektor.ui.components.LoadingRow
 import pl.wertis.kolektor.ui.components.MinTap
 import pl.wertis.kolektor.ui.components.OutlineButton
+import pl.wertis.kolektor.ui.components.WertisTextField
 import pl.wertis.kolektor.ui.theme.AmberBg
 import pl.wertis.kolektor.ui.theme.AmberInk
 import pl.wertis.kolektor.ui.theme.AmberLine
@@ -129,6 +134,7 @@ fun DoZmierzeniaScreen(graph: AppGraph) {
                     sortuj = z.sortuj,
                     naStanie = z.naStanie,
                     sprzedane = z.sprzedane,
+                    symbolOd = z.symbolOd,
                 )
             }
             /* Odpowiedź pod wybór, który człowiek już zmienił, wkleiłaby
@@ -234,23 +240,11 @@ fun DoZmierzeniaScreen(graph: AppGraph) {
         wskazany = pozycje[i].twId
     }
 
-    ScanHandlerEffect { scan ->
-        /* Przy otwartym formularzu skan NIE przełącza towaru: wpisane liczby
-           przepadłyby bez słowa. Bierzemy go jednak dla siebie, bo oddany
-           dalej otworzyłby kartę towaru spod formularza. */
-        if (formularz != null) {
-            graph.feedback.beep(false)
-            graph.effects.toast("Najpierw zapisz albo anuluj bieżący pomiar")
-            return@ScanHandlerEffect true
-        }
-        if (scan.kind == ScanKind.LOC) {
-            pokazRegal(scan.code)
-            return@ScanHandlerEffect true
-        }
-        // ta sama trasa skanu co reszta kolektora — serwer zna aliasy kodów
+    /** Kod towaru → formularz; ta sama trasa skanu co reszta kolektora, bo serwer zna aliasy kodów. */
+    fun skanujKod(kod: String) {
         scope.launch {
             try {
-                when (val r = apiCall { graph.api.scan(scan.code, null, "wymiary") }) {
+                when (val r = apiCall { graph.api.scan(kod, null, "wymiary") }) {
                     is ScanResult.Product -> {
                         graph.cards.putCard(r.card)
                         otworz(r.card.id)
@@ -270,6 +264,22 @@ fun DoZmierzeniaScreen(graph: AppGraph) {
                 graph.effects.toast("Błąd połączenia z serwerem")
             }
         }
+    }
+
+    ScanHandlerEffect { scan ->
+        /* Przy otwartym formularzu skan NIE przełącza towaru: wpisane liczby
+           przepadłyby bez słowa. Bierzemy go jednak dla siebie, bo oddany
+           dalej otworzyłby kartę towaru spod formularza. */
+        if (formularz != null) {
+            graph.feedback.beep(false)
+            graph.effects.toast("Najpierw zapisz albo anuluj bieżący pomiar")
+            return@ScanHandlerEffect true
+        }
+        if (scan.kind == ScanKind.LOC) {
+            pokazRegal(scan.code)
+            return@ScanHandlerEffect true
+        }
+        skanujKod(scan.code)
         true
     }
 
@@ -306,12 +316,19 @@ fun DoZmierzeniaScreen(graph: AppGraph) {
     ) {
         item(key = "naglowek") {
             Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                Text("Do zmierzenia: $razem", fontSize = 20.sp, fontWeight = FontWeight.Bold, color = Ink)
+                val grupa = poczatekSymbolu(filtr.symbolOd)
+                // filtr symbolu w liczniku: „37" bez grupy brzmiałoby jak cała kartoteka
+                Text(
+                    if (grupa.isEmpty()) "Do zmierzenia: $razem" else "Do zmierzenia: $razem · symbole na $grupa",
+                    fontSize = 20.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = Ink,
+                )
                 Text("Skan towaru otwiera pomiar.", fontSize = 12.sp, color = InkMute)
                 bladListy?.let { Text(it, fontSize = 12.sp, color = AmberInk, fontWeight = FontWeight.SemiBold) }
             }
         }
-        item(key = "filtry") { FiltryListy(filtr, ::zmienFiltr) }
+        item(key = "filtry") { FiltryListy(filtr, ::zmienFiltr, ::skanujKod) }
         if (pozycje.isEmpty()) {
             item(key = "pusto") {
                 Text(
@@ -432,7 +449,8 @@ private fun WierszDoZmierzenia(
 }
 
 /**
- * Porządek (cztery chipy w rzędzie) i dwa przełączniki filtrów pod spodem.
+ * Porządek (cztery chipy w rzędzie), dwa przełączniki filtrów i pole
+ * początku symbolu pod spodem.
  *
  * Przy 360 dp chip porządku ma około 79 dp szerokości, przełącznik około
  * 165 dp — oba wyżej niż MinTap. Wybrany ma obrys i znacznik ✓, nie tylko
@@ -440,7 +458,7 @@ private fun WierszDoZmierzenia(
  * (ergonomia, punkt 7).
  */
 @Composable
-private fun FiltryListy(filtr: FiltrWymiarow, onZmiana: (FiltrWymiarow) -> Unit) {
+private fun FiltryListy(filtr: FiltrWymiarow, onZmiana: (FiltrWymiarow) -> Unit, onKod: (String) -> Unit) {
     Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
         Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
             PorzadekWymiarow.entries.forEach { p ->
@@ -455,6 +473,46 @@ private fun FiltryListy(filtr: FiltrWymiarow, onZmiana: (FiltrWymiarow) -> Unit)
             }
             ChipWyboru("SPRZEDANE 30 DNI", filtr.sprzedane, Modifier.weight(1f)) {
                 onZmiana(filtr.copy(sprzedane = !filtr.sprzedane))
+            }
+        }
+        FiltrSymbolu(filtr.symbolOd, onKod) { onZmiana(filtr.copy(symbolOd = it)) }
+    }
+}
+
+/**
+ * Początek symbolu, np. „W": cała grupa towarów do zmierzenia jednym
+ * przejściem. Lista zmienia się na „Szukaj" z klawiatury, nie przy każdej
+ * literze. Inaczej „WA" przeładowałoby listę dwa razy, a pierwsza odpowiedź
+ * przewinęłaby ekran spod palca. Włączony filtr ma obok cel „WSZYSTKIE",
+ * bo kasowanie liter w rękawicy to kilka trafień zamiast jednego.
+ */
+@Composable
+private fun FiltrSymbolu(zastosowany: String, onKod: (String) -> Unit, onZmiana: (String) -> Unit) {
+    var wpis by remember(zastosowany) { mutableStateOf(zastosowany) }
+    val aktywny = poczatekSymbolu(zastosowany).isNotEmpty()
+    Row(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
+        WertisTextField(
+            value = wpis,
+            onValueChange = { wpis = it.take(MAKS_ZNAKOW_SYMBOLU) },
+            modifier = Modifier.weight(1f),
+            placeholder = "Symbol zaczyna się od…",
+            imeAction = ImeAction.Search,
+            /* Pole z fokusem ucisza skaner, więc skan EAN-u ląduje tutaj.
+               Taki wpis idzie jak skan, do pomiaru, a pole wraca do filtra. */
+            onDone = {
+                if (wygladaNaKod(wpis)) {
+                    val kod = wpis.trim()
+                    wpis = zastosowany
+                    onKod(kod)
+                } else {
+                    onZmiana(poczatekSymbolu(wpis))
+                }
+            },
+        )
+        if (aktywny) {
+            ChipWyboru("WSZYSTKIE", false, Modifier) {
+                wpis = ""
+                onZmiana("")
             }
         }
     }

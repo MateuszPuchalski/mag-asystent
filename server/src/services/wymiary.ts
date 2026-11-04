@@ -92,6 +92,7 @@ function oczekujace(twIds: number[]): Set<number> {
 /** Strona listy. Wyjątek źródła idzie wyżej: awaria bazy to nie „funkcja wyłączona". */
 export async function listaBezWymiarow(zapytanie: {
   q?: unknown;
+  symbolOd?: unknown;
   limit?: unknown;
   offset?: unknown;
   sortuj?: unknown;
@@ -102,6 +103,7 @@ export async function listaBezWymiarow(zapytanie: {
   if (powod) return { wlaczone: false, powod, razem: 0, pozycje: [] };
 
   const q = String(zapytanie.q ?? "").trim().slice(0, 100);
+  const symbolOd = String(zapytanie.symbolOd ?? "").trim().slice(0, 100);
   const limit = calkowita(zapytanie.limit, LIMIT_DOMYSLNY, 1, LIMIT_MAX);
   const offset = calkowita(zapytanie.offset, 0, 0, Number.MAX_SAFE_INTEGER);
   /* Nieznana nazwa wraca do domyślnej: stara zakładka nie wywróci ekranu błędem 400. */
@@ -111,7 +113,7 @@ export async function listaBezWymiarow(zapytanie: {
   const tak = (v: unknown) => v === "1" || v === "true";
 
   const { razem, pozycje } = await listaZrodla()({
-    q, limit, offset, sortuj, naStanie: tak(zapytanie.naStanie), sprzedane: tak(zapytanie.sprzedane),
+    q, symbolOd, limit, offset, sortuj, naStanie: tak(zapytanie.naStanie), sprzedane: tak(zapytanie.sprzedane),
   });
   const czeka = oczekujace(pozycje.map((p) => p.twId));
   return { wlaczone: true, razem, pozycje: pozycje.map((p) => ({ ...p, oczekuje: czeka.has(p.twId) })) };

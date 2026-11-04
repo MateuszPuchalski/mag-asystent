@@ -1,7 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import {
-  budujZapytanieBezWymiarow, budujZapytanieWag, budujZapytanieWymiarow, tekstWymiaru, zrodloWymiarow,
+  budujZapytanieBezWymiarow, budujZapytanieWag, wzorzecPrefiksu, budujZapytanieWymiarow, tekstWymiaru, zrodloWymiarow,
 } from "./wymiary.sgt.js";
 
 /* ── Zapytania wag i wymiarów — jedyna logika tego adaptera bez serwera MSSQL ─
@@ -98,4 +98,14 @@ test("obchód po regałach: porządek po lokalizacji, towary bez adresu na końc
     "ORDER BY CASE WHEN LTRIM(RTRIM(ISNULL(t.tw_Pole1, ''))) = '' THEN 1 ELSE 0 END, t.tw_Pole1, t.tw_Id OFFSET"
   ), strona);
   assert.throws(() => budujZapytanieBezWymiarow({ pola: POLA, lokalizacja: "tw_Pole1;--", zFiltrem: false }));
+});
+
+test("początek symbolu: osobny parametr w stronie i liczniku, bez % z przodu", () => {
+  const { strona, razem } = budujZapytanieBezWymiarow({ pola: POLA, lokalizacja: "tw_Pole1", zFiltrem: false, zSymbolem: true });
+  for (const z of [strona, razem]) {
+    assert.ok(z.includes("t.tw_Symbol LIKE @symbolOd ESCAPE '!'"), z);
+    assert.ok(!z.includes("@q"), "sam symbol nie dokłada szukania w nazwie");
+  }
+  assert.equal(wzorzecPrefiksu("W"), "W%");
+  assert.equal(wzorzecPrefiksu("W4_%"), "W4!_!%%", "wieloznaczniki z palca to zwykłe znaki");
 });

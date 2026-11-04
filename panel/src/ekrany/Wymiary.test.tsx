@@ -112,4 +112,16 @@ describe("Wymiary", () => {
     expect(braki(poz(1, "A", "a", { dlugosc: "1", szerokosc: "2", wysokosc: "3" }))).toBe("waga");
     expect(braki(poz(1, "A", "a", { brutto: 2, dlugosc: "1", szerokosc: "2", wysokosc: "3" }))).toBe("netto");
   });
+
+  it("początek symbolu jedzie do serwera wielkimi literami, bez zapisu", async () => {
+    const stan = atrapa();
+    const u = userEvent.setup();
+    pokaz();
+    await screen.findByRole("heading", { name: "Kosa spalinowa" });
+    await u.type(screen.getByLabelText("Symbol zaczyna się od"), " w");
+    await waitFor(() => expect(vi.mocked(fetch).mock.calls.some(([url]) => String(url).includes("symbolOd=W&")
+      || String(url).endsWith("symbolOd=W"))).toBe(true));
+    expect(await screen.findByText(/symbole na W/)).toBeInTheDocument();
+    expect(stan.wyslane).toEqual([]);
+  });
 });

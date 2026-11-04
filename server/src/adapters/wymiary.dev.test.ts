@@ -84,3 +84,13 @@ test("pomiar częściowy nie kasuje wcześniejszego, a brak jednego wymiaru trzy
     { masa: 0.8, wym_dlugosc: "150", wym_wysokosc: "4,5" }
   );
 });
+
+test("filtr po początku symbolu: „W” łapie W-…, nie łapie symbolu z W w środku", async () => {
+  const t = db().prepare("INSERT INTO sgt_towar(tw_id, symbol, nazwa, ean) VALUES (?,?,?,?)");
+  t.run(3, "W-10", "Wąż ogrodowy", null);
+  t.run(4, "w-11", "Wąż mały", null);
+  t.run(5, "KOSA-W", "Kosa W", null);
+  const l = await S.listaBezWymiarow({ symbolOd: " w " });
+  assert.deepEqual(l.pozycje.map((p) => p.symbol).sort(), ["W-10", "w-11"]);
+  assert.equal(l.razem, 2, "licznik liczy ten sam filtr co strona");
+});
