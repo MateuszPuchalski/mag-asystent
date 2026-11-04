@@ -1,6 +1,7 @@
 import type { FastifyInstance, FastifyReply } from "fastify";
 import { autorOperacji, sesjaZadania, subiekt } from "../context.js";
 import { listaBezZdjecia } from "../services/zdjecia-bez.js";
+import { listaZeZdjeciem } from "../services/zdjecia-ze.js";
 import { odswiezListeOfert, pobierzParametryOfert, powodBrakuIndeksu, stanIndeksu } from "../services/zdjecia-allegro-indeks.js";
 import { dopasujSymbole, symboleZCiala } from "../services/zdjecia-import.js";
 import {
@@ -76,6 +77,20 @@ export async function zdjeciaRoutes(app: FastifyInstance) {
     }
   );
 
+  /* Kartoteki ze zdjęciem głównym, do szukania niewyraźnych. Sam odczyt,
+     a zamiana idzie przez `gotowe` z `zamien`. */
+  app.get<{ Querystring: { limit?: string; offset?: string } }>(
+    "/api/zdjecia/ze-zdjeciem",
+    async (req, reply) => {
+      const nie = odmowa(reply, "Listę towarów ze zdjęciem"); if (nie) return nie;
+      try {
+        return await listaZeZdjeciem(req.query);
+      } catch (e) {
+        return awariaBazy(reply, e);
+      }
+    }
+  );
+
   /**
    * Które pliki z folderu trafią w kartotekę. Sam odczyt; POST tylko dlatego,
    * że dwa tysiące symboli nie zmieszczą się w adresie.
@@ -97,12 +112,18 @@ export async function zdjeciaRoutes(app: FastifyInstance) {
    * Przeglądarka składa biały kwadrat sama, a człowiek oglądał plik, zanim
    * go wybrał. Podgląd dokładałby drugą rundę na plik przy kilkuset plikach.
    */
-  app.post<{ Params: { twId: string }; Body: { gotowy?: unknown; zrodlo?: unknown; plik?: unknown } }>(
+  app.post<{ Params: { twId: string }; Body: { gotowy?: unknown; zrodlo?: unknown; plik?: unknown; zamien?: unknown } }>(
     "/api/products/:twId/zdjecie/gotowe",
     async (req, reply) => {
       const nie = odmowa(reply, "Import zdjęć"); if (nie) return nie;
       if (!dodawanieWlaczone()) {
         return reply.code(409).send({ error: "Dodawanie zdjęć jest w tej instalacji wyłączone" });
+      }
+      /* Zamiana zdejmuje dotychczasowe główne zdjęcie. Wolno ją tylko zdjęciem
+         z naszej oferty, bo plik z dysku nie przeszedł porównania z kartoteką. */
+      const zamien = req.body?.zamien === true;
+      if (zamien && req.body?.zrodlo !== "allegro") {
+        return reply.code(400).send({ error: "Zamienić zdjęcie główne można tylko zdjęciem z oferty Allegro" });
       }
       const twId = Number(req.params.twId);
       const p = Number.isInteger(twId) ? subiekt.getProductById(twId) : undefined;
@@ -133,6 +154,7 @@ export async function zdjeciaRoutes(app: FastifyInstance) {
            wpisać do audytu źródła, którego nie ma w typie. */
         zrodlo: req.body?.zrodlo === "allegro" ? "allegro" : "import",
         plik: nazwaPliku(req.body?.plik),
+        zamien,
         autor: autorOperacji(req),
       });
     }

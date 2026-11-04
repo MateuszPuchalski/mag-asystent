@@ -36,7 +36,7 @@ właściwy silnik w środku.
 | `-Aktualizuj -Paczka <wersja>` | nowa wersja z paczki wydania (`najnowsza`, numer albo ścieżka ZIP-a) |
 | `-Aktualizuj` | nowa wersja na instalacji z Gita (`git pull`, budowanie) |
 | `-TylkoKonfiguracja` | sam kreator na działającej instalacji |
-| `-ZdjeciaZapis` | pozwala dodać zdjęcie kartoteki z kolektora; kosztuje `GRANT INSERT` do bazy firmy |
+| `-ZdjeciaZapis` | pozwala dodać zdjęcie kartoteki z kolektora; kosztuje `GRANT INSERT` do bazy firmy i `GRANT UPDATE` flagi zdjęcia głównego |
 | `-DryRun` | wypisuje, co by zrobił, i **nie zmienia niczego**; nie zadaje pytań |
 | `-Odinstaluj` | zdejmuje usługi, regułę zapory i katalog; **Subiekta nie rusza** |
 | `-UsunDane` | tylko z `-Odinstaluj`: kasuje też ślad audytowy, po drugim potwierdzeniu |

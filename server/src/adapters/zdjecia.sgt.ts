@@ -466,6 +466,114 @@ export async function towaryBezZdjecia(z: {
   };
 }
 
+/* ── Kartoteki ZE zdjęciem — szukanie niewyraźnych ──────────────────────────
+   Biuro mierzy w przeglądarce ostrość i rozmiar zdjęć głównych, a gorsze
+   zamienia na zdjęcie z naszej oferty. Stąd idzie tylko lista i rozmiar
+   bloba. Same bajty panel bierze potem po jednym, przez cache zdjęć. */
+
+export interface TowarZeZdjeciem {
+  twId: number;
+  symbol: string;
+  nazwa: string;
+  /** Rozmiar zdjęcia głównego w bajtach; `null`, gdy baza go nie podała. */
+  bajtow: number | null;
+}
+
+/**
+ * Strona i licznik kartotek ze zdjęciem.
+ *
+ * Warunek to zaprzeczenie warunku braku, więc obie listy dzielą kartotekę
+ * bez reszty. Porządek jak w liście braków: niewyraźne zdjęcie chodliwego
+ * towaru szkodzi najbardziej.
+ *
+ * Rozmiar mierzy zdjęcie GŁÓWNE, w porządku z `budujZapytanieBlob`.
+ * Odczyt bloba pomija jeszcze kandydatów, którzy nie są obrazem, czego
+ * `DATALENGTH` nie widzi. To przybliżenie wystarcza, bo pomiar i tak
+ * robi przeglądarka na prawdziwych bajtach.
+ */
+export function budujZapytanieZeZdjeciem(opts: {
+  tabela: string;
+  kolumna: string;
+  klucz: string;
+  glowne?: string;
+  kolejnosc?: string;
+  sprzedaz?: { fs: number; pa: number; odnosnik?: string };
+}): { strona: string; razem: string } {
+  const k = assertSafeColumn(opts.kolumna);
+  const gdzie = `WHERE t.tw_Zablokowany = 0 AND NOT (${warunekBrakuZdjecia(opts)})`;
+  let rozmiar: string;
+  let zdjecie = "";
+  if (!opts.tabela || opts.tabela === "tw__Towar") {
+    rozmiar = `DATALENGTH(t.${k})`;
+  } else {
+    const tab = assertSafeColumn(opts.tabela);
+    const id = assertSafeColumn(opts.klucz);
+    const porzadek = [
+      opts.glowne ? `z.${assertSafeColumn(opts.glowne)} DESC` : null,
+      opts.kolejnosc ? `z.${assertSafeColumn(opts.kolejnosc)}` : null,
+      `z.${id}`,
+    ].filter(Boolean);
+    /* Jeden wiersz na towar przez TOP 1 w APPLY. Złączenie wprost
+       mnożyłoby towar przez liczbę jego zdjęć. */
+    zdjecie =
+      `OUTER APPLY (SELECT TOP 1 DATALENGTH(z.${k}) AS bajtow FROM ${tab} z WITH (NOLOCK) ` +
+      `WHERE z.${id} = t.tw_Id ORDER BY ${porzadek.join(", ")}) zg`;
+    rozmiar = "zg.bajtow";
+  }
+  const zrodlo = zrodloSprzedazy(opts.sprzedaz ?? { fs: 2, pa: 21 });
+  /* Stan i sprzedaż w podzapytaniach z tego samego powodu co w liście
+     braków: złączenie wprost mnożyłoby wiersze towaru. */
+  const stan =
+    "LEFT JOIN (SELECT st_TowId, SUM(st_Stan) AS stan FROM tw_Stan WITH (NOLOCK) GROUP BY st_TowId) s " +
+    "ON s.st_TowId = t.tw_Id";
+  const sprzedaz =
+    `LEFT JOIN (SELECT p.ob_TowId, SUM(p.ob_IloscMag) AS sprzedaz ${zrodlo} GROUP BY p.ob_TowId) sp ` +
+    "ON sp.ob_TowId = t.tw_Id";
+  return {
+    strona:
+      `SELECT t.tw_Id AS twId, t.tw_Symbol AS symbol, t.tw_Nazwa AS nazwa, ${rozmiar} AS bajtow ` +
+      `FROM tw__Towar t WITH (NOLOCK) ${stan} ${sprzedaz} ${zdjecie} ${gdzie} ` +
+      `ORDER BY ${PORZADEK.sprzedaz} OFFSET @offset ROWS FETCH NEXT @limit ROWS ONLY`,
+    razem: `SELECT COUNT(*) AS razem FROM tw__Towar t WITH (NOLOCK) ${gdzie}`,
+  };
+}
+
+/** Strona kartotek ze zdjęciem prosto z Subiekta; wyjątek = nie dało się zapytać. */
+export async function towaryZeZdjeciem(z: {
+  limit: number;
+  offset: number;
+}): Promise<{ razem: number; pozycje: TowarZeZdjeciem[] }> {
+  const c = config.zdjecia;
+  const m = config.mssql;
+  /* Odnośnik tylko znaleziony przez import faktur, jak w liście braków. */
+  const odnosnik = m.korektaColumn && !brakKolumnyKorekty ? m.korektaColumn : undefined;
+  const zapytania = budujZapytanieZeZdjeciem({
+    tabela: c.tabela,
+    kolumna: c.kolumna,
+    klucz: c.kolumnaKlucza,
+    glowne: c.kolumnaGlowne || undefined,
+    kolejnosc: c.kolumnaKolejnosc || undefined,
+    sprzedaz: { fs: m.dokTypFS, pa: m.dokTypPA, odnosnik },
+  });
+  const od = new Date(Date.now() - DNI_SPRZEDAZY * 86400_000).toISOString().slice(0, 10);
+  const pool = await mssqlPool();
+  const strona = await pool
+    .request()
+    .input("odSprzedazy", sql.VarChar(10), od)
+    .input("offset", sql.Int, z.offset)
+    .input("limit", sql.Int, z.limit)
+    .query<{ twId: number; symbol: string; nazwa: string; bajtow: number | string | null }>(zapytania.strona);
+  const razem = await pool.request().query<{ razem: number }>(zapytania.razem);
+  return {
+    razem: Number(razem.recordset[0]?.razem ?? 0),
+    pozycje: strona.recordset.map((w) => {
+      /* DATALENGTH na varbinary(max) to bigint, a sterownik oddaje go tekstem. */
+      const n = w.bajtow === null || w.bajtow === undefined ? NaN : Number(w.bajtow);
+      return { twId: w.twId, symbol: w.symbol, nazwa: w.nazwa, bajtow: Number.isFinite(n) ? n : null };
+    }),
+  };
+}
+
 /* ── Dopasowanie symboli z nazw plików — import zdjęć z folderu ──────────────
    Biuro ma folder plików nazwanych symbolem towaru i pyta, które z nich da
    się przypiąć do kartoteki. Odczyt i nic więcej: zapis idzie potem po jednym

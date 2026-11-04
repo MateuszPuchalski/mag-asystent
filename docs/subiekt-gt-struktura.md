@@ -6,7 +6,7 @@ wersja bazy 1.8731.31.6933** — czyli dokładnie tej, którą ma firma (Subiekt
 poniżej jest cytatem ze struktury, a nie domysłem z innej wersji.
 
 To, czego dokumentacja **nie** zawiera (bo zależy od konkretnego podmiotu),
-zostało wyraźnie oznaczone `[WERYFIKUJ]` — takich rzeczy zostały trzydzieści cztery.
+zostało wyraźnie oznaczone `[WERYFIKUJ]` — takich rzeczy zostały trzydzieści pięć.
 Licznik obejmuje też `docs/allegro-ksztalt.md`: §8.2 projektu panelu kieruje
 tutaj znaczniki z mapowania Allegro, żeby lista czekających na sprawdzenie
 była jedna, a nie dwie.
@@ -609,9 +609,9 @@ Ustalone na bazie firmy po pierwszym nieudanym INSERT-cie (2026-10-16):
   `zzz_rtnetCT_Zdjecia_*`. To synchronizacja zewnętrznego programu. Odpala
   się na naszym wierszu tak samo jak na wierszu Subiekta i tak ma być.
 
-Prawa konta: `GRANT INSERT ON dbo.tw_ZdjecieTw`, `GRANT SELECT ON
-dbo.ins_ident` i `GRANT UPDATE ON dbo.ins_ident (ido_wartosc)`. Nadaje je
-instalator z `-ZdjeciaZapis`.
+Prawa konta: `GRANT INSERT ON dbo.tw_ZdjecieTw`, `GRANT UPDATE ON
+dbo.tw_ZdjecieTw (zd_Glowne)`, `GRANT SELECT ON dbo.ins_ident` i `GRANT UPDATE
+ON dbo.ins_ident (ido_wartosc)`. Nadaje je instalator z `-ZdjeciaZapis`.
 
 ### Czego przy okazji NIE ma
 
@@ -724,12 +724,25 @@ zdjęcia. Liczymy je w tej samej transakcji co `INSERT`. Dwa wiersze oznaczone
 jako główne dałyby odczyt raz jednego zdjęcia, raz drugiego — i ETag skaczący
 przy każdym wejściu na kartę.
 
+Wyjątkiem jest zamiana niewyraźnego zdjęcia na zdjęcie z naszej oferty Allegro.
+Stare główne dostaje wtedy `zd_Glowne = 0`, a nowe wchodzi z `1`, w jednej
+transakcji. Stare zostaje jako dodatkowe, więc pomyłkę da się cofnąć.
+
+`[WERYFIKUJ]` **Zamiana zdjęcia głównego na żywej bazie.** Nikt jeszcze nie
+widział, jak Subiekt rysuje kartę, gdy stare główne ma `zd_Glowne = 0`. Nie
+wiadomo też, czy wyzwalacze `zzz_rtnet*` reagują na `UPDATE` tej flagi. Sprawdź
+to na kartotece próbnej przed pierwszą zamianą seryjną.
+
 Funkcja jest domyślnie **wyłączona**. Włącza ją `ZDJECIA_DODAWANIE=subiekt`
 i **ósmy grant**:
 
 ```sql
 GRANT INSERT ON dbo.tw_ZdjecieTw TO wertis;
+GRANT UPDATE ON dbo.tw_ZdjecieTw (zd_Glowne) TO wertis;
 ```
+
+Druga linia jest potrzebna tylko przy zamianie zdjęcia głównego. Bez niej zwykłe
+dopisanie działa, a zamiana kończy się błędem z gotowym poleceniem.
 
 Bez tego grantu zdjęcie nadal działa. Leży wtedy w bazie WERTIS i widać je na
 karcie towaru. Zadanie stoi w kolejce z błędem, który podaje gotowe polecenie.

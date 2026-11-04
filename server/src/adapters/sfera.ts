@@ -171,8 +171,13 @@ export interface SferaAdapter {
    * Zadanie zna sam `twId` — bajty leżą w `zdjecie_wlasne`. Kolumna `payload`
    * kolejki jest czytana przy każdym obrocie pętli workera i 300 kB w niej to
    * 300 kB odczytu co sekundę.
+   *
+   * `zamien: true` robi nowe zdjęcie głównym, a dotychczasowe główne zostawia
+   * jako dodatkowe. Powód: niewyraźne zdjęcie kartoteki zastępujemy zdjęciem
+   * z naszej oferty Allegro, a pomyłkę ma dać się cofnąć w Subiekcie.
+   * Bez `zamien` nowe jest główne tylko na kartotece bez zdjęć.
    */
-  applySetZdjecie(twId: number): Promise<void>;
+  applySetZdjecie(twId: number, opcje?: { zamien?: boolean }): Promise<void>;
   /**
    * Wagi i wymiary kartoteki — `tw_Masa` (brutto), `tw_MasaNetto` i trzy pola
    * własne w `pw_Dane`, wskazane kluczami `WYMIARY_POLE_*`.

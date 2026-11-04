@@ -2,6 +2,7 @@ import {
   CEL_BAJTOW_GOTOWEGO, JAKOSCI_GOTOWEGO, JAKOSCI_WYSYLKI, LIMIT_BAJTOW, MAKS_BOKU_WYSYLKI, kadrWPikselach, kwadratWokol,
   ramkaAlfy, wymiaryWLimicie, wyrownajPoziomy, zakodujJakNajlzej, zakodujWLimicie, type Kadr, type Obrot,
 } from "./obrobka";
+import { ocenPiksele, type Ocena } from "./ostrosc";
 
 /* ── RYSOWANIE NA PŁÓTNIE ──────────────────────────────────────────────────
    Cienka warstwa nad `obrobka.ts`: płótno, obrót, kodowanie JPEG. Rachunek
@@ -128,4 +129,14 @@ export async function zlozGotowy(base64: string, mime: string): Promise<Plik> {
  */
 export function pngZrodla(z: Zrodlo): string {
   return base64ZAdresu(z.kanwa.toDataURL("image/png"));
+}
+
+/**
+ * Rozmiar i ostrość wczytanego zdjęcia do listy niewyraźnych. Płótno oddaje
+ * tylko piksele, a rachunek stoi w `ostrosc.ts`, gdzie ma testy.
+ */
+export function ocenZdjecie(z: Zrodlo): Ocena {
+  const ctx = z.kanwa.getContext("2d");
+  if (!ctx) throw new Error(BRAK_PLOTNA);
+  return ocenPiksele(ctx.getImageData(0, 0, z.szer, z.wys).data, z.szer, z.wys);
 }

@@ -33,8 +33,10 @@ export class DevSferaAdapter implements SferaAdapter {
    * SGT_MODE=seeded stało ZDJECIA_DODAWANIE=wertis i to zadanie w ogóle nie
    * powstało — ta metoda jest tu po to, żeby kontrakt był kompletny, a nie
    * po to, żeby czymkolwiek udawać zapis do Subiekta.
+   *
+   * `zamien` niczego tu nie zmienia, bo demo nie ma flagi zdjęcia głównego.
    */
-  async applySetZdjecie(twId: number): Promise<void> {
+  async applySetZdjecie(twId: number, _opcje?: { zamien?: boolean }): Promise<void> {
     if (!wlasneZdjecie(twId)) return;
     oznaczWSubiekcie(twId);
     db().prepare("DELETE FROM zdjecie_cache WHERE tw_id = ?").run(twId);

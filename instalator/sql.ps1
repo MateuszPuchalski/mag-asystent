@@ -828,7 +828,10 @@ function Get-WertisSkryptUprawnien {
         # nie jest IDENTITY. Bez tych dwóch linii INSERT pada na prawie zapisu.
         $wiersze = "`n-- DOPISYWANIE WIERSZY: wyłącznie tabela zdjęć kartotek.`n$wiersze" +
             "`nGRANT SELECT ON dbo.ins_ident TO [$Login];   -- licznik numerów zdjęć" +
-            "`nGRANT UPDATE ON dbo.ins_ident (ido_wartosc) TO [$Login];   -- licznik numerów zdjęć"
+            "`nGRANT UPDATE ON dbo.ins_ident (ido_wartosc) TO [$Login];   -- licznik numerów zdjęć" +
+            # Zamiana zdjęcia na zdjęcie z naszej oferty przestawia flagę głównego.
+            # Prawo tylko do tej jednej kolumny, bo stare zdjęcie zostaje w tabeli.
+            "`nGRANT UPDATE ON dbo.tw_ZdjecieTw (zd_Glowne) TO [$Login];   -- zamiana zdjęcia głównego"
     }
 
     return @"
@@ -1013,6 +1016,12 @@ function Test-WertisUprawnienia {
         $_.obiekt -eq "ins_ident" -and $_.kolumna -eq "ido_wartosc"
     })
     if (-not $licznikOk) { $brakujaceWiersze += @{ Tabela = "ins_ident" } }
+
+    # Flaga zdjęcia głównego — bez niej zamiana zdjęcia pada na prawie zapisu.
+    $glowneOk = (-not $ZapisZdjec) -or [bool]@($update | Where-Object {
+        $_.obiekt -eq "tw_ZdjecieTw" -and $_.kolumna -eq "zd_Glowne"
+    })
+    if (-not $glowneOk) { $brakujaceWiersze += @{ Tabela = "tw_ZdjecieTw (zd_Glowne)" } }
 
     $wymagane = @(Get-WertisTabeleOdczytu -Zdjecia $Zdjecia -PoziomyCen $PoziomyCen).Count
     return [pscustomobject]@{

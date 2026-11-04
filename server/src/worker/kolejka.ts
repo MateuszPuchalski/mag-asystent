@@ -152,7 +152,9 @@ export async function przetworzZadanie(task: Task, sfera: SferaAdapter): Promise
     } else if (task.type === "set_ean") {
       await sfera.applySetEan(payload.twId, payload.ean);
     } else if (task.type === "set_zdjecie") {
-      await sfera.applySetZdjecie(payload.twId);
+      /* Tylko dosłowne `true` zamienia zdjęcie główne. Każda inna wartość
+         w wierszu kolejki to zwykłe dopisanie, bo zamiana zmienia zdjęcie widoczne w Subiekcie. */
+      await sfera.applySetZdjecie(payload.twId, { zamien: payload.zamien === true });
     } else if (task.type === "set_wymiary") {
       await sfera.applySetWymiary(payload.twId, payload.pomiar);
     } else if (task.type === "mm") {

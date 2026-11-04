@@ -156,13 +156,20 @@ export interface AudytZdjecia {
  * Payload to SAM `twId`. Bajty zostają w bazie, bo kolumna `payload` jest
  * czytana przy każdym obrocie pętli workera — 300 kB w niej to 300 kB odczytu
  * co sekundę, przez cały czas życia zadania.
+ *
+ * `zamien` każe workerowi uczynić nowe zdjęcie głównym, a dotychczasowe
+ * główne zostawić jako dodatkowe. Nic nie znika, więc pomyłkę da się cofnąć.
  */
 export function enqueueSetZdjecie(
   twId: number,
   base: EnqueueBase,
-  audyt: AudytZdjecia
+  audyt: AudytZdjecia,
+  opcje?: { zamien?: boolean }
 ): number {
-  const queueId = insert("set_zdjecie", { twId }, base);
+  /* Pole trafia do ładunku tylko jako prawda. Zwykłe dodanie zostaje tym
+     samym `{ twId }`, które worker zna od zawsze. */
+  const zamien = opcje?.zamien === true;
+  const queueId = insert("set_zdjecie", zamien ? { twId, zamien: true } : { twId }, base);
   logEvent(
     "zdjecie_dodane",
     base.createdBy,
@@ -173,6 +180,9 @@ export function enqueueSetZdjecie(
       zrodlo: audyt.zrodlo,
       queueId,
       ...(audyt.plik ? { plik: audyt.plik } : {}),
+      /* Ten sam typ zdarzenia co dodanie, bo zdjęcie weszło tak samo.
+         Flaga mówi biuru, że stare główne zeszło do dodatkowych. */
+      ...(zamien ? { zamiana: true } : {}),
     },
     base.createdByRef ?? currentUserRef()
   );

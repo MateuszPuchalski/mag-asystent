@@ -2,6 +2,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import {
   budujZapytanieBezZdjecia,
+  budujZapytanieZeZdjeciem,
   budujZapytanieDopasowania,
   paczkiSymboli,
   SYMBOLI_W_PACZCE,
@@ -329,4 +330,70 @@ test("dopasowanie: nazwa z konfiguracji nie wstrzyknie SQL", () => {
     budujZapytanieDopasowania({ tabela: "x; DROP TABLE y", kolumna: "k", klucz: "id", ile: 1 })
   );
   assert.throws(() => budujZapytanieDopasowania({ tabela: "", kolumna: "k--", klucz: "id", ile: 1 }));
+});
+
+// ── Kartoteki ZE zdjęciem — do pomiaru niewyraźnych ─────────────────────────
+
+const TABELA_ZDJEC = {
+  tabela: "tw_ZdjecieTw", kolumna: "zd_Zdjecie", klucz: "zd_IdTowar", glowne: "zd_Glowne", kolejnosc: "zd_Id",
+};
+
+/* Lista ze zdjęciem to dokładne dopełnienie listy braków. Własny warunek
+   rozjechałby oba ekrany przy pierwszej zmianie jednego z nich. */
+test("ze zdjęciem: warunek to zaprzeczenie warunku braku, w stronie i w liczniku", () => {
+  const bez = budujZapytanieBezZdjecia({ ...TABELA_ZDJEC, zFiltrem: false });
+  const brak = /NOT EXISTS \(SELECT 1 FROM tw_ZdjecieTw z WITH \(NOLOCK\) WHERE z\.zd_IdTowar = t\.tw_Id\)/;
+  assert.match(bez.razem, brak);
+  const { strona, razem } = budujZapytanieZeZdjeciem(TABELA_ZDJEC);
+  for (const z of [strona, razem]) {
+    assert.ok(z.includes("NOT (NOT EXISTS (SELECT 1 FROM tw_ZdjecieTw z WITH (NOLOCK) WHERE z.zd_IdTowar = t.tw_Id))"), z);
+    assert.match(z, /t\.tw_Zablokowany = 0/);
+  }
+  assert.match(razem, /^SELECT COUNT\(\*\) AS razem FROM tw__Towar t/);
+  assert.ok(!razem.includes("DATALENGTH"), "licznik nie ma po co mierzyć blobów");
+});
+
+/* Rozmiar ma dotyczyć zdjęcia, które kolektor pokazuje, czyli głównego.
+   Porządek jak przy odczycie bloba, bo inaczej zmierzylibyśmy inne zdjęcie. */
+test("ze zdjęciem: bajtow to DATALENGTH głównego, w porządku odczytu bloba", () => {
+  const { strona } = budujZapytanieZeZdjeciem(TABELA_ZDJEC);
+  assert.ok(
+    strona.includes(
+      "OUTER APPLY (SELECT TOP 1 DATALENGTH(z.zd_Zdjecie) AS bajtow FROM tw_ZdjecieTw z WITH (NOLOCK) " +
+        "WHERE z.zd_IdTowar = t.tw_Id ORDER BY z.zd_Glowne DESC, z.zd_Id, z.zd_IdTowar) zg"
+    ),
+    strona
+  );
+  assert.match(strona, /zg\.bajtow AS bajtow/);
+  assert.ok(!/SELECT[^()]*zd_Zdjecie AS/.test(strona), "strona nie może ciągnąć samych bajtów");
+});
+
+test("ze zdjęciem: kolejność jak w liście braków, sprzedaż 30 dni malejąco, stronami", () => {
+  const { strona } = budujZapytanieZeZdjeciem(TABELA_ZDJEC);
+  assert.ok(
+    strona.endsWith(
+      "ORDER BY ISNULL(sp.sprzedaz, 0) DESC, ISNULL(s.stan, 0) DESC, t.tw_Symbol, t.tw_Id " +
+        "OFFSET @offset ROWS FETCH NEXT @limit ROWS ONLY"
+    ),
+    strona
+  );
+  assert.ok(strona.includes("d.dok_DataWyst >= @odSprzedazy"), strona);
+});
+
+test("ze zdjęciem w samej kartotece: rozmiar z kolumny towaru, bez APPLY", () => {
+  const { strona } = budujZapytanieZeZdjeciem({ tabela: "", kolumna: "tw_Zdjecie", klucz: "tw_Id" });
+  assert.match(strona, /DATALENGTH\(t\.tw_Zdjecie\) AS bajtow/);
+  assert.ok(strona.includes("NOT ((t.tw_Zdjecie IS NULL OR DATALENGTH(t.tw_Zdjecie) = 0))"), strona);
+  assert.doesNotMatch(strona, /APPLY/);
+});
+
+test("ze zdjęciem: bez kolumny głównej porządek domyka sam klucz i kolejność", () => {
+  const { strona } = budujZapytanieZeZdjeciem({ ...TABELA_ZDJEC, glowne: undefined });
+  assert.ok(strona.includes("ORDER BY z.zd_Id, z.zd_IdTowar) zg"), strona);
+});
+
+test("ze zdjęciem: nazwa z konfiguracji nie wstrzyknie SQL", () => {
+  assert.throws(() => budujZapytanieZeZdjeciem({ ...TABELA_ZDJEC, glowne: "x; DROP TABLE y" }));
+  assert.throws(() => budujZapytanieZeZdjeciem({ ...TABELA_ZDJEC, kolejnosc: "id--" }));
+  assert.throws(() => budujZapytanieZeZdjeciem({ ...TABELA_ZDJEC, tabela: "t;x" }));
 });

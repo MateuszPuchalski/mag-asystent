@@ -239,10 +239,13 @@ export function zapiszIZglos(dane: {
   tloUsuniete: boolean;
   zrodlo: ZrodloZdjecia;
   plik?: string | null;
+  /** Nowe zdjęcie staje się głównym w Subiekcie, stare zostaje dodatkowym. */
+  zamien?: boolean;
   autor: { nazwa: string; ref: number | null };
 }): { queueId: number | null; etag: string; bajtow: number; wSubiekcie: boolean } {
   const { twId, autor, tloUsuniete, zrodlo } = dane;
   const plik = dane.plik ?? null;
+  const zamien = dane.zamien === true;
   const { etag, bajtow } = zapiszWlasne({
     twId,
     obraz: dane.obraz,
@@ -262,9 +265,13 @@ export function zapiszIZglos(dane: {
         createdByRef: autor.ref,
         twId,
         label: "Zdjęcie · " + dane.symbol,
-        detail: `${Math.round(bajtow / 1024)} kB, tło ${tloUsuniete ? "usunięte" : "zostawione"}`,
+        /* Biuro w kolejce ma widzieć, że to zadanie zdejmie dotychczasowe główne. */
+        detail:
+          `${Math.round(bajtow / 1024)} kB, tło ${tloUsuniete ? "usunięte" : "zostawione"}` +
+          (zamien ? ", zamiana głównego" : ""),
       },
-      { bajtow, tloUsuniete, zrodlo, plik }
+      { bajtow, tloUsuniete, zrodlo, plik },
+      zamien ? { zamien: true } : undefined
     );
     przypiszZadanie(twId, queueId);
   } else {
