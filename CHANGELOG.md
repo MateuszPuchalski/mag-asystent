@@ -10,6 +10,19 @@ z wersją monorepo" — i właśnie tak przestał być zgodny: `0.3.0` przetrwa�
 sześć zmergowanych zmian, w tym takie, które wymagały nowego uprawnienia SQL.
 Komentarz nie jest mechanizmem.
 
+## 0.618.0 — 4 listopada 2026
+
+**Niewyraźne zdjęcia zastąpisz zdjęciem z naszej oferty Allegro.** W zakładce
+„Zdjęcia” przycisk „Popraw niewyraźne” mierzy rozmiar i ostrość zdjęć
+w Subiekcie, gdy towar ma ofertę ze zdjęciem. Najgorsze stoją na górze, obok
+zdjęcia z oferty. Zamiana robi nowe zdjęcie główne, a stare zostaje w Subiekcie
+jako dodatkowe.
+
+**[wymaga działania]** Zamiana przestawia flagę zdjęcia głównego, więc konto
+`wertis` potrzebuje prawa `UPDATE` na kolumnie `zd_Glowne`. Na bazie Subiekta:
+`GRANT UPDATE ON dbo.tw_ZdjecieTw (zd_Glowne) TO wertis;`. Bez niego zamiana
+skończy się błędem uprawnień, a zwykłe dodawanie zdjęć działa dalej.
+
 ## 0.617.0 — 4 listopada 2026
 
 **Pilne do zmierzenia.** Biuro wkleja w panelu Wymiary listę symboli, które
