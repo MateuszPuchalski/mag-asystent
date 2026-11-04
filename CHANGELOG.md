@@ -10,6 +10,14 @@ z wersją monorepo" — i właśnie tak przestał być zgodny: `0.3.0` przetrwa�
 sześć zmergowanych zmian, w tym takie, które wymagały nowego uprawnienia SQL.
 Komentarz nie jest mechanizmem.
 
+## 0.617.0 — 4 listopada 2026
+
+**Pilne do zmierzenia.** Biuro wkleja w panelu Wymiary listę symboli, które
+trzeba zważyć i zmierzyć najpierw. Na kolektorze, w zakładce WYMIARY, pojawia
+się wtedy przycisk „PILNE" z liczbą towarów, które jeszcze czekają. Przycisk
+znika, gdy cała lista jest zmierzona. Pierwsze 20 symboli od właściciela
+(W37-0401 i dalej) wchodzi na listę samo przy aktualizacji.
+
 ## 0.616.0 — 4 listopada 2026
 
 **Wymiary filtrują po początku symbolu, na kolektorze i w panelu.**
