@@ -29,6 +29,7 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -55,13 +56,13 @@ import pl.wertis.kolektor.core.wymiary.indeksRegalu
 import pl.wertis.kolektor.core.wymiary.jestWiecej
 import pl.wertis.kolektor.core.wymiary.nastepnyWolny
 import pl.wertis.kolektor.core.wymiary.wolny
+import pl.wertis.kolektor.core.wymiary.wygladaNaKod
 import pl.wertis.kolektor.net.apiCall
 import pl.wertis.kolektor.scan.ScanHandlerEffect
 import pl.wertis.kolektor.ui.components.LoadingRow
 import pl.wertis.kolektor.ui.components.MinTap
 import pl.wertis.kolektor.ui.components.OutlineButton
 import pl.wertis.kolektor.ui.components.WertisTextField
-import androidx.compose.ui.text.input.ImeAction
 import pl.wertis.kolektor.ui.theme.AmberBg
 import pl.wertis.kolektor.ui.theme.AmberInk
 import pl.wertis.kolektor.ui.theme.AmberLine
@@ -239,23 +240,11 @@ fun DoZmierzeniaScreen(graph: AppGraph) {
         wskazany = pozycje[i].twId
     }
 
-    ScanHandlerEffect { scan ->
-        /* Przy otwartym formularzu skan NIE przełącza towaru: wpisane liczby
-           przepadłyby bez słowa. Bierzemy go jednak dla siebie, bo oddany
-           dalej otworzyłby kartę towaru spod formularza. */
-        if (formularz != null) {
-            graph.feedback.beep(false)
-            graph.effects.toast("Najpierw zapisz albo anuluj bieżący pomiar")
-            return@ScanHandlerEffect true
-        }
-        if (scan.kind == ScanKind.LOC) {
-            pokazRegal(scan.code)
-            return@ScanHandlerEffect true
-        }
-        // ta sama trasa skanu co reszta kolektora — serwer zna aliasy kodów
+    /** Kod towaru → formularz; ta sama trasa skanu co reszta kolektora, bo serwer zna aliasy kodów. */
+    fun skanujKod(kod: String) {
         scope.launch {
             try {
-                when (val r = apiCall { graph.api.scan(scan.code, null, "wymiary") }) {
+                when (val r = apiCall { graph.api.scan(kod, null, "wymiary") }) {
                     is ScanResult.Product -> {
                         graph.cards.putCard(r.card)
                         otworz(r.card.id)
@@ -275,6 +264,22 @@ fun DoZmierzeniaScreen(graph: AppGraph) {
                 graph.effects.toast("Błąd połączenia z serwerem")
             }
         }
+    }
+
+    ScanHandlerEffect { scan ->
+        /* Przy otwartym formularzu skan NIE przełącza towaru: wpisane liczby
+           przepadłyby bez słowa. Bierzemy go jednak dla siebie, bo oddany
+           dalej otworzyłby kartę towaru spod formularza. */
+        if (formularz != null) {
+            graph.feedback.beep(false)
+            graph.effects.toast("Najpierw zapisz albo anuluj bieżący pomiar")
+            return@ScanHandlerEffect true
+        }
+        if (scan.kind == ScanKind.LOC) {
+            pokazRegal(scan.code)
+            return@ScanHandlerEffect true
+        }
+        skanujKod(scan.code)
         true
     }
 
@@ -323,7 +328,7 @@ fun DoZmierzeniaScreen(graph: AppGraph) {
                 bladListy?.let { Text(it, fontSize = 12.sp, color = AmberInk, fontWeight = FontWeight.SemiBold) }
             }
         }
-        item(key = "filtry") { FiltryListy(filtr, ::zmienFiltr) }
+        item(key = "filtry") { FiltryListy(filtr, ::zmienFiltr, ::skanujKod) }
         if (pozycje.isEmpty()) {
             item(key = "pusto") {
                 Text(
@@ -453,7 +458,7 @@ private fun WierszDoZmierzenia(
  * (ergonomia, punkt 7).
  */
 @Composable
-private fun FiltryListy(filtr: FiltrWymiarow, onZmiana: (FiltrWymiarow) -> Unit) {
+private fun FiltryListy(filtr: FiltrWymiarow, onZmiana: (FiltrWymiarow) -> Unit, onKod: (String) -> Unit) {
     Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
         Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
             PorzadekWymiarow.entries.forEach { p ->
@@ -470,7 +475,7 @@ private fun FiltryListy(filtr: FiltrWymiarow, onZmiana: (FiltrWymiarow) -> Unit)
                 onZmiana(filtr.copy(sprzedane = !filtr.sprzedane))
             }
         }
-        FiltrSymbolu(filtr.symbolOd) { onZmiana(filtr.copy(symbolOd = it)) }
+        FiltrSymbolu(filtr.symbolOd, onKod) { onZmiana(filtr.copy(symbolOd = it)) }
     }
 }
 
@@ -482,7 +487,7 @@ private fun FiltryListy(filtr: FiltrWymiarow, onZmiana: (FiltrWymiarow) -> Unit)
  * bo kasowanie liter w rękawicy to kilka trafień zamiast jednego.
  */
 @Composable
-private fun FiltrSymbolu(zastosowany: String, onZmiana: (String) -> Unit) {
+private fun FiltrSymbolu(zastosowany: String, onKod: (String) -> Unit, onZmiana: (String) -> Unit) {
     var wpis by remember(zastosowany) { mutableStateOf(zastosowany) }
     val aktywny = poczatekSymbolu(zastosowany).isNotEmpty()
     Row(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
@@ -492,7 +497,17 @@ private fun FiltrSymbolu(zastosowany: String, onZmiana: (String) -> Unit) {
             modifier = Modifier.weight(1f),
             placeholder = "Symbol zaczyna się od…",
             imeAction = ImeAction.Search,
-            onDone = { onZmiana(poczatekSymbolu(wpis)) },
+            /* Pole z fokusem ucisza skaner, więc skan EAN-u ląduje tutaj.
+               Taki wpis idzie jak skan, do pomiaru, a pole wraca do filtra. */
+            onDone = {
+                if (wygladaNaKod(wpis)) {
+                    val kod = wpis.trim()
+                    wpis = zastosowany
+                    onKod(kod)
+                } else {
+                    onZmiana(poczatekSymbolu(wpis))
+                }
+            },
         )
         if (aktywny) {
             ChipWyboru("WSZYSTKIE", false, Modifier) {

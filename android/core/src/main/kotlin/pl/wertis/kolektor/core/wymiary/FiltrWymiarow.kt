@@ -69,8 +69,22 @@ fun FiltrWymiarow.zapytanie(offset: Int): ZapytanieWymiarow = ZapytanieWymiarow(
  * Pierwsze zapytanie po zmianie wyboru — zawsze od zera.
  * Ten sam wybór nie zaczyna listy od nowa: `null` znaczy „nic nie rób".
  */
-fun zmianaFiltra(stary: FiltrWymiarow, nowy: FiltrWymiarow): ZapytanieWymiarow? =
-    if (stary == nowy) null else nowy.zapytanie(0)
+fun zmianaFiltra(stary: FiltrWymiarow, nowy: FiltrWymiarow): ZapytanieWymiarow? {
+    // porównanie po zapytaniu: „ w " i „W" to ten sam filtr, lista nie ma czego przeładować
+    val z = nowy.zapytanie(0)
+    return if (stary.zapytanie(0) == z) null else z
+}
+
+/**
+ * Czy wpis w polu symbolu to w istocie zeskanowany kod kreskowy. Pole z
+ * fokusem ucisza skaner, więc skan EAN-u wpadłby jako początek symbolu
+ * i pokazał pustą listę, która kłamie. Same cyfry od 8 znaków to EAN-8,
+ * EAN-13 albo ITF-14; symbole Subiektu tak nie wyglądają.
+ */
+fun wygladaNaKod(wpis: String): Boolean {
+    val t = wpis.trim()
+    return t.length in 8..14 && t.all { it in '0'..'9' }
+}
 
 /**
  * Czy wiersz ma pokazać sprzedaż i stan. Tak, gdy to one ustalają porządek

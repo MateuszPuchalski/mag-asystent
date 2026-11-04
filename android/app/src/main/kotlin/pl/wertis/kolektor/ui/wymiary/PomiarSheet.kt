@@ -11,6 +11,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.ModalBottomSheetProperties
 import androidx.compose.material3.SheetValue
 import androidx.compose.material3.Text
 import androidx.compose.material3.rememberModalBottomSheetState
@@ -102,10 +103,11 @@ fun PomiarSheet(
        zatrzymany w pół drogi chowałby przycisk zapisu pod klawiaturą.
 
        Z WPISANYMI LICZBAMI ARKUSZ ZAMYKA TYLKO „ZAPISZ" ALBO „ANULUJ".
-       Dotknięcie obok i Wstecz pytają tę samą bramkę, a odmowa daje sygnał,
-       żeby człowiek wiedział, czemu arkusz został. Pusty formularz zamyka się
-       po staremu, bo nie ma czego stracić. Zgłoszenie z hali: przewijanie
-       pól palcem zamykało arkusz i kasowało zważone już liczby. */
+       Ruch palcem w dół i dotknięcie obok pytają tę bramkę: odmowa cofa
+       arkusz na miejsce i daje sygnał, żeby człowiek wiedział, czemu został.
+       Pusty formularz zamyka się po staremu, bo nie ma czego stracić.
+       Zgłoszenie z hali: przewijanie pól palcem zamykało arkusz i kasowało
+       zważone już liczby. */
     val stanArkusza = rememberModalBottomSheetState(
         skipPartiallyExpanded = true,
         confirmValueChange = { cel ->
@@ -156,19 +158,16 @@ fun PomiarSheet(
         onDismissRequest = onClose,
         sheetState = stanArkusza,
         containerColor = CardWhite,
-        /* Bez przeciągania arkusza w ogóle: ruch palcem po polach ma przewijać
-           formularz, a nie go zamykać. Uchwyt znika razem z gestem, bo
-           obiecywałby ruch, którego już nie ma. */
-        sheetGesturesEnabled = false,
-        dragHandle = null,
+        /* Wstecz chowa arkusz z pominięciem bramki wyżej, więc przy wpisanych
+           liczbach wyłączamy go wprost. Zamyka wtedy „Zapisz" albo „Anuluj". */
+        properties = ModalBottomSheetProperties(shouldDismissOnBackPress = !cokolwiekWpisane(wpisy)),
     ) {
         Column(
             modifier = Modifier
                 .fillMaxWidth()
                 .verticalScroll(rememberScrollState())
                 .padding(horizontal = 16.dp)
-                // bez uchwytu górny brzeg przylegałby do napisu
-                .padding(top = 16.dp, bottom = 24.dp),
+                .padding(bottom = 24.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
             Text("ZWAŻ I ZMIERZ", fontSize = 11.sp, color = InkMute, fontWeight = FontWeight.Bold)

@@ -73,7 +73,15 @@ class FiltrWymiarowTest {
 
     @Test fun `nowy poczatek symbolu zaczyna liste od zera, ten sam po oczyszczeniu tez`() {
         assertEquals(0, zmianaFiltra(FiltrWymiarow(), FiltrWymiarow(symbolOd = "W"))!!.offset)
-        assertNull(zmianaFiltra(FiltrWymiarow(symbolOd = "W"), FiltrWymiarow(symbolOd = "W")))
+        assertNull(zmianaFiltra(FiltrWymiarow(symbolOd = "W"), FiltrWymiarow(symbolOd = " w ")))
+    }
+
+    @Test fun `skan kodu w polu symbolu rozpoznany jako kod, nie symbol`() {
+        assertTrue(wygladaNaKod("5901234123457"))
+        assertTrue(wygladaNaKod(" 59012341 "))
+        assertFalse(wygladaNaKod("W"))
+        assertFalse(wygladaNaKod("1234"))
+        assertFalse(wygladaNaKod("W5901234123457"))
     }
 
     @Test fun `pusta lista przy symbolu mowi o grupie`() {
