@@ -1,6 +1,7 @@
 import type { FastifyInstance, FastifyReply } from "fastify";
 import { autorOperacji, sesjaZadania } from "../context.js";
-import { listaBezWymiarow, towarDoPomiaru, zapiszPomiar } from "../services/wymiary.js";
+import { listaBezWymiarow, pilneSymbole, towarDoPomiaru, ustawPilne, zapiszPomiar } from "../services/wymiary.js";
+import { ROLE_BIUROWE } from "../services/users.js";
 
 /* ── Waga i wymiary kartotek — biuro i kolektor ──────────────────────────────
    Lista braków, jeden towar i zapis pomiaru. Logika siedzi w
@@ -22,7 +23,7 @@ function awariaBazy(reply: FastifyReply, e: unknown) {
 }
 
 export async function wymiaryRoutes(app: FastifyInstance) {
-  app.get<{ Querystring: { q?: string; symbolOd?: string; limit?: string; offset?: string; sortuj?: string; naStanie?: string; sprzedane?: string } }>(
+  app.get<{ Querystring: { q?: string; symbolOd?: string; pilne?: string; limit?: string; offset?: string; sortuj?: string; naStanie?: string; sprzedane?: string } }>(
     "/api/wymiary/bez-wymiarow",
     async (req, reply) => {
       const nie = odmowa(reply); if (nie) return nie;
@@ -33,6 +34,24 @@ export async function wymiaryRoutes(app: FastifyInstance) {
       }
     }
   );
+
+  /* Lista pilnych: czytają wszyscy, bo kolektor pokazuje przycisk. Ustala ją
+     biuro, bo to decyzja o kolejności pracy, nie czynność przy wadze. Statyczna
+     ścieżka wygrywa w Fastify z `/:twId`, więc „pilne" nie wpada w numer towaru. */
+  app.get("/api/wymiary/pilne", async (_req, reply) => {
+    const nie = odmowa(reply); if (nie) return nie;
+    return { symbole: pilneSymbole() };
+  });
+
+  app.put<{ Body: unknown }>("/api/wymiary/pilne", async (req, reply) => {
+    const nie = odmowa(reply); if (nie) return nie;
+    if (!ROLE_BIUROWE.includes(sesjaZadania()!.user.role)) {
+      return reply.code(403).send({ error: "Listę pilnych ustala biuro" });
+    }
+    const w = ustawPilne(req.body, autorOperacji(req));
+    if (!w.ok) return reply.code(w.kod).send({ error: w.error });
+    return { symbole: w.symbole };
+  });
 
   /** Jeden towar dla karty w kolektorze: obecne wagi, wymiary i czy pomiar czeka. */
   app.get<{ Params: { twId: string } }>("/api/wymiary/:twId", async (req, reply) => {

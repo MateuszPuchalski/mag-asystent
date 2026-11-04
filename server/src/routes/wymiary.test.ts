@@ -50,7 +50,7 @@ before(async () => {
 
 beforeEach(() => {
   const d = db();
-  for (const t of ["sfera_queue", "device_session", "app_user", "events"]) d.prepare(`DELETE FROM ${t}`).run();
+  for (const t of ["sfera_queue", "device_session", "app_user", "events", "wymiary_pilne"]) d.prepare(`DELETE FROM ${t}`).run();
   ustawZrodla(
     async (z) => ({ razem: KARTOTEKA.length, pozycje: KARTOTEKA.slice(z.offset, z.offset + z.limit) }),
     async (twId) => KARTOTEKA.find((t) => t.twId === twId) ?? null
@@ -90,6 +90,7 @@ test("biuro dostaje stronę w kształcie kontraktu", async () => {
     wlaczone: true,
     razem: 2,
     pozycje: KARTOTEKA.map((t) => ({ ...t, oczekuje: false })),
+    pilneRazem: 0,
   });
 });
 
@@ -169,4 +170,49 @@ test("awaria bazy Subiekta to 503 z powodem, nie pusta lista", async () => {
   assert.match(r.json().error, /timeout/);
   assert.equal((await zapisz(h, 1, { bruttoKg: 1 })).statusCode, 503);
   assert.equal(zadania().length, 0);
+});
+
+/* ── Lista pilnych ── */
+
+const pilne = (headers: Record<string, string>, payload?: unknown) =>
+  payload === undefined
+    ? app.inject({ method: "GET", url: "/api/wymiary/pilne", headers })
+    : app.inject({ method: "PUT", url: "/api/wymiary/pilne", headers, payload: payload as object });
+
+test("biuro wkleja listę pilnych: oczyszczona, podmieniona w całości i w dzienniku", async () => {
+  const h = sesja("biuro");
+  const r = await pilne(h, { symbole: ["Wertis NO.\nw37-0401\nW09-1304", "W37-0401;  b-02 "] });
+  assert.equal(r.statusCode, 200, r.payload);
+  assert.deepEqual(r.json().symbole, ["WERTIS", "NO.", "W37-0401", "W09-1304", "B-02"]);
+  await pilne(h, { symbole: ["A-01"] });
+  assert.deepEqual((await pilne(sesja("magazynier"))).json(), { symbole: ["A-01"] }, "nowa lista zastępuje starą");
+  const wpisy = db().prepare("SELECT payload FROM events WHERE type = 'wymiary_pilne'").all() as Array<{ payload: string }>;
+  assert.equal(wpisy.length, 2);
+  assert.deepEqual(JSON.parse(wpisy[1].payload).przed, ["WERTIS", "NO.", "W37-0401", "W09-1304", "B-02"]);
+});
+
+test("listę pilnych ustala biuro; magazynier i zły kształt dostają odmowę bez zapisu", async () => {
+  assert.equal((await pilne(sesja("magazynier"), { symbole: ["A-01"] })).statusCode, 403);
+  assert.equal((await pilne(sesja("biuro"), { symbole: "A-01" })).statusCode, 400);
+  const zaDuzo = Array.from({ length: 501 }, (_, i) => `X-${i}`);
+  assert.equal((await pilne(sesja("biuro"), { symbole: zaDuzo })).statusCode, 400);
+  assert.equal((await pilne({}, { symbole: ["A-01"] })).statusCode, 401);
+  assert.deepEqual((await pilne(sesja("biuro"))).json(), { symbole: [] });
+});
+
+test("lista podaje źródłu symbole pilnych i liczy pilne bez pozostałych filtrów", async () => {
+  const widziane: Array<string[] | undefined> = [];
+  ustawZrodla(async (z) => {
+    widziane.push(z.pilne);
+    const pasuje = KARTOTEKA.filter((t) => !z.pilne || z.pilne.includes(t.symbol));
+    return { razem: pasuje.length, pozycje: pasuje.slice(z.offset, z.offset + z.limit) };
+  });
+  const h = sesja("biuro");
+  await pilne(h, { symbole: ["B-02", "W-99"] });
+  const wszystko = (await lista(h)).json();
+  assert.equal(wszystko.razem, 2);
+  assert.equal(wszystko.pilneRazem, 1, "W-99 nie ma w kartotece braków");
+  const tylko = (await app.inject({ method: "GET", url: "/api/wymiary/bez-wymiarow?pilne=1&naStanie=1", headers: h })).json();
+  assert.deepEqual(tylko.pozycje.map((p: { symbol: string }) => p.symbol), ["B-02"]);
+  assert.deepEqual(widziane, [undefined, ["B-02", "W-99"], ["B-02", "W-99"], ["B-02", "W-99"]]);
 });

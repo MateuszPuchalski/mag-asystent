@@ -45,12 +45,14 @@ import pl.wertis.kolektor.core.wymiary.MAKS_ZNAKOW_SYMBOLU
 import pl.wertis.kolektor.core.wymiary.PorzadekWymiarow
 import pl.wertis.kolektor.core.wymiary.braki
 import pl.wertis.kolektor.core.wymiary.poczatekSymbolu
+import pl.wertis.kolektor.core.wymiary.pokazPilne
 import pl.wertis.kolektor.core.wymiary.liczbyWiersza
 import pl.wertis.kolektor.core.wymiary.pokazLiczby
 import pl.wertis.kolektor.core.wymiary.pustaLista
 import pl.wertis.kolektor.core.wymiary.zapytanie
 import pl.wertis.kolektor.core.wymiary.zmianaFiltra
 import pl.wertis.kolektor.core.wymiary.dolaczStrone
+import pl.wertis.kolektor.core.wymiary.etykietaPilnych
 import pl.wertis.kolektor.core.wymiary.doPomiaru
 import pl.wertis.kolektor.core.wymiary.indeksRegalu
 import pl.wertis.kolektor.core.wymiary.jestWiecej
@@ -109,6 +111,8 @@ fun DoZmierzeniaScreen(graph: AppGraph) {
 
     var pozycje by remember { mutableStateOf<List<PozycjaBezWymiarow>>(emptyList()) }
     var razem by remember { mutableStateOf(0) }
+    /** Niezmierzone z listy pilnych biura — od niego zależy, czy przycisk „PILNE" stoi. */
+    var pilneRazem by remember { mutableStateOf(0) }
     /** Przesunięcie następnej strony: suma wierszy oddanych przez serwer. */
     var offset by remember { mutableStateOf(0) }
     /** `null` = jeszcze nie wiem, czy funkcja działa. */
@@ -135,6 +139,7 @@ fun DoZmierzeniaScreen(graph: AppGraph) {
                     naStanie = z.naStanie,
                     sprzedane = z.sprzedane,
                     symbolOd = z.symbolOd,
+                    pilne = z.pilne,
                 )
             }
             /* Odpowiedź pod wybór, który człowiek już zmienił, wkleiłaby
@@ -143,6 +148,7 @@ fun DoZmierzeniaScreen(graph: AppGraph) {
             wlaczone = strona.wlaczone
             powod = strona.powod
             razem = strona.razem
+            pilneRazem = strona.pilneRazem
             pozycje = if (od == 0) strona.pozycje else dolaczStrone(pozycje, strona.pozycje)
             offset = od + strona.pozycje.size
             bladListy = null
@@ -328,7 +334,7 @@ fun DoZmierzeniaScreen(graph: AppGraph) {
                 bladListy?.let { Text(it, fontSize = 12.sp, color = AmberInk, fontWeight = FontWeight.SemiBold) }
             }
         }
-        item(key = "filtry") { FiltryListy(filtr, ::zmienFiltr, ::skanujKod) }
+        item(key = "filtry") { FiltryListy(filtr, pilneRazem, ::zmienFiltr, ::skanujKod) }
         if (pozycje.isEmpty()) {
             item(key = "pusto") {
                 Text(
@@ -458,8 +464,20 @@ private fun WierszDoZmierzenia(
  * (ergonomia, punkt 7).
  */
 @Composable
-private fun FiltryListy(filtr: FiltrWymiarow, onZmiana: (FiltrWymiarow) -> Unit, onKod: (String) -> Unit) {
+private fun FiltryListy(
+    filtr: FiltrWymiarow,
+    pilneRazem: Int,
+    onZmiana: (FiltrWymiarow) -> Unit,
+    onKod: (String) -> Unit,
+) {
     Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+        /* Pilne na samej górze i na całą szerokość: to praca, o którą biuro
+           prosi teraz, a nie jeszcze jeden sposób oglądania listy. */
+        if (pokazPilne(filtr, pilneRazem)) {
+            ChipWyboru(etykietaPilnych(pilneRazem), filtr.pilne, Modifier.fillMaxWidth()) {
+                onZmiana(filtr.copy(pilne = !filtr.pilne))
+            }
+        }
         Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
             PorzadekWymiarow.entries.forEach { p ->
                 ChipWyboru(p.etykieta, filtr.porzadek == p, Modifier.weight(1f)) {

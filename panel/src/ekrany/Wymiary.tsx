@@ -1,10 +1,11 @@
 import React, { useEffect, useId, useRef, useState } from "react";
 import { Ruler } from "lucide-react";
 import {
-  NA_STRONIE, poczatekSymbolu, useBezWymiarow, useZapiszPomiar, type PozycjaBezWymiarow, type Pomiar, type SortWymiarow,
+  NA_STRONIE, poczatekSymbolu, rozpoznajSymbole, useBezWymiarow, useListaPilnych, useZapiszPilne, useZapiszPomiar,
+  type PozycjaBezWymiarow, type Pomiar, type SortWymiarow,
 } from "../api/wymiary";
 import { Blad, EtykietaWartosci, Karta, Pole, Przycisk, Pusto, WierszKolejki, ile } from "../ui";
-import { klawiszZajety } from "../nawigacja/fokus";
+import { klawiszZajety, useOkno } from "../nawigacja/fokus";
 import { nastepnyWolny, sasiad } from "./Zdjecia";
 
 /* ── WYMIARY: TOWARY BEZ WAGI ALBO WYMIARÓW ──────────────────────────────────
@@ -146,6 +147,53 @@ function Formularz({ towar, onZapisano, onPomin }: {
   </form>;
 }
 
+/**
+ * Okno listy pilnych: biuro wkleja kolumnę symboli z Excela i zapisuje całość.
+ *
+ * Pole czeka na odczyt listy, bo zapis zastępuje ją w całości. Pisanie przed
+ * odczytem zapisałoby puste pole i wyczyściło listę, której człowiek nie widział.
+ * Escape zamyka tylko nietknięte pole, żeby wklejonej listy nie wyrzucił rozpęd.
+ */
+function OknoPilnych({ onZamknij }: { onZamknij: () => void }) {
+  const lista = useListaPilnych();
+  const zapis = useZapiszPilne();
+  const [tekst, setTekst] = useState<string | null>(null);
+  const id = useId();
+  const okno = useOkno<HTMLDivElement>({ onZamknij: tekst === null ? onZamknij : undefined });
+  const wartosc = tekst ?? lista.data?.symbole.join("\n") ?? "";
+  const symbole = rozpoznajSymbole(wartosc);
+
+  return <div role="dialog" {...okno} aria-labelledby={`${id}-tytul`}
+    className="fixed inset-0 z-50 grid place-items-center bg-black/40 p-4">
+    <form className="card flex w-full max-w-lg flex-col gap-3 p-6" onSubmit={(e) => {
+      e.preventDefault();
+      if (!lista.data || zapis.isPending) return;
+      zapis.mutate(symbole, { onSuccess: onZamknij });
+    }}>
+      <div className="flex items-center justify-between">
+        <h2 id={`${id}-tytul`} className="text-naglowek font-bold">Lista pilnych do zmierzenia</h2>
+        <button type="button" onClick={onZamknij} className="text-slate-500" aria-label="Zamknij">✕</button>
+      </div>
+      <label htmlFor={`${id}-pole`} className="text-sm font-semibold text-slate-700">
+        Symbole, jeden pod drugim (wklej kolumnę z Excela)</label>
+      <textarea id={`${id}-pole`} className="field min-h-60 font-mono" value={wartosc}
+        readOnly={!lista.data} aria-describedby={`${id}-ile`} data-fokus-startowy
+        onChange={(e) => setTekst(e.target.value)} />
+      <p id={`${id}-ile`} className="text-sm text-slate-600">
+        {lista.isLoading ? "Wczytuję listę pilnych…"
+          : `Rozpoznano ${ile(symbole.length, "symbol", "symbole", "symboli")}.`
+            + (symbole.length === 0 ? " Zapis pustej listy wyłącza filtr pilnych." : "")}</p>
+      {lista.error && <Blad>{(lista.error as Error).message}</Blad>}
+      {zapis.error && <Blad>{(zapis.error as Error).message}</Blad>}
+      <div className="flex flex-wrap gap-2">
+        <Przycisk type="submit" wariant="glowny" disabled={!lista.data || zapis.isPending}>
+          {zapis.isPending ? "Zapisuję…" : "Zapisz"}</Przycisk>
+        <Przycisk type="button" onClick={onZamknij}>Anuluj</Przycisk>
+      </div>
+    </form>
+  </div>;
+}
+
 export function Wymiary() {
   const [fraza, setFraza] = useState("");
   /* Szukanie liczy serwer — ćwierć sekundy przerwy, jak na ekranie zdjęć. */
@@ -154,6 +202,8 @@ export function Wymiary() {
   const [sortuj, setSortuj] = useState<SortWymiarow>("sprzedaz");
   const [naStanie, setNaStanie] = useState(false);
   const [sprzedane, setSprzedane] = useState(false);
+  const [pilne, setPilne] = useState(false);
+  const [oknoPilnych, setOknoPilnych] = useState(false);
   /* Początek symbolu („W") zawęża listę do grupy towarów — ta sama przerwa co szukanie. */
   const [frazaSymbolu, setFrazaSymbolu] = useState("");
   const [symbolOd, setSymbolOd] = useState("");
@@ -165,7 +215,7 @@ export function Wymiary() {
     const t = setTimeout(() => { setSymbolOd(poczatekSymbolu(frazaSymbolu)); setOffset(0); }, 250);
     return () => clearTimeout(t);
   }, [frazaSymbolu]);
-  const lista = useBezWymiarow(q, offset, sortuj, naStanie, sprzedane, symbolOd);
+  const lista = useBezWymiarow(q, offset, sortuj, naStanie, sprzedane, symbolOd, pilne);
   const [wybrany, setWybrany] = useState<PozycjaBezWymiarow | null>(null);
   const [zrobione, setZrobione] = useState<ReadonlySet<number>>(() => new Set());
   const [ostatni, setOstatni] = useState("");
@@ -216,6 +266,10 @@ export function Wymiary() {
   };
 
   const razem = lista.data?.razem;
+  /* Filtr bez pilnych do zmierzenia nic by nie pokazał, więc chowa się.
+     Zaznaczony zostaje widoczny, żeby dało się go odznaczyć. */
+  const pilneRazem = lista.data?.pilneRazem ?? 0;
+  const filtrPilnych = pilne || pilneRazem > 0;
   /* Awaria bazy Subiekta (503) to nie wyłączona funkcja — mija sama, więc obok stoi ponowienie. */
   const bladListy = lista.error && <div className="flex flex-col gap-2 p-2">
     <Blad>{(lista.error as Error).message}</Blad>
@@ -226,6 +280,7 @@ export function Wymiary() {
     /* Błąd bez danych zamiast „wszystko zmierzone” — awaria to nie koniec pracy. */
     : lista.error && !lista.data ? bladListy
     : pozycje.length === 0 ? <Pusto waga="lista">{q ? "Nic nie pasuje do szukania."
+        : pilne ? "Wszystkie pilne towary mają wagę i wymiary."
         : symbolOd ? `Każdy towar z symbolem na „${symbolOd}” ma wagę i wymiary.`
         : sprzedane ? "Każdy towar sprzedany w 30 dni ma wagę i wymiary."
         : naStanie ? "Każdy towar na stanie ma wagę i wymiary." : "Każdy towar ma wagę i wymiary."}</Pusto>
@@ -259,6 +314,12 @@ export function Wymiary() {
               onChange={(e) => { setNaStanie(e.target.checked); setOffset(0); }} />
             Tylko na stanie
           </label>
+          {filtrPilnych && <label className="flex min-h-10 items-center gap-1.5 text-sm text-slate-700">
+            <input type="checkbox" checked={pilne}
+              onChange={(e) => { setPilne(e.target.checked); setOffset(0); }} />
+            Tylko pilne ({LICZBA.format(pilneRazem)})
+          </label>}
+          <Przycisk type="button" className="ml-auto" onClick={() => setOknoPilnych(true)}>Lista pilnych…</Przycisk>
         </div>
       </div>
       <div className="shrink-0 border-y border-slate-200 bg-slate-50 px-3 py-1">
@@ -282,5 +343,6 @@ export function Wymiary() {
         ? <Formularz key={wybrany.twId} towar={wybrany} onZapisano={zapisano(wybrany)} onPomin={pomin(wybrany)} />
         : <Pusto ikona={Ruler}>{pozycje.length ? "Wybierz towar z listy." : "Nie ma towaru do zmierzenia."}</Pusto>}
     </Karta>
+    {oknoPilnych && <OknoPilnych onZamknij={() => setOknoPilnych(false)} />}
   </div>;
 }

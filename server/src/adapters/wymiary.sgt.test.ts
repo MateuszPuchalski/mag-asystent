@@ -109,3 +109,10 @@ test("początek symbolu: osobny parametr w stronie i liczniku, bez % z przodu", 
   assert.equal(wzorzecPrefiksu("W"), "W%");
   assert.equal(wzorzecPrefiksu("W4_%"), "W4!_!%%", "wieloznaczniki z palca to zwykłe znaki");
 });
+
+test("pilne: IN z osobnym parametrem na symbol w stronie i liczniku", () => {
+  const { strona, razem } = budujZapytanieBezWymiarow({ pola: POLA, lokalizacja: "tw_Pole1", zFiltrem: false, pilnych: 3 });
+  for (const z of [strona, razem]) assert.ok(z.includes("t.tw_Symbol IN (@pilne0, @pilne1, @pilne2)"), z);
+  const bez = budujZapytanieBezWymiarow({ pola: POLA, lokalizacja: "tw_Pole1", zFiltrem: false });
+  assert.ok(!bez.strona.includes("@pilne"));
+});

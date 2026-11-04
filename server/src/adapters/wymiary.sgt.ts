@@ -190,6 +190,8 @@ export function budujZapytanieBezWymiarow(opts: {
   zFiltrem: boolean;
   /** Filtr po początku symbolu (`@symbolOd`), osobny od szukania w treści. */
   zSymbolem?: boolean;
+  /** Liczba symboli z listy pilnych; parametry `@pilne0`…; 0 = bez filtra. */
+  pilnych?: number;
   sortuj?: SortWymiarow;
   naStanie?: boolean;
   sprzedane?: boolean;
@@ -206,6 +208,10 @@ export function budujZapytanieBezWymiarow(opts: {
     );
   }
   if (opts.zSymbolem) warunki.push("t.tw_Symbol LIKE @symbolOd ESCAPE '!'");
+  if (opts.pilnych) {
+    const znaki = Array.from({ length: opts.pilnych }, (_, i) => `@pilne${i}`).join(", ");
+    warunki.push(`t.tw_Symbol IN (${znaki})`);
+  }
   if (opts.naStanie) {
     warunki.push("EXISTS (SELECT 1 FROM tw_Stan st WITH (NOLOCK) WHERE st.st_TowId = t.tw_Id AND st.st_Stan > 0)");
   }
@@ -240,6 +246,8 @@ export interface ZapytanieListy {
   q: string;
   /** Początek symbolu; pusty = bez filtra. */
   symbolOd: string;
+  /** Tylko te symbole (lista pilnych); `undefined` = bez filtra, pusta = nic. */
+  pilne?: string[];
   limit: number;
   offset: number;
   sortuj: SortWymiarow;
@@ -277,6 +285,9 @@ function naPozycje(w: WierszListy): TowarBezWymiarow {
 
 /** Strona kartotek bez wagi albo wymiarów prosto z Subiekta; wyjątek = nie dało się zapytać. */
 export async function towaryBezWymiarow(z: ZapytanieListy): Promise<{ razem: number; pozycje: TowarBezWymiarow[] }> {
+  /* Pusta lista pilnych przy włączonym filtrze to pusty wynik, nie „bez filtra".
+     `IN ()` byłoby błędem składni, a brak warunku pokazałby całą kartotekę. */
+  if (z.pilne && z.pilne.length === 0) return { razem: 0, pozycje: [] };
   const m = config.mssql;
   /* Odnośnik faktury do paragonu tylko wtedy, gdy import go znalazł —
      kolumna, której nie ma, wywróciłaby listę błędem 207. */
@@ -286,6 +297,7 @@ export async function towaryBezWymiarow(z: ZapytanieListy): Promise<{ razem: num
     lokalizacja: m.locColumn,
     zFiltrem: z.q !== "",
     zSymbolem: z.symbolOd !== "",
+    pilnych: z.pilne?.length ?? 0,
     sortuj: z.sortuj,
     naStanie: z.naStanie,
     sprzedane: z.sprzedane,
@@ -297,6 +309,7 @@ export async function towaryBezWymiarow(z: ZapytanieListy): Promise<{ razem: num
     const r = pool.request().input("odSprzedazy", sql.VarChar(10), od);
     if (z.q !== "") r.input("q", sql.NVarChar(200), wzorzecLike(z.q));
     if (z.symbolOd !== "") r.input("symbolOd", sql.NVarChar(200), wzorzecPrefiksu(z.symbolOd));
+    (z.pilne ?? []).forEach((s, i) => r.input(`pilne${i}`, sql.NVarChar(200), s));
     return r;
   };
   const strona = await zapytanie()
@@ -366,6 +379,11 @@ export async function towaryBezWymiarowDemo(z: ZapytanieListy): Promise<{ razem:
   if (z.symbolOd !== "") {
     warunki.push("t.symbol LIKE ? ESCAPE '!'");
     parametry.push(wzorzecPrefiksu(z.symbolOd));
+  }
+  if (z.pilne) {
+    // pusta lista pilnych to pusty wynik — `IN ()` odrzuca SQLite, „0" oddaje to wprost
+    warunki.push(z.pilne.length ? `t.symbol COLLATE NOCASE IN (${z.pilne.map(() => "?").join(", ")})` : "0");
+    parametry.push(...z.pilne);
   }
   if (z.naStanie) {
     warunki.push("EXISTS (SELECT 1 FROM sgt_stan st WHERE st.tw_id = t.tw_id AND st.stan > 0)");

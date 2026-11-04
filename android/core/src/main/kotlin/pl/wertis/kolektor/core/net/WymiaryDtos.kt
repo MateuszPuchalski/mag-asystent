@@ -40,6 +40,8 @@ data class ListaBezWymiarow(
     val powod: String? = null,
     val razem: Int = 0,
     val pozycje: List<PozycjaBezWymiarow> = emptyList(),
+    /** Niezmierzone z listy pilnych biura; 0 (także u starszego serwera) chowa przycisk. */
+    val pilneRazem: Int = 0,
 )
 
 /** Kartoteka do formularza pomiaru — to, co Subiekt dziś o niej wie. */

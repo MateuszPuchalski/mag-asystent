@@ -3250,3 +3250,19 @@ CREATE TABLE IF NOT EXISTS sellasist_sync_state (
   blad            TEXT,                 -- stałe zdanie ostatniej porażki, nigdy treść odpowiedzi
   blad_kod        INTEGER
 );
+
+-- Symbole, które biuro kazało zmierzyć najpierw. Sam symbol, bez tw_Id:
+-- biuro wkleja listę z arkusza, a symbol przetrwa też odtworzenie kartoteki.
+-- Zmierzony towar schodzi z listy „Do zmierzenia" sam, więc wiersz zostaje,
+-- aż biuro wklei nową listę.
+CREATE TABLE IF NOT EXISTS wymiary_pilne (
+  symbol     TEXT PRIMARY KEY COLLATE NOCASE,
+  dodano_at  TEXT NOT NULL
+);
+
+-- Jeden wiersz: pierwsza lista od właściciela już weszła. Osobno od listy,
+-- bo lista wyczyszczona przez biuro nie może wrócić przy restarcie.
+CREATE TABLE IF NOT EXISTS wymiary_pilne_ziarno (
+  id  INTEGER PRIMARY KEY CHECK (id = 1),
+  at  TEXT NOT NULL
+);
