@@ -29,6 +29,8 @@ data class ZapytanieWymiarow(
     val naStanie: String?,
     val sprzedane: String?,
     val offset: Int,
+    /** Początek symbolu; `null` nie jedzie wcale. */
+    val symbolOd: String? = null,
 )
 
 /** Wybór człowieka na ekranie listy. */
@@ -37,7 +39,19 @@ data class FiltrWymiarow(
     val naStanie: Boolean = false,
     /** Sprzedane w ostatnich 30 dniach. */
     val sprzedane: Boolean = false,
+    /** Początek symbolu, np. „W" — cała grupa towarów do zmierzenia naraz. */
+    val symbolOd: String = "",
 )
+
+/** Najdłuższy początek symbolu, jaki przyjmuje serwer. */
+const val MAKS_ZNAKOW_SYMBOLU = 100
+
+/**
+ * Wpis człowieka → początek symbolu. Spacje z brzegów to palec, nie znak
+ * symbolu. Wielkie litery, bo symbole w Subiekcie tak stoją, a serwer i tak
+ * porównuje bez wielkości liter.
+ */
+fun poczatekSymbolu(wpis: String): String = wpis.trim().uppercase().take(MAKS_ZNAKOW_SYMBOLU)
 
 /**
  * Zapytanie o stronę. Flagi idą jako `1` albo wcale: serwer czyta brak
@@ -48,6 +62,7 @@ fun FiltrWymiarow.zapytanie(offset: Int): ZapytanieWymiarow = ZapytanieWymiarow(
     naStanie = if (naStanie) "1" else null,
     sprzedane = if (sprzedane) "1" else null,
     offset = offset,
+    symbolOd = poczatekSymbolu(symbolOd).ifEmpty { null },
 )
 
 /**
@@ -73,9 +88,14 @@ fun liczbyWiersza(p: PozycjaBezWymiarow): String =
  * Pusta lista mówi, DLACZEGO jest pusta przy tym filtrze. Gołe „brak" przy
  * włączonym filtrze wyglądałoby jak awaria albo jak koniec pracy w ogóle.
  */
-fun pustaLista(f: FiltrWymiarow): String = when {
-    f.naStanie && f.sprzedane -> "Każdy towar na stanie i sprzedany w 30 dni ma wagę i wymiary."
-    f.sprzedane -> "Każdy towar sprzedany w 30 dni ma wagę i wymiary."
-    f.naStanie -> "Każdy towar na stanie ma wagę i wymiary."
-    else -> "Każdy towar ma wagę i wymiary."
+fun pustaLista(f: FiltrWymiarow): String {
+    val ogolnie = when {
+        f.naStanie && f.sprzedane -> "Każdy towar na stanie i sprzedany w 30 dni ma wagę i wymiary."
+        f.sprzedane -> "Każdy towar sprzedany w 30 dni ma wagę i wymiary."
+        f.naStanie -> "Każdy towar na stanie ma wagę i wymiary."
+        else -> "Każdy towar ma wagę i wymiary."
+    }
+    val symbol = poczatekSymbolu(f.symbolOd)
+    // przy filtrze symbolu zdanie mówi o tej grupie, nie o całej kartotece
+    return if (symbol.isEmpty()) ogolnie else "Symbole na „$symbol”: " + ogolnie.replaceFirstChar { it.lowercase() }
 }

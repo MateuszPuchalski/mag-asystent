@@ -169,6 +169,15 @@ export function zrodloWymiarow(pola: Record<Wymiar, string>): string {
 const pustyTekst = (k: Wymiar) => `LTRIM(RTRIM(ISNULL(pw.${k}, ''))) = ''`;
 
 /**
+ * Wzorzec LIKE „symbol zaczyna się od". Wieloznaczniki uciekają tak samo
+ * jak w `wzorzecLike`, ale bez `%` z przodu: „W" ma złapać „W-12",
+ * a nie „KOSA-W", bo magazynier mierzy całą grupę symboli naraz.
+ */
+export function wzorzecPrefiksu(q: string): string {
+  return q.replace(/[!%_[]/g, (z) => "!" + z) + "%";
+}
+
+/**
  * Strona i licznik kartotek, którym brakuje którejś wagi albo wymiaru.
  *
  * Ten sam kształt co lista bez zdjęcia: tylko niezablokowane, stan i sprzedaż
@@ -179,6 +188,8 @@ export function budujZapytanieBezWymiarow(opts: {
   /** Kolumna lokalizacji (`MSSQL_LOC_COLUMN`) — do wiersza i do obchodu po regałach. */
   lokalizacja: string;
   zFiltrem: boolean;
+  /** Filtr po początku symbolu (`@symbolOd`), osobny od szukania w treści. */
+  zSymbolem?: boolean;
   sortuj?: SortWymiarow;
   naStanie?: boolean;
   sprzedane?: boolean;
@@ -194,6 +205,7 @@ export function budujZapytanieBezWymiarow(opts: {
       "(t.tw_Symbol LIKE @q ESCAPE '!' OR t.tw_Nazwa LIKE @q ESCAPE '!' OR t.tw_PodstKodKresk LIKE @q ESCAPE '!')"
     );
   }
+  if (opts.zSymbolem) warunki.push("t.tw_Symbol LIKE @symbolOd ESCAPE '!'");
   if (opts.naStanie) {
     warunki.push("EXISTS (SELECT 1 FROM tw_Stan st WITH (NOLOCK) WHERE st.st_TowId = t.tw_Id AND st.st_Stan > 0)");
   }
@@ -226,6 +238,8 @@ export function budujZapytanieBezWymiarow(opts: {
 
 export interface ZapytanieListy {
   q: string;
+  /** Początek symbolu; pusty = bez filtra. */
+  symbolOd: string;
   limit: number;
   offset: number;
   sortuj: SortWymiarow;
@@ -271,6 +285,7 @@ export async function towaryBezWymiarow(z: ZapytanieListy): Promise<{ razem: num
     pola: polaWymiarow(),
     lokalizacja: m.locColumn,
     zFiltrem: z.q !== "",
+    zSymbolem: z.symbolOd !== "",
     sortuj: z.sortuj,
     naStanie: z.naStanie,
     sprzedane: z.sprzedane,
@@ -281,6 +296,7 @@ export async function towaryBezWymiarow(z: ZapytanieListy): Promise<{ razem: num
   const zapytanie = () => {
     const r = pool.request().input("odSprzedazy", sql.VarChar(10), od);
     if (z.q !== "") r.input("q", sql.NVarChar(200), wzorzecLike(z.q));
+    if (z.symbolOd !== "") r.input("symbolOd", sql.NVarChar(200), wzorzecPrefiksu(z.symbolOd));
     return r;
   };
   const strona = await zapytanie()
@@ -346,6 +362,10 @@ export async function towaryBezWymiarowDemo(z: ZapytanieListy): Promise<{ razem:
     warunki.push("(t.symbol LIKE ? ESCAPE '!' OR t.nazwa LIKE ? ESCAPE '!' OR IFNULL(t.ean, '') LIKE ? ESCAPE '!')");
     const wz = wzorzecLike(z.q);
     parametry.push(wz, wz, wz);
+  }
+  if (z.symbolOd !== "") {
+    warunki.push("t.symbol LIKE ? ESCAPE '!'");
+    parametry.push(wzorzecPrefiksu(z.symbolOd));
   }
   if (z.naStanie) {
     warunki.push("EXISTS (SELECT 1 FROM sgt_stan st WHERE st.tw_id = t.tw_id AND st.stan > 0)");

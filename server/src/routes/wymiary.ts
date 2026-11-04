@@ -22,7 +22,7 @@ function awariaBazy(reply: FastifyReply, e: unknown) {
 }
 
 export async function wymiaryRoutes(app: FastifyInstance) {
-  app.get<{ Querystring: { q?: string; limit?: string; offset?: string; sortuj?: string; naStanie?: string; sprzedane?: string } }>(
+  app.get<{ Querystring: { q?: string; symbolOd?: string; limit?: string; offset?: string; sortuj?: string; naStanie?: string; sprzedane?: string } }>(
     "/api/wymiary/bez-wymiarow",
     async (req, reply) => {
       const nie = odmowa(reply); if (nie) return nie;

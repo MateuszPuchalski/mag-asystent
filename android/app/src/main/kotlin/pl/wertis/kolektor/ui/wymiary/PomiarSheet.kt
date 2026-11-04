@@ -11,6 +11,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.SheetValue
 import androidx.compose.material3.Text
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
@@ -98,8 +99,24 @@ fun PomiarSheet(
     val fokusy = remember(towar.twId) { PolePomiaru.entries.associateWith { FocusRequester() } }
     val scope = rememberCoroutineScope()
     /* Pięć pól z klawiaturą nie mieści się w połowie ekranu, a arkusz
-       zatrzymany w pół drogi chowałby przycisk zapisu pod klawiaturą. */
-    val stanArkusza = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+       zatrzymany w pół drogi chowałby przycisk zapisu pod klawiaturą.
+
+       Z WPISANYMI LICZBAMI ARKUSZ ZAMYKA TYLKO „ZAPISZ" ALBO „ANULUJ".
+       Dotknięcie obok i Wstecz pytają tę samą bramkę, a odmowa daje sygnał,
+       żeby człowiek wiedział, czemu arkusz został. Pusty formularz zamyka się
+       po staremu, bo nie ma czego stracić. Zgłoszenie z hali: przewijanie
+       pól palcem zamykało arkusz i kasowało zważone już liczby. */
+    val stanArkusza = rememberModalBottomSheetState(
+        skipPartiallyExpanded = true,
+        confirmValueChange = { cel ->
+            val wolno = cel != SheetValue.Hidden || !cokolwiekWpisane(wpisy)
+            if (!wolno) {
+                graph.feedback.beep(false)
+                graph.effects.toast("Zapisz pomiar albo dotknij „Anuluj”")
+            }
+            wolno
+        },
+    )
 
     LaunchedEffect(towar.twId) { fokusNa(fokusy, poleStartowe(towar)) }
 
@@ -135,13 +152,23 @@ fun PomiarSheet(
         }
     }
 
-    ModalBottomSheet(onDismissRequest = onClose, sheetState = stanArkusza, containerColor = CardWhite) {
+    ModalBottomSheet(
+        onDismissRequest = onClose,
+        sheetState = stanArkusza,
+        containerColor = CardWhite,
+        /* Bez przeciągania arkusza w ogóle: ruch palcem po polach ma przewijać
+           formularz, a nie go zamykać. Uchwyt znika razem z gestem, bo
+           obiecywałby ruch, którego już nie ma. */
+        sheetGesturesEnabled = false,
+        dragHandle = null,
+    ) {
         Column(
             modifier = Modifier
                 .fillMaxWidth()
                 .verticalScroll(rememberScrollState())
                 .padding(horizontal = 16.dp)
-                .padding(bottom = 24.dp),
+                // bez uchwytu górny brzeg przylegałby do napisu
+                .padding(top = 16.dp, bottom = 24.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
             Text("ZWAŻ I ZMIERZ", fontSize = 11.sp, color = InkMute, fontWeight = FontWeight.Bold)
