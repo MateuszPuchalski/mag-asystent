@@ -1,7 +1,7 @@
 import React, { useEffect, useId, useRef, useState } from "react";
 import { Ruler } from "lucide-react";
 import {
-  NA_STRONIE, useBezWymiarow, useZapiszPomiar, type PozycjaBezWymiarow, type Pomiar, type SortWymiarow,
+  NA_STRONIE, poczatekSymbolu, useBezWymiarow, useZapiszPomiar, type PozycjaBezWymiarow, type Pomiar, type SortWymiarow,
 } from "../api/wymiary";
 import { Blad, EtykietaWartosci, Karta, Pole, Przycisk, Pusto, WierszKolejki, ile } from "../ui";
 import { klawiszZajety } from "../nawigacja/fokus";
@@ -154,11 +154,18 @@ export function Wymiary() {
   const [sortuj, setSortuj] = useState<SortWymiarow>("sprzedaz");
   const [naStanie, setNaStanie] = useState(false);
   const [sprzedane, setSprzedane] = useState(false);
+  /* Początek symbolu („W") zawęża listę do grupy towarów — ta sama przerwa co szukanie. */
+  const [frazaSymbolu, setFrazaSymbolu] = useState("");
+  const [symbolOd, setSymbolOd] = useState("");
   useEffect(() => {
     const t = setTimeout(() => { setQ(fraza.trim()); setOffset(0); }, 250);
     return () => clearTimeout(t);
   }, [fraza]);
-  const lista = useBezWymiarow(q, offset, sortuj, naStanie, sprzedane);
+  useEffect(() => {
+    const t = setTimeout(() => { setSymbolOd(poczatekSymbolu(frazaSymbolu)); setOffset(0); }, 250);
+    return () => clearTimeout(t);
+  }, [frazaSymbolu]);
+  const lista = useBezWymiarow(q, offset, sortuj, naStanie, sprzedane, symbolOd);
   const [wybrany, setWybrany] = useState<PozycjaBezWymiarow | null>(null);
   const [zrobione, setZrobione] = useState<ReadonlySet<number>>(() => new Set());
   const [ostatni, setOstatni] = useState("");
@@ -219,6 +226,7 @@ export function Wymiary() {
     /* Błąd bez danych zamiast „wszystko zmierzone” — awaria to nie koniec pracy. */
     : lista.error && !lista.data ? bladListy
     : pozycje.length === 0 ? <Pusto waga="lista">{q ? "Nic nie pasuje do szukania."
+        : symbolOd ? `Każdy towar z symbolem na „${symbolOd}” ma wagę i wymiary.`
         : sprzedane ? "Każdy towar sprzedany w 30 dni ma wagę i wymiary."
         : naStanie ? "Każdy towar na stanie ma wagę i wymiary." : "Każdy towar ma wagę i wymiary."}</Pusto>
     : <ul className="divide-y divide-slate-100">
@@ -231,6 +239,8 @@ export function Wymiary() {
       <div className="shrink-0 p-2">
         <Pole value={fraza} onChange={(e) => setFraza(e.target.value)}
           placeholder="Symbol, nazwa albo EAN" aria-label="Szukaj towaru bez wymiarów" />
+        <Pole className="mt-2" value={frazaSymbolu} onChange={(e) => setFrazaSymbolu(e.target.value)}
+          placeholder="Symbol zaczyna się od…" aria-label="Symbol zaczyna się od" />
         {/* Zmiana porządku albo filtra wraca na pierwszą stronę. */}
         <label className="mt-2 flex items-center gap-2 text-sm text-slate-700">Kolejność
           <select className="field min-w-0 flex-1" value={sortuj}
@@ -253,7 +263,8 @@ export function Wymiary() {
       </div>
       <div className="shrink-0 border-y border-slate-200 bg-slate-50 px-3 py-1">
         <span className="text-xs font-semibold text-slate-600">
-          {razem === undefined ? "Towary bez wymiarów" : `${ile(razem, "towar", "towary", "towarów")} bez wagi lub wymiarów`}</span>
+          {razem === undefined ? "Towary bez wymiarów" : `${ile(razem, "towar", "towary", "towarów")} bez wagi lub wymiarów`
+            + (symbolOd ? ` · symbole na ${symbolOd}` : "")}</span>
       </div>
       <div className="min-h-0 flex-1 overflow-y-auto">{lewa}</div>
       {lista.data && bladListy}

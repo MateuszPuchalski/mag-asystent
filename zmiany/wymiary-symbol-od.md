@@ -1,9 +1,9 @@
 ---
 rodzaj: minor
-tytul: kolektor — wymiary po początku symbolu, formularz nie zamyka się sam
+tytul: wymiary po początku symbolu, formularz kolektora nie zamyka się sam
 ---
 
-**Lista „Do zmierzenia" na kolektorze filtruje po początku symbolu.**
+**Wymiary filtrują po początku symbolu, na kolektorze i w panelu.**
 Wpisz „W", a zostaną tylko towary, których symbol zaczyna się na W.
 
 **Formularz pomiaru nie zamyka się od przesunięcia palcem.** Wpisanych
