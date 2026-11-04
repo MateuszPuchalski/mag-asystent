@@ -47,13 +47,20 @@ function opiszBlad(e: unknown, kolumna: string): string {
   );
 }
 
-/** Ta sama zamiana dla INSERT-u zdjęcia — inne prawo, więc inne polecenie. */
-function opiszBladZdjecia(e: unknown, tabela: string): string {
+/**
+ * Ta sama zamiana dla INSERT-u zdjęcia — inne prawo, więc inne polecenie.
+ *
+ * Zamiana zdjęcia głównego potrzebuje jeszcze prawa do flagi głównego.
+ * `glowneZamiany` podaje tę kolumnę tylko przy zamianie, bo zwykłe dopisanie flagi nie zmienia.
+ */
+export function opiszBladZdjecia(e: unknown, tabela: string, glowneZamiany?: string): string {
   const tresc = e instanceof Error ? e.message : String(e);
   if (!/permission was denied|odmowa|denied/i.test(tresc)) return tresc;
+  const zamiana = glowneZamiany ? `GRANT UPDATE ON dbo.${tabela} (${glowneZamiany}) TO wertis; ` : "";
   return (
-    `Konto SQL nie ma prawa dopisania zdjęcia. Wykonaj w SSMS na bazie ` +
+    `Konto SQL nie ma prawa ${glowneZamiany ? "zamiany" : "dopisania"} zdjęcia. Wykonaj w SSMS na bazie ` +
     `podmiotu: GRANT INSERT ON dbo.${tabela} TO wertis; ` +
+    zamiana +
     `GRANT SELECT ON dbo.ins_ident TO wertis; ` +
     `GRANT UPDATE ON dbo.ins_ident (ido_wartosc) TO wertis; ` +
     `— potem PONÓW to zadanie. Zdjęcie NIE ZGINĘŁO: leży w bazie WERTIS ` +
@@ -102,7 +109,7 @@ async function pwdIdJestIdentity(pool: sql.ConnectionPool): Promise<boolean> {
  * `assertSafeColumn`: pochodzą z pliku konfiguracyjnego, czyli z wejścia.
  *
  * `zd_Glowne` NIE JEST tu na sztywno. Kartoteka może mieć kilka zdjęć, a odczyt
- * bierze główne; nowe ma być główne WYŁĄCZNIE wtedy, gdy żadnego jeszcze nie ma.
+ * bierze główne; nowe jest główne, gdy żadnego jeszcze nie ma albo przy zamianie.
  * Rozstrzyga to `@glowne`, wyliczone przez wołającego w tej samej transakcji —
  * dwa zdjęcia oznaczone jako główne dałyby ETag skaczący przy każdym odczycie.
  *
@@ -165,6 +172,85 @@ export function budujZapytanieLiczby(opts: { tabela: string; klucz: string }): s
   const t = assertSafeColumn(opts.tabela);
   const klucz = assertSafeColumn(opts.klucz);
   return `SELECT COUNT(*) AS ile FROM ${t} WHERE ${klucz} = @id`;
+}
+
+/**
+ * Zdjęcie główne kartoteki schodzi na dodatkowe, przy zamianie na zdjęcie z Allegro.
+ *
+ * Tylko UPDATE flagi, nigdy DELETE. Stare zdjęcie zostaje w Subiekcie jako
+ * dodatkowe, więc pomyłkę da się cofnąć. Jak Subiekt to rysuje, stoi jako
+ * [WERYFIKUJ] w docs/subiekt-gt-struktura.md.
+ *
+ * `HOLDLOCK` trzyma zakres kluczy towaru do końca transakcji. Druga zamiana
+ * tego samego towaru czeka wtedy na pierwszą i widzi jej nowy wiersz.
+ * Bez tego oba nowe wiersze mogłyby zostać głównymi.
+ */
+export function budujZapytanieZdjeGlowne(opts: { tabela: string; klucz: string; glowne: string }): string {
+  const t = assertSafeColumn(opts.tabela);
+  const klucz = assertSafeColumn(opts.klucz);
+  const glowne = assertSafeColumn(opts.glowne);
+  return `UPDATE ${t} WITH (HOLDLOCK) SET ${glowne} = 0 WHERE ${klucz} = @id AND ${glowne} = 1`;
+}
+
+/** Tyle z transakcji `mssql` potrzebuje zapis zdjęcia; atrapa w teście podaje to samo. */
+export interface TransakcjaZdjecia {
+  request(): ZadanieZdjecia;
+}
+export interface ZadanieZdjecia {
+  input(nazwa: string, typ: unknown, wartosc: unknown): ZadanieZdjecia;
+  query(q: string): Promise<{ recordset: Array<Record<string, unknown>> }>;
+}
+
+/**
+ * Zapytania zapisu zdjęcia wewnątrz otwartej transakcji.
+ *
+ * Wydzielone z adaptera, bo kolejność zapytań da się sprawdzić atrapą
+ * transakcji, bez serwera MSSQL. Commit i rollback zostają u wołającego.
+ *
+ * Bez `zamien`: liczymy zdjęcia i nowe jest główne tylko przy pustej kartotece.
+ * Z `zamien`: najpierw stare główne schodzi na dodatkowe, potem nowe wchodzi
+ * jako główne. Oba kroki w jednej transakcji, więc kartoteka nigdy nie zostaje
+ * bez głównego ani z dwoma.
+ */
+export async function zapiszZdjecieWTransakcji(
+  trans: TransakcjaZdjecia,
+  twId: number,
+  obraz: Buffer,
+  opcje: { zamien?: boolean } = {},
+): Promise<void> {
+  const c = config.zdjecia;
+  let glowne: boolean;
+  if (opcje.zamien === true) {
+    await trans
+      .request()
+      .input("id", sql.Int, twId)
+      .query(budujZapytanieZdjeGlowne({ tabela: c.tabela, klucz: c.kolumnaKlucza, glowne: c.kolumnaGlowne }));
+    glowne = true;
+  } else {
+    const ile = await trans
+      .request()
+      .input("id", sql.Int, twId)
+      .query(budujZapytanieLiczby({ tabela: c.tabela, klucz: c.kolumnaKlucza }));
+    glowne = Number(ile.recordset[0]?.ile ?? 0) === 0;
+  }
+
+  const zapytanie = budujZapytanieInsert({
+    tabela: c.tabela,
+    kolumna: c.kolumna,
+    klucz: c.kolumnaKlucza,
+    glowne: c.kolumnaGlowne,
+    idWiersza: c.kolumnaKolejnosc,
+    crc: c.kolumnaCrc || undefined,
+  });
+  const req = trans
+    .request()
+    .input("id", sql.Int, twId)
+    .input("obraz", sql.VarBinary(sql.MAX), obraz)
+    .input("glowne", sql.Bit, glowne)
+    /* Licznik Subiekta nazywa się jak tabela, której numery wydaje. */
+    .input("licznik", sql.VarChar(50), c.tabela);
+  if (c.kolumnaCrc) req.input("crc", sql.Int, sumaZdjecia(obraz));
+  await req.query(zapytanie);
 }
 
 export class SqlSferaAdapter implements SferaAdapter {
@@ -281,8 +367,11 @@ export class SqlSferaAdapter implements SferaAdapter {
    *
    * PNG jedzie do bazy Z PRZEZROCZYSTOŚCIĄ. Jak podgląd Subiekta rysuje kanał
    * alfa — [WERYFIKUJ] na kartotece próbnej PRZED produkcją (DEPLOY §6).
+   *
+   * `zamien` dotyczy tylko osobnej tabeli zdjęć. Wariantu z obrazem w wierszu
+   * `tw__Towar` zapis nie ma: konfiguracja odmawia startu bez `ZDJECIA_TABELA`.
    */
-  async applySetZdjecie(twId: number): Promise<void> {
+  async applySetZdjecie(twId: number, opcje: { zamien?: boolean } = {}): Promise<void> {
     const c = config.zdjecia;
     const wlasne = wlasneZdjecie(twId);
     if (!wlasne) {
@@ -296,33 +385,11 @@ export class SqlSferaAdapter implements SferaAdapter {
     const trans = pool.transaction();
     await trans.begin();
     try {
-      const ile = await trans
-        .request()
-        .input("id", sql.Int, twId)
-        .query(budujZapytanieLiczby({ tabela: c.tabela, klucz: c.kolumnaKlucza }));
-      const pierwsze = Number(ile.recordset[0]?.ile ?? 0) === 0;
-
-      const zapytanie = budujZapytanieInsert({
-        tabela: c.tabela,
-        kolumna: c.kolumna,
-        klucz: c.kolumnaKlucza,
-        glowne: c.kolumnaGlowne,
-        idWiersza: c.kolumnaKolejnosc,
-        crc: c.kolumnaCrc || undefined,
-      });
-      const req = trans
-        .request()
-        .input("id", sql.Int, twId)
-        .input("obraz", sql.VarBinary(sql.MAX), wlasne.obraz)
-        .input("glowne", sql.Bit, pierwsze)
-        /* Licznik Subiekta nazywa się jak tabela, której numery wydaje. */
-        .input("licznik", sql.VarChar(50), c.tabela);
-      if (c.kolumnaCrc) req.input("crc", sql.Int, sumaZdjecia(wlasne.obraz));
-      await req.query(zapytanie);
+      await zapiszZdjecieWTransakcji(trans, twId, wlasne.obraz, opcje);
       await trans.commit();
     } catch (e) {
       await trans.rollback().catch(() => undefined);
-      throw new Error(opiszBladZdjecia(e, c.tabela));
+      throw new Error(opiszBladZdjecia(e, c.tabela, opcje.zamien === true ? c.kolumnaGlowne : undefined));
     }
 
     /* Wiersz w WERTIS znika DOPIERO TERAZ — od tej chwili źródłem jest znowu

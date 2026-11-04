@@ -324,6 +324,9 @@ Sprawdz "zapis zdjec nadaje prawo do licznika numerow ins_ident" {
     Zaloz ($zZapisem -match "GRANT UPDATE ON dbo\.ins_ident \(ido_wartosc\)") "brak zapisu licznika"
     $bez = Get-WertisSkryptUprawnien -Baza "T" -KolumnaLokalizacji "tw_Pole3" -Haslo "x"
     Zaloz (-not ($bez -match "ins_ident")) "prawo do licznika bez zapisu zdjec"
+    # Zamiana zdjecia glownego na zdjecie z Allegro przestawia zd_Glowne.
+    Zaloz ($zZapisem -match "GRANT UPDATE ON dbo\.tw_ZdjecieTw \(zd_Glowne\)") "brak prawa do flagi glownego"
+    Zaloz (-not ($bez -match "zd_Glowne")) "prawo do flagi glownego bez zapisu zdjec"
 
     $ile = @(Get-WertisTabeleOdczytu -Zdjecia $true).Count
     $upr = @(1..$ile | ForEach-Object {
@@ -337,6 +340,10 @@ Sprawdz "zapis zdjec nadaje prawo do licznika numerow ins_ident" {
     Zaloz (-not $bezLicznika.Ok) "prog przepuszcza brak prawa do licznika"
     Zaloz ($bezLicznika.BrakujaceWiersze -contains "ins_ident") "komunikat nie nazywa licznika"
     $upr += [pscustomobject]@{ permission_name = "UPDATE"; state_desc = "GRANT"; obiekt = "ins_ident"; kolumna = "ido_wartosc" }
+    $bezFlagi = Test-WertisUprawnienia -Uprawnienia $upr -KolumnaLokalizacji "tw_Pole3" -ZapisZdjec $true
+    Zaloz (-not $bezFlagi.Ok) "prog przepuszcza brak prawa do flagi zdjecia glownego"
+    Zaloz ($bezFlagi.BrakujaceWiersze -contains "tw_ZdjecieTw (zd_Glowne)") "komunikat nie nazywa flagi glownego"
+    $upr += [pscustomobject]@{ permission_name = "UPDATE"; state_desc = "GRANT"; obiekt = "tw_ZdjecieTw"; kolumna = "zd_Glowne" }
     $komplet = Test-WertisUprawnienia -Uprawnienia $upr -KolumnaLokalizacji "tw_Pole3" -ZapisZdjec $true
     Zaloz $komplet.Ok "prog odrzuca komplet z licznikiem"
 }

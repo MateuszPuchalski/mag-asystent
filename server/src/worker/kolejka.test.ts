@@ -162,6 +162,27 @@ test("zdjęcie kartoteki trafia do adaptera, nie w gałąź nieznanego typu", as
   assert.equal(stan(id).status, "done");
 });
 
+/* Zamiana zdjęcia głównego zmienia to, co biuro widzi w Subiekcie. Wartość
+   inna niż dosłowne `true` w wierszu kolejki ma dać zwykłe dopisanie. */
+test("zamiana zdjęcia głównego przechodzi do adaptera tylko przy zamien: true", async () => {
+  const zapisane: Array<[number, boolean | undefined]> = [];
+  const adapter: SferaAdapter = {
+    ...udany(),
+    applySetZdjecie: async (twId, opcje) => {
+      zapisane.push([twId, opcje?.zamien]);
+    },
+  };
+  for (const payload of [{ twId: 1, zamien: true }, { twId: 2 }, { twId: 3, zamien: "true" }, { twId: 4, zamien: 1 }]) {
+    const id = dodajZadanie("set_zdjecie", payload);
+    await K.przetworzZadanie(
+      { id, type: "set_zdjecie", payload: JSON.stringify(payload), attempts: 0, source_doc_id: null, ...AUDYT },
+      adapter,
+    );
+    assert.equal(stan(id).status, "done");
+  }
+  assert.deepEqual(zapisane, [[1, true], [2, false], [3, false], [4, false]]);
+});
+
 test("pomiar wagi i wymiarów trafia do adaptera, nie w gałąź nieznanego typu", async () => {
   /* `set_wymiary` to CZWARTY typ zapisu do bazy firmy. Literówka w dyspozytorze
      dałaby błąd po trzech próbach, a ekran wymiarów pokazywałby towar jako

@@ -37,7 +37,7 @@ export const LIMIT_DOMYSLNY = 50;
 const LIMIT_MAX = 200;
 
 /** Liczba z zapytania albo wartość domyślna; śmieci nie wywracają strony. */
-function calkowita(surowa: unknown, domyslna: number, min: number, max: number): number {
+export function calkowita(surowa: unknown, domyslna: number, min: number, max: number): number {
   const n = Math.trunc(Number(surowa));
   if (!Number.isFinite(n) || surowa === undefined || surowa === "") return domyslna;
   return Math.min(max, Math.max(min, n));
@@ -55,7 +55,7 @@ export function powodWylaczenia(): string | null {
   }
   if (config.zdjecia.zrodlo !== "blob") {
     return (
-      "Listę towarów bez zdjęcia czyta się z bazy Subiekta, a ta instalacja " +
+      "Listy towarów do zdjęć czyta się z bazy Subiekta, a ta instalacja " +
       "nie czyta z niej zdjęć (ZDJECIA_ZRODLO=blob)."
     );
   }
@@ -63,7 +63,7 @@ export function powodWylaczenia(): string | null {
 }
 
 /** Które z podanych towarów mają u nas zdjęcie, którego Subiekt jeszcze nie ma. */
-function oczekujace(twIds: number[]): Set<number> {
+export function oczekujace(twIds: number[]): Set<number> {
   if (twIds.length === 0) return new Set();
   const znaki = twIds.map(() => "?").join(",");
   const wiersze = db()

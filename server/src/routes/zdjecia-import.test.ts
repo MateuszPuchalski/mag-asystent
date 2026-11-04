@@ -332,3 +332,61 @@ test("gotowe: magazynier 403, bez sesji 401", async () => {
   assert.equal((await gotowe({}, { gotowy: JPEG.toString("base64") })).statusCode, 401);
   assert.equal(zapisane(), undefined);
 });
+
+// ── Zamiana niewyraźnego zdjęcia na zdjęcie z oferty ────────────────────────
+
+const zadanieZdjecia = (queueId: number) =>
+  JSON.parse(
+    (db().prepare("SELECT payload FROM sfera_queue WHERE id = ?").get(queueId) as { payload: string }).payload
+  );
+
+test("gotowe z zamien i zrodlo=allegro: payload niesie zamien, audyt zamiana", async () => {
+  config.zdjecia.dodawanie = "subiekt";
+  const r = await gotowe(sesja("biuro"), {
+    gotowy: JPEG.toString("base64"),
+    zrodlo: "allegro",
+    plik: "oferta 123",
+    zamien: true,
+  });
+  assert.equal(r.statusCode, 200, r.payload);
+  const { queueId } = r.json();
+  assert.deepEqual(zadanieZdjecia(queueId), { twId: 1, zamien: true });
+  assert.deepEqual(zdarzenie(), {
+    bajtow: JPEG.length, tloUsuniete: false, zrodlo: "allegro", queueId, plik: "oferta 123", zamiana: true,
+  });
+});
+
+/* Zamiana zdejmuje dotychczasowe główne, więc wolno ją tylko zdjęciem
+   z naszej oferty. Plik z dysku nie ma tej gwarancji. */
+test("gotowe: zamien bez zrodlo=allegro → 400 i nic nie zapisuje", async () => {
+  config.zdjecia.dodawanie = "subiekt";
+  const h = sesja("biuro");
+  for (const zrodlo of [undefined, "import", "ALLEGRO"]) {
+    const r = await gotowe(h, { gotowy: JPEG.toString("base64"), zrodlo, zamien: true });
+    assert.equal(r.statusCode, 400, `zrodlo=${String(zrodlo)}`);
+    assert.match(r.json().error, /Allegro/);
+  }
+  assert.equal(zapisane(), undefined);
+  assert.equal(dodanych(), 0);
+  assert.equal((db().prepare("SELECT COUNT(*) AS n FROM sfera_queue").get() as { n: number }).n, 0);
+});
+
+test("gotowe: zamien inne niż true to zwykłe dodanie, bez pól zamiany", async () => {
+  config.zdjecia.dodawanie = "subiekt";
+  const h = sesja("biuro");
+  for (const zamien of [false, "true", 1]) {
+    db().prepare("DELETE FROM zdjecie_wlasne").run();
+    db().prepare("DELETE FROM events").run();
+    const r = await gotowe(h, { gotowy: JPEG.toString("base64"), zrodlo: "allegro", zamien });
+    assert.equal(r.statusCode, 200, r.payload);
+    assert.deepEqual(zadanieZdjecia(r.json().queueId), { twId: 1 }, `zamien=${String(zamien)}`);
+    assert.equal("zamiana" in zdarzenie(), false);
+  }
+});
+
+test("gotowe: zamiana przy zdjęciu czekającym na Subiekt → 409 jak dziś", async () => {
+  czekajace(1);
+  const r = await gotowe(sesja("biuro"), { gotowy: JPEG.toString("base64"), zrodlo: "allegro", zamien: true });
+  assert.equal(r.statusCode, 409);
+  assert.equal(dodanych(), 0);
+});

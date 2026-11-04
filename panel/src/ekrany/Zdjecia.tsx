@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from "react";
-import { FolderInput, ImageOff, ImagePlus, Store } from "lucide-react";
+import { FolderInput, ImageOff, ImagePlus, ScanSearch, Store } from "lucide-react";
 import {
   NA_STRONIE, useBezZdjecia, type PozycjaBezZdjecia, type SortBezZdjecia, type ZapisanieZdjecia,
 } from "../api/zdjecia";
@@ -7,6 +7,7 @@ import { Blad, EtykietaWartosci, Karta, Pole, Przycisk, Pusto, WierszKolejki, il
 import { Edytor } from "../zdjecia/Edytor";
 import { ImportZFolderu } from "../zdjecia/ImportZFolderu";
 import { ImportZAllegro } from "../zdjecia/ImportZAllegro";
+import { NiewyrazneZAllegro } from "../zdjecia/NiewyrazneZAllegro";
 import { klawiszZajety } from "../nawigacja/fokus";
 
 /* ── ZDJĘCIA: TOWARY BEZ ZDJĘCIA ───────────────────────────────────────────
@@ -98,6 +99,7 @@ export function Zdjecia() {
   const [ostatni, setOstatni] = useState("");
   const [importuje, setImportuje] = useState(false);
   const [zAllegro, setZAllegro] = useState(false);
+  const [niewyrazne, setNiewyrazne] = useState(false);
 
   const pozycje = lista.data?.pozycje ?? [];
   /* Pierwszy wolny towar wybiera się sam. Wybór nie jest zapisem, a oszczędza
@@ -167,6 +169,7 @@ export function Zdjecia() {
   return <div className="flex flex-col gap-4 lg:h-full lg:min-h-0">
     {importuje && <ImportZFolderu onZamknij={() => setImportuje(false)} />}
     {zAllegro && <ImportZAllegro onZamknij={() => setZAllegro(false)} />}
+    {niewyrazne && <NiewyrazneZAllegro onZamknij={() => setNiewyrazne(false)} />}
     <div className="grid gap-4 lg:min-h-0 lg:flex-1 lg:grid-cols-[23rem_minmax(0,1fr)] lg:grid-rows-[minmax(0,1fr)] 2xl:grid-cols-[25rem_minmax(0,1fr)]">
       <Karta className="flex min-h-0 flex-col overflow-hidden">
         <div className="shrink-0 p-2">
@@ -205,6 +208,10 @@ export function Zdjecia() {
           <button type="button" onClick={() => setZAllegro(true)}
             className="inline-flex min-h-8 items-center gap-1.5 rounded-md px-2 text-xs font-semibold text-slate-700 hover:bg-slate-200">
             <Store size={14} aria-hidden="true" />Z ofert Allegro</button>
+          {/* Obok, bo to to samo źródło: oferta poprawia też zdjęcie, które już jest. */}
+          <button type="button" onClick={() => setNiewyrazne(true)}
+            className="inline-flex min-h-8 items-center gap-1.5 rounded-md px-2 text-xs font-semibold text-slate-700 hover:bg-slate-200">
+            <ScanSearch size={14} aria-hidden="true" />Popraw niewyraźne</button>
           </div>
         </div>
         <div className="min-h-0 flex-1 overflow-y-auto">{lewa}</div>

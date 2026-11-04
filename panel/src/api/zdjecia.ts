@@ -162,11 +162,14 @@ export function useImportGotowych() {
   const qc = useQueryClient();
   const wyslij = useMutation({
     /* `zrodlo` trafia do audytu: zdjęcie z oferty i z folderu to dwie różne drogi. */
-    mutationFn: ({ twId, gotowy, plik, zrodlo = "import" }: {
-      twId: number; gotowy: string; plik: string; zrodlo?: "import" | "allegro";
+    /* `zamien` robi zdjęcie nowym głównym, a stare zostaje w Subiekcie jako
+       dodatkowe. Pole idzie tylko wtedy, gdy jest prawdą, więc zwykły import
+       wysyła dokładnie to co dotąd. */
+    mutationFn: ({ twId, gotowy, plik, zrodlo = "import", zamien = false }: {
+      twId: number; gotowy: string; plik: string; zrodlo?: "import" | "allegro"; zamien?: boolean;
     }) =>
       api<ZapisanieZdjecia>(`${sciezka(twId)}/gotowe`, {
-        method: "POST", body: JSON.stringify({ gotowy, zrodlo, plik }),
+        method: "POST", body: JSON.stringify({ gotowy, zrodlo, plik, ...(zamien ? { zamien: true } : {}) }),
       }),
     /* Jak przy zapisie z edytora: pamięć obrazów nie może dalej mówić „bez zdjęcia". */
     onSuccess: (_w, { twId }) => zapomnijObraz(sciezka(twId)),
@@ -411,6 +414,52 @@ export async function zbierzBezZdjecia(postep: (zebrane: number, razem: number) 
   }
   return { wlaczone: true, razem, pozycje };
 }
+
+/* ── TOWARY ZE ZDJĘCIEM ────────────────────────────────────────────────────
+   Do szukania niewyraźnych zdjęć kartotek. Serwer oddaje towary ze zdjęciem
+   głównym w porządku sprzedaży, a ostrość mierzy panel na płótnie. */
+
+export interface PozycjaZeZdjeciem {
+  twId: number;
+  symbol: string;
+  nazwa: string;
+  /** Rozmiar pliku zdjęcia głównego; `null`, gdy baza go nie podała. */
+  bajtow: number | null;
+  /** Zdjęcie tego towaru już czeka w kolejce do Subiekta. */
+  oczekuje: boolean;
+}
+
+export interface ListaZeZdjeciem {
+  wlaczone: boolean;
+  powod?: string;
+  razem: number;
+  pozycje: PozycjaZeZdjeciem[];
+}
+
+/**
+ * Wszystkie towary ze zdjęciem, strona po stronie. Sam odczyt, więc bez haka
+ * mutacji. `null`, gdy agent zatrzymał zbiórkę.
+ */
+export async function zbierzZeZdjeciem(postep: (zebrane: number, razem: number) => void,
+  stop: () => boolean): Promise<ListaZeZdjeciem | null> {
+  const pozycje: PozycjaZeZdjeciem[] = [];
+  let razem = 0;
+  for (let offset = 0; ; offset += ZBIORKA_NA_STRONE) {
+    if (stop()) return null;
+    const p = new URLSearchParams({ limit: String(ZBIORKA_NA_STRONE), offset: String(offset) });
+    const d = await api<ListaZeZdjeciem>(`/api/zdjecia/ze-zdjeciem?${p}`);
+    if (!d.wlaczone) return d;
+    razem = d.razem;
+    pozycje.push(...d.pozycje);
+    postep(pozycje.length, razem);
+    /* Pusta strona też kończy: lista mogła się skrócić w trakcie zbiórki. */
+    if (d.pozycje.length === 0 || pozycje.length >= razem) break;
+  }
+  return { wlaczone: true, razem, pozycje };
+}
+
+/** Pełne zdjęcie główne kartoteki do pomiaru. Ta sama trasa co kafel, więc serwer bierze je z pamięci podręcznej. */
+export const pobierzZdjecieTowaru = (twId: number): Promise<Blob> => pobierzBlob(sciezka(twId));
 
 /** Duże zdjęcie oferty, z którego panel składa biały kwadrat. */
 export const pobierzZdjecieOferty = (offerId: string): Promise<Blob> =>
