@@ -2495,11 +2495,10 @@ function bezObslugiKlienta(database: DatabaseSync) {
  * Pierwsza lista pilnych do zmierzenia, podana przez właściciela razem z samą
  * funkcją. Bez niej przycisk „PILNE" czekałby, aż ktoś w biurze wklei listę.
  *
- * WSIEWAMY RAZ: tylko do pustej tabeli i tylko, gdy w dzienniku nie ma
- * jeszcze żadnej zmiany listy. Sama pusta tabela nie wystarczy, bo biuro,
- * które listę wyczyściło, dostałoby ją z powrotem przy restarcie. Wpis
- * w dzienniku idzie surowym SQL-em z tego samego powodu co w
- * `sprzatnijSprzedGranicy`: `services/events.ts` importuje ten moduł.
+ * WSIEWAMY RAZ, a pamięta to `wymiary_pilne_ziarno`. Sama pusta tabela
+ * nie wystarczy, bo biuro, które listę wyczyściło, dostałoby ją z powrotem
+ * przy restarcie. Instalacja, w której biuro zdążyło już ustawić listę,
+ * zostaje przy swojej.
  */
 const PILNE_OD_WLASCICIELA = [
   "W37-0401", "W37-0407", "W09-1304", "W09-1101", "W37-0403", "W09-0409", "W09-0410",
@@ -2508,14 +2507,13 @@ const PILNE_OD_WLASCICIELA = [
 ];
 
 function ziarnoPilnychWymiarow(database: DatabaseSync) {
-  const jest = database.prepare("SELECT 1 FROM wymiary_pilne LIMIT 1").get();
-  const zmieniana = database.prepare("SELECT 1 FROM events WHERE type = 'wymiary_pilne' LIMIT 1").get();
-  if (jest || zmieniana) return;
+  if (database.prepare("SELECT 1 FROM wymiary_pilne_ziarno").get()) return;
   const teraz = new Date().toISOString();
-  const ins = database.prepare("INSERT INTO wymiary_pilne(symbol, dodano_at) VALUES (?, ?)");
-  for (const s of PILNE_OD_WLASCICIELA) ins.run(s, teraz);
-  database.prepare("INSERT INTO events(type, user_id, payload) VALUES (?,?,?)")
-    .run("wymiary_pilne", "migracja", JSON.stringify({ przed: [], po: PILNE_OD_WLASCICIELA }));
+  if (!database.prepare("SELECT 1 FROM wymiary_pilne LIMIT 1").get()) {
+    const ins = database.prepare("INSERT INTO wymiary_pilne(symbol, dodano_at) VALUES (?, ?)");
+    for (const s of PILNE_OD_WLASCICIELA) ins.run(s, teraz);
+  }
+  database.prepare("INSERT INTO wymiary_pilne_ziarno(id, at) VALUES (1, ?)").run(teraz);
 }
 
 function ziarnoTagowSpraw(database: DatabaseSync) {

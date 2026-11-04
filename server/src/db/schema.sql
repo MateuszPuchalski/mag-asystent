@@ -3259,3 +3259,10 @@ CREATE TABLE IF NOT EXISTS wymiary_pilne (
   symbol     TEXT PRIMARY KEY COLLATE NOCASE,
   dodano_at  TEXT NOT NULL
 );
+
+-- Jeden wiersz: pierwsza lista od właściciela już weszła. Osobno od listy,
+-- bo lista wyczyszczona przez biuro nie może wrócić przy restarcie.
+CREATE TABLE IF NOT EXISTS wymiary_pilne_ziarno (
+  id  INTEGER PRIMARY KEY CHECK (id = 1),
+  at  TEXT NOT NULL
+);

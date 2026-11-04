@@ -6,21 +6,23 @@ import { MemoryRouter } from "react-router-dom";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { atrapaZapisow } from "../test/zapisy";
 import { Wymiary, braki } from "./Wymiary";
-import type { ListaBezWymiarow, PozycjaBezWymiarow } from "../api/wymiary";
+import { rozpoznajSymbole, type ListaBezWymiarow, type PozycjaBezWymiarow } from "../api/wymiary";
 
 /* ── Ekran „Wymiary” ──────────────────────────────────────────────────────
    1. ZERO ZAPISU PRZY OTWARCIU, także gdy formularz sam wybiera pierwszy towar.
    2. Wyłączona funkcja: zdanie z serwera zamiast formularza.
    3. Pełna droga samą klawiaturą: Enter po polach, zapis, następny towar.
    4. Puste pole nie jedzie do serwera — zostaje w Subiekcie bez zmian.
-   5. Towar w kolejce jest wyszarzony i nie da się go wybrać. */
+   5. Towar w kolejce jest wyszarzony i nie da się go wybrać.
+   6. Filtr pilnych widać tylko wtedy, gdy jest co zmierzyć; okno listy
+      zapisuje całość jednym PUT, a samo otwarcie niczego nie zapisuje. */
 
 const poz = (twId: number, symbol: string, nazwa: string, inne: Partial<PozycjaBezWymiarow> = {}): PozycjaBezWymiarow =>
   ({ twId, symbol, nazwa, ean: null, stan: 2, sprzedaz: 0, lokalizacja: null, brutto: null, netto: null, dlugosc: null, szerokosc: null,
     wysokosc: null, oczekuje: false, ...inne });
 
 const LISTA: ListaBezWymiarow = {
-  wlaczone: true, razem: 3,
+  wlaczone: true, razem: 3, pilneRazem: 0,
   pozycje: [
     poz(1, "KOSA-1", "Kosa spalinowa"),
     poz(2, "KON-2", "Konewka 10 l", { oczekuje: true }),
@@ -35,8 +37,11 @@ function pokaz() {
   return render(<QueryClientProvider client={qc}><MemoryRouter><Wymiary /></MemoryRouter></QueryClientProvider>);
 }
 
+let pilneSymbole: string[] = [];
+
 const atrapa = () => atrapaZapisow(
-  (url) => (url.startsWith("/api/wymiary/bez-wymiarow") ? lista : undefined),
+  (url) => (url.startsWith("/api/wymiary/bez-wymiarow") ? lista
+    : url === "/api/wymiary/pilne" ? { symbole: pilneSymbole } : undefined),
   (url) => (url.startsWith("/api/wymiary/") ? { status: 200, cialo: { queueId: 9 } } : undefined));
 
 /** Ciało zapisu pod danym adresem, z prawdziwych wywołań `fetch`. */
@@ -45,7 +50,7 @@ const cialo = (url: string) => {
   return w ? JSON.parse(String(w[1]!.body)) : undefined;
 };
 
-beforeEach(() => { lista = LISTA; });
+beforeEach(() => { lista = LISTA; pilneSymbole = []; });
 afterEach(() => { vi.unstubAllGlobals(); });
 
 describe("Wymiary", () => {
@@ -58,7 +63,7 @@ describe("Wymiary", () => {
   });
 
   it("wyłączona funkcja pokazuje zdanie z serwera zamiast formularza", async () => {
-    lista = { wlaczone: false, powod: "Wymiary czekają na konfigurację: WYMIARY_POLE_DLUGOSC", razem: 0, pozycje: [] };
+    lista = { wlaczone: false, powod: "Wymiary czekają na konfigurację: WYMIARY_POLE_DLUGOSC", razem: 0, pilneRazem: 0, pozycje: [] };
     atrapa();
     pokaz();
     expect(await screen.findByText(/czekają na konfigurację/)).toBeInTheDocument();
@@ -123,5 +128,71 @@ describe("Wymiary", () => {
       || String(url).endsWith("symbolOd=W"))).toBe(true));
     expect(await screen.findByText(/symbole na W/)).toBeInTheDocument();
     expect(stan.wyslane).toEqual([]);
+  });
+
+  it("filtr pilnych chowa się, gdy z listy pilnych nie ma czego mierzyć", async () => {
+    atrapa();
+    pokaz();
+    await screen.findByRole("heading", { name: "Kosa spalinowa" });
+    expect(screen.queryByRole("checkbox", { name: /Tylko pilne/ })).toBeNull();
+  });
+
+  it("filtr pilnych pokazuje liczbę i wysyła pilne=1, bez zapisu", async () => {
+    lista = { ...LISTA, pilneRazem: 7 };
+    const stan = atrapa();
+    const u = userEvent.setup();
+    pokaz();
+    await u.click(await screen.findByRole("checkbox", { name: "Tylko pilne (7)" }));
+    await waitFor(() => expect(vi.mocked(fetch).mock.calls.some(([url]) => /[?&]pilne=1(&|$)/.test(String(url)))).toBe(true));
+    expect(stan.wyslane).toEqual([]);
+  });
+
+  it("pusta lista przy filtrze pilnych mówi, że pilne są zmierzone", async () => {
+    lista = { ...LISTA, pilneRazem: 2 };
+    atrapa();
+    const u = userEvent.setup();
+    pokaz();
+    const filtr = await screen.findByRole("checkbox", { name: "Tylko pilne (2)" });
+    lista = { ...LISTA, razem: 0, pilneRazem: 0, pozycje: [] };
+    await u.click(filtr);
+    expect(await screen.findByText("Wszystkie pilne towary mają wagę i wymiary.")).toBeInTheDocument();
+    /* Zaznaczony filtr zostaje, choć licznik spadł do zera — inaczej nie dałoby się go odznaczyć. */
+    expect(screen.getByRole("checkbox", { name: "Tylko pilne (0)" })).toBeChecked();
+  });
+
+  it("otwarcie okna listy pilnych czyta listę i niczego nie zapisuje", async () => {
+    pilneSymbole = ["W37-0401", "W09-1304"];
+    const stan = atrapa();
+    const u = userEvent.setup();
+    pokaz();
+    await screen.findByRole("heading", { name: "Kosa spalinowa" });
+    await u.click(screen.getByRole("button", { name: "Lista pilnych…" }));
+    const pole = await screen.findByLabelText(/Symbole, jeden pod drugim/);
+    await waitFor(() => expect(pole).toHaveValue("W37-0401\nW09-1304"));
+    expect(screen.getByText("Rozpoznano 2 symbole.")).toBeInTheDocument();
+    expect(stan.wyslane).toEqual([]);
+    expect(stan.nieznane).toEqual([]);
+  });
+
+  it("okno zapisuje wklejoną kolumnę jednym PUT z tablicą symboli", async () => {
+    const stan = atrapa();
+    const u = userEvent.setup();
+    pokaz();
+    await screen.findByRole("heading", { name: "Kosa spalinowa" });
+    await u.click(screen.getByRole("button", { name: "Lista pilnych…" }));
+    const pole = await screen.findByLabelText(/Symbole, jeden pod drugim/);
+    await waitFor(() => expect(pole).not.toHaveAttribute("readonly"));
+    await u.click(pole);
+    await u.paste("Wertis NO.\nw37-0401\nW09-1304; W37-0401");
+    expect(screen.getByText("Rozpoznano 2 symbole.")).toBeInTheDocument();
+    await u.click(screen.getByRole("button", { name: "Zapisz" }));
+    await waitFor(() => expect(stan.wyslane).toEqual(["PUT /api/wymiary/pilne"]));
+    expect(cialo("/api/wymiary/pilne")).toEqual({ symbole: ["W37-0401", "W09-1304"] });
+    await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+  });
+
+  it("rozpoznaje symbole po białych znakach, przecinkach i średnikach, bez powtórzeń", () => {
+    expect(rozpoznajSymbole(" a-1,b-2;\tA-1\r\nc-3 ")).toEqual(["A-1", "B-2", "C-3"]);
+    expect(rozpoznajSymbole("")).toEqual([]);
   });
 });
