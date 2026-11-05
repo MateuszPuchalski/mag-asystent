@@ -322,6 +322,22 @@ export function useZdjecieDowodu(problemId: number | null | undefined): {
 }
 
 /**
+ * ÓSME ŹRÓDŁO: zdjęcie dołączone do zgłoszenia pracownika.
+ *
+ * Trasa stoi za sesją i wpuszcza wyłącznie właściciela, więc `<img src>`
+ * dostałby 401. Wchodzi do wspólnej kolejki z powodu opisanego w nagłówku.
+ * Zdanie o porażce jest potrzebne, bo zdjęcie bywa całą treścią uwagi.
+ */
+export function useZdjecieZgloszenia(zgloszenieId: number, zdjecieId: number): {
+  url: string | null | undefined; blad: string | null; ponow: () => void;
+} {
+  const sciezka = `/api/obsluga/zgloszenia/${zgloszenieId}/zdjecie/${zdjecieId}`;
+  const url = useObraz(sciezka);
+  const { blad, ponow } = useBladObrazu(sciezka);
+  return { url, blad, ponow };
+}
+
+/**
  * Logo dostawcy. `maLogo` przychodzi z listy — pytamy WYŁĄCZNIE wtedy, gdy
  * logo jest. Próba „na ślepo" przy każdym dostawcy dała kiedyś 355 wpisów 404
  * na tysiąc w dzienniku produkcyjnym (komentarz przy `DeliveryDocument.maLogo`).

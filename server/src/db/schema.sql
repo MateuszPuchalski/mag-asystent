@@ -3266,3 +3266,43 @@ CREATE TABLE IF NOT EXISTS wymiary_pilne_ziarno (
   id  INTEGER PRIMARY KEY CHECK (id = 1),
   at  TEXT NOT NULL
 );
+
+-- Zgłoszenie pracownika: pomysł, irytacja albo błąd, złożone z dowolnego
+-- ekranu panelu lub kolektora (`docs/zgloszenia-pracownikow.md`). Czyta je
+-- wyłącznie admin, bo uwaga o koledze albo o szefie ma być bezpieczna.
+-- `ekran` to ścieżka BEZ zapytania: zapytanie niesie to, czego pracownik
+-- szukał, czyli często login albo nazwisko klienta.
+CREATE TABLE IF NOT EXISTS zgloszenie_pracownika (
+  id            INTEGER PRIMARY KEY AUTOINCREMENT,
+  rodzaj        TEXT NOT NULL CHECK (rodzaj IN ('pomysl','przeszkadza','blad')),
+  opis          TEXT NOT NULL,
+  ekran         TEXT NOT NULL,
+  zrodlo        TEXT NOT NULL CHECK (zrodlo IN ('panel','kolektor')),
+  wersja        TEXT,
+  -- Identyfikator kolektora z sesji albo nagłówka, nigdy z ciała: przy
+  -- błędzie pierwsze pytanie brzmi „to jedno urządzenie czy wszystkie?".
+  urzadzenie    TEXT,
+  at            TEXT NOT NULL,
+  autor         TEXT NOT NULL,
+  autor_user_id INTEGER REFERENCES app_user(user_id),
+  status        TEXT NOT NULL DEFAULT 'nowe'
+                CHECK (status IN ('nowe','przyjete','zrobione','odrzucone')),
+  odpowiedz     TEXT,
+  status_at     TEXT,
+  status_przez  TEXT
+);
+CREATE INDEX IF NOT EXISTS ix_zgloszenie_pracownika_autor
+  ON zgloszenie_pracownika(autor_user_id, id);
+CREATE INDEX IF NOT EXISTS ix_zgloszenie_pracownika_status
+  ON zgloszenie_pracownika(status, id);
+
+-- CASCADE, bo zdjęcie bez zgłoszenia nie znaczy nic. Plik leży w katalogu
+-- zdjęć z hali (`services/foto.ts`), tu jest tylko jego nazwa.
+CREATE TABLE IF NOT EXISTS zgloszenie_zdjecie (
+  id            INTEGER PRIMARY KEY AUTOINCREMENT,
+  zgloszenie_id INTEGER NOT NULL REFERENCES zgloszenie_pracownika(id) ON DELETE CASCADE,
+  foto_ref      TEXT NOT NULL,
+  at            TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS ix_zgloszenie_zdjecie_zgloszenie
+  ON zgloszenie_zdjecie(zgloszenie_id, id);

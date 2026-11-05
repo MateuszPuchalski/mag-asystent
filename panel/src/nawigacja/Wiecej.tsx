@@ -1,12 +1,16 @@
 import React from "react";
 import { Link, useLocation } from "react-router-dom";
-import { Activity, BarChart3, ChevronDown, FileText, LogOut, Menu, Settings } from "lucide-react";
-import { useZdrowie } from "../api/rozmowy";
+import { Activity, BarChart3, ChevronDown, FileText, LogOut, Menu, MessageSquarePlus, Settings } from "lucide-react";
+import { useJa, useZdrowie } from "../api/rozmowy";
+import { useLicznikZgloszen } from "../api/zgloszenia";
 import { useOkienko } from "../skrzynka/MenuRozmowy";
 import { zdanieSynchronizacji } from "./Synchronizacja";
 
 /** Adres ustawień w JEDNYM miejscu: czyta go menu i trasa w `main.tsx`. */
 export const USTAWIENIA = "/obsluga/ustawienia";
+
+/** Adres zgłoszeń pracowników — czyta go menu i trasa w `main.tsx`. */
+export const ZGLOSZENIA = "/obsluga/zgloszenia";
 
 /* ── MENU „WIĘCEJ" ZAMIAST DOLNEGO RZĘDU (0.538.0) ─────────────────────────
    Decyzja właściciela z 27 września 2026: nagłówek ma jeden rząd. Dolny rząd
@@ -38,8 +42,15 @@ export function Wiecej({ wyloguj }: { wyloguj: () => void }) {
   const { pathname } = useLocation();
   const { otwarte, setOtwarte, ramka } = useOkienko<HTMLDivElement>();
   const zdrowie = useZdrowie().data;
+  /* Zgłoszenia czyta wyłącznie właściciel, więc innym rolom pozycji nie ma.
+     Licznik nowych mówi mu, że ktoś czeka na jego słowo. */
+  const admin = useJa().data?.user.role === "admin";
+  /* Brak danych to nie zero: przy awarii licznik mówi „—”, a nie milknie.
+     Zgaszony licznik właściciel czytałby jako „nikt nic nie zgłosił”. */
+  const licznikZgloszen = useLicznikZgloszen(admin);
+  const noweZgloszenia = licznikZgloszen.data;
   const tu = (adres: string) => pathname.startsWith(adres);
-  const wMenu = WGLAD.some((p) => tu(p.do)) || tu(USTAWIENIA);
+  const wMenu = WGLAD.some((p) => tu(p.do)) || tu(USTAWIENIA) || tu(ZGLOSZENIA);
   /* Klik w pozycję zamyka menu: przejście na inny ekran z otwartym okienkiem
      zostawiałoby je nad nową treścią. */
   const zamknij = () => setOtwarte(false);
@@ -71,6 +82,14 @@ export function Wiecej({ wyloguj }: { wyloguj: () => void }) {
           {p.do === "/obsluga/stan" && zdrowie && <span className="text-podpis font-normal text-slate-600">
             {zdanieSynchronizacji(zdrowie.allegroInbox)}</span>}</span>
       </Link>)}
+      {admin && <Link to={ZGLOSZENIA} onClick={zamknij} aria-current={tu(ZGLOSZENIA) ? "page" : undefined}
+        className={klasaPozycji(ZGLOSZENIA)}><MessageSquarePlus size={16} />
+        <span className="mr-auto">Zgłoszenia pracowników</span>
+        {noweZgloszenia === undefined && licznikZgloszen.isError
+          ? <span className="rounded-full bg-slate-200 px-1.5 text-podpis font-bold text-slate-800"
+            aria-label="nowe zgłoszenia: nie wiadomo, brak odpowiedzi serwera">—</span>
+          : !!noweZgloszenia && <span className="rounded-full bg-wertis-amber px-1.5 text-podpis font-bold text-wertis-ink"
+            aria-label={`nowe zgłoszenia: ${noweZgloszenia}`}>{noweZgloszenia}</span>}</Link>}
       <span aria-hidden="true" className="mx-1.5 my-1 h-px bg-slate-200" />
       <Link to={USTAWIENIA} onClick={zamknij} aria-current={tu(USTAWIENIA) ? "page" : undefined}
         className={klasaPozycji(USTAWIENIA)}><Settings size={16} />Ustawienia</Link>
