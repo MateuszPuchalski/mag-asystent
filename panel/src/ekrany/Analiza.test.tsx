@@ -130,6 +130,11 @@ beforeEach(() => {
     if (url === "/api/obsluga/eskalacja") return new Response(JSON.stringify({ miesiace: [] }));
     if (url === "/api/obsluga/copilot") return new Response(JSON.stringify({ wlaczony: false, powod: "wyłączony",
       model: "x", modelKlasyfikacji: "x", maxPartia: 20, autoKlasyfikacja: false, autoSzkic: false }));
+    /* Reklamacje w liczbach jadą z kolejką reklamacji; kafle mają własny test. */
+    if (url === "/api/obsluga/reklamacje") return new Response(JSON.stringify({
+      reklamacje: [], liczniki: {}, stan: null, prog: null,
+      statystyki: { doDecyzji: { teraz: 18, tydzienTemu: 12 }, doOdpowiedzi: { teraz: 11, tydzienTemu: null },
+        poTerminie: { teraz: 1, tydzienTemu: null }, sredniDniDoWerdyktu: { teraz: 2.4, poprzednio: 3.3, okresDni: 30 } } }));
     /* Stan Sellasist ma własny test przy `analiza/Strefa.tsx`; tu liczy się skład. */
     if (url === "/api/biuro/sellasist/stan") return new Response(JSON.stringify({ wlaczony: false,
       ostatniaProbaAt: null, ostatniSukcesAt: null, blad: null, wKolejce: 0, dni: [] }));
@@ -260,6 +265,20 @@ describe("zakres Obsługa klienta", () => {
     expect(screen.queryByText("Według osoby")).toBeNull();
     /* Wgląd prowadzi do pracy (0.502.0): liczba bieżąca otwiera kolejkę. */
     expect(screen.getByRole("link", { name: /ostatnie słowo klienta teraz/ })).toHaveAttribute("href", "/obsluga/skrzynka");
+    expect(zapisy).toEqual([]);
+  });
+
+  /* Liczby reklamacji zeszły z kolejki do wglądu: trend i średni czas
+     odpowiadają na „jak idzie”, a nie na „co teraz zrobić”. */
+  it("pokazuje reklamacje w liczbach z trendem, samym odczytem kolejki", async () => {
+    pokaz();
+    await screen.findByText("Rosa-Pol");
+    await userEvent.click(screen.getByRole("button", { name: "Obsługa klienta" }));
+    const kafle = await screen.findByRole("group", { name: "Reklamacje w liczbach" });
+    expect(adresy).toContain("/api/obsluga/reklamacje");
+    expect(await within(kafle).findByText("+6 od zeszłego tygodnia")).toBeInTheDocument();
+    expect(within(kafle).getByText("2,4 dnia")).toBeInTheDocument();
+    expect(within(kafle).queryAllByRole("button")).toHaveLength(0);
     expect(zapisy).toEqual([]);
   });
 

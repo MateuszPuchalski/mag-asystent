@@ -111,33 +111,31 @@ describe("Kto prowadzi — jedyna czynność na wierzchu", () => {
   });
 });
 
-describe("Menu „⋮”: rzadkie czynności na jawne kliknięcie", () => {
-  it("niesie odświeżenie z Allegro; nic nie woła się samo", async () => {
+describe("Odświeżenie z Allegro: jeden przycisk na jawne kliknięcie", () => {
+  it("odświeża sprawę kliknięciem; nic nie woła się samo", async () => {
     const onOdswiez = vi.fn();
     glowica({ przesylka: PRZESYLKA }, {}, { onOdswiez });
     expect(onOdswiez).not.toHaveBeenCalled();
-    await userEvent.click(screen.getByRole("button", { name: "Więcej działań" }));
-    const menu = screen.getByRole("menu", { name: "Więcej działań" });
-    await userEvent.click(within(menu).getByRole("menuitem", { name: "Odśwież z Allegro" }));
+    await userEvent.click(screen.getByRole("button", { name: "Odśwież z Allegro" }));
     expect(onOdswiez).toHaveBeenCalledTimes(1);
-    expect(screen.queryByRole("menu")).not.toBeInTheDocument();
   });
 
-  it("pytania o przesyłkę w menu nie ma — stoi raz, przy przesyłce", async () => {
+  it("menu z jedną pozycją nie wraca, a pytanie o przesyłkę stoi przy przesyłce", () => {
     glowica({ przesylka: PRZESYLKA }, {}, { onOdswiez: vi.fn() });
-    await userEvent.click(screen.getByRole("button", { name: "Więcej działań" }));
-    expect(screen.getAllByRole("menuitem")).toHaveLength(1);
-    expect(screen.queryByRole("menuitem", { name: /przesyłk/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Więcej działań" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /przesyłk/ })).not.toBeInTheDocument();
   });
 
-  it("Escape zamyka menu i oddaje fokus przyciskowi", async () => {
-    glowica({}, {}, { onOdswiez: vi.fn() });
-    const przycisk = screen.getByRole("button", { name: "Więcej działań" });
-    await userEvent.click(przycisk);
-    expect(screen.getByRole("menuitem", { name: "Odśwież z Allegro" })).toHaveFocus();
-    await userEvent.keyboard("{Escape}");
-    expect(screen.queryByRole("menu")).not.toBeInTheDocument();
-    expect(przycisk).toHaveFocus();
+  it("w trakcie przycisk jest martwy i mówi, że trwa", () => {
+    glowica({}, {}, { onOdswiez: vi.fn(), odswieza: true });
+    const przycisk = screen.getByRole("button", { name: "Odśwież z Allegro" });
+    expect(przycisk).toBeDisabled();
+    expect(przycisk).toHaveAttribute("aria-busy", "true");
+  });
+
+  it("bez obsługi odświeżenia przycisku nie ma", () => {
+    glowica();
+    expect(screen.queryByRole("button", { name: "Odśwież z Allegro" })).not.toBeInTheDocument();
   });
 });
 
