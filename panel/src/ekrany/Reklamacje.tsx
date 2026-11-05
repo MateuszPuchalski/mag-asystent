@@ -2,22 +2,20 @@ import React, { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { Search, ShieldQuestion } from "lucide-react";
 import {
-  useCofnijNotatkeReklamacji, useDodajZalacznikSprawy, useNotatkaReklamacji, useOdpowiedz,
+  useCofnijNotatkeReklamacji, useDodajZalacznikSprawy, useNotatkaReklamacji,
   useOdswiez, useProwadze, useReklamacja, useReklamacje, useSprawdzPrzesylke, useSynchronizuj,
-  useUsunZalacznikSprawy, useWerdykt, useZalacznikiSprawy, useZwrotTowaru,
+  useUsunZalacznikSprawy, useZalacznikiSprawy,
 } from "../api/reklamacje";
 import { useJa } from "../api/rozmowy";
-import { Konflikt } from "../api/klient";
 import { naBase64 } from "../api/plik";
-import type {
-  KubelekReklamacji, Reklamacja, SzczegolyWysylki, WiadomoscReklamacji,
-} from "../api/typy";
+import type { KubelekReklamacji, Reklamacja } from "../api/typy";
 import { DialogKonfliktu } from "../skrzynka/DialogKonfliktu";
 import { Edytor } from "../reklamacje/Edytor";
-import { Werdykt, type DecyzjaOTowarze, type ZadanieWerdyktu } from "../reklamacje/Werdykt";
+import { Werdykt } from "../reklamacje/Werdykt";
 import { useSzkicSprawy } from "../sprawy/useSzkicSprawy";
+import { useBledy } from "../sprawy/useBledy";
 import { Blad, Karta, Pusto } from "../ui";
-import { KUBELKI, Kolejka, kwotaWiersza, liniaPowodu, wGrupach } from "../reklamacje/Kolejka";
+import { KUBELKI, Kolejka, kwotaWiersza, wGrupach } from "../reklamacje/Kolejka";
 import { PasekSita, ZdanieOUkrytych, mojaSprawa, useSito, wSicie } from "../sprawy/Moje";
 import { posortuj, usePorzadek, type OsPorzadku } from "../sprawy/Porzadek";
 import { PasekProgu } from "../sprawy/Prog";
@@ -26,31 +24,30 @@ import { Czat } from "../reklamacje/Czat";
 import { Glowica } from "../reklamacje/Glowica";
 import { DrogaSprawy } from "../reklamacje/DrogaSprawy";
 import { zdarzeniaPrzesylek } from "../reklamacje/przesylki";
-import { Kafle, type FiltrKafla } from "../reklamacje/Kafle";
-import { PozostaleKubelki } from "../reklamacje/Przelacznik";
+import { Kubelki } from "../reklamacje/Kubelki";
 import { PrzyciskSynchronizacji, StanSynchronizacji } from "../reklamacje/Synchronizacja";
 import { FiltrKolejki } from "../reklamacje/Filtr";
 import { Produkt } from "../reklamacje/Produkt";
 import { Notatka } from "../reklamacje/Notatka";
+import { liniaPowodu } from "../reklamacje/slownik";
+import { useWysylki } from "../reklamacje/useWysylki";
 import { pasujeDoFrazy, rozbij } from "../sprawy/szukanie";
 import { klawiszZajety } from "../nawigacja/fokus";
 import { useKursorListy } from "../nawigacja/kursor";
 
 /* ── Ekran reklamacji: trzy kolumny ──────────────────────────────────────────
    Kolejka, sprawa i decyzja. Kolejka po lewej, bo od niej zaczyna się każda
-   praca. Niesie też liczby dnia jako kafle-filtry i synchronizację przy
-   tytule, więc nad kolumnami nic nie zabiera wysokości.
+   praca. Nad listą stoi jeden rząd kubełków z liczbą listy, a synchronizacja
+   przy tytule, więc nad kolumnami nic nie zabiera wysokości.
    Sprawa w środku rośnie, bo rozmowę czyta się najdłużej. Decyzja z faktami
    stoi po prawej, bo nieodwracalne pytanie zadaje się PO rozmowie.
+
+   EKRAN JEST UKŁADEM. Wysyłki do Allegro z triażem 409 i dialogiem zgody
+   mieszkają w `useWysylki`, a zdania o porażce czynności w `useBledy`.
 
    UKŁAD ŁAMIE SIĘ W DÓŁ, NIE W BOK. Na szerokim oknie każda kolumna przewija
    się osobno, a na wąskim albo przy powiększeniu 200% kolumny spadają pod
    siebie i przewija się cały ekran. Nic nie wychodzi za kadr (WCAG 1.4.4).
-
-   TRZY RODZAJE 409 i każdy każe co innego zrobić: dopisek klienta albo doradcy
-   otwiera dialog z jawną zgodą, zamknięta rozmowa kończy temat, a rozjazd
-   wersji każe odświeżyć. Rozróżnia je EKRAN, nie hak — ten sam podział co
-   w skrzynce. Stanowisko o towarze dostaje TEN SAM triage (`dopisek()`).
 
    Klawiatura działa bez podpowiedzi na ekranie: strzałki i j/k chodzą po
    kolejce, cyfry przełączają kubełek, m i n — sito. Podpowiedzi nie stoją,
@@ -65,32 +62,20 @@ const UKLAD = "flex flex-wrap items-start gap-4 "
 const KOLUMNA = "min-w-0 xl:min-h-0";
 const KARTA = "rounded-xl border border-slate-200 bg-white shadow-sm";
 
-/* Niepewny los stanowiska o towarze. Serwer drugiego nie wyśle, a nic
-   w panelu tej próby nie rozstrzyga, więc zdanie wskazuje Centrum Sprzedaży
-   zamiast synchronizacji, która blokady nie zdejmie. */
-const TOWAR_NIEPEWNY = "Stanowisko o towarze mogło nie dojść do kupującego. "
-  + "Sprawdź w Centrum Sprzedaży, czy je dostał — panel drugiego nie wyśle.";
-
 /** Osie porządku tej kolejki; pierwsza jest domyślna. */
 const OSIE: OsPorzadku[] = ["termin", "otwarto", "ruch", "kwota"];
 
-/* Porządek słowami obok sita. Wybiera się go w filtrze,
-   a zdanie mówi bez otwierania filtra, w jakiej kolejności stoi lista. */
+/* Porządek słowami, ale TYLKO GDY NIE JEST DOMYŚLNY. Domyślny termin widać
+   po nagłówku „Po terminie” na górze listy, a zdanie przy każdej sprawie
+   powtarzałoby to, co lista mówi sama. */
 const OPIS_PORZADKU: Partial<Record<OsPorzadku, string>> = {
-  termin: "Najpilniejsze na górze",
   otwarto: "Najnowsze na górze",
   ruch: "Ostatni ruch na górze",
   kwota: "Najdroższe na górze",
 };
 
-/**
- * Dopisek klienta albo doradcy w chwili wysyłki — jedyny 409, który wymaga
- * DECYZJI agenta, więc jedyny z własnym dialogiem. Reszta (zamknięta rozmowa,
- * rozjazd wersji, odmowa Allegro) to zdanie z serwera pod polem.
- */
-const dopisek = (e: unknown): SzczegolyWysylki | null =>
-  e instanceof Konflikt && (e.szczegoly as SzczegolyWysylki).nowaWiadomosc !== undefined
-    ? (e.szczegoly as SzczegolyWysylki) : null;
+/** Czynności na sprawie, które kończą się zdaniem o porażce przy swoim przycisku. */
+type Czynnosc = "prowadze" | "przesylka" | "zalacznik" | "notatka";
 
 /**
  * Kody, po których człowiek szuka reklamacji — wszystkie, jakie sprawa niesie.
@@ -104,26 +89,10 @@ const kody = (r: Reklamacja) =>
   [r.numer, r.externalId, r.orderId, r.kupujacyLogin, r.prowadzi, r.notatka, r.ofertaNazwa]
     .filter((k): k is string => Boolean(k)).map((k) => k.toLowerCase());
 
-/**
- * Ostatnia NIE nasza wiadomość — punkt odniesienia dla kontroli świeżości.
- *
- * Liczy go panel z osi, a serwer sprawdza po swojemu i to on rozstrzyga.
- * Panel musi mieć CO wysłać, zanim serwer powie, czy się zgadza.
- */
-const ostatniaNieNasza = (czat: WiadomoscReklamacji[]): number | null => {
-  for (let i = czat.length - 1; i >= 0; i -= 1) {
-    if (czat[i].autorRola !== "SELLER") return czat[i].id;
-  }
-  return null;
-};
-
 export function Reklamacje() {
   const { id } = useParams();
   const nawiguj = useNavigate();
   const [kubelek, setKubelek] = useState<KubelekReklamacji | null>("decyzja");
-  /* Kafel „Po terminie” zawęża kubełek DO DECYZJI do spraw po terminie, bo
-     tak liczy go serwer. Stan osobny, bo kubełka „po terminie” nie ma. */
-  const [poTerminie, setPoTerminie] = useState(false);
   const [fraza, setFraza] = useState("");
   const ja = useJa();
   const mojeId = ja.data?.user.userId ?? null;
@@ -140,31 +109,15 @@ export function Reklamacje() {
   const { data, isLoading, error } = useReklamacje(bezProgu);
   const prowadze = useProwadze();
   const synchronizuj = useSynchronizuj();
-  const odpowiedz = useOdpowiedz();
   const odswiez = useOdswiez();
   const dodajZalacznik = useDodajZalacznikSprawy();
   const usunZalacznik = useUsunZalacznikSprawy();
   const sprawdzPrzesylke = useSprawdzPrzesylke();
-  const werdykt = useWerdykt();
-  const zwrotTowaru = useZwrotTowaru();
   const notatka = useNotatkaReklamacji();
   const cofnijNotatke = useCofnijNotatkeReklamacji();
-  const [bladPrzesylki, setBladPrzesylki] = useState("");
-  const [bladZalacznika, setBladZalacznika] = useState("");
-  const [bladProwadze, setBladProwadze] = useState("");
-  const [bladNotatki, setBladNotatki] = useState("");
-  const [bladWysylki, setBladWysylki] = useState("");
-  const [konfliktWysylki, setKonfliktWysylki] = useState<SzczegolyWysylki | null>(null);
-  const [bladWerdyktu, setBladWerdyktu] = useState("");
-  const [bladTowaru, setBladTowaru] = useState("");
-  /* Dopisek przy stanowisku o towarze niesie DECYZJĘ i treść, żeby „wyślij
-     mimo to” poszło z tym samym zamiarem, a nie z pustym formularzem. */
-  const [konfliktTowaru, setKonfliktTowaru] = useState<
-    { szczegoly: SzczegolyWysylki; decyzja: DecyzjaOTowarze; tresc: string } | null>(null);
 
   const wKubelku = useMemo(() => (data?.reklamacje ?? []).filter((r) =>
-    (kubelek === null || r.kubelek === kubelek) && (!poTerminie || r.poTerminie)),
-  [data, kubelek, poTerminie]);
+    kubelek === null || r.kubelek === kubelek), [data, kubelek]);
 
   /* Filtry liczą się w pamięci ekranu: lista przyjeżdża w całości, bo spraw
      w pracy są dziesiątki, nie tysiące. Fraza dzieli się po spacjach i każdy
@@ -212,15 +165,13 @@ export function Reklamacje() {
   const szczegol = useReklamacja(wybrana);
   /* Załączniki szkicu wiszą przy SPRAWIE, nie przy przeglądarce. */
   const zalacznikiWysylki = useZalacznikiSprawy(wybrana);
+  const { blad, zBledem } = useBledy<Czynnosc>(wybrana);
+  const wysylki = useWysylki({ szczegol: szczegol.data, tresc, onWyslano: wyczyscSzkic });
 
   /* Wejście z paska adresu na sprawę z innego kubełka ma pokazać TĘ sprawę,
      a nie pustą listę. Adres jest tu źródłem prawdy, kubełek za nim idzie. */
   useEffect(() => {
-    if (!reklamacja) return;
-    if ((kubelek !== null && reklamacja.kubelek !== kubelek) || (poTerminie && !reklamacja.poTerminie)) {
-      setKubelek(reklamacja.kubelek);
-      setPoTerminie(false);
-    }
+    if (reklamacja && kubelek !== null && reklamacja.kubelek !== kubelek) setKubelek(reklamacja.kubelek);
   }, [reklamacja?.id]);
 
   /**
@@ -229,34 +180,22 @@ export function Reklamacje() {
    * Bez tego lista by się zmieniła, a zaznaczenie zostałoby na sprawie
    * z poprzedniego kubełka — środek pokazywałby rozmowę spoza listy.
    */
-  const przelacz = (k: KubelekReklamacji | null, tylkoPoTerminie = false) => {
+  const przelacz = (k: KubelekReklamacji | null) => {
     setKubelek(k);
-    setPoTerminie(tylkoPoTerminie);
     setFraza("");
-    const pierwsza = (data?.reklamacje ?? []).find((r) =>
-      (k === null || r.kubelek === k) && (!tylkoPoTerminie || r.poTerminie));
+    const pierwsza = (data?.reklamacje ?? []).find((r) => k === null || r.kubelek === k);
     nawiguj(pierwsza ? `/obsluga/reklamacje/${pierwsza.id}` : "/obsluga/reklamacje");
   };
-
-  /* Wciśnięty „Po terminie” klikany drugi raz wraca do całego „Do decyzji”,
-     jak każdy przełącznik z `aria-pressed`. */
-  const wybierzKafel = (f: FiltrKafla) => {
-    if (f === "po_terminie") przelacz("decyzja", !(kubelek === "decyzja" && poTerminie));
-    else przelacz(f);
-  };
-  const kafelWybrany: FiltrKafla | null = kubelek === "decyzja"
-    ? (poTerminie ? "po_terminie" : "decyzja")
-    : kubelek === "odpowiedz" ? "odpowiedz" : null;
 
   /* Po werdykcie sprawa schodzi z kubełka, a `j` ma otworzyć tę, która
      stanęła na jej miejscu. Powód przy `nawigacja/kursor.ts`. */
   const idz = useKursorListy(widoczne, wybrana, (r) => nawiguj(`/obsluga/reklamacje/${r.id}`));
 
   /* ── WEJŚCIE W SPRAWĘ JĄ ODŚWIEŻA ──────────────────────────────────────────
-     Świadomy wyjątek od „zera zapisu przy patrzeniu”, decyzją właściciela.
-     Przebieg synchronizacji czyta najwyżej tysiąc spraw, więc ogona archiwum
-     nie odświeża nigdy, a agent patrzy na sprawę teraz. Trasa `/odswiez` jest
-     POST-em po to, żeby ten wyjątek był GŁOŚNY.
+     Agent pracuje na aktualnej sprawie. Przebieg synchronizacji przychodzi
+     co trzy minuty i czyta najwyżej tysiąc spraw, a agent patrzy na sprawę
+     teraz. To świadomy wyjątek od „zera zapisu przy patrzeniu”, decyzją
+     właściciela. Trasa `/odswiez` jest POST-em po to, żeby był GŁOŚNY.
 
      Jedno żądanie na sprawę: `ostatnioOdswiezona` pilnuje, żeby nie powtórzyć
      go przy renderze ani drugi raz w trybie ścisłym Reacta. Błąd zostawia
@@ -267,110 +206,6 @@ export function Reklamacje() {
     ostatnioOdswiezona.current = wybrana;
     odswiez.mutate({ id: wybrana });
   }, [wybrana]);
-
-  /* Szkic przeżywa zmianę sprawy, bo `useSzkicSprawy` przypisuje treść do
-     NUMERU sprawy. Czyszczą się błędy i konflikty: należą do próby, nie do
-     sprawy. */
-  useEffect(() => {
-    setBladWysylki("");
-    setKonfliktWysylki(null);
-    setBladWerdyktu("");
-    setBladTowaru("");
-    setKonfliktTowaru(null);
-    setBladProwadze("");
-    setBladPrzesylki("");
-    setBladNotatki("");
-  }, [wybrana]);
-
-  const wyslij = (mimoNowejWiadomosci = false) => {
-    const d = szczegol.data;
-    if (!d) return;
-    setBladWysylki("");
-    odpowiedz.mutate({
-      id: d.reklamacja.id,
-      tresc,
-      expectedWersja: d.reklamacja.wersja,
-      expectedLastMessageId: ostatniaNieNasza(d.czat),
-      mimoNowejWiadomosci,
-    }, {
-      onSuccess: (w) => {
-        setKonfliktWysylki(null);
-        if (w.status === "sent") wyczyscSzkic();
-        else setBladWysylki(
-          "Wysyłka nie dała jednoznacznej odpowiedzi — zsynchronizuj sprawę, zanim spróbujesz znowu.");
-        /* Stan sprawy u Allegro zmienił się przed chwilą, a takt przyjdzie za
-           trzy minuty. Przy wyniku niejednoznacznym to jedno żądanie
-           rozstrzyga, czy wiadomość poszła. */
-        odswiez.mutate({ id: d.reklamacja.id });
-      },
-      onError: (e) => {
-        /* Dopisek ma WŁASNY ekran, bo wymaga decyzji. Reszta to jedno zdanie
-           pod polem, które serwer przysyła gotowe. */
-        const k = dopisek(e);
-        if (k) setKonfliktWysylki(k);
-        else setBladWysylki((e as Error).message);
-      },
-    });
-  };
-
-  /* Werdykt: los próby przychodzi w odpowiedzi, a po `onSettled` sprawa
-     dociąga się z kolumnami `werdykt_*`. Tu zostaje tylko zdanie o porażce.
-
-     STANOWISKO O TOWARZE jedzie tym samym żądaniem, a jego los w polu
-     `towar`. Werdykt wyszedł nieodwracalnie, więc porażka towaru nie jest
-     porażką werdyktu: dopisek otwiera ten sam dialog, reszta to zdanie. */
-  const wyslijWerdykt = (z: ZadanieWerdyktu) => {
-    const d = szczegol.data;
-    if (!d) return;
-    setBladWerdyktu("");
-    setBladTowaru("");
-    setKonfliktTowaru(null);
-    const { towar, ...werdyktSam } = z;
-    werdykt.mutate({
-      id: d.reklamacja.id, ...werdyktSam, wersja: d.reklamacja.wersja,
-      ...(towar ? { towar: { ...towar, expectedLastMessageId: ostatniaNieNasza(d.czat) } } : {}),
-    }, {
-      onSuccess: (w) => {
-        if (w.status === "send_failed") setBladWerdyktu(w.blad ?? "Allegro odmówiło");
-        const los = w.towar;
-        if (towar && los) {
-          if ("konflikt" in los) {
-            if (los.konflikt.nowaWiadomosc !== undefined) {
-              setKonfliktTowaru({ szczegoly: los.konflikt, decyzja: towar.decyzja, tresc: towar.tresc });
-            } else setBladTowaru(los.konflikt.error ?? "Stanowisko o towarze nie wyszło — wyślij je jeszcze raz.");
-          } else if ("blad" in los) setBladTowaru(los.blad);
-          else if ("pominiety" in los) setBladTowaru(los.pominiety);
-          else if (los.status !== "sent") setBladTowaru(TOWAR_NIEPEWNY);
-        }
-        /* Zieleń „potwierdzony przez Allegro” należy się dopiero statusowi
-           z synchronizacji, więc dociągamy go od razu, zamiast czekać na takt. */
-        odswiez.mutate({ id: d.reklamacja.id });
-      },
-      onError: (e) => setBladWerdyktu((e as Error).message),
-    });
-  };
-
-  const wyslijTowar = (decyzja: DecyzjaOTowarze, trescTowaru: string, mimoNowejWiadomosci = false) => {
-    const d = szczegol.data;
-    if (!d) return;
-    setBladTowaru("");
-    zwrotTowaru.mutate({
-      id: d.reklamacja.id, decyzja, tresc: trescTowaru,
-      expectedWersja: d.reklamacja.wersja,
-      expectedLastMessageId: ostatniaNieNasza(d.czat),
-      mimoNowejWiadomosci,
-    }, {
-      onSuccess: (w) => {
-        setKonfliktTowaru(null);
-        if (w.status !== "sent") setBladTowaru(TOWAR_NIEPEWNY);
-      },
-      onError: (e) => {
-        const k = dopisek(e);
-        if (k) setKonfliktTowaru({ szczegoly: k, decyzja, tresc: trescTowaru });
-        else setBladTowaru((e as Error).message);
-      },
-    });
-  };
 
   /* Skróty milkną w polu tekstowym i pod oknem modalnym — inaczej cyfra
      wpisana w notatkę przełączałaby kubełek. Strażnik jest wspólny, bo własna
@@ -403,7 +238,6 @@ export function Reklamacje() {
   /* Nagłówek grupy spraw w terminie mówi, czym jest lista. Przy szukaniu
      lista miesza kubełki, więc nie udaje żadnego z nich. */
   const nazwaGrupy = pasujace ? "Wyniki szukania"
-    : poTerminie ? "Po terminie"
     : kubelek === null ? "Wszystkie" : (KUBELKI.find((k) => k.id === kubelek)?.etykieta ?? "");
   /* PRÓG, KTÓRY CHOWA PRACĘ, WOŁA NAD LISTĄ. W ciszy próg mieszka w filtrze,
      ale sprawy sprzed progu z żywym terminem to praca, a nie archiwum. */
@@ -413,17 +247,17 @@ export function Reklamacje() {
   const d = szczegol.data;
   const r = d?.reklamacja;
 
-  /* Zapytanie padło i nie ma danych: błąd zamiast listy, a kafle i pigułki
-     mówią „—”. Pusta lista przy awarii czytałaby się jako „nic nie czeka”. */
+  /* Zapytanie padło i nie ma danych: błąd zamiast listy, a pigułki mówią
+     „—”. Pusta lista przy awarii czytałaby się jako „nic nie czeka”. */
   const bezDanych = Boolean(error && !data);
 
   return <div className="flex flex-col gap-4 lg:h-full lg:min-h-0 lg:overflow-y-auto xl:overflow-hidden">
     <div className={UKLAD}>
       <section aria-label="Kolejka reklamacji"
         className={`${KOLUMNA} ${KARTA} flex flex-[1_1_340px] flex-col xl:overflow-hidden`}>
-        {/* Porządek z makiety: tytuł z synchronizacją i filtrem, szukanie,
-            kafle-filtry, pozostałe kubełki, sito, lista. Liczby stoją raz,
-            w kaflach, bo drugi licznik tej samej pracy to druga decyzja. */}
+        {/* Tytuł z synchronizacją i filtrem, szukanie, kubełki, sito, lista.
+            Liczby stoją raz, w kubełkach, bo drugi licznik tej samej pracy
+            to druga decyzja. */}
         <div className="flex shrink-0 flex-col gap-3 border-b border-slate-200 px-4 pb-3 pt-4">
           <div className="flex items-start gap-1">
             <div className="min-w-0 flex-1">
@@ -444,15 +278,15 @@ export function Reklamacje() {
               value={fraza} onChange={(e) => setFraza(e.target.value)}
               placeholder="Login, numer, zamówienie, towar, notatka" />
           </label>
-          <Kafle statystyki={data?.statystyki} wybrany={kafelWybrany} onWybierz={wybierzKafel} />
-          <PozostaleKubelki wybrany={kubelek} onWybierz={(k) => przelacz(k)}
+          <Kubelki wybrany={kubelek} onWybierz={przelacz}
             liczniki={data?.liczniki} wszystkich={data?.reklamacje.length} />
           {/* Sito bez danych mówiłoby „Moje 0”, czyli „nic nie czeka”. */}
           {!bezDanych && <div className="flex flex-wrap items-center gap-1.5">
             <PasekSita sito={sito} mojeId={mojeId} onPrzelacz={przelaczSito}
               moich={wKubelku.filter((x) => mojaSprawa(x.prowadziId, mojeId)).length}
               niczyich={wKubelku.filter((x) => x.prowadziId === null).length} />
-            <span className="ml-auto text-xs text-slate-600">{OPIS_PORZADKU[porzadek]}</span>
+            {OPIS_PORZADKU[porzadek] &&
+              <span className="ml-auto text-xs text-slate-600">{OPIS_PORZADKU[porzadek]}</span>}
           </div>}
         </div>
 
@@ -486,20 +320,12 @@ export function Reklamacje() {
         ? <>
           <section aria-label={`Reklamacja ${r.numer ?? r.externalId}`}
             className={`${KOLUMNA} ${KARTA} flex flex-[999_1_560px] flex-col xl:overflow-y-auto`}>
-            <Glowica szczegol={d} mojeId={mojeId} trwa={prowadze.isPending} blad={bladProwadze}
-              onProwadze={() => {
-                setBladProwadze("");
-                prowadze.mutate({ id: r.id, wersja: r.wersja },
-                  { onError: (e) => setBladProwadze((e as Error).message) });
-              }}
+            <Glowica szczegol={d} mojeId={mojeId} trwa={prowadze.isPending} blad={blad("prowadze")}
+              onProwadze={() => prowadze.mutate({ id: r.id, wersja: r.wersja }, zBledem("prowadze"))}
               onOdswiez={() => odswiez.mutate({ id: r.id })} odswieza={odswiez.isPending} />
             <DrogaSprawy dane={d} biezaca={{ rodzaj: "reklamacja", id: r.id }} sprawdzaPrzesylke={sprawdzPrzesylke.isPending}
-              bladPrzesylki={bladPrzesylki}
-              onSprawdzPrzesylke={() => {
-                setBladPrzesylki("");
-                sprawdzPrzesylke.mutate({ id: r.id },
-                  { onError: (e) => setBladPrzesylki((e as Error).message) });
-              }} />
+              bladPrzesylki={blad("przesylka")}
+              onSprawdzPrzesylke={() => sprawdzPrzesylke.mutate({ id: r.id }, zBledem("przesylka"))} />
             <div className="flex min-h-0 flex-1 flex-col border-t border-slate-200">
               <Czat tytul="Czat reklamacji"
                 sprawa={{
@@ -521,26 +347,22 @@ export function Reklamacje() {
                 /* Klucz sprawy: edytor trzyma własny stan (cofnięcie
                    wyczyszczenia, zwłokę Ctrl+Enter), a ekran nie montuje go
                    od nowa przy przejściu. */
-                edytor={<Edytor key={r.id} etykietaWyslij="Wyślij do klienta" tresc={tresc} wysyla={odpowiedz.isPending} blad={bladWysylki}
+                edytor={<Edytor key={r.id} etykietaWyslij="Wyślij do klienta" tresc={tresc}
+                  wysyla={wysylki.odpowiedz.trwa} blad={wysylki.odpowiedz.blad}
                   zalaczniki={zalacznikiWysylki.data?.zalaczniki ?? []}
                   dodajeZalacznik={dodajZalacznik.isPending}
-                  bladZalacznika={bladZalacznika}
+                  bladZalacznika={blad("zalacznik")}
                   /* Plik czytamy TU, nie w komponencie: base64 to sprawa
                      klienta HTTP, a katalog `reklamacje/` trzyma komponenty czyste. */
                   onDodajZalacznik={(plik) => {
-                    setBladZalacznika("");
-                    void naBase64(plik).then((dane) => {
-                      if (!wybrana) return;
-                      dodajZalacznik.mutate(
-                        { id: wybrana, nazwa: plik.name, typ: plik.type, dane },
-                        { onError: (e) => setBladZalacznika((e as Error).message) });
-                    });
+                    const opcje = zBledem("zalacznik");
+                    void naBase64(plik).then((dane) => dodajZalacznik.mutate(
+                      { id: r.id, nazwa: plik.name, typ: plik.type, dane }, opcje));
                   }}
-                  onUsunZalacznik={(zid) => wybrana && usunZalacznik.mutate(
-                    { id: wybrana, zalacznikId: zid },
-                    { onError: (e) => setBladZalacznika((e as Error).message) })}
+                  onUsunZalacznik={(zid) => usunZalacznik.mutate(
+                    { id: r.id, zalacznikId: zid }, zBledem("zalacznik"))}
                   czatAktywny={r.czatAktywny}
-                  onZmiana={setTresc} onWyslij={() => wyslij()} />} />
+                  onZmiana={setTresc} onWyslij={wysylki.odpowiedz.wyslij} />} />
             </div>
           </section>
 
@@ -550,24 +372,17 @@ export function Reklamacje() {
                 wysłaniem zostaje przy OBU gałęziach, bo uznanie kosztuje
                 pieniądze i jest równie nieodwracalne co odmowa. */}
             <Werdykt reklamacja={r}
-              czat={d.czat} trwa={werdykt.isPending} blad={bladWerdyktu}
-              bladTowaru={bladTowaru} onWerdykt={wyslijWerdykt}
+              czat={d.czat} trwa={wysylki.werdykt.trwa} blad={wysylki.werdykt.blad}
+              bladTowaru={wysylki.werdykt.bladTowaru} onWerdykt={wysylki.werdykt.wyslij}
               /* Niepewny los werdyktu rozstrzyga jedno odświeżenie sprawy,
                  nie drugi werdykt — ten sam hak co wejście w sprawę. */
               onSprawdz={() => odswiez.mutate({ id: r.id })} sprawdza={odswiez.isPending} />
             <Produkt szczegol={d} />
             <Notatka reklamacja={r} trwa={notatka.isPending || cofnijNotatke.isPending}
-              blad={bladNotatki}
-              onZapisz={(tekst, gotowe) => {
-                setBladNotatki("");
-                notatka.mutate({ id: r.id, notatka: tekst.trim() || null, wersja: r.wersja },
-                  { onSuccess: gotowe, onError: (e) => setBladNotatki((e as Error).message) });
-              }}
-              onCofnij={() => {
-                setBladNotatki("");
-                cofnijNotatke.mutate({ id: r.id, wersja: r.wersja },
-                  { onError: (e) => setBladNotatki((e as Error).message) });
-              }} />
+              blad={blad("notatka")}
+              onZapisz={(tekst, gotowe) => notatka.mutate(
+                { id: r.id, notatka: tekst.trim() || null, wersja: r.wersja }, zBledem("notatka", gotowe))}
+              onCofnij={() => cofnijNotatke.mutate({ id: r.id, wersja: r.wersja }, zBledem("notatka"))} />
           </aside>
         </>
         : <Karta className={`${KOLUMNA} flex flex-[999_1_560px] flex-col xl:col-span-2`}>
@@ -579,28 +394,15 @@ export function Reklamacje() {
           </Karta>}
     </div>
 
-    {/* Jawna zgoda po dopisku — dialog ze skrzynki, bez kopiowania. Autora
-        nazywa `ktoDopisal`, bo przy reklamacji bywa nim doradca Allegro. */}
-    {konfliktWysylki && <DialogKonfliktu
-      szczegoly={konfliktWysylki}
-      szkic={tresc}
-      wysyla={odpowiedz.isPending}
-      blad={bladWysylki}
-      ktoDopisal={konfliktWysylki.nowaWiadomosc?.rola === "ADMIN"
-        ? "doradca Allegro" : "klient"}
-      onWyslijMimoTo={() => wyslij(true)}
-      onPopraw={() => setKonfliktWysylki(null)} />}
-
-    {/* Ten sam dialog przy stanowisku o towarze — ta sama kolejka i ten sam
-        rodzaj konfliktu, więc drugiego okna nie ma. */}
-    {konfliktTowaru && <DialogKonfliktu
-      szczegoly={konfliktTowaru.szczegoly}
-      szkic={konfliktTowaru.tresc}
-      wysyla={zwrotTowaru.isPending}
-      blad={bladTowaru}
-      ktoDopisal={konfliktTowaru.szczegoly.nowaWiadomosc?.rola === "ADMIN"
-        ? "doradca Allegro" : "klient"}
-      onWyslijMimoTo={() => wyslijTowar(konfliktTowaru.decyzja, konfliktTowaru.tresc, true)}
-      onPopraw={() => setKonfliktTowaru(null)} />}
+    {/* Jawna zgoda po dopisku — dialog ze skrzynki, jeden dla odpowiedzi
+        i dla stanowiska o towarze. Klucz zdejmuje zgodę przy zmianie rodzaju. */}
+    {wysylki.konflikt && <DialogKonfliktu key={wysylki.konflikt.rodzaj}
+      szczegoly={wysylki.konflikt.szczegoly}
+      szkic={wysylki.konflikt.szkic}
+      wysyla={wysylki.konflikt.wysyla}
+      blad={wysylki.konflikt.blad}
+      ktoDopisal={wysylki.konflikt.ktoDopisal}
+      onWyslijMimoTo={wysylki.konflikt.wyslijMimoTo}
+      onPopraw={wysylki.konflikt.popraw} />}
   </div>;
 }

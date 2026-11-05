@@ -8,6 +8,7 @@ import { zlote } from "../api/zwroty";
 import { STATUS_ALLEGRO, rozstrzygniecie, znanyStatus } from "./statusy";
 import { LIMIT_ZNAKOW } from "./Edytor";
 import { DlugaTresc, scisle, zawieraOpis } from "./tresc";
+import { UZNANIE_ZYCZENIA } from "./slownik";
 
 /* ── KARTA „DECYZJA” (makiety właściciela: Main, Werdykt, Stany) ─────────────
    Pierwszy element prawej kolumny i jedyne miejsce nieodwracalnego kroku.
@@ -75,17 +76,6 @@ const ODRZUCAM: Array<[KodWerdyktu, string]> = [
   ["REJECTED_CLAIM_WITHDRAWN_BY_BUYER", "Klient wycofał reklamację"],
 ];
 const KROTKO = Object.fromEntries([...UZNAJE, ...ODRZUCAM]) as Record<KodWerdyktu, string>;
-
-/* Czego chce klient (`PostPurchaseIssueExpectation.name`): uznanie startuje
-   na jego życzeniu, bo tak brzmi każde uznanie bez sporu o sposób. */
-const UZNANIE_ZYCZENIA: Record<string, KodWerdyktu> = {
-  REPAIR: "ACCEPTED_REPAIR", EXCHANGE: "ACCEPTED_EXCHANGE",
-  REFUND: "ACCEPTED_REFUND", PARTIAL_REFUND: "ACCEPTED_PARTIAL_REFUND",
-};
-const CHCE: Record<string, string> = {
-  REPAIR: "chce naprawy", EXCHANGE: "chce wymiany",
-  REFUND: "chce zwrotu pieniędzy", PARTIAL_REFUND: "chce częściowego zwrotu",
-};
 
 /** Zdania startowe stanowiska o towarze — do edycji, nie do wysłania w ciemno. */
 const ZDANIE_O_TOWARZE = {
@@ -352,8 +342,6 @@ export function Werdykt({
       <span>{napis}</span>
     </label>;
 
-  const podpis = [r.kupujacyLogin, r.ofertaNazwa, CHCE[r.oczekiwanie ?? ""]].filter(Boolean).join(" · ");
-
   return <form ref={formularz} aria-label="Werdykt" onSubmit={(e) => e.preventDefault()}
     className="card flex flex-col gap-3.5 px-5 py-4">
     <div className="flex items-center justify-between">
@@ -362,7 +350,6 @@ export function Werdykt({
         className="flex h-10 w-10 items-center justify-center rounded-lg border border-slate-200 bg-white">
         <X size={16} strokeWidth={2.2} aria-hidden="true" /></button>
     </div>
-    {podpis && <span className="text-sm text-slate-600">{podpis}</span>}
 
     <fieldset className="flex flex-col gap-0.5">
       <legend className="pb-1.5 text-xs font-bold uppercase tracking-wide text-ranga-ok">Uznaję</legend>

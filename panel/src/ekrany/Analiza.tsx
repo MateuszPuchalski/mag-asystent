@@ -10,6 +10,7 @@ import { Strefa } from "../analiza/Strefa";
 import { ZakresObslugi } from "../analiza/ZakresObslugi";
 import { ZakresUzycia } from "../analiza/ZakresUzycia";
 import { MiaryObslugi } from "../analiza/MiaryObslugi";
+import { ReklamacjeWLiczbach } from "../analiza/Reklamacje";
 import { TarcieSkrzynki } from "../analiza/TarcieSkrzynki";
 import { ZakresTygodnia } from "../analiza/ZakresTygodnia";
 import { Wskazniki } from "../analiza/Wskazniki";
@@ -114,6 +115,9 @@ export function Analiza() {
         {/* Tarcie zaraz pod czasem odpowiedzi: tamto mówi, jak szybko,
             to — ile kosztował sam ekran (0.500.0). */}
         <TarcieSkrzynki dni={okna.obsluga} />
+        {/* Liczby reklamacji zeszły z kolejki, bo to wgląd: tam wybiera się
+            widok, tu patrzy, jak idzie. Własnego okna nie mają, liczy je serwer. */}
+        <ReklamacjeWLiczbach />
         <MiaryObslugi />
       </>}
       {zakres === "uzycie" && uzycie.data && <ZakresUzycia r={uzycie.data} />}

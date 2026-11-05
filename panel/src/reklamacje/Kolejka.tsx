@@ -26,7 +26,8 @@ import { mojaSprawa } from "../sprawy/Moje";
    bez obrazu, żeby wiersze nie skakały pod kursorem.
 
    PO TERMINIE NIESIE NAGŁÓWEK GRUPY. Sprawy po terminie decyzji stoją
-   pierwsze, pod jednym nagłówkiem, a wiersz mówi już tylko „ile”. Kolejność
+   pierwsze, pod jednym nagłówkiem z ich liczbą, a wiersz mówi już tylko
+   „ile dni”. Osobnego filtra „po terminie” nie ma, bo grupa już je zbiera. Kolejność
    grup liczy `wGrupach`, a ekran chodzi strzałkami po tej samej tablicy.   */
 
 export const KUBELKI: Array<{ id: KubelekReklamacji; etykieta: string; pytanie: string }> = [
@@ -74,54 +75,6 @@ export const SYGNALY: Record<SygnalReklamacji,
   towar_do_decyzji: { tytul: "Reklamacja uznana, a kupujący nie wie, czy odsyłać towar",
     krotko: "towar?", klasa: "bg-violet-100 text-violet-800", ikona: <PackageSearch size={13} /> },
 };
-
-/** Powody z `PostPurchaseIssueReason.type` po polsku. Nieznany zostaje SUROWY. */
-export const POWODY: Record<string, string> = {
-  DEFECT_FOUND_DURING_USE: "usterka przy używaniu",
-  NOT_AS_DESCRIBED: "niezgodny z opisem",
-  MISSING_PRODUCT_ELEMENT: "brakuje elementu",
-  PRODUCT_DAMAGED_PARCEL_INTACT: "uszkodzony, paczka cała",
-  PRODUCT_AND_PARCEL_DAMAGED_IN_TRANSIT: "uszkodzony w transporcie",
-  NO_PRODUCT_RECEIVED: "towar nie dotarł",
-  NO_PRODUCT_IN_PARCEL: "brak towaru w paczce",
-  NO_PROOF_OF_PURCHASE_MANUAL_OR_WARRANTY: "brak dowodu zakupu",
-  ITEM_IS_DAMAGED: "towar uszkodzony",
-  RECEIVED_INCOMPLETE_ORDER: "niekompletne zamówienie",
-  RECEIVED_ITEMS_NOT_MATCHING_DESCRIPTION: "towar niezgodny z opisem",
-  OTHER: "inny powód",
-};
-
-/** Czego klient chce — `PostPurchaseIssueExpectation.name`. */
-export const OCZEKIWANIA: Record<string, string> = {
-  REPAIR: "naprawa",
-  EXCHANGE: "wymiana",
-  REFUND: "zwrot pieniędzy",
-  PARTIAL_REFUND: "częściowy zwrot",
-};
-
-/* To samo w dopełniaczu, bo w dymku zgłoszenia stoi po „chce”. */
-const CHCE: Record<string, string> = {
-  REPAIR: "naprawy",
-  EXCHANGE: "wymiany",
-  REFUND: "zwrotu pieniędzy",
-  PARTIAL_REFUND: "częściowego zwrotu",
-};
-
-/**
- * Linia nad zdaniem klienta w dymku zgłoszenia: „Powód: … · chce …”.
- *
- * Kod spoza słownika zostaje kodem, bo zgadnięte słowo byłoby nieprawdą.
- * Brak obu daje `null`, a dymek stoi wtedy bez tej linii.
- */
-export function liniaPowodu(r: Pick<Reklamacja, "powodTyp" | "oczekiwanie">): string | null {
-  const czesci: string[] = [];
-  if (r.powodTyp) czesci.push(`Powód: ${POWODY[r.powodTyp] ?? r.powodTyp}`);
-  if (r.oczekiwanie) {
-    const chce = CHCE[r.oczekiwanie] ?? r.oczekiwanie;
-    czesci.push(czesci.length ? `chce ${chce}` : `Chce ${chce}`);
-  }
-  return czesci.length ? czesci.join(" · ") : null;
-}
 
 /* `dniSlowo` mieszka w `ui/` od audytu z 15 września 2026 — stało w trzech
    kolejkach przepisane znak w znak. Re-eksport zostaje, bo wołają je stąd
@@ -294,8 +247,10 @@ export function Kolejka({ reklamacje, wybrana, zKubelkiem = false, onWybierz, mo
      niesie wyłącznie swoje pozycje, a czytnik ogłasza grupę i jej liczbę. */
   return <div>
     {po.length > 0 && <>
+      {/* Liczba stoi w nagłówku, bo grupa jest jedynym miejscem spraw po
+          terminie — osobnego kafla z tą samą liczbą nad listą nie ma. */}
       <NaglowekSekcji jako="h3" ton="text-ranga-zle" className="px-4 pb-1 pt-2.5">
-        Po terminie</NaglowekSekcji>
+        Po terminie · {po.length}</NaglowekSekcji>
       <ul className="divide-y divide-slate-200 border-b border-slate-200">{po.map(wiersz)}</ul>
     </>}
     {reszta.length > 0 && <>

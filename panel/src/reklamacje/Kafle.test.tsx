@@ -1,20 +1,18 @@
 import React from "react";
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, it } from "vitest";
 import { render, screen } from "@testing-library/react";
-import userEvent from "@testing-library/user-event";
 import type { StatystykiReklamacji } from "../api/typy";
 import { Kafle } from "./Kafle";
 
-/* ── Kafle w kolejce reklamacji ──────────────────────────────────────────────
-   Cztery liczby dnia w siatce 2×2. Testy pilnują reguł, których nie widać okiem:
+/* ── Reklamacje w liczbach (Analiza) ─────────────────────────────────────────
+   Cztery liczby z trendem. Testy pilnują reguł, których nie widać okiem:
 
    1. BRAK DANYCH TO „—”, NIGDY ZERO. Zero przy awarii serwera agent czyta
       jako „nic nie czeka” i kończy pracę (`panel/CLAUDE.md`).
    2. TREND TYLKO PRAWDZIWY. `tydzienTemu: null` daje zdanie opisowe, a nie
       „+18 od zeszłego tygodnia” liczone od zera.
-   3. KAFEL PRACY JEST FILTREM — klik przestawia kolejkę, a średni czas
-      niczego nie udaje.
-   4. WYBÓR TO CIEMNA RAMKA, nie bursztyn.                                   */
+   3. TO WGLĄD, NIE FILTR. Żaden kafel nie jest przyciskiem: widok kolejki
+      wybiera rząd kubełków nad listą (`Kubelki.tsx`).                      */
 
 const STAT: StatystykiReklamacji = {
   doDecyzji: { teraz: 18, tydzienTemu: 12 },
@@ -23,20 +21,15 @@ const STAT: StatystykiReklamacji = {
   sredniDniDoWerdyktu: { teraz: 2.4, poprzednio: 3.3, okresDni: 30 },
 };
 
-const pokaz = (p: Partial<React.ComponentProps<typeof Kafle>> = {}) => {
-  const onWybierz = vi.fn();
-  render(<Kafle statystyki={STAT} wybrany="decyzja" onWybierz={onWybierz} {...p} />);
-  return { onWybierz };
-};
+const pokaz = (p: Partial<React.ComponentProps<typeof Kafle>> = {}) =>
+  render(<Kafle statystyki={STAT} {...p} />);
 
 describe("Kafle reklamacji", () => {
-  it("siatka 2×2 w kolejności z makiety: liczba, nazwa, podpis", () => {
+  it("siatka w kolejności z makiety: liczba, nazwa, podpis", () => {
     pokaz();
     const siatka = screen.getByRole("group", { name: "Reklamacje w liczbach" });
     expect(siatka.className).toMatch(/grid-cols-2/);
-    expect(screen.getByRole("button", { name: /^18 Do decyzji/ })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /^11 Do odpowiedzi/ })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /^1 Po terminie/ })).toBeInTheDocument();
+    expect(siatka).toHaveTextContent(/^18 Do decyzji .*11 Do odpowiedzi .*1 Po terminie/);
     expect(screen.getByText("Średni czas do werdyktu")).toBeInTheDocument();
     expect(screen.getByText("2,4 dnia")).toBeInTheDocument();
   });
@@ -71,7 +64,7 @@ describe("Kafle reklamacji", () => {
   });
 
   it("po terminie z pracą świeci czerwienią, bez pracy — nie", () => {
-    const { unmount } = render(<Kafle statystyki={STAT} wybrany={null} onWybierz={vi.fn()} />);
+    const { unmount } = pokaz();
     expect(screen.getByText("1").className).toMatch(/text-ranga-zle/);
     unmount();
     pokaz({ statystyki: { ...STAT, poTerminie: { teraz: 0, tydzienTemu: 0 } } });
@@ -85,35 +78,9 @@ describe("Kafle reklamacji", () => {
     expect(screen.queryByText("0")).not.toBeInTheDocument();
   });
 
-  it("kafel pracy jest filtrem: klik oddaje filtr, wybrany wciśnięty ciemną ramką", async () => {
-    const { onWybierz } = pokaz();
-    const decyzja = screen.getByRole("button", { name: /Do decyzji/ });
-    expect(decyzja).toHaveAttribute("aria-pressed", "true");
-    expect(decyzja.className).toMatch(/border-wertis-ink/);
-    expect(decyzja.className).not.toMatch(/amber/);
-    expect(screen.getByRole("button", { name: /Do odpowiedzi/ })).toHaveAttribute("aria-pressed", "false");
-    await userEvent.click(screen.getByRole("button", { name: /Do odpowiedzi/ }));
-    expect(onWybierz).toHaveBeenCalledWith("odpowiedz");
-    await userEvent.click(screen.getByRole("button", { name: /Po terminie/ }));
-    expect(onWybierz).toHaveBeenCalledWith("po_terminie");
-  });
-
-  it("„Po terminie” wciska się sam, a „Do decyzji” wtedy NIE", () => {
-    pokaz({ wybrany: "po_terminie" });
-    expect(screen.getByRole("button", { name: /Po terminie/ })).toHaveAttribute("aria-pressed", "true");
-    expect(screen.getByRole("button", { name: /Do decyzji/ })).toHaveAttribute("aria-pressed", "false");
-  });
-
-  it("podpowiedź kafla zna klawisz skrótu jego kubełka", () => {
+  it("żaden kafel nie jest przyciskiem — liczby to wgląd, nie filtr kolejki", () => {
     pokaz();
-    expect(screen.getByTitle("Pokaż w kolejce: Do decyzji (klawisz 1)")).toBeInTheDocument();
-    expect(screen.getByTitle("Pokaż w kolejce: Do odpowiedzi (klawisz 2)")).toBeInTheDocument();
-  });
-
-  it("średni czas nie jest przyciskiem — nie obiecuje filtra, którego nie ma", () => {
-    pokaz();
-    expect(screen.queryByRole("button", { name: /Średni czas/ })).not.toBeInTheDocument();
-    expect(screen.getAllByRole("button")).toHaveLength(3);
+    expect(screen.queryAllByRole("button")).toHaveLength(0);
   });
 
   it("kafle nie niosą synchronizacji — ta stoi przy tytule kolejki", () => {
