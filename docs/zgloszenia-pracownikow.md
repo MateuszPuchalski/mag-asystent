@@ -4,7 +4,7 @@ Pracownik zgłasza z każdego ekranu panelu i kolektora, co mu przeszkadza,
 czego brakuje albo co nie działa. Dokłada do czterech zdjęć. Zgłoszenia czyta
 właściciel (rola `admin`) w menu „Więcej” panelu i odpowiada krótkim zdaniem.
 
-Wchodzi w wydaniu @wydanie.
+Wchodzi w wydaniu 0.620.0.
 
 ## Po co
 

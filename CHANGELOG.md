@@ -10,6 +10,12 @@ z wersją monorepo" — i właśnie tak przestał być zgodny: `0.3.0` przetrwa�
 sześć zmergowanych zmian, w tym takie, które wymagały nowego uprawnienia SQL.
 Komentarz nie jest mechanizmem.
 
+## 0.620.0 — 5 listopada 2026
+
+**Uwaga albo pomysł z każdego ekranu.** W panelu i na kolektorze stoi
+przycisk „Zgłoś uwagę”. Opisujesz, co przeszkadza albo czego brakuje,
+i dokładasz zdjęcia. Zgłoszenia czyta właściciel w menu „Więcej”.
+
 ## 0.619.0 — 5 listopada 2026
 
 **Reklamacje: jeden rząd kubełków nad kolejką.** Kafle i osobne pigułki
