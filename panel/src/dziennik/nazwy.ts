@@ -165,6 +165,8 @@ export const NAZWA_ZDARZENIA: Record<string, string> = {
   pomylka_zakonczona: "Pomyłka wysyłkowa zakończona",
   pomylka_usunieta: "Pomyłka wysyłkowa usunięta",
   pomylka_wznowiona: "Pomyłka wysyłkowa wznowiona",
+  zgloszenie_pracownika: "Zgłoszenie pracownika złożone",
+  zgloszenie_pracownika_status: "Zgłoszenie pracownika rozpatrzone",
   zwroty_synchronizacja_reczna: "Zwroty odświeżone ręcznie",
   zwroty_rozliczone_skasowane: "Rozliczone zwroty skasowane",
   zwroty_wyczyszczone: "Zwroty wyczyszczone",

@@ -469,6 +469,12 @@ interface ApiService {
     @POST("api/zadania-terenowe/{id}/oddaj")
     suspend fun zadanieTerenoweOddaj(@Path("id") id: Long, @Body body: RequestBody = EMPTY_BODY): pl.wertis.kolektor.core.net.ZadanieTerenoweResponse
 
+    /* Zgłoszenie uwagi pracownika z dowolnego ekranu. Bez bufora offline:
+       ciało ze zdjęciami waży megabajty, a bufor plikowy niesie meldunki.
+       Arkusz trzyma tekst i zdjęcia, dopóki serwer nie przyjmie. */
+    @POST("api/zgloszenia")
+    suspend fun zglosUwage(@Body body: pl.wertis.kolektor.core.net.ZgloszenieBody): pl.wertis.kolektor.core.net.ZgloszenieResponse
+
     @GET("api/magazyny")
     suspend fun listMagazyny(): MagazynyResponse
 

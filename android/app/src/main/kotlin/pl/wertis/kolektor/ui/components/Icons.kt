@@ -135,6 +135,19 @@ object WIcons {
     }
 
     /**
+     * Zgłoś uwagę — dymek z dwiema liniami tekstu.
+     *
+     * Dymek, a nie trójkąt `Alert`: trójkąt znaczy w tej aplikacji błąd
+     * zapisu, a tu człowiek mówi coś od siebie.
+     */
+    val Uwaga: ImageVector = strokeIcon("uwaga") {
+        moveTo(4f, 5f); lineTo(20f, 5f); lineTo(20f, 16f); lineTo(11f, 16f)
+        lineTo(7f, 20f); lineTo(7f, 16f); lineTo(4f, 16f); close()
+        moveTo(8f, 9f); lineTo(16f, 9f)
+        moveTo(8f, 12.5f); lineTo(13f, 12.5f)
+    }
+
+    /**
      * WYMIARY — miarka ukośna z podziałką, jak `Ruler` w zakładce panelu.
      *
      * Pudło noszą już trzy zakładki. Miarka mówi o czynności, nie o towarze,

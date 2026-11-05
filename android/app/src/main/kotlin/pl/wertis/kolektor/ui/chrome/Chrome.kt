@@ -35,6 +35,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import pl.wertis.kolektor.core.nav.SCREEN_TITLES
@@ -64,7 +65,14 @@ import pl.wertis.kolektor.ui.theme.Success
    po prawej, bo tak trzyma się sprzęt na tej hali.
 
    Górny pasek zostaje przy rzeczach, po które sięga się rzadko i świadomie:
-   ustawienia i kolejka Sfery.                                                 */
+   ustawienia, kolejka Sfery i zgłoszenie uwagi.
+
+   ZGŁOŚ UWAGĘ stoi tutaj, bo ten pasek widać z każdego ekranu po zalogowaniu.
+   Dolny pasek jest terenem kciuka i szóstej zakładki nie zniesie. Gest albo
+   klawisz skanera odpadły: uwaga ma być do znalezienia bez instrukcji.
+
+   Ikona zabiera tytułowi 48 dp, więc długi tytuł kończy się wielokropkiem.
+   Tytuł się czyta, ikonę się trafia, a ucięty cel dotyku byłby gorszy.        */
 
 @Composable
 fun TopBar(
@@ -75,6 +83,7 @@ fun TopBar(
     summary: QueueSummary?,
     onOpenQueue: () -> Unit,
     onOpenSettings: () -> Unit,
+    onZglos: () -> Unit,
 ) {
     Row(
         modifier = Modifier
@@ -122,8 +131,18 @@ fun TopBar(
             fontSize = 16.sp,
             textAlign = TextAlign.Center,
             maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
             modifier = Modifier.weight(1f),
         )
+        Box(
+            modifier = Modifier
+                .size(MinTap)
+                .clip(CircleShape)
+                .clickable(onClick = onZglos),
+            contentAlignment = Alignment.Center,
+        ) {
+            Icon(WIcons.Uwaga, contentDescription = "Zgłoś uwagę", tint = Amber, modifier = Modifier.size(24.dp))
+        }
         /* Awatar (inicjały) → ustawienia. KÓŁKO ZOSTAJE 40 dp, CEL DOTYKU MA 48:
            rozmiar widoczny i rozmiar klikalny to dwie różne rzeczy, a pasek ma
            62 dp wysokości, więc pionowo to nic nie kosztuje. Patrz

@@ -22,6 +22,9 @@ import { SzukajIKlawisze } from "./nawigacja/Klawisze";
 import { WskaznikSynchronizacji } from "./nawigacja/Synchronizacja";
 import { PasekPolaczenia } from "./nawigacja/Polaczenie";
 import { USTAWIENIA, Wiecej } from "./nawigacja/Wiecej";
+import { ZGLOSZENIA } from "./nawigacja/Wiecej";
+import { PrzyciskZgloszenia } from "./zgloszenia/OknoZgloszenia";
+import { Zgloszenia } from "./ekrany/Zgloszenia";
 import { useZwinietyPasek } from "./nawigacja/ZwinietyPasek";
 import { Ustawienia } from "./ekrany/Ustawienia";
 import { DoDecyzji } from "./ekrany/DoDecyzji";
@@ -182,6 +185,9 @@ function PasekBoczny({ wyloguj }: { wyloguj: () => void }) {
           do której zakładki iść. */}
       <div className="flex flex-wrap items-center gap-2">
         <SzukajIKlawisze />
+        {/* Zgłoszenie uwagi stoi w dolnym bloku, bo ma być na każdym ekranie,
+            a pracą nie jest. Sama ikona mieści się w zwiniętym pasku 80 px. */}
+        <PrzyciskZgloszenia />
         <Wiecej wyloguj={wyloguj} />
         {/* Przycisk zwinięcia stoi na końcu, z dala od zakładek: pomyłka
             w kliku w zakładkę nie może zwijać paska. */}
@@ -320,6 +326,9 @@ function Rama({ wyloguj }: { wyloguj: () => void }) {
         {/* Ustawienia mają własny adres jak każdy ekran: link da się wkleić
             koledze, a odświeżenie strony nie wyrzuca z powrotem do Zadań. */}
         <Route path={USTAWIENIA} element={<Ustawienia />} />
+        {/* Zgłoszenia pracowników czyta tylko właściciel; ekran sam mówi
+            innym rolom, że listy nie zobaczą. */}
+        <Route path={ZGLOSZENIA} element={<Zgloszenia />} />
         <Route path="*" element={<Navigate to="/obsluga/" replace />} />
       </Routes>
     </main>

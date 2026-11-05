@@ -9,6 +9,9 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Modifier
@@ -20,6 +23,7 @@ import pl.wertis.kolektor.net.apiCall
 import pl.wertis.kolektor.core.nav.Screen
 import pl.wertis.kolektor.core.session.SessionState
 import pl.wertis.kolektor.core.session.osoba
+import pl.wertis.kolektor.core.zgloszenie.ekranZgloszenia
 import pl.wertis.kolektor.scan.ScannerBus
 import androidx.compose.runtime.LaunchedEffect
 import pl.wertis.kolektor.ui.kolektory.KolektoryScreen
@@ -33,6 +37,7 @@ import pl.wertis.kolektor.ui.chrome.ToastOverlay
 import pl.wertis.kolektor.ui.chrome.TopBar
 import pl.wertis.kolektor.ui.chrome.WersjaBar
 import pl.wertis.kolektor.ui.update.AktualizacjaSheet
+import pl.wertis.kolektor.ui.zgloszenie.ZgloszenieSheet
 import pl.wertis.kolektor.ui.home.HomeScreen
 import pl.wertis.kolektor.ui.location.LocationScreen
 import pl.wertis.kolektor.ui.product.ProductScreen
@@ -78,6 +83,10 @@ fun AppRoot(graph: AppGraph) {
     val problems by graph.problemsRepo.problems.collectAsStateWithLifecycle()
     val ustawienia by graph.settings.settings.collectAsStateWithLifecycle()
     val scope = rememberCoroutineScope()
+    /* Ekran, z którego otwarto zgłoszenie uwagi; `null` = arkusz zamknięty.
+       Zapamiętany w chwili dotknięcia, bo skan pod arkuszem nie ma prawa
+       zmienić, czego zgłoszenie dotyczy. */
+    var zgloszenieZ by remember { mutableStateOf<String?>(null) }
 
     // Globalny fallback skanów — łapie to, czego OTWARTY EKRAN nie przechwycił.
     // Kolejność jest tu całą regułą kontekstu: karta towaru bierze skan półki
@@ -156,6 +165,7 @@ fun AppRoot(graph: AppGraph) {
             summary = queue?.summary,
             onOpenQueue = { graph.nav.openQueue() },
             onOpenSettings = { graph.nav.openSettings() },
+            onZglos = { zgloszenieZ = ekranZgloszenia(screen) },
         )
         /* Tylko przy działającej sieci: bez niej to urządzenie jest odcięte,
            nie serwer — i wtedy mówi bufor offline, nie ten baner. */
@@ -212,6 +222,9 @@ fun AppRoot(graph: AppGraph) {
         }
     }
     AktualizacjaSheet(graph)
+    zgloszenieZ?.let { ekran ->
+        ZgloszenieSheet(graph, ekran, onClose = { zgloszenieZ = null })
+    }
     // OSTATNIA, czyli nad wszystkim — także nad arkuszem aktualizacji
     WezwanieOverlay(graph)
 }
