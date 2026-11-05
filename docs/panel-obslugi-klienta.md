@@ -6453,7 +6453,7 @@ towar niż ten, który wyjechał w paczce.
 Brak pola `paragon` znaczy, że serwer jeszcze nie odpowiedział. Karta wtedy
 milczy, zamiast mówić „brak paragonu”. Dyskusje tej karty nie mają.
 
-### 25b.14. Prostsza kolejka i sprawa (@wydanie)
+### 25b.14. Prostsza kolejka i sprawa (0.619.0)
 
 Analiza ekranu z 5 listopada 2026 znalazła dwa miejsca do jednego wyboru
 i fakty sprawy stojące kilka razy. Właściciel zlecił uproszczenie całości.
