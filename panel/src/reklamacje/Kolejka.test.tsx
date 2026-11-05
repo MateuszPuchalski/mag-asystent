@@ -109,7 +109,7 @@ describe("Kolejka reklamacji", () => {
   it("termin przekroczony liczy się w dniach, nie na minusie — „po” mówi nagłówek grupy", () => {
     render(<Kolejka reklamacje={[rek({ dniDoTerminu: -2, poTerminie: true })]}
       wybrana={null} onWybierz={() => {}} />);
-    expect(screen.getByRole("heading", { name: "Po terminie" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Po terminie · 1" })).toBeInTheDocument();
     expect(screen.getByTitle("Termin decyzji: przekroczony")).toHaveTextContent(/^2 dni$/);
   });
 
@@ -117,7 +117,7 @@ describe("Kolejka reklamacji", () => {
     render(<Kolejka reklamacje={[rek({ dniDoTerminu: -2, poTerminie: false })]}
       wybrana={null} onWybierz={() => {}} />);
     expect(screen.getByText("2 dni po")).toBeInTheDocument();
-    expect(screen.queryByRole("heading", { name: "Po terminie" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: /Po terminie/ })).not.toBeInTheDocument();
   });
 
   it("plakietka terminu ma barwę pilności: czerwień od dnia terminu, bursztyn do trzech dni", () => {
@@ -141,7 +141,8 @@ describe("Kolejka reklamacji", () => {
     expect(lista.map((r) => r.id)).toEqual([2, 4, 1, 3]);
     render(<Kolejka reklamacje={lista} wybrana={null} nazwaGrupy="Do decyzji" onWybierz={() => {}} />);
     const naglowki = screen.getAllByRole("heading").map((h) => h.textContent);
-    expect(naglowki).toEqual(["Po terminie", "Do decyzji"]);
+    /* Liczba spraw po terminie stoi w nagłówku, bo osobnego kafla z nią nie ma. */
+    expect(naglowki).toEqual(["Po terminie · 2", "Do decyzji"]);
     /* Wiersze w DOM idą tą samą kolejnością, po której ekran chodzi strzałkami. */
     expect(screen.getAllByRole("button").map((b) => b.textContent?.match(/\d\/2026/)?.[0]))
       .toEqual(["2/2026", "4/2026", "1/2026", "3/2026"]);

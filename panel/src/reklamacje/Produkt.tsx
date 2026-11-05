@@ -1,12 +1,9 @@
 import React from "react";
 import type { DokumentParagonu, ParagonReklamacji, SzczegolReklamacji } from "../api/typy";
-import { zlote } from "../api/zwroty";
 import { useKartaTowaru } from "../api/rozmowy";
 import { CenyKartoteki } from "../skrzynka/OsCenKartoteki";
 import { ZdjecieOferty } from "../towar/Zdjecie";
 import { PrzyciskTowaru } from "../towar/Szuflada";
-import { OCZEKIWANIA, POWODY } from "./Kolejka";
-import { PRAWO } from "./statusy";
 import { ileReklamacji } from "./etap";
 import { dataCyfrowa, dniSlowo, SymbolTowaru } from "../ui";
 
@@ -120,9 +117,6 @@ function KupionyTowar({ paragon }: { paragon: ParagonReklamacji }) {
   </section>;
 }
 
-/** Wielka litera na początku pozycji listy — słownik trzyma słowa małymi. */
-const zWielkiej = (t: string) => t.charAt(0).toLocaleUpperCase("pl") + t.slice(1);
-
 const Wiersz = ({ nazwa, children }: { nazwa: string; children: React.ReactNode }) => <>
   <dt className="text-slate-600">{nazwa}</dt>
   <dd className="m-0 min-w-0 break-words">{children}</dd>
@@ -154,9 +148,6 @@ export function Produkt({ szczegol }: { szczegol: SzczegolReklamacji }) {
   const sprzedaz = (k?.ceny ?? []).filter((c) => c.poziom !== 0);
   const oferta = r.ofertaCenaGrosze != null ? { grosze: r.ofertaCenaGrosze, waluta: r.waluta } : null;
   const zakup = r.cenaParagonuGrosze != null ? { grosze: r.cenaParagonuGrosze, waluta: r.waluta } : null;
-  const chce = r.oczekiwanie ? (OCZEKIWANIA[r.oczekiwanie] ?? r.oczekiwanie) : null;
-  const powod = r.powodTyp ? (POWODY[r.powodTyp] ?? r.powodTyp) : null;
-  const prawo = r.prawo ? (PRAWO[r.prawo] ?? r.prawo) : null;
   const historiaTowaru = szczegol.historia?.towar ?? null;
 
   return <section aria-label="Produkt" className="card flex flex-col">
@@ -192,19 +183,13 @@ export function Produkt({ szczegol }: { szczegol: SzczegolReklamacji }) {
         <p className="text-xs font-bold text-slate-700">Ceny tego towaru w Subiekcie</p>
         <CenyKartoteki ceny={sprzedaz} ramka={false} oferta={oferta} zakup={zakup} />
       </div>}
-      <dl className="m-0 grid grid-cols-[6.25rem_minmax(0,1fr)] gap-x-3 gap-y-1.5 text-sm">
-        <Wiersz nazwa="Chce">
-          <b className="font-semibold text-slate-900">{chce ? zWielkiej(chce) : "Nie podał"}</b>
-          {r.oczekiwanaKwotaGrosze !== null &&
-            <span className="tabular-nums"> · {zlote(r.oczekiwanaKwotaGrosze, r.waluta)}</span>}
-        </Wiersz>
-        <Wiersz nazwa="Podstawa">
-          {[prawo ? zWielkiej(prawo) : "Tytuł nieznany", powod].filter(Boolean).join(" · ")}
-        </Wiersz>
-        {/* Pierwsza sprawa przy tym towarze nie jest informacją o towarze,
-            więc wiersz staje dopiero przy historii. */}
-        {historiaTowaru && <Wiersz nazwa="Ten towar">{ileReklamacji(historiaTowaru)}</Wiersz>}
-      </dl>
+      {/* Czego klient chce i na jakiej podstawie, mówi linia nad jego
+          zdaniem w dymku zgłoszenia (`liniaPowodu`). Karta mówi o towarze.
+          Pierwsza sprawa przy tym towarze nie jest informacją o towarze,
+          więc wiersz staje dopiero przy historii. */}
+      {historiaTowaru && <dl className="m-0 grid grid-cols-[6.25rem_minmax(0,1fr)] gap-x-3 gap-y-1.5 text-sm">
+        <Wiersz nazwa="Ten towar">{ileReklamacji(historiaTowaru)}</Wiersz>
+      </dl>}
     </div>
 
   </section>;

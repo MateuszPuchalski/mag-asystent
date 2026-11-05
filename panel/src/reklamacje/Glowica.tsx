@@ -1,11 +1,10 @@
 import React from "react";
 import { Link as RouterLink } from "react-router-dom";
-import { Check, EllipsisVertical, ExternalLink } from "lucide-react";
+import { Check, ExternalLink, RefreshCw } from "lucide-react";
 import type { Reklamacja, SzczegolReklamacji } from "../api/typy";
 import { ile, LoginKlienta } from "../ui";
 import { mojaSprawa } from "../sprawy/Moje";
 import { tytulStatusu } from "./etap";
-import { MenuPrzycisku } from "./Menu";
 
 /* ── Głowica sprawy: która to reklamacja i czyja ─────────────────────────────
    Dwa rzędy nad drogą sprawy i rozmową. Pierwszy mówi, KTÓRA to sprawa i w
@@ -94,7 +93,7 @@ export function Glowica({
   trwa: boolean;
   blad?: string;
   onProwadze: () => void;
-  /** Jawne odświeżenie sprawy z Allegro, z menu „⋮”. */
+  /** Jawne odświeżenie sprawy z Allegro — przycisk obok „Prowadzę”. */
   onOdswiez?: () => void;
   odswieza?: boolean;
 }) {
@@ -105,12 +104,6 @@ export function Glowica({
   /* `null` serwer daje i przy zerze, i przy „nie wiemy”, więc wtedy nic nie
      stoi — ekran nigdy nie mówi „pierwsza reklamacja”. */
   const inne = szczegol.historia?.klient ?? null;
-
-  /* Rzadkie czynności stoją pod „⋮”: każda to jawne kliknięcie, bo żądanie
-     u Allegro nie wychodzi z samego patrzenia. Pytanie o paczkę stoi przy
-     przesyłce w karcie zamówienia, bo tam widać też jego błąd. */
-  const pozycje = onOdswiez ? [{ klucz: "odswiez", napis: odswieza ? "Odświeżam…" : "Odśwież z Allegro",
-    onWybierz: onOdswiez, wylaczona: odswieza }] : [];
 
   return <div className="flex flex-col gap-2.5 px-5 py-4">
     <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
@@ -130,9 +123,16 @@ export function Glowica({
       <div className="ml-auto flex items-center gap-1.5">
         <Prowadze prowadzi={r.prowadzi} moja={mojaSprawa(r.prowadziId, mojeId)} trwa={trwa}
           onProwadze={onProwadze} />
-        <MenuPrzycisku etykieta="Więcej działań" nazwaPrzycisku="Więcej działań" pozycje={pozycje}
-          przycisk={<EllipsisVertical size={16} aria-hidden="true" />}
-          klasaPrzycisku="flex h-9 w-9 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-900 hover:bg-slate-50" />
+        {/* ODŚWIEŻENIE TO JEDEN PRZYCISK, nie menu z jedną pozycją. Wejście
+            w sprawę już ją odświeża, bo agent pracuje na aktualnym stanie.
+            Ten przycisk jest na chwilę, gdy klient pisze, a sprawa leży
+            otwarta. */}
+        {onOdswiez && <button type="button" onClick={onOdswiez} disabled={odswieza}
+          aria-label="Odśwież z Allegro" aria-busy={odswieza}
+          title={odswieza ? "Odświeżam z Allegro…" : "Odśwież z Allegro"}
+          className="flex h-9 w-9 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-900 hover:bg-slate-50 disabled:opacity-50">
+          <RefreshCw size={16} aria-hidden="true" className={odswieza ? "motion-safe:animate-spin" : ""} />
+        </button>}
       </div>
     </div>
     <div className="flex flex-wrap items-center gap-x-3.5 gap-y-2 text-sm text-slate-600">

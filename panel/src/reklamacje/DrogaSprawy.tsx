@@ -10,6 +10,7 @@ import { adresPrzystanku, inneSprawyZakupu, KOLEJKI, type InnaSprawaZakupu } fro
 import { czas, dataCyfrowa, dniSlowo, dzienMiesiac, ile, kiedy, odmien, Skopiuj } from "../ui";
 import { PRZEWOZNICY } from "../zwroty/Dowody";
 import { rozstrzygniecie } from "./statusy";
+import { OCZEKIWANIA, rozliczenieWerdyktu } from "./slownik";
 
 /* ── DROGA SPRAWY W JEDNYM RZĘDZIE ───────────────────────────────────────────
    Makieta właściciela: sześć kroków od zakupu do rozliczenia, poziomo pod
@@ -94,19 +95,6 @@ export interface KrokDrogi {
   chwila: string | null;
 }
 
-/* Czym kończy się uznanie — od tego zależy, co jest do rozliczenia. */
-const ROZLICZENIE_WERDYKTU: Record<string, string> = {
-  ACCEPTED_REPAIR: "naprawa",
-  ACCEPTED_EXCHANGE: "wymiana",
-  ACCEPTED_REFUND: "zwrot pieniędzy",
-  ACCEPTED_PARTIAL_REFUND: "częściowy zwrot",
-};
-
-/* Czego chce klient (`PostPurchaseIssueExpectation.name`), zanim zapadł werdykt. */
-const ROZLICZENIE_OCZEKIWANIA: Record<string, string> = {
-  REPAIR: "naprawa", EXCHANGE: "wymiana", REFUND: "zwrot pieniędzy", PARTIAL_REFUND: "częściowy zwrot",
-};
-
 /* Werdykt z panelu liczy się od chwili, gdy mógł wyjść. `send_failed` nie
    wyszedł, więc decyzja dalej czeka. */
 const WYSZEDL = new Set(["sending", "sent", "send_uncertain"]);
@@ -178,9 +166,11 @@ export function krokiDrogi(s: DaneDrogi): KrokDrogi[] {
       : sklej(r.decyzjaDo && `do ${dzienMiesiac(r.decyzjaDo)}`,
           r.dniDoTerminu !== null && dniSlowo(r.dniDoTerminu));
 
+  /* Przed werdyktem do rozliczenia jest to, czego chce klient. Kod spoza
+     słownika milczy, bo surowy kod w podpisie kroku nic agentowi nie mówi. */
   const rozliczenie = odrzucona ? "bez rozliczenia"
-    : naszWerdykt ? (ROZLICZENIE_WERDYKTU[String(r.werdykt)] ?? "")
-      : ROZLICZENIE_OCZEKIWANIA[r.oczekiwanie ?? ""] ?? "";
+    : naszWerdykt ? (rozliczenieWerdyktu(String(r.werdykt)) ?? "")
+      : OCZEKIWANIA[r.oczekiwanie ?? ""] ?? "";
 
   /* Rozmowa bez jednej wiadomości nie jest krokiem, który się odbył. Stoi
      więc pusta także przed bieżącą decyzją: werdykt bywa wydany bez słowa. */

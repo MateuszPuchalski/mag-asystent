@@ -39,8 +39,3 @@ export function znanyStatus(kod: string | null): kod is StatusAllegro {
 export function rozstrzygniecie(kod: string | null): "uznana" | "odrzucona" | null {
   return kod === "CLAIM_ACCEPTED" ? "uznana" : kod === "CLAIM_REJECTED" ? "odrzucona" : null;
 }
-
-/** Tytuł prawny słowem — rękojmia i gwarancja to dwie różne rozmowy z klientem. */
-export const PRAWO: Record<string, string> = {
-  COMPLAINT: "rękojmia", WARRANTY: "gwarancja",
-};

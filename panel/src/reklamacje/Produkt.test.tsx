@@ -313,13 +313,12 @@ describe("Produkt: co to jest, czy mamy i ile kosztuje", () => {
     expect(p.zakup).toBeNull();
   });
 
-  it("Chce, Podstawa i historia towaru stoją słowem", () => {
+  it("historia towaru stoi słowem, a Chce i Podstawa nie — mówi je linia w dymku zgłoszenia", () => {
     render(<Produkt szczegol={szczegol({ historia: { towar: { ile: 3, uznanych: 2, odrzuconych: 1 }, klient: null } },
       { oczekiwanie: "EXCHANGE", oczekiwanaKwotaGrosze: 17900 })} />);
-    expect(screen.getByText("Wymiana")).toBeInTheDocument();
-    expect(screen.getByText(/179,00 PLN/)).toBeInTheDocument();
-    expect(screen.getByText("Rękojmia · usterka przy używaniu")).toBeInTheDocument();
     expect(screen.getByText("3 reklamacje (2 uznane, 1 odrzucona)")).toBeInTheDocument();
+    for (const t of ["Chce", "Podstawa", "Wymiana"]) expect(screen.queryByText(t)).not.toBeInTheDocument();
+    expect(screen.queryByText(/179,00 PLN/)).not.toBeInTheDocument();
   });
 
   it("bez historii towaru wiersza „Ten towar” nie ma — pierwsza sprawa to nie informacja", () => {

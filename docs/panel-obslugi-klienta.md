@@ -6453,6 +6453,33 @@ towar niż ten, który wyjechał w paczce.
 Brak pola `paragon` znaczy, że serwer jeszcze nie odpowiedział. Karta wtedy
 milczy, zamiast mówić „brak paragonu”. Dyskusje tej karty nie mają.
 
+### 25b.14. Prostsza kolejka i sprawa (@wydanie)
+
+Analiza ekranu z 5 listopada 2026 znalazła dwa miejsca do jednego wyboru
+i fakty sprawy stojące kilka razy. Właściciel zlecił uproszczenie całości.
+
+- **Jeden rząd kubełków nad kolejką** (`reklamacje/Kubelki.tsx`). Pięć
+  pigułek w kolejności klawiszy 1–5: Do decyzji, Do odpowiedzi,
+  Rozstrzygnięte, Bez ruchu i Wszystkie. Liczba to długość listy, którą
+  pigułka pokaże (`liczniki`), a przy awarii „—”.
+- **Po terminie nie ma własnego filtra.** Sprawy po terminie stoją pierwsze
+  pod nagłówkiem „Po terminie · N”, więc filtr pokazywałby tę samą grupę.
+- **Liczby z trendem i średni czas do werdyktu są w Analizie,** w zakresie
+  „Obsługa klienta” (`analiza/Reklamacje.tsx`). To wgląd, a nie praca, więc
+  nie stoją nad kolejką (§7).
+- **Zdanie o porządku stoi tylko przy porządku innym niż termin.**
+- **Powód, żądanie z kwotą i tytuł prawny mają jeden dom:** linię nad zdaniem
+  klienta w dymku zgłoszenia (`liniaPowodu`). Karta Produkt mówi wyłącznie
+  o towarze, a formularz werdyktu nie powtarza loginu ani oferty.
+- **Jeden słownik kodów** (`reklamacje/slownik.ts`) zamiast pięciu map tych
+  samych powodów, oczekiwań i werdyktów.
+- **Odświeżenie z Allegro to przycisk w głowicy,** a nie menu „⋮” z jedną
+  pozycją. Wejście w sprawę dalej ją odświeża, bo agent pracuje na
+  aktualnej sprawie.
+- **Ekran jest układem.** Wysyłki z triażem 409 i jednym dialogiem zgody
+  mieszkają w `reklamacje/useWysylki.ts`. Zdania o porażce czynności trzyma
+  `sprawy/useBledy.ts` i czyści je przy zmianie sprawy.
+
 ### 25c.1. Czym jest dyskusja
 
 Rozmową posprzedażową, którą kupujący otwiera przy zamówieniu, gdy coś poszło
