@@ -21,8 +21,8 @@ import { DEFINICJE } from "../services/copilot-narzedzia.js";
 
 const SKROTY: Record<string, Record<string, string>> = {
   PROMPT_KLASYFIKACJI: { k5: "f261e501c1045be0" },
-  PROMPT_SZKICU: { s1: "848e05a0269b19e2" },
-  PROMPT_DOPYTANIA: { d1: "e65b4bcb03adaa96" },
+  PROMPT_SZKICU: { s1: "848e05a0269b19e2", s2: "9faf6aacd3357096" },
+  PROMPT_DOPYTANIA: { d1: "e65b4bcb03adaa96", d2: "3d482f33f5014b9d" },
 };
 
 const skrot = (tekst: string) => createHash("sha256").update(tekst).digest("hex").slice(0, 16);
