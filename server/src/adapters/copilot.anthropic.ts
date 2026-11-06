@@ -262,6 +262,18 @@ const Szkic = z.object({
    w nawiasie, powstały z posłuszeństwa regule z 0.253.0 („zrób z tego listę").
    Reguła zostaje, dostaje warunek.
 
+   ── REGUŁA 3c I WARUNEK W REGULE 4: SPRAWA ZAMKNIĘTA TO KONIEC ────────────
+   Klient szukał klucza do regulacji gaźnika. Szkic podał komplet dziesięciu
+   kluczy z linkiem i ceną, czyli sprawę zamknął. Potem dopisał wyliczankę
+   końcówek z opisu aukcji i drogę zapasową: „jeśli wolą Państwo jeden klucz,
+   proszę o zdjęcie śrub". Właściciel: odpowiedź dobra, ale nadto pomocna.
+
+   Oba dopiski mają źródło tutaj. Reguła 4 kazała przy „prawdopodobnie"
+   zawsze proponować sprawdzenie, choć przy komplecie pasującym na każdy
+   wariant sprawdzenie niczego nie rozstrzyga. Reguła 3b zakazywała porady
+   na końcu, ale nie nowej oferty. Droga zapasowa to drugie zadanie dla
+   klienta i druga sprawa dla agenta, gdy klient na nią odpowie.
+
    ── REGUŁA 2c: KARTOTEKA NIE MÓWI, CO JEST W PACZCE (0.261.0) ─────────────
    Szkic o filtr powietrza do Craftsmana LT2000 NAPISAŁ KLIENTOWI SPROSTOWANIE:
    „pod tą ofertą jest sam filtr główny, mimo że opis wspomina o komplecie
@@ -426,8 +438,15 @@ export const INSTRUKCJA_SZKICU = [
   "   to nie jest odpowiedź. Nie dopisuj na koniec porady ani uogólnienia,",
   "   o które nikt nie prosił. Zdania w rodzaju „to najczęstsza przyczyna”",
   "   agent nie ma jak sprawdzić, a klient o nie nie pytał.",
+  "3c. GDY ODPOWIEDŹ ZAMYKA SPRAWĘ, NIE OTWIERAJ NOWEJ. Klient szuka towaru,",
+  "   a ty masz ofertę z adresem: podaj ją i skończ. Nie streszczaj opisu aukcji,",
+  "   którą klient zaraz otworzy. Nie dopisuj drogi zapasowej („jeśli wolą",
+  "   Państwo…”, „gdyby jednak…”), o którą nie prosił. Każde takie zdanie to",
+  "   nowe zadanie dla klienta, a on już dostał to, po co przyszedł.",
   "4. Pewność „prawdopodobne” oddaj słowem „prawdopodobnie” i zaproponuj",
-  "   sprawdzenie (tabliczka, zdjęcie starej części).",
+  "   sprawdzenie (tabliczka, zdjęcie starej części), ale tylko wtedy, gdy od",
+  "   wyniku zależy, co klient kupi. Komplet albo zestaw, który pokrywa każdy",
+  "   wariant, sprawdzenia nie potrzebuje.",
   "5. Nie obiecuj terminu dostawy ani przyszłej dostępności. Jedyny wyjątek to",
   "   fakt „Realizacja zamówienia”: zrób to, co mówi jego WERDYKT. Gdy klient pyta",
   "   o wysyłkę, a paczka wychodzi dziś, napisz wprost, że wyślemy ją dziś. Gdy werdykt podaje termin",
@@ -537,7 +556,7 @@ export const INSTRUKCJA_SZKICU = [
  * pomiar oddzielił szkice starej instrukcji od nowej. Zmieniasz tekst
  * albo opis narzędzia, podnosisz numer. Pilnuje skrót w `wersje-instrukcji.test.ts`.
  */
-export const PROMPT_SZKICU = "s1";
+export const PROMPT_SZKICU = "s2";
 
 /* Ile rund narzędzi na jeden szkic. Mniej niż przy dopytaniu, bo szkic
    ma już fakty, a sięga po bazę tylko o towar spoza nich: znajdź symbol,
@@ -764,7 +783,7 @@ export const INSTRUKCJA_DOPYTANIA = [
  * szkicu zmienia też tę, bo wchodzi do niej bajt w bajt, więc podnosisz
  * oba numery. Powód i strażnik jak przy `PROMPT_SZKICU`.
  */
-export const PROMPT_DOPYTANIA = "d1";
+export const PROMPT_DOPYTANIA = "d2";
 
 /* Ile rund narzędzi na jedno dopytanie. Pytanie o towar to zwykle dwie:
    znajdź symbol, otwórz kartę. Sufit zatrzymuje pętlę, w której model
