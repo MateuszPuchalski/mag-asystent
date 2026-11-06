@@ -10,6 +10,14 @@ z wersją monorepo" — i właśnie tak przestał być zgodny: `0.3.0` przetrwa�
 sześć zmergowanych zmian, w tym takie, które wymagały nowego uprawnienia SQL.
 Komentarz nie jest mechanizmem.
 
+## 0.620.1 — 6 listopada 2026
+
+**Szkic Copilota nie dopisuje drogi zapasowej.** Gdy szkic podaje ofertę
+z adresem, która odpowiada na prośbę klienta, kończy na niej. Nie streszcza
+opisu aukcji i nie proponuje innej drogi w rodzaju „jeśli wolą Państwo…”.
+Prośbę o zdjęcie albo tabliczkę dodaje tylko wtedy, gdy od niej zależy,
+co klient kupi. Komplet pasujący na każdy wariant jej nie potrzebuje.
+
 ## 0.620.0 — 5 listopada 2026
 
 **Uwaga albo pomysł z każdego ekranu.** W panelu i na kolektorze stoi
