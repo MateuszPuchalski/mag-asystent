@@ -101,6 +101,10 @@ import pl.wertis.kolektor.core.text.jednostka
 import pl.wertis.kolektor.net.apiCall
 import pl.wertis.kolektor.scan.ScanHandlerEffect
 import pl.wertis.kolektor.ui.przesuniecie.PrzesuniecieSheet
+import pl.wertis.kolektor.ui.wymiary.PomiarSheet
+import pl.wertis.kolektor.core.net.TowarDoPomiaru
+import pl.wertis.kolektor.core.wymiary.pomiarPrzedOdlozeniem
+import pl.wertis.kolektor.core.wymiary.wymaganePola
 import pl.wertis.kolektor.ui.components.LoadingRow
 import pl.wertis.kolektor.ui.components.LokPastylka
 import pl.wertis.kolektor.ui.components.MinTap
@@ -273,6 +277,79 @@ fun DeliveryLinesScreen(graph: AppGraph) {
        `null` po dostawie krajowej, więc kolektor nie musi znać identyfikatorów
        z konfiguracji, żeby wiedzieć, że nie ma czego przesuwać. */
     val magZrodlowy = view?.sourceMagId
+
+    /* ── Pomiar wymuszony przed odłożeniem ─────────────────────────────────
+       Towar bez kompletu wagi i wymiarów nie idzie na półkę, dopóki ktoś go
+       nie zmierzy. Reguła i wyjątki od niej stoją przy `pomiarPrzedOdlozeniem`
+       w `:core`. Pytamy zaraz po skanie towaru, bo wtedy karton leży przy
+       wadze; przy regale człowiek ma już tylko towar i drabinę. */
+    /** Otwarty arkusz wymuszonego pomiaru — `null` = zamknięty. */
+    var pomiarDla by remember(id) { mutableStateOf<TowarDoPomiaru?>(null) }
+    /** Towar, którego kartotekę właśnie czytamy; skan półki czeka na odpowiedź. */
+    var sprawdzany by remember(id) { mutableStateOf<Long?>(null) }
+    /**
+     * Kartoteki z brakami. Czyta je `czekaNaPomiar`, którą wołają skan półki,
+     * ręczny wpis i przesunięcie na halę. Bez sieci to jedyna wiedza o brakach.
+     */
+    var doPomiaru by remember(id) { mutableStateOf<Map<Long, TowarDoPomiaru>>(emptyMap()) }
+    /** Zmierzone z tego ekranu. Subiekt zobaczy pomiar dopiero po workerze. */
+    var zmierzone by remember(id) { mutableStateOf<Set<Long>>(emptySet()) }
+    /** Kartoteki, które w tej wizycie nie blokują — drugi skan nie pyta serwera. */
+    var bezBlokady by remember(id) { mutableStateOf<Set<Long>>(emptySet()) }
+
+    /* Sprawdzenie na każde otwarcie pozycji, z każdej drogi: skan, wybór
+       z listy, wejście z karty towaru. Zmiana pozycji anuluje stare żądanie.
+       Znany brak też pytamy od nowa: towar mógł zmierzyć w międzyczasie
+       drugi kolektor albo lista „Do zmierzenia". */
+    val otwartyTwId = active?.twId
+    LaunchedEffect(otwartyTwId) {
+        val twId = otwartyTwId ?: return@LaunchedEffect
+        if (twId in bezBlokady || twId in zmierzone) return@LaunchedEffect
+        sprawdzany = twId
+        val w = try {
+            apiCall { graph.api.wymiaryTowaru(twId) }
+        } catch (e: kotlinx.coroutines.CancellationException) {
+            throw e
+        } catch (_: Exception) {
+            null
+        } finally {
+            if (sprawdzany == twId) sprawdzany = null
+        }
+        /* Bez odpowiedzi blokuje wyłącznie brak już znany. Nieznany nie blokuje,
+           bo inaczej każda dziura Wi-Fi zatrzymałaby rozkładanie. Następne
+           otwarcie tej pozycji zapyta jeszcze raz. */
+        val towar = if (w == null) doPomiaru[twId] else pomiarPrzedOdlozeniem(w, twId, zmierzone)
+        if (towar == null) {
+            if (w != null) {
+                doPomiaru = doPomiaru - twId
+                bezBlokady = bezBlokady + twId
+            }
+            return@LaunchedEffect
+        }
+        doPomiaru = doPomiaru + (twId to towar)
+        // ton uwagi: człowiek patrzy na karton, nie na ekran (dekalog p. 7)
+        graph.feedback.beep(false)
+        pomiarDla = towar
+    }
+
+    /**
+     * Czy zapis tej pozycji musi poczekać na pomiar. Mówi o tym od razu
+     * i głosem, bo skan półki połknięty po cichu czyta się jak zapisany.
+     */
+    fun czekaNaPomiar(line: DeliveryLineView): Boolean {
+        val brak = doPomiaru[line.twId]
+        if (brak != null) {
+            graph.feedback.beep(false)
+            pomiarDla = brak
+            return true
+        }
+        if (sprawdzany == line.twId) {
+            graph.feedback.beep(false)
+            graph.effects.toast("Sprawdzam wagę i wymiary ${line.sym} — zeskanuj półkę za chwilę")
+            return true
+        }
+        return false
+    }
 
     suspend fun resolveProduct(code: String) {
         try {
@@ -465,6 +542,8 @@ fun DeliveryLinesScreen(graph: AppGraph) {
      * przeniesiono, czy leży teraz w dwóch miejscach (§4.3).
      */
     suspend fun putaway(line: DeliveryLineView, code: String, recznie: Boolean = false) {
+        // przed pytaniem o rozjazd: decyzja o półce dla niezmierzonego towaru i tak by przepadła
+        if (czekaNaPomiar(line)) return
         when (val decyzja = rozjazdPamiec.rozstrzygnij(line.twId, line.locExpected, code)) {
             is DecyzjaRozjazdu.Zgodna -> commitPutaway(line, code, locAction = null, recznie = recznie)
 
@@ -507,7 +586,7 @@ fun DeliveryLinesScreen(graph: AppGraph) {
        a nie na pytanie „czego zapomniano". */
     val arkuszOtwarty = mismatch != null || problemOpen || conflict != null ||
         korektaDla != null || zakonczenie != null || notatkaOtwarta != null ||
-        eanDla != null || przesunFor != null || polkaDla != null
+        eanDla != null || przesunFor != null || polkaDla != null || pomiarDla != null
 
     ScanHandlerEffect { scan ->
         if (arkuszOtwarty) {
@@ -967,7 +1046,8 @@ fun DeliveryLinesScreen(graph: AppGraph) {
                             problemFor = line
                             problemOpen = true
                         },
-                        onPrzesun = magZrodlowy?.let { { przesunFor = line } },
+                        // przesunięcie z pozycją to też odłożenie (`putawayLine` na serwerze)
+                        onPrzesun = magZrodlowy?.let { { if (!czekaNaPomiar(line)) przesunFor = line } },
                         onCancel = { zwolnij(line) },
                         onKorekta = { korektaDla = line },
                         onCofnij = { cofnij(line.id, line.sym) },
@@ -1240,6 +1320,35 @@ fun DeliveryLinesScreen(graph: AppGraph) {
                 scope.launch { resolveProduct(c.sym) } // symbol jest jednoznaczny
             },
             onCancel = { conflict = null },
+        )
+    }
+
+    /* Wymuszony pomiar — na poziomie ekranu, jak korekta. Pozycja zostaje
+       otwarta pod arkuszem, więc po zapisie następny ruch to skan półki. */
+    pomiarDla?.let { towar ->
+        PomiarSheet(
+            graph = graph,
+            towar = towar,
+            wymagane = wymaganePola(towar),
+            onClose = {
+                // twarda blokada: bez pomiaru pozycja wraca na listę nieodłożona,
+                // razem z arkuszem przesunięcia, który też by ją odłożył
+                pomiarDla = null
+                active?.takeIf { it.twId == towar.twId }?.let { zwolnij(it) }
+                if (przesunFor?.twId == towar.twId) przesunFor = null
+                graph.effects.toast("${towar.symbol} czeka na pomiar — bez niego nie odłożysz")
+            },
+            onZapisano = {
+                pomiarDla = null
+                doPomiaru = doPomiaru - towar.twId
+                zmierzone = zmierzone + towar.twId
+            },
+            onWylaczone = {
+                // serwer wyłączył wymiary w trakcie pracy — blokować nie ma czym
+                pomiarDla = null
+                doPomiaru = doPomiaru - towar.twId
+                bezBlokady = bezBlokady + towar.twId
+            },
         )
     }
 }

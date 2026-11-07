@@ -293,4 +293,76 @@ class PomiarTest {
         assertEquals(0.5, w.towar!!.netto!!, 0.0)
         assertEquals(PolePomiaru.BRUTTO, poleStartowe(w.towar!!))
     }
+
+    /* ── Pomiar wymuszony przy rozkładaniu ─────────────────────────────────── */
+
+    private val pelny = pusty.copy(brutto = 2.0, netto = 1.5, dlugosc = "10", szerokosc = "20", wysokosc = "30")
+    private fun odp(t: TowarDoPomiaru?, wlaczone: Boolean = true, oczekuje: Boolean = false) =
+        WymiaryTowaru(wlaczone = wlaczone, towar = t, oczekuje = oczekuje)
+
+    @Test fun `wymagane sa dokladnie braki kartoteki`() {
+        val t = pelny.copy(netto = null, wysokosc = " ")
+        assertEquals(setOf(PolePomiaru.NETTO, PolePomiaru.WYSOKOSC), wymaganePola(t))
+        assertEquals(PolePomiaru.entries.toSet(), wymaganePola(pusty))
+        assertTrue(wymaganePola(pelny).isEmpty())
+    }
+
+    @Test fun `towar bez ktorejkolwiek z pieciu wartosci blokuje odlozenie`() {
+        // netto też — decyzja właściciela: wszystkie pięć pól
+        val t = pelny.copy(netto = null)
+        assertEquals(t, pomiarPrzedOdlozeniem(odp(t), 1, emptySet()))
+    }
+
+    @Test fun `pelna kartoteka nie blokuje`() {
+        assertNull(pomiarPrzedOdlozeniem(odp(pelny), 1, emptySet()))
+    }
+
+    @Test fun `pomiar w kolejce nie blokuje`() {
+        assertNull(pomiarPrzedOdlozeniem(odp(pusty, oczekuje = true), 1, emptySet()))
+    }
+
+    @Test fun `zmierzony z tego ekranu nie blokuje drugi raz`() {
+        // Subiekt zobaczy pomiar dopiero po workerze — druga pozycja tego towaru nie pyta
+        assertNull(pomiarPrzedOdlozeniem(odp(pusty), 1, setOf(1L)))
+    }
+
+    @Test fun `wylaczona funkcja nie blokuje`() {
+        assertNull(pomiarPrzedOdlozeniem(odp(null, wlaczone = false), 1, emptySet()))
+        assertNull(pomiarPrzedOdlozeniem(odp(pusty, wlaczone = false), 1, emptySet()))
+    }
+
+    @Test fun `odpowiedz o innym towarze nie blokuje`() {
+        // spóźnione żądanie po poprzednim skanie mierzyłoby cudzą kartotekę
+        assertNull(pomiarPrzedOdlozeniem(odp(pusty), 2, emptySet()))
+    }
+
+    @Test fun `wymuszony formularz wymaga kazdego braku`() {
+        val t = pelny.copy(brutto = null, wysokosc = null)
+        val wymagane = wymaganePola(t)
+        // brutto ponad netto 1,5 z kartoteki — inaczej odmówiłaby reguła netto ≤ brutto
+        val wpisy = PolePomiaru.entries.associateWith { "" } + (PolePomiaru.BRUTTO to "2,2")
+        assertEquals(
+            "Wpisz: wysokość — bez tego pozycji nie odłożysz.",
+            bladPomiaru(wpisy, t, wymagane),
+        )
+        val komplet = wpisy + (PolePomiaru.WYSOKOSC to "30")
+        assertNull(bladPomiaru(komplet, t, wymagane))
+    }
+
+    @Test fun `zle pole mowi przed brakiem`() {
+        // człowiek poprawia to, co wpisał, zanim usłyszy o tym, czego nie wpisał
+        val wpisy = PolePomiaru.entries.associateWith { "" } + (PolePomiaru.BRUTTO to "0")
+        assertEquals(
+            "Waga brutto musi być większa od zera.",
+            bladPomiaru(wpisy, pusty, wymaganePola(pusty)),
+        )
+    }
+
+    @Test fun `braki wymienione w kolejnosci formularza`() {
+        val wpisy = PolePomiaru.entries.associateWith { "" }
+        assertEquals(
+            "Wpisz: waga brutto, waga netto, długość, szerokość, wysokość — bez tego pozycji nie odłożysz.",
+            brakWymaganych(wpisy, wymaganePola(pusty)),
+        )
+    }
 }
