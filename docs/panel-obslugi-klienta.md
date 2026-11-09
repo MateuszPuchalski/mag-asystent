@@ -1,63 +1,18 @@
 # WERTIS — panel obsługi klienta
 
-Status: projekt docelowy. Wersja dokumentu 1.0, 1 września 2026.
+Ten dokument opisuje panel obsługi klienta i decyzje, które go kształtują.
+Rejestrem decyzji właściciela i listą dowodów jest `docs/obsluga-klienta.md`.
+Stan faktyczny kodu opisuje rozdział 28 na końcu.
 
-Ten dokument opisuje, dokąd idziemy. Rejestrem decyzji właściciela i listą
-dowodów jest `docs/obsluga-klienta.md` — tam stoją odpowiedzi na osiem pytań,
-tutaj ich konsekwencja. Stan faktyczny kodu opisuje rozdział 28 na końcu.
-
-**Nazwy bytów są tu takie, jak w kodzie.** Projekt właściciela używał nazw
-angielskich (`field_task`, `internal_comment`, `draft`, `audit_event`), a repo
-ma dla nich własne tabele. Zmieniliśmy dokument, nie bazę: równoległa nazwa dla
-istniejącego bytu dała już w tym repo dwie tabele zadań i trzeci front.
-
-**Doboru części i bazy wiedzy już nie ma.** Wyszły w całości decyzją
-właściciela w 0.565.0. Rozdziały 11, 12, 7.2, 14.7, 14.8 i 19a zostają jako
-zapis powodów; reszta dokumentu wspomina je tam, gdzie wtedy stały.
+**Nazwy bytów są tu takie, jak w kodzie.** Równoległa nazwa dla istniejącego
+bytu dała już w tym repo dwie tabele zadań i trzeci front.
 
 ## 1. Cel systemu
 
-Panel wspiera obsługę pytań klientów sklepu z częściami do kosiarek,
-traktorków, kos, pilarek i silników ogrodniczych.
-
-Najważniejszy przypadek to **techniczny dobór części**. Odpowiedź wymaga
-połączenia danych z wielu źródeł: pytania klienta, oferty Allegro, historii
-rozmowy, kartoteki Subiekta GT, symboli OEM i zamienników, dokumentacji
-producenta, wcześniejszych potwierdzonych dopasowań, zdjęć i tabliczek
-znamionowych, pomiarów magazyniera oraz wiedzy pracowników.
-
-System nie jest skrzynką wiadomości. Ma prowadzić agenta od pytania klienta do
-udokumentowanej decyzji o dopasowaniu części.
-
-## 2. Główna obietnica produktu
-
-Agent obsługuje pytanie techniczne bez przełączania się między Centrum
-Wiadomości Allegro, pocztą, Subiektem GT, katalogami producentów, arkuszami,
-komunikatorem, telefonem do magazynu i prywatnymi notatkami.
-
-Docelowy przepływ:
-
-```
-pytanie klienta
-    ↓
-automatycznie pobrana rozmowa i oferta
-    ↓
-rozpoznanie urządzenia, silnika i szukanej części
-    ↓
-wyszukanie produktów oraz potwierdzonych zastosowań
-    ↓
-uzupełnienie brakujących informacji
-    ↓
-opcjonalne zadanie dla magazynu
-    ↓
-wynik pomiaru lub zdjęcie
-    ↓
-szkic odpowiedzi
-    ↓
-kontrola i wysyłka przez agenta
-    ↓
-utrwalenie potwierdzonej wiedzy
-```
+Panel wspiera obsługę klientów sklepu z częściami do kosiarek, traktorków,
+kos, pilarek i silników ogrodniczych. Agent prowadzi w nim rozmowy, zwroty
+i reklamacje z Allegro. Nie przełącza się przy tym do Centrum Wiadomości,
+Subiekta GT ani telefonu do magazynu.
 
 ## 3. Zakres pierwszego kanału
 
@@ -197,36 +152,15 @@ sztucznej inteligencji.
 
 ### 6.1. Jednostki domenowe
 
-System rozróżnia **rozmowę** (komunikację w kanale), **wiadomość**, **dobór**
-(proces wyboru części), **zadanie** (pracę pomocniczą), **dowód** (podstawę
-decyzji technicznej) i **szkic** (niewysłaną treść).
+System rozróżnia **rozmowę** (komunikację w kanale), **wiadomość**,
+**zadanie** (pracę pomocniczą) i **szkic** (niewysłaną treść). Nie zastępujemy
+tych pojęć jedną tabelą ze wspólnym statusem.
 
-Nie zastępujemy tych pojęć jedną tabelą ze wspólnym statusem.
-
-**SPRAWY NA TEJ LIŚCIE JUŻ NIE MA (0.388.0).** Stała tu od 0.161.0 jako
-„problem klienta obejmujący czasem kilka rozmów". Szczegóły kasaty niżej.
-
-#### 6.1.1. Kasata nakładki spraw (0.388.0)
-
-Sprawa była KLAMRĄ: tytuł i lista rozmów, nic więcej. Nie miała statusu, bo §7
-go dla niej nie znał, ani własnej osi, bo zdarzenia wiszą przy ŹRÓDLE.
-
-**Przestała mieć pytanie, na które odpowiada.** Od 0.387.0 droga zakupu wiąże
-rozmowy, zwroty, reklamacje i dyskusje po numerze zamówienia — automatycznie
-i przez wszystkie cztery kolejki. Sprawa robiła mniej, ręką i tylko w jednej.
-
-Dwa paski nad jedną rozmową mówiące o tym samym to podwojenie, którego dekalog
-obsługi zabrania w punkcie 3 (`docs/obsluga-klienta-calosc.md`).
-
-**Czego to kosztuje.** Droga wiąże po zamówieniu, więc dwóch rozmów o jednym
-problemie BEZ wspólnego zakupu nikt już nie sklei. Cena zapisana jawnie,
-decyzją właściciela z 18 września 2026.
-
-**Ślad w dzienniku ZOSTAJE.** `sprawa_dolaczona` i `sprawa_odlaczona` dalej
-leżą w `conversation_event`: wiszą przy źródle, a dziennik nie ma retencji.
-Panel przestał je rysować; „kto i kiedy sklejał te rozmowy" zostaje pytaniem
-z odpowiedzią. Tabele kasuje `bezNakladkiSpraw` w `server/src/db/db.ts`, a
-strażnikiem wskrzeszenia jest `server/src/db/kasata-spraw.test.ts`.
+**Nakładki spraw nad rozmowami nie ma.** Rozmowy, zwroty i reklamacje wiąże
+droga zakupu po numerze zamówienia (`services/droga-klienta.ts`). Dwóch rozmów
+o jednym problemie bez wspólnego zakupu nikt więc nie sklei. To cena zapisana
+decyzją właściciela. Nazwy tabel sprawy są spalone: `migrate()` je kasuje,
+a pilnuje tego `server/src/db/kasata-spraw.test.ts`.
 
 ### 6.2. Przypisanie
 
@@ -303,8 +237,6 @@ z nim dwie różne sprawy. Odhaczone zostają na liście jako dowód.
 
 **Rozmowa:** `new`, `open`, `waiting_for_customer`, `waiting_for_us`,
 `waiting_for_internal`, `snoozed`, `resolved`, `closed`, `spam`.
-
-**Dobór:** usunięty w 0.565.0 razem z bazą wiedzy.
 
 **Szkic:** `none`, `draft`, `needs_review`, `ready`, `sending`, `sent`,
 `send_uncertain`, `send_failed`.
@@ -465,37 +397,6 @@ model. Nowa wiadomość klienta unieważnia decyzję, a poprawka kategorii
 na inną niż `OTHER` zdejmuje regułę od razu. Liczą to `klientPodziekowal`
 i `statusZKierunku`, jedną regułą dla kolejki i otwartej rozmowy.
 
-### 7.2. Statusy doboru w kodzie (etap E1)
-
-> **Usunięte.** Dobór części i baza wiedzy wyszły z WERTIS w całości
-> decyzją właściciela w 0.565.0 (5 października 2026), razem z kodem
-> i tabelami. Tekst zostaje jako zapis powodów i blizn.
-
-Lista doboru stoi, jak lista rozmowy, w trzech miejscach: `STATUSY_DOBORU`
-w `services/dobor.ts`, `CHECK` na kolumnie `dobor_rozmowy.status` i typ
-`StatusDoboru` w panelu. Brak wiersza `dobor_rozmowy` znaczy `not_started`
-i liczy się przy odczycie. Otwarcie zakładki niczego nie wstawia.
-
-`extracting_data` nie ma w etapie E nadawcy. To stan, w którym Copilot wyciąga
-dane z pytania klienta (etap F). Człowiek dane wpisuje, nie wyciąga, więc
-serwis odrzuca ten status z ręki. `CHECK` zostawia go na liście, żeby etap F
-nie przebudowywał tabeli.
-
-Przyrost trzeci etapu F (§14.7) tego statusu NIE użył i nie użyje. Rozpoznanie
-danych jest propozycją w wierszu szkicu, a nie stanem doboru: dobór dostaje
-wartości dopiero na kliknięcie agenta, drogą zwykłego zapisu, więc przechodzi
-z `not_started` wprost do `searching`. Status stoi w `CHECK` jako rezerwa.
-
-Trzy przejścia dzieją się SAME:
-
-- pierwszy zapis danych wejściowych prowadzi `not_started` → `searching`;
-- wybór kandydata prowadzi do `candidates_found`, z każdego stanu;
-- zdjęcie wyboru przy `confirmed` cofa do `candidates_found`.
-
-`confirmed` wymaga wybranej kartoteki. `missing_information` niesie notatkę,
-czego dopytać; wyjście z tego stanu ją kasuje. Zatwierdza każdy z biura.
-Roli „ekspert" nie ma decyzją właściciela, a automat nie zatwierdza nigdy.
-
 ## 8. Integracja z Allegro
 
 ### 8.1. Autoryzacja
@@ -605,87 +506,28 @@ do ośmiu. Decyzja właściciela, świadoma; §7 niesie nową wycenę.
 │ Moje            │ Agent                     │   oferta Allegro     │
 │ Oczekujące      │ Komentarze                │   towar z Subiekta   │
 │                 │ Zadania i wyniki          │   opis kartoteki     │
-│                 │                           │ Dobór części         │
 │                 │                           │ Klient               │
-│                 │                           │ Wiedza               │
 └─────────────────┴───────────────────────────┴──────────────────────┘
 ```
 
-**Ekran mieści się w OKNIE, a przewijają się kolumny (0.165.0).** Do 0.164.0
-przewijał się dokument, czyli wszystkie kolumny naraz: żeby dojść do dołu
-dowodów przy zwrocie, operator zjeżdżał z oczu kolejce i paskowi decyzji.
-Makieta `docs/projekt-widokow/Main.dc.html` rysowała to poprawnie od początku.
+**Ekran mieści się w OKNIE, a przewijają się kolumny.** Przewijany dokument
+zabierał z oczu kolejkę i pasek decyzji, gdy operator zjeżdżał do dołu dowodów.
 
-**Rama stała na jednej jednostce i to ją przewróciło (0.233.0).** Wysokość
-okna trzymało samo `lg:h-dvh`. Przeglądarka, która nie zna `dvh`, nie ignoruje
-jej po kawałku — wyrzuca całą deklarację. `lg:min-h-0` skasowało już wtedy
-`min-h-screen`, więc ramie nie zostawał ŻADEN limit: przewijał się cały
-dokument razem z nagłówkiem, dokładnie jak przed 0.165.0.
+**Rama stoi na `position: fixed` z `inset: 0`, nie na jednostce okna.** `vh`
+mierzy okno układu, które bywa wyższe niż widoczne. Przeglądarka bez `dvh`
+wyrzuca całą deklarację. `lg:min-h-0` musi zostać, bo bez niego `min-h-screen`
+wpuszcza `vh` z powrotem. Pilnują tego `panel/e2e/dym.spec.ts` (piksele
+w przeglądarce) i `panel/src/RamaOkna.test.ts` (klasy w JSX).
 
-Wyglądało to na zepsuty układ, a nie na brak obsługi jednostki, bo kolumny
-dalej stały obok siebie — `lg:grid-cols` liczy w pikselach i działa wszędzie.
-Zgłoszenie właściciela: „dlaczego mogę przesunąć w dół". Zmierzone na żywej
-przeglądarce: bez `dvh` dokument rósł o 182 px.
-
-0.233.0 dołożyło do tego zapas `100vh` pod `@supports` — i **to nie zamknęło
-usterki**. Właściciel wrócił z nagraniem: „nadal mogę swobodnie przesuwać".
-
-**Rama nie używa już żadnej jednostki okna (0.236.0).** `vh` mierzy okno
-UKŁADU, a ono bywa wyższe niż okno WIDOCZNE — dokładnie ten przypadek wymienia
-komentarz z 0.165.0 jako powód, dla którego wybrano wtedy `dvh`. Zapas z
-0.233.0 był więc drugim zakładem o to, co przeglądarka rozumie i jak liczy,
-zamiast wyjściem z zakładu.
-
-`position: fixed` z `inset: 0` zakładem nie jest: to definicja kadru
-widocznego, znana każdej przeglądarce od kilkunastu lat, wolna od różnicy
-między oknem układu a oknem widocznym i od pytania, czy jednostka jest
-obsługiwana. `lg:min-h-0` musi ZOSTAĆ — bez niego `min-h-screen`, czyli
-`min-height: 100vh`, wpuściłoby `vh` z powrotem tylnymi drzwiami.
-
-Modale (`fixed inset-0`) pozycjonują się teraz względem ramy, nie względem
-okna. Zmierzone, nie założone: przy oknie 1918×966 modal wypada `1918×966`
-w punkcie `0,0`, a jego treść na środku — czyli bez różnicy na ekranie.
-
-Pilnują tego dwa testy o rozdzielonych rolach. `panel/e2e/dym.spec.ts` mierzy
-niezmiennik pikselowy w prawdziwej przeglądarce: wstawia do ramy 5000 px
-treści i sprawdza, że dokument dalej się nie przewija. `panel/src/RamaOkna.test.ts`
-pilnuje, żeby JSX nie wrócił do klasy Tailwinda z jednostką i żeby nie zniknęło
-`lg:min-h-0`.
-
-Warto zapisać, dlaczego pierwsza poprawka przeszła wszystkie bramki i nie
-pomogła: dopóki rama stała na jednostce okna, żaden test w Chromium nie mógł
-jej podważyć — Chromium zna `dvh` i `vh` i liczy je równo z oknem widocznym.
-Niezmiennik „rama równa się kadrowi" da się sprawdzić wszędzie; „jednostka
-znaczy to samo wszędzie" nie dało się sprawdzić nigdzie.
-
-**Nagłówek zawija się, zamiast znikać poza kadrem (0.233.0).** Rama jest
-`overflow-hidden`, więc to, co nie mieści się w szerokości, nie dostaje paska
-przewijania — przestaje istnieć dla myszy. Pasek potrzebuje 1112 px, więc
-poniżej ~1150 px zębatka ustawień i wylogowanie leżały poza oknem i nie dało
-się w nie kliknąć. Żadnego sygnału o tym na ekranie nie było.
-
-`flex-wrap` kosztuje drugi rząd na wąskim oknie (117 px zamiast 65 px) i to
-jest cena świadoma: rząd zabiera kilkadziesiąt pikseli, brak wylogowania
+**Nagłówek zawija się, zamiast znikać poza kadrem.** Rama jest
+`overflow-hidden`, więc to, co nie mieści się w szerokości, przestaje istnieć
+dla myszy. Drugi rząd na wąskim oknie to cena świadoma: brak wylogowania
 zabiera całą funkcję.
 
-**Skrzynka ma trzy kolumny od 0.180.0.** Do 0.179.0 miała dwie, a kontekst —
-oferta, towar i zamówienie — leżał w środkowej, nad osią. Cztery bloki jeden
-pod drugim spychały pytanie klienta poniżej krawędzi okna, czyli chowały to,
-po co agent otwiera rozmowę.
+**Skrzynka ma trzy kolumny.** Kontekst nad osią spychał pytanie klienta poniżej
+krawędzi okna, czyli chował to, po co agent otwiera rozmowę.
 
-**Kolumna kontekstu ma DWIE zakładki od 0.198.0: „Oferta i towar" oraz
-„Dobór".** Wcześniej oferta i towar stały osobno. Zakładka „Oferta" to
-jedenaście linijek w kolumnie wysokiej na osiemset pikseli, a zdjęcie, stan,
-półka i parametry kartoteki leżały schowane obok. Właściciel przysłał zrzut,
-na którym klient pyta o wymiar gwintu, a parametr „Gwint" stoi w niewidocznej
-zakładce.
-
-Argument za rozdziałem brzmiał: to dwa równorzędne tematy, więc niech się nie
-przewijają nawzajem. Trzyma się on, dopóki obie karty są wysokie. „Dobór"
-zostaje osobno, bo to nie karta faktów, tylko robota z własnymi krokami
-i przyciskami.
-
-**Od 0.498.0 zakładek nie ma: kolumna jest ciemnym kokpitem.** Nagranie
+**Kolumna kontekstu nie ma zakładek: jest ciemnym kokpitem.** Nagranie
 właściciela pokazało cztery zakładki i trzy kłopoty. Nazwa towaru stała cztery
 razy, a SKU sześć. Zwrot do decyzji, jedyna rzecz z terminem, leżał w połowie
 przewijania. „Klient 2" i „Wiedza 0" niosły po zdaniu na całą kolumnę.
@@ -694,26 +536,12 @@ Właściciel wybrał z kanwy trzy zmiany naraz („E + A + D"):
 - **A — ciemny kokpit** (zasada Airbusa: w normie lampki gasną). Na górze
   „Wymaga Ciebie": zwrot w toku, otwarta reklamacja albo dyskusja, paczka
   z awizo, problemem lub w drodze powrotnej, pozycja zamówienia do wskazania
-  i dobór w toku. Niżej „W normie": jedna linia na temat ze streszczeniem,
+  Niżej „W normie": jedna linia na temat ze streszczeniem,
   rozwijana kliknięciem. Reguły stoją w `skrzynka/kokpit.ts`, każda z testem,
   który sprawdza, że zapala się, gdy warunek pęka.
 - **D — towar raz.** Nazwę, SKU i stan mówi pasmo nad kolumną. Streszczenie
   wiersza dokłada tylko to, co jego źródło ma inne. Cena oferty staje na
   jednej osi z poziomami cen kartoteki i zdaniem, o ile od nich odbiega.
-- **E — bramka doboru.** Gdy oferta rozmowy jest pozycją jej zamówienia,
-  towar jest znany i dobór automatu chowa się za zdaniem „dobór zbędny".
-  Na nagraniu klient zwracał nóż 14-25001, a dobór pokazał świecę, sprężynę
-  i przewody paliwa — bez kupionego towaru. „Szukaj innego towaru mimo to"
-  odsłania go jednym kliknięciem. Dobór uruchomiony przez człowieka bramka
-  zostawia na wierzchu.
-- **Bez „Szukamy" przy znanym towarze (0.499.0).** Tę samą regułę stosuje
-  serwer (plik `towar-znany.ts`, usunięty razem ze starym doborem). Automat szkicu dalej wpisuje dane
-  doboru, ale przy znanym towarze nie podnosi statusu do `searching`. Nagłówek
-  i plakietka kolejki nie mówią więc „Szukamy" przy zwrocie kupionego noża.
-  Rozmowy oznaczone tak przed tym wydaniem porządkuje start serwera. Cofa
-  wyłącznie start automatu, z kreską na osi i wpisem w dzienniku. Decyzji
-  człowieka i doboru z wybranym kandydatem nie dotyka.
-
 **Soczewki według rodzaju pytania (0.499.0).** Właściciel przysłał listę
 prawdziwych pytań klientów i pomysł: prawa kolumna ma pokazywać to, czego
 wymaga KATEGORIA pytania. Soczewka to blok na samej górze kolumny, nad
@@ -748,42 +576,12 @@ Decyzja z 0.198.0 zostaje: oferta i kartoteka to jeden wiersz, otwarty bez
 klikania. Zwija się wyłącznie przy zwrocie albo sprawie w toku, bo wtedy
 tematem jest decyzja z terminem, a karta towaru jest tłem.
 
-**„Klient" i „Wiedza" WRACAJĄ z makiety (0.216.0)** — decyzja właściciela,
-która unieważnia oba powody odmowy z 0.198.0, a nie idzie wbrew nim.
+**Zakładka Klient** pokazuje zakupy, rozmowy i sprawy po loginie kupującego.
+Jest czystym odczytem i nie zakłada żadnej tabeli. Wątek bez loginu mówi, że
+nie wiemy, czyja to historia: pusta oś kłamałaby o stałym kliencie.
 
-> **Od 0.565.0 Wiedzy i maszyn klienta nie ma.** Zeszły razem z doborem.
-> Zakładka Klient pokazuje zakupy, rozmowy i sprawy po loginie. Dwa akapity
-> niżej o Wiedzy i maszynach zostają jako zapis powodów.
-
-Wiedzy odmawialiśmy, bo dowody stały już w „Doborze", a druga zakładka z tą
-samą treścią kazałaby zgadywać, w której szukać. Argument był słuszny, więc
-dowody STAMTĄD WYSZŁY: stoją w jednym miejscu, nie w dwóch. Dobór został
-robotą, Wiedza jest kartą faktów pod szkic — sięga się po nią także wtedy,
-gdy dobór dawno domknięto i nikt nie przewija jego kroków. U góry stoi
-klauzula §14.3: twierdzenie bez źródła jest przypuszczeniem. Zdanie ma stać
-tam, gdzie agent pisze, a nie tylko w tym dokumencie.
-
-Klientowi odmawialiśmy zdaniem „nie ma bytu". Było prawdziwe o TABELI i
-fałszywe o danych: login kupującego wiąże jego zamówienia (`zamowienie_klienta`),
-jego rozmowy (`allegro_inbox_thread.interlocutor_login`) i maszyny z doborów
-z wybraną częścią (tabela `dobor`, wynik `czesc`). Zakładka jest czystym odczytem i NIE ZAKŁADA ANI
-JEDNEJ NOWEJ TABELI — osobny rejestr maszyn trzeba by utrzymywać przy każdej
-poprawce doboru, czyli ten sam kształt, który w 0.128.0 kosztował cztery tabele
-nakładki spraw.
-
-Maszyna liczy się jako ustalona dopiero z doborem `confirmed`: w trakcie agent
-wpisuje markę, zanim cokolwiek ustali. Ta sama maszyna z kilku rozmów zostaje
-jedna, z NAJSTARSZĄ — pytanie brzmi „od kiedy to wiemy". Wątek bez loginu mówi,
-że nie wiemy, czyja to historia; pusta oś byłaby wtedy kłamstwem o kliencie,
-który kupuje u nas od lat.
-
-Po co to biuru: odpowiedź „ten szarpak pasuje" waży inaczej, gdy ten sam klient
-kupił go rok temu do tej samej kosiarki. §11.3 nazywa to wprost —
-`sprzedaz_weryfikacja` jest rodzajem dowodu.
-
-**Ekran bierze CAŁĄ szerokość okna od 0.198.0.** Wcześniej `<main>` miał
-`max-w-[1500px]` i wyśrodkowanie. Ogranicznik przyszedł z makiety i nikt go
-nigdy nie uzasadnił. Na monitorze 1920 oddawał 210 pikseli na margines z każdej
+**Ekran bierze CAŁĄ szerokość okna.** Ogranicznik `max-w-[1500px]` nie miał
+uzasadnienia. Na monitorze 1920 oddawał 210 pikseli na margines z każdej
 strony, na 2560 — po 530, a kolumny stały wąskie mimo wolnego miejsca.
 
 Rosną kolumny SKRAJNE, nie środkowa. W kolejce i w kontekście szerokość zamienia
@@ -794,8 +592,6 @@ przeciwnych krawędzi: klient do lewej, my do prawej. Strona kolumny mówi, kto
 mówi, zanim wzrok dojdzie do podpisu.
 
 Szerokości kolumn stoją w JEDNYM miejscu (`SIATKA_TRZECH_KOLUMN` w `panel/src/ui`).
-Do 0.197.4 skrzynka miała kolejkę 22 rem, a zwroty 320 px — rozjazd, którego
-nikt nie zdecydował, choć ta sekcja wymienia szerokości wprost.
 
 Blokada zaczyna się od szerokości `lg`. Niżej grid jest jednokolumnowy, a trzy
 scrollery po dwieście pikseli czytałoby się gorzej niż jedną przewijaną stronę;
@@ -805,7 +601,7 @@ widok wąski jest osobnym ekranem (§10.5), nie tym samym w miniaturze.
 
 Wiersz pokazuje kanał, klienta, fragment ostatniej wiadomości, czas
 oczekiwania, ofertę lub produkt, właściciela, priorytet, termin, liczbę nowych
-wiadomości, status doboru i oczekujące zadanie terenowe.
+wiadomości i oczekujące zadanie terenowe.
 
 **Wiersz uzupełniony w 0.181.0: priorytet, czas oczekiwania, licznik dopisków
 klienta i znak oczekującego zadania.** Jednej pozycji z listy wyżej dalej nie
@@ -908,7 +704,7 @@ i „tu coś jest nie tak" nie mogą mieć jednego piksela.
 
 Zaznaczenie jest stanem STRUKTURALNYM i dlatego bierze neutralną szarość. Wolnej
 rodziny barw i tak nie było: czerwień to błąd, zieleń powodzenie, fiolet
-przypuszczenie Copilota, błękit zdarzenie doboru. Pilnuje tego
+przypuszczenie Copilota. Pilnuje tego
 `panel/src/Bursztyn.test.ts`; zwolnienie wymaga komentarza `bursztyn: <powód>`.
 
 **Stopień szarości i belka są zmierzone (0.265.0).** `slate-100` różni się od
@@ -1079,7 +875,7 @@ tam, gdzie niesie treść, a stan idzie znakiem.
 | ludzik przy plakietce | czerwona kropka na kaflu |
 | „czeka 14 g 42 min" | cztery kreski i „14 g" na prawej krawędzi |
 | „3 dopiski klienta" | dymek i liczba |
-| „zadanie w toku", „po terminie", status doboru | ikona z dymkiem |
+| „zadanie w toku", „po terminie" | ikona z dymkiem |
 | podgląd w dwóch liniach | jedna linia |
 | „Prowadzi nikt — przypisze pierwsza odpowiedź" | puste kółko, inicjał albo „Ty" |
 | „Oznacz jako pilne", „Sprawa reklamacyjna" | ikona; słowo dopiero przy podniesionej fladze |
@@ -1149,66 +945,13 @@ ponownie. Otwarcie rozmowy czyta wyłącznie stan zapisany wcześniej.
 odbiorcy, a ten do modelu nie wychodzi. Fakt mówi, że klient ma numer przy
 zamówieniu w Allegro. Szkic odsyła go tam, zamiast zmyślać numer.
 
-### 10.2c. Prawa kolumna bez powtórzeń (0.447.0)
+### 10.2d. Lista „Pasuje do" z oferty
 
-Zgłoszenie właściciela ze zrzutami czterech zakładek: „prawa kolumna jest
-wciąż chaotyczna". Zrzut pokazał cztery przyczyny i każda ma swoją poprawkę.
-
-| przyczyna | poprawka |
-|---|---|
-| Nazwa towaru trzy razy, symbol cztery, stan i półka dwa | Sekcja „Subiekt GT" nie powtarza pasma odpowiedzi. Zostaje zdjęcie, pasek wolne–zarezerwowane, identyfikatory, ceny i opis. |
-| Pięć ramek w jednej kolumnie, każda z innym tłem | Sekcje dzieli kreska, a nagłówki mają jeden kształt. Ramkę zachowują tylko ceny w reklamacjach, gdzie stoją samodzielnie. |
-| Dwie zakładki z jednym zdaniem, a każda kosztuje kliknięcie | Klient i Wiedza niosą licznik. Zero widać bez klikania. |
-| Jedenaście pigułek dróg i pełne karty trafień bez dowodu | Na wierzchu drogi z wynikiem i mocni kandydaci. Reszta stoi pod jednym rozwinięciem. |
-
-**Nic nie znika.** Fakty, które zeszły ze wzroku, stoją pod rozwinięciem,
-w dymku albo w paśmie nad zakładkami. §4.3 zabrania chowania faktów, ale
-pozwala je wyciszyć.
-
-**Status doboru stoi raz.** Plakietka obok pola wyboru mówiła to samo co
-pole. Barwę stanu niesie kropka przed polem.
-
-**„Wybierz" ma obrys, nie pełną zieleń.** Pięć pełnych zielonych przycisków
-było najgłośniejszą rzeczą w kolumnie. To ruch dostępny, a nie zalecany.
-
-**Wybrany kandydat zostaje na wierzchu zawsze**, choćby był trafieniem bez
-dowodu. Gdy żaden kandydat nie jest mocny, lista się nie zwija.
-
-**Liczniki czytają te same zapytania, które zakładki i tak wołają.**
-Otwarcie rozmowy pyta o historię klienta i wiedzę od razu, nie po
-kliknięciu. To są odczyty, więc zasada zera zapisu przy patrzeniu stoi.
-
-### 10.2d. Lista „Pasuje do" z oferty (0.447.0)
-
-Zgłoszenie właściciela ze zrzutem sekcji „Pasuje do kosiarek" z Allegro.
-Listę mamy od 0.253.0, ale do tej wersji czytał ją tylko model. Na zrzucie
-klient miał HECHT 1803S i ten model stał na liście. Dobór oddał jednak zero,
-a panel listy nie pokazywał wcale.
-
-> **Od 0.565.0 lista stoi bez maszyny klienta.** Maszynę znał wyłącznie
-> dobór, więc podświetlenie trafienia i zdanie „jest / nie ma na liście"
-> zeszły razem z nim. Zostaje sama lista: w sekcji „Oferta" jako zwinięta
-> „Pasuje do (N)" i w faktach szkicu. Tabela i akapity niżej to zapis powodów.
-
-| co | gdzie | reguła |
-|---|---|---|
-| Szukanie bez wariantu | szczebel „zastosowanie" w doborze | **usunięte** w 0.565.0 |
-| Zdanie „jest / nie ma na liście" | fakt szkicu Copilota | **usunięte** w 0.565.0 |
-| Lista w panelu | sekcja „Oferta" | Zwinięta „Pasuje do (N)", bez podświetlenia. |
-
-**Jedno dopasowanie dla szkicu i ekranu** — `services/zgodnosc-oferty.ts`.
-Model musi stać w pozycji jako ciąg całych słów, więc „46" nie trafia
-w „Stiga 460". Marka musi stać w pozycji, chyba że pozycja jest samym
-modelem.
-
-**Maszyna pochodzi wyłącznie z danych wpisanych przez agenta.** Maszyna
-wyczytana z treści pytania nie wchodzi — blizna szarpaka.
-
-**Wpis dla wariantu wygrywa.** Druga próba rusza tylko wtedy, gdy dokładny
-klucz nie dał ani jednego kandydata. Inaczej rozmyłaby mocniejszą wiedzę.
-
-**Listę dociąga układanie szkicu.** Otwarcie rozmowy jej nie pobiera, więc
-przed pierwszym szkicem bloku nie ma.
+Lista zgodności z oferty Allegro stoi w sekcji „Oferta" jako zwinięta
+„Pasuje do (N)" i w faktach szkicu. Dociąga ją układanie szkicu, bo otwarcie
+rozmowy niczego nie pobiera. Przed pierwszym szkicem bloku więc nie ma.
+Dopasowanie modelu do pozycji liczy `services/zgodnosc-oferty.ts`. Model musi
+stać w pozycji jako ciąg całych słów, więc „46" nie trafia w „Stiga 460".
 
 ### 10.2e. Zakończenie rozmowy (0.464.0)
 
@@ -1289,7 +1032,7 @@ mamy w Subiekcie, gdzie jest paczka i co czeka na ruch.
 | fakt | dom | co zeszło z kolumny |
 |---|---|---|
 | numer zamówienia, suma, data zakupu | karta; numer z kopiowaniem i Allegro także przed treścią zamówienia, a cena oferty stoi wtedy przy ofercie, nie w miejscu sumy | nagłówek bloku zamówienia, „Kupione · zapłacono”, daty w streszczeniu i w „Zamówił” |
-| nazwa, SKU, zdjęcie i cena oferty | karta | tytuł, kafel i cena w „Oferta i towar”, kwota w zdaniu osi cen, nazwa i SKU w bramce doboru |
+| nazwa, SKU, zdjęcie i cena oferty | karta | tytuł, kafel i cena w „Oferta i towar”, kwota w zdaniu osi cen |
 | stan oferty | słowo w streszczeniu „Oferta i towar” | plakietka „ACTIVE” |
 | „Nowy klient” i „Wcześniej u nas” | karta, także zwinięta i w pasku | linijka pod pasmem i liczniki w wierszu „Klient” |
 | zamówienie rozmowy wśród zakupów klienta | karta | pozycja na liście, która nazywa się teraz „Inne zakupy klienta” |
@@ -1495,8 +1238,7 @@ Zgłoszenie właściciela: przenieść wszystkie zmiany statusu do jednego rzęd
 pod oknem wiadomości, jak oś czasu, a kliknięcie ma prowadzić do tego miejsca
 w rozmowie.
 
-Do 0.242.0 zmiana statusu, sklejenie sprawy i każdy krok doboru stały między
-wypowiedziami jako kreski. Przy jednym zdarzeniu to jest znak, że sprawa
+Zmiany statusu stały kiedyś między wypowiedziami jako kreski. Przy jednym zdarzeniu to jest znak, że sprawa
 przeszła dalej; przy dziewięciu — ściana szarego tekstu, przez którą trzeba
 się przewinąć do zdania klienta. Na zrzucie od właściciela dwa takie bloki
 zajmują więcej miejsca niż obie wypowiedzi razem.
@@ -1680,8 +1422,7 @@ magazyniera, wstawienie parametrów produktu i przełączenie na komentarz
 wewnętrzny.
 
 **Z tej listy działa od 22 września 2026:** licznik znaków, ostrzeżenie
-o dopisku klienta, wstawienie wyniku magazyniera, wstawienie zdania doboru ze
-źródłem, przełączenie trybu i szkic ze sztucznej inteligencji (§14.6).
+o dopisku klienta, wstawienie wyniku magazyniera, przełączenie trybu i szkic ze sztucznej inteligencji (§14.6).
 
 **Szablony i wstawka parametrów odeszły 22 września 2026**, decyzją
 właściciela. Szkic Copilota czeka przy każdej wiadomości klienta i niesie te
@@ -1754,7 +1495,7 @@ zmiany naraz („A + B"):
 
 **„Ułóż odpowiedź" stoi tylko wtedy, gdy szkicu brak albo jest stary.** Takt
 układa szkic sam, więc przy świeżej karcie przycisk kazałby zapłacić drugi raz.
-Wraca po odrzuceniu, przy dopisku klienta i po zmianie doboru, jako „Ułóż
+Wraca po odrzuceniu i przy dopisku klienta, jako „Ułóż
 ponownie".
 
 **Przycisk komentarza i przycisk wysyłki do klienta są jednoznacznie
@@ -1771,466 +1512,23 @@ Pierwotny projekt zostaje dla historii: lista jako osobny ekran, otwarcie
 rozmowy ją zastępuje, kontekst jako panel albo zakładka, szkic nie ginie przy
 powrocie. Gdyby decyzja wróciła, to jest punkt wyjścia.
 
-## 11. Dobór części
+## 11. Źródło i pewność dopasowania
 
-> **Usunięte.** Dobór części i baza wiedzy wyszły z WERTIS w całości
-> decyzją właściciela w 0.565.0 (5 października 2026), razem z kodem
-> i tabelami. Tekst zostaje jako zapis powodów i blizn.
+Dobór części i baza wiedzy wyszły z WERTIS decyzją właściciela. Z tamtego
+rozdziału obowiązują dwie reguły, na które powołuje się kod.
 
-### 11.1. Dane wejściowe
+### 11.2. Identyfikatory z opisów
 
-System rozpoznaje markę urządzenia, model, wariant, rocznik, numer seryjny,
-model i kod silnika, numer OEM, nazwę części, parametry, wymiary, dane ze
-zdjęcia oraz wcześniejsze ustalenia. Rozpoznane wartości są propozycją i agent
-może je poprawić.
-
-**Co działa od przyrostu trzeciego etapu F (§14.7).** Copilot rozpoznaje
-markę, model, wariant, rocznik, numer seryjny, silnik, numer OEM, nazwę części
-i parametry z treści rozmowy — przy tym samym wywołaniu, które układa szkic.
-Serwer sprawdza każdą wartość przeciw rozmowie. Zakładka Dobór pokazuje je
-kartą „Copilot rozpoznał w rozmowie", a „Wpisz do danych" zapisuje je jednym
-kliknięciem w PUSTE pola. Słowo agenta zostaje; różnicę karta tylko nazywa.
-Od przyrostu czwartego (§14.8) Copilot rozpoznaje też parę część→część
-i agent proponuje ją jednym kliknięciem do kolejki wiedzy. Zdjęcia i OCR
-czekają.
-
-### 11.2. Kandydaci
-
-Kolejność wyszukiwania: dokładny symbol, EAN, numer OEM, potwierdzone
-zastosowanie, zastosowanie przez silnik, pasowanie do części klienta,
-zamiennik, zgodne wymiary, wyszukiwanie pełnotekstowe, wyszukiwanie
-semantyczne.
-
-**Wynik semantyczny nie jest dowodem kompatybilności.**
-
-**Co działa od etapu E1.** Dobór wisi przy rozmowie w tabeli `dobor_rozmowy`
-(nie `dopasowanie` — tę nazwę `migrate()` kasuje). Agent wpisuje dane §11.1,
-widzi kandydatów i wybiera kartotekę. Kandydatów daje `services/kandydaci.ts`
-z czterech szczebli: dokładny symbol, EAN, kartoteka oferty, zamiennik z opisu.
-Zastosowanie doszło w E2, numer OEM i pełny tekst w E3. Wyszukiwanie
-semantyczne nie ma szczebla w kodzie — czeka na F.
-Każdy szczebel mówi, czy był sprawdzony; pominięty niesie powód. Wyszukiwarka
-klikana ręcznie nie jest kandydatem, tylko wyborem z drogą `wyszukiwarka`.
-Furtki na literówki dobór nie używa — blizna „szarpaka".
-
-Zdanie do szkicu pisze serwer, ze źródłem (§14.3). Dobór zatwierdzony przez
-agenta to wciąż dobór, nie potwierdzone zastosowanie — wiedza idzie w E2.
-
-**Co działa od etapu E3.** Numer OEM czyta się z tabeli `towar_identyfikator`,
-odbudowanej z opisów kartotek po każdym imporcie (sekcje `OEM:`, `Nr. oryg.`,
-`Stare SKU`, a od 0.234.0 także `Zamiennik:`). Numer bez kartoteki nie znika: staje się kandydatem bez wiersza,
-bez stanu i bez przycisku Wybierz. Decyzja właściciela: „nie mamy tego" jest
-odpowiedzią dla klienta, a puste miejsce na liście nią nie jest. Pełny tekst
-to indeks FTS5 `towar_fts` po symbolu, nazwie i opisie, z rankingiem bm25.
-Pyta wyłącznie o dane wpisane przez agenta, nigdy o treść wiadomości (blizna
-„szarpaka"). Marka i model podnoszą ranking, ale go nie warunkują. Trafienie
-po treści ma pewność „wymaga danych" — to podpowiedź, nie dowód. Bez FTS5
-w SQLite szczebel jest pominięty z powodem, a karta pokrycia to pokazuje.
-
-**Co działa od 0.241.0: szczebel „zgodne wymiary".** Blizna z 9.09.2026:
-klient pytał na ofercie linki do COMBI 48-53 o „linkę napędową 148 cm
-zakończoną sprężyną". Katalog MIAŁ tę linkę — 18-11010 i 470002 „Linka
-napędu Castel Garden 81000668/1 1170x1480" — a szkic Copilota opisał linkę
-z oferty jako „prawdopodobną" i poprosił o tabliczkę. Model zrobił jedyne,
-co doktryna pozwala: fakty niosły kartotekę oferty i jej zamienniki, a numeru
-spoza faktów nazwać nie wolno. Luka siedziała w szczeblach: żaden nie czytał
-parametrów doboru, pełny tekst pyta o słowa, a „148 cm" nigdzie nie stawało
-się „1480". Ten szczebel stał w tym zdaniu wyżej od dawna — teraz ma kod.
-
-Wymiary czyta się z tabeli `wymiar_kartoteki`, odbudowanej z NAZW i OPISÓW
-kartotek po każdym imporcie (wzór `towar_identyfikator`). Parser jest
-deterministyczny: liczba z jednostką („40 cm", „102 MM", „2,5m") i para
-„1170x1480"; metry wyłącznie małą literą, bo „1330M" to model Mountfield;
-para z trzech cyfr, bo „M12x1,5" to gwint. Milimetry całkowite. Wejście
-idzie WYŁĄCZNIE z parametrów doboru wpisanych przez agenta („długość:
-148 cm"), nigdy z treści wiadomości (blizna „szarpaka"). Jednostka jest
-obowiązkowa — „148" nie mówi, czy to centymetry — a dopasowanie jest
-dokładne co do milimetra: tolerancja byłaby zgadywaniem, a szczebel i tak
-mówi „wymaga danych". Kandydat cytuje zapis z kartoteki: „zgodny wymiar
-1480 mm (długość: 148 cm) w nazwie kartoteki „1170x1480” — nie dowód".
-Trzy powody pominięcia, bo trzy różne rzeczy może zrobić agent: wpisać
-parametr, dopisać jednostkę, poczekać na odbudowę indeksu. Copilot podaje
-wymiary z rozmowy w `daneDoboru` (§14.7); po „Wpisz do danych" szczebel
-je czyta. Po wdrożeniu tabelę zakłada start serwera — ostatni wpis audytu
-przebudowy bez klucza `wymiary` znaczy, że pochodne są sprzed tego wydania.
-
-**Co działa od wydania 0.229.0: szczebel „przez silnik".** Części ogrodnicze
-mają problem dwupoziomowy. Filtr, gaźnik, świeca i linka rozrusznika pasują do
-SILNIKA, a kupujący zna wyłącznie model kosiarki. Bez tego szczebla pytanie
-„filtr do NAC LS 46-450" nie ma jak trafić na filtr Loncina, choć oba wpisy
-leżą w bazie obok siebie. Szczebel stoi zaraz za zastosowaniem do maszyny
-i przed ofertą, bo łańcuch ma o jedno ogniwo więcej.
-
-Szczebel idzie WYŁĄCZNIE przez zatwierdzoną zabudowę (§12). Pola
-`dobor_rozmowy.silnik` nie czyta: to wolny tekst, a „B&S 450E" nigdy nie
-trafi na „Briggs & Stratton 450E". Rozbijanie go na markę i nazwę byłoby tym
-samym zgadywaniem, które właściciel odrzucił przy sekcjach „Modele:".
-Wpisany tekst służy do czego innego — karmi listę luk na ekranie Silniki
-i podpowiedź pod polem w zakładce Dobór.
-
-**Od 0.238.0 most między tekstem a modelem jest LUDZKI: słownik silników**
-(§12). Biuro zapisuje, że „B&S 450E" znaczy silnik Briggs & Stratton 450E,
-a system dopasowuje tekst dokładnie po zwinięciu pisowni — bez rozbijania
-i bez furtki na literówki. Alias nie karmi szczebla: prowadzi tylko do
-propozycji zabudowy jednym kliknięciem pod polem „Silnik", z dowodem
-`rozmowa` (klient podał silnik), więc z pewnością „prawdopodobne". Rozstrzyga
-człowiek w Wiedza → Silniki, dopiero wtedy szczebel rusza.
-
-**Od 0.239.0 szczebel ma paliwo z nazw kartotek: tokeny silników** (§12).
-Zabudowa mówi, jaki silnik stoi w maszynie, ale kandydatów daje dopiero
-zastosowanie części DO SILNIKA — a tych było tyle, ile biuro wpisało ręcznie.
-Tymczasem nazwy kartotek mówią wprost „Gaźnik do silników HONDA GX160".
-Biuro wpisuje token „GX160" = Honda GX160, przegląda listę kartotek z tym
-słowem w nazwie i jednym kliknięciem zatwierdza zaznaczone. Kandydat z tokenu
-ma pewność „potwierdzone", bo dowodem jest decyzja biura, nie ślad rozmowy.
-
-Pominięcie tego szczebla jest produktem, nie porażką: powód pominięcia to
-jedyna droga, którą agent dowie się o luce, więc prowadzi o krok dalej.
-Tekst bez aliasu: „„Lonci v200" nie ma w słowniku silników, dopisz go
-w Wiedza → Silniki". Alias bez pary: „to silnik Loncin V200 wg słownika, ale
-nikt nie zatwierdził, że stoi w tej maszynie — zaproponuj zabudowę pod polem
-Silnik". Silnik znany, ale bez zastosowań, daje `sprawdzona: true` z zerem
-wyników — to dwie różne prawdy.
-
-**Co działa od wydania 0.230.0: szczebel „pasuje do części".** Firma sprzedaje
-dużo gaźników, a klient pyta: „czy ta uszczelka pasuje do mojego gaźnika?".
-Do 0.229.0 baza nie znała ŻADNEJ relacji część↔część — zastosowanie wiąże
-część z modelem, zabudowa model z modelem. Jedyną relacją między kartotekami
-był zamiennik, liczony z opisu i jednokierunkowy. Odpowiedź na to pytanie
-brał agent z pamięci albo z katalogu na drugim monitorze.
-
-Szczebel czyta zatwierdzone pasowania (§12) do KOTWIC. Kotwica to kartoteka
-trafiona w tym przebiegu przez symbol, EAN albo numer OEM wpisany przez agenta,
-oraz kartoteka oferty. Nigdy treść wiadomości — blizna „szarpaka". Bez
-kotwicy szczebel jest pominięty z powodem „agent nie wpisał symbolu ani
-numeru, a rozmowa nie ma kartoteki oferty". Kotwica bez pasowań daje
-`sprawdzona: true` z zerem. Wyników nie filtruje się po nazwie części: gaźnik
-ma trzy uszczelki, membranę i zestaw naprawczy, a agent czyta nazwy sam.
-
-Szczebel stoi PRZED ofertą, choć dziś oferta bije zastosowanie. Powód to
-scenariusz odwrotny: oferta jest uszczelką, klient pyta „pasuje do W09-0211?".
-Symbol wpisany przez agenta daje gaźnik jako kotwicę, a pasowanie oddaje
-uszczelkę oferty. Gdyby oferta stała wyżej, dedup po `twId` zostawiłby zdanie
-„kartoteka oferty…", a dowód pasowania zniknąłby ze szkicu.
-
-Pewność trafienia wprost to pewność wiersza. Trafienie PRZEZ ZAMIENNIK
-(§12) nigdy nie jest `potwierdzone` — zamiennik gaźnika bywa produktem
-nadrzędnym z innym rozstawem uszczelki. Negatywne pasowania do kotwicy idą do
-sekcji negatywów i do ostrzeżeń kandydata, scalane, nie nadpisywane.
-
-Odpowiedź kandydatów niesie listę `kotwice`. Panel potrzebuje jej do przycisku
-„Pasuje do W09-0211" przy wybranym kandydacie — jedynego miejsca, gdzie
-pasowanie rodzi się z pracy. Kierunek jest narzucony: wybrany pasuje DO
-kotwicy. Automatu przy ZATWIERDŹ DOBÓR nie ma: rola części jest nieznana,
-a kotwica bywa samą częścią, gdy klient pyta o dostępność gaźnika.
-
-**SIŁA SZCZEBLA STOI W ZDANIU, NIE TYLKO W KOLEJNOŚCI (0.263.0).** Ranga dróg
-porządkowała listę, ale ta liczba nie wychodziła poza sortowanie. Zdania źródła
-nazywały za to słabość dwóch najniższych dróg dopiskiem „nie dowód". Model
-dostawał więc listę, na której najsłabsze wpisy były opisane jako słabe,
-a najmocniejsze nie miały przy sobie nic.
-
-Kosztowało to szkic o koło pasowe do Husqvarny TC38. Klient podał numer
-producenta ze starej części, kartoteka miała ten numer w opisie, kandydat
-stanął pierwszy z jedenastoma sztukami na stanie. Szkic nie wymienił go ani
-razu: odradził ofertę i poprosił o zdjęcie na tle linijki, bo z nazwy kartoteki
-wywnioskował inną szerokość kosiska. Domysł o maszynie pobił trafienie po
-numerze, bo nic nie mówiło, że to trafienie jest mocne.
-
-Trzy mocne drogi, czyli dokładny symbol, kod EAN i numer producenta, niosą
-teraz w zdaniu źródła dopisek o trafieniu po identyfikatorze. Karta „numer bez
-wiersza w kartotece" go nie dostaje, bo jest odpowiedzią „nie mamy tego
-u siebie", a nie trafieniem. Reguły 7a do 7c instrukcji szkicu mówią modelowi,
-co z tym zrobić: trafienie po identyfikatorze bije wniosek z nazwy maszyny,
-takiego kandydata się nie przemilcza, a rozbieżność idzie do zastrzeżeń.
-
-Kandydat dalej **nie wpisuje się sam** do zakładki Dobór. Automatyczny wybór
-łamałby wzorzec trzymany w całym module: dane trafiają tam na kliknięcie
-agenta i tylko w puste pola, a propozycję składa człowiek.
-
-**Powód pominięcia przestaje być tooltipem (0.267.0).** Każdy pominięty
-szczebel produkuje zdanie mówiące, co zrobić dalej. Do 0.266.0 panel wsadzał je
-w atrybut `title` czipa: jedenaście czipów, jedenaście tooltipów, a agent
-z pustą listą czytał jeden ogólnik.
-
-Przy pustej liście kandydatów te zdania stoją teraz jako widoczna lista,
-a szczeble, których brak da się zamknąć bez opuszczania rozmowy, dostają
-przycisk. Rodzaj akcji nadaje SERWIS, w tej samej gałęzi, w której pisze powód
-— panel nie rozbiera polskiego zdania, żeby zgadnąć przycisk. Etykieta mówi,
-CO wpisać („Wpisz numer OEM"), a nie „wpisz dane".
-
-Rodzaje są trzy, bo tyle da się zrobić na tym ekranie: uzupełnienie danych
-wejściowych, wpisanie wymiaru z jednostką i zaproponowanie zabudowy silnika,
-gdy alias stoi już w słowniku. Szczebel bez akcji zostaje samym zdaniem
-i to jest treść, nie niedoróbka: przycisk, który nie pomaga, uczy klikania
-w nic.
+Numery OEM, numery oryginalne, stare SKU i zamienniki czyta się z opisów
+kartotek do tabeli `towar_identyfikator`. Przebudowuje ją `po-imporcie.ts` po
+każdym imporcie. Numer z pytania klienta prowadzi dzięki niej do kartoteki.
 
 ### 11.3. Poziomy pewności
 
-Dopasowanie bywa potwierdzone przez producenta, katalogiem dostawcy, pomiarem
-własnym, decyzją biura, wcześniejszą sprzedażą i weryfikacją; albo jest
-prawdopodobne, wymagające danych lub odrzucone. Interfejs pokazuje źródło
-i poziom pewności.
-
-**Rodzaje dowodu w kodzie (E2):** `producent`, `katalog_dostawcy`,
-`pomiar_wlasny`, `sprzedaz_weryfikacja`, `decyzja_biura`, `rozmowa`. Lista
-stoi w `RODZAJE_DOWODU` (`services/wiedza.ts`), w `CHECK` na kolumnie
-`dowod_zastosowania.rodzaj` i w typie panelu. `decyzja_biura` stoi tam, gdzie
-projekt pisał „ekspert" (§5). `rozmowa` to ślad — „dobór zatwierdzony
-w rozmowie" — nie dowód techniczny.
-
-**Pewność zastosowania** jest `potwierdzone`, gdy stoi za nim choć jeden dowód
-techniczny; same ślady rozmów dają `prawdopodobne`. Liczba śladów rozmów
-pewności nie podnosi. Makieta mówiła „z najsłabszego dowodu" — brane dosłownie
-karałoby za dopisanie śladu rozmowy do katalogu producenta, więc reguła jest
-inna i zapisana tu świadomie.
-
-**Łańcuch przez silnik rządzi się INNĄ regułą: najsłabszego ogniwa.** Powyższa
-reguła dotyczy JEDNEGO twierdzenia i wygrywa w niej najmocniejszy dowód.
-Kandydat z drogi `silnik` niesie twierdzenia DWA — „część pasuje do silnika"
-oraz „silnik stoi w tej maszynie" — i jest wart tyle, co jego słabsze ogniwo.
-`potwierdzone` wymaga więc dowodu technicznego po obu stronach. Ta rozbieżność
-jest celowa; nie należy jej „naprawiać" na spójność.
-
-**Maszyna z kilkoma silnikami nigdy nie daje `potwierdzone`.** Klient zna
-model kosiarki, nie wersję silnikową. Każdy kandydat z tej drogi niesie wtedy
-ostrzeżenie „potwierdź z tabliczki znamionowej", a pewność spada do
-`prawdopodobne`. Milcząca pewność w tym miejscu kończy się zwrotem „nie
-pasuje" — czyli psuje właśnie tę miarę, którą dobór ma poprawiać.
-
-### 11.4. Negatywne dopasowania
-
-Przechowujemy również wiedzę, że część nie pasuje, pasuje tylko do innego
-wariantu, ma niewłaściwy rozstaw, ma właściwą średnicę przy innym sposobie
-mocowania, występuje pod mylącym oznaczeniem albo wymaga dodatkowego pomiaru.
-
-Negatywne dopasowanie jest istotnym ostrzeżeniem, nie brakiem danych.
-
-**Powody w kodzie (E2):** `nie_pasuje`, `tylko_inny_wariant`,
-`niewlasciwy_rozstaw`, `srednica_ok_inne_mocowanie`, `mylace_oznaczenie`,
-`wymaga_pomiaru`. Negatyw bez powodu nie istnieje — pilnuje tego `CHECK`
-sprzęgający obie kolumny. Negatyw pokazuje się przy kandydacie jako
-ostrzeżenie i osobno, bo dotyczy także kartoteki, której nie ma na liście.
-Wycofać go może tylko człowiek i tylko z powodem (§14.2).
-
-Ta sama lista powodów obowiązuje pasowanie części (0.230.0). Dwa z nich —
-`niewlasciwy_rozstaw` i `srednica_ok_inne_mocowanie` — są wręcz kształtu
-uszczelkowego. „Nie, ta jest od strony kolektora" to odpowiedź, którą
-właściciel chce dawać klientowi, więc negatyw wszedł do tabeli od razu.
-Dołożenie go później oznaczałoby przebudowę tabeli.
-
-## 12. Baza wiedzy
-
-> **Usunięte.** Dobór części i baza wiedzy wyszły z WERTIS w całości
-> decyzją właściciela w 0.565.0 (5 października 2026), razem z kodem
-> i tabelami. Tekst zostaje jako zapis powodów i blizn.
-
-Projekt wymieniał dziesięć bytów: `Manufacturer`, `MachineModel`,
-`EngineModel`, `Part`, `PartIdentifier`, `Fitment`, `FitmentEvidence`,
-`Measurement`, `KnowledgeDocument`, `KnowledgeRevision`. Kod ma JEDENAŚCIE
-tabel, nazwami z kodu: `model_urzadzenia`, `zastosowanie`,
-`dowod_zastosowania` (E2), `towar_identyfikator` i `model_z_opisu` (E3),
-`zabudowa_silnika` (0.229.0), `pasowanie_czesci` (0.230.0), `alias_silnika`
-(0.238.0), `token_silnika` z `token_silnika_kartoteka` (0.239.0) oraz
-`wymiar_kartoteki` (0.241.0, pochodna nazw i opisów jak identyfikatory).
-Każda z pozostałych byłaby dziś tabelą bez czytelnika — blizna 0.157.0. Nazwa
-`dopasowanie` jest spalona (§15) i nie wraca.
-
-**Model** trzyma maszynę i silnik w jednej tabeli z `rodzaj`. Klucz liczy
-`zwin()` z marki, nazwy i wariantu, więc jedna kosiarka to jeden wiersz.
-
-**Zastosowanie** wiąże kartotekę z modelem i mówi, czy część pasuje, czy nie.
-Cykl życia: `propozycja` → `zatwierdzone` | `odrzucone` | `wycofane`.
-Propozycję składa dobór (automatycznie, przy zatwierdzeniu z marką i modelem),
-pomiar z hali (na kliknięcie) albo biuro ręcznie. Źródło `opis` ma nadawcę
-od E3 — człowieka na liście „Z opisów"; `copilot` czeka na F.
-Rozstrzyga człowiek z biura, także autor propozycji — **albo od 0.331.0
-automat wiedzy**, jeśli właściciel go włączył. Zatwierdzenie wymaga choć
-jednego dowodu i ten warunek obowiązuje też maszynę.
-
-**Kolejka wiedzy opróżnia się sama (0.331.0).** Właściciel: „wiedza powinna
-uzupełniać się automatycznie", a pytany o zakres wybrał najdalszy — cała
-kolejka automatycznie, człowiek tylko prostuje. To **odwraca** zasadę, która
-do 0.330.0 stała w nagłówku `services/wiedza.ts` i w `czlowiekZBiura`:
-„automat może proponować, ale nie zatwierdza nigdy".
-
-Kolejka `model_z_opisu` nie czekała na ZATWIERDZENIE, tylko na ODCZYTANIE:
-w wierszu stoi goły tekst („LS 46-450", „FS450"), a człowiek dopisywał do niego
-markę. Automat bierze ją z czterech źródeł, od najmocniejszego: tekst zaczyna
-się od znanej marki; sama nazwa trafia w dokładnie jeden znany model; marka
-stoi w nazwie kartoteki albo w tytule naszej oferty; a gdy trzy pierwsze
-milczą i właściciel włączył `WIEDZA_AUTOMAT_MODEL`, pyta model językowy.
-
-**Parametr „Marka" naszej oferty jest tu celowo nieużyty.** Niesie markę
-CZĘŚCI, nie maszyny. Wzięty jako marka maszyny dałby model „WERTIS LS 46-450",
-czyli markę sprzedawcy sklejoną z nazwą cudzej kosiarki i zatwierdzoną bez
-człowieka. Tytuł oferty czytamy, ale wyłącznie po to, żeby znaleźć w nim markę
-już znaną z zatwierdzonej wiedzy.
-
-Wiersz, przy którym wszystkie źródła milczą, **zostaje w kolejce**. Pusty klucz
-byłby gorszy od braku klucza.
-
-Wpis maszyny jest odróżnialny: `rozstrzygnal` niepuste przy pustym
-`rozstrzygnal_user_id`. Po tej parze stoi karta **„Co automat dopisał do
-wiedzy"** w ustawieniach obsługi — lista do prostowania, bez której pierwsza
-połowa tej decyzji byłaby nie do przyjęcia. Cofanie idzie istniejącymi
-trasami, bo to dalej to samo wycofanie, tylko cudzego wpisu.
-
-Czego automat nie zniósł: `czlowiekZBiura` dalej strzeże gałęzi ludzkiej, więc
-magazynier nadal nie zatwierdzi wiedzy, a zatwierdzenie bez dowodu nadal nie
-przechodzi.
-
-**Dowód** przechowuje rodzaj (§11.3), treść, odnośnik, zadanie i rozmowę,
-autora i datę. Tabela jest append-only: dowodu nie da się poprawić po cichu.
-
-**Zabudowa silnika** (`zabudowa_silnika`, 0.229.0) mówi, który silnik stoi
-w której maszynie. Relacja jest wiele do wielu: jedna kosiarka bywa sprzedawana
-w dwóch wersjach silnikowych, a jeden silnik stoi w setkach maszyn. Cykl życia
-i podpisy ma te same co zastosowanie, rozstrzyga człowiek z biura,
-a wycofanie wymaga powodu ZAWSZE — cofnięcie pary gasi całą gałąź kandydatów
-naraz.
-
-Dlaczego to nie jest wiersz w `zastosowanie`: tam `tw_id` znaczy kartoteka
-Subiekta i wierzy w to cała warstwa odczytu. Wiersz, w którym `tw_id` znaczy
-„model", zatruwałby każdego z tych czytelników po cichu.
-
-Dlaczego dowód stoi w wierszu, a nie w `dowod_zastosowania`: dowody zabudowy
-się nie kumulują. „Ten silnik stoi w tej kosiarce" ma jedno źródło naraz — IPL,
-tabliczkę albo katalog dealera. Drugie źródło albo mówi to samo, albo mówi co
-innego, a wtedy chcemy nowego wiersza z `zastepuje_id`, nie dopisku. Dowód jest
-obowiązkowy, więc para bez niego nie powstaje wcale.
-
-**Skąd biorą się pary.** Ekran Wiedza → Silniki układa listę luk: maszyny
-z doborów, od najczęściej pytanych, z surowymi łańcuchami wpisanymi w pole
-„Silnik" i licznikiem. Ranking liczy się z pól WPISANYCH PRZEZ AGENTA
-w zakładce Dobór, nigdy z treści wiadomości klienta (blizna „szarpaka").
-Automat nie rozbija tych łańcuchów na markę i nazwę — markę i nazwę wpisuje
-człowiek, tak jak przy sekcjach „Modele:".
-
-**Słownik silników** (`alias_silnika`, 0.238.0) to to, co człowiek wpisał
-o tych łańcuchach: „B&S 450E" = silnik Briggs & Stratton 450E. Powód: po
-0.237.0 Copilot wpisuje silnik z rozmowy do pola, a „Lonci v200" dalej był
-tylko notatką. Dopasowanie jest dokładne po `zwin()`, tą samą normalizacją,
-co klucz modelu i `towar_identyfikator`. Alias nie ma cyklu życia — jest
-zapisem ręki biura, nie propozycją automatu, więc pomyłkę się usuwa. Czip na
-liście luk ze słownikiem wypełnia formularz zabudowy modelem; czip bez
-słownika otwiera formularz z zaznaczonym „zapamiętaj w słowniku", bo
-człowiek, który właśnie wpisuje markę i nazwę, mówi, co ten tekst znaczy.
-Alias nigdy nie wskazuje maszyny (pilnuje serwis) i nigdy nie karmi
-szczebla wprost: w zakładce Dobór daje jedno zdanie i przycisk „Zaproponuj
-zabudowę" z dowodem `rozmowa`, a szczebel rusza po zatwierdzeniu pary.
-Alias marki bez modelu („Lonci" = Loncin) nie istnieje — to byłoby
-rozbijanie.
-
-**Tokeny silników w nazwach kartotek** (`token_silnika`,
-`token_silnika_kartoteka`, 0.239.0) to drugi słownik, zapowiedziany
-w 0.230.0. Alias mówi, co znaczy tekst z pola „Silnik"; token mówi, co znaczy
-słowo w NAZWIE kartoteki: „GX160" = silnik Honda GX160. To dwie tabele, nie
-jedna z flagą, bo alias jest dokładnym tekstem pola, a token podłańcuchem
-nazwy — jedna kolumna niosłaby dwie prawdy. Serwer dopasowuje token do nazw
-po `zwin()` przy dodaniu i po każdym imporcie, nigdy przy odczycie; wiersz na
-parę (token, kartoteka) ma cykl jak `model_z_opisu`: `nowa` czeka na decyzję,
-`zatwierdzona` wskazuje zastosowanie, `pominieta` nie wraca po imporcie,
-a `nowa` znika, gdy kartoteka przestaje pasować. Dopasowanie idzie WYŁĄCZNIE
-po nazwie, nigdy po opisie: opis bywa notatką i mówi też „nie pasuje do…".
-
-Decyzja właściciela: **jedno kliknięcie zatwierdza zaznaczone.** Biuro widzi
-listę kartotek z tokenem w nazwie, odznacza te, które nie pasują, i klika.
-Zaznaczone dostają ZATWIERDZONE zastosowanie do silnika, odznaczone idą do
-pominiętych. Propozycję i rozstrzygnięcie robi ten sam człowiek w jednej
-transakcji — wolno, bo zatwierdza każdy z biura, także autor (Q5); nowe jest
-tylko to, że oba zapisy idą za jednym kliknięciem. Ślad jest pełny:
-`zaproponowal` = `rozstrzygnal`, źródło `opis`, dowód `decyzja_biura`
-z tokenem i nazwą kartoteki. Automat dalej nie zgaduje marki z tokenu
-(0.186.0) — lista kartotek jest podglądem decyzji człowieka, nie propozycją
-automatu. Usunięcie tokenu nie cofa zastosowań: to fakty z dowodem, cofa się
-je osobno przez wycofanie. Rozstrzygnięcie idzie hurtem jedną trasą, bo
-decyzja dotyczy listy przejrzanej naraz. Sekcja stoi na ekranie Wiedza →
-Z opisów jako druga sekcja tego samego widoku; zakładka liczy sekcje
-„Modele:" i kartoteki z tokenem razem, bo to jedna praca tego samego
-człowieka.
-
-Druga droga to zatwierdzenie doboru. Do 0.229.0 hak wpisywał `rodzaj:
-"maszyna"` na sztywno, więc żadne zastosowanie do silnika nie mogło powstać
-z pracy, a szczebel „przez silnik" zwracałby zero na zawsze. Od tego wydania
-agent wybiera przy zatwierdzeniu, czy wiedza ma urosnąć przy maszynie, czy przy
-jej silniku. Opcja silnikowa pojawia się wyłącznie przy zatwierdzonej
-zabudowie. Część silnikowa zapisana raz przy jednej kosiarce odpowiada odtąd
-na pytania o wszystkie maszyny z tym samym silnikiem.
-
-**Pasowanie części** (`pasowanie_czesci`, 0.230.0) mówi, że część `tw_id`
-pasuje DO części `do_tw_id`: uszczelka do gaźnika, membrana do gaźnika,
-łącznik do kolektora. Kierunek jest semantyczny — gaźnik nie „pasuje do
-uszczelki" — a odczyt symetryczny: ekran gaźnika czyta `pasujace`, ekran
-uszczelki `pasujeDo`. Wiersz niesie ROLĘ z listy zamkniętej (`uszczelka`,
-`membrana`, `zestaw_naprawczy`, `lacznik`, `element_zestawu`, `inne`)
-i POZYCJĘ jako wolny tekst: „od strony filtra", „między dystansem". Jeden
-gaźnik GX160 ma trzy różne uszczelki i pozycja jest jedynym, co je rozróżnia.
-Enum pozycji byłby trzecią listą do pilnowania dla czterech wierszy.
-
-Rola należy do CZĘŚCI, a zapisujemy ją w relacji tylko dlatego, że nazwa
-kartoteki to wolny tekst. Automat NIE wyprowadza roli z nazwy — to ta sama
-pułapka, co rozbijanie „B&S 450E". Dowód stoi w wierszu jak przy zabudowie,
-z tego samego powodu: jedno źródło naraz. Polaryzacja i powody z §11.4
-obowiązują od pierwszego wydania. Cykl życia, podpisy i rozstrzyganie te same
-co przy zastosowaniu; wycofanie negatywu wymaga powodu, pozytywu — nie, bo
-pasowanie nie gasi żadnej gałęzi kandydatów.
-
-Dlaczego to nie jest wiersz w `zastosowanie`: tam drugi koniec to MODEL,
-a wiersz z kartoteką w tym miejscu zatruwałby po cichu każdego czytelnika
-zastosowań. Dlaczego nie `dopasowanie_czesci`: nazwa `dopasowanie` jest
-spalona (§15).
-
-**Przechodniość przez zamiennik** liczy się PRZY ODCZYCIE, na głębokość
-jeden, po obu stronach, nigdy jako `potwierdzone`. Uszczelka stoi w kartotece
-pod czterema symbolami od czterech dostawców, z wzajemnym „Zamiennik:" —
-231 takich skupisk. Zapisanie pasowania do jednej z nich ma odpowiedzieć
-o wszystkie. Nie materializujemy tego: zamiennik jest efemeryczny, parsowany
-z opisu po każdym imporcie, a odczyt pyta o jedną kartotekę. Czytamy TEN
-opis: jeśli opis Y′ wymienia Y, a Y nie wymienia Y′, przy odczycie Y nie ma
-nic. Wprost bije przechodnie po `twId`.
-
-**Skąd biorą się pasowania.** Z pracy: przycisk „Pasuje do …" przy wybranym
-kandydacie w Doborze, gdy kotwica jest inna niż wybrany (§11.2); propozycja
-niesie rozmowę i dowód `rozmowa`. Z ręki: Wiedza → Sprawdź kartotekę →
-„Dopisz pasowanie", z radiem kierunku i dowodem technicznym. Propozycje
-czekają w kolejce Wiedza jako druga sekcja „Pasowania części" — ta sama
-decyzja tego samego człowieka, nie szósta zakładka. Z Copilota (§14.8): model
-nazywa parę symbolami z faktów, serwer sprawdza oba końce po kartotekach
-z kontekstu, agent klika „Zaproponuj pasowanie"; źródło `copilot`, podpis
-agenta, pastylka w kolejce. Źródło `opis` stoi w `CHECK` bez nadawcy,
-precedensem `zastosowanie`.
-
-**Historia wersji** bez `KnowledgeRevision`: poprawka to nowy wiersz
-z `zastepuje_id`, a stary schodzi na `wycofane` przy zatwierdzeniu nowego.
-Dziennik `events` niesie pełny wiersz przy każdej zmianie.
-
-**Identyfikatory** (`towar_identyfikator`, E3) to numery OEM, numery
-oryginału, katalogi obce, stare SKU i numery z sekcji zamienników.
-
-**Sekcja zamienników niesie numery obcych katalogów (0.234.0).** Eksport
-kartotek z 8 września pokazał, gdzie leży druga połowa mostka „numer klienta →
-towar". Etykiet `Zamiennik:`, `Zamiennie:` i `ZAM:` jest w opisach tyle samo
-co `OEM:` — po około czterysta każdej. Czytał je jednak wyłącznie parser
-zamienników, a ten zostawia z listy tylko NASZE kartoteki i wyrzuca resztę.
-Numer obcego katalogu stał więc w opisie i nie prowadził do niczego.
-
-Na pełnej kartotece daje to 1701 numerów przy 1742 czytanych dotąd ze
-wszystkich pozostałych sekcji razem — indeks urósł dwukrotnie, do 973 kartotek.
-Rodzaj jest osobny (`zamiennik`, podpis „z zamienników"), bo sekcja zamienników
-jest słabszym świadectwem niż numer producenta, a §11.3 każe pokazywać źródło.
-Nasze symbole z tej listy do tabeli NIE wchodzą: pokazuje je sekcja
-zamienników, a szukanie po numerze i tak trafia w kartotekę po symbolu. Z opisu biorą się po każdym imporcie
-(źródło `opis`, przebudowa je odtwarza); z ręki biura — z katalogu, którego
-w opisie nie ma (źródło `reczne`, przebudowa je omija). Tabela nie ma klucza
-obcego do `sgt_towar`, bo import wycina read-model.
-
-**Z opisów** (`model_z_opisu`, E3). Sekcje `Modele:` z opisów kartotek
-trafiają na osobną listę na ekranie Wiedza, nie do kolejki propozycji.
-Automat nie proponuje z opisu — decyzja właściciela: `FS350 FS400` nie mówi,
-czyja to maszyna. Człowiek wskazuje markę i model, dopiero to tworzy
-propozycję ze źródłem `opis` i dowodem `decyzja_biura`. Odrzucony wiersz
-zostaje w tabeli i nie wraca po imporcie.
+Interfejs pokazuje przy dopasowaniu jego źródło i poziom pewności. Numer
+z sekcji zamienników jest słabszym świadectwem niż numer producenta, więc
+ekran nie zrównuje ich podpisem. Wskazanie agenta jest jego wyborem, nie
+faktem z Allegro. Niepewne dopasowanie zostaje propozycją do zatwierdzenia.
 
 ## 13. Zadania terenowe
 
@@ -2325,28 +1623,23 @@ niej jako kolejny dowód.
 Klasyfikacja wiadomości, podsumowanie rozmowy, rozpoznanie modelu i numerów,
 wskazanie brakujących danych, wyszukanie kandydatów, porównanie parametrów,
 propozycja pytania doprecyzowującego, przygotowanie szkicu, wskazanie
-sprzecznych danych, propozycja wpisu do bazy wiedzy.
+sprzecznych danych.
 
 ### 14.2. Niedozwolone bez człowieka
 
-Automat nie potwierdza niepewnego dopasowania, nie rozszerza bazy
-zastosowań, nie obiecuje dostępności ani terminu, nie uznaje reklamacji, nie
-usuwa negatywnego dopasowania i nie podmienia faktu technicznego.
+Automat nie potwierdza niepewnego dopasowania, nie obiecuje dostępności ani
+terminu, nie uznaje reklamacji i nie podmienia faktu technicznego. Dotyczy to
+także wysyłki bez człowieka (§27, punkt 2).
 
-Do 22 września 2026 lista zaczynała się od „nie wysyła odpowiedzi". Ten zakaz
-odszedł razem z zasadą nadrzędną nr 2 (§27), decyzją właściciela. Pozostałe
-zakazy stoją: wysyłka bez człowieka, gdy powstanie, nie ma prawa obiecać
-terminu ani uznać reklamacji.
 
 ### 14.3. Źródła
 
 Każde twierdzenie techniczne w szkicu wskazuje źródło: ofertę, kartotekę,
-dokumentację, dowód zastosowania, pomiar magazyniera, wcześniejszą rozmowę albo
+dokumentację, pomiar magazyniera, wcześniejszą rozmowę albo
 decyzję biura. Brak źródła oznacza treść jako przypuszczenie.
 
 Podpis dowodu w szkicu dla klienta niesie rodzaj i datę, bez nazwiska
-pracownika — z obu dróg: wstawki „ze źródłem" z Doboru i szkicu Copilota
-(0.232.1, decyzja właściciela). Ekran biura autora pokazuje nadal.
+pracownika (decyzja właściciela). Ekran biura autora pokazuje nadal.
 
 ### 14.4. Prywatność
 
@@ -2361,13 +1654,6 @@ Pierwsza rzecz z §14.1 i pierwsze miejsce, z którego treść rozmowy wychodzi
 poza firmę. Agent klika przycisk NAD KOLEJKĄ, a partia bierze nierozpoznane
 rozmowy z oglądanego kubełka. Przycisku w pojedynczej rozmowie nie ma
 świadomie: etykietowałby treść, którą agent właśnie przeczytał.
-
-Słownik ma osiem wartości: `dobor`, `dostepnosc`, `wysylka`, `zwrot`,
-`reklamacja`, `dokumenty` oraz dwa kosze. `inne` znaczy „słownik jest za
-krótki”, `nie_wiadomo` — „za mało treści, przeczytaj sam”. Kolumna `kategoria`
-nie ma `CHECK`-a, bo w SQLite rozszerzenie zamkniętej listy to przebudowa
-tabeli (blizna 0.135.0). Listy pilnuje serwis, a na ekranie — `Record`
-z nazwami po polsku.
 
 **Kategoria nie przestawia kolejki i to jest decyzja.** Klucze kolejności —
 ręczna flaga „pilne” i czas oczekiwania klienta — są faktami. Kategoria jest
@@ -2393,8 +1679,7 @@ Znacznik zostaje, żeby model wiedział, że coś tam było.
 **Gdzie kończy się gwarancja.** Adres bez markera i bez kodu pocztowego
 przejdzie — rozpoznawanie adresów w wolnym tekście wyrażeniami regularnymi nie
 jest zadaniem rozwiązywalnym. W drugą stronę: numer OEM zapisany jak telefon
-znikał jako `[telefon]`. Klasyfikacji ten numer nie był potrzebny, ale
-przyrost ekstrakcji (§14.7) regułę zawęził: dziewięć cyfr tuż po słowie OEM,
+znikał jako `[telefon]`. Dlatego reguła jest węższa: dziewięć cyfr tuż po słowie OEM,
 nr, numer, symbol albo kod zostaje. Cena: telefon podany jako „nr 601…" bez
 słowa „tel" przejdzie do dostawcy. Pilnuje tego test.
 
@@ -2524,9 +1809,7 @@ a nie uruchamia partię na dwadzieścia rozmów.
 
 **Serwer układa FAKTY, model pisze prozę, serwer sprawdza wynik.** Fakty (F1,
 F2, …) powstają ze zdań, które serwer już pisze dla ekranu: kartoteka oferty
-z dostępnością dziś, treść oferty i rozpoznanie klasyfikatora. Dane doboru,
-kandydaci, zastosowania, silniki i pasowania zeszły z faktów w 0.565.0
-razem z doborem. Model cytuje identyfikatory faktów, a serwer
+z dostępnością dziś, treść oferty i rozpoznanie klasyfikatora. Model cytuje identyfikatory faktów, a serwer
 SPRAWDZA wynik w kodzie: każdy cytowany fakt musi istnieć, a długość nie może
 przekroczyć limitu wysyłki.
 Odwołania „(F3)" znikają z treści dopiero po tym sprawdzeniu (0.232.1) —
@@ -2570,65 +1853,6 @@ w kartotece" idzie zdanie o tym, co rozstrzygnie sprawę. Stan naszej wiedzy
 opisuje `zastrzezenia`, które czyta wyłącznie agent. Dostępność podajemy, gdy
 klient o nią PYTA.
 
-**Okazja do uzupełnienia kartoteki (0.254.0).** Ta sama rozmowa pokazała drugą
-rzecz. Oferta wymieniała jedenaście modeli zgodnych, a kartoteka znała dwa —
-i był to jedyny moment, w którym obie listy stanęły obok siebie. Właściciel:
-„jeśli jakieś numery są w ofercie, a nie ma w kartotece, zaznacz — to jest
-organiczna okazja do uzupełnienia danych".
-
-Liczy to KOD, nie model: `lukiZOferty` porównuje oznaczenia z oferty
-z wszystkim, co już wiemy. Lista braków wyliczana przez model raz by była,
-a raz nie — i przestałaby być listą braków. Do faktów NIE wchodzi, więc model
-nie ma jak jej klientowi napisać; agent widzi ją paskiem pod szkicem.
-
-**Wiedza z ofert przestaje ginąć razem z rozmową (0.264.0).** Właściciel:
-„w jaki sposób można lepiej wykorzystać wiedzę, która jest zapisana w ofertach
-w doborze części". Rozpoznanie odpowiedziało: dziś prawie wcale. Lista
-zgodności miała w całym repozytorium jednego czytelnika i trafiała stamtąd do
-polecenia modelu, obcięta do trzydziestu pozycji. Treść oferty jest cache'em
-na tydzień, nadpisywanym. Pasek luk wypisywał braki i przy następnym szkicu
-liczył tę samą listę od zera — system zauważał lukę za każdym razem i za
-każdym razem o niej zapominał.
-
-Odtąd zapisuje. `services/wiedza-z-oferty.ts` woła się z `ulozSzkic`, PRZED
-wywołaniem modelu, i dzieli wiedzę na dwie drogi, bo są to dwa różne rodzaje
-danych:
-
-- **numery** (z pól parametrów o nazwie obiecującej numer katalogowy oraz
-  z opisu oferty, spod etykiety z dwukropkiem) idą wprost do
-  `towar_identyfikator` ze źródłem `oferta`. Są wyszukiwalne same z siebie,
-  szczeblem OEM — trzecim z jedenastu — i nie wymagają niczyjej decyzji;
-- **pozycje listy zgodności** idą do kolejki Wiedzy, w CAŁOŚCI, z marką.
-  Klucz modelu składa człowiek: automat nie zgaduje marki od 0.186.0,
-  a `FS250` bez „STIHL" jest nie do złożenia.
-
-Trzy granice, każda kupiona osobnym rozumowaniem. **Bramka pewności
-kartoteki**: zapis idzie tylko przy dopasowaniu oferty do kartoteki
-o pewności `sku` albo `pamiec`, bo numer wpisany do CUDZEJ kartoteki wraca do
-klienta jako zły towar. **Filtr nazw pól** węższy niż dawny filtr
-wyświetlania: „Moc [KM]: 204" w tabeli przeszukiwanej szczeblem OEM znaczy,
-że pytanie o numer 204 prowadzi do kosiarki; EAN odpada, bo ma własny
-szczebel. **Porcja dwudziestu na kliknięcie**: lista zgodności bywa na
-dwieście pozycji, a kolejka Wiedzy jest wspólna dla całego magazynu. Reszta
-dochodzi przy następnym szkicu, bo zapisane przestaje być luką.
-
-Zapis stoi PRZED wywołaniem modelu i to jest cała treść tej zmiany: wiedza
-zostaje także wtedy, gdy dostawca odmówi albo szkic padnie na walidacji. Za
-nieudanym szkicem stoi jedno kliknięcie, za utratą tych numerów nie stoi nic.
-Miejsce przed asercją maskowania jest bezpieczne, bo zapisywane dane pochodzą
-wyłącznie z NASZEJ oferty i NASZEJ kartoteki — ani jeden znak nie idzie tędy
-z wiadomości klienta. `kontekstSzkicu` zostaje przy tym czystym odczytem:
-samo otwarcie rozmowy dalej niczego nie mutuje.
-
-Pasek pod szkicem przestaje być listą braków i staje się POKWITOWANIEM: co
-dopisano do kartoteki, co poszło do kolejki, ile pozycji tej kartoteki tam
-czeka. Bez przycisku — rozstrzygnięcie modelu wymaga marki i wariantu, czyli
-ekranu Wiedza, a przycisk „dopisz" przy szkicu udawałby, że da się to zrobić
-w rozmowie. Cofnięcie numeru z oferty ma własną, wąską trasę i przycisk przy
-czipie w „Sprawdź kartotekę": wpis `opis` cofa się poprawką w Subiekcie, wpis
-`reczne` napisał człowiek, a wpisu z oferty nie cofa nic — przebudowa po
-imporcie go omija, bo nie ma z czego go odtworzyć.
-
 **Link do naszej oferty zamiast pracy domowej dla klienta (0.270.0).**
 Właściciel, czytając szkic o presostacie: „model powinien proponować oferty,
 jeśli jest pewny linki do ofert". Szkic pisał wtedy: „proszę o wyszukanie po
@@ -2670,9 +1894,9 @@ i czekał kilka sekund. Teraz propozycja czeka na niego.
 
 Zakres jest wąski decyzją właściciela: **wyłącznie wiadomość przychodząca
 niosąca numer oferty**, czyli pytanie sprzed zakupu. To jest ten przypadek,
-w którym Copilot ma komplet faktów: kartotekę oferty, treść aukcji, kandydatów
+w którym Copilot ma komplet faktów: kartotekę oferty, treść aukcji
 i adres naszej aktywnej aukcji. Przy „dziękuję", zmianie adresu czy reklamacji
-szkic z faktów doboru niewiele wnosi, a kosztuje tyle samo.
+szkic z faktów niewiele wnosi, a kosztuje tyle samo.
 
 **Kliknięcie było hamulcem samo w sobie** — agent prosił o pracę dla siebie
 i płacił za jedną rozmowę. Takt takiego ogranicznika nie ma, więc dostał dwa
@@ -2743,10 +1967,6 @@ wyobraził. Twierdzenie oparte na zdjęciu ma własne źródło `zdjecie` z sufi
 **prawdopodobne**, bo z tego, że tabliczkę widać, nie wynika, że to tabliczka
 maszyny, o którą klient pyta.
 
-Najcenniejsze jest to, co dzieje się dalej: **dane z tabliczki wpadają do
-propozycji doboru**. Marka i model maszyny trafiają do `daneDoboru` bez
-przepisywania ich ręcznie ze zdjęcia, a sprawdzenie zostaje deterministyczne,
-bo wartość musi stać w zadeklarowanym odczycie.
 
 Trzy zawężenia, opisane w polityce danych (`docs/obsluga-klienta.md`): tylko
 `SAFE`, tylko przychodzące i sufit sztuk. Sufit jest tu, a nie przy
@@ -2784,54 +2004,8 @@ chowa szczegóły w `Collapsible.kt`.
 Zwijanie ma **jedną implementację** (`skrzynka/Zwijka.tsx`), nie trzy kopie
 `useState` w trzech plikach.
 
-**Trzy paski informacyjne scaliły się w jeden.** Dane doboru, pasowanie
-i pokwitowanie wiedzy z oferty mówiły wariant tego samego zdania („Copilot
-zrobił coś obok szkicu"), każdy we własnej ramce. Rozdzielone miały sens,
-gdy każdy niósł PRZYCISK; przycisków nie ma od 0.341.0. Licznik znaków
-przeniósł się do nagłówka karty.
-
 **Cena jest jawna.** Przy długim szkicu bloki pod nim schodzą poniżej krawędzi
 i trzeba do nich przewinąć. Właściciel wybrał to świadomie, pytany wprost.
-
-**Nic nie czeka na kliknięcie (0.341.0).** Dwie prośby właściciela, jedna
-zmiana: „wiedza z ofert powinna wskakiwać bez potwierdzania przez agenta"
-oraz „dane wejściowe po rozpoznaniu powinny wchodzić automatycznie".
-
-**Dane wejściowe wchodzą do doboru same.** Marka, model, silnik i nazwa części
-rozpoznane w rozmowie trafiają do tabeli `dobor` w tym samym przebiegu, który
-układa szkic. Wchodzą **tylko w puste pola** — to, co agent wpisał sam, jest
-jego słowem i zostaje. Wpis idzie tą samą drogą co ręczny, więc dostaje wersję
-i dziennik. Wyniku nie rusza: ustawia go wyłącznie człowiek.
-
-Kolejność jest tu treścią, nie porządkiem: wpis stoi PRZED zapisem szkicu, bo
-podnosi wersję doboru. Odwrotnie dałby szkic nieświeży w chwili narodzin, a
-ekran mówiłby „ułóż ponownie" o zmianie, którą sam ten szkic wprowadził.
-
-**Zmiana danych budzi takt** i bez tego całość byłaby połową funkcji.
-Kandydatów liczy się z danych, które stały w doborze PRZED wywołaniem modelu,
-więc pierwszy szkic ich nie zna. Klient pyta pod gaźnikiem A o część do innej
-maszyny, dane wpadają, a drugi szkic pisze się już z kandydatami. Pętli z tego
-nie ma: drugi przebieg zastaje pola wypełnione i niczego nie dopisuje.
-
-**Wiedza z ofert wskakuje od razu.** Numery z opisu robiły to od 0.264.0.
-Pozycje listy zgodności czekały w kolejce, bo w wierszu stoi goły tekst bez
-marki — klucz składa się teraz przy zbieraniu, z tych samych trzech źródeł
-deterministycznych, co automat z 0.331.0. To jest lepszy moment niż takt:
-ofertę mamy w ręku razem z jej tytułem, a takt przyszedłby pół godziny później.
-Modelu językowego na tej drodze nie ma, więc nie kosztuje ani grosza.
-
-Pozycja, przy której źródła milczą, **zostaje w kolejce**. Pusty klucz byłby
-gorszy od braku klucza.
-
-**Zdanie „model wskazuje człowiek" zeszło z ekranu.** Było nieprawdą od
-0.331.0, kiedy kolejkę zaczął opróżniać automat, i to ono kazało właścicielowi
-myśleć, że nic się nie dzieje. Pasek mówi teraz osobno, co weszło do wiedzy,
-a co czeka bez rozpoznanej marki.
-
-**Wpis maszyny jest odróżnialny** wszędzie tam, gdzie powstaje:
-`dobor.zmienil='automat (szkic)'` i `zastosowanie.rozstrzygnal=
-'automat (oferta)'`, oba przy pustym koncie. Agent poprawia takie pole tam,
-gdzie ono stoi — w zakładce Dobór albo w Wiedzy.
 
 **Dopytanie Copilota (0.332.0).** Właściciel: „dodaj możliwość kontynuowania
 rozmowy z modelem, możliwość dopytania, rozwiania wątpliwości". Agent czyta
@@ -2953,12 +2127,8 @@ kosztowałby zwrot — i tego drugiego kod nie przepuszcza.
 
 **Gdy fakty nie rozstrzygają, szkic pyta.** Serwer dokłada do faktów pytania
 z intake per typ części (nóż, pasek, filtr, linka, rozrusznik, gaźnik
-z uszczelką), wybrane po nazwie części z DANYCH DOBORU, nigdy z treści
-wiadomości. Słownik pytań jest kodem, nie promptem. Przy wyborze
-z potwierdzonym dowodem pytań nie ma — udawałyby niewiedzę. Szkic pyta
-tylko o to, czego rozmowa jeszcze nie zawiera (0.232.2). Model z rozmowy,
-którego nie ma w faktach, wracał do agenta jako zastrzeżenie „wpisz go do
-doboru"; od przyrostu trzeciego wraca jako propozycja danych doboru (§14.7).
+z uszczelką). Słownik pytań jest kodem, nie promptem. Szkic pyta tylko
+o to, czego rozmowa jeszcze nie zawiera.
 
 **Do dostawcy idzie cały wątek, zamaskowany, z sufitem.** Decyzja
 właściciela; zapis w polityce danych skrzynki (`docs/obsluga-klienta.md`).
@@ -3296,126 +2466,18 @@ Opis MF381356 wskazuje zamiennik jako „S11103”, a nie naszym symbolem.
   szukanie. Wynik zostawia pełne nazwy i ostrzega, że pełny 3/8 i 3/8 LP
   (Picco) to różne łańcuchy.
 
-### 14.7. Co działa: dane doboru z rozmowy (etap F, przyrost trzeci)
-
-> **Usunięte.** Dobór części i baza wiedzy wyszły z WERTIS w całości
-> decyzją właściciela w 0.565.0 (5 października 2026), razem z kodem
-> i tabelami. Tekst zostaje jako zapis powodów i blizn.
-
-Pytanie właściciela z 8 września 2026, nad szkicem o śrubę noża do kosiarki
-Faworyt GTV51N196L-4W1 z silnikiem „Lonci v200": „dlaczego dane wejściowe nie
-zostały wprowadzone automatycznie ze szkicu?". Model czytał te dane i odsyłał
-agenta do przepisywania. Bez nich żaden szczebel doboru nie szukał.
-
-**Trzy decyzje właściciela.** Rozpoznanie idzie RAZEM ze szkicem — to samo
-wywołanie „Ułóż odpowiedź", zero dodatkowego kosztu. Jedno kliknięcie
-wpisuje: karta w zakładce Dobór pokazuje wartości, a „Wpisz do danych"
-zapisuje je w puste pola. Maskowanie zawężone po kontekście: dziewięć cyfr
-tuż po OEM, nr, numer, symbol albo kod nie jest telefonem (§14.5).
-
-**Model oddaje, serwer sprawdza, agent wpisuje.** Model wpisuje do
-`daneDoboru` dane maszyny i części dosłownie tak, jak napisał je klient.
-Serwer sprawdza każdą wartość przeciw ZAMASKOWANEMU wątkowi, czyli temu, co
-model widział: każdy token z cyfrą musi stać w rozmowie po zwinięciu
-separatorów, a każde słowo musi mieć swoje pierwsze cztery litery w rozmowie.
-Wartość spoza rozmowy wypada z propozycji, a szkic zostaje — jest wart
-pieniędzy sam w sobie. Liczba wyrzuconych idzie do dziennika jako miara tego,
-ile model zmyśla. Wartość zamaskowana nie ma jak wrócić.
-
-**Tylko puste pola.** Propozycja mieszka w wierszu `szkic_copilota`, nie
-w `dobor_rozmowy`. Kliknięcie „Wpisz do danych" idzie drogą ręcznego zapisu:
-wersja doboru rośnie, dziennik dostaje `dobor_dane`, status przechodzi
-z `not_started` do `searching`, a wyścig kończy się tym samym 409. Słowo
-agenta zostaje; pola, które ma inaczej niż model, karta wymienia jednym
-zdaniem i nie nadpisuje. Blizna szarpaka nietknięta: szczeble czytają
-wyłącznie `dobor_rozmowy`, a tam trafia tylko to, co agent kliknął.
-
-**Los propozycji jest miarą.** `wpisane` albo `odrzucone` liczy się osobno
-od losu szkicu, bo dobry szkic bywa ze złym modelem i odwrotnie. Pomiar zza
-zębatki mówi, w ilu szkicach model coś rozpoznał i co agent z tym zrobił.
-Karta szkicu w edytorze tylko mówi, jakie pola rozpoznano — bez drugiego
-przycisku, bo dane wpisuje się tam, gdzie stoją. Zmiana danych doboru po
-szkicu czyni go nieświeżym tak samo jak dopisek klienta: pastylka mówi
-„ułóż ponownie", bo fakty są inne.
-
-### 14.8. Co działa: Copilot proponuje pasowania (etap F, przyrost czwarty)
-
-> **Usunięte.** Dobór części i baza wiedzy wyszły z WERTIS w całości
-> decyzją właściciela w 0.565.0 (5 października 2026), razem z kodem
-> i tabelami. Tekst zostaje jako zapis powodów i blizn.
-
-Zapowiedź z 0.230.0 („Copilot proponujący pasowania czeka"). Od 0.230.0
-pasowanie część↔część ma tabelę, kolejkę i przycisk „Pasuje do…" w Doborze,
-ale rodziło się wyłącznie z ręki agenta. Klient mówi wprost: „mam gaźnik
-W09-0211, potrzebuję uszczelki od strony filtra". Model to czytał, a wiedza
-przepadała, bo nikt nie klikał formularza.
-
-**Trzy decyzje właściciela.** Agent proponuje jednym kliknięciem — wzór
-danych doboru z §14.7: model oddaje, serwer sprawdza, człowiek klika. Oba
-końce pary muszą być kartotekami z FAKTÓW tej rozmowy: kartoteka oferty,
-kandydaci, kotwice z wpisanych symboli, strony cytowanych pasowań. Tylko
-polaryzacja „pasuje" — negatyw wymaga powodu z listy zamkniętej, a model nie
-ma go skąd wziąć.
-
-**Model nazywa, serwer sprawdza po faktach.** Model wpisuje do `pasowanie`
-oba SYMBOLE dosłownie z faktów, rolę z listy i pozycję słowami klienta.
-Serwer trzyma BIAŁĄ LISTĘ kartotek, które sam położył na stole, i dopasowuje
-symbole po `zwin()`. Symbol spoza listy, ta sama kartoteka po obu stronach,
-rola spoza listy albo para już żywa w bazie — w dowolnej polaryzacji —
-wypada z propozycją, a powód idzie do dziennika jako etykieta. Pozycja
-zostaje tylko, gdy stoi w rozmowie: fakt intake wymienia „od strony filtra",
-więc model mógłby przepisać ją z faktu. Szkic zostaje w każdym z tych
-przypadków. Żadnego szukania symbolu w treści wiadomości (blizna szarpaka).
-
-**Agent klika, biuro rozstrzyga.** Karta „Copilot rozpoznał pasowanie"
-w zakładce Dobór pokazuje oba końce z kaflami, rolę i pozycję. „Zaproponuj
-pasowanie" kładzie parę w kolejce Wiedza drogą `zaproponujPasowanie`, ze
-źródłem `copilot`, dowodem `rozmowa` i PODPISEM AGENTA — za wpis odpowiada
-człowiek (§14.2), a źródło niesie pochodzenie dla pomiaru i pastylki
-„z Copilota" w kolejce. Pewność „prawdopodobne", jak przy każdej parze
-z rozmowy. Dubel nie jest błędem: para wpisana ręcznie między szkicem
-a kliknięciem daje ocenę `zaproponowane` bez drugiego wiersza. Zła rola
-albo pozycja to „Odrzuć" i formularz „Pasuje do…" obok. Karta szkicu
-w edytorze tylko mówi o parze, bez drugiego przycisku.
-
-**Los propozycji jest miarą.** Pomiar liczy pary rozpoznane, zaproponowane
-i odrzucone osobno od losu szkicu i danych. Właściwa miara jakości stoi
-obok: ile par ze źródłem `copilot` biuro ZATWIERDZIŁO.
-
 ## 15. Model danych
 
-Tabele docelowe, nazwami z kodu:
-
-```
-channel_account          conversation            message
-conversation_event       conversation_comment     conversation_mention    offer_snapshot           customer                customer_machine
-order_snapshot           product_link
-dobor                    model_urzadzenia        zastosowanie
-dowod_zastosowania       towar_identyfikator     model_z_opisu
-zabudowa_silnika         pasowanie_czesci        alias_silnika
-token_silnika            token_silnika_kartoteka
-towar_fts                knowledge_document      zadanie_terenowe
-zadanie_zalacznik        allegro_inbox_thread    allegro_inbox_message
-allegro_inbox_sync_state outbox                  events
-klasyfikacja_rozmowy     copilot_wywolanie
-```
-
-Projektowy `part_identifier` nazywa się w kodzie `towar_identyfikator`
-(precedens `zwrot_klienta`). `towar_fts` to tabela wirtualna FTS5 tworzona
-w `migrate()`, nie w `schema.sql`: bez FTS5 w SQLite start ma przeżyć,
-a szczebel pełnego tekstu ma się pominąć z powodem.
-
+Tabele obsługi, nazwami z kodu: `channel_account`, `conversation`, `message`,
+`conversation_event`, `conversation_comment`, `conversation_mention`,
+`offer_snapshot`, `towar_identyfikator`, `zadanie_terenowe`,
+`zadanie_zalacznik`, `allegro_inbox_thread`, `allegro_inbox_message`,
+`allegro_inbox_sync_state`, `outbox`, `events` i `copilot_wywolanie`.
 Obecności agentów nie ma na tej liście świadomie — patrz §6.3.
 
-**Tabel sprawy nie ma od 0.388.0** — `sprawa_klienta` i
-`sprawa_klienta_rozmowa` zeszły razem z kodem, który je czytał (§6.1.1).
-Obie nazwy są odtąd SPALONE, tak samo jak samo `sprawa`: `migrate()` kasuje je
-przy każdym starcie, więc tabela dopisana z powrotem do `schema.sql`
-powstawałaby i znikała sekundę później, bez błędu. Pilnuje tego
-`server/src/db/kasata-spraw.test.ts`.
-
-Ta sama pułapka dała wcześniej `zwrot_klienta` zamiast `zwrot` i wciąż
-obowiązuje przy każdej nowej tabeli o krótkiej nazwie po starej obsłudze.
+**Nazwy tabel sprawy są spalone** (§6.1). Ta sama pułapka dała wcześniej
+`zwrot_klienta` zamiast `zwrot`. Obowiązuje przy każdej nowej tabeli o krótkiej
+nazwie po starej obsłudze.
 
 ### 15.1. Identyfikatory zewnętrzne
 
@@ -3440,87 +2502,13 @@ proponował trzecią, `/api/customer-service/*`.
 zysku funkcjonalnego. Ujednolicenie jest długiem do spłacenia przy okazji
 większej zmiany tras, nie osobno.
 
-Zasoby docelowe (prefiksy do ujednolicenia):
-
-```
-GET    /api/obsluga/rozmowy
-GET    /api/obsluga/rozmowy/:id
-POST   /api/conversations/:id/claim
-POST   /api/conversations/:id/assign
-POST   /api/conversations/:id/snooze
-POST   /api/conversations/:id/resolve
-POST   /api/conversations/:id/comments
-GET    /api/conversations/:id/draft
-PUT    /api/conversations/:id/draft
-POST   /api/conversations/:id/send
-GET    /api/conversations/:id/context
-POST   /api/obsluga/zadania/pomiar
-GET    /api/zadania-terenowe
-POST   /api/zadania-terenowe/:id/wez
-POST   /api/zadania-terenowe/:id/wykonaj
-POST   /api/zadania-terenowe/:id/odeslij
-POST   /api/zadania-terenowe/:id/oddaj
-POST   /api/zadania-terenowe/:id/ponow
-POST   /api/zadania-terenowe/:id/zalacznik
-GET    /api/zadania-terenowe/:id/zalacznik/:zid
-GET    /api/products/search
-GET    /api/obsluga/rozmowy/:id/dobor/kandydaci
-PUT    /api/obsluga/rozmowy/:id/dobor/dane
-POST   /api/obsluga/rozmowy/:id/dobor/status
-POST   /api/obsluga/rozmowy/:id/dobor/wybor
-GET    /api/obsluga/rozmowy/:id/dobor/wiedza
-POST   /api/obsluga/rozmowy/:id/dobor/pomiar-do-wiedzy
-GET    /api/obsluga/wiedza/kolejka
-GET    /api/obsluga/wiedza/modele
-GET    /api/obsluga/wiedza/towar/:twId
-POST   /api/obsluga/wiedza/propozycje
-POST   /api/obsluga/wiedza/:id/rozstrzygnij
-POST   /api/obsluga/wiedza/:id/wycofaj
-POST   /api/obsluga/wiedza/:id/dowody
-GET    /api/obsluga/wiedza/z-opisow
-POST   /api/obsluga/wiedza/z-opisow/:id/przerob
-POST   /api/obsluga/wiedza/z-opisow/:id/odrzuc
-GET    /api/obsluga/wiedza/identyfikatory/:twId
-POST   /api/obsluga/wiedza/identyfikatory
-GET    /api/obsluga/pokrycie-wiedzy
-GET    /api/obsluga/reklamacje
-GET    /api/obsluga/reklamacje/:id
-GET    /api/obsluga/reklamacje/:id/zalaczniki/:zid
-GET    /api/obsluga/reklamacje/:id/zalaczniki/:zid/podglad
-POST   /api/obsluga/reklamacje/synchronizuj
-POST   /api/obsluga/reklamacje/:id/prowadze
-POST   /api/obsluga/reklamacje/:id/notatka
-POST   /api/obsluga/reklamacje/:id/odpowiedz
-POST   /api/obsluga/reklamacje/:id/werdykt
-POST   /api/obsluga/reklamacje/:id/zwrot-towaru
-```
-
-Trasy doboru działają od E1, trasy wiedzy od E2. Projekt właściciela pisał
-`dopasowania/*` — adres zmienił się razem z nazwą tabeli: `dopasowanie` jest
-spalone i nie wraca nawet w URL-u.
-
 Każda mutacja przyjmuje oczekiwaną wersję rekordu. Konflikt wersji zwraca 409.
-
-## 17. Architektura backendu
-
-```
-routes → application services → domain → repositories → SQLite, Allegro, Subiekt, AI
-```
-
-Trasy walidują wejście, sprawdzają uprawnienia, wołają przypadek użycia
-i mapują błąd na HTTP. Logika domenowa nie mieszka w trasach.
-
-Adaptery zewnętrzne: `AllegroMessagingAdapter`, `AllegroOffersAdapter`,
-`SubiektProductsAdapter`, `KnowledgeRepository`, `AiProvider`,
-`RealtimePublisher`.
 
 ## 18. Baza aplikacji
 
 Zostajemy przy `node:sqlite`, dopóki instalacja jest pojedyncza, agentów jest
 niewielu, synchronizacja działa w jednym procesie, zapisy są krótkie,
-a konflikty rozstrzyga wersjonowanie. Wyszukiwanie pełnotekstowe (E3)
-pokrywa FTS5 wbudowane w `node:sqlite`; progiem PostgreSQL zostaje
-wyszukiwanie wektorowe.
+a konflikty rozstrzyga wersjonowanie.
 
 Migrację na PostgreSQL rozważamy przy wielu instancjach backendu, wielu kontach
 marketplace, intensywnej pracy agentów, dużej historii, rozbudowanym
@@ -3535,53 +2523,11 @@ konta, czas, obiekt, wersję przed i po, powód (gdy wymagany), identyfikator
 urządzenia i identyfikator żądania.
 
 Audyt obejmuje przejęcie, przekazanie, komentarz, utworzenie i wykonanie
-zadania, zatwierdzenie dopasowania, zmianę szkicu, próbę i sukces wysyłki,
+zadania, zmianę szkicu, próbę i sukces wysyłki,
 niejednoznaczny timeout, konflikt świeżości, wymuszone przejęcie i eksport
 danych.
 
 **Treść wiadomości nie trafia do ogólnego dziennika zdarzeń.**
-
-### 19a. Skuteczność doboru — raport za zębatką (0.267.0)
-
-> **Usunięte.** Dobór części i baza wiedzy wyszły z WERTIS w całości
-> decyzją właściciela w 0.565.0 (5 października 2026), razem z kodem
-> i tabelami. Tekst zostaje jako zapis powodów i blizn.
-
-`dobor_rozmowy.wybrany_droga` zapisuje, którym z jedenastu szczebli §11.2
-przyszedł kandydat wybrany przez agenta. Kolumna stała w bazie od 0.229.0
-i miała w całym repozytorium dwóch czytelników: odczyt jednego wiersza do
-ekranu oraz dwa zapisy. Nie dało się więc odpowiedzieć na pytanie, od którego
-zależy każda decyzja o rozwoju doboru — czy szczebel „zgodne wymiary" dał
-kiedykolwiek wybraną część.
-
-Raport liczy z KSIĘGI ZDARZEŃ, nie ze stanu tabeli, i to jest jego główna
-decyzja projektowa. Tabela pamięta ostatni wybór, więc agent, który zmienił
-zdanie, kasuje z niej pierwszą drogę bez śladu. Status `confirmed` też jest
-cofalny. Do tego retencja kasuje rozmowy sprzed progu skrzynki, a dobór wisi
-na kaskadzie — raport z tabeli potrafiłby zmienić liczby między dwoma
-odświeżeniami strony. Księga zdarzeń nie ma klucza obcego do rozmowy
-i przeżywa sprzątanie.
-
-Zatwierdzenie kredytuje wyłącznie wybór bezpośrednio je poprzedzający. Agent,
-który wziął kandydata z pełnego tekstu, zmienił zdanie na trafienie po numerze
-i dopiero to zatwierdził, nie dopisuje punktu pełnemu tekstowi.
-
-Szczebel bez ani jednego wyboru **zostaje na liście**, z zerem i z osobnym
-zdaniem pod tabelą. To jest najcenniejsze ustalenie tego raportu: droga,
-którą utrzymujemy w kodzie, a która nikomu jeszcze nie odpowiedziała.
-
-**Oś osobowa i Kodeks pracy.** Decyzja właściciela: raport pokazuje, kto jak
-pracuje. Pomiar per osoba to monitoring pracowniczy wg art. 22² Kodeksu pracy
-— wymaga zapisu w regulaminie albo obwieszczeniu oraz uprzedzenia pracowników
-dwa tygodnie wcześniej. Zdanie o tym jedzie z serwera w ładunku i stoi pod
-tabelą osób, więc karta nie ma jak go zgubić.
-
-Trzy hamulce, wprost z precedensu raportu wydajności magazynu. Mediana czasu
-pokazuje się dopiero od progu wiarygodności, bo mediana z czterech doborów
-przy nazwisku i tak zostanie przeczytana jako werdykt. Każda liczba pochodna
-niesie swoje `n`. I nie ma tu ŻADNEJ kolumny rankingowej: „najczęściej kończy
-na" mówi, JAK ktoś pracuje, czyli komu warto pokazać bazę wiedzy, a nie kto
-jest lepszy.
 
 ## 20. Bezpieczeństwo
 
@@ -3603,7 +2549,7 @@ Subiekta.
 Panel pokazuje trwały alarm, gdy synchronizacja nie powiodła się przez więcej
 niż dwa planowane interwały.
 
-Od 0.168.0 pełna tabela tych trzynastu pozycji mieszka **za zębatką**, na
+Pełna tabela tych trzynastu pozycji mieszka **za zębatką**, na
 ekranie `/obsluga/ustawienia`. Ekran pracy niesie to, co woła o reakcję:
 pigułkę synchronizacji w nagłówku i trwały alarm nad kolejką. Sama tabela
 opisuje tło i czyta się ją rzadko — zasada 10 mówi o widocznej AWARII, nie
@@ -3613,64 +2559,10 @@ o widocznej diagnostyce.
 
 Czas do pierwszej odpowiedzi, czas do rozwiązania, rozmowy po terminie, liczba
 przekazań, pytania wymagające pomiaru, czas realizacji zadania magazynowego,
-udział dopasowań potwierdzonych, udział spraw wymagających dodatkowych danych,
-liczba błędnych rekomendacji, zwroty z błędnego dopasowania, najczęściej
-brakujące parametry ofert, produkty generujące najwięcej pytań oraz wpływ
-uzupełnienia oferty na liczbę pytań.
+najczęściej brakujące parametry ofert, produkty generujące najwięcej pytań oraz
+wpływ uzupełnienia oferty na liczbę pytań.
 
 **Metryki nie oceniają agentów liczbą wysłanych wiadomości.**
-
-## 23. Testowanie
-
-### 23.1. Backend
-
-Mapowanie rzeczywistych fixture'ów Allegro, paginacja, idempotencja, restart
-synchronizacji, 401, 403, 406, 429, timeout, błąd jednego wątku, wyścig
-agentów, konflikt szkicu, nowa wiadomość podczas redagowania, podwójne
-kliknięcie wysyłki, niejednoznaczny wynik POST, migracja starej bazy, audyt
-każdej mutacji.
-
-### 23.2. Frontend
-
-Logowanie, kolejka, zmiana filtrów, otwarcie rozmowy, przejęcie, komentarz,
-szkic, konflikt, nowa wiadomość, utworzenie zadania, wynik z magazynu, błąd
-synchronizacji.
-
-### 23.3. End-to-end
-
-Najważniejszy scenariusz: Allegro zwraca nowe pytanie, synchronizator zapisuje
-rozmowę, panel pokazuje ją w kolejce, agent przejmuje rozmowę, zleca pomiar,
-kolektor pokazuje zadanie, magazynier je przejmuje i wpisuje wynik, wynik
-pojawia się w panelu, agent aktualizuje szkic, klient dopisuje wiadomość,
-pierwsza wysyłka dostaje konflikt, agent poprawia szkic, odpowiedź wychodzi
-raz, a audyt zawiera cały przebieg.
-
-## 24. Etapy wdrożenia
-
-**A — fundament frontu:** podział na moduły, TanStack Query, React Router,
-shadcn, walidacja, testy, wyszukiwarka produktu zamiast ręcznego `tw_id`.
-
-**B — kontrakt Allegro:** oficjalna dokumentacja, fixture'y, potwierdzenie
-oferty i autora, decyzja o retencji.
-
-**C — skrzynka tylko do odczytu:** synchronizacja, lista rozmów, historia,
-oferta, kartoteka, przypisanie agentów, komentarze, zadania z rozmowy.
-
-**D — wysyłka:** szkic, kontrola świeżości, idempotencja, wysyłka, audyt,
-obsługa niejednoznacznego timeoutu.
-
-**E — dobór części:** modele urządzeń i silników, OEM, zamienniki, parametry,
-pozytywne i negatywne zastosowania, dowody.
-
-**F — Copilot:** klasyfikacja, ekstrakcja, OCR, brakujące dane, kandydaci,
-porównanie, szkic z dowodami. Przyrost pierwszy — klasyfikacja wiadomości —
-stoi (§14.5). Przyrost drugi — szkic z dowodami — stoi od 0.231.0 (§14.6).
-Przyrost trzeci — dane doboru z rozmowy — stoi (§14.7). Przyrost czwarty —
-Copilot proponuje pasowania — stoi (§14.8). OCR, kandydaci i porównanie
-czekają.
-
-**G — automatyzacje:** priorytety, routing, terminy, odłożenie, sugestie
-poprawy ofert, analiza powodów kontaktu, kolejne kanały.
 
 ## 25. Kryteria gotowości
 
@@ -3682,17 +2574,13 @@ wewnętrzny nie może trafić do klienta; wynik magazyniera wraca do właściwej
 rozmowy; nowa wiadomość zatrzymuje nieaktualną wysyłkę; podwójne kliknięcie nie
 tworzy dwóch odpowiedzi; automat nie wysyła bez człowieka poza kategorią
 włączoną na żywo (§14.6f); rekomendacja
-techniczna pokazuje źródło; negatywne dopasowania są widoczne; awaria
+pokazuje źródło; awaria
 synchronizacji jest jawna; każda mutacja ma autora i czas; system działa bez
 Teamsa i Slacka; agent obsłuży typowe pytanie bez otwierania panelu Allegro.
 
-Dwa kryteria o wiedzy stoją od E2. Rekomendacja pokazuje źródło: kandydat
-drogą `zastosowanie` i zdanie do szkicu cytują dowód z bazy wiedzy. Negatywne
-dopasowania widać w zakładce Dobór osobno i jako ostrzeżenie przy kandydacie.
-
 ## 25a. Zwroty klienckie
 
-Rozdział dopisany w 0.150.0. Odpowiada na pytanie §6 z `docs/obsluga-klienta.md`
+Rozdział odpowiada na pytanie §6 z `docs/obsluga-klienta.md`
 i opisuje drugi ekran obsługi — pierwszy poza skrzynką.
 
 ### 25a.1. Czym jest zwrot
@@ -4435,18 +3323,12 @@ tam, gdzie serwer już wie, że nie ma o co.
 
 ### 25a.6a. Zdjęcia w całej obsłudze (0.203.0)
 
-Do 0.202.0 kafel stał wyłącznie tam, gdzie kartoteka była już rozstrzygnięta:
-w kolejce zwrotów, przy pozycji zwrotu i przy kartotece potwierdzonej przy
-rozmowie. Miejsca, w których człowiek DECYDUJE, obrazu nie miały.
-
-Zdjęcie doszło więc do kandydatów doboru, negatywnych dopasowań, wybranej
-kartoteki doboru, wyników wyszukiwarki kartotek, obu propozycji kartoteki
-(przy rozmowie i przy pozycji zwrotu), karty zadania terenowego oraz obu kart
-bazy wiedzy. Wszystkie biorą obraz z trasy `/api/products/:twId/zdjecie` —
+Kafel stoi także tam, gdzie człowiek DECYDUJE, a nie tylko przy kartotece
+rozstrzygniętej. Zdjęcie mają wyniki wyszukiwarki kartotek, obie propozycje
+kartoteki (przy rozmowie i przy pozycji zwrotu) oraz karta zadania terenowego. Wszystkie biorą obraz z trasy `/api/products/:twId/zdjecie` —
 z Allegro nie pobieramy nic (§ oferta przy rozmowie).
 
-Wyszukiwarka jest tu jedną zmianą dla pięciu ekranów: doboru, kartoteki przy
-rozmowie, zlecenia pomiaru, sprawdzenia wiedzy i nowej propozycji.
+Wyszukiwarka jest jedną zmianą dla kartoteki przy rozmowie i zlecenia pomiaru.
 
 **Nazwa przed symbolem.** Wiersz kandydata i wynik wyszukiwarki zaczynały się
 od symbolu, a nazwa leżała pod nim, w rozmiarze podpisu. Symbol jedzie na
@@ -4703,20 +3585,12 @@ kurier odesłał ją po dwóch awizach — Allegro takiego zdarzenia nie zna,
 bo `CustomerReturn` powstaje wyłącznie ze zgłoszenia klienta. Pieniądze
 i tak trzeba oddać, więc paczka musi wejść do kolejki.
 
-**Rejestracji w panelu już nie ma (0.451.0).** Decyzja właściciela:
-„usuń opcję rejestracji paczki — ja tylko wyszukuję ją w Allegro".
-Formularz zakładał zwrot od zera, a biuro brało z niego tylko szukanie
-klienta. Zostało samo szukanie: przycisk „Paczki klienta" przy polu i „Szukaj
-po kliencie" przy nieznanym kodzie. Wiersz wyniku prowadzi do zamówienia
-w panelu Allegro. Trasa `nieodebrana` zniknęła też z serwera.
-Wiersze zarejestrowane wcześniej zostają w kolejce ze znacznikiem.
+**Panel nie zakłada paczki od zera** (decyzja właściciela). Biuro szuka jej
+przyciskiem „Paczki klienta" przy polu i „Szukaj po kliencie" przy nieznanym
+kodzie. Wiersz wyniku prowadzi do zamówienia w panelu Allegro.
 
-**Przyjęcie wraca jednym kliknięciem (0.493.0).** Właściciel zapytał, jak
-procesujemy paczki nieodebrane, i zdecydował: mają iść drogą zwrotu. Od
-0.451.0 paczka kończyła się na stronie zamówienia w Allegro. ZW, półka
-i przelew działy się poza panelem, bez oceny, koszyka i śladu pieniędzy.
-
-Formularz z 0.451.0 nie wraca. Przy wierszu wyniku stoi przycisk „Przyjmij
+**Przyjęcie jednym kliknięciem.** Paczka nieodebrana idzie drogą zwrotu,
+decyzją właściciela. Przy wierszu wyniku stoi przycisk „Przyjmij
 jako nieodebraną", a klik w sam wiersz dalej otwiera Allegro. Przycisk nie
 pyta o nic: pozycje, login i odbiorcę bierze z zamówienia. Numer listu
 dochodzi tylko ze skanu, który chybił, bo to numer tego kartonu. Następny
@@ -4740,7 +3614,7 @@ po terminie. Wypłata zdejmuje tylko to czekanie, a zwrot zamyka korekta.
 Narzędzie kasowania rozliczonych poza aplikacją paczki nie rusza, bo nie
 wróciłaby z synchronizacji.
 
-**Drugi zwrot tego zamówienia ostrzega (0.493.0).** Klient z paczką
+**Drugi zwrot tego zamówienia ostrzega.** Klient z paczką
 nieodebraną zgłasza czasem potem odstąpienie w Allegro. Synchronizacja zakłada
 wtedy drugi zwrot tego samego zamówienia, a to dwie kwoty za jeden towar.
 Worker drugiego ZW nie wystawi, ale pieniędzy pilnuje już tylko człowiek.
@@ -4754,29 +3628,7 @@ stoi i w kolejce, i w nagłówku, i w kolumnie eksportu CSV. Bez tego biuro
 liczyłoby świadome odstąpienia razem z nieodebranymi i nie miało jak ich
 rozdzielić — a to dwie różne rozmowy z klientem i dwa różne wnioski.
 
-**Numer zamówienia jest opcjonalny, ale za niego są pozycje.** Podany
-przepisuje pozycje zamówienia do zwrotu, więc jest co ocenić i co wycenić.
-Bez niego wiersz zostaje pustym uchwytem na paczkę — lepszym niż kartka
-przy monitorze, ale pieniędzy z niego nie policzy.
-
-**Login kupującego jest trzecim uchwytem (0.365.0).** Zgłoszenie właściciela:
-„nieodebrane paczki powinienem móc wyszukiwać po loginie klienta". Pole
-szukania zna login od 0.337.0 i mówi to wprost — ale ta paczka brała go
-wyłącznie z zamówienia, a numeru zamówienia przy nieodebranej najczęściej nie
-ma. Szukanie po loginie milczało wtedy tak samo, jakby paczki nie było.
-
-Formularz pyta o login pod numerem zamówienia, czyli w kolejności od uchwytu
-najpewniejszego do najsłabszego: naklejka, numer, człowiek. Wpisany bije ten
-z zamówienia, bo pochodzi od kogoś patrzącego na sprawę. Gdy go nie wpisano,
-bierze się z zamówienia — i ląduje w KOLUMNIE zwrotu, a nie w złączeniu przy
-odczycie. Paczka ma zostać odnajdywalna także wtedy, gdy zamówienie wypadnie
-z okna synchronizacji.
-
-Dziennik notuje sam fakt (`zLoginem`), nie login. Dana osobowa ma jedno
-miejsce, a nie dwa do pilnowania przy tej samej polityce.
-
-**Z loginu wybiera się PACZKĘ.** Druga połowa tego samego zgłoszenia: „kupujący
-może mieć wiele paczek kupionych w historii sklepu". Enter w polu loginu
+**Z loginu wybiera się PACZKĘ**, bo kupujący bywa klientem od lat. Enter w polu loginu
 pokazuje zakupy tego klienta — numer, datę, kwotę i zawartość w jednej
 linijce. Kliknięcie wpisuje numer do pola zamówienia, więc operator widzi, co
 pojedzie na serwer.
@@ -4799,16 +3651,6 @@ wychodzi w eksporcie. Politykę opisuje `docs/obsluga-klienta.md`.
 Odnośnika do Allegro taki wiersz nie dostaje. Prowadziłby na stronę zwrotu,
 którego po tamtej stronie nie ma.
 
-**Pierwszy skan takiej paczki CHYBIA Z DEFINICJI (0.367.0).** Właściciel:
-paczki nakleja klient albo kurier, więc tych numerów w Allegro nie ma wcale.
-Numeru listu z wracającego kartonu nasz system nigdy nie widział i nie
-zobaczy — a panel mówił tymczasem „paczka bywa u nas szybciej niż zwrot"
-i kazał czekać na coś, co nie przyjdzie.
-
-Dlatego kolejność wyjść z nieznanego kodu jest odwrócona względem 0.172.0:
-rejestracja stoi pierwsza, pytanie do Allegro drugie. Nie znika, bo etykieta
-zwrotna ZGŁOSZONEGO zwrotu wygląda tak samo i tamtą drogą się ją znajduje.
-
 **Uchwyt człowieka to jedno pole: login albo nazwisko z naklejki.** Dwa pola
 kazałyby operatorowi najpierw rozstrzygnąć, czym jest to, co przepisuje.
 Rozstrzyga serwer: login w całości, nazwisko po fragmencie od trzech znaków.
@@ -4819,11 +3661,6 @@ Ceną fragmentu jest to, że dwoje ludzi o tym samym nazwisku daje dwa wiersze.
 Dlatego wiersz listy niesie nazwę odbiorcy — wybiera człowiek, patrząc na
 wszystkie trafienia naraz. Wybór ustala od razu trzy rzeczy: numer zamówienia,
 login i nazwę odbiorcy.
-
-**Przewoźnik dochodzi listą rozwijaną.** Przy nieodebranej Allegro nie zna go
-wcale, a operator ma logo przed oczami. Lista, nie pole: wpisane „inpost"
-i „InPost" byłyby w danych dwiema firmami, a kody muszą się zgadzać z tymi,
-które przychodzą przy zwrotach.
 
 ### 25a.13a. Towar dołożony do koszyka ręką (0.365.0)
 
@@ -6145,138 +4982,13 @@ założeniem — `[WERYFIKUJ]` w `docs/allegro-ksztalt.md`: specyfikacja nie
 (werdykt, liczba znaków, kwota), `reklamacja_werdykt` (los, kod HTTP),
 `reklamacja_zwrot_towaru` (decyzja, liczba znaków), `privileged` (operacja).
 
-### 25b.8a. Copilot reklamacyjny: zbiera dane, nie radzi (0.275.0)
+### 25b.8a. Copilot reklamacyjny
 
-**Od 0.564.0 karty i rady nie ma na ekranie reklamacji** (decyzja
-właściciela, „na razie"). Zniknął przycisk „Przeczytaj sprawę" i trasa
-`…/rozpoznaj`, więc z reklamacji nic nie idzie do dostawcy modelu. Zapisane
-karty zostają w `reklamacja_karta` i jadą w szczegółach sprawy, a serwisy
-Copilota zostają w kodzie. Opis niżej mówi, jak to działało, i obowiązuje,
-gdyby Copilot wrócił.
-
-Zgłoszenie właściciela z 11 września: „zintegruj z copilotem, wersja do
-reklamacji zbierająca dane". Słowo „zbierająca" jest tu całym projektem.
-
-#### Co Copilot WIDZI (0.282.0)
-
-Do 0.282.0 widział wyłącznie czat. Właściciel wkleił kartę, w której Copilot
-prosił agenta o „datę zakupu / numer zamówienia" i o „zdjęcia tabliczki w celu
-identyfikacji modelu" — o trzy rzeczy, z których numer zamówienia stał na
-wierszu sprawy, data przyszła w tej samej odpowiedzi Allegro, a model towaru
-zna oferta. **Prosił, bo nie dostał.**
-
-Przed rozmową stoi teraz blok FAKTY ZE SPRAWY z własnym numerem `S`. Numer
-jest konieczny, nie ozdobny: bez niego zdanie przepisane ze zgłoszenia
-wylatywałoby jako rzekomo niepokryte, a to są słowa klienta tak samo jak
-wiadomość.
-
-Wychodzą fakty o SPRAWIE i o ZAKUPIE, nie fakty o NAS. Notatka biura, znacznik
-„kto prowadzi", tagi, kartoteka i nasze kwoty zostają u nas — granica jest ta
-sama co była, tylko przesunięta o jedno pojęcie. Pełny zapis w polityce danych.
-
-**Pole `brakuje` przechodzi przez SITO po stronie kodu.** To jedyne pole karty
-bez cytatu, więc bramka numerów go nie dotyka — a właśnie ono trzymało sprawę
-w miejscu. Sito wycina pozycje pytające o to, co przed chwilą podaliśmy, ale
-ma nad sobą STRAŻNIKA, który jest ważniejszy: dowód zakupu to dokument, a nie
-data; numer seryjny to egzemplarz, a nie model; zdjęcia to materiał, którego
-w tekście nie ma z definicji. Tych pozycji nie tnie nic. Sito, które utnie za
-dużo, kasuje najcenniejszą część karty.
-
-Licznik odsianych pozycji idzie do dziennika. Heurystyka bez pomiaru to wiara,
-a po miesiącu nikt inaczej nie odpowie, czy sito nie tnie za dużo.
-
-#### Copilot czyta ZDJĘCIA (0.283.0)
-
-Zlecenie właściciela: „copilot powinien czytać zdjęcia". Karta, którą pokazał,
-prosiła agenta o zdjęcia, które w sprawie już były — sama się do nich
-odwoływała, cytując wiadomość sprzedawcy.
-
-Obrazy idą przed tekstem, a na końcu tekstu stoi ich spis z numerami `Z1`,
-`Z2` i nazwami plików. Numery są potrzebne z tego samego powodu co `S`: bez
-własnej przestrzeni każdy fakt odczytany ze zdjęcia wylatywałby w odsiewie.
-
-**Typ rozstrzyga SYGNATURA pliku, nie nazwa.** Ta sama bramka co przy podglądzie
-w panelu. Plik, który nie jest obrazem, zostaje wymieniony w spisie z nazwą —
-to pozwala modelowi napisać w `brakuje`, że przysłany dokument jest nieczytelny
-jako zdjęcie.
-
-**Żadne potknięcie nie wywraca rozpoznania.** Pobranie, które padło, plik spoza
-typu, komplet, który nie zmieścił się w suficie bajtów — wszystko jest liczone,
-nie rzucane. Karta bez zdjęć wie mniej; brak karty nie mówi agentowi nic.
-
-Stopka karty mówi, ile zdjęć przeczytała, a cytat `Z2` niesie w podpowiedzi
-nazwę pliku. Bez tych dwóch rzeczy „Copilot nic nie zobaczył na zdjęciu"
-i „Copilot nie dostał zdjęć" wyglądają na ekranie identycznie — a to dwie
-różne sprawy i dwa różne następne ruchy.
-
-Czego ta zmiana kosztuje po stronie danych, mówi polityka: pikseli zamaskować
-się nie da i nie udajemy, że jest inaczej.
-
-#### Numer cytatu bez nawiasów (0.282.0)
-
-Model widzi w rozmowie `[W3]` i regularnie tak właśnie cytuje. Bramka
-porównywała łańcuchy dosłownie, więc taki fakt znikał z karty BEZ ŚLADU, jako
-niepokryty. To było poluzowanie doktryny przez literówkę, nie przez decyzję.
-Numer normalizuje się teraz przed porównaniem — dwa numery naraz dalej
-wypadają, bo doktryna została ta sama.
-
-**Od 0.276.0 Copilot także RADZI.** Do 0.275.0 karta z jakimkolwiek słowem
-z rodziny werdyktu leciała w całości — decyzja agenta piszącego kod, nie
-właściciela. Właściciel odwrócił ją tego samego dnia: „copilot powinien też
-radzić w reklamacji". Wie to lepiej: to on wydaje te werdykty i płaci za ich
-skutki.
-
-**Bramka nie znika, tylko zmienia cel.** Rada mieszka WYŁĄCZNIE w polu
-`rada` — typowanym i podpisanym na ekranie. Pola opisowe (`usterka`, `kiedy`,
-`oczekiwanie`, `dowody`) mają zostać tym, co powiedział klient, i pilnuje tego
-ta sama deterministyczna bramka. Bez niej model przemyciłby werdykt w polu,
-które wygląda jak cytat z kupującego, a agent czytałby to jako słowa klienta.
-
-**Rada jest TYPOWANA, nie prozą**: jedna z jedenastu wartości werdyktu Allegro
-albo dwunasta, nasza — `POPROSIC_O_DOWODY`, znacząca „nie ma jeszcze czego
-rozstrzygać". Prozą byłoby ładniej i nie dałoby się tego zmierzyć.
-
-**Pewność bez nazwanej niewiedzy jest odrzucana.** Model deklarujący „wysoką"
-musi wymienić co najmniej jedną rzecz, której nie wie, a która zmieniłaby radę.
-Deklaracja pewności bez tego nie jest pewnością, tylko brawurą — i karta z nią
-nie zapisuje się wcale.
-
-**Rada NIE dotyka formularza werdyktu.** Nie zaznacza opcji, nie otwiera
-dialogu, nie podstawia wiadomości. Agent klika „UZNAJĘ" sam i sam potwierdza
-zgodę. Powód jest wąski i techniczny: Allegro nie przyjmie drugiego werdyktu
-w sprawie, więc różnica między „przeczytaj i zdecyduj" a „potwierdź" jest tu
-nieodwracalna — a podstawiony formularz zamienia jedno w drugie jednym
-kliknięciem mniej.
-
-**Trafność liczy się z FAKTU, nie z ankiety.** Gdy werdykt wychodzi, serwis
-porównuje go z radą i dopisuje `trafna`/`nietrafna`. Rekomendacja jest typowana
-tym samym słownikiem, więc porównanie to równość dwóch napisów — nikogo nie
-trzeba o nic pytać. `POPROSIC_O_DOWODY` zostaje bez oceny i to nie luka: ta
-rada mówi „jeszcze nie rozstrzygaj", więc każdy późniejszy werdykt może być
-słuszny.
-
-**Co karta niesie.** Cztery rzeczy, których agent szuka w rozmowie za każdym
-razem ręcznie: co się zepsuło, od kiedy, czego klient chce i co już przysłał.
-Piąta pozycja jest najcenniejsza — **czego BRAKUJE**, żeby dało się
-rozstrzygnąć. Sprawy stoją tygodniami nie dlatego, że nikt nie umie
-zdecydować, tylko dlatego, że nikt nie zapytał o zdjęcie tabliczki.
-
-**Każde zdanie ma cytat.** Model dostaje rozmowę ponumerowaną (`W1`, `W2`, …)
-i przy każdym polu podaje numer wiadomości. Serwer sprawdza numery przed
-zapisem: pole z numerem, którego nie ma, znika, a licznik odsianych idzie do
-dziennika. Inaczej niż przy szkicu, gdzie wymyślony numer kasuje całość —
-tam liczba wchodzi do zdania wysyłanego kupującemu, a tutaj karta jest notatką
-dla agenta, który ma rozmowę przed oczami.
-
-**Kliknięcie jest jawne.** Żądanie kosztuje u dostawcy, więc nie wychodzi
-z samego otwarcia ekranu — ta sama zasada, co przy całym Copilocie od etapu F.
-Trasa jest `POST`em mimo braku decyzji człowieka właśnie dlatego: przeglądarka
-powtarza i wstępnie pobiera `GET`-y bez pytania.
-
-**Do dostawcy idzie rozmowa ZAMASKOWANA**, tym samym modułem co w skrzynce
-(§14.4), a pilnuje tego kompilator: nadawca przyjmuje wyłącznie
-`TrescBezpieczna`. Do dziennika idą liczby — ile braków, ile dowodów, ile pól
-odsiano — nigdy słowa klienta.
+**Karty i rady Copilota nie ma na ekranie reklamacji** (decyzja właściciela,
+„na razie"). Nie ma przycisku „Przeczytaj sprawę" ani trasy `…/rozpoznaj`,
+więc z reklamacji nic nie idzie do dostawcy modelu. Zapisane karty zostają
+w `reklamacja_karta` i jadą w szczegółach sprawy. Serwis zostaje w kodzie, a
+jego bramki opisuje `server/src/services/copilot-reklamacja.ts`.
 
 ### 25b.9. Czego panel nie wie
 
@@ -6323,19 +5035,6 @@ samym przycisku, bo dotąd wypisywało go tylko pole notatki.
 pokazują tagi przypięte wcześniej i szukają po starych notatkach. Notatki tej
 na ekranie sprawy nie widać, a numeru sprawy Allegro biuro nie ma już gdzie
 zapisać tak, żeby kolejka go znalazła.
-
-## 25c. Dyskusje
-
-**Wycofane w 0.612.0.** Od 28 października 2026 Allegro zakłada nowe sprawy
-kupujących jako Problemy z zakupem w Centrum Wiadomości, czyli w skrzynce
-(§10). Ekran, trasy, alarm i pobieranie `DISPUTE` zniknęły. Wiersze
-w `reklamacja_klienta` zostały w bazie nietknięte, więc decyzję da się
-odwrócić. Poniżej historia projektu, nie opis działającego ekranu.
-
-Zaprojektowane 9 września 2026, zbudowane w 0.245.0. Jeden przyrost, nie trzy:
-maszyneria reklamacji stała już gotowa, więc do napisania został model pracy
-i ekran, a nie integracja.
-
 
 ### 25b.11. Reklamacje w trzech kolumnach (0.575.0)
 
@@ -6480,240 +5179,22 @@ i fakty sprawy stojące kilka razy. Właściciel zlecił uproszczenie całości.
   mieszkają w `reklamacje/useWysylki.ts`. Zdania o porażce czynności trzyma
   `sprawy/useBledy.ts` i czyści je przy zmianie sprawy.
 
-### 25c.1. Czym jest dyskusja
+## 25c. Dyskusje
 
-Rozmową posprzedażową, którą kupujący otwiera przy zamówieniu, gdy coś poszło
-nie tak, a nie chce jeszcze składać reklamacji. Allegro trzyma ją tym samym
-zasobem co reklamację i różnicuje polem `type`.
+Panel nie prowadzi dyskusji (`type: "DISPUTE"`). Allegro zakłada nowe sprawy
+kupujących jako Problemy z zakupem w Centrum Wiadomości, więc trafiają do
+skrzynki (§10). Stare dyskusje zostają w `reklamacja_klienta` nietknięte.
 
-**Dyskusja to NIE reklamacja i nie wolno ich skleić.** Reklamacja ma zegar,
-formalny werdykt i tytuł prawny. Dyskusja nie ma żadnego z tych trzech: pola
-`decisionDueDate`, `statusDueDate`, `reason`, `right`, `expectations`
-i `referenceNumber` są dla niej w schemacie opisane jako puste. Sklejenie ich
-jedną plakietką kosztowało już wydanie — blizna 0.121.0.
-
-Trzecią stroną rozmowy bywa **doradca Allegro**. Sonda widziała go jako autora
-ostatniej wypowiedzi w 61 sprawach na 100. To przypadek typowy, nie brzegowy.
-
-### 25c.2. Co panel dokłada
-
-To samo, czego Centrum Sprzedaży nie daje: kolejkę z porządkiem i właściciela
-sprawy. Notatka z ustaleń zeszła w 0.568.0 (§25b.10). Panel niczego tu nie spina z Subiektem — dyskusja
-żyje w całości w Allegro.
-
-### 25c.3. Kolejka bramek
-
-Ekran nie jest rejestrem. Praca dzieli się na kubełki, a w każdym stoi jedno
-pytanie — operator nie wybiera akcji z menu, tylko odpowiada.
-
-| kubełek | pytanie | skąd |
-|---|---|---|
-| DO ODPOWIEDZI | co odpisać? | rozmowa otwarta, ostatnie słowo NIE nasze |
-| CZEKA NA KLIENTA | — | rozmowa otwarta, ostatnie słowo nasze |
-| ZAMKNIĘTE | — | `DISPUTE_CLOSED` albo rozmowa zamknięta przez Allegro |
-
-Trzy kubełki, tyle samo co przy reklamacjach, więc klawisze `1`–`3` zachowują
-naturę. Strzałki chodzą po kolejce, cyfry przełączają kubełek, a przełączenie
-przestawia kursor na pierwszą sprawę. Skróty milkną w polu tekstowym.
-
-**Doradca Allegro stawia piłkę po NASZEJ stronie** i to jest jedyna reguła,
-która różni ten ekran od reklamacji. Tam `ALLEGRO_ADVISOR_REPLIED` jest samym
-sygnałem. Gdyby tak zostało tutaj, większość dyskusji siedziałaby w CZEKA NA
-KLIENTA, podczas gdy czeka Allegro.
-
-**Sito „Moje" jest TO SAMO co przy reklamacjach** (§25b.3a) — ten sam rząd,
-ten sam klawisz `m`, ta sama kolumna `prowadzi_user_id`. Dyskusja i reklamacja
-to jeden wiersz `reklamacja_klienta` rozróżniany polem `typ`, a pytanie „czyje
-to" brzmi na obu ekranach identycznie. Dwa osobne mechanizmy dla jednego
-pytania byłyby dwoma nawykami zamiast jednego.
-
-**Tagi też są wspólne** (§25b.3b) — jeden słownik, jedna para tabel, ten sam
-pasek filtra. Osobny słownik dla dyskusji rozjechałby się z tym przy pierwszej
-zmianie nazwy, a sprawa przenoszona między ekranami gubiłaby opis.
-
-**Notatka ma drogę powrotną** (§25b.3c) — ten sam mechanizm, własna nazwa
-zdarzenia w dzienniku. Prośba o zakończenie jej NIE MA i mieć nie może: idzie
-do kupującego i Allegro jej nie cofnie.
-
-### 25c.4. Pilność bez zegara
-
-Allegro nie oddaje dla dyskusji żadnego terminu. Porządek liczymy więc sami
-i mówimy o tym wprost.
-
-Miarą jest **czas od ostatniej NIE naszej wiadomości** — czyli od kiedy ruch
-należy do nas. Na wierszu stoi zdanie „czeka 5 dni". Gdy ruch należy do
-klienta albo rozmowa jest zamknięta, nie stoi nic: liczba bez znaczenia jest
-gorsza od jej braku.
-
-**To nie jest termin i nie wolno go tak nazwać ani tak pokazać.** Blizna
-0.121.0 to ustawowy zegar czternastu dni liczony przez nas samych, rozjeżdżający
-się z tym, co widział kupujący. Tutaj liczymy fakt o WŁASNEJ skrzynce, nie
-zobowiązanie wobec klienta — i dlatego zdanie mówi „czeka", a nie „zostało".
-Ranga wizualna jest inna niż czerwony termin reklamacji.
-
-Próg wyróżnienia to trzy dni, ta sama liczba co przy terminie reklamacji.
-Agent nie ma uczyć się dwóch progów na dwóch ekranach tego samego panelu.
-
-Kolejka idzie od najdłużej czekających. Sprawy, w których ruch należy do
-klienta, stoją za nimi — nie czekają na nas, więc nie mają pilności.
-
-### 25c.5. Sygnały
-
-Pięć, każdy z jednym powodem istnienia.
-
-**Klient czeka** — ruch należy do nas. **Doradca** — ostatnie słowo miało
-Allegro; zmienia ton odpowiedzi, bo czyta ją trzecia strona. **Czat zamknięty**
-— `chatActive` jest fałszem, więc nie wyjdzie stąd ani wiadomość, ani prośba
-o zakończenie. **Nierozstrzygnięta** — `DISPUTE_UNRESOLVED`; sonda nie widziała
-ani jednej na sto, więc gdy się pojawi, jest wiadomością samą w sobie.
-**Status?** — wartość spoza `PostPurchaseIssueStatus`, czyli sygnał, że lista
-w kodzie się zestarzała.
-
-Odpadają wszystkie sygnały reklamacyjne: termin, zwrot towaru i trzy o losie
-werdyktu. Dyskusja żadnego z tych bytów nie ma.
-
-### 25c.6. Układ
-
-Trzy kolumny, jak §10.1, jak zwroty i jak reklamacje. Cztery ekrany obsługi
-mają mieć jeden nawyk, nie cztery. Kolumna faktów ma **sekcje, nie zakładki**:
-to jedna lista faktów o jednej sprawie.
-
-Środek okna niesie rozmowę, bo po to agent otwiera ten ekran. Rola autora jest
-podpisem, a nie ozdobą — bez wyraźnego podpisu agent odpowiadałby doradcy tak,
-jak odpowiada klientowi.
-
-Dwie różnice wobec ekranu reklamacji, obie wymuszone przez dane:
-
-**Wiersz kolejki nie ma zdjęcia oferty.** Pole `offer` jest w schemacie opisane
-jako nieobecne przy dyskusji. Zamiast obrazu stoi numer zamówienia.
-
-**Kolumna faktów jest chudsza i ma to powiedzieć.** Dyskusja nie niesie powodu,
-oczekiwania, prawa ani kwoty. Zostaje kupujący, zamówienie razem ze zwrotami
-tego samego zamówienia, data otwarcia, status i załączniki. Notatka biura
-zeszła w 0.568.0 (§25b.10), a „kto prowadzi" stoi nad rozmową. Puste miejsce po polach, których nie ma, byłoby gorsze od zdania.
-
-### 25c.7. Odpowiedź w rozmowie
-
-Wychodzi z panelu, tą samą maszynerią co odpowiedź w reklamacji: `type:
-"REGULAR"`, limit 20 000 znaków sprawdzany PRZED wysłaniem, klucz idempotencji
-liczony przez serwer, jeden wiersz na próbę.
-
-Bramka `chatActive` stoi przed strzałem, żeby agent zobaczył zdanie zamiast
-surowego kodu 409. Przy zamkniętej rozmowie **edytora nie ma w drzewie** — nie
-jest wyłączony. Pole, w które wolno pisać, a którego nie da się wysłać, jest
-obietnicą bez pokrycia.
-
-Punktem odniesienia świeżości jest ostatnia NIE nasza wiadomość, więc także
-wypowiedź doradcy.
-
-**Załączniki wychodzące są od 0.486.0.** Do tego wydania stało tu „nie ma”,
-bez powodu. Specyfikacja przyjmuje załącznik w wiadomości sprawy dowolnego
-rodzaju, a serwer wysyłał go już tą samą maszynerią. Trasy i tabela są wspólne
-z reklamacjami, rozstrzyga wiersz sprawy. Dziennik mówi
-`dyskusja_zalacznik_dodany` i `dyskusja_zalacznik_zdjety`.
-
-### 25c.7a. Odświeżenie sprawy (0.485.0)
-
-Wejście w dyskusję odświeża ją z Allegro, tak samo jak reklamację od 0.410.0.
-To świadomy wyjątek od „zero zapisu przy patrzeniu”, rozszerzony decyzją
-właściciela z 24 września 2026. Powód jest ten sam: przebieg synchronizacji
-czyta najwyżej tysiąc spraw, więc starszych dyskusji nie odświeżał nigdy.
-
-Obok stoi przycisk „Odśwież z Allegro”, też decyzją właściciela. Agent czeka
-w sprawie na klienta albo doradcę i nie musi z niej wychodzić. Po wysyłce
-i po prośbie o zakończenie sprawa dociąga się sama.
-
-Błąd przy wejściu milczy, bo agent o nic nie prosił. Błąd z przycisku mówi.
-Trasa dyskusji nie odświeża reklamacji, a zdarzenie w dzienniku nazywa się
-`dyskusja_odswiezenie`. Pilnuje tego `ekrany/Dyskusje.test.tsx`: samo
-otwarcie ekranu wysyła zero mutacji, wejście w sprawę dokładnie jedną.
-
-### 25c.8. Prośba o zakończenie
-
-Jedyna operacja zapisu, którą Allegro przewiduje **wyłącznie dla dyskusji**.
-Werdykt tu nie istnieje: `POST /sale/issues/{id}/status` ma w specyfikacji
-adnotację „Not a valid operation for disputes".
-
-**Przycisk nazywa się POPROŚ O ZAKOŃCZENIE, nie ZAKOŃCZ.** Enum nazywa tę
-wartość `END_REQUEST` — żądaniem zakończenia. Ani schemat, ani opis nigdzie nie
-obiecują, że dyskusja zamknie się od naszego kliknięcia. Przycisk obiecujący
-więcej, niż mówi specyfikacja, to ten sam rodzaj zgadywania, który do 0.155.0
-trzymał w kodzie adres `/sale/disputes/{id}/messages` — adres, którego Allegro
-nigdy nie miało.
-
-Wiadomość jest wymagana i czyta ją kupujący. Limit ten sam co w czacie.
-
-`status_allegro` nie jest przestawiany po wysyłce. Należy do Allegro,
-a potwierdzenie przynosi synchronizacja — jak zieleń przy pieniądzach z 0.209.0
-i przy werdykcie z 0.242.0.
-
-Los prośby ma WŁASNE kolumny, nie `werdykt_*`. Werdykt rozstrzyga reklamację
-jedną z jedenastu wartości; prośba niczego nie rozstrzyga. Jedna kolumna na oba
-znaczenia kazałaby czytać ten sam zapis raz jako decyzję, raz jako pytanie.
-
-Stany są DWA: „poszła" i „poszła, ale Allegro nie potwierdziło". Porażka kodem
-nie dotyka sprawy — zostaje w skrzynce nadawczej, a agent może spróbować raz
-jeszcze. Na wierszu stoi wyłącznie to, po czym drugiej próby robić NIE WOLNO.
-
-Potwierdzenie zamiast cofnięcia: „Rozumiem: prośba o zakończenie trafia do
-kupującego i nie da się jej cofnąć". Trasa stoi za rolą biura i zostawia wpis
-`privileged`. Wersja sprawy z ekranu jest obowiązkowa.
-
-### 25c.9. Co dzielimy z reklamacjami
-
-Jedna tabela, bo Allegro ma jedną przestrzeń identyfikatorów: `{issueId}` jest
-w specyfikacji opisane jako „Dispute or claim identifier". Rozróżnia je kolumna
-`typ`, a każde zapytanie po obu stronach musi ją nieść — pilnuje tego strażnik
-czytający ŹRÓDŁO obu serwisów. Zwolnienie istnieje dla zapisów stojących za
-bramką i wymaga zdania z powodem, jak przy celach dotyku na kolektorze.
-
-Jedna synchronizacja, bo obie sprawy przyjeżdżają jedną listą. Odświeżenie
-JEDNEJ sprawy (§25c.7a) nie jest drugą synchronizacją: czyta jedną sprawę,
-nie listę. Drugi przycisk
-„synchronizuj teraz" byłby drugim żądaniem o to samo i drugą drogą w limit 429,
-więc ekran dyskusji pokazuje stan wspólnego przebiegu i odsyła po odświeżenie
-do reklamacji.
-
-Jedna skrzynka nadawcza i jeden klucz idempotencji. Jedne trasy załączników —
-klucz jest tym samym wierszem tej samej tabeli, a bramka roli identyczna.
-
-Jeden czat, ten sam komponent. Czyta on ze sprawy TRZY pola i tyle bierze;
-gdyby brał całą reklamację, dyskusja musiałaby mu podać dwadzieścia pól
-z `null`, z których żadne nie jest o niej prawdą.
-
-Jedna rzecz jest ROZŁĄCZNA i to celowo: nazwy zdarzeń w dzienniku.
-`dyskusja_prowadzi`, `dyskusja_notatka`, `dyskusja_odpowiedz`
-i `dyskusja_zakonczenie` mówią, z którego ekranu padło kliknięcie. `events`
-nie ma retencji i czyta się je po latach.
-
-### 25c.10. Czego panel nie wie
-
-**Co `END_REQUEST` robi naprawdę.** Sonda nigdy tej operacji nie wykonała.
-Z nazwy wynika prośba, ze statusu `DISPUTE_CLOSED` — możliwy skutek natychmiastowy.
-Znacznik `[WERYFIKUJ]` stoi przy tym w `docs/allegro-ksztalt.md` i schodzi
-dopiero po pierwszym udanym zakończeniu na żywym koncie.
-
-**Czy rozmowa mieści się w stu wiadomościach** — to samo pytanie co przy
-reklamacji i ta sama odpowiedź: nie wiemy.
+Dyskusja i reklamacja dzielą tabelę, bo Allegro ma dla nich jedną przestrzeń
+identyfikatorów. Rozróżnia je kolumna `typ`, a każde zapytanie musi ją nieść.
+Pilnuje tego `server/src/services/reklamacje-typ.test.ts`.
 
 ## 26. Decyzje do potwierdzenia
 
 Ile kont Allegro podłączymy? Ilu agentów pracuje jednocześnie? Jak długo
-przechowujemy treść rozmów? Czy obsługujemy też dyskusje? Czy wynik magazyniera
-może zawierać zdjęcia? Czy komentarze
-wymagają wzmianek? Jaki jest wymagany czas odpowiedzi? Kiedy zamykamy rozmowę
-automatycznie? Czy do pierwszego wydania wchodzi AI? Które katalogi producentów
-są dostępne? Czy istnieje firmowa baza dopasowań? Czy panel zostaje
-on-premise? Czy przewidujemy dostęp spoza sieci firmy? Czy Subiekt zostaje
-jedynym ERP?
-
-Pytanie „kto zatwierdza nowe zastosowania części" zeszło z tej listy w E2:
-każdy z biura, także autor propozycji (§5, §12).
-
-Pytanie „czy obsługujemy też dyskusje" zeszło z niej dwa razy i za każdym
-razem inaczej. W 0.222.0: NIE — panel prowadzi wyłącznie reklamacje.
-9 września 2026: **TAK**, dyskusje dostają własną zakładkę (§25c). Pierwsza
-odpowiedź stoi tu dalej, bo tłumaczy kod trzech wydań.
+przechowujemy treść rozmów? Jaki jest wymagany czas odpowiedzi? Kiedy zamykamy
+rozmowę automatycznie? Czy panel zostaje on-premise? Czy przewidujemy dostęp
+spoza sieci firmy? Czy Subiekt zostaje jedynym ERP?
 
 ## 26b. Klawiatura w skrzynce (0.383.0)
 
@@ -6778,9 +5259,6 @@ Bramka zapala się tylko tam, gdzie OBOK wyboru formy drukuje się liczba: bez
 liczebnika polski ma dwie formy i dwie wystarczą. Dlatego „ogląda"/„oglądają"
 w `skrzynka/Obecni.tsx` zostaje — czasownik ma dwie formy, nie trzy.
 
-Jedyna poprawna kopia reguły mieszkała jako prywatna funkcja w
-`ekrany/Wiedza.tsx`. Nikt jej nie znalazł przy pozostałych ośmiu miejscach
-— reguła języka schowana w ekranie nie jest regułą, jest kopią.
 
 `dniSlowo` przyjechało przy okazji z trzech kolejek, gdzie stało przepisane
 znak w znak. „Dni" brzmi tak samo w obu formach mnogich, więc tamte kopie były
@@ -6815,7 +5293,6 @@ Każda zmiana niżej ma powód w komentarzu obok kodu.
      i skaziło pomiar klasyfikatora;
    - **wskazanie zamówienia** — serwer nie ma trasy odwiązania, a dopisanie
      jej to osobna decyzja;
-   - **wybór w doborze** — ma już widoczne „Zdejmij wybór".
 5. **Znaczek klawisza tylko wtedy, gdy klawisz działa.** E, R i Z milczą
    w polu tekstowym, więc ich znaczki znikają, gdy fokus wchodzi w pole.
    Wspólny strażnik stoi w `nawigacja/fokus.ts`.
@@ -6899,32 +5376,12 @@ dobre — każda rzecz jest najwyżej jedno kliknięcie dalej.
    przeglądanie, więc stoją w liście „Więcej" z liczbą. Klawisze 1–5 działają
    jak dotąd. Czas czekania to sama barwna liczba, bez słupków.
 7. **Prawa kolumna bez dubli.** Przy zwrocie i sprawie „Oferta i towar" startuje
-   zwinięta. Wiersz „Dobór" nie staje, gdy dobór jest zbędny. Bramka doboru
-   mieszka w wierszu towaru. Soczewka zwrotu mówi, że zgłoszenia w Allegro
+   zwinięta. Soczewka zwrotu mówi, że zgłoszenia w Allegro
    jeszcze nie ma i kiedy doręczono paczkę.
-
-**Druga runda krytyki na wdrożonym ekranie.** Zrzuty w 1900 i 1366 px
-złapały pięć rzeczy, poprawionych w tym samym wydaniu:
-
-- baner „Brak powiązania z ofertą" stał nad kolumną, która mówiła „Zamówił
-  1 ×". Milknie teraz, gdy ekran zna zamówienie albo ofertę inną drogą;
-- ten baner mówił o ekranie („Ekran mówi to wprost…"). Mówi teraz o kliencie:
-  „Nie wiadomo, o który towar pyta klient";
-- symbol kartoteki stał dwa razy w pasmie. Staje w „To jest" tylko wtedy,
-  gdy różni się od sygnatury zamówienia — wtedy to sygnał, nie powtórzenie;
-- plakietka kategorii łamała nagłówek na dwa rzędy przy 1366 px. Zeszła do
-  „⋯", bo kategorię niesie już kafel wiersza i nagłówek soczewki;
-- lista „Więcej" spadała pod kubełki i dokładała rząd. Wypełnia teraz resztę
-  rzędu kubełków.
-
-**Odwrócona decyzja.** Słupki czasu czekania weszły 23 września 2026.
-Zdjęła je przyjęta propozycja: barwa i liczba mówią to samo w jednym znaku.
-Kafel kategorii na początku wiersza zostaje, bo tylko on niesie częste
-kategorie.
 
 ## 26e. Uproszczenie całego panelu (0.527.0)
 
-Po §26d ta sama reguła objęła resztę panelu. Właściciel poprosił krótko: „uprość UI”. Zasada się nie zmieniła: nic nowego, tylko zdjąć, scalić, zwinąć albo użyć wspólnego elementu. Każda rzecz została najwyżej jedno kliknięcie dalej. Zmiany weszły siedemnastoma osobnymi PR-ami (#610–#626) i dwoma poprawkami po nich (#627, #628).
+Po §26d ta sama reguła objęła resztę panelu. Właściciel poprosił krótko: „uprość UI”. Zasada się nie zmieniła: nic nowego, tylko zdjąć, scalić, zwinąć albo użyć wspólnego elementu. Każda rzecz została najwyżej jedno kliknięcie dalej.
 
 **Wspólne wzorce, które powstały albo się rozeszły:**
 
@@ -6938,12 +5395,11 @@ Po §26d ta sama reguła objęła resztę panelu. Właściciel poprosił krótko
 
 **Co zeszło z ekranu, ekran po ekranie:**
 
-- **Skrzynka.** Jeden „?” w kolejce zamiast dwóch; zamyka się Escape'em i kliknięciem obok. Kategoria i jej źródło w soczewce, poprawka w podpowiedzi. Metadane szkicu Copilota i doboru w podpowiedziach. Linia oferty przy wiadomości tylko wtedy, gdy różni się od rozmowy.
+- **Skrzynka.** Jeden „?” w kolejce zamiast dwóch; zamyka się Escape'em i kliknięciem obok. Kategoria i jej źródło w soczewce, poprawka w podpowiedzi. Metadane szkicu Copilota w podpowiedziach. Linia oferty przy wiadomości tylko wtedy, gdy różni się od rozmowy.
 - **Zwroty.** Kwota raz, w „Pieniądzach”. „Przyjmij” drugorzędny, gdy działa „Wszystko OK”. Lista outletu zwinięta do jednej linii z licznikiem.
-- **Reklamacje i dyskusje.** Dyskusje dostały jeden wiersz nagłówka: prowadzący, „Odśwież z Allegro” i zakończenie. „Sprawa” i „Stan” zwinięte, domyślny status Allegro znika. Cyfry kubełków reklamacji liczą się z listy, więc 4 otwiera „Bez ruchu”.
+- **Reklamacje.** „Sprawa” i „Stan” zwinięte, domyślny status Allegro znika. Cyfry kubełków reklamacji liczą się z listy, więc 4 otwiera „Bez ruchu”.
 - **Do zrobienia i Zadania.** Bez tytułu powtarzającego zakładkę; trzy sekcje w jednym kształcie nagłówka. „Pokaż odhaczone” to mały przycisk w nagłówku sekcji.
 - **Analiza.** Karty obsługi w `KartaWgladu`, szczegóły pod „Szczegóły”, okno podane raz w nagłówku. Ergonomia pokazuje otwartą tylko pierwszą sekcję.
-- **Wiedza.** Lista pracy na wierzchu, narzędzia importu pod „Importy i zbiórki”. W nagłówku jedna suma. Jeden styl przycisków „Zatwierdź” i „Odrzuć”.
 - **Stan, Ustawienia, Dziennik, szuflada towaru.** Rzadkie karty zwinięte; `?karta=` dalej je otwiera. Każdy fakt w jednym miejscu. Konta mają menu „⋯” w wierszu, a kod QR stoi za „Pokaż kod”. Rzadkie filtry dziennika stoją pod „Więcej filtrów”. Puste listy szuflady nie stoją wcale.
 - **Powłoka.** Bez napisu „Biuro” przy logo. Jeden licznik w nawigacji. Pasek „Nowe w panelu” w jednej linii z „+N”.
 
@@ -6952,151 +5408,19 @@ Po §26d ta sama reguła objęła resztę panelu. Właściciel poprosił krótko
 - zdanie o czasie synchronizacji w kolejce (0.193.0);
 - kafle i pasek pytania kubełka w zwrotach (0.214.0, 0.454.0);
 - zdanie „Klientowi trzeba powiedzieć osobno” (0.210.0) i zdanie o prywatności w zwrocie;
-- rozwinięta lista automatu wiedzy (0.331.0);
 - tarcie „Wyślij bez zmian” (§26c.3);
-- wiersze Klient i Wiedza w Skrzynce, tylko skrócone (0.216.0).
+- wiersz Klient w Skrzynce, tylko skrócony.
 
-**Odwrócone 26 września 2026 decyzją właściciela (0.531.0).** Puste wiersze Klient i Wiedza znikają, bo przy większości rozmów mówiły tylko „nic tu nie ma”. Wiersz z treścią zostaje zwinięty jak dotąd. Pierwszy kontakt ze znanym loginem mówi jedna linijka „Nowy klient” pod pasmem. Od 0.558.0 tę linijkę zastępuje plakietka w karcie zakupu (§10.2g).
+## 26f. Pętla pracy w skrzynce
 
-**Jedna zmiana do potwierdzenia.** Ściąga skrótów w kolejce Skrzynki otwiera się teraz kliknięciem, nie najechaniem. Najechanie przyszło w 0.402.0 po uwadze właściciela. Pełna lista skrótów dalej stoi pod klawiszem `?`.
+Dwie decyzje właściciela o pracy seryjnej w Skrzynce:
 
-## 26f. Pętla pracy w skrzynce (0.533.0)
+- **Domyślny kubełek „Do odpowiedzi”.** To nasz ruch bez cudzych rozmów: niczyje i moje razem. „Wszystkie” stoi pod „Więcej”, bo pokazywało zakończone rozmowy na górze.
+- **Odłóż do terminu.** Trasa `POST /api/conversations/:id/odloz` przyjmuje `doKiedy`, a `null` zdejmuje odłożenie. Termin jest zawsze, najwyżej trzydzieści dni. Rozmowa wraca sama o 8:00 w dzień roboczy, a nowa wiadomość klienta budzi ją wcześniej.
 
-Właściciel poprosił o poprawę przepływu pracy agenta w Skrzynce. §26d i §26e zdejmowały z ekranu nadmiar. Tu chodziło o co innego: o kroki, czekanie i przeskoki między rozmowami przy pracy seryjnej. Przegląd kodu i przejście na żywym serwerze znalazły błędy na styku klocków i dziury w pętli.
+Odłożenie nie jest powrotem ręcznych statusów, bo zawsze ma datę. Rozmowa bez możliwego ruchu stała najwyżej w kolejce i agent przeskakiwał ją przy każdym wejściu.
 
-**Błędy, które psuły pracę seryjną:**
-
-- Wysyłka poprzedniej rozmowy gasiła przycisk bieżącej. Obie drogi niosła jedna mutacja, więc po dziesięciu sekundach przycisk pisał „Wysyłam…”, a Ctrl+Enter ginął.
-- Klawisz E nadpisywał poprawiony szkic, który już stał w polu. Karta nie pokazywała wtedy „Wstaw”, a klawisz działał dalej.
-- Niezapisana odpowiedź ginęła przy j/k. Notatka nie była czyszczona i zapisywała się przy następnej rozmowie. Tekst trzyma teraz pamięć karty przy rozmowie, jak w reklamacjach od 0.423.0.
-- „Poproś o przekazanie” pisało do pola odpowiedzi do klienta. Pisze do notatki, a edytor przełącza się na nią.
-- Ściąga obiecywała, że Z otwiera zakończoną rozmowę. Nie otwiera; otwiera przycisk.
-
-**Pętla od listy do wysyłki:**
-
-- Enter z tła strony albo z wiersza kolejki stawia kursor w polu odpowiedzi. Autofokusu dalej nie ma, bo zabiłby j/k.
-- Ctrl+Enter wysyła także spoza pola. Przez pierwszą sekundę po otwarciu rozmowy milczy, żeby podwójne naciśnięcie nie wysłało następnej.
-- Po przejściu dalej fokus schodzi na tło. Następna rozmowa wczytuje się, zanim agent do niej przejdzie.
-- Szkic zamówiony przyciskiem „Ułóż odpowiedź” wchodzi do pustego pola. Reguła 0.500.0 dotyczy szkiców z tła i zostaje.
-- Dopisek klienta i kolega przy rozmowie zatrzymują wysyłkę przy kliknięciu, nie dziesięć sekund później.
-- Drugie Z zatwierdza zakończenie bez odpowiedzi, a Escape je anuluje.
-- Paski „Cofnij” i odliczanie wysyłki stoją w jednym stosie nad dołem kolejki. Stały na środku dołu i zasłaniały przycisk wysyłki następnej rozmowy.
-
-**Dwie decyzje właściciela z 26 września 2026:**
-
-- **Domyślny kubełek „Do odpowiedzi”.** To nasz ruch bez cudzych rozmów: niczyje i moje razem. „Wszystkie” zeszło pod „Więcej”, bo pokazywało zakończone rozmowy na górze.
-- **Odłóż do terminu wraca.** Trasa `POST /api/conversations/:id/odloz` przyjmuje `doKiedy`, a `null` zdejmuje odłożenie. Termin jest zawsze, najwyżej trzydzieści dni. Rozmowa wraca sama o 8:00 w dzień roboczy, a nowa wiadomość klienta budzi ją wcześniej. Menu „⋯” ma trzy gotowe terminy i kalendarz. Klawisz O odkłada do następnego dnia roboczego. Po odłożeniu stoi pasek „Cofnij”, jak po Zakończ.
-
-Odłożenie nie jest powrotem ręcznych statusów z 22 września. Tamto było pozycją menu bez daty. Powód zmiany jest mierzalny: rozmowa bez możliwego ruchu stała najwyżej w kolejce, bo była najstarsza. Agent przeskakiwał ją przy każdym wejściu.
-
-**Pomiary pod decyzje.** Ekran zgłasza pominięcie przy wyjściu z rozmowy bez ruchu, nigdy przy otwarciu. „Cofnij” niesie czas od odłożenia wysyłki. Oba liczby czyta karta „Pomiary pod decyzje” w Analizie.
-
-**Strażnik.** `ekrany/Skrzynka.test.tsx` jest pierwszym testem całego ekranu Skrzynki. Pilnuje zera zapisu przy otwarciu i każdego błędu z listy wyżej.
-
-## 26g. Nagłówek w jednym rzędzie (0.538.0)
-
-Właściciel zgłosił, że górny pasek nie powinien zajmować dwóch rzędów. Z trzech wariantów na makietach wybrał B: jeden rząd i jedno menu „Więcej”. Decyzja z 27 września 2026 zmienia kształt z 0.431.0 opisany w `obsluga-klienta.md` §7.
-
-**Co gdzie stoi:**
-
-- Z lewej logo, dalej lupa szukania (Ctrl K bez zmian) i osiem zakładek pracy. Dostawy stoją ostatnie, za kreską.
-- Z prawej kropka synchronizacji z godziną. Pełne zdanie z liczbą błędów jest w dymku i w menu przy stanie systemu.
-- Menu „Więcej” niesie Stan systemu, Dziennik i Analizę, a pod kreską Ustawienia i Wyloguj. Zamyka je Esc, klik obok i przejście na ekran.
-- Przycisk menu świeci bursztynem, gdy bieżący ekran leży w menu. Bez tego agent w dzienniku nie widziałby żadnej zaznaczonej zakładki.
-
-**Pomiar.** Przy 1180 px nagłówek ma 65 px zamiast 117 px, czyli ekran pracy zyskuje 52 px. Zakładki mają węższe wypełnienie, a rząd z licznikami zostawia 55 px luzu. Alarm mieści się bez kropki, bo czerwone słowo mówi to samo. Poniżej 1180 px `flex-wrap` przenosi menu do drugiego rzędu, zamiast chować je poza kadrem.
-
-**Strażnik.** `nawigacja/Wiecej.test.tsx` pilnuje zawartości menu, zamykania, zera zapisu przy otwarciu i słowa „Stanęła” w alarmie. Pilnuje też, że drugi rząd nie wrócił.
-
-## 26h. Stan systemu jako tablica (0.538.0)
-
-Właściciel pokazał nagraniem przewijanie przez stan systemu i poprosił o poprawę. Dziesięć kart stało jedna pod drugą, a zdrowe zajmowały tyle miejsca co te, które czegoś chcą. Z trzech makiet wybrał A: tablicę z problemami na górze.
-
-**Co gdzie stoi:**
-
-- Na górze rząd kafelków, po jednym na obszar. Kafelek niesie barwę i jedno zdanie, na przykład „2 do decyzji” albo „działa · 11:36”.
-- Czerwień znaczy, że coś nie działa. Bursztyn znaczy, że obszar czeka na biuro. Zieleń to „działa”, szarość to „na żądanie”.
-- Pod kafelkami stoją wyłącznie karty obszarów czerwonych i bursztynowych. Klik w kafelek otwiera albo zamyka kartę każdego obszaru.
-- Karta raz pokazana zostaje, aż człowiek zamknie ją kafelkiem. Sparowanie Allegro nie zabiera karty spod kursora.
-- Adres `?karta=` otwiera kartę obszaru, więc wiersze „Do zrobienia” trafiają tam, gdzie wcześniej.
-- Kolejka zapisów chowa wiersze „zapisane” pod przyciskiem. Kody kreskowe mają przyciski decyzji w wierszu, nie pod kreską.
-
-Kafelek czyta to samo zapytanie co jego karta, więc tablica nie dokłada żadnego żądania. Rekoncyliacja dalej liczy się tylko na żądanie.
-
-**Blizna z przejścia na żywym serwerze.** Pierwsza wersja wkładała karty problemów z efektu, jeden render po ich danych. Skok do `?karta=` zdążał wtedy przed kartą nad celem i lądował za wysoko. Karta problemu wchodzi teraz w tym samym renderze co jej dane.
-
-**Strażnik.** `ekrany/Stan.test.tsx` pilnuje, że na wejściu otwarte są wyłącznie karty do uwagi. Pilnuje też kafelków, przycisku zapisanych i zera zapisu przy otwarciu każdej karty.
-
-## 26i. Dziennik po polsku (0.540.0)
-
-Właściciel poprosił o poprawę kolejnego ekranu z menu „Więcej”. Z trzech makiet wybrał C: tę samą tabelę, tylko po polsku. Tabela została, bo w śladzie audytowym szuka się konkretu po kolumnach: kto, kiedy, który towar.
-
-**Co się zmieniło:**
-
-- Kolumna „Zdarzenie” niesie polską nazwę, na przykład „Zapis do Subiekta nie wszedł”. Klucz serwera stoi w dymku, w CSV i w wartości filtra.
-- Kolumna „Co się stało” zastępuje schowany JSON jednym zdaniem z danych wpisu, na przykład „3 próby · „Kartoteka w edycji””. Surowe dane są w dymku komórki.
-- Osoba i urządzenie stoją w jednej kolumnie „Kto, czym”.
-- Okres wybiera się jednym polem: najnowsze, dziś, wczoraj, ostatnie 7 dni albo własny zakres.
-- Pomiary techniczne, czyli czas skanu i przeliczenia, są domyślnie schowane. Chowa je serwer parametrem `bez`, więc licznik „pokazano N z M” liczy to, co widać.
-
-Nazwy leżą w `dziennik/nazwy.ts` dla wszystkich 287 typów z rejestru serwera. Opisy leżą w `dziennik/opis.ts`: własne zdania dla kolektora, dostaw, zapisów i błędów, a pary z danych dla reszty.
-
-**Strażnik.** `dziennik/nazwy.test.ts` czyta rejestr `services/zdarzenia-rejestr.ts`. Typ dopisany do rejestru bez polskiej nazwy to czerwony test.
-
-## 26j. Analiza krótsza (0.542.0)
-
-Właściciel poprosił o poprawę następnego ekranu z menu „Więcej”. Z trzech makiet wybrał C: ten sam układ, mniej miejsca. Analiza była najdłuższym ekranem panelu. Przy 1180 px zakres „Obsługa klienta” miał 3295 px, a „Użycie” 10 709 px.
-
-**Co się zmieniło:**
-
-- Karta bez danych w oknie jest jedną linią: tytuł i zdanie, dlaczego jest pusta. Mechanizm stoi we wspólnej ramie `KartaWgladu` jako `pusta`.
-- Tabele „według kategorii” i „według osoby” weszły do kart liczb, które rozbijają, jako przełącznik `Przekroje`. Rozbicie na osoby dalej przychodzi tylko administratorowi.
-- „Tarcie według osoby” stoi w karcie „Tarcie w skrzynce”.
-- Zakres „Użycie” to jedna tabela obszarów z liczbami i paskiem. Klik otwiera czynności obszaru po polsku, ze słownika dziennika, z kluczem w dymku.
-
-**Pomiar.** Na zasianym serwerze przy 1180 px „Obsługa klienta” ma 1067 px zamiast 3295 px, a „Użycie” 983 px zamiast 10 709 px. „Praca hali” i „Dostawy” mają dane w każdej karcie, więc zostały bez zmian.
-
-**Strażnik.** `ui/wglad.test.tsx` pilnuje karty pustej i przekrojów. Test zakresu „Użycie” w `ekrany/Analiza.test.tsx` pilnuje polskich nazw i zwiniętych obszarów.
-
-## 26k. Ustawienia wierszami (0.543.0)
-
-Właściciel poprosił o poprawę następnego ekranu z menu „Więcej”. Z trzech makiet wybrał B: wiersze jak w ustawieniach telefonu.
-
-**Problem.** Decyzje właściciela stały w tabeli z kluczem pliku na czele, np. `ZWROT_TERMIN_DNI`. Przy wartości domyślnej komórka miała kreskę. Termin zwrotu, sufit szkiców czy model Copilota znał tylko `config.ts`.
-
-**Co się zmieniło:**
-
-- Wiersz ma nazwę po polsku i jedno zdanie opisu z lewej. Z prawej stoi wartość, która obowiązuje, słowem: „7 dni”, „wyłączony”, data.
-- Pod wartością jest jej źródło: domyślna, z pliku albo przykryta przez usługę. Klucz z pliku został w dymku nazwy.
-- Cały wiersz otwiera edycję, a pole startuje od obowiązującej wartości. Wiersz zmieniany tylko w pliku nie udaje przycisku i mówi „w pliku”.
-- Nad grupami zniknęła karta z jednym słowem „Ustawienia”. Tytuł stoi nad listą grup.
-
-**Wartość obowiązująca bez drugiej kopii domyślnych.** Rejestr kluczy celowo nie ma domyślnych. `konfiguracja-obowiazuje.ts` czyta każdą wartość z gotowego obiektu `config`. To ta sama liczba, na której pracuje serwer, także wyliczona, jak model rozpoznawania po modelu szkiców. Zła ścieżka łapie się przy kompilacji. Sekrety i klucze workerów C# wartości nie dostają.
-
-**Nazwy i słowa są w rejestrze.** Pola `nazwa`, `jednostka` i `wartosci` stoją przy kluczu, bo rodzaj gramatyczny idzie za nazwą. Szkic jest „wyłączony”, a rozpoznanie „wyłączone”.
-
-**Pomiar.** Na zasianym serwerze przy 1180 px grupa „Obsługa klienta” ma 2117 px, a tabela miała 1879 px. Wiersz z opisem pod nazwą jest wyższy od wiersza tabeli. Zapłaciliśmy wysokością za wartość, którą widać bez otwierania pliku.
-
-**Strażnik.** `konfiguracja-obowiazuje.test.ts` wymaga wartości przy każdej jawnej decyzji właściciela czytanej przez serwer. Test rejestru wymaga nazwy przy każdej decyzji właściciela i słowa dla każdej opcji wyboru. `ustawienia/Konfiguracja.test.ts` pilnuje wartości słowem.
-
-## 26l. Do zrobienia: pytanie raz (0.545.0)
-
-Właściciel poprosił o poprawę następnego ekranu. Menu „Więcej” było już przerobione, więc przyszła kolej na pierwszą zakładkę. Z trzech makiet wybrał B.
-
-**Problem.** Dwie puste sekcje, „Wspomniano o mnie · 0” i „Moje sprawy · 0”, stały kartami nad decyzjami i zabierały 170 px. Każdy wiersz decyzji powtarzał pytanie i nazwę źródła obok ikony, która mówiła to samo. Na zasianym serwerze sześć wierszy niosło trzy pytania.
-
-**Co się zmieniło:**
-
-- Pusta sekcja schodzi do jednej linijki nad decyzjami. Pełna wraca w swoim kształcie. Sekcja wczytywana albo z błędem zostaje pełna, bo błąd ma być widać.
-- Odhaczone wzmianki dalej są o jedno kliknięcie: linijka ma „pokaż odhaczone (N)”.
-- Decyzje stoją grupami. Nagłówek grupy niesie pytanie, źródło i liczbę spraw, a wiersz tylko sprawę i jej wiek.
-- Nazwa odnośnika w wierszu niesie też pytanie, bo czytnik ekranu nie czyta nagłówka grupy razem z wierszem.
-
-**Kolejność dalej jest serwera.** Panel niczego nie sortuje. Grupa staje tam, gdzie serwer postawił jej pierwszą sprawę, a w grupie zostaje kolejność serwera. Ceną jest to, że młodsza sprawa znanego pytania staje nad starszą sprawą innego. Biuro i tak rozstrzyga pytanie naraz dla całej grupy.
-
-**Pomiar.** Na zasianym serwerze przy 1180 px lista decyzji zaczyna się na 166 px zamiast około 305 px. Kończy się na 553 px zamiast około 760 px.
-
-**Strażnik.** `ekrany/DoDecyzji.test.tsx` pilnuje grup w kolejności serwera, linijki pustych sekcji i historii wzmianek o jedno kliknięcie.
+Pilnuje tego `ekrany/Skrzynka.test.tsx`, pierwszy test całego ekranu Skrzynki.
 
 ## 27. Zasady nadrzędne
 
@@ -7105,9 +5429,9 @@ MIĘDZY czterema kolejkami stoją osobno, w dekalogu
 `docs/obsluga-klienta-calosc.md`, razem z mapą możliwości i spoiwem.
 
 1. Najpierw dane i dowody, potem automatyzacja.
-2. *(Usunięta 22 września 2026 decyzją właściciela — patrz niżej.)*
+2. *(Usunięta decyzją właściciela — patrz niżej.)*
 3. Automat nie jest źródłem kompatybilności.
-4. Rozmowa, dobór, zadanie i dowód są osobnymi bytami.
+4. Rozmowa, zadanie i dowód są osobnymi bytami.
 5. Każda mutacja ma autora.
 6. Praca kilku agentów musi być bezpieczna.
 7. Wynik terenowy wraca do źródłowej rozmowy.
@@ -7119,24 +5443,9 @@ MIĘDZY czterema kolejkami stoją osobno, w dekalogu
     nie ma z czego policzyć.
 12. Nieodwracalne pyta, odwracalne się cofa.
 
-**Przegląd z 0.426.1.** Do tego wydania rozdział mówił o sobie „zostaje bez
-zmian" i dlatego zestarzał się bez sprzeciwu. Punkt 4 wymieniał jeszcze
-sprawę, choć nakładka spraw odeszła w 0.388.0 (`obsluga-klienta.md`, pytanie 1).
-
-Punkt 9 skleja dawne punkty 10 i 11 z punktem 10 dekalogu: trzy zapisy jednej
-myśli. Punkty 11 i 12 przyszły z dekalogu (dawne 7 i 9), bo mówią o jednej
-rozmowie albo o ekranie, nie o przejściu między kolejkami.
-
-Odszedł punkt „magazynier pracuje w aplikacji kolektora". To granica frontów,
-a pilnuje jej zasada „Dwa fronty" w `CLAUDE.md`.
-
-**Punkt 2 odszedł 22 września 2026.** Brzmiał „Człowiek wysyła odpowiedź do
-klienta". Właściciel go usunął po specyfikacji z 20 września, która
-przewiduje wysyłkę bez człowieka dla klas z dowodami. Numer zostaje pusty,
-a reszta się nie przesuwa: kod i dekalog cytują punkty 9, 11 i 12 po numerze.
-
-Usunięcie zasady nie było funkcją. Funkcją jest przepływ kategorii na żywo
-(§14.6f): dziś tylko stan zamówienia i tylko po włączeniu w `wertis.env`.
+Punkt 2 brzmiał „Człowiek wysyła odpowiedź do klienta". Właściciel go usunął,
+bo przepływ kategorii na żywo (§14.6f) wysyła bez człowieka. Numer zostaje
+pusty, a reszta się nie przesuwa: kod i dekalog cytują punkty po numerze.
 
 ## 28. Stan faktyczny — co już działa
 
@@ -7145,205 +5454,176 @@ stoi. W tym repo zdarzyło się to już dwa razy.
 
 | Obszar | Stan | Gdzie |
 |---|---|---|
-| Konto kanału, rozmowa, wiadomość | **działa** od 0.144.0 | `channel_account`, `conversation`, `message` |
-| Synchronizacja skrzynki Allegro | **działa** od 0.142.1 | `services/allegro-inbox-sync.ts` |
+| Konto kanału, rozmowa, wiadomość | **działa** | `channel_account`, `conversation`, `message` |
+| Synchronizacja skrzynki Allegro | **działa** | `services/allegro-inbox-sync.ts` |
 | Surowe lądowisko odpowiedzi kanału | **działa** | `allegro_inbox_thread`, `allegro_inbox_message` |
-| Lista rozmów i oś czasu | **działa** od 0.143.0 | `services/skrzynka.ts`, `panel/src/skrzynka/` |
-| Przejęcie rozmowy, właściciel | **działa** od 0.144.0 | `przejmijRozmowe`, `conversation.version` |
-| Współdzielony szkic z wersją | **działa** od 0.144.0 | `conversation_draft` |
-| Komentarze i wzmianki | **działa** od 0.157.0 | oś rozmowy, tryb w `Edytor.tsx`, wzmianki z `/api/users`; od 0.157.0 do 0.181.0 panel wołał zły adres i dostawał 404 |
-| Skrzynka wzmianek („wspomniano o mnie") | **działa** od 0.160.0 | `services/wzmianki.ts`, `panel/src/ekrany/Wzmianki.tsx` |
-| Oś rozmowy w kolejności czasu | **działa** od 0.157.0 | do 0.156.0 wyniki zadań doklejały się na końcu |
-| Obecność i „pisze" | **na ekranie** od 0.190.0 | serwer od 0.144.0; kolejka pokazuje trzymającego, pasek w rozmowie — resztę i piszących (`skrzynka/Obecni.tsx`, `usePisze`) |
-| Jawna zgoda „odpowiedz mimo to" przy cudzym uchwycie | **działa** od 0.224.1 | flaga `mimoObecnosci` w ciele wysyłki; do 0.224.0 trasa jej nie deklarowała i gubiła, więc miękka blokada działała jak twarda |
-| Szyna zdarzeń do panelu | **działa** od 0.144.0 | `GET /api/conversations/events` |
-| Zadania terenowe i kolektor | **działa** od 0.141.0 | `zadanie_terenowe`, `FieldTasksScreen.kt` |
-| Droga powrotna z hali (§13.3) | **działa** od 0.352.0 | status `odeslane`, kody `brak_towaru`/`nie_da_sie`, `oddaj` i `ponow`; do 0.351.0 hala mogła odpowiedzieć wyłącznie wynikiem |
-| Odesłanie na osi rozmowy | **działa** od 0.352.0 | `field_task_returned`, wpis `odeslanie_zadania`, zdejmuje `waiting_for_internal` |
-| Wiek zlecenia na karcie i na kolektorze | **działa** od 0.352.0 | `zleconeOdMs` liczone na serwerze, `wiek()` w `panel/src/ui`; od 0.364.0 „za długo" ma próg, ale liczony z historii kanału, nie wpisany ręką |
-| Zdjęcie przy zadaniu (§13.3) | **działa** od 0.352.0 | `zadanie_zalacznik`, `services/foto.ts`, `useZdjecieZadania` — piąte źródło obrazów w panelu |
-| Czas realizacji zadania magazynowego (§22) | **działa** od 0.361.0 | `services/wymiana.ts`, `GET /api/biuro/wymiana`, tabela w karcie STAN SYSTEMU; mediana i p90, każda ze swoim `n` |
-| Alarm „to stoi za długo" | **działa** od 0.364.0 | `alarmyWymiany()`, `GET /api/biuro/alarm-wymiany`, plakietka w pasku stanu; próg to `p90` spraw domkniętych w TYM kanale, osobno dla każdego z osobna |
-| Notatka do dostawy w mierze i alarmie | **działa** od 0.369.0 | wyłączona w 0.361.0 przez uzasadnienie wzięte z `conversation_event`; `delivery_note` ma jedną odpowiedź, a brak odpowiedzi wstrzymuje domknięcie dostawy |
-| Wynik z hali na osi rozmowy | **działa** od 0.144.0 | `conversation_event`, `field_task_result` |
-| Wyszukiwarka towaru w panelu | **działa** od 0.145.0 | `panel/src/wyszukiwarka.tsx` |
-| Kartoteka wywiedziona z oferty | **działa** od 0.152.0 | `services/dopasowanie-sku.ts`, `offer.external.id` |
-| Powód braku kartoteki i licznik | **działa** od 0.154.0 | `Dopasowanie.powod`, `bilansKartotek` |
-| Pamięć wskazań oferta–kartoteka | **działa** od 0.154.0 | `oferta_kartoteka`, wzorzec `ean_alias`; od 0.219.0 ważna tylko przy tej samej sygnaturze (`pamiecAktualna`) |
+| Lista rozmów i oś czasu | **działa** | `services/skrzynka.ts`, `panel/src/skrzynka/` |
+| Przejęcie rozmowy, właściciel | **działa** | `przejmijRozmowe`, `conversation.version` |
+| Współdzielony szkic z wersją | **działa** | `conversation_draft` |
+| Komentarze i wzmianki | **działa** | oś rozmowy, tryb w `Edytor.tsx`, wzmianki z `/api/users`; od 0.157.0 do 0.181.0 panel wołał zły adres i dostawał 404 |
+| Skrzynka wzmianek („wspomniano o mnie") | **działa** | `services/wzmianki.ts`, `panel/src/ekrany/Wzmianki.tsx` |
+| Oś rozmowy w kolejności czasu | **działa** | do 0.156.0 wyniki zadań doklejały się na końcu |
+| Obecność i „pisze" | **na ekranie** | serwer od 0.144.0; kolejka pokazuje trzymającego, pasek w rozmowie — resztę i piszących (`skrzynka/Obecni.tsx`, `usePisze`) |
+| Jawna zgoda „odpowiedz mimo to" przy cudzym uchwycie | **działa** | flaga `mimoObecnosci` w ciele wysyłki; do 0.224.0 trasa jej nie deklarowała i gubiła, więc miękka blokada działała jak twarda |
+| Szyna zdarzeń do panelu | **działa** | `GET /api/conversations/events` |
+| Zadania terenowe i kolektor | **działa** | `zadanie_terenowe`, `FieldTasksScreen.kt` |
+| Droga powrotna z hali (§13.3) | **działa** | status `odeslane`, kody `brak_towaru`/`nie_da_sie`, `oddaj` i `ponow`; do 0.351.0 hala mogła odpowiedzieć wyłącznie wynikiem |
+| Odesłanie na osi rozmowy | **działa** | `field_task_returned`, wpis `odeslanie_zadania`, zdejmuje `waiting_for_internal` |
+| Wiek zlecenia na karcie i na kolektorze | **działa** | `zleconeOdMs` liczone na serwerze, `wiek()` w `panel/src/ui`; od 0.364.0 „za długo" ma próg, ale liczony z historii kanału, nie wpisany ręką |
+| Zdjęcie przy zadaniu (§13.3) | **działa** | `zadanie_zalacznik`, `services/foto.ts`, `useZdjecieZadania` — piąte źródło obrazów w panelu |
+| Czas realizacji zadania magazynowego (§22) | **działa** | `services/wymiana.ts`, `GET /api/biuro/wymiana`, tabela w karcie STAN SYSTEMU; mediana i p90, każda ze swoim `n` |
+| Alarm „to stoi za długo" | **działa** | `alarmyWymiany()`, `GET /api/biuro/alarm-wymiany`, plakietka w pasku stanu; próg to `p90` spraw domkniętych w TYM kanale, osobno dla każdego z osobna |
+| Notatka do dostawy w mierze i alarmie | **działa** | wyłączona w 0.361.0 przez uzasadnienie wzięte z `conversation_event`; `delivery_note` ma jedną odpowiedź, a brak odpowiedzi wstrzymuje domknięcie dostawy |
+| Wynik z hali na osi rozmowy | **działa** | `conversation_event`, `field_task_result` |
+| Wyszukiwarka towaru w panelu | **działa** | `panel/src/wyszukiwarka.tsx` |
+| Kartoteka wywiedziona z oferty | **działa** | `services/dopasowanie-sku.ts`, `offer.external.id` |
+| Powód braku kartoteki i licznik | **działa** | `Dopasowanie.powod`, `bilansKartotek` |
+| Pamięć wskazań oferta–kartoteka | **działa** | `oferta_kartoteka`, wzorzec `ean_alias`; od 0.219.0 ważna tylko przy tej samej sygnaturze (`pamiecAktualna`) |
 | Przestrzeń identyfikatora oferty w zwrocie | **niepotwierdzona** | złączenie po obu kolumnach, `poKolumnie` |
-| Statusy rozmowy (§7) | **działa** od 0.158.0; ręczne **usunięte** 22.09.2026 | `conversation.status`, kubełki kolejki; `ustawStatus` woła już tylko zlecenie pomiaru |
-| Uchwyt rozmowy — przydział na czas oglądania | **działa** od 0.159.0 | `conversation-realtime.ts`, w pamięci |
-| Odpowiedź przydziela rozmowę na stałe | **działa** od 0.159.0 | `services/wysylka.ts` |
-| `waiting_for_internal` z pomiaru i wyniku hali | **działa** od 0.159.0 | `zlecPomiar`, `dopiszZdarzenieWyniku` |
-| Kto ma ruch — wyliczane z ostatniej wiadomości | **działa** od 0.225.0 | `statusZKierunku`; trasy ręcznej nie ma od 22.09.2026 |
-| Podziękowanie klienta nie czeka na nas | **działa** od 22.09.2026, wymaga `COPILOT_AUTO_KLASYFIKACJA=1` | `klientPodziekowal`: `OTHER` + `NO_ACTION`, wysoka pewność, po naszej odpowiedzi |
-| Autoodpowiedź nie liczy się jako nasz ruch | **działa** od 0.227.0 | `message.auto_odpowiedz`, liczone przy zapisie w `zapiszWiadomosc` |
-| Pasek o nowej wiadomości tylko przy kliencie | **działa** od 0.228.0 | kierunek w zdarzeniu `message.created` |
-| Login kopiuje się kliknięciem | **działa** od 0.228.0 | `LoginKlienta`, `ui/kopiuj.ts` — droga zapasowa dla HTTP |
-| Wynik doboru (§7) | **usunięte** w 0.565.0 | tabela `dobor`, `services/dobor.ts`: cztery wyniki ustawiane przez człowieka, stan wyliczany |
-| Kandydaci doboru (§11.2) | **usunięte** w 0.565.0 | `services/kandydaci.ts`: trzy grupy — wskazane przez klienta, z bazy wiedzy, podobne po nazwie; numer spoza kartoteki to wiersz bez wyboru |
-| Wymiary z kartotek (§11.2) | **usunięte** w 0.552.0 | droga „zgodne wymiary" wyszła z doborem; tabelę `wymiar_kartoteki` kasuje migracja od 0.565.0 |
-| Identyfikatory z opisów (OEM, nr oryg., stare SKU, zamienniki) | **działa** od 0.186.0 | `towar_identyfikator`, `services/identyfikatory.ts`, przebudowa po imporcie w `po-imporcie.ts`; sekcje `Zamiennik:` od 0.234.0 |
-| Sekcje „Modele:" z opisów do przerobienia | **usunięte** w 0.565.0 | `model_z_opisu`, ekran Wiedza → „Z opisów"; automat nie proponuje z opisu |
-| Pełny tekst kartotek (FTS5, bm25) | **usunięte** w 0.565.0 | `towar_fts`, `services/pelnotekst.ts`; bez FTS5 szczebel pominięty z powodem |
-| Pokrycie wiedzy w ustawieniach | **usunięte** w 0.565.0 | `GET /api/obsluga/pokrycie-wiedzy`, `ustawienia/PokrycieWiedzy.tsx` |
+| Uchwyt rozmowy — przydział na czas oglądania | **działa** | `conversation-realtime.ts`, w pamięci |
+| Odpowiedź przydziela rozmowę na stałe | **działa** | `services/wysylka.ts` |
+| `waiting_for_internal` z pomiaru i wyniku hali | **działa** | `zlecPomiar`, `dopiszZdarzenieWyniku` |
+| Kto ma ruch — wyliczane z ostatniej wiadomości | **działa** | `statusZKierunku`; trasy ręcznej nie ma od 22.09.2026 |
+| Podziękowanie klienta nie czeka na nas | **działa**, wymaga `COPILOT_AUTO_KLASYFIKACJA=1` | `klientPodziekowal`: `OTHER` + `NO_ACTION`, wysoka pewność, po naszej odpowiedzi |
+| Autoodpowiedź nie liczy się jako nasz ruch | **działa** | `message.auto_odpowiedz`, liczone przy zapisie w `zapiszWiadomosc` |
+| Pasek o nowej wiadomości tylko przy kliencie | **działa** | kierunek w zdarzeniu `message.created` |
+| Login kopiuje się kliknięciem | **działa** | `LoginKlienta`, `ui/kopiuj.ts` — droga zapasowa dla HTTP |
+| Identyfikatory z opisów (OEM, nr oryg., stare SKU, zamienniki) | **działa** | `towar_identyfikator`, `services/identyfikatory.ts`, przebudowa po imporcie w `po-imporcie.ts`; sekcje `Zamiennik:` od 0.234.0 |
 | Automatyczne zamknięcie po N dniach | **projekt** | otwarta decyzja właściciela z §26 |
-| Znacznik „sprawa reklamacyjna" na rozmowie | **działa** od 0.390.0 | `conversation.reklamacyjna`, `ustawReklamacyjna`, `POST …/rozmowy/:id/reklamacyjna`, przełącznik w `skrzynka/Status.tsx`, plakietka w kolejce; NASZ znacznik — `/sale/issues` ma wyłącznie GET, więc sprawy w Allegro sprzedawca nie założy |
-| Sprawa nad rozmowami (§6.1) | **skasowana** w 0.388.0 | działała od 0.161.0; zastąpiła ją droga zakupu (0.387.0), bo odpowiada na to samo pytanie automatycznie i przez cztery kolejki |
-| Ekran sprawy z własną osią | **bezprzedmiotowe** od 0.388.0 | nakładki spraw nie ma; zdarzenia i tak wiszą przy źródle — blizna 0.130.0 |
-| Wysyłka do Allegro (§8.5) | **działa** od 0.148.0 | `services/wysylka.ts`, `outbox` |
+| Znacznik „sprawa reklamacyjna" na rozmowie | **działa** | `conversation.reklamacyjna`, `ustawReklamacyjna`, `POST …/rozmowy/:id/reklamacyjna`, przełącznik w `skrzynka/Status.tsx`, plakietka w kolejce; NASZ znacznik — `/sale/issues` ma wyłącznie GET, więc sprawy w Allegro sprzedawca nie założy |
+| Wysyłka do Allegro (§8.5) | **działa** | `services/wysylka.ts`, `outbox` |
 | Kształt POST wysyłki | **potwierdzony** w 0.151.0 | specyfikacja OpenAPI; limit 2000 znaków |
-| Mapowanie odczytu skrzynki | **poprawione** w 0.151.0 | do 0.150.0 błędne w każdym polu |
-| Kontrola świeżości i dialog 409 | **działa** od 0.148.0 | `skrzynka/DialogKonfliktu.tsx` |
-| Baza wiedzy (§12) | **usunięte** w 0.565.0 | `model_urzadzenia`, `zastosowanie`, `dowod_zastosowania`, `services/wiedza.ts` |
-| Zabudowa silnika (§12) | **usunięte** w 0.565.0 | `zabudowa_silnika`, `services/silniki.ts`, zakładka „Silniki" na ekranie Wiedza z listą luk |
-| Słownik silników (§12) | **usunięte** w 0.565.0 | `alias_silnika`, `silnikZTekstu` w `services/silniki.ts`, sekcja „Słownik silników" na ekranie Silniki, przycisk „Zaproponuj zabudowę" pod polem Silnik w Doborze |
-| Tokeny silników w nazwach kartotek (§12) | **usunięte** w 0.565.0 | `token_silnika`, `token_silnika_kartoteka`, `services/tokeny-silnikow.ts`, sekcja „Tokeny silników w nazwach kartotek" na ekranie Z opisów, hak po imporcie |
-| Pasowanie części (§12) | **usunięte** w 0.565.0 | `pasowanie_czesci`, `services/pasowania.ts`; przycisk „Pasuje do…" w Doborze, sekcja w kolejce Wiedza, blok przy kartotece w rozmowie |
-| Ekran Wiedza — kolejka propozycji | **usunięte** w 0.565.0 | `panel/src/ekrany/Wiedza.tsx`, zakładka w pasku z licznikiem |
-| Dowody i negatywy przy doborze | **usunięte** w 0.565.0 | `skrzynka/Dobor.tsx`: sekcja „Nie pasuje"; dowody i pomiary w wierszu „Wiedza" (`skrzynka/Wiedza.tsx`) |
-| Copilot — klasyfikacja wiadomości (§14.5) | **zastąpiona** 22 września 2026 | słownik ośmiu etykiet i kciuki; zastąpiła je decyzja z §14.5a |
-| Klasyfikacja w kształcie specyfikacji (§14.5a) | **działa** od 22 września 2026 | `services/copilot-klasyfikacja.ts`, `klasyfikacja-slownik.ts`, `klasyfikacja-polityka.ts`, tabela `decyzja_klasyfikacji`, `skrzynka/Copilot.tsx` (`EtykietaKategorii`) |
-| Takt klasyfikacji każdej nowej wiadomości (§14.5a) | **działa** od 22 września 2026, wyłączony domyślnie | `services/klasyfikacja-auto.ts`, `COPILOT_AUTO_KLASYFIKACJA` |
-| Rozpoznanie w faktach szkicu, intake tylko przy towarze (§14.6a) | **działa** od 22 września 2026 | `kontekstSzkicu`, `zRozpoznaniaNiepewne` w `services/copilot-szkic.ts` |
-| Szkic z taktu dla rozmów bez oferty (§14.6a) | **działa** od 22 września 2026, przy `COPILOT_AUTO_SZKIC=1` | `services/copilot-auto-szkic.ts` |
-| Szkic zaraz po rozpoznaniu (§14.6c) | **działa** od 0.477.0, domyślnie włączony (`COPILOT_SZKIC_PO_ROZPOZNANIU`) | `services/copilot-szkic-po-rozpoznaniu.ts`, `szkic_copilota.decyzja_id` |
-| Przepływ kategorii w trybie cienia (§14.6e) | **działa** od 0.569.0, propozycje i pomiar; wysyłka na żywo w §14.6f | `services/przeplyw-kategorii.ts`, tabela `propozycja_przeplywu`, karta „Automat by…" w rozmowie, pomiar za zębatką |
-| Przepływ kategorii na żywo, stan zamówienia (§14.6f) | **działa** od 0.570.0, wyłączony domyślnie (`PRZEPLYW_NA_ZYWO`) | `services/przeplyw-na-zywo.ts`, konto „Automat", `propozycja_przeplywu.wykonana_at` |
-| Los szkicu przy wysyłce i uzgodnienie `send_uncertain` (§14.6a) | **działa** od 22 września 2026 | `outbox.szkic_los`, `losSzkicu` w `wysylka.ts`, `uzgodnijNiepewna` w `allegro-inbox-sync.ts` |
-| Typ i podtyp wątku z `beta.v1` w klasyfikacji (§14.5b) | **działa** od 22 września 2026, `[WERYFIKUJ]` dostępność bety na koncie | `allegro-inbox-sync.ts` (`czytajStrukture`), kolumny `watek_*` w `allegro_inbox_thread`, `services/klasyfikacja-mapowanie.ts` |
-| Problemy z zakupem (`POST_PURCHASE_ISSUE`) w skrzynce | **działa** od 0.573.0, lista wątków w `beta.v1` z zejściem na `public.v1`; `[WERYFIKUJ]` na sandboxie | `allegro-inbox-sync.ts` (`watekZBety`, `wiadomoscZBety`, `rozmowcaWatku`), `allegro-wysylka.ts` (`wersjaWatku`), `docs/allegro-ksztalt.md` |
-| Copilot — szkic odpowiedzi z faktów (§14.6) | **działa** od 0.231.0 | `services/copilot-szkic.ts`, `szkic_copilota`, przycisk „Ułóż odpowiedź" w edytorze, karta `skrzynka/SzkicCopilota.tsx`; od 0.253.0 wiedza własna modelu wolna, ale każde twierdzenie ma źródło, a pewność przyznaje serwer |
-| Wiedza z ofert w doborze (§11.2) | **usunięte** w 0.565.0 | `services/wiedza-z-oferty.ts`: numery z parametrów i opisu oferty wprost do `towar_identyfikator` (`zrodlo='oferta'`), pozycje listy zgodności do kolejki Wiedzy z marką; zapis przed wywołaniem modelu, bramka na pewności kartoteki, porcja 20 na kliknięcie, wąska trasa cofnięcia |
-| Copilot — propozycja pasowania z rozmowy (§14.8) | **usunięte** w 0.565.0 | `pasowanie` w odpowiedzi szkicu, kolumny `pasowanie_propozycja`/`pasowanie_ocena` w `szkic_copilota`, karta „Copilot rozpoznał pasowanie" w wierszu „Wiedza" (`skrzynka/Wiedza.tsx`); proponuje agent, rozstrzyga biuro |
-| Copilot — dane doboru z rozmowy (§14.7) | **usunięte** w 0.565.0 | `daneDoboru` w odpowiedzi szkicu; automat wpisuje je sam w puste pola doboru, bez karty do kliknięcia |
+| Kontrola świeżości i dialog 409 | **działa** | `skrzynka/DialogKonfliktu.tsx` |
+| Klasyfikacja w kształcie specyfikacji (§14.5a) | **działa** | `services/copilot-klasyfikacja.ts`, `klasyfikacja-slownik.ts`, `klasyfikacja-polityka.ts`, tabela `decyzja_klasyfikacji`, `skrzynka/Copilot.tsx` (`EtykietaKategorii`) |
+| Takt klasyfikacji każdej nowej wiadomości (§14.5a) | **działa**, wyłączony domyślnie | `services/klasyfikacja-auto.ts`, `COPILOT_AUTO_KLASYFIKACJA` |
+| Rozpoznanie w faktach szkicu, intake tylko przy towarze (§14.6a) | **działa** | `kontekstSzkicu`, `zRozpoznaniaNiepewne` w `services/copilot-szkic.ts` |
+| Szkic z taktu dla rozmów bez oferty (§14.6a) | **działa**, przy `COPILOT_AUTO_SZKIC=1` | `services/copilot-auto-szkic.ts` |
+| Szkic zaraz po rozpoznaniu (§14.6c) | **działa**, domyślnie włączony (`COPILOT_SZKIC_PO_ROZPOZNANIU`) | `services/copilot-szkic-po-rozpoznaniu.ts`, `szkic_copilota.decyzja_id` |
+| Przepływ kategorii w trybie cienia (§14.6e) | **działa**, propozycje i pomiar; wysyłka na żywo w §14.6f | `services/przeplyw-kategorii.ts`, tabela `propozycja_przeplywu`, karta „Automat by…" w rozmowie, pomiar za zębatką |
+| Przepływ kategorii na żywo, stan zamówienia (§14.6f) | **działa**, wyłączony domyślnie (`PRZEPLYW_NA_ZYWO`) | `services/przeplyw-na-zywo.ts`, konto „Automat", `propozycja_przeplywu.wykonana_at` |
+| Los szkicu przy wysyłce i uzgodnienie `send_uncertain` (§14.6a) | **działa** | `outbox.szkic_los`, `losSzkicu` w `wysylka.ts`, `uzgodnijNiepewna` w `allegro-inbox-sync.ts` |
+| Typ i podtyp wątku z `beta.v1` w klasyfikacji (§14.5b) | **działa**, `[WERYFIKUJ]` dostępność bety na koncie | `allegro-inbox-sync.ts` (`czytajStrukture`), kolumny `watek_*` w `allegro_inbox_thread`, `services/klasyfikacja-mapowanie.ts` |
+| Problemy z zakupem (`POST_PURCHASE_ISSUE`) w skrzynce | **działa**, lista wątków w `beta.v1` z zejściem na `public.v1`; `[WERYFIKUJ]` na sandboxie | `allegro-inbox-sync.ts` (`watekZBety`, `wiadomoscZBety`, `rozmowcaWatku`), `allegro-wysylka.ts` (`wersjaWatku`), `docs/allegro-ksztalt.md` |
+| Copilot — szkic odpowiedzi z faktów (§14.6) | **działa** | `services/copilot-szkic.ts`, `szkic_copilota`, przycisk „Ułóż odpowiedź" w edytorze, karta `skrzynka/SzkicCopilota.tsx`; od 0.253.0 wiedza własna modelu wolna, ale każde twierdzenie ma źródło, a pewność przyznaje serwer |
 | Copilot — OCR, kandydaci, porównanie (§14.1) | **projekt** | etap F, przyrosty dalsze |
-| Front na TanStack, Router, shadcn | **działa** od 0.146.0 | `panel/src/api/`, `panel/src/ui/` |
-| Testy frontu (Vitest, Playwright) | **działa** od 0.146.0 | `panel/src/**/*.test.tsx`, `panel/e2e/` |
-| Audyt mutacji rozmowy | **działa** od 0.145.1 | `logEvent` w `services/conversations.ts` |
-| Status synchronizacji (§7) | **działa** od 0.147.0 | `statusSynchronizacji` |
-| Trwały alarm synchronizacji (§21) | **działa** od 0.147.0 | `skrzynka/AlarmSynchronizacji.tsx` |
-| Ustawienia obsługi za zębatką (§21) | **działa** od 0.168.0 | `panel/src/ekrany/Ustawienia.tsx`, trasa `/obsluga/ustawienia` |
-| Wiązanie kartoteki po sygnaturze BEZ zatwierdzania | **działa** od 0.169.0 | `zwiazPewne` w `services/sygnatury.ts`; od 0.220.0 pod parasolem `powiazZaleglosci`, więc błąd Allegro go nie zabiera |
-| Pokrycie sygnatur na ekranie ustawień | **działa** od 0.169.0 | `GET /api/obsluga/sygnatury`, `panel/src/ustawienia/PokrycieSygnatur.tsx` |
-| Szkic sam dla nowego pytania (§14.6) | **działa** od 0.317.0 | `services/copilot-auto-szkic.ts`, takt `copilot-auto-szkic`: wyłącznie pytania pod ofertą, limit na przebieg i sufit godzinowy z księgi wywołań, autor `automat` bez konta; domyślnie wyłączone (`COPILOT_AUTO_SZKIC`) |
-| Zdjęcia z rozmowy w szkicu (§14.6) | **działa** od 0.484.6 (od 0.330.0 do 0.484.5 każde pobranie padało 403 na zapisanym adresie) | `services/copilot-zdjecia.ts` (`kandydaciRozmowy`, `przygotujZdjeciaRozmowy`), kolumna `szkic_copilota.odczyt_zdjec`, blok `skrzynka/OdczytZdjec.tsx`; tylko `SAFE` i tylko przychodzące, sufit sztuk, źródło twierdzenia `zdjecie` z sufitem „prawdopodobne" |
-| Kolejka wiedzy opróżnia się sama (§11.3) | **usunięte** w 0.565.0 | `services/wiedza-automat.ts`, takt `wiedza-automat`: cztery źródła marki, podpis `automat (wiedza)` bez konta, karta „Co automat dopisał" w ustawieniach; domyślnie wyłączone (`WIEDZA_AUTOMAT`), model językowy osobno (`WIEDZA_AUTOMAT_MODEL`) |
-| Karta Copilota bez ścisku (§14.6) | **działa** od 0.342.0 | `skrzynka/Zwijka.tsx` jako jedno zwijanie dla trzech bloków; szkic bez własnego przewijania, trzy paski scalone w jeden, licznik znaków w nagłówku |
-| Dane wejściowe wchodzą same (§11.2) | **działa** od 0.341.0 | `copilot-szkic.ts`: wpis w puste pola przed zapisem szkicu, podpis `automat (szkic)`; zmiana wersji doboru budzi takt `copilot-auto-szkic` |
-| Wiedza z ofert bez kolejki (§11.3) | **usunięte** w 0.565.0 | `wiedza-z-oferty.ts`: klucz składany przy zbieraniu z trzech źródeł deterministycznych, podpis `automat (oferta)`; bez rozpoznanej marki wiersz zostaje w kolejce |
-| Dopytanie Copilota (§14.6) | **działa** od 0.332.0 | `services/copilot-pytania.ts`, tabela `copilot_pytanie`, siódma trasa zapisu Copilota, blok `skrzynka/Dopytanie.tsx`; notka dla agenta bez przycisku wstawiania, sufit dopytań na rozmowę |
-| Dopytanie poprawia szkic (§14.6) | **działa** od 0.596.0 | `zadajPytanie` z tekstem pola, `sitaSzkicu`, `zamaskujOdwracalnie`; wersje w `copilot_pytanie`, różnica w `skrzynka/RoznicaSzkicu.tsx`, „Cofnij" w `ekrany/Skrzynka.tsx` |
-| Link do naszej oferty w szkicu (§14.6) | **działa** od 0.270.0 | `services/allegro-oferty-po-sygnaturze.ts`, `urlOfertPoSygnaturze`: jedno żądanie `external.id` na komplet kandydatów, tylko `ACTIVE`; fakt `oferta_link`, reguły 7d i 7e instrukcji |
-| Miary doboru w analizie | **usunięte** w 0.565.0 | `GET /api/obsluga/miary-doboru`, `services/miary-doboru.ts`, `analiza/MiaryDoboru.tsx`: ostatni wynik każdej rozmowy i podstawa wybranej części z księgi zdarzeń |
-| Ekran przegranego przejęcia (§6.2) | **działa** od 0.147.0 | `skrzynka/KonfliktPrzejecia.tsx` |
-| Wymuszone przekazanie z powodem | **działa** od 0.147.0 | `przekazRozmowe`, rola `admin` |
-| Ręczne wskazanie oferty | **działa** od 0.147.0 | `wskazOferte`, `conversation_event` |
-| Podgląd kolejki = ostatnia wiadomość klienta | **działa** od 0.167.0 | `LISTA` w `services/skrzynka.ts`, `ostatniaOdKlienta` |
-| Zamówienie przy rozmowie (`relatesTo.order`) | **działa** od 0.167.0 | `message.related_order_id`, `skrzynka/ZamowienieRozmowy.tsx`; od 0.215.0 pozycja ze zdjęciem oferty, kartoteką i „Wskaż"; od 0.558.0 sama lista pozycji, bo numer, sumę i kroki mówi karta zakupu (§10.2g) |
-| Oferta przy rozmowie (`relatesTo.offer`) | **działa** od 0.178.0 | `offer_snapshot`, `services/allegro-oferty-sync.ts`, `skrzynka/OfertaRozmowy.tsx`; od 0.215.0 także ze wskazania agenta i z jedynej pozycji zamówienia |
-| Kolejność listy rozmów — przełącznik „od najnowszych" | **działa** od 0.215.0 | `skrzynka/Kolejka.tsx`, `odNajnowszych`; domyślnie PILNE i najdłużej czekające |
-| Nazwa towaru przy ofercie w rozmowie | **z oferty** od 0.178.0 | `nazwaOferty` — snapshot, a bez niego pozycja zamówienia |
-| Kartoteka Subiekta przy rozmowie | **działa** od 0.179.0 | `kartotekaOferty`, `skrzynka/TowarRozmowy.tsx` — stan, półka, zdjęcie; od 0.219.0 jedno trafienie po SKU bez „Zatwierdź" |
-| Trzy kolumny w skrzynce (§10.1) | **działa** od 0.180.0 | `skrzynka/Kontekst.tsx`; od 0.498.0 bez zakładek: „Wymaga Ciebie" i wiersze „W normie" (`skrzynka/kokpit.ts`); od 0.558.0 każdy fakt raz: zakup i klient w karcie nad osią, kolumna mówi Subiekt, paczkę i robotę (§10.2g) |
-| Opis kartoteki przy rozmowie | **działa** od 0.198.0 | `skrzynka/TowarRozmowy.tsx`, pole `desc` z `/api/products/:twId` |
-| Wiersz kolejki wg §10.2 | **częściowo** od 0.181.0 | priorytet, czas oczekiwania, dopiski, zadanie, od E1 status doboru; bez terminu |
-| Historia przypisań rozmowy | **działa** od 0.145.1 | `conversation_assignment` |
-| Dokument sprzedaży (FS/PA) przy zwrocie | **działa** od 0.174.0 | `sgt_faktura`, `services/faktury.ts` |
-| Data doręczenia paczki zwrotnej | **działa** od 0.187.0 | `services/allegro-tracking.ts`, `zwrot_klienta.dostarczono_at` |
-| Produkt dopisany do zwrotu przez biuro | **działa** od 0.184.0 | `dopiszPozycje`, `zwrot_klienta_pozycja.zrodlo` |
-| Paczka nieodebrana jako osobny byt | formularz **wycofany** w 0.451.0, przyjęcie **działa** od 0.493.0 | `przyjmijNieodebrana`, przycisk przy wierszu paczek klienta |
-| Zwroty klienckie — odczyt i kolejka | **działa** od 0.150.0 | `services/zwroty.ts`, `panel/src/zwroty/` |
-| Synchronizacja zwrotów z Allegro | **działa** od 0.150.0 | `services/allegro-zwroty-sync.ts` |
-| Ręczna synchronizacja zwrotów | **działa** od 0.232.0 | `POST /api/obsluga/zwroty/synchronizuj`, przycisk w paśmie filtrów kolejki |
+| Front na TanStack, Router, shadcn | **działa** | `panel/src/api/`, `panel/src/ui/` |
+| Testy frontu (Vitest, Playwright) | **działa** | `panel/src/**/*.test.tsx`, `panel/e2e/` |
+| Audyt mutacji rozmowy | **działa** | `logEvent` w `services/conversations.ts` |
+| Status synchronizacji (§7) | **działa** | `statusSynchronizacji` |
+| Trwały alarm synchronizacji (§21) | **działa** | `skrzynka/AlarmSynchronizacji.tsx` |
+| Ustawienia obsługi za zębatką (§21) | **działa** | `panel/src/ekrany/Ustawienia.tsx`, trasa `/obsluga/ustawienia` |
+| Wiązanie kartoteki po sygnaturze BEZ zatwierdzania | **działa** | `zwiazPewne` w `services/sygnatury.ts`; od 0.220.0 pod parasolem `powiazZaleglosci`, więc błąd Allegro go nie zabiera |
+| Pokrycie sygnatur na ekranie ustawień | **działa** | `GET /api/obsluga/sygnatury`, `panel/src/ustawienia/PokrycieSygnatur.tsx` |
+| Szkic sam dla nowego pytania (§14.6) | **działa** | `services/copilot-auto-szkic.ts`, takt `copilot-auto-szkic`: wyłącznie pytania pod ofertą, limit na przebieg i sufit godzinowy z księgi wywołań, autor `automat` bez konta; domyślnie wyłączone (`COPILOT_AUTO_SZKIC`) |
+| Zdjęcia z rozmowy w szkicu (§14.6) | **działa** (od 0.330.0 do 0.484.5 każde pobranie padało 403 na zapisanym adresie) | `services/copilot-zdjecia.ts` (`kandydaciRozmowy`, `przygotujZdjeciaRozmowy`), kolumna `szkic_copilota.odczyt_zdjec`, blok `skrzynka/OdczytZdjec.tsx`; tylko `SAFE` i tylko przychodzące, sufit sztuk, źródło twierdzenia `zdjecie` z sufitem „prawdopodobne" |
+| Karta Copilota bez ścisku (§14.6) | **działa** | `skrzynka/Zwijka.tsx` jako jedno zwijanie dla trzech bloków; szkic bez własnego przewijania, trzy paski scalone w jeden, licznik znaków w nagłówku |
+| Dopytanie Copilota (§14.6) | **działa** | `services/copilot-pytania.ts`, tabela `copilot_pytanie`, siódma trasa zapisu Copilota, blok `skrzynka/Dopytanie.tsx`; notka dla agenta bez przycisku wstawiania, sufit dopytań na rozmowę |
+| Dopytanie poprawia szkic (§14.6) | **działa** | `zadajPytanie` z tekstem pola, `sitaSzkicu`, `zamaskujOdwracalnie`; wersje w `copilot_pytanie`, różnica w `skrzynka/RoznicaSzkicu.tsx`, „Cofnij" w `ekrany/Skrzynka.tsx` |
+| Link do naszej oferty w szkicu (§14.6) | **działa** | `services/allegro-oferty-po-sygnaturze.ts`, `urlOfertPoSygnaturze`: jedno żądanie `external.id` na komplet kandydatów, tylko `ACTIVE`; fakt `oferta_link`, reguły 7d i 7e instrukcji |
+| Ekran przegranego przejęcia (§6.2) | **działa** | `skrzynka/KonfliktPrzejecia.tsx` |
+| Wymuszone przekazanie z powodem | **działa** | `przekazRozmowe`, rola `admin` |
+| Ręczne wskazanie oferty | **działa** | `wskazOferte`, `conversation_event` |
+| Podgląd kolejki = ostatnia wiadomość klienta | **działa** | `LISTA` w `services/skrzynka.ts`, `ostatniaOdKlienta` |
+| Zamówienie przy rozmowie (`relatesTo.order`) | **działa** | `message.related_order_id`, `skrzynka/ZamowienieRozmowy.tsx`; od 0.215.0 pozycja ze zdjęciem oferty, kartoteką i „Wskaż"; od 0.558.0 sama lista pozycji, bo numer, sumę i kroki mówi karta zakupu (§10.2g) |
+| Oferta przy rozmowie (`relatesTo.offer`) | **działa** | `offer_snapshot`, `services/allegro-oferty-sync.ts`, `skrzynka/OfertaRozmowy.tsx`; od 0.215.0 także ze wskazania agenta i z jedynej pozycji zamówienia |
+| Kolejność listy rozmów — przełącznik „od najnowszych" | **działa** | `skrzynka/Kolejka.tsx`, `odNajnowszych`; domyślnie PILNE i najdłużej czekające |
+| Nazwa towaru przy ofercie w rozmowie | **z oferty** | `nazwaOferty` — snapshot, a bez niego pozycja zamówienia |
+| Kartoteka Subiekta przy rozmowie | **działa** | `kartotekaOferty`, `skrzynka/TowarRozmowy.tsx` — stan, półka, zdjęcie; od 0.219.0 jedno trafienie po SKU bez „Zatwierdź" |
+| Trzy kolumny w skrzynce (§10.1) | **działa** | `skrzynka/Kontekst.tsx`; od 0.498.0 bez zakładek: „Wymaga Ciebie" i wiersze „W normie" (`skrzynka/kokpit.ts`); od 0.558.0 każdy fakt raz: zakup i klient w karcie nad osią, kolumna mówi Subiekt, paczkę i robotę (§10.2g) |
+| Opis kartoteki przy rozmowie | **działa** | `skrzynka/TowarRozmowy.tsx`, pole `desc` z `/api/products/:twId` |
+| Wiersz kolejki wg §10.2 | **częściowo** | priorytet, czas oczekiwania, dopiski, zadanie; bez terminu |
+| Historia przypisań rozmowy | **działa** | `conversation_assignment` |
+| Dokument sprzedaży (FS/PA) przy zwrocie | **działa** | `sgt_faktura`, `services/faktury.ts` |
+| Data doręczenia paczki zwrotnej | **działa** | `services/allegro-tracking.ts`, `zwrot_klienta.dostarczono_at` |
+| Produkt dopisany do zwrotu przez biuro | **działa** | `dopiszPozycje`, `zwrot_klienta_pozycja.zrodlo` |
+| Paczka nieodebrana jako osobny byt | formularz **wycofany** w 0.451.0, przyjęcie **działa** | `przyjmijNieodebrana`, przycisk przy wierszu paczek klienta |
+| Zwroty klienckie — odczyt i kolejka | **działa** | `services/zwroty.ts`, `panel/src/zwroty/` |
+| Synchronizacja zwrotów z Allegro | **działa** | `services/allegro-zwroty-sync.ts` |
+| Ręczna synchronizacja zwrotów | **działa** | `POST /api/obsluga/zwroty/synchronizuj`, przycisk w paśmie filtrów kolejki |
 | Kształt zwrotów z dokumentacji, nie z sondy | **niepotwierdzony** | `[WERYFIKUJ]` w `docs/allegro-ksztalt.md` |
-| Termin ustawowy w rekoncyliacji | **działa** od 0.210.0 | `zwrotyPoTerminie` w `services/reconcile.ts`; do 0.209.0 pilnował go wyłącznie kolor wiersza |
-| Sygnał rozjazdu kwoty z pozycjami | **działa** od 0.210.0 | `kwotaRozjechana`; synchronizator nadpisuje ilość i cenę, kwoty nie przelicza nic |
-| Powód odmowy widoczny na zwrocie | **działa** od 0.210.0 | `werdyktPowod`; zapisywał się do bazy i nikt go nie czytał |
+| Termin ustawowy w rekoncyliacji | **działa** | `zwrotyPoTerminie` w `services/reconcile.ts`; do 0.209.0 pilnował go wyłącznie kolor wiersza |
+| Sygnał rozjazdu kwoty z pozycjami | **działa** | `kwotaRozjechana`; synchronizator nadpisuje ilość i cenę, kwoty nie przelicza nic |
+| Powód odmowy widoczny na zwrocie | **działa** | `werdyktPowod`; zapisywał się do bazy i nikt go nie czytał |
 | Odmowa zwrotu dociera do klienta | **działa** przez ODMÓW WYPŁATY | werdykt biura jest wewnętrzny; klienta zawiadamia Allegro po zgłoszeniu odmowy wypłaty |
-| Utylizacja schodzi ze stanu | **działa** od 0.211.0 | koszyk odpadu, MM z magazynu głównego na `MAG_ID_ODP`; bez tego wpisu wyłączone; od 0.266.0 nie wchodzi na listę kolektora |
-| Powrót towaru z regału zwrotów na halę | **działa** od 0.266.0 | `zakolejkujPowrot` w `services/kosze.ts`; jedno MM ZWROTY→MAG po rozłożeniu kosza, po zapisaniu adresów; od 0.277.0 także kosz z dokumentu MM, na magazyn z tamtego dokumentu |
+| Utylizacja schodzi ze stanu | **działa** | koszyk odpadu, MM z magazynu głównego na `MAG_ID_ODP`; bez tego wpisu wyłączone; od 0.266.0 nie wchodzi na listę kolektora |
+| Powrót towaru z regału zwrotów na halę | **działa** | `zakolejkujPowrot` w `services/kosze.ts`; jedno MM ZWROTY→MAG po rozłożeniu kosza, po zapisaniu adresów; od 0.277.0 także kosz z dokumentu MM, na magazyn z tamtego dokumentu |
 | Dokument zejścia ze stanu dla odpadu (RW) | **nie działa** | po MM na magazyn odpadu stan zostaje; decyzja procesowa biura |
-| Ślad po zwrocie pieniędzy przy pobraniu | **działa** od 0.269.0 | `zapiszPrzelew`/`cofnijPrzelew`, kolumny `przelew_*`; sygnał `przelew_czeka` i rozjazd `zwrot_bez_przelewu` |
-| Ślad rozłożenia towaru na osi zwrotu | **działa** od 0.269.0 | `services/zwrot-slad.ts`; odłożenie i pominięcie w koszu dopisują zdarzenie zwrotu |
-| Rozjazd ilości zgłoszonej i zwróconej | **działa** od 0.212.0 | `zapiszIloscZwrocona`, `ilosc_zwrocona`; liczy biuro przy rozpakowaniu |
-| Werdykt biura przy zwrocie | **działa** od 0.156.0 | `rozstrzygnijZwrot`, odmowa wymaga powodu |
-| Ocena towaru przy zwrocie | **działa** od 0.156.0 | `ocenPozycje`, `stan`/`utylizacja` — przecena zdjęta w 0.209.0 |
-| Kwota do oddania | **działa** od 0.156.0 | `zapiszKwote`, suma z zaznaczenia po stronie serwera |
-| Korekta i zamknięcie zwrotu | **działa** od 0.162.0 | `zapiszKorekte`, `cofnijKorekte` — numer z Subiekta |
-| Skan etykiety zwrotnej otwiera zwrot | **działa** od 0.163.0 | `znajdzZwrotPoKodzie`, `panel/src/skaner.ts` |
-| Szukanie zwrotu po fragmencie kodu | **działa** od 0.165.0 | `panel/src/zwroty/Szukanie.tsx`, filtr w pamięci ekranu |
-| Skan w polu szukania zastępuje treść | **działa** od 0.329.0 | `SeriaWPolu` w `panel/src/skaner.ts`; próg sześciu znaków serii |
-| Panel trzyma się okna, kolumny przewijają się osobno | **działa** od 0.165.0 | `panel/src/main.tsx`, wzorzec z makiety |
-| Produkty ze zwrotu w głównym oknie, akcja na wierszu | **działa** od 0.167.0 | `panel/src/zwroty/Pozycje.tsx` |
-| Przebieg sprawy na ekranie (oś zwrotu) | **działa** od 0.313.0 | `osZwrotu` w `services/zwroty.ts`, `panel/src/zwroty/Os.tsx`; werdykt, kwota i ocena dopisują się na oś od tego wydania — wcześniej pisały ją same cofnięcia |
-| Notatka biura przy zwrocie z cofnięciem | **działa** od 0.313.0 | `zapiszNotatkeZwrotu`, `cofnijNotatkeZwrotu`, kolumny `notatka_*`; wolno ją dopisać przy zwrocie zamkniętym |
-| Rozjazdy rekoncyliacji w panelu obsługi | **działa** od 0.313.0 | `GET /api/obsluga/zwroty/rozjazdy` — cztery kontrole zwrotów, bez reszty hali; od 0.319.0 pasek liczy rodzajami, a numery pokazuje po kliknięciu |
-| Prowadzący zwrot i sito „Moje"/„Niczyje" | **działa** od 0.315.0 | `stempelProwadziZwrot`, kolumny `prowadzi_*`; `panel/src/sprawy/Moje.tsx` bez zmian, klawisze `m` i `n` |
-| Tagi przy zwrocie | **zdjęte** w 0.370.0 | działały od 0.315.0; tabela `zwrot_tag_sprawy` zeszła razem z osią, mechanizm `OsTagow` został przy reklamacjach i dyskusjach |
-| Klawisze kubełka z §25a.2 | **działa** od 0.284.0 | nasłuch w `panel/src/ekrany/Zwroty.tsx`, rejestr akcji w `zwroty/klawisze.ts`, pasek `sprawy/Skroty.tsx`; do 0.283.0 litery stały przy przyciskach jako podpowiedzi bez nasłuchu |
-| Ocena wszystkich pozycji hurtem | **działa** od 0.284.0 | `Shift+S` i przycisk przy więcej niż jednej nieocenionej pozycji; po kolei, z wersją z poprzedniego zapisu |
-| Kupujący, przewoźnik, płatność i rodzaj dokumentu | **działa** od 0.169.0 | `zwrot_klienta.kupujacy_login`, `zamowienie_klienta.platnosc_typ` |
-| Potrącenie za utratę wartości pozycji | **działa** od 0.170.0 | `zapiszPotracenie`, `panel/src/zwroty/Potracenie.tsx` |
-| EAN i SKU na wierszu produktu | **działa** od 0.169.0 | `sgt_towar.ean`, `zamowienie_klienta_pozycja.sku` |
-| Wiadomości o tym zakupie przy zwrocie | **działa** od 0.169.0 | złączenie po `message.related_order_id` |
-| Zwrot tego zamówienia przy rozmowie | **działa** od 0.221.0 | `osRozmowy.zwroty` z `listaZwrotow` po zamówieniu, `skrzynka/ZwrotRozmowy.tsx` |
-| Zakładka WSZYSTKIE, filtr przewoźnika, eksport CSV | **działa** od 0.169.0 | `csvZwrotow`, `GET /api/obsluga/zwroty/csv` |
-| Załączniki wiadomości — ODCZYT | **działa** od 0.155.0 | `message_attachment`, `GET /api/obsluga/zalaczniki/:id` |
-| Zdjęcie klienta widoczne wprost na osi | **działa** od 0.218.0, naprawione w 0.244.0 | `GET /api/obsluga/zalaczniki/:id/podglad` — typ z SYGNATURY bajtów (`rozpoznajMime` × `TYPY_PODGLADU`, także WebP), tylko `SAFE`; odmowa Allegro to 502 ze zdaniem pod nazwą pliku i „Spróbuj ponownie", nie pusta linia; od 0.246.0 kliknięcie powiększa (`towar/Zalacznik.tsx`, wspólne z reklamacjami) |
-| Pobranie załącznika Centrum Wiadomości z `api.allegro.pl` | **działa** od 0.248.0 (kandydat od 0.244.0) | `kandydaciPobrania`: `downloadAttachmentGET` BEZ `Accept` (swagger: odpowiedź `*/*`), zapisany `url` jako zapas; sonda właściciela 10 września: 200 `image/jpeg`, z `Accept` 406, `upload.allegro.pl` 403 |
-| Załączniki odświeżane przy każdym przebiegu | **działa** od 0.244.0 | `zapiszZalaczniki` upsert po `(message_id, file_name)`, dociąg wątków ze stanem `NEW` (sufit 5), dosypka z lądowiska przy starcie |
-| Autoodpowiedź biura zwinięta na osi | **działa** od 0.218.0 | `czyAutoresponder`, pole `automatyczna` w `WpisOsi` |
-| Stopka firmowa zwinięta pod odpowiedzią | **działa** od 0.219.1 | `podzielStopke`, pole `stopka` w `WpisOsi` |
-| Podpis wiadomości klienta niesie jego login | **działa** od 0.219.2 | `allegro_inbox_thread.interlocutor_login` w zapytaniu osi |
-| Załączniki przy odpowiedzi — WYSYŁKA | **działa** od 0.195.0 | `wysylka_zalacznik`, `services/zalaczniki-wysylki.ts`, `skrzynka/Zalaczniki.tsx`; dwukrokowe wgranie do Allegro |
-| Wątek oznaczany jako przeczytany w Allegro | **działa** od 0.195.0 | `oznaczPrzeczytanyWAllegro`, `PUT /messaging/threads/{id}/read` po udanej wysyłce |
-| Obecność łata wiersz kolejki zamiast pobierać listę | **działa** od 0.196.0 | `setQueryData` w `api/zdarzenia.ts`; pomiar ładunku w `CHANGELOG.md` |
-| Wyszukiwanie w kolejce rozmów | **działa** od 0.195.0 | filtr w pamięci ekranu, `skrzynka/Kolejka.tsx` — login, treść, prowadzący |
-| Zamówienie klienta przy zwrocie | **działa** od 0.152.0 | `services/allegro-zamowienia-sync.ts` |
-| Ręczne dociągnięcie zamówień | **działa** od 0.154.0 | `POST /api/obsluga/zwroty/zamowienia` |
-| Zdjęcia towaru w panelu obsługi | **działa** od 0.152.0 | `panel/src/zwroty/useZdjecie.ts` |
+| Ślad po zwrocie pieniędzy przy pobraniu | **działa** | `zapiszPrzelew`/`cofnijPrzelew`, kolumny `przelew_*`; sygnał `przelew_czeka` i rozjazd `zwrot_bez_przelewu` |
+| Ślad rozłożenia towaru na osi zwrotu | **działa** | `services/zwrot-slad.ts`; odłożenie i pominięcie w koszu dopisują zdarzenie zwrotu |
+| Rozjazd ilości zgłoszonej i zwróconej | **działa** | `zapiszIloscZwrocona`, `ilosc_zwrocona`; liczy biuro przy rozpakowaniu |
+| Werdykt biura przy zwrocie | **działa** | `rozstrzygnijZwrot`, odmowa wymaga powodu |
+| Ocena towaru przy zwrocie | **działa** | `ocenPozycje`, `stan`/`utylizacja` — przecena zdjęta w 0.209.0 |
+| Kwota do oddania | **działa** | `zapiszKwote`, suma z zaznaczenia po stronie serwera |
+| Korekta i zamknięcie zwrotu | **działa** | `zapiszKorekte`, `cofnijKorekte` — numer z Subiekta |
+| Skan etykiety zwrotnej otwiera zwrot | **działa** | `znajdzZwrotPoKodzie`, `panel/src/skaner.ts` |
+| Szukanie zwrotu po fragmencie kodu | **działa** | `panel/src/zwroty/Szukanie.tsx`, filtr w pamięci ekranu |
+| Skan w polu szukania zastępuje treść | **działa** | `SeriaWPolu` w `panel/src/skaner.ts`; próg sześciu znaków serii |
+| Panel trzyma się okna, kolumny przewijają się osobno | **działa** | `panel/src/main.tsx`, wzorzec z makiety |
+| Produkty ze zwrotu w głównym oknie, akcja na wierszu | **działa** | `panel/src/zwroty/Pozycje.tsx` |
+| Przebieg sprawy na ekranie (oś zwrotu) | **działa** | `osZwrotu` w `services/zwroty.ts`, `panel/src/zwroty/Os.tsx`; werdykt, kwota i ocena dopisują się na oś od tego wydania — wcześniej pisały ją same cofnięcia |
+| Notatka biura przy zwrocie z cofnięciem | **działa** | `zapiszNotatkeZwrotu`, `cofnijNotatkeZwrotu`, kolumny `notatka_*`; wolno ją dopisać przy zwrocie zamkniętym |
+| Rozjazdy rekoncyliacji w panelu obsługi | **działa** | `GET /api/obsluga/zwroty/rozjazdy` — cztery kontrole zwrotów, bez reszty hali; od 0.319.0 pasek liczy rodzajami, a numery pokazuje po kliknięciu |
+| Prowadzący zwrot i sito „Moje"/„Niczyje" | **działa** | `stempelProwadziZwrot`, kolumny `prowadzi_*`; `panel/src/sprawy/Moje.tsx` bez zmian, klawisze `m` i `n` |
+| Klawisze kubełka z §25a.2 | **działa** | nasłuch w `panel/src/ekrany/Zwroty.tsx`, rejestr akcji w `zwroty/klawisze.ts`, pasek `sprawy/Skroty.tsx`; do 0.283.0 litery stały przy przyciskach jako podpowiedzi bez nasłuchu |
+| Ocena wszystkich pozycji hurtem | **działa** | `Shift+S` i przycisk przy więcej niż jednej nieocenionej pozycji; po kolei, z wersją z poprzedniego zapisu |
+| Kupujący, przewoźnik, płatność i rodzaj dokumentu | **działa** | `zwrot_klienta.kupujacy_login`, `zamowienie_klienta.platnosc_typ` |
+| Potrącenie za utratę wartości pozycji | **działa** | `zapiszPotracenie`, `panel/src/zwroty/Potracenie.tsx` |
+| EAN i SKU na wierszu produktu | **działa** | `sgt_towar.ean`, `zamowienie_klienta_pozycja.sku` |
+| Wiadomości o tym zakupie przy zwrocie | **działa** | złączenie po `message.related_order_id` |
+| Zwrot tego zamówienia przy rozmowie | **działa** | `osRozmowy.zwroty` z `listaZwrotow` po zamówieniu, `skrzynka/ZwrotRozmowy.tsx` |
+| Zakładka WSZYSTKIE, filtr przewoźnika, eksport CSV | **działa** | `csvZwrotow`, `GET /api/obsluga/zwroty/csv` |
+| Załączniki wiadomości — ODCZYT | **działa** | `message_attachment`, `GET /api/obsluga/zalaczniki/:id` |
+| Zdjęcie klienta widoczne wprost na osi | **działa**, naprawione w 0.244.0 | `GET /api/obsluga/zalaczniki/:id/podglad` — typ z SYGNATURY bajtów (`rozpoznajMime` × `TYPY_PODGLADU`, także WebP), tylko `SAFE`; odmowa Allegro to 502 ze zdaniem pod nazwą pliku i „Spróbuj ponownie", nie pusta linia; od 0.246.0 kliknięcie powiększa (`towar/Zalacznik.tsx`, wspólne z reklamacjami) |
+| Pobranie załącznika Centrum Wiadomości z `api.allegro.pl` | **działa** (kandydat od 0.244.0) | `kandydaciPobrania`: `downloadAttachmentGET` BEZ `Accept` (swagger: odpowiedź `*/*`), zapisany `url` jako zapas; sonda właściciela 10 września: 200 `image/jpeg`, z `Accept` 406, `upload.allegro.pl` 403 |
+| Załączniki odświeżane przy każdym przebiegu | **działa** | `zapiszZalaczniki` upsert po `(message_id, file_name)`, dociąg wątków ze stanem `NEW` (sufit 5), dosypka z lądowiska przy starcie |
+| Autoodpowiedź biura zwinięta na osi | **działa** | `czyAutoresponder`, pole `automatyczna` w `WpisOsi` |
+| Stopka firmowa zwinięta pod odpowiedzią | **działa** | `podzielStopke`, pole `stopka` w `WpisOsi` |
+| Podpis wiadomości klienta niesie jego login | **działa** | `allegro_inbox_thread.interlocutor_login` w zapytaniu osi |
+| Załączniki przy odpowiedzi — WYSYŁKA | **działa** | `wysylka_zalacznik`, `services/zalaczniki-wysylki.ts`, `skrzynka/Zalaczniki.tsx`; dwukrokowe wgranie do Allegro |
+| Wątek oznaczany jako przeczytany w Allegro | **działa** | `oznaczPrzeczytanyWAllegro`, `PUT /messaging/threads/{id}/read` po udanej wysyłce |
+| Obecność łata wiersz kolejki zamiast pobierać listę | **działa** | `setQueryData` w `api/zdarzenia.ts`; pomiar ładunku w `CHANGELOG.md` |
+| Wyszukiwanie w kolejce rozmów | **działa** | filtr w pamięci ekranu, `skrzynka/Kolejka.tsx` — login, treść, prowadzący |
+| Zamówienie klienta przy zwrocie | **działa** | `services/allegro-zamowienia-sync.ts` |
+| Ręczne dociągnięcie zamówień | **działa** | `POST /api/obsluga/zwroty/zamowienia` |
+| Zdjęcia towaru w panelu obsługi | **działa** | `panel/src/zwroty/useZdjecie.ts` |
 | Odnośniki do panelu sprzedawcy | **niepotwierdzone** | `[WERYFIKUJ]`, wzorce w `ALLEGRO_PANEL_*` |
-| Czyszczenie lądowisk z danych osobowych | **działa** od 0.152.0 | `services/allegro-oczyszczanie.ts` |
-| Zwrot pieniędzy i odmowa w Allegro | **działa** od 0.190.0 | `services/zwrot-pieniedzy.ts`, `panel/src/zwroty/Pieniadze.tsx`; `commandId` stały na zwrot, uprawnienie `payments:write` |
-| Numer korekty czytany z Subiekta | **działa** od 0.201.0 | `zwiazKorektyPewne` po `dok_DoDokId`; wiąże tylko pewność, bramki jak u człowieka |
+| Czyszczenie lądowisk z danych osobowych | **działa** | `services/allegro-oczyszczanie.ts` |
+| Zwrot pieniędzy i odmowa w Allegro | **działa** | `services/zwrot-pieniedzy.ts`, `panel/src/zwroty/Pieniadze.tsx`; `commandId` stały na zwrot, uprawnienie `payments:write` |
+| Numer korekty czytany z Subiekta | **działa** | `zwiazKorektyPewne` po `dok_DoDokId`; wiąże tylko pewność, bramki jak u człowieka |
 | Automat WYSTAWIANIA korekty przez Sferę | **poza zasięgiem** | pytanie do księgowości: `PAk`, `ZW` czy `ZWn` przy paragonie |
-| Rabat transakcyjny — stan przy pozycji | **działa** od 0.164.0 | `services/rabaty.ts`, `allegro_rabat`, `zwrot_klienta.status_allegro` |
-| Rabat transakcyjny — złożenie wniosku | **działa** od 0.164.0 | PIERWSZY zapis do Allegro; wymaga `allegro:api:orders:write` |
+| Rabat transakcyjny — stan przy pozycji | **działa** | `services/rabaty.ts`, `allegro_rabat`, `zwrot_klienta.status_allegro` |
+| Rabat transakcyjny — złożenie wniosku | **działa** | PIERWSZY zapis do Allegro; wymaga `allegro:api:orders:write` |
 | Anulowanie wniosku o rabat | **niepotrzebne** | decyzja właściciela: Allegro anuluje wniosek samo |
-| Rabat transakcyjny — wniosek składany sam | **działa** od 0.320.0 | `services/rabaty-automat.ts`; karencja 30 min, sufit 20 na takt, zastane pozycje poza automatem |
-| Komplet rozbity na paragonie | **działa** od 0.328.0 | `services/komplety.ts`, `oferta_komplet`; kartoteka z dokumentu, ilość ze zwrotu |
-| Reklamacje — odczyt, kolejka i czat | **działa** od 0.222.0 | `services/reklamacje.ts`, `services/allegro-reklamacje-sync.ts`, `panel/src/reklamacje/` |
-| Termin decyzji przy reklamacji | **z Allegro** od 0.222.0 | `decisionDueDate`; sprzed 0.140.0 liczyliśmy go sami i było to błędem |
-| Dyskusje (`type: "DISPUTE"`) | **wycofane** w 0.612.0 | §25c; nowe sprawy idą przez skrzynkę, wiersze zostają w bazie |
-| Prośba o zakończenie dyskusji (`END_REQUEST`) | **wycofane** w 0.612.0 | razem z ekranem dyskusji |
-| Odpowiedź w czacie reklamacji | **działa** od 0.224.0 | `services/reklamacje-wysylka.ts`, `reklamacja_outbox`, `reklamacje/Edytor.tsx`; `type: "REGULAR"`, sam tekst, limit 20 000 znaków |
-| Klucz idempotencji wspólny dla skrzynki i reklamacji | **działa** od 0.224.0 | `services/idempotencja.ts`; liczy go SERWER, format `snd-` nietknięty |
-| Świeżość liczona od ostatniej NIE naszej wiadomości | **działa** od 0.224.0 | rola inna niż `SELLER`, więc także doradcy Allegro |
-| Rozmowa sprawy dociąga się STRONAMI | **działa** od 0.273.0 | `offset` do pięciu stron; dłuższa dostaje `czat_urwany` i własne zdanie na ekranie zamiast obietnicy |
-| Sprawy otwarte przed bezpiecznikiem stron | **działa** od 0.273.0 | filtr `status` ze specyfikacji; przelot otwartych przed przelotem pełnym |
-| Język odpowiedzi Allegro | **działa** od 0.273.0 | `accept-language: pl-PL` w `zapytajAllegro` — jedno miejsce dla całej rodziny końcówek |
-| Odświeżenie JEDNEJ sprawy | **działa** od 0.273.0 | `GET /sale/issues/{id}`, trasa `…/odswiez`; wołane po wysyłce i po werdykcie |
-| Copilot RADZI w reklamacji | **zdjęte z ekranu** od 0.564.0 | działało od 0.276.0; rekomendacja typowana słownikiem werdyktu plus POPROSIC_O_DOWODY; zapisane rady zostają, trafność dalej liczy się z wysłanego werdyktu |
-| Copilot reklamacyjny: karta faktów | **zdjęte z ekranu** od 0.564.0 | działało od 0.275.0; `services/copilot-reklamacja.ts` zostaje, trasy `…/rozpoznaj` nie ma, zapisane karty jadą w szczegółach sprawy |
-| Dowody biura w reklamacji | **zdjęte z ekranu** od 0.575.0 | działało od 0.564.0; `services/reklamacja-dowody.ts` i `reklamacja_dowod` zostają, zapisane wpisy jadą w szczegółach sprawy |
-| Reklamacja u dostawcy | **zdjęte z ekranu** od 0.575.0 | działało od 0.564.0; `services/reklamacja-dowody-zapis.ts` i `reklamacja_u_dostawcy` zostają, trasa `…/u-dostawcy` także |
-| Ostatnia dostawa towaru w sprawie | **zdjęte z ekranu** od 0.575.0 | działało od 0.564.0; `services/ostatnia-dostawa.ts` dalej liczy `dostawa` w szczegółach sprawy |
-| Kwota sprawy w kolejce | **działa** od 0.564.0 | `kwotaSprawy` w `services/reklamacje.ts`; żądanie klienta, potem cena z paragonu razy liczba sztuk, bez zgadywania jednej sztuki |
-| Załączniki WYCHODZĄCE w sprawie | **działa** od 0.274.0 | `services/reklamacje-zalaczniki.ts`; deklaracja z polem `fileName`, adres wgrania z nagłówka `Location`, spinacz wspólny ze skrzynką |
-| Werdykt reklamacji do Allegro | **działa** od 0.242.0 | `services/reklamacja-werdykt.ts`, `reklamacje/Werdykt.tsx`; `POST /sale/issues/{id}/status`, jedenaście wartości, kwota przy częściowym, `autoryzuj("reklamacja_werdykt")`, los na wierszu |
-| Krok „towar do odesłania?" po uznaniu | **zdjęte z ekranu** od 0.575.0 | działało od 0.242.0; wybór towaru stoi w formularzu werdyktu, a ponowienie idzie z okna konfliktu. `RETURN_REQUIRED_CUSTOM` / `RETURN_NOT_REQUIRED` przez `reklamacja_outbox.typ`; `[WERYFIKUJ]` mapowanie na `returnRequired` |
-| Towar razem z werdyktem | **działa** od 0.564.0 | pole `towar` w `…/werdykt`; walidacja przed werdyktem, wysyłka tylko po `sent`, jedno `autoryzuj()`; krok po werdykcie zostaje jako droga zapasowa |
-| Podgląd załącznika reklamacji na osi | **działa** od 0.223.0, wyrównane w 0.246.0 | typ z SYGNATURY pliku (`rozpoznajMime` × `TYPY_PODGLADU`); przechodzą JPEG, PNG, GIF; od 0.246.0 ta sama powłoka co w skrzynce (`towar/Zalacznik.tsx`), odmowa Allegro 502 / awaria drogi 503 ze zdaniem i „Spróbuj ponownie" (`routes/pobranie.ts`), błąd pobrania widoczny |
-| Zdjęcie oferty i kartoteki przy reklamacji | **działa** od 0.223.0 | `offer_snapshot` i `oferta_kartoteka` w kolejce, dwa kafle w dowodach |
-| Spoiwo kolejek — sprawy i droga zakupu | **działa** od 0.387.0 | `services/droga-klienta.ts`, `panel/src/sprawy/Spoiwo.tsx`; mostek po `order_id`, blok wspólny dla skrzynki, zwrotów i reklamacji; w skrzynce od 0.558.0 bez czipów drogi, bo mówią ją linie zakupu w osi (§10.2g) |
-| Historia klienta ze zwrotami i sprawami | **działa** od 0.387.0 | `services/klient-historia.ts`; pięć rodzajów wpisu, wiązanie po `kupujacy_login` — wolno, bo zwrot i sprawa niosą go z Allegro |
-| Profil klienta: liczby, sygnały, otwarte sprawy, zamówienia, notatka | **działa** od 0.484.0 | `services/profil-klienta.ts`, `GET /api/obsluga/klient/:login`, `panel/src/ekrany/ProfilKlienta.tsx`; login przez konta, bez wielkości liter; sygnały wyliczane; zapisy tylko na kliknięcie: `klient_notatka` z cofnięciem i od 0.535.0 sprawa klienta; karta „Otwarte sprawy” nazywa się od 0.535.0 „Otwarte w kolejkach” |
-| Sprawa klienta: kto prowadzi, następny krok z terminem, zakończenie | **działa** od 0.535.0 (pierwszy przyrost S6) | `services/prowadzenie-klienta.ts`, tabela `klient_prowadzenie`, cztery `POST /api/obsluga/klient/:login/sprawa/…` (`krok`, `zakoncz`, `wznow`, `przejmij`), karta na profilu, linijka przy historii klienta, wiersz w „Moje”; dwa stany, krok jako jedyna droga założenia i wznowienia, „nowe” z odcisku przy odczycie, obudzenie zakończonej przez 30 dni od zakończenia, `wersja` i odcisk pilnują świeżości każdego zapisu; w dzienniku numer sprawy, nigdy login ani krok; Ctrl+K po numerze zamówienia daje wiersz kupującego (`szukajWszedzie`), żeby brak w dostawie był o krok od sprawy (`docs/obsluga-klienta-calosc.md` S6, `docs/obsluga-klienta.md`) |
-| Dosyłka ze śledzeniem: numer i stan drugiej paczki przy kroku „dosłać” | **działa** od 0.536.0 (drugi przyrost S6), poprawki w 0.536.1 | `services/dosylka.ts`, czysty `services/dosylka-opis.ts`, tabela `klient_dosylka`; odmowa wypłaty z kodem `NEW_ITEM_SENT` albo `MISSING_PART_SENT` w tym samym ruchu stawia krok „dosłać” (trzy dni robocze, 8:00) tą samą drogą co „Ustaw krok” i zakłada śledzenie, a jej porażka nie psuje odmowy (`POST /api/obsluga/zwroty/:id/dosylka` ponawia); ticker `dosylki` w `main()` co 17 minut (`ALLEGRO_DOSYLKI_SYNC_MS`) wykrywa numer przy zamówieniu i śledzi paczkę tylko w sprawach w toku i w bieżącym epizodzie, a wznowienie sprawy odkłada do historii skończone dosyłki, w drodze zostawia; numer wpisany ręką (`POST …/sprawa/dosylka/numer`) i propozycja na profilu (`POST …/sprawa/dosylka`) sprawdzają wersję i odcisk; doręczenie i kłopot budzą sprawę (klucze odcisku `k`, `q`); „Moje” stawia na dziś dosyłkę bez numeru i z kłopotem; odmowa z panelu Allegro bez śledzenia staje od 0.541.0 w „Do decyzji” wierszem z przyciskiem „Śledź dosyłkę” (`odmowy-dosylki.ts`, ta sama reguła co propozycja na profilu); w dzienniku numer sprawy, nigdy numer przesyłki (`docs/obsluga-klienta-calosc.md` S6, `docs/obsluga-klienta.md`) |
-| Test na żywym Allegro | **działa** od 0.495.0 | `services/sonda-rzeczywistosci.ts`, takt dzienny w `main()`, karta `stan/Sonda.tsx`, wiersz w DO DECYZJI; drogi produkcji bez atrap, tylko odczyt z Allegro |
-| Droga zakupu przez kolejki | **działa** od 0.387.0 | `drogaZakupu`; ODCZYT z momentów otwarcia, bez zdarzenia i bez tabeli (otwarcie ekranu nic nie mutuje) |
-| Jedno „Moje" ponad kolejkami | **działa** od 0.387.0 | `mojeSprawy`, `GET /api/obsluga/moje`, `panel/src/ekrany/Moje.tsx`; TRZY kolejki — zwrot nie ma prowadzącego od 0.370.0; tożsamość z sesji, nie z zapytania; od 0.535.0 także sprawy klienta tej osoby, scalone w `mojaLista` w cztery piętra |
-| Miara eskalacji po rozmowie | **działa** od 0.387.0 | `eskalacje`, `GET /api/obsluga/eskalacja`, `panel/src/ustawienia/Eskalacja.tsx`; liczy ZAKUPY, bez osi osobowej |
-| Statusy końcowe sprawy w jednym pliku | **działa** od 0.387.0 | `services/statusy-spraw.ts`; status nieznany zostaje OTWARTY |
-| Raport sondy w repo | **działa** od 0.164.0 | `docs/allegro-sonda.md`, obserwacja z 2 września |
+| Rabat transakcyjny — wniosek składany sam | **działa** | `services/rabaty-automat.ts`; karencja 30 min, sufit 20 na takt, zastane pozycje poza automatem |
+| Komplet rozbity na paragonie | **działa** | `services/komplety.ts`, `oferta_komplet`; kartoteka z dokumentu, ilość ze zwrotu |
+| Reklamacje — odczyt, kolejka i czat | **działa** | `services/reklamacje.ts`, `services/allegro-reklamacje-sync.ts`, `panel/src/reklamacje/` |
+| Termin decyzji przy reklamacji | **z Allegro** | `decisionDueDate`; sprzed 0.140.0 liczyliśmy go sami i było to błędem |
+| Odpowiedź w czacie reklamacji | **działa** | `services/reklamacje-wysylka.ts`, `reklamacja_outbox`, `reklamacje/Edytor.tsx`; `type: "REGULAR"`, sam tekst, limit 20 000 znaków |
+| Klucz idempotencji wspólny dla skrzynki i reklamacji | **działa** | `services/idempotencja.ts`; liczy go SERWER, format `snd-` nietknięty |
+| Świeżość liczona od ostatniej NIE naszej wiadomości | **działa** | rola inna niż `SELLER`, więc także doradcy Allegro |
+| Rozmowa sprawy dociąga się STRONAMI | **działa** | `offset` do pięciu stron; dłuższa dostaje `czat_urwany` i własne zdanie na ekranie zamiast obietnicy |
+| Sprawy otwarte przed bezpiecznikiem stron | **działa** | filtr `status` ze specyfikacji; przelot otwartych przed przelotem pełnym |
+| Język odpowiedzi Allegro | **działa** | `accept-language: pl-PL` w `zapytajAllegro` — jedno miejsce dla całej rodziny końcówek |
+| Odświeżenie JEDNEJ sprawy | **działa** | `GET /sale/issues/{id}`, trasa `…/odswiez`; wołane po wysyłce i po werdykcie |
+| Copilot RADZI w reklamacji | **zdjęte z ekranu** | działało od 0.276.0; rekomendacja typowana słownikiem werdyktu plus POPROSIC_O_DOWODY; zapisane rady zostają, trafność dalej liczy się z wysłanego werdyktu |
+| Copilot reklamacyjny: karta faktów | **zdjęte z ekranu** | działało od 0.275.0; `services/copilot-reklamacja.ts` zostaje, trasy `…/rozpoznaj` nie ma, zapisane karty jadą w szczegółach sprawy |
+| Dowody biura w reklamacji | **zdjęte z ekranu** | działało od 0.564.0; `services/reklamacja-dowody.ts` i `reklamacja_dowod` zostają, zapisane wpisy jadą w szczegółach sprawy |
+| Reklamacja u dostawcy | **zdjęte z ekranu** | działało od 0.564.0; `services/reklamacja-dowody-zapis.ts` i `reklamacja_u_dostawcy` zostają, trasa `…/u-dostawcy` także |
+| Ostatnia dostawa towaru w sprawie | **zdjęte z ekranu** | działało od 0.564.0; `services/ostatnia-dostawa.ts` dalej liczy `dostawa` w szczegółach sprawy |
+| Kwota sprawy w kolejce | **działa** | `kwotaSprawy` w `services/reklamacje.ts`; żądanie klienta, potem cena z paragonu razy liczba sztuk, bez zgadywania jednej sztuki |
+| Załączniki WYCHODZĄCE w sprawie | **działa** | `services/reklamacje-zalaczniki.ts`; deklaracja z polem `fileName`, adres wgrania z nagłówka `Location`, spinacz wspólny ze skrzynką |
+| Werdykt reklamacji do Allegro | **działa** | `services/reklamacja-werdykt.ts`, `reklamacje/Werdykt.tsx`; `POST /sale/issues/{id}/status`, jedenaście wartości, kwota przy częściowym, `autoryzuj("reklamacja_werdykt")`, los na wierszu |
+| Krok „towar do odesłania?" po uznaniu | **zdjęte z ekranu** | działało od 0.242.0; wybór towaru stoi w formularzu werdyktu, a ponowienie idzie z okna konfliktu. `RETURN_REQUIRED_CUSTOM` / `RETURN_NOT_REQUIRED` przez `reklamacja_outbox.typ`; `[WERYFIKUJ]` mapowanie na `returnRequired` |
+| Towar razem z werdyktem | **działa** | pole `towar` w `…/werdykt`; walidacja przed werdyktem, wysyłka tylko po `sent`, jedno `autoryzuj()`; krok po werdykcie zostaje jako droga zapasowa |
+| Podgląd załącznika reklamacji na osi | **działa**, wyrównane w 0.246.0 | typ z SYGNATURY pliku (`rozpoznajMime` × `TYPY_PODGLADU`); przechodzą JPEG, PNG, GIF; od 0.246.0 ta sama powłoka co w skrzynce (`towar/Zalacznik.tsx`), odmowa Allegro 502 / awaria drogi 503 ze zdaniem i „Spróbuj ponownie" (`routes/pobranie.ts`), błąd pobrania widoczny |
+| Zdjęcie oferty i kartoteki przy reklamacji | **działa** | `offer_snapshot` i `oferta_kartoteka` w kolejce, dwa kafle w dowodach |
+| Spoiwo kolejek — sprawy i droga zakupu | **działa** | `services/droga-klienta.ts`, `panel/src/sprawy/Spoiwo.tsx`; mostek po `order_id`, blok wspólny dla skrzynki, zwrotów i reklamacji; w skrzynce od 0.558.0 bez czipów drogi, bo mówią ją linie zakupu w osi (§10.2g) |
+| Historia klienta ze zwrotami i sprawami | **działa** | `services/klient-historia.ts`; pięć rodzajów wpisu, wiązanie po `kupujacy_login` — wolno, bo zwrot i sprawa niosą go z Allegro |
+| Profil klienta: liczby, sygnały, otwarte sprawy, zamówienia, notatka | **działa** | `services/profil-klienta.ts`, `GET /api/obsluga/klient/:login`, `panel/src/ekrany/ProfilKlienta.tsx`; login przez konta, bez wielkości liter; sygnały wyliczane; zapisy tylko na kliknięcie: `klient_notatka` z cofnięciem i od 0.535.0 sprawa klienta; karta „Otwarte sprawy” nazywa się od 0.535.0 „Otwarte w kolejkach” |
+| Sprawa klienta: kto prowadzi, następny krok z terminem, zakończenie | **działa** (pierwszy przyrost S6) | `services/prowadzenie-klienta.ts`, tabela `klient_prowadzenie`, cztery `POST /api/obsluga/klient/:login/sprawa/…` (`krok`, `zakoncz`, `wznow`, `przejmij`), karta na profilu, linijka przy historii klienta, wiersz w „Moje”; dwa stany, krok jako jedyna droga założenia i wznowienia, „nowe” z odcisku przy odczycie, obudzenie zakończonej przez 30 dni od zakończenia, `wersja` i odcisk pilnują świeżości każdego zapisu; w dzienniku numer sprawy, nigdy login ani krok; Ctrl+K po numerze zamówienia daje wiersz kupującego (`szukajWszedzie`), żeby brak w dostawie był o krok od sprawy (`docs/obsluga-klienta-calosc.md` S6, `docs/obsluga-klienta.md`) |
+| Dosyłka ze śledzeniem: numer i stan drugiej paczki przy kroku „dosłać” | **działa** (drugi przyrost S6), poprawki w 0.536.1 | `services/dosylka.ts`, czysty `services/dosylka-opis.ts`, tabela `klient_dosylka`; odmowa wypłaty z kodem `NEW_ITEM_SENT` albo `MISSING_PART_SENT` w tym samym ruchu stawia krok „dosłać” (trzy dni robocze, 8:00) tą samą drogą co „Ustaw krok” i zakłada śledzenie, a jej porażka nie psuje odmowy (`POST /api/obsluga/zwroty/:id/dosylka` ponawia); ticker `dosylki` w `main()` co 17 minut (`ALLEGRO_DOSYLKI_SYNC_MS`) wykrywa numer przy zamówieniu i śledzi paczkę tylko w sprawach w toku i w bieżącym epizodzie, a wznowienie sprawy odkłada do historii skończone dosyłki, w drodze zostawia; numer wpisany ręką (`POST …/sprawa/dosylka/numer`) i propozycja na profilu (`POST …/sprawa/dosylka`) sprawdzają wersję i odcisk; doręczenie i kłopot budzą sprawę (klucze odcisku `k`, `q`); „Moje” stawia na dziś dosyłkę bez numeru i z kłopotem; odmowa z panelu Allegro bez śledzenia staje od 0.541.0 w „Do decyzji” wierszem z przyciskiem „Śledź dosyłkę” (`odmowy-dosylki.ts`, ta sama reguła co propozycja na profilu); w dzienniku numer sprawy, nigdy numer przesyłki (`docs/obsluga-klienta-calosc.md` S6, `docs/obsluga-klienta.md`) |
+| Test na żywym Allegro | **działa** | `services/sonda-rzeczywistosci.ts`, takt dzienny w `main()`, karta `stan/Sonda.tsx`, wiersz w DO DECYZJI; drogi produkcji bez atrap, tylko odczyt z Allegro |
+| Droga zakupu przez kolejki | **działa** | `drogaZakupu`; ODCZYT z momentów otwarcia, bez zdarzenia i bez tabeli (otwarcie ekranu nic nie mutuje) |
+| Jedno „Moje" ponad kolejkami | **działa** | `mojeSprawy`, `GET /api/obsluga/moje`, `panel/src/ekrany/Moje.tsx`; TRZY kolejki — zwrot nie ma prowadzącego od 0.370.0; tożsamość z sesji, nie z zapytania; od 0.535.0 także sprawy klienta tej osoby, scalone w `mojaLista` w cztery piętra |
+| Miara eskalacji po rozmowie | **działa** | `eskalacje`, `GET /api/obsluga/eskalacja`, `panel/src/ustawienia/Eskalacja.tsx`; liczy ZAKUPY, bez osi osobowej |
+| Statusy końcowe sprawy w jednym pliku | **działa** | `services/statusy-spraw.ts`; status nieznany zostaje OTWARTY |

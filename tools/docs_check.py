@@ -51,6 +51,11 @@ ALLOWED_MISSING = {
     # CHANGELOG-a i rozdziały-zapisy w panel-obslugi-klienta.md nazywają go
     # po imieniu, bo opisują czas, w którym istniał.
     "docs/dobor-od-zera.md",
+    # Makiety zastąpione kodem panelu i notatka decyzyjna, która spełniła
+    # swoje zadanie. CHANGELOG nazywa je, bo opisuje wydania z ich czasu.
+    "docs/projekt-widokow-jeden-front/",
+    "docs/projekt-widokow-biuro/",
+    "docs/porownanie-asystent.md",
 }
 
 # Byty usunięte z kodu — odwołanie do nich w dokumentacji znaczy, że opis

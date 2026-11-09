@@ -93,8 +93,8 @@ wyjątek: nowy odczyt nie dokłada czwartej drogi, tylko korzysta z istniejącej
 ### 3. Zegar rządzi kolejnością, a sprawa bez zegara dostaje własny
 
 Termin jest osobnym bytem i to on ustawia pracę. Reklamacja bierze go
-z Allegro (`decisionDueDate`), zwrot z ustawy. Dyskusja liczy pilność bez
-zegara (§25c.4), a rozmowa nie ma terminu odpowiedzi. **Zabrania** sortowania
+z Allegro (`decisionDueDate`), zwrot z ustawy, a rozmowa nie ma terminu
+odpowiedzi. **Zabrania** sortowania
 po dacie wpływu tam, gdzie istnieje termin (blizna 0.121.0). **Pilnuje**
 `droga-klienta.test.ts`: sprawa z terminem staje nad sprawą bez terminu (S4).
 
