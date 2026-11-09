@@ -2,16 +2,15 @@ import { useZdrowie } from "../api/rozmowy";
 import type { Zdrowie } from "../api/typy";
 import { godzina } from "../ui";
 
-/* ── Stan synchronizacji w nagłówku (z pigułki 0.193.0, skrócony 0.538.0) ──
+/* ── Stan synchronizacji w nagłówku ──────────────────────────────────────────
    Stoi w NAGŁÓWKU, a nie w skrzynce: agent ma go widzieć z każdej zakładki.
    Awaria integracji, o której wie tylko jeden ekran, jest awarią widoczną
    dopiero wtedy, gdy ktoś na ten ekran wejdzie.
 
-   KROPKA I GODZINA ZAMIAST ZDANIA (0.538.0, decyzja właściciela z 27 września
-   2026 — nagłówek w jednym rzędzie). Pełne zdanie zajmowało ~200 px, a przy
-   1180 px jeden rząd nie ma ich skąd wziąć. W spokoju agent pyta tylko „czy
-   żyje i jak świeże", a na to odpowiadają kolor i godzina. Liczba błędów
-   została w dymku i w menu „Więcej" przy stanie systemu, jeden klik dalej.
+   KROPKA I GODZINA ZAMIAST ZDANIA: nagłówek ma jeden rząd, a pełne zdanie
+   zajęłoby ~200 px. W spokoju agent pyta tylko „czy żyje i jak świeże", a na
+   to odpowiadają kolor i godzina. Liczba błędów stoi w dymku i w menu
+   „Więcej" przy stanie systemu, jeden klik dalej.
 
    ALARM ZOSTAJE SŁOWEM, nie kolorem kropki: „Stanęła" czerwonym tekstem.
    Czerwona kropka wśród ośmiu zakładek to szczegół, który oko przeskakuje,
@@ -30,9 +29,8 @@ export function WskaznikSynchronizacji() {
   if (!data) return null;
   const i = data.allegroInbox;
   const zle = i.status !== "current";
-  /* Zielona kropka przy „—" mówiła „działa" o synchronizacji, która nie
-     odbyła się ani razu (0.546.0). Nieznane to nie to samo co dobre, więc
-     przed pierwszą udaną kropka jest szara, a dymek mówi to zdaniem. */
+  /* Przed pierwszą udaną synchronizacją kropka jest szara, a dymek mówi to
+     zdaniem: nieznane to nie to samo co dobre. */
   const nigdy = !i.ostatniaUdanaSynchronizacja;
   const zdanie = zdanieSynchronizacji(i);
   return <span role="status" title={zdanie} aria-label={zdanie}

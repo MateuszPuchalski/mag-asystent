@@ -4,7 +4,7 @@ import { dzienMiesiac } from "../ui";
 import type { StanZakupu } from "./zakup";
 
 /* ── PROŚBA O ANULOWANIE: ZAMÓWIENIE POD RĘKĄ ───────────────────────────────
-   Decyzja właściciela z 8 października 2026: przy rozmowie rozpoznanej jako
+   Decyzja właściciela: przy rozmowie rozpoznanej jako
    anulowanie odnośnik do zamówienia ma stać w rozmowie jako przycisk. Powód:
    opłacone zamówienie trzeba anulować i oddać pieniądze w Allegro, a agent
    ma tam trafić jednym kliknięciem, zanim paczka wyjdzie z magazynu.

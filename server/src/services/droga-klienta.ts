@@ -10,36 +10,32 @@ import { opisPomylki } from "./pomylki.js";
    kolei. Podział jest NASZ,
    nie jego — i to jest punkt 1 dekalogu.
 
-   Wiązania istniały przed tym plikiem, ale niepełne: pięć przejść z dwunastu
-   możliwych. Żaden ekran nie widział sprawy POSPRZEDAŻOWEJ, więc agent
-   odpowiadający na pytanie nie wiedział o otwartej reklamacji tego klienta.
-   Ten plik domyka brakujące siedem jednym mostkiem.
+   Ten plik wiąże każdą kolejkę z każdą, żeby agent odpowiadający na pytanie
+   widział otwartą sprawę POSPRZEDAŻOWĄ tego samego klienta.
 
    MOSTKIEM JEST NUMER ZAMÓWIENIA i nic więcej. `message.related_order_id`,
    `zwrot_klienta.order_id` i `reklamacja_klienta.order_id` mówią o tym samym
    zakupie. Po loginie ten plik nie wiąże, bo droga ZAKUPU to jedno
    zamówienie, a login łączy wszystkie zakupy klienta. Te niesie historia
    klienta (`klient-historia.ts`). Login rozmówcy to login kupującego —
-   zweryfikował to właściciel 24 września 2026 (`docs/allegro-ksztalt.md`).
+   zweryfikował to właściciel (`docs/allegro-ksztalt.md`).
 
    ZERO ŻĄDAŃ DO ALLEGRO i zero nowych tabel. Wszystko, czego te odczyty
-   potrzebują, leży już w naszej bazie od pierwszej synchronizacji. Piąta
-   tabela ze wspólnym statusem nad kolejkami kosztowałaby to, co nakładka
-   spraw w 0.140.0 — cztery tabele i ręczne SCAL. `klient_prowadzenie`
-   (0.535.0, S6) taką tabelą nie jest: nie zbiera statusów kolejek, tylko
-   niesie nasz następny krok — powód w `prowadzenie-klienta.ts`. */
+   potrzebują, leży już w naszej bazie od pierwszej synchronizacji. Tabela
+   ze wspólnym statusem nad kolejkami wymagałaby ręcznego SCAL.
+   `klient_prowadzenie` (S6) taką tabelą nie jest: nie zbiera statusów
+   kolejek, tylko niesie nasz następny krok — powód w
+   `prowadzenie-klienta.ts`. */
 
 type Wiersz = Record<string, unknown>;
 
 /**
  * Które rozmowy są o którym zamówieniu — JEDNA relacja SQL dla każdej strony
- * mostka (0.502.0). Kolumny: `conversation_id`, `numer`, `at`.
+ * mostka. Kolumny: `conversation_id`, `numer`, `at`.
  *
- * Do tego wydania skrzynka czytała numer rozmowy razem z ręcznym wskazaniem
- * (`numerZamowieniaRozmowy`), a zwrot, reklamacja, droga zakupu i szukanie —
- * tylko z `message.related_order_id`. Rozmowa z zamówieniem wskazanym przez
- * agenta widziała więc zwrot, a zwrot jej nie widział. Wiązanie jednostronne
- * to wiązanie, którego nie ma (CLAUDE.md), i nic go nie pilnowało.
+ * Każda strona czyta tę samą relację, z ręcznym wskazaniem włącznie. Inaczej
+ * rozmowa z zamówieniem wskazanym przez agenta widziałaby zwrot, a zwrot jej
+ * nie. Wiązanie jednostronne to wiązanie, którego nie ma (CLAUDE.md).
  *
  * Reguła jest ta sama co w `numerZamowieniaRozmowy`: numer z wiadomości bije
  * wskazanie, bo numer z Allegro jest faktem, a wskazanie wnioskiem. Wskazanie
@@ -76,8 +72,7 @@ const tekst = (v: unknown): string | null => {
  * `WierszReklamacji` ma czterdzieści pól, bo obsługuje własną kolejkę. Blok
  * kontekstu odpowiada na jedno pytanie: „czy ten klient ma u nas coś jeszcze
  * otwartego i jak pilne". Pełny wiersz dołożyłby do skrzynki propozycje
- * kartotek i stany rabatów, których nikt tam nie czyta — audyt zwrotów
- * z 15 września 2026 opisuje dokładnie ten koszt przy szczególe zwrotu.
+ * kartotek i stany rabatów, których nikt tam nie czyta.
  */
 export interface SprawaZakupu {
   id: number;
@@ -150,13 +145,11 @@ export interface PrzystanekDrogi {
 /**
  * Droga jednego zakupu przez kolejki — ODCZYT, nigdy zapis.
  *
- * Projekt spoiwa przewidywał tu zdarzenie dopisywane przy synchronizacji.
- * Zdarzenie jest ZBĘDNE: moment otwarcia każdego bytu i tak leży w bazie,
- * więc przeskok wylicza się z kolejności. Zapis dokładałby drugą prawdę o tym
- * samym fakcie, a ta rozjeżdża się przy pierwszej poprawce jednej z nich.
+ * Moment otwarcia każdego bytu i tak leży w bazie, więc przeskok wylicza się
+ * z kolejności. Zdarzenie zapisywane przy synchronizacji byłoby drugą prawdą
+ * o tym samym fakcie, a ta rozjeżdża się przy pierwszej poprawce.
  *
  * Wynika z tego druga rzecz, ważniejsza: otwarcie ekranu niczego nie mutuje.
- * Zapis przy samym patrzeniu jest blizną 0.18.0 i umową liczników w testach.
  */
 export function drogaZakupu(
   database: Db = defaultDb(), konto: number, orderId: string | null,
@@ -293,13 +286,13 @@ export function kontekstZwrotu(
 
 /** Jedna pozycja listy „Moje" — z której kolejki i co to za sprawa. */
 export interface MojaSprawa {
-  /* Dwie kolejki, nie trzy: zwrot nie ma prowadzącego od 0.370.0. Powód
+  /* Dwie kolejki, nie trzy: zwrot nie ma prowadzącego. Powód
      stoi przy zapytaniach w `mojeSprawy`.
 
-     `klient` to sprawa klienta (S6, 0.535.0) — nie kolejka, tylko nasz
+     `klient` to sprawa klienta (S6) — nie kolejka, tylko nasz
      następny krok przy kliencie. Wiersze dokłada `mojaLista`
      w `prowadzenie-klienta.ts`; ten plik zna wyłącznie TYP, bo import
-     w drugą stronę zamknąłby cykl (blizna `statusy-spraw.ts`). */
+     w drugą stronę zamknąłby cykl (`statusy-spraw.ts`). */
   kolejka: "rozmowa" | "reklamacja" | "klient";
   id: number;
   /** Zdanie na wiersz: temat rozmowy, numer zwrotu albo temat sprawy. */
@@ -321,20 +314,19 @@ export interface MojaSprawa {
   dzis?: boolean;
   /** Zdanie najnowszego zdarzenia po stronie klienta; `null`, gdy nic nowego. */
   nowe?: string | null;
-  /** Stan najważniejszej dosyłki sprawy (0.536.0): kłopot, brak numeru, w drodze,
+  /** Stan najważniejszej dosyłki sprawy: kłopot, brak numeru, w drodze,
    *  doręczona — zdaniem z serwera; `null`, gdy sprawa dosyłki nie ma. */
   dosylka?: string | null;
 }
 
 /**
  * Wszystko, co prowadzi jedna osoba — kolejki jedną listą (S4 spoiwa).
- * Sprawy klienta (S6, 0.535.0) dokłada do niej `mojaLista`
+ * Sprawy klienta (S6) dokłada do niej `mojaLista`
  * w `prowadzenie-klienta.ts` i to ją woła trasa „Moje”, nie tę funkcję.
  *
  * ODCZYT Z DWÓCH ZAPYTAŃ, nie piąta kolejka i nie nowa tabela. Kliknięcie
  * prowadzi na ekran właściwy dla rodzaju sprawy, bo to tam stoją jej bramki.
- * Wspólny ekran roboczy nad kolejkami byłby piątą kolejką z własnym statusem,
- * czyli kształtem, który kosztował cztery tabele nakładki (blizna 0.140.0).
+ * Wspólny ekran roboczy nad kolejkami byłby piątą kolejką z własnym statusem.
  *
  * KAŻDA KOLEJKA MA WŁASNE POJĘCIE WŁAŚCICIELA i to nie jest niedoróbka.
  * Rozmowa ma `assigned_user_id` — przydział, bo odpowiada jedna osoba. Sprawa
@@ -344,9 +336,8 @@ export interface MojaSprawa {
  *
  * KOLEJNOŚĆ MA DWA PIĘTRA, nie jedno pole. Najpierw sprawy z TERMINEM, wedle
  * terminu; potem reszta, wedle ostatniego ruchu. Jedno pole na oba zegary
- * ustawiłoby sprawę ruszoną wczoraj nad sprawą, której termin mija jutro —
- * a to jest wprost blizna 0.121.0: jeden zegar nazwany drugim. Zegar rządzi
- * kolejnością pracy, ale wyłącznie tam, gdzie zegar jest.
+ * ustawiłoby sprawę ruszoną wczoraj nad sprawą, której termin mija jutro.
+ * Zegar rządzi kolejnością pracy, ale wyłącznie tam, gdzie zegar jest.
  */
 export function mojeSprawy(
   database: Db = defaultDb(), userId: number,
@@ -357,7 +348,7 @@ export function mojeSprawy(
     SELECT id, subject, updated_at FROM conversation
      WHERE assigned_user_id = ?
        AND status NOT IN ('resolved','closed','spam')`).all(userId) as Wiersz[]) {
-    /* Zakończenie liczy się też SAMO, przy odczycie (23 września 2026):
+    /* Zakończenie liczy się też SAMO, przy odczycie:
        podziękowanie, dwa dni ciszy, wątek zamknięty w Allegro. Kolumna tego
        nie zna, więc filtr SQL zostaje tylko wstępnym sitem — rozstrzyga ta
        sama reguła, co w skrzynce. */
@@ -385,16 +376,10 @@ export function mojeSprawy(
     });
   }
 
-  /* ZWROTÓW TU NIE MA I TO NIE JEST NIEDOKOŃCZONA ROBOTA. Projekt spoiwa
-     mówił „cztery źródła", a w 0.370.0 właściciel zdjął ze zwrotu znacznik
-     prowadzącego wprost: zwrot przechodzi przez biuro jako KOLEJKA DECYZJI,
-     nie jako czyjaś sprawa. Kolumny `prowadzi_*` zostały w tabeli, ale nikt
-     ich nie pisze, więc lista z nich byłaby pusta albo — gorzej — pokazywała
-     przydziały sprzed tamtego wydania.
-
-     Wskrzeszanie znacznika przy okazji innej funkcji odwracałoby decyzję
-     właściciela bez jednego zdania uzasadnienia. Zwrot wraca tu w dniu,
-     w którym ktoś tę decyzję świadomie zmieni. */
+  /* ZWROTÓW TU NIE MA, decyzją właściciela: zwrot przechodzi przez biuro
+     jako KOLEJKA DECYZJI, nie jako czyjaś sprawa. Kolumn `prowadzi_*` nikt
+     nie pisze, więc lista z nich byłaby pusta albo pokazywała stare
+     przydziały. */
 
   return lista.sort((a, b) => {
     if (a.terminDo && b.terminDo) return a.terminDo.localeCompare(b.terminDo);

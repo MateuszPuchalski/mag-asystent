@@ -1,15 +1,14 @@
-import React, { useRef, useState } from "react";
+import { useRef, useState } from "react";
 import { FileText, ImageIcon, Paperclip, X } from "lucide-react";
 import type { ZalacznikSzkicu } from "../api/rozmowy";
 
-/* ── Załączniki DO WYSYŁKI (0.195.0) ─────────────────────────────────────────
-   Nazwa rozróżnia strony: `Os.tsx` rysuje załączniki PRZYCHODZĄCE (od 0.155.0,
-   testowane w `Zalaczniki.test.tsx`), a ten plik — te, które dopiero pójdą.
+/* ── Załączniki DO WYSYŁKI ───────────────────────────────────────────────────
+   Nazwa rozróżnia strony: `Os.tsx` rysuje załączniki PRZYCHODZĄCE (testy
+   w `Zalaczniki.test.tsx`), a ten plik — te, które dopiero pójdą.
 
-   Odczyt załączników klienta stoi od 0.155.0; wysyłka nie istniała wcale.
    Przy pytaniach o części zdjęcie bywa CAŁĄ odpowiedzią — „ten gwint, nie
-   tamten" pokazuje się szybciej, niż opisuje — a agent musiał po to iść do
-   panelu Allegro, czyli tam, skąd panel miał go zabrać (§25).
+   tamten" pokazuje się szybciej, niż opisuje — a panel Allegro to miejsce,
+   skąd panel ma agenta zabrać (§25).
 
    PLIK LECI DO ALLEGRO JUŻ PRZY DODANIU, nie przy WYŚLIJ. Dlatego lista tutaj
    pokazuje rzeczy, które NAPRAWDĘ tam są — a odmowa typu albo rozmiaru pada,
@@ -46,12 +45,12 @@ export function poLudzku(bajtow: number): string {
 }
 
 /**
- * Sam spinacz razem z jego ukrytym polem pliku (0.249.0).
+ * Sam spinacz razem z jego ukrytym polem pliku.
  *
  * ROZDZIELONY OD LISTY, bo mają różne miejsca na ekranie: przycisk należy do
  * rzędu działań pod polem, lista dołożonych plików — do wiadomości, którą się
- * komponuje. Do 0.247.0 stały razem i przycisk ciągnął listę ze sobą, więc
- * musiał zająć własny rząd. Zgłoszenie właściciela: „niepotrzebnie ułóż
+ * komponuje. Razem przycisk ciągnąłby listę i zajmował własny rząd.
+ * Zgłoszenie właściciela: „niepotrzebnie ułóż
  * odpowiedź i add attachment mają swój własny rząd".
  *
  * Pole `<input type="file">` jedzie z przyciskiem, nie z listą: bez niego
@@ -104,7 +103,7 @@ export function ZalacznikiWysylki({ lista, blad, onUsun, wylaczone }: {
 }) {
   return <div>
 
-    {/* ── NIE KAŻDE DZIAŁANIE ZASŁUGUJE NA PRZYCISK (0.247.0) ─────────────────
+    {/* ── NIE KAŻDE DZIAŁANIE ZASŁUGUJE NA PRZYCISK ───────────────────────────
         Pełny przycisk z obwódką i zdanie o dozwolonych formatach zajmowały
         własny rząd pod wysyłką — dwa elementy w tej samej wadze co „Wyślij do
         klienta", dla czynności, która zdarza się przy co którejś odpowiedzi.
@@ -114,7 +113,7 @@ export function ZalacznikiWysylki({ lista, blad, onUsun, wylaczone }: {
         a nie przy każdym otwarciu rozmowy. Wgrywanie ODZYSKUJE słowa, bo wtedy
         sama ikona nie powiedziałaby, że coś trwa. */}
 
-    {/* SPINACZ WYPROWADZONY DO RZĘDU DZIAŁAŃ (0.249.0). Stał we własnym
+    {/* SPINACZ WYPROWADZONY DO RZĘDU DZIAŁAŃ. Stał we własnym
         rzędzie nad wysyłką i kosztował 34 px wysokości na czynność, która
         zdarza się przy co którejś odpowiedzi. Lista dołożonych plików zostaje
         TUTAJ — należy do wiadomości, nie do przycisków. */}

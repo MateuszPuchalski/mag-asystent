@@ -1,4 +1,3 @@
-import React from "react";
 import { Zap } from "lucide-react";
 import type { Zwrot } from "../api/typy";
 import { zlote } from "../api/zwroty";
@@ -6,7 +5,7 @@ import { Przycisk } from "../ui";
 import type { SzybkaSciezka } from "./regulaSzybkiej";
 
 /**
- * Przycisk szybkiej ścieżki (0.481.0) — reguła stoi w `regulaSzybkiej.ts`.
+ * Przycisk szybkiej ścieżki — reguła stoi w `regulaSzybkiej.ts`.
  *
  * KWOTA STOI NA PRZYCISKU, bo to jedyna liczba, która wychodzi do klienta.
  * Kto naciska „wszystko w porządku", ma widzieć, ile to jest, zanim naciśnie
@@ -20,7 +19,7 @@ export function SzybkiZwrot({ zwrot, stan, trwa, blad, onStart }: {
   onStart: () => void;
 }) {
   if (!stan.pokaz) return null;
-  /* Sama suma pozycji, BEZ dostawy (0.484.5) — ta sama liczba, którą ciąg
+  /* Sama suma pozycji, BEZ dostawy — ta sama liczba, którą ciąg
      zapisze. Kwota na przycisku i kwota w bazie nie mogą się rozjechać. */
   const suma = zwrot.pozycje.reduce((s, p) => s + Math.round(p.cenaGrosze * p.ilosc), 0);
   const nieocenione = zwrot.pozycje.filter((p) => p.ocena === null).length;

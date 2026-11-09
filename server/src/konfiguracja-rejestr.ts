@@ -1,4 +1,4 @@
-/* ── Rejestr kluczy wertis.env (0.488.0) ─────────────────────────────────────
+/* ── Rejestr kluczy wertis.env ─────────────────────────────────────
    Lista WSZYSTKIEGO, co trzy programy czytają z `wertis.env`: serwer, worker
    Sfery i usługa tła. Do tego wydania jedynym spisem był `wertis.env.example`
    (561 linii), a pytanie „na czym ten serwer faktycznie chodzi" wymagało
@@ -51,7 +51,7 @@ export type Kto = "instalator" | "wlasciciel" | "zaawansowane" | "dev";
 export type Program = "serwer" | "sfera" | "tlo";
 
 /**
- * Jak panel ma edytować klucz (0.491.0). Brak pola = klucz zmienia się
+ * Jak panel ma edytować klucz. Brak pola = klucz zmienia się
  * wyłącznie w pliku albo instalatorem.
  *
  * Pole mają TYLKO decyzje właściciela czytane przez sam serwer. Klucze
@@ -80,7 +80,7 @@ export interface Klucz {
   czyta?: readonly Program[];
   edycja?: Edycja;
   /**
-   * Nazwa po polsku, pod którą panel pokazuje decyzję właściciela (0.543.0).
+   * Nazwa po polsku, pod którą panel pokazuje decyzję właściciela.
    * Klucz z pliku zostaje w dymku: szuka się go przy awarii, nie co dzień.
    * Wymagana przy `kto: "wlasciciel"` — pilnuje tego test.
    */

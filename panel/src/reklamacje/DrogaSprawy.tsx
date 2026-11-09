@@ -13,7 +13,7 @@ import { rozstrzygniecie } from "./statusy";
 import { OCZEKIWANIA, rozliczenieWerdyktu } from "./slownik";
 
 /* ── DROGA SPRAWY W JEDNYM RZĘDZIE ───────────────────────────────────────────
-   Makieta właściciela: sześć kroków od zakupu do rozliczenia, poziomo pod
+   Sześć kroków od zakupu do rozliczenia, poziomo pod
    głowicą. Agent widzi jednym spojrzeniem, gdzie stoi sprawa i ile zostało
    do terminu, zamiast składać to z dat rozsianych po kolumnach.
 
@@ -26,8 +26,7 @@ import { OCZEKIWANIA, rozliczenieWerdyktu } from "./slownik";
    najpierw, a zielona pigułka mówi naraz „zapłacił” i „ile”.
 
    DROGA NIESIE FAKTY ZAMÓWIENIA. Data i forma płatności, numer zamówienia,
-   stan paczki i pytanie o nią stoją przy swoim kroku. Osobna karta mówiła
-   to samo drugi raz, tylko bez kolejności w czasie.
+   stan paczki i pytanie o nią stoją przy swoim kroku, w kolejności w czasie.
 
    PODPIS MA NAJWYŻEJ DWIE LINIE i żadna się nie łamie. Krok rośnie w szerz,
    a rząd przewija się w poziomie, bo złamany podpis rozsadza wysokość drogi.

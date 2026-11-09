@@ -7,17 +7,11 @@ import { czas, godzina, stempel } from "./ui";
 const ZRODLA = import.meta.glob(["./**/*.tsx", "./**/*.ts", "!./**/*.test.ts", "!./**/*.test.tsx",
   "!./ui/index.tsx"], { query: "?raw", eager: true, import: "default" }) as Record<string, string>;
 
-/* ── CZAS MA JEDNO ŹRÓDŁO I NIE MA SEKUND (0.272.0) ────────────────────────────
-   Ustalenie 13 z audytu. `czas()` oddawał „10.09.2026, 14:23:05" we wszystkich
-   52 wywołaniach. Sekunda nie rozstrzyga w tym panelu niczego — ani kiedy
-   klient napisał, ani kiedy przebiegła synchronizacja.
-
-   Kod wiedział o tym przed audytem i radził sobie najgorszym możliwym
-   sposobem: TRZY miejsca robiły `czas(...).slice(-8, -3)`, czyli wycinek
-   liczony od KOŃCA sformatowanego napisu. To jest zakład o długość daty,
-   a nie odczyt godziny — i przegrywał dokładnie w chwili, w której `czas()`
-   przestaje dawać sekundy. Na „10.09.2026, 14:23" ten sam wycinek daje
-   „6, 14". Dlatego obie zmiany musiały wejść jednym wydaniem.
+/* ── CZAS MA JEDNO ŹRÓDŁO I NIE MA SEKUND ──────────────────────────────────────
+   Sekunda nie rozstrzyga w tym panelu niczego — ani kiedy klient napisał,
+   ani kiedy przebiegła synchronizacja. Wycinek liczony od KOŃCA
+   sformatowanego napisu (`czas(...).slice(-8, -3)`) to zakład o długość
+   daty, a nie odczyt godziny.
 
    CO PILNUJE — dwie rzeczy:
 
@@ -26,10 +20,10 @@ const ZRODLA = import.meta.glob(["./**/*.tsx", "./**/*.ts", "!./**/*.test.ts", "
         `toLocaleString`, `toLocaleTimeString` ani `toLocaleDateString`
         w ekranach — bo tak właśnie zaczyna się drugi format w panelu.
 
-   CZEGO NIE PILNUJE. Nie sprawdza PROMIENI (ustalenie 11). Reguła „promień
-   kafelka = promień bieżni minus jej wypełnienie" wymaga znajomości rodzica
-   i dziecka, a strażnik czyta tekst linia po linii. Dwa miejsca, których
-   dotyczy, mają uzasadnienie w komentarzu przy sobie i tyle.
+   CZEGO NIE PILNUJE. Nie sprawdza PROMIENI. Reguła „promień kafelka =
+   promień bieżni minus jej wypełnienie" wymaga znajomości rodzica i dziecka,
+   a strażnik czyta tekst linia po linii. Dwa miejsca, których dotyczy, mają
+   uzasadnienie w komentarzu przy sobie i tyle.
 
    ZWOLNIENIA SĄ JAWNE. Komentarz `czas: <powód>` w linii albo do sześciu linii
    nad nią, powód co najmniej trzy wyrazy — ten sam mechanizm i próg co

@@ -7,13 +7,10 @@ const MAIN = (import.meta.glob("./main.tsx", { query: "?raw", eager: true, impor
 const TESTY = import.meta.glob("./**/*.test.tsx",
   { query: "?raw", eager: true, import: "default" }) as Record<string, string>;
 
-/* ── KAŻDA TRASA MA STRAŻNIKA ZERA ZAPISU (0.544.0) ─────────────────────────
-   Reguła „otwarcie ekranu niczego nie mutuje" miała strażnika w testach
-   ekranów, ale tylko tam, gdzie autor pamiętał go dopisać. Część tras
-   chodziła bez niego, a CLAUDE.md twierdził, że pilnują go
-   „testy ekranów". Ten plik zamienia obietnicę w mechanizm: czyta trasy
-   z `main.tsx` i dla KAŻDEJ żąda testu, który liczy zapisy.
-
+/* ── KAŻDA TRASA MA STRAŻNIKA ZERA ZAPISU ───────────────────────────────────
+   Reguła „otwarcie ekranu niczego nie mutuje" nie może zależeć od tego, czy
+   autor pamiętał dopisać test. Ten plik czyta trasy z `main.tsx` i dla
+   KAŻDEJ żąda testu, który liczy zapisy.
    CO UZNAJE ZA STRAŻNIKA. Plik testu obok ekranu (`Nazwa.test.tsx` albo
    `Nazwa.<cokolwiek>.test.tsx`), który:
      - widzi metodę żądania: `method ?? "GET"`, atrapę `atrapaZapisow`

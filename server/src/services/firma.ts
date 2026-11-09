@@ -2,7 +2,7 @@ import type { DatabaseSync } from "node:sqlite";
 import { db } from "../db/db.js";
 import { logEvent } from "./events.js";
 
-/* ── Dane firmy (0.444.0) ──────────────────────────────────────────────────
+/* ── Dane firmy ────────────────────────────────────────────────────────────
    Nagłówek wydruków biura. Przeniesione z localStorage na serwer, bo dane
    jednej firmy trzymane osobno w każdej przeglądarce rozjeżdżały się po
    cichu: nowe biurko drukowało protokół z pustym nagłówkiem.

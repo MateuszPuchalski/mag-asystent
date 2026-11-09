@@ -4,38 +4,33 @@ import { linkZamowienia } from "./allegro-linki.js";
 import { ROZMOWA_ZAMOWIENIA } from "./droga-klienta.js";
 
 /* ── Historia klienta u nas (§10.1, zakładka KLIENT) ─────────────────────────
-   Zakładka wróciła z makiety decyzją właściciela. §10.1 skreślił ją w 0.198.0
-   zdaniem „nie ma bytu" — i to zdanie było prawdziwe o TABELI, nie o danych.
-   Kupujący ma u nas login, po którym wiążą się jego zamówienia, rozmowy
-   i sprawy. Wszystko to już leży w bazie.
+   Kupujący nie ma u nas osobnej tabeli, ale ma login, po którym wiążą się
+   jego zamówienia, rozmowy i sprawy. Wszystko to już leży w bazie.
 
    DLATEGO TU NIE MA ANI JEDNEJ NOWEJ TABELI. Osobny rejestr klienta
-   rozjechałby się z kolejkami przy pierwszej poprawce — to jest dokładnie
-   ten kształt, który w 0.128.0 kosztował cztery tabele nakładki spraw.
-   Historia jest ODCZYTEM.
+   rozjechałby się z kolejkami przy pierwszej poprawce. Historia jest
+   ODCZYTEM.
 
    TOŻSAMOŚĆ KLIENTA TO LOGIN ALLEGRO i nic więcej. Polityka danych skrzynki
    dopuszcza go wprost (`zamowienie_klienta.kupujacy_login`). Adres dostawy
-   przechodzi przez mapowanie od 0.422.0, ale ta zakładka po nim nie wiąże
+   przechodzi przez mapowanie, ale ta zakładka po nim nie wiąże
    i zmiana tego wymaga uzasadnienia w `docs/obsluga-klienta.md`. Bez loginu
    ekran mówi, że nie wie — zgadywanie klienta z treści rozmowy byłoby
    pokazaniem cudzych zakupów pod nazwiskiem, którego nikt nie potwierdził.
 
    LOGIN ROZMÓWCY TO LOGIN KUPUJĄCEGO — zweryfikował to właściciel
-   24 września 2026 (`docs/allegro-ksztalt.md`). `client:44300444` z blizny
-   0.56.6 to login kupującego bez konta, nie maska.
+   (`docs/allegro-ksztalt.md`). `client:44300444` to login kupującego bez
+   konta, nie maska.
 
    PORÓWNANIE ZAWSZE BEZ WIELKOŚCI LITER (`COLLATE NOCASE`). Wątek i zamówienie
-   potrafią podać ten sam login różnie zapisany („Chips20" i „chips20").
-   Dokładne porównanie dawało wtedy pustą historię klientowi, który u nas
-   kupował, a zakładka stała tak do 24 września 2026. */
+   potrafią podać ten sam login różnie zapisany („Chips20" i „chips20"),
+   a dokładne porównanie dawałoby pustą historię klientowi, który u nas
+   kupował. */
 
 export interface WpisHistorii {
-  /* ── Trzy rodzaje doszły w S2 spoiwa (`docs/obsluga-klienta-calosc.md`) ────
-     Zakładka obiecywała HISTORIĘ KLIENTA, a pokazywała jej połowę: zakupy
-     i rozmowy. Zwrot i reklamacja tego samego kupującego leżały
-     w bazie i nie docierały tu wcale, więc agent czytał „nic się nie działo"
-     o kliencie, który miesiąc temu odesłał towar.
+  /* ── Zwrot i reklamacja też (S2 spoiwa, `docs/obsluga-klienta-calosc.md`) ──
+     Bez nich agent czytałby „nic się nie działo" o kliencie, który miesiąc
+     temu odesłał towar.
 
      Wiązanie idzie po LOGINIE, bo to oś tej zakładki. Zwrot i sprawa niosą
      `kupujacy_login` wprost z Allegro, a rozmowy — login z wątku
@@ -102,18 +97,16 @@ export function historiaKlienta(
 }
 
 /**
- * Historia kupującego ZE ZWROTU albo ze SPRAWY posprzedażowej (23 września 2026).
+ * Historia kupującego ZE ZWROTU albo ze SPRAWY posprzedażowej.
  *
- * Z rozmowy do historii klienta był jeden klik od S2 spoiwa; ze zwrotu
- * i reklamacji — żaden. Agent przy zwrocie nie wiedział, że ten sam
- * kupujący pisał tydzień temu o tej samej części.
+ * Agent przy zwrocie ma wiedzieć, że ten sam kupujący pisał tydzień temu
+ * o tej samej części.
  *
  * LOGIN BIERZE SIĘ Z SAMEJ SPRAWY, nie z wątku. `kupujacy_login` zwrotu
  * i sprawy przychodzi z Allegro wprost. ROZMOWY dochodzą DWIEMA drogami:
  * numerem zamówienia (z zakupów tego loginu i z samej sprawy) oraz loginem
- * rozmówcy z wątku. Druga doszła 24 września 2026, gdy właściciel potwierdził,
- * że to login kupującego. Bez niej pytanie sprzed zakupu, które nie niesie
- * numeru zamówienia, nie trafiało do historii ze zwrotu.
+ * rozmówcy z wątku. Bez drugiej pytanie sprzed zakupu, które nie niesie
+ * numeru zamówienia, nie trafiałoby do historii ze zwrotu.
  */
 export function historiaSprawy(
   rodzaj: "zwrot" | "sprawa", id: number, database: DatabaseSync = db(),
@@ -159,10 +152,9 @@ export function historiaSprawy(
  * jedno konto, ale login jest unikalny w obrębie konta sprzedawcy, nie
  * globalnie — historia składa się per konto. Pusta lista znaczy „nie znamy”.
  *
- * Stała w profilu klienta; tu jest od 0.535.0, bo sprawa klienta pyta
- * o dokładnie to samo. Dwie kopie tego złączenia rozjechałyby się przy
- * pierwszym piątym źródle, a sprawa budziłaby się z innych rozmów, niż
- * profil pokazuje.
+ * Czytają to profil klienta i sprawa klienta. Dwie kopie tego złączenia
+ * rozjechałyby się przy pierwszym piątym źródle, a sprawa budziłaby się
+ * z innych rozmów, niż profil pokazuje.
  */
 export function kontaLoginu(
   database: DatabaseSync, login: string,
@@ -182,7 +174,7 @@ export function kontaLoginu(
  * i numery zamówień tego loginu (także wskazane ręcznie, przez
  * `ROZMOWA_ZAMOWIENIA`). Od najświeższej.
  *
- * JEDNA definicja dla osi profilu i dla sprawy klienta (0.535.0). Sprawa
+ * JEDNA definicja dla osi profilu i dla sprawy klienta. Sprawa
  * budzi się z wiadomości w tych rozmowach, więc ręczna kopia zapytania
  * dawałaby obudzenie z rozmowy, której profil nie pokazuje — albo odwrotnie.
  */
@@ -216,7 +208,7 @@ export function rozmowyPoLoginie(
 }
 
 /**
- * Login, którego SPRAWA KLIENTA dotyczy tej rozmowy (0.535.0), albo `null`.
+ * Login, którego SPRAWA KLIENTA dotyczy tej rozmowy, albo `null`.
  *
  * Najpierw rozmówca z wątku. Gdy wątek go nie niesie (schemat Allegro
  * dopuszcza `interlocutor: null`), login kupującego z zamówienia tej rozmowy,
@@ -250,7 +242,7 @@ export function loginSprawyRozmowy(database: DatabaseSync, conversationId: numbe
 
 /**
  * Historia po SAMYM loginie, bez sprawy, z której się przyszło — dla profilu
- * klienta (24 września 2026). Rozmowy te same dwiema drogami co przy zwrocie:
+ * klienta. Rozmowy te same dwiema drogami co przy zwrocie:
  * login rozmówcy i numery zamówień tego loginu. Nic nie jest pomijane, bo
  * profil nie stoi obok żadnej otwartej sprawy.
  */

@@ -6,7 +6,7 @@ import { MemoryRouter } from "react-router-dom";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { PrzyciskHistorii } from "./HistoriaKlienta";
 
-/* ── Historia klienta ze sprawy (23 września 2026) ───────────────────────────
+/* ── Historia klienta ze sprawy ──────────────────────────────────────────────
    Trzy gwarancje. Sama sprawa na ekranie NIE pobiera historii — liczniki
    żądań ekranów zostają, jakie były. Klik pobiera ją adresem właściwym dla
    rodzaju sprawy. Esc zamyka szufladę. */

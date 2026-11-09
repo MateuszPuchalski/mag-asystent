@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import { List, RefreshCw, Undo2 } from "lucide-react";
+import { List, Undo2 } from "lucide-react";
 import { useDociagnijPoSkanie, useSkanZwrotu, useSynchronizujZwroty, useZwroty, useSprawdzWszystkiePlatnosci, type WynikSkanu, type WynikSprawdzeniaWszystkich } from "../api/zwroty";
 import { Konflikt } from "../api/klient";
 import type { BilansKartotek, Kubelek, Ocena, StanZwrotow, WynikDosylki, Zwrot } from "../api/typy";
@@ -45,19 +45,15 @@ import type { AkcjeKlawiszy } from "../zwroty/klawisze";
 import { pasujeDoFrazy, rozbij } from "../sprawy/szukanie";
 import { useKursorListy } from "../nawigacja/kursor";
 
-/* ── Ekran zwrotów (0.150.0) ─────────────────────────────────────────────────
+/* ── Ekran zwrotów ───────────────────────────────────────────────────────────
    Trzy kolumny, jak skrzynka — dwa ekrany obsługi mają mieć jeden nawyk,
    nie dwa.
 
-   PIĘĆ KUBEŁKÓW MA DZIAŁANIE: werdykt, ocena i kwota od 0.156.0, korekta od
-   0.162.0. Ekran nie wystawia korekty — robi to człowiek w Subiekcie — więc
-   mówi to wprost przy polu numeru. Pieniądze oddaje od 0.190.0 przycisk ODDAJ
-   PIENIĄDZE; zdanie „oddajesz w panelu Allegro" przetrwało przy korekcie do
-   audytu z 15 września 2026 i odsyłało biuro do Sales Center.
+   Ekran nie wystawia korekty — robi to człowiek w Subiekcie — więc mówi to
+   wprost przy polu numeru. Pieniądze oddaje przycisk ODDAJ PIENIĄDZE.
 
-   Klawiatura DZIAŁA JUŻ TERAZ w tej części, która niczego nie zapisuje:
-   strzałki chodzą po kolejce, cyfry przełączają kubełek. Odruch buduje się
-   od pierwszego wydania, a nie po dołożeniu zapisu.                        */
+   Klawiatura działa także w części, która niczego nie zapisuje: strzałki
+   chodzą po kolejce, cyfry przełączają kubełek.                            */
 
 /**
  * Co robi klawisz w danym kubełku — jedna tabela dla paska i dla doktryny.
@@ -73,7 +69,7 @@ export const KLAWISZE_KUBELKA: Record<string, ReadonlyArray<readonly [string, st
     ["Shift+S", "wszystkie na stan"], ["-", "wróciło mniej"]],
   zwrot: [["Enter", "zapisz kwotę"], ["D", "potrącenie"], ["-", "wróciło mniej"]],
   korekta: [["Enter", "wpisz numer korekty"]],
-  /* `R` doklejany ze stanu (0.484.7) — zamknięty bez korekty go nie ma. */
+  /* `R` doklejany ze stanu — zamknięty bez korekty go nie ma. */
   zamkniety: [],
 };
 
@@ -83,7 +79,7 @@ export const KLAWISZE_KUBELKA: Record<string, ReadonlyArray<readonly [string, st
    po naszej stronie — i dlatego nieznany kod pokazuje się SUROWY zamiast
    zniknąć. Licznik, który cicho gubi część liczb, jest gorszy od jego braku. */
 const POWODY_SKROT: Record<string, string> = {
-  /* DWA RÓŻNE CZEKANIA (0.220.0). „Czeka na automat" znaczy, że sygnatura
+  /* DWA RÓŻNE CZEKANIA. „Czeka na automat" znaczy, że sygnatura
      trafia w jedną kartotekę — takiej pozycji nikt nie musi klikać, wiąże ją
      przebieg po synchronizacji. Liczba, która nie spada, mówi więc o USTERCE,
      nie o pracy do zrobienia. */
@@ -108,12 +104,11 @@ const STANY_SYNCHRONIZACJI: Record<StanZwrotow["status"], string> = {
 };
 
 /**
- * Rozjazdy rekoncyliacji, które dotyczą zwrotów (0.313.0).
+ * Rozjazdy rekoncyliacji, które dotyczą zwrotów.
  *
- * Cztery kontrole — termin ustawowy, zwrot bez śladu po przelewie, koszyk
- * czekający na korektę i kosz bez powrotu z regału — liczyły się od dawna
- * i rysowały WYŁĄCZNIE w `/biuro`. Obsługa klienta pracuje na innym ekranie,
- * więc raport chroniący jej pracę wisiał tam, gdzie ona nie zagląda.
+ * Cztery kontrole: termin, zwrot bez śladu po przelewie, koszyk czekający
+ * na korektę i kosz bez powrotu z regału. Stoją tu, bo obsługa klienta
+ * pracuje na tym ekranie.
  *
  * MILCZY PRZY ZERZE. Pas szarości z napisem „wszystko w porządku" uczy
  * przewijać wzrokiem to miejsce — a wtedy nie zauważa się go w dniu, w którym
@@ -122,32 +117,27 @@ const STANY_SYNCHRONIZACJI: Record<StanZwrotow["status"], string> = {
  */
 /** Nazwa rodzaju po ludzku — w zdaniu zbiorczym, nie w wierszu. */
 const NAZWA_ROZJAZDU: Record<string, string> = {
-  /* TERMIN OBSŁUGI, nie ustawowy (0.537.0) — siedem dni od doręczenia,
-     regulamin Allegro. Serwer mówi tak od 0.339.0, a podpis tutaj został
-     przy „ustawowym" i właściciel zapytał, co to właściwie znaczy. */
+  /* TERMIN OBSŁUGI, nie ustawowy — siedem dni od doręczenia, regulamin Allegro. */
   zwrot_po_terminie: "po terminie obsługi (7 dni od doręczenia)",
   zwrot_bez_przelewu: "bez śladu po przelewie",
   kosz_czeka_na_korekte: "koszyk czeka na korektę",
   kosz_bez_powrotu: "kosz bez powrotu z regału",
-  /* Allegro oddało pieniądze, a u nas nie ma korekty albo oceny (0.476.0).
-     Do tego wydania taki zwrot wychodził z tego ekranu bez śladu. */
+  /* Allegro oddało pieniądze, a u nas nie ma korekty albo oceny. */
   zwrot_rozliczony_bez_korekty: "rozliczony w Allegro bez korekty",
 };
 
 /* Rodzaje, które dotyczą ZWROTU — ich klucz to numer zwrotu, więc zawężają
-   listę. Pozostałe mówią o koszach i prowadzą do ekranu koszy (0.537.0). */
+   listę. Pozostałe mówią o koszach i prowadzą do ekranu koszy. */
 const ROZJAZDY_ZWROTOW = new Set(["zwrot_po_terminie", "zwrot_bez_przelewu", "zwrot_rozliczony_bez_korekty"]);
 
 function PasekRozjazdow({ rozjazdy, filtr, onFiltr }: {
   rozjazdy: RozjazdZwrotu[];
-  /** Rodzaj, po którym lista jest teraz zawężona (0.537.0). */
+  /** Rodzaj, po którym lista jest teraz zawężona. */
   filtr?: string | null;
   onFiltr?: (rodzaj: string | null) => void;
 }) {
-  /* ZWINIĘTY DOMYŚLNIE — i to jest NAPRAWA, nie upodobanie (0.319.0).
-     Pierwsza wersja rysowała każdy wiersz z osobna. Na żywej bazie wyszło ich
-     czterysta trzydzieści trzy, więc pasek zjadł cały ekran: kolejki i kolumn
-     nie było widać wcale, a ekran zwrotów przestał być ekranem pracy.
+  /* ZWINIĘTY DOMYŚLNIE. Na żywej bazie wierszy bywa kilkaset, a rozwinięty
+     pasek zjada cały ekran i zasłania kolejkę.
 
      Czterysta wierszy to nie informacja, tylko szum. Dekalog p. 2: pokazuj to,
      co rozstrzyga bieżącą czynność — a tu rozstrzyga LICZBA i RODZAJ, nie
@@ -160,10 +150,9 @@ function PasekRozjazdow({ rozjazdy, filtr, onFiltr }: {
 
   return <section aria-label="Rozjazdy zwrotów"
     className="shrink-0 rounded-lg border border-amber-300 bg-amber-50 px-3 py-2">
-    {/* ── GRUPA ZAWĘŻA LISTĘ (0.537.0) ─────────────────────────────────────
-        Zgłoszenie właściciela: „co to właściwie oznacza", a potem „zrób
-        oba". Liczba bez drogi do spraw kazała rozwijać czterysta numerów
-        i szukać ich w kolejce ręką. Kliknięcie zostawia na liście tylko te
+    {/* ── GRUPA ZAWĘŻA LISTĘ ──────────────────────────────────────────────
+        Liczba bez drogi do spraw kazałaby rozwijać setki numerów i szukać ich
+        w kolejce ręką. Kliknięcie zostawia na liście tylko te
         zwroty, ze wszystkich kubełków; grupy koszy prowadzą do koszy. */}
     <div className="flex w-full flex-wrap items-center gap-x-3 gap-y-1">
       <span className="text-xs font-bold uppercase text-amber-900">
@@ -233,12 +222,10 @@ function PasekKartotek({ bilans, stan }: { bilans: BilansKartotek; stan?: StanZw
 }
 
 /**
- * Ile zwrotów NIE WESZŁO do tej kolejki (0.209.0).
+ * Ile zwrotów NIE WESZŁO do tej kolejki.
  *
- * Synchronizacja chodzi z bezpiecznikiem dziesięciu stron i do tego wydania
- * urywała się na nim CICHO: przebieg kończył się sukcesem, kursor szedł
- * naprzód, a reszta nie wracała już nigdy. Kolejka ustawia się według terminu
- * ustawowego, więc brakujące wiersze były w większości tymi najbardziej
+ * Synchronizacja chodzi z bezpiecznikiem dziesięciu stron. Kolejka ustawia
+ * się według terminu, więc brakujące wiersze są w większości tymi najbardziej
  * spóźnionymi — czyli dokładnie tymi, dla których ten ekran istnieje.
  *
  * Zero i `null` MILCZĄ. Zero znaczy „lista skończyła się sama", `null` — że
@@ -257,12 +244,11 @@ function PasekOgona({ stan }: { stan: StanZwrotow }) {
 }
 
 /**
- * Kartoteki i rozjazdy ZWINIĘTE W JEDEN WIERSZ (15 września 2026).
+ * Kartoteki i rozjazdy ZWINIĘTE W JEDEN WIERSZ.
  *
- * Zgłoszenie właściciela: „schowaj to gdzieś". Dwa bursztynowe pasy zajmowały
- * nad kolejką tyle, co trzy zwroty, a w codziennej pracy mówiły to samo co
- * wczoraj — dekalog p. 2: na ekranie to, co rozstrzyga bieżącą czynność.
- * Liczby zostają widoczne, zdania są o jedno kliknięcie dalej.
+ * W codziennej pracy pasy mówią to samo co wczoraj — dekalog p. 2: na ekranie
+ * to, co rozstrzyga bieżącą czynność. Liczby zostają widoczne, zdania są
+ * o jedno kliknięcie dalej.
  *
  * SAMO SIĘ OTWIERA, gdy stoi synchronizacja przy pozycjach czekających na
  * automat. To jedyne zdanie tych pasów, które wymaga działania dziś, a nie
@@ -278,7 +264,7 @@ function PasekUwag({ bilans, stan, rozjazdy, filtr = null, onFiltr }: {
   if (!bez && !rozjazdy.length) return null;
   const alarm = Boolean(stan && stan.status !== "current" && (bilans?.powody.do_zwiazania ?? 0) > 0);
   /* Otwarty filtr trzyma pasek otwarty: zwinięty chowałby przycisk, którym
-     się go zdejmuje (0.537.0). */
+     się go zdejmuje. */
   const otwarte = rozwiniete || alarm || filtr !== null;
   return <section aria-label="Uwagi do kolejki" className="shrink-0 space-y-1">
     <button type="button" onClick={() => setRozwiniete((r) => !r)}
@@ -300,24 +286,16 @@ function PasekUwag({ bilans, stan, rozjazdy, filtr = null, onFiltr }: {
  *
  * Numer zwrotu bywa doklejony na paczce, identyfikator z Allegro wpada
  * z odnośnika, numer zamówienia z rozmowy z klientem, numer korekty z Subiekta.
+ * Numer listu też, bo szuka się po naklejce. Enter dalej pyta serwer — tamta
+ * droga zna też numery paczek, których w modelu pracy nie ma.
  *
- * NUMER LISTU DOSZEDŁ W 0.344.0 i to jest zdjęcie polityki 0.163.0, nie
- * przeoczenie naprawione po latach. Do 0.343.0 numer żył wyłącznie w kopii
- * odpowiedzi Allegro, więc filtr go nie widział, a szukanie po naklejce
- * wymagało Entera i pytania serwera. Decyzja właściciela: „zapisuj numery
- * paczek". Enter dalej pyta serwer — tamta droga zna też numery paczek,
- * których w modelu pracy nie ma, bo zwrot bywa u nas szybciej niż w Allegro.
+ * LOGIN KUPUJĄCEGO odpowiada na inne pytanie niż numery: nie „gdzie jest TA
+ * paczka", tylko „co jeszcze mam od TEGO klienta". To pytanie pada przy
+ * rozmowie, w której klient mówi o dwóch przesyłkach naraz.
  *
- * LOGIN KUPUJĄCEGO doszedł w 0.337.0 na zgłoszenie właściciela. Odpowiada na
- * inne pytanie niż numery: nie „gdzie jest TA paczka", tylko „co jeszcze mam
- * od TEGO klienta" — a to pytanie pada przy każdej rozmowie, w której klient
- * mówi o dwóch przesyłkach naraz. Jedyny uchwyt, jaki wtedy jest pod ręką.
- *
- * NAZWA ODBIORCY I PRZEWOŹNIK DOSZLI W 0.367.0 i to jest odpowiedź na pytanie,
- * którego wcześniej nie zadano dość dokładnie. Właściciel: paczki nakleja
- * klient albo kurier, więc numeru listu z WRACAJĄCEGO kartonu nasz system nie
- * widział nigdy — pierwszy skan takiej paczki musi chybić z definicji. Zostaje
- * to, co na naklejce widać: kto na niej stoi i czyim samochodem przyjechała.
+ * NAZWA ODBIORCY I PRZEWOŹNIK, bo paczki nakleja klient albo kurier, więc
+ * numeru listu z WRACAJĄCEGO kartonu nasz system nie zna. Zostaje to, co na
+ * naklejce widać: kto na niej stoi i czyim samochodem przyjechała.
  *
  * Przewoźnik ma też własną listę rozwijaną i to NIE jest dublowanie: lista
  * odpowiada na „pokaż wszystko od InPostu", a człon frazy zawęża trafienia po
@@ -325,15 +303,11 @@ function PasekUwag({ bilans, stan, rozjazdy, filtr = null, onFiltr }: {
  * a w danych `INPOST`.
  */
 const kody = (z: Zwrot) =>
-  /* NOTATKA WCHODZI DO SZUKANIA (0.394.0). Zgłoszenie właściciela: gdy paczka
-     nie dotarła, zgłaszamy to Allegro i dostajemy NUMER SPRAWY, który nie ma
-     w naszych danych żadnego własnego pola — ląduje w notatce biura. Pole
-     szukało po treści sprawy i po loginie, więc po tym numerze nie znajdowało
-     NICZEGO, choć stał on na ekranie obok. Notatka jest zresztą jedynym
-     miejscem, gdzie biuro pisze WŁASNYMI słowami; wykluczenie jej z szukania
-     znaczyło, że im lepiej ktoś opisał sprawę, tym trudniej ją znaleźć. */
-  /* TOWAR WCHODZI DO SZUKANIA (0.486.2). Zgłoszenie właściciela: „powinienem
-     móc wyszukiwać zwroty po produkcie". Pytanie „gdzie jest zwrot z tym
+  /* NOTATKA WCHODZI DO SZUKANIA. Numer sprawy z Allegro o zaginionej paczce
+     nie ma własnego pola i ląduje w notatce biura. Notatka jest też jedynym
+     miejscem, gdzie biuro pisze WŁASNYMI słowami; bez niej im lepiej ktoś
+     opisał sprawę, tym trudniej ją znaleźć. */
+  /* TOWAR WCHODZI DO SZUKANIA. Pytanie „gdzie jest zwrot z tym
      gaźnikiem" pada przy kartonie bez etykiety i przy telefonie od klienta.
      Nazwa, symbol kartoteki, SKU sprzedawcy i EAN — te same kody, które stoją
      przy pozycji na ekranie. Każde słowo trafia w KTÓREŚ pole, więc
@@ -366,13 +340,12 @@ const aliasy = (kod: string | null) => (kod ? ALIASY[kod.toUpperCase()] ?? [] : 
  *
  * `kody` wyżej służy do zawężania listy i celowo bierze też rzeczy opisowe:
  * login, nazwę odbiorcy, przewoźnika. Żadna z nich nie jest identyfikatorem
- * paczki — login mówi, CZYJA to paczka, a nie KTÓRA (decyzja 0.365.0), nazwa
- * odbiorcy tak samo, a przewoźnik opisuje setki naraz.
+ * paczki — login mówi, CZYJA to paczka, a nie KTÓRA, nazwa odbiorcy tak samo,
+ * a przewoźnik opisuje setki naraz.
  *
- * Do 0.366.0 jedna lista robiła oba zadania i przy loginie to jeszcze uchodziło.
- * Przy przewoźniku przestało od razu: wpisanie „dpd" przy jednym zwrocie tej
- * firmy OTWIERAŁO go, jakby ktoś podał numer. Otwarcie stawia na ekranie cudze
- * pieniądze, więc lista do otwierania musi być węższa niż lista do szukania.
+ * Wpisanie „dpd" przy jednym zwrocie tej firmy nie może go OTWORZYĆ, jakby
+ * ktoś podał numer. Otwarcie stawia na ekranie cudze pieniądze, więc lista
+ * do otwierania musi być węższa niż lista do szukania.
  */
 const identyfikatory = (z: Zwrot) =>
   [z.numer, z.externalId, z.orderId, z.korektaNumer, z.waybill]
@@ -382,7 +355,7 @@ export function Zwroty() {
   const { id } = useParams();
   const nawiguj = useNavigate();
   const [kubelek, setKubelek] = useState<Kubelek | null>("decyzja");
-  /* Sito DO DECYZJI (0.539.0); `null` = cały kubełek. Powód w `zwroty/sita.ts`. */
+  /* Sito DO DECYZJI; `null` = cały kubełek. Powód w `zwroty/sita.ts`. */
   const [sito, setSito] = useState<SitoDecyzji | null>(null);
   const werdykt = useWerdykt();
   const ocena2 = useOcena();
@@ -408,7 +381,7 @@ export function Zwroty() {
   const zdejmij = useZdejmijPozycje();
   const [bladDopisania, setBladDopisania] = useState("");
   const [bladRabatu, setBladRabatu] = useState("");
-  /* ZDANIA SEKCJI PIENIĘDZY NIOSĄ NUMER ZWROTU (0.536.1) — błąd i wynik
+  /* ZDANIA SEKCJI PIENIĘDZY NIOSĄ NUMER ZWROTU — błąd i wynik
      założenia dosyłki. Odpowiedź przychodzi po chwili, a operator bywa już
      przy następnym zwrocie. Bez numeru błąd odmowy zwrotu A stanąłby pod
      pieniędzmi zwrotu B. Klucz sekcji tego nie załatwi: te zdania mieszkają
@@ -436,33 +409,15 @@ export function Zwroty() {
     ? String((bledy.find(Boolean) as Error).message) : "";
   const { data, isLoading, error } = useZwroty();
 
-  /* WSZYSTKIE to siódma zakładka, nie siódmy kubełek (0.169.0). Kubełki dalej
+  /* WSZYSTKIE to siódma zakładka, nie siódmy kubełek. Kubełki dalej
      są silnikiem pracy — każdy niesie jedno pytanie — a ta zakładka jest do
-     SZUKANIA: „gdzie stoi ten zwrot", nie „co mam zrobić". Rejestr skasowany
-     w 0.140.0 mieszał te dwie rzeczy i to go pogrążyło. */
+     SZUKANIA: „gdzie stoi ten zwrot", nie „co mam zrobić". */
   const [bladSync, setBladSync] = useState("");
 
-  /* TOŻSAMOŚCI TEN EKRAN JUŻ NIE POTRZEBUJE (0.370.0). Czytał ją po to, żeby
-     odróżnić „moje" od „niczyjego" — a sito zeszło. `zMoje={false}` w pasku
-     klawiszy mówi to wprost: klawisze `m` i `n` nie istnieją. */
-
-  /* ── CO ZESZŁO Z TEJ KOLUMNY W 0.370.0 ──────────────────────────────────
-     Zgłoszenie właściciela: „uprość panel zwrotów do wymaganego minimum",
-     a po pytaniu o szczegóły wskazanie wprost: sito Moje/Niczyje, tagi spraw,
-     filtry przewoźnika i dat, Pobierz CSV — i „usunąć zupełnie".
-
-     SITO WRACA DO PIERWSZEJ DECYZJI, nie do nowej. 0.315.0 ustaliło najpierw,
-     że przy zwrocie prowadzącego NIE MA, bo zwroty prowadzi całe biuro i sito
-     „nie odpowiadałoby na żadne prawdziwe pytanie" — a tego samego dnia
-     przywróciło go z powrotem. To jest powrót do tamtego zdania i dlatego
-     stoi tu zapisane: bez niego następna sesja „naprawi" to trzeci raz.
-
-     FILTRY ZESZŁY, BO SZUKANIE JE WCHŁONĘŁO. Od 0.367.0 fraza dzieli się po
-     spacjach i zna przewoźnika razem z nazwami z naklejki, więc lista
-     rozwijana odpowiadała na pytanie, na które odpowiada już pole wyżej.
-
-     Sito i tagi ZOSTAJĄ przy reklamacjach — `sprawy/Moje.tsx`
-     i `sprawy/Tagi.tsx` stoją nietknięte. Zeszło UŻYCIE, nie komponent. */
+  /* Ekran nie czyta tożsamości: zwroty prowadzi całe biuro, więc sita
+     Moje/Niczyje tu nie ma. `zMoje={false}` w pasku klawiszy mówi to
+     wprost: klawisze `m` i `n` nie istnieją. Filtry przewoźnika i dat
+     wchłonęło szukanie, bo fraza zna przewoźnika i nazwy z naklejki. */
   const wKubelku = useMemo(() => kubelek === null
     ? (data?.zwroty ?? [])
     : (data?.zwroty ?? []).filter((z) => z.kubelek === kubelek
@@ -497,14 +452,14 @@ export function Zwroty() {
   const rozjazdy = useRozjazdyZwrotow();
   const [kod, setKod] = useState("");
   const [fraza, setFraza] = useState("");
-  /* Grupa z paska „Do sprawdzenia", po której zawężona jest lista (0.537.0). */
+  /* Grupa z paska „Do sprawdzenia", po której zawężona jest lista. */
   const [filtrRozjazdu, setFiltrRozjazdu] = useState<string | null>(null);
-  /* Login, o którego PACZKI pytamy (0.365.0) — osobno od tego, co operator
+  /* Login, o którego PACZKI pytamy — osobno od tego, co operator
      wpisuje, bo pytanie idzie po Enterze i po wyjściu z pola, a nie po każdym
      znaku. Pusty nie pyta wcale. */
   const [loginPaczek, setLoginPaczek] = useState("");
   const paczkiKlienta = usePaczkiKlienta(loginPaczek);
-  /* Uchwyt, o który Allegro JUŻ zapytaliśmy (0.450.0). Enter i wyjście
+  /* Uchwyt, o który Allegro JUŻ zapytaliśmy. Enter i wyjście
      z pola wołają `onLogin` oba, a drugi strzał do Allegro o ten sam login
      niczego by nie dodał — kosztowałby tylko żądanie. */
   const zAllegro = useZamowieniaZAllegro();
@@ -518,11 +473,10 @@ export function Zwroty() {
      dziesiątki, nie tysiące. Szukanie po fragmencie na serwerze musiałoby albo
      rozluźnić `znajdzZwrotPoKodzie` (a ono ma być DOKŁADNE, bo samo otwiera
      zwrot), albo dołożyć trasę z dziennikiem — czyli zapisać, czego ktoś
-     szukał. Numer listu ten filtr WIDZI od 0.344.0 — zdanie mówiące inaczej
-     stało tu przez pięć wydań po tym, jak przestało być prawdą. Enter zostaje,
-     bo `POST /skan` zna też numery paczek, których w modelu pracy nie ma.
+     szukał. Enter zostaje, bo `POST /skan` zna też numery paczek, których
+     w modelu pracy nie ma.
 
-     Od 0.367.0 fraza dzieli się po spacjach (`pasujeDoFrazy`): człowiek
+     Fraza dzieli się po spacjach (`pasujeDoFrazy`): człowiek
      z kartonem w ręku ma kilka drobnych uchwytów naraz, a żaden sam nie
      zawęża. */
   const { porzadek, ustaw: ustawPorzadek } = usePorzadek(
@@ -545,26 +499,18 @@ export function Zwroty() {
      kubełek jest pusty" i nie ma jak się dowiedzieć, że zwrot stoi w
      ZAMKNIĘTYCH. Kod jest mocniejszy niż zakładka, na którą ktoś przed chwilą
      kliknął — tak samo jak adres w pasku przeglądarki. */
-  /* ── PORZĄDEK WRACA, ALE INACZEJ (0.401.0) ────────────────────────────────
-     Do 0.370.0 stał tu przełącznik „od daty nadania" i ZSZEDŁ ŚWIADOMIE razem
-     z pasmem filtrów: odpowiadał na inne pytanie („co przyszło najdawniej")
-     niż to, które prowadzi tę pracę („co się najbardziej pali").
-
-     Wraca na wyraźne zgłoszenie właściciela — „dodaj sortowanie po dacie etc"
-     — i z jedną różnicą, która tamten powód szanuje: DOMYŚLNY ZOSTAJE TERMIN.
-     Zegar ustawowy dalej rządzi listą, dopóki agent sam nie powie inaczej,
-     więc wydanie niczego nie przestawia pod ręką. Kolejność liczona po
-     terminie to blizna 0.121.0 i ona zostaje nietknięta.
+  /* ── PORZĄDEK: DOMYŚLNIE TERMIN ──────────────────────────────────────────
+     Pracę prowadzi pytanie „co się najbardziej pali", więc domyślny jest
+     termin. Inny porządek wybiera agent sam.
 
      TRZY OSIE, nie cztery: zwrot nie ma „ostatniego ruchu" — nie prowadzi
      rozmowy, więc nie ma czego pytać. Kwotą jest suma pozycji, bo ona stoi
      przy KAŻDYM zwrocie; `kwotaGrosze` bywa pusta do czasu decyzji, a dwie
-     różne kwoty pod jedną etykietą to dokładnie blizna 0.121.0 w innym
-     miejscu. */
-  /* ── PACZKA W DRODZE NA KOŃCU (0.479.0) ────────────────────────────────
-     Przegląd zwrotów z 23 września: DO DECYZJI mieszało zwroty, przy których
+     różne kwoty pod jedną etykietą wprowadzałyby w błąd. */
+  /* ── PACZKA W DRODZE NA KOŃCU ───────────────────────────────────────────
+     DO DECYZJI nie miesza zwrotów, przy których
      jest co zrobić, z paczkami, które jeszcze nie przyszły. Porządek po
-     terminie spychał je w dół sam, ale porządek po dacie albo kwocie wplatał
+     terminie spycha je w dół sam, ale porządek po dacie albo kwocie wplatałby
      je między pracę. Podział stoi PO sortowaniu i go nie łamie: w obu
      częściach zostaje kolejność, którą wybrał człowiek. */
   const widoczne = useMemo(() => {
@@ -585,10 +531,9 @@ export function Zwroty() {
     setWynikSkanu(w);
     setBladSkanu("");
     if (!w.zwrotId) return;
-    /* TRAFIENIE ZDEJMUJE KURSOR Z POLA (audyt zwrotów, 15 września 2026).
-       Czytnik pisze w pole, gdy ono ma kursor, a skróty w polu milkną. Po
-       otwarciu zwrotu następnym ruchem jest `P` albo `S`, nie dopisanie znaku —
-       na nagraniu z biura zwrot przyjmowało przez to kliknięcie. */
+    /* TRAFIENIE ZDEJMUJE KURSOR Z POLA. Czytnik pisze w pole, gdy ono ma
+       kursor, a skróty w polu milkną. Po otwarciu zwrotu następnym ruchem
+       jest `P` albo `S`, nie dopisanie znaku. */
     (document.activeElement as HTMLElement | null)?.blur();
     nawiguj(`/obsluga/zwroty/${w.zwrotId}`);
   };
@@ -598,11 +543,10 @@ export function Zwroty() {
     skan.mutate(v, { onSuccess: przyjmij, onError: (e) => setBladSkanu((e as Error).message) });
   };
 
-  /* ── SKAN: ETYKIETA ALBO TOWAR (0.468.0) ─────────────────────────────────
-     Zgłoszenie właściciela: „zakładka zwrotów powinna cały czas nasłuchiwać
-     skanu etykiety zwrotowej oraz odróżniać ją od skanu EAN-u produktu".
-     Decyzja właściciela co do EAN-u: DOŁÓŻ DO KOSZYKA — tak jak pole „Skanuj
-     towar" przy pudle, tylko bez klikania w nie.
+  /* ── SKAN: ETYKIETA ALBO TOWAR ───────────────────────────────────────────
+     Zakładka cały czas nasłuchuje skanu etykiety zwrotowej i odróżnia ją od
+     EAN-u towaru. EAN idzie DO KOSZYKA — tak jak pole „Skanuj towar" przy
+     pudle, tylko bez klikania w nie.
 
      Kształt EAN-u to podejrzenie, rozstrzyga kartoteka. Jedno dokładne
      trafienie idzie do koszyka. Brak trafienia albo odmowa serwera wraca do
@@ -610,10 +554,10 @@ export function Zwroty() {
      Skan towaru NIE rusza frazy: lista kolejki zostaje taka, jaka była. */
   const dolozTowar = useDolozTowar();
   const [skanTowaru, setSkanTowaru] = useState<{ tekst: string; blad: boolean } | null>(null);
-  /* Kod, który przyszedł Z CZYTNIKA (0.493.0). Pole szukania woła tę samą
+  /* Kod, który przyszedł Z CZYTNIKA. Pole szukania woła tę samą
      drogę Enterem, więc wpisane „kowalski" też chybia i otwiera szukanie
      klienta. Bez tego rozróżnienia przycisk „Przyjmij jako nieodebraną"
-     zapisywał nazwisko jako numer listu, a potem wpisane nazwisko otwierało
+     zapisałby nazwisko jako numer listu, a potem wpisane nazwisko otwierałoby
      ten zwrot jak skan naklejki. */
   const kodZCzytnika = useRef("");
   const naSkan = async (v: string) => {
@@ -651,7 +595,7 @@ export function Zwroty() {
      kolejka: liczą się z okna sześćdziesięciu dni sprzedaży, a kolejka ma
      dziesiątki wierszy. Jeden otwarty zwrot to jedno takie liczenie. */
   const szczegol = useZwrot(wybrany);
-  /* Dokument sprzedaży, który Enter w DO KOREKTY przyjmuje (0.479.0).
+  /* Dokument sprzedaży, który Enter w DO KOREKTY przyjmuje.
      Automat ZW bez dokumentu nie ruszy (`wiazania.ts`), więc w tym kubełku
      brak dokumentu jest PIERWSZĄ rzeczą do zrobienia — pierwszy Enter
      przyjmuje podsuniętego kandydata, następny stawia kursor w numerze
@@ -674,7 +618,7 @@ export function Zwroty() {
    *
    * Ekran sam otwiera przy jednym wyniku, więc dopasowanie przybliżone
    * prowadziłoby do CUDZEJ sprawy — a przy zwrocie znaczy to cudzego klienta
-   * i cudze pieniądze. Ta sama zasada stoi przy skanie od 0.163.0.
+   * i cudze pieniądze. Ta sama zasada stoi przy skanie.
    *
    * Otwarcie w pół pisania nie jest wpadką: otwarty zwrot niczego nie mutuje
    * (zero zapisu przy patrzeniu), pole zostaje z tekstem, a dopisanie znaku
@@ -683,7 +627,7 @@ export function Zwroty() {
    */
   useEffect(() => {
     const czlony = rozbij(fraza);
-    /* JEDEN CZŁON I DOKŁADNIE (0.367.0). Fraza wieloczłonowa zawęża listę,
+    /* JEDEN CZŁON I DOKŁADNIE. Fraza wieloczłonowa zawęża listę,
        ale nigdy nie otwiera sama: dopasowanie po fragmentach jest z natury
        przybliżone, a to jest ekran, z którego wychodzi się z czyimś zwrotem
        i czyimiś pieniędzmi. Ta sama zasada trzyma `znajdzZwrotPoKodzie`. */
@@ -742,15 +686,13 @@ export function Zwroty() {
     }
   };
 
-  /* ── PUDŁO TEGO ZWROTU PRZY KILKU OTWARTYCH (0.476.0) ──────────────────
-     Przegląd zwrotów z 23 września: przy dwóch otwartych pudłach klawisz `S`
-     odbijał się od serwera, bo nie niósł wyboru, i każda ocena wracała do
-     myszy. Decyzja właściciela z 0.379.0 zostaje nietknięta: pudła NIE
-     zgadujemy. Wybieramy wyłącznie to, do którego człowiek sam włożył już
-     towar TEGO zwrotu — to ten sam karton, który ma przed sobą.
+  /* ── PUDŁO TEGO ZWROTU PRZY KILKU OTWARTYCH ─────────────────────────────
+     Pudła NIE zgadujemy. Wybieramy wyłącznie to, do którego człowiek sam
+     włożył już towar TEGO zwrotu — to ten sam karton, który ma przed sobą.
+     Dzięki temu klawisz `S` działa przy dwóch otwartych pudłach.
 
-     Bez takiego pudła albo przy dwóch naraz zostaje dotychczasowa droga:
-     serwer pyta, a przyciski z kodami pudeł stoją przy pozycji. */
+     Bez takiego pudła albo przy dwóch naraz serwer pyta, a przyciski
+     z kodami pudeł stoją przy pozycji. */
   const pudla = useKosz().data?.kosze ?? [];
   const pudloTegoZwrotu = (ocena: Ocena): number | undefined => {
     if (!zwrot || ocena === "outlet") return undefined;
@@ -761,7 +703,7 @@ export function Zwroty() {
     return zTymZwrotem.length === 1 ? zTymZwrotem[0].id : undefined;
   };
 
-  /* ── SZYBKA ŚCIEŻKA (0.481.0) — reguła w `zwroty/regulaSzybkiej.ts` ─────
+  /* ── SZYBKA ŚCIEŻKA — reguła w `zwroty/regulaSzybkiej.ts` ─────────────────
      Cały ciąg typowego zwrotu jednym ruchem: przyjęcie, pewne kartoteki,
      ocena „na stan", pełna kwota, a na końcu zwrot w Allegro do wypłaty.
 
@@ -795,7 +737,7 @@ export function Zwroty() {
       for (const p of z.pozycje.filter((x) => x.ocena === null)) {
         const w = await ocena2.mutateAsync({ pozycjaId: p.id, ocena: "stan", wersja, koszId });
         wersja = w.wersja;
-        /* POZYCJA POZA PUDŁEM ZATRZYMUJE CIĄG (0.484.2). Serwer zapisuje
+        /* POZYCJA POZA PUDŁEM ZATRZYMUJE CIĄG. Serwer zapisuje
            ocenę także wtedy, gdy do pudła jej nie dołożył, i mówi to
            `koszyk: null`. Iść dalej znaczyłoby oddać pieniądze za towar,
            którego nie ma na MM — a zakładka Allegro zasłoniłaby napis przy
@@ -804,10 +746,7 @@ export function Zwroty() {
           throw new Error(`„${p.nazwa}” nie weszła do pudła — powód stoi przy pozycji. Kwoty nie zapisałem.`);
         }
       }
-      /* BEZ KOSZTU DOSTAWY (0.484.5) — decyzja właściciela: „przy
-         zwrotach wszystko OK koszt dostawy powinien być odznaczony". Do
-         0.484.4 ciąg brał regułę ekranu ręcznego (`calaDostawa`) i przy
-         zwrocie całego zamówienia oddawał też dostawę. Ekran ręczny ma swój
+      /* BEZ KOSZTU DOSTAWY — decyzja właściciela. Ekran ręczny ma swój
          haczyk i tam człowiek decyduje; szybka ścieżka nie pyta, więc nie
          dokłada pieniędzy, o które nikt nie zdecydował. */
       await kwota.mutateAsync({ id: z.id, pozycjeIds: z.pozycje.map((p) => p.id),
@@ -821,7 +760,7 @@ export function Zwroty() {
     });
   };
 
-  /* ── KLIENT NIE ODESŁAŁ: ODMOWA JEDNYM RUCHEM (0.505.0) ──────────────
+  /* ── KLIENT NIE ODESŁAŁ: ODMOWA JEDNYM RUCHEM ───────────────────────
      Najpierw odmowa w Allegro, potem werdykt u nas. Odwrotnie zwrot stałby
      u nas jako odrzucony, a w Allegro dalej czekałby na wypłatę — i nic by
      o tym nie przypominało. Odmowa, która nie przejdzie, nie zmienia niczego. */
@@ -846,12 +785,7 @@ export function Zwroty() {
   };
 
   /**
-   * Klawisze KUBEŁKA — tabela §25a.2 wreszcie z nasłuchem (0.284.0).
-   *
-   * Do 0.283.0 ekran rysował te litery przy przyciskach jako `<kbd>`, a żadna
-   * z nich nic nie robiła. Doktryna obiecywała przy tym, że „typowy zwrot to
-   * jeden klawisz" (§25a.3) — więc obietnicę składał i ekran, i dokument,
-   * a dotrzymywała jej wyłącznie mysz.
+   * Klawisze KUBEŁKA — tabela §25a.2. Typowy zwrot to jeden klawisz (§25a.3).
    *
    * Klawisz NIE JEST skrótem do wszystkiego: `O` otwiera pole powodu zamiast
    * zapisywać odmowę, bo odmowa jest nieodwracalna (§25a.5). Utylizacja nie ma
@@ -877,7 +811,7 @@ export function Zwroty() {
       szybkiZwrot();
       return;
     }
-    /* WYJĄTKI Z KLAWIATURY (0.479.0): `-` otwiera „wróciło mniej", `D`
+    /* WYJĄTKI Z KLAWIATURY: `-` otwiera „wróciło mniej", `D`
        potrącenie. Gdzie formularza nie ma, akcja w `Pozycje.tsx` milczy. */
     if (e.key === "-" && (zwrot.kubelek === "ocena" || zwrot.kubelek === "zwrot")) {
       e.preventDefault();
@@ -890,7 +824,7 @@ export function Zwroty() {
       return;
     }
     if (zwrot.kubelek === "decyzja") {
-      /* `N` — gotowa odmowa, tylko przy sygnale „nie odesłał" (0.505.0). */
+      /* `N` — gotowa odmowa, tylko przy sygnale „nie odesłał". */
       if ((e.key === "n" || e.key === "N") && zwrot.sygnaly.includes("nie_odeslany")) {
         e.preventDefault();
         odmowNieOdeslanemu();
@@ -900,8 +834,8 @@ export function Zwroty() {
         e.preventDefault();
         werdykt.mutate({ id: zwrot.id, decyzja: "przyjety", powod: null, wersja });
       } else if (e.key === "s" || e.key === "S" || e.key === "u" || e.key === "U") {
-        /* ── OCENA JEST PRZYJĘCIEM (0.476.0) ────────────────────────────
-           Przegląd zwrotów z 23 września: `P` i zaraz `S` to dwa klawisze na
+        /* ── OCENA JEST PRZYJĘCIEM ──────────────────────────────────────
+           `P` i zaraz `S` to byłyby dwa klawisze na
            jedną decyzję. Kto ocenia towar „na stan", ten zwrot przyjął — więc
            klawisz oceny w DO DECYZJI robi jedno i drugie. Odmowa zostaje
            osobną, świadomą drogą pod `O`, bo idzie do klienta.
@@ -947,7 +881,7 @@ export function Zwroty() {
       ocena2.mutate({ pozycjaId: pozycja.id, ocena, wersja, koszId: pudloTegoZwrotu(ocena) });
       return;
     }
-    /* Enter zapisuje kwotę tylko wtedy, gdy jej jeszcze nie ma (0.476.0).
+    /* Enter zapisuje kwotę tylko wtedy, gdy jej jeszcze nie ma.
        Zwrot czekający na pieniądze stoi w tym kubełku z kwotą i korektą. */
     if (zwrot.kubelek === "zwrot" && zwrot.kwotaGrosze === null && e.key === "Enter") {
       e.preventDefault();
@@ -956,8 +890,7 @@ export function Zwroty() {
     }
     if (zwrot.kubelek === "korekta" && e.key === "Enter") {
       /* Numer korekty wpisuje człowiek, więc ten Enter niczego nie zapisuje —
-         stawia kursor w polu. Drugi Enter, już w polu, zapisuje numer. Do
-         audytu z 15 września 2026 pasek obiecywał tu Enter, a klawisz milczał. */
+         stawia kursor w polu. Drugi Enter, już w polu, zapisuje numer. */
       e.preventDefault();
       if (polecany) {
         setBladFaktury("");
@@ -968,20 +901,20 @@ export function Zwroty() {
       akcje.current.korekta?.();
       return;
     }
-    /* `R` stoi przy numerze korekty, czyli na zwrocie ZAMKNIĘTYM — tam, gdzie
-       ekran rysuje ten klawisz od 0.162.0 (`Decyzje.tsx`). */
+    /* `R` stoi przy numerze korekty, czyli na zwrocie ZAMKNIĘTYM
+       (`Decyzje.tsx`). */
     if (zwrot.korektaNumer && (e.key === "r" || e.key === "R")) {
       e.preventDefault();
       cofnijKorekte.mutate({ id: zwrot.id, wersja });
     }
   };
 
-  /* Skróty idą TĄ SAMĄ drogą co czytnik (0.163.0). Dwa niezależne nasłuchy
+  /* Skróty idą TĄ SAMĄ drogą co czytnik. Dwa niezależne nasłuchy
      nie umiałyby się dogadać, który klawisz jest czyj — a numer listu
      `600000367616070023174201` zawiera wszystkie cyfry kubełków. */
-  /* `wPolach` (0.468.0): skan działa także przy kursorze w notatce, kwocie
-     czy loginie. Seria czytnika nie zostaje w polu — właściciel chce, żeby
-     zakładka słuchała etykiety CAŁY CZAS. */
+  /* `wPolach`: skan działa także przy kursorze w notatce, kwocie
+     czy loginie. Seria czytnika nie zostaje w polu — zakładka słucha
+     etykiety CAŁY CZAS. */
   useSkaner(
     (kod) => { void naSkan(kod); },
     (e) => {
@@ -989,7 +922,7 @@ export function Zwroty() {
       else if (e.key === "ArrowUp" || e.key === "k") { e.preventDefault(); idz(-1); }
       else if (/^[1-6]$/.test(e.key)) przelacz(KUBELKI[Number(e.key) - 1].id);
       else if (e.key === "7") przelacz(null);
-      /* Klawisze `m` i `n` zeszły razem z sitem (0.370.0). Martwy klawisz
+      /* Bez klawiszy `m` i `n`, bo sita tu nie ma. Martwy klawisz
          w nasłuchu jest gorszy niż jego brak: milczy i uczy, że nie działa. */
       else klawiszKubelka(e);
     },
@@ -1009,12 +942,12 @@ export function Zwroty() {
      dwóch bramek (`zwrot-pieniedzy.ts`), więc wartość sprzed zapisu jest ta
      sama co po nim — a nie ściga się z odświeżeniem zapytania. */
   const stanPieniedzy = szczegol.data?.pieniadze;
-  /* ── KLAWISZE, KTÓRE NAPRAWDĘ DZIAŁAJĄ (0.484.7) ───────────────────────
+  /* ── KLAWISZE, KTÓRE NAPRAWDĘ DZIAŁAJĄ ─────────────────────────────────
      Tabela kubełków mówi, co klawisz robi w typowym zwrocie; stan zwrotu
      potrafi to wyłączyć. Z kwotą w DO ZWROTU (czeka na pieniądze) Enter, `D`
      i `-` milczą, bo wycena się skończyła. `-` milczy też bez pozycji
-     z kilkoma sztukami do przeliczenia. Pasek bez tych wyjątków obiecywał
-     martwe klawisze — przeciw temu powstał `SkrotyKlawiszy`. */
+     z kilkoma sztukami do przeliczenia. Pasek bez tych wyjątków obiecywałby
+     martwe klawisze. */
   const klawiszeTeraz = (KLAWISZE_KUBELKA[zwrot?.kubelek ?? kubelek ?? "wszystkie"] ?? [])
     .filter(([k]) => {
       if (!zwrot) return true;
@@ -1022,15 +955,15 @@ export function Zwroty() {
       if (k === "-") return zwrot.pozycje.some((p) => p.ilosc > 1 && p.iloscZwrocona == null);
       return true;
     })
-    /* `N` doklejany przy sygnale „nie odesłał" (0.505.0) — tak jak `R`. */
+    /* `N` doklejany przy sygnale „nie odesłał" — tak jak `R`. */
     .concat(zwrot?.kubelek === "decyzja" && zwrot.sygnaly.includes("nie_odeslany")
       ? [["N", "nie odesłał — odmów"] as const] : []);
   const pieniadzeCzekaja =
     Boolean(stanPieniedzy?.moznaZwrocic || stanPieniedzy?.moznaZapisacPrzelew);
 
-  /* Ekran trzyma się okna, a przewijają się KOLUMNY (0.165.0). Pion strony był
-     tu drogą do zgubienia kolejki: żeby dojść do dołu dowodów, operator
-     zjeżdżał z oczu liście, po której chodzi klawiszami.
+  /* Ekran trzyma się okna, a przewijają się KOLUMNY. Pion strony byłby
+     drogą do zgubienia kolejki: żeby dojść do dołu dowodów, operator
+     zjeżdżałby z oczu liście, po której chodzi klawiszami.
 
      Pasek kartotek stoi POZA gridem, w zewnętrznej kolumnie. Jako warunkowy
      wiersz `auto` byłby pułapką: bez paska pierwsza karta wpadałaby w ten
@@ -1041,13 +974,11 @@ export function Zwroty() {
      mierzy się do `max-content`, więc przy treści wyższej niż okno grid
      wylewałby się poza kontener zamiast przyciąć ścieżkę. */
   return <div className="flex flex-col gap-4 lg:h-full lg:min-h-0">
-    {/* ── JEDEN RZĄD NAGŁÓWKA (0.484.3) ─────────────────────────────────
-        Zgłoszenie właściciela: „ten fragment zajmuje za dużo miejsca". Nad
-        listą stały trzy pełne pasma: przełącznik, pasek kartotek i przycisk
-        nowego koszyka — każde z własnym odstępem, treści na kilka
-        centymetrów. Teraz to jeden rząd; pasek kartotek bierze resztę
+    {/* ── JEDEN RZĄD NAGŁÓWKA ───────────────────────────────────────────
+        Przełącznik, pasek kartotek i przycisk nowego koszyka stoją w jednym
+        rzędzie, żeby oszczędzić wysokość. Pasek kartotek bierze resztę
         szerokości, a na wąskim ekranie rząd się zawija.
-        Zwroty i kosze pod jedną zakładką (0.438.0) — powód w `Przelacznik.tsx`. */}
+        Zwroty i kosze pod jedną zakładką — powód w `Przelacznik.tsx`. */}
     <div className="flex shrink-0 flex-wrap items-start gap-2">
       <PrzelacznikZwrotow teraz="zwroty" />
       <NowyKoszyk />
@@ -1068,23 +999,21 @@ export function Zwroty() {
     <Karta className="flex min-h-0 flex-col overflow-hidden">
       {/* `shrink-0` na blokach nad listą nie jest kosmetyką: lista ma bazę 0,
           więc przy ciasnym oknie kurczyłyby się WYŁĄCZNIE one. */}
-      {/* ── KAFLE ZAMIAST PIGUŁEK (0.454.0) ──────────────────────────────────
-          Zgłoszenie właściciela: „ulżyj przeładowaniu tekstem, użyj ikon".
-          Siedem pigułek z pomocą i kolejnością łamało się na trzy nierówne
-          rzędy. Siatka trzech kolumn układa je w rzędy równe, a kolejność
-          i pomoc stają w ostatnim, obok „Wszystkie" — tam, gdzie zostaje
-          miejsce, zamiast przed kubełkami, które czyta się pierwsze. */}
+      {/* ── KAFLE ZAMIAST PIGUŁEK ───────────────────────────────────────────
+          Ikony zamiast tekstu. Siatka trzech kolumn układa kubełki w równe
+          rzędy, a kolejność i pomoc stają w ostatnim, obok „Wszystkie" — tam,
+          gdzie zostaje miejsce, zamiast przed kubełkami, które czyta się
+          pierwsze. */}
       <nav className="grid shrink-0 grid-cols-3 gap-1 border-b border-slate-200 p-2">
-        {/* ── JEDEN KSZTAŁT WYBORU (0.262.0) ─────────────────────────────────
-            Ten rząd stał w trzech ekranach przepisany znak w znak, w bursztynie,
-            bez tła pigułki niewybranej i bez `aria-pressed`. Kształt jest teraz
-            jeden dla całego panelu — powód stoi przy `FiltrSegmentowy`.
+        {/* ── JEDEN KSZTAŁT WYBORU ───────────────────────────────────────────
+            Kształt jest jeden dla całego panelu — powód stoi przy
+            `FiltrSegmentowy`.
 
             „Wszystkie" WCHODZI DO TABLICY, zamiast wisieć osobnym przyciskiem
             pod pętlą: to jest ten sam wybór, co każdy kubełek, tylko bez
             zawężenia. Numer klawisza liczy się z długości listy, więc dopisanie
             kubełka nie zostawia w podpowiedzi nieaktualnej cyfry. */}
-        {/* Kolejność i pomoc w RZĘDZIE KUBEŁKÓW (0.402.0). Tu, inaczej niż
+        {/* Kolejność i pomoc w RZĘDZIE KUBEŁKÓW. Tu, inaczej niż
             w reklamacjach, nie ma osobnego wiersza narzędzi: szukanie zwrotów
             to skaner z własnym rzędem (`zwroty/Szukanie.tsx`), więc dokładanie
             mu sąsiadów zrobiłoby z niego to, czym nie jest. */}
@@ -1106,12 +1035,12 @@ export function Zwroty() {
         </div>
       {/* Pomoc w swojej komórce siatki — obok kolejności, na końcu rzędu. */}
       <div className="flex items-center justify-center">
-      {/* `sita={false}` (0.476.0): sito „Niczyje" zeszło z tego ekranu
-          w 0.370.0, a pomoc dalej obiecywała klawisz `n`, który nic nie robi. */}
+      {/* `sita={false}`: sita „Niczyje" tu nie ma, więc pomoc nie obiecuje
+          klawisza `n`. */}
       <SkrotyKlawiszy zMoje={false} sita={false} kubelkow={KUBELKI.length}
-          /* Klawisze OTWARTEGO zwrotu, gdy jest (audyt, 15 września 2026). Po `P`
-             zwrot stoi już w DO OCENY, a lista dalej w DO DECYZJI — pasek kubełka
-             pokazywał wtedy P/O, choć działały S/U. */
+          /* Klawisze OTWARTEGO zwrotu, gdy jest. Po `P` zwrot stoi już
+             w DO OCENY, a lista dalej w DO DECYZJI — pasek kubełka pokazywałby
+             P/O, choć działają S/U. */
           /* `Z` DOPISUJE SIĘ ZE STANU, nie z tabeli kubełków: należność
              przechodzi przez trzy kubełki i gaśnie w środku każdego z nich.
              Wpisany do `KLAWISZE_KUBELKA` stałby w pasku także po wypłacie —
@@ -1128,7 +1057,7 @@ export function Zwroty() {
                przeszkodzie klawisz milczałby, a pasek kłamał. */
             ...(stanSzybkiej.pokaz && !stanSzybkiej.przeszkoda
               ? [["W", "wszystko OK — na półkę i wypłata"] as const] : []),
-            /* `R` ZE STANU, nie z kubełka (0.484.7): klawisz działa przy
+            /* `R` ZE STANU, nie z kubełka: klawisz działa przy
                każdym zwrocie z numerem korekty — także w DO ZWROTU, gdzie
                czeka na pieniądze — a w ZAMKNIĘTYCH bez korekty (rozliczonych
                przez Allegro) milczy. */
@@ -1159,9 +1088,9 @@ export function Zwroty() {
         onWybierz={(x) => { setWynikSkanu(null); nawiguj(`/obsluga/zwroty/${x}`); }}
         paczki={loginPaczek ? paczkiKlienta.data?.paczki ?? null : null}
         szukaPaczek={paczkiKlienta.isFetching}
-        /* LOGIN IDZIE TEŻ DO ALLEGRO (0.450.0). Lista wyżej czyta naszą
+        /* LOGIN IDZIE TEŻ DO ALLEGRO. Lista wyżej czyta naszą
            bazę, a ta nie zna zamówienia paczki nieodebranej — nic do niego nie
-           prowadzi. Bez tego biuro szukało takiej paczki na stronie Allegro.
+           prowadzi. Bez tego biuro szukałoby takiej paczki na stronie Allegro.
            Pobrane zamówienia serwer zapisuje, a mutacja odświeża listę, więc
            wynik pokazuje ta sama lista, w tym samym miejscu. */
         onLogin={(v) => {
@@ -1176,7 +1105,7 @@ export function Zwroty() {
             onError: () => { pytanyLogin.current = ""; },
           });
         }}
-        /* PRZYJĘCIE PACZKI NIEODEBRANEJ (0.493.0). Numer z naklejki idzie
+        /* PRZYJĘCIE PACZKI NIEODEBRANEJ. Numer z naklejki idzie
            tylko po skanie, który CHYBIŁ — to numer tego kartonu. Trafiony skan
            albo EAN towaru nie mają z tą paczką nic wspólnego, a fraza wpisana
            ręką numerem listu nie jest. Po sukcesie
@@ -1199,34 +1128,22 @@ export function Zwroty() {
         bladPrzyjecia={przyjmijNieodebrana.error ? (przyjmijNieodebrana.error as Error).message : ""}
         pytaAllegro={zAllegro.isPending}
         bladAllegro={zAllegro.error ? (zAllegro.error as Error).message : ""}
-        /* SYNCHRONIZACJA WCHODZI DO RZĘDU POLA (0.370.0). Stała we własnym
-           paśmie razem z filtrami; po ich zdjęciu zostałaby sama i kosztowała
-           całe pasmo na jeden przycisk. Ta sama droga, którą w audycie
-           15 września przeszedł przycisk NIEODEBRANA. */
+        /* SYNCHRONIZACJA W RZĘDZIE POLA: osobne pasmo kosztowałoby całą
+           wysokość wiersza na jeden przycisk. */
         synchronizuje={synchronizuj.isPending}
         bladSync={bladSync}
         onSynchronizuj={() => { setBladSync(""); synchronizuj.mutate(undefined,
           { onError: (e) => setBladSync((e as Error).message) }); }}
-        /* REJESTRACJI PACZKI NIE MA od 0.451.0 — decyzja właściciela,
-           „ja tylko wyszukuję ją w Allegro". Uzasadnienie stoi w `Szukanie`. */
+        /* Rejestracji paczki nie ma — biuro tylko wyszukuje ją w Allegro.
+           Uzasadnienie stoi w `Szukanie`. */
       />
 
-      {/* ── PYTANIE KUBEŁKA I SITO W JEDNYM PAŚMIE (audyt, 15 września 2026) ──
-          Stały w dwóch, po 33 i 37 px, i mówiły o TEJ SAMEJ liście: kubełek
-          „na jakim to etapie", sito „czyje to", tag „o czym to" (0.315.0).
-          Trzy pytania o jedną rzecz mieszczą się w jednym rzędzie, a kolejka
-          odzyskuje wiersz.
-
-          Oba warunki zostają osobne, bo każdy milczy z innego powodu: pytanie
-          przy włączonym filtrze mówiłoby nieprawdę o tym, co widać, a sita nie
-          ma bez tożsamości. Pasmo znika dopiero, gdy milczą oba. */}
-      {/* PYTANIE KUBEŁKA, samo (0.370.0). Stało tu z sitem i filtrem tagów;
-          po ich zdjęciu pasmo niesie jedno zdanie i milczy przy szukaniu
+      {/* PYTANIE KUBEŁKA. Pasmo niesie jedno zdanie i milczy przy szukaniu
           oraz w zakładce WSZYSTKIE, gdzie pytania nie ma. */}
       {!pasujace && kubelek !== null &&
         <div className="flex shrink-0 flex-wrap items-center gap-1 border-b border-slate-200 bg-slate-50 px-2 py-1">
           <span className="mr-1 text-xs font-semibold text-slate-600">{opis?.pytanie}</span>
-          {/* SITA W PAŚMIE PYTANIA (0.539.0), nie w rzędzie kubełków: dzielą
+          {/* SITA W PAŚMIE PYTANIA, nie w rzędzie kubełków: dzielą
               jeden kubełek, więc stoją tam, gdzie widać, który. Kliknięcie
               przestawia kursor na pierwszy zwrot sita — powód przy `przelacz`. */}
           {kubelek === "decyzja" &&
@@ -1246,7 +1163,7 @@ export function Zwroty() {
                   ile: ileWSicie[s.id], podpowiedz: s.podpowiedz })),
               ]} />}
         </div>}
-      {/* Aktywna grupa rozjazdów w miejscu pytania kubełka (0.537.0) — lista
+      {/* Aktywna grupa rozjazdów w miejscu pytania kubełka — lista
           mówi, dlaczego jest krótsza, i ma wyjście jednym kliknięciem. */}
       {filtrRozjazdu &&
         <div className="flex shrink-0 items-center gap-2 border-b border-amber-200 bg-amber-50 px-2 py-1">
@@ -1256,7 +1173,7 @@ export function Zwroty() {
             className="ml-auto text-xs text-amber-900 underline">wyczyść</button>
         </div>}
 
-      {/* Klawisze NA EKRANIE, wzorem reklamacji (0.281.0). Dekalog p. 2:
+      {/* Klawisze NA EKRANIE, wzorem reklamacji. Dekalog p. 2:
           rozpoznanie jest tańsze od pamiętania. Pasek pokazuje klawisze
           OGLĄDANEGO kubełka, bo tylko one coś tam robią — lista wszystkich
           uczyłaby przebiegać wzrokiem obok tego jednego, który jest do rzeczy.
@@ -1290,7 +1207,7 @@ export function Zwroty() {
               <ZlaPaczka className="ml-auto shrink-0" login={zwrot.kupujacyLogin} zamowienie={zwrot.orderId}
                 konto={zwrot.konto} />
             </div>
-            {/* Oś etapów (0.453.0): gdzie jest sprawa i co jeszcze przed nią —
+            {/* Oś etapów: gdzie jest sprawa i co jeszcze przed nią —
                 zamiast zdań rozsianych po sekcjach. */}
             <Etapy kubelek={zwrot.kubelek} poKorekcie={Boolean(zwrot.korektaNumer)} />
             {/* Pasek stoi NAD produktami i nie przewija się razem z nimi:
@@ -1301,7 +1218,6 @@ export function Zwroty() {
             <NieOdeslany zwrot={zwrot} trwa={nieOdeslany.trwa || trwa}
               blad={nieOdeslany.blad} onOdmow={odmowNieOdeslanemu} />
             <Decyzje zwrot={zwrot} trwa={trwa} blad={bladDecyzji} akcje={akcje}
-              moznaZwrocic={Boolean(stanPieniedzy?.moznaZwrocic)}
               /* KURSOR SCHODZI PO TYCH DWÓCH DECYZJACH, i tylko po nich
                  (§25a.2). Odmowa i zapisany numer korekty WYPROWADZAJĄ zwrot
                  z drabiny — nie ma przy nim następnego pytania, więc trzymanie
@@ -1312,14 +1228,10 @@ export function Zwroty() {
               onWerdykt={(decyzja, powod) =>
                 werdykt.mutate({ id: zwrot.id, decyzja, powod, wersja: zwrot.wersja },
                   { onSuccess: () => { if (decyzja === "odrzucony") idz(1); } })}
-              /* KOREKTA PRZESUWA KURSOR TYLKO WTEDY, GDY PIENIĄDZE SĄ ZAŁATWIONE
-                 (audyt, 15 września 2026). Dwa zdania na tym samym ekranie
-                 przeczyły sobie: `Decyzje.tsx` obiecywało „pieniądze oddajesz
-                 przyciskiem niżej — także po zapisaniu korekty", a zapis numeru
-                 natychmiast wyprowadzał z tego zwrotu na następny. Biuro
-                 wystawia korektę zwykle PRZED wypłatą, więc kursor uciekał
-                 dokładnie przed pieniędzmi — i dlatego szły w Sales Center.
-                 Dwie drogi do wypłaty, dwie bramki: przez Allegro
+              /* KOREKTA PRZESUWA KURSOR TYLKO WTEDY, GDY PIENIĄDZE SĄ
+                 ZAŁATWIONE. Biuro wystawia korektę zwykle PRZED wypłatą, więc
+                 przejście na następny zwrot uciekałoby dokładnie przed
+                 pieniędzmi. Dwie drogi do wypłaty, dwie bramki: przez Allegro
                  (`moznaZwrocic`) i przelewem poza nim (`moznaZapisacPrzelew`,
                  przy pobraniu jedyna). Obie zamknięte znaczą, że przy tym
                  zwrocie nie ma już czego kliknąć — dopiero wtedy wolno zabrać
@@ -1358,8 +1270,8 @@ export function Zwroty() {
             {/* Pieniądze STOJĄ POD DECYZJAMI, nie w kolumnie dowodów: to jest
                 ostatni krok tej pracy i ma być tam, gdzie operator właśnie
                 patrzy, a nie o kolumnę dalej. */}
-            {/* `key` na ZWROCIE, jak przy `Pozycje` niżej (0.536.1). Bez niego
-                sekcja zostawała zamontowana przy przejściu na zwrot z pamięci
+            {/* `key` na ZWROCIE, jak przy `Pozycje` niżej. Bez niego
+                sekcja zostałaby zamontowana przy przejściu na zwrot z pamięci
                 podręcznej, a z nią otwarty formularz odmowy z kodem i powodem
                 poprzedniego zwrotu — gotowy do wysłania pod cudzym numerem. */}
             {szczegol.data?.pieniadze && <Pieniadze key={`pieniadze-${zwrot.id}`}
@@ -1431,9 +1343,9 @@ export function Zwroty() {
                   listę od nowa. Bez tego zostawał w niej stan poprzedniego —
                   zaznaczenie pozycji i haczyk przy koszcie dostawy — a zapis
                   kwoty szedł z cudzymi identyfikatorami. */}
-              {/* KLUCZ Z PRZEDROSTKIEM (0.484.4). `Wiadomosc` niżej też kluczy
+              {/* KLUCZ Z PRZEDROSTKIEM. `Wiadomosc` niżej też kluczy
                   się zwrotem, a dwa rodzeństwa z jednym kluczem React myli:
-                  po skanie kolejnego zwrotu zostawała lista poprzedniego. */}
+                  po skanie kolejnego zwrotu zostawałaby lista poprzedniego. */}
               <Pozycje key={`pozycje-${zwrot.id}`} zwrot={zwrot} trwa={trwa} blad={bladDecyzji}
                 akcje={akcje} onWszystkieNaStan={() => void wszystkieNaStan().catch(() => {})}
                 trwaRabat={rabat.isPending} bladRabatu={bladRabatu}
@@ -1464,21 +1376,18 @@ export function Zwroty() {
                   zdejmij.mutate({ id: zwrot.id, pozycjaId, wersja: zwrot.wersja },
                     { onError: (e) => setBladDopisania((e as Error).message) });
                 }} />
-              {/* DOŁOŻENIE TOWARU DO KOSZYKA (0.365.0) stoi POD pozycjami,
+              {/* DOŁOŻENIE TOWARU DO KOSZYKA stoi POD pozycjami,
                   bo to ostatnia rzecz przy otwartym kartonie: najpierw oceniam
                   to, co klient zgłosił, potem dokładam to, czego w zgłoszeniu
                   nie ma. Pasek koszyka pokazuje się dopiero z zawartością, więc
                   pierwszej sztuki nie dałoby się tam zeskanować.
 
-                  TYLKO PRZY ZWROCIE, KTÓRY JESZCZE ŻYJE (0.370.0). Granicę
-                  postawił właściciel razem ze zgłoszeniem: „tylko z poziomu
-                  obsługi zwrotów, jak jeszcze nie jest zamknięty" — a pole
-                  rysowało się bezwarunkowo, także przy zwrocie zamkniętym
-                  i odrzuconym. Skaner przy sprawie, której nie ma jak zmienić,
-                  obiecuje ruch, po którym serwer odmówi. */}
+                  TYLKO PRZY ZWROCIE, KTÓRY JESZCZE ŻYJE. Skaner przy sprawie,
+                  której nie ma jak zmienić, obiecuje ruch, po którym serwer
+                  odmówi. */}
               {zwrot.kubelek !== "zamkniety" && zwrot.kubelek !== "odrzucony" &&
                 <DolozTowar />}
-              {/* Gotowa wiadomość do klienta (0.476.0) — `key`, bo edytowana
+              {/* Gotowa wiadomość do klienta — `key`, bo edytowana
                   treść jednego zwrotu nie ma prawa przejść na następny. */}
               <Wiadomosc key={`wiadomosc-${zwrot.id}`} zwrot={zwrot} />
             </div>

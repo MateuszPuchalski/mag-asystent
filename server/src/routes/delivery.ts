@@ -102,7 +102,7 @@ export async function deliveryRoutes(app: FastifyInstance) {
   );
 
   /**
-   * Korekta ilości odłożonej na pozycji (0.45.0).
+   * Korekta ilości odłożonej na pozycji.
    *
    * Bez bramki roli: to poprawianie WŁASNEJ pomyłki w liczeniu, zanim faktura
    * zostanie zamknięta — nie orzeczenie o niczym i nie zapis do Subiekta.

@@ -8,12 +8,12 @@ import type { MojaSprawa } from "../api/typy";
    Ekran jest ODCZYTEM z trzech kolejek i testy pilnują trzech rzeczy:
 
    1. SPRAWA Z TERMINEM STOI NAD RESZTĄ — kolejność bierze zegar, a zegar ma
-      wyłącznie część spraw (blizna 0.121.0: jeden zegar nazwany drugim).
+      wyłącznie część spraw.
    2. WIERSZ PROWADZI DO WŁAŚCIWEJ KOLEJKI, bo tam stoją bramki sprawy.
    3. NIE MA TU ANI JEDNEGO PRZYCISKU PRACY. Ekran roboczy nad kolejkami
-      byłby nakładką ze wspólnym statusem — kształtem z blizny 0.140.0.
+      byłby nakładką ze wspólnym statusem.
 
-   Sprawa klienta (S6, 0.535.0) dokłada wiersz `klient`: prowadzi do źródła
+   Sprawa klienta (S6) dokłada wiersz `klient`: prowadzi do źródła
    zdarzenia albo do profilu, mówi o kroku jednym zdaniem i dalej nie ma
    przycisku — krok i zakończenie stoją na profilu.                         */
 
@@ -60,7 +60,7 @@ describe("Ekran Moje", () => {
     render(<MemoryRouter><Moje /></MemoryRouter>);
     expect(screen.getAllByText(/^termin /).length).toBe(1);
     expect(screen.getAllByText(/^ostatni ruch /).length).toBe(1);
-    /* Liczniki stoją w nagłówku po kropce (0.524.0), jednym wzorem
+    /* Liczniki stoją w nagłówku po kropce, jednym wzorem
        z pozostałymi sekcjami „Do zrobienia". */
     expect(screen.getByRole("heading", { name: "Moje sprawy · 2 · 1 z terminem" })).toBeInTheDocument();
   });
@@ -97,9 +97,8 @@ describe("Ekran Moje", () => {
   });
 
   it("czyta scaloną `lista`, a wiersz nieznanego rodzaju pomija, zamiast wywrócić ekran", () => {
-    /* `sprawy` to od 0.535.0 same kolejki — dla kart sprzed wydania, które
-       na wierszu `klient` wywracały się bez granicy błędu. Ta karta czyta
-       `lista`, a rodzaj dołożony przez przyszły serwer po prostu pomija. */
+    /* `sprawy` to same kolejki. Ta karta czyta `lista`, a rodzaj dołożony
+       przez przyszły serwer po prostu pomija, zamiast się wywracać. */
     moje.mockReturnValue({ data: {
       sprawy: [sprawa({ kolejka: "rozmowa", id: 11 })],
       lista: [
@@ -114,7 +113,7 @@ describe("Ekran Moje", () => {
       .toEqual(["/obsluga/klient/zielony", "/obsluga/skrzynka/11"]);
   });
 
-  /* Dosyłka (0.536.0) stoi po prawej ZAMIAST „dziś” i „czeka do”, a nie
+  /* Dosyłka stoi po prawej ZAMIAST „dziś” i „czeka do”, a nie
      doklejona do opisu: opis jest ucięty i dopisek znikałby przy długim
      kroku. Obudzona i po terminie dalej wygrywają — to one każą działać. */
   it("wiersz sprawy z dosyłką mówi o paczce, nie o dacie", () => {

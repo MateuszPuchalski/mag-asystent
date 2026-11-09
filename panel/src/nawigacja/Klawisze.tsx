@@ -2,16 +2,13 @@ import { useEffect, useState } from "react";
 import { useLocation } from "react-router-dom";
 import { Keyboard, Search, X } from "lucide-react";
 import { OknoSzukania } from "./Szukaj";
-/* „Czy klawisz padł w polu" pyta jeden strażnik (0.515.0): własna kopia
-   w tym pliku była tą samą funkcją pod inną nazwą. */
+/* „Czy klawisz padł w polu" pyta jeden wspólny strażnik. */
 import { polePisania, useOkno } from "./fokus";
 import { Klawisz } from "./Klawisz";
 
-/* ── Jedna lista skrótów i klawisze całego panelu (23 września 2026) ────────
-   Każda kolejka miała swoją pomoc pod „?", widoczną dopiero po najechaniu
-   i tylko na tym jednym ekranie. Kto chciał wiedzieć, czym chodzi się po
-   zwrotach, musiał na nie wejść. Dekalog p. 2 — rozpoznanie tańsze od
-   pamiętania — wymaga jednego miejsca na wszystkie.
+/* ── Jedna lista skrótów i klawisze całego panelu ───────────────────────────
+   Dekalog p. 2 — rozpoznanie tańsze od pamiętania — wymaga jednego miejsca
+   na wszystkie skróty, a nie pomocy widocznej tylko na jednym ekranie.
 
    KLAWISZ `?` otwiera listę z każdego ekranu, a sekcja bieżącego ekranu stoi
    na górze. Lista jest DANYMI, nie opisem: ta sama tablica, z której czyta
@@ -20,7 +17,7 @@ import { Klawisz } from "./Klawisz";
 
    TE SAME KLAWISZE NA KAŻDEJ KOLEJCE: `j`/`k`, cyfry kubełków i Ctrl+Enter
    przy odpowiedzi. `Z` zostaje różny i to jest świadome: w skrzynce kończy
-   rozmowę, w zwrotach oddaje pieniądze od 0.284.0. Przestawienie pieniędzy
+   rozmowę, w zwrotach oddaje pieniądze. Przestawienie pieniędzy
    pod inną literę uczyłoby biuro od nowa czynności nieodwracalnej. */
 
 export interface SekcjaSkrotow {
@@ -43,24 +40,23 @@ export const SKROTY: ReadonlyArray<SekcjaSkrotow> = [
     ["1–9", "kubełek"],
   ] },
   { tytul: "Skrzynka", sciezka: "/obsluga/skrzynka", klawisze: [
-    /* Enter i Ctrl+Enter działają też spoza pola (0.533.0) — powód
+    /* Enter i Ctrl+Enter działają też spoza pola — powód
        w `skrzynka/Edytor.tsx`. */
     ["Enter", "pisz odpowiedź (kursor w polu)"],
     ["Ctrl Enter", "wyślij odpowiedź"],
     ["Ctrl Shift Enter", "wyślij i zakończ"],
-    /* Do 0.533.0 stało tu „zakończ / otwórz", a na zakończonej „Z" nie robi
-       nic — ponowne otwarcie jest wyłącznie przyciskiem. */
+    /* Na zakończonej „Z" nie robi nic — ponowne otwarcie jest wyłącznie
+       przyciskiem. */
     ["Z", "zakończ rozmowę; drugie Z — mimo pytania"],
     ["O", "odłóż do następnego dnia roboczego, 8:00"],
-    /* Pusty edytor chowa zakładki (0.548.0), więc notatka ma klawisz. */
+    /* Pusty edytor chowa zakładki, więc notatka ma klawisz. */
     ["N", "notatka wewnętrzna"],
-    /* Opis idzie za napisem przycisku, który od 0.500.0 mówi „Wstaw do
-       odpowiedzi" (0.515.0): stary opis obiecywał poprawianie. */
+    /* Opis idzie za napisem przycisku „Wstaw do odpowiedzi". */
     ["E", "wstaw szkic do odpowiedzi"],
     ["R", "odrzuć szkic Copilota"],
   ] },
   { tytul: "Reklamacje", sciezka: "/obsluga/reklamacje", klawisze: [
-    /* Ten sam edytor co w skrzynce (0.549.0), więc te same klawisze. */
+    /* Ten sam edytor co w skrzynce, więc te same klawisze. */
     ["Enter", "pisz odpowiedź (kursor w polu)"],
     ["Ctrl Enter", "wyślij odpowiedź"],
     ["m", "moje sprawy"],
@@ -110,9 +106,8 @@ export function ListaSkrotow({ onZamknij }: { onZamknij: () => void }) {
   const okno = useOkno<HTMLDivElement>({ onZamknij });
   return <div className="fixed inset-0 z-50 flex items-start justify-center bg-black/30 px-4 pt-[10vh]"
     onClick={onZamknij}>
-    {/* `text-slate-900` jawnie (0.515.0): okno rysuje się wewnątrz nagłówka,
-        który ma `text-white`. Tytuł i ikona dziedziczyły biel na białym tle
-        i nie było ich widać — zmierzone w przeglądarce przy uproszczeniu. */}
+    {/* `text-slate-900` jawnie: okno rysuje się wewnątrz nagłówka, który ma
+        `text-white`, więc tytuł i ikona dziedziczyłyby biel na białym tle. */}
     <div role="dialog" {...okno} aria-label="Skróty klawiszowe" onClick={(e) => e.stopPropagation()}
       className="max-h-[80vh] w-full max-w-3xl overflow-y-auto rounded-xl bg-white p-5 text-slate-900 shadow-2xl">
       <div className="mb-3 flex items-center gap-2">
@@ -163,10 +158,10 @@ export function SzukajIKlawisze() {
     return () => window.removeEventListener("keydown", f);
   }, []);
   return <>
-    {/* SAMA IKONA (0.538.0, nagłówek w jednym rzędzie). Napis „Szukaj"
-        z klawiszem zajmował ~130 px, a jeden rząd przy 1180 px nie ma ich
-        skąd wziąć. Lupa jest znakiem, który rozpoznaje się bez czytania;
-        skrót Ctrl K stoi w dymku i w nazwie dla czytnika. */}
+    {/* SAMA IKONA. Napis „Szukaj" z klawiszem zająłby ~130 px, a jeden rząd
+        nagłówka przy 1180 px nie ma ich skąd wziąć. Lupa jest znakiem, który
+        rozpoznaje się bez czytania; skrót Ctrl K stoi w dymku i w nazwie dla
+        czytnika. */}
     <button type="button" onClick={() => setSzukanie(true)} aria-keyshortcuts="Control+K"
       aria-label="Szukaj (Ctrl K)" title="Szukaj — Ctrl K"
       className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-white/10 text-slate-300 hover:bg-white/15">

@@ -1,9 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { MIN_DLUGOSC, PRZERWA_MS, SeriaWPolu } from "./skaner";
 
-/* ── Skan w polu szukania zastępuje, nie dopisuje (0.329.0) ──────────────────
-   Zgłoszenie właściciela: „skan powinien najpierw wyczyścić pole szukania,
-   a nie dopisywać się na końcu tego, co już w nim stoi".
+/* ── Skan w polu szukania zastępuje, nie dopisuje ────────────────────────────
 
    Ta reguła psuje się w DWIE strony i obie kosztują:
 

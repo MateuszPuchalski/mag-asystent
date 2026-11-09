@@ -1,41 +1,18 @@
 import React, { useState } from "react";
 import { Klawisz } from "../nawigacja/Klawisz";
 
-/* ── Skróty klawiszowe NA EKRANIE (0.281.0) ──────────────────────────────────
-   Kolejka reklamacji chodzi z klawiatury od 0.245.0: strzałki albo
-   `j`/`k` po wierszach, cyfry po kubełkach, a od 0.278.0 także `m` i `n` po
-   sitach. Do tego wydania NIE BYŁO TEGO NIGDZIE WIDAĆ. Klawisz stał wyłącznie
-   w podpowiedzi pod kursorem, czyli tam, gdzie trafia się przypadkiem.
+/* ── Skróty klawiszowe NA EKRANIE ────────────────────────────────────────────
+   Kolejka chodzi z klawiatury: strzałki albo `j`/`k` po wierszach, cyfry
+   po kubełkach, `m` i `n` po sitach. Dekalog p. 2 mówi to wprost:
+   „Rozpoznanie jest tańsze od pamiętania. Nie każ pamiętać tego, co może
+   zostać na ekranie". Skrót, o którym nikt nie wie, nie skraca niczyjej
+   pracy — jest kodem, nie funkcją.
 
-   Dekalog p. 2 mówi to wprost: „Rozpoznanie jest tańsze od pamiętania. Nie
-   każ pamiętać tego, co może zostać na ekranie". Skrót, o którym nikt nie wie,
-   nie skraca niczyjej pracy — jest kodem, nie funkcją.
-
-   CENA BYŁA JAWNA: jeden wiersz wysokości kolumny, około 22 px, zabrany
-   liście spraw. 0.281.0 wzięło ją świadomie i odrzuciło pomoc pod znakiem
-   zapytania zdaniem: „kosztowałaby dwa kliknięcia przy każdym przypomnieniu,
-   a schowane przypomnienie to znowu pamiętanie".
-
-   TA CENA PODWOIŁA SIĘ PO CICHU (audyt, 15 września 2026). Pomiar na żywym
-   ekranie zwrotów: pasek zawijał się na dwa rzędy i kosztował 49 px, nie 22 —
-   odkąd doszły klawisze kubełka (0.284.0) i `Z` od pieniędzy. Wtedy skróciły
-   się opisy.
-
-   ── ZNAK ZAPYTANIA JEDNAK WYGRYWA (0.402.0) ─────────────────────────────────
-   Zgłoszenie właściciela ze zrzutem: „panel wygląda chaotycznie". Policzone na
-   ekranie reklamacji: SIEDEM pasm sterowania nad pierwszą sprawą, 268 px
-   w kolumnie szerokiej na 280. Ten pasek jest jednym z nich, a trzy sąsiednie
-   odpowiadają na to samo pytanie „co pokazać". Rachunek z 0.281.0 był robiony
-   przy dwóch pasmach i przy nich był słuszny; przy siedmiu przestał.
-
-   ZARZUT Z 0.281.0 ZOSTAJE ODPOWIEDZIANY, nie zignorowany: pomoc otwiera się
-   NA NAJECHANIE, nie na kliknięcie. Dwa kliknięcia, których tamta decyzja nie
-   chciała płacić, kosztują teraz zero — a panel obsługi chodzi na monitorach
-   biura z myszą pod ręką (§10.5, decyzja o zdjęciu widoku mobilnego). Klawisz
-   dalej stoi też w podpowiedzi każdej pigułki, więc rozpoznanie ma dwie drogi.
-
-   Nazwa komponentu zostaje, bo to dalej ten sam byt: „gdzie agent widzi, czym
-   chodzi się po tej kolejce".                                              */
+   POMOC POD ZNAKIEM ZAPYTANIA, bo stały pasek to kolejne pasmo nad pierwszą
+   sprawą, a pasm sterowania jest już kilka. Pomoc otwiera się NA NAJECHANIE,
+   nie na kliknięcie, więc przypomnienie nic nie kosztuje — a panel obsługi
+   chodzi na monitorach biura z myszą pod ręką (§10.5). Klawisz stoi też
+   w podpowiedzi każdej pigułki, więc rozpoznanie ma dwie drogi.             */
 
 export function SkrotyKlawiszy({ zMoje, kubelkow, sita = true, zWszystkimi = true,
   dodatkowe = [] }: {
@@ -44,15 +21,15 @@ export function SkrotyKlawiszy({ zMoje, kubelkow, sita = true, zWszystkimi = tru
   /** Ile jest kubełków; ostatnia cyfra to „Wszystkie". */
   kubelkow: number;
   /**
-   * Czy ekran ma sita „Moje"/„Niczyje" (0.284.0).
+   * Czy ekran ma sita „Moje"/„Niczyje".
    *
    * Zwroty ich nie mają — nie noszą prowadzącego — a pasek obiecujący `m`
-   * i `n` na ekranie, który ich nie obsługuje, byłby dokładnie tym błędem,
-   * który ten komponent naprawiał: klawiszem widocznym i martwym.
+   * i `n` na ekranie, który ich nie obsługuje, pokazywałby klawisz
+   * widoczny i martwy.
    */
   sita?: boolean;
   /**
-   * Czy „Wszystkie" jest DOKLEJONE za kubełkami (0.383.0).
+   * Czy „Wszystkie" jest DOKLEJONE za kubełkami.
    *
    * Zwroty i reklamacje trzymają je poza tablicą kubełków, więc
    * ostatnią cyfrą jest `kubelkow + 1`. Skrzynka ma je jako kubełek PIERWSZY
@@ -75,8 +52,7 @@ export function SkrotyKlawiszy({ zMoje, kubelkow, sita = true, zWszystkimi = tru
 
   /* NAJECHANIE I FOKUS OTWIERAJĄ, kliknięcie NIE PRZEŁĄCZA — i to nie jest
      drobiazg. Kliknięcie myszą idzie po najechaniu, więc przełącznik zamykałby
-     to, co najechanie przed chwilą otworzyło; pierwsza wersja tej poprawki
-     miała dokładnie tę usterkę i złapały ją testy czterech ekranów.
+     to, co najechanie przed chwilą otworzyło.
 
      Trzy drogi wejścia dają ten sam skutek: mysz najeżdża, Tab ustawia fokus,
      dotyk ustawia fokus stuknięciem. Zamknięcie to zejście kursora albo utrata
@@ -98,9 +74,9 @@ export function SkrotyKlawiszy({ zMoje, kubelkow, sita = true, zWszystkimi = tru
           <span className="min-w-0">{opis}</span>
         </li>)}
       </ul>
-      {/* Od 23 września 2026 wszystkie skróty panelu stoją w jednej liście
-          pod klawiszem `?` (`nawigacja/Klawisze.tsx`); tu zostają klawisze
-          tej kolejki, pod ręką przy najechaniu. */}
+      {/* Wszystkie skróty panelu stoją w jednej liście pod klawiszem `?`
+          (`nawigacja/Klawisze.tsx`); tu zostają klawisze tej kolejki, pod
+          ręką przy najechaniu. */}
       <p className="mt-2 border-t border-slate-100 pt-1 text-podpis text-slate-500">
         Wszystkie skróty: <Klawisz>?</Klawisz></p>
     </div>}

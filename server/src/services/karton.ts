@@ -9,11 +9,10 @@ import {
   type SzczegolKosza,
 } from "./kosze.js";
 
-/* ── KARTON: rozkładanie od zera (0.122.0) ───────────────────────────────────
+/* ── KARTON: rozkładanie od zera ─────────────────────────────────────────────
    Pakujący odkładają do jednego pudła towary źle zebrane pod zamówienia.
-   Ktoś musi je potem rozłożyć na półki, a do tego wydania nie było na to
-   żadnej drogi: rozkładanie znało wyłącznie dokument (dostawa) albo kosz
-   zwrotowy (MM z Subiekta, zwrot Allegro).
+   Ktoś musi je potem rozłożyć na półki, a nie ma do tego dokumentu ani kosza
+   zwrotowego.
 
    Cykl życia kartonu:
 
@@ -129,7 +128,7 @@ export function zalozKarton(autor: string): SzczegolKosza {
  * `code` to skan albo wpis — napis, który dopiero trzeba rozwiązać, i serwer
  * jest właścicielem tej reguły (`towarZKodu`).
  *
- * `twId` (0.123.0) to WSKAZANIE wiersza z listy wyszukiwarki. Człowiek już
+ * `twId` to WSKAZANIE wiersza z listy wyszukiwarki. Człowiek już
  * obejrzał symbol, nazwę i półkę, i wybrał wzrokiem. Rozwiązywanie tego drugi
  * raz z napisu cofałoby decyzję, którą właśnie podjął — a przy niejednoznacznym
  * symbolu mogłoby ją nawet zmienić.
@@ -245,8 +244,7 @@ export function usunPozycjeKartonu(pozycjaId: number, autor: string): void {
  *
  * Dostępne NA KAŻDYM ETAPIE, także po zatwierdzeniu (decyzja właściciela).
  * Karton bywa otwarty przez pomyłkę, bywa też porzucony w połowie, bo ktoś
- * zabrał zawartość ręką — a do 0.123.0 jedynym wyjściem było rozłożenie
- * wszystkiego albo pominięcie każdej pozycji z powodem.
+ * zabrał zawartość ręką.
  *
  * DWA ZAKOŃCZENIA, bo to dwie różne rzeczy:
  *

@@ -1,6 +1,6 @@
 import type { Kategoria } from "./klasyfikacja-slownik.js";
 
-/* ── Wzorzec odpowiedzi dla rozpoznanej kategorii (23 września 2026) ────────
+/* ── Wzorzec odpowiedzi dla rozpoznanej kategorii ───────────────────────────
    Zgłoszenie właściciela: „gdy pytanie jest sklasyfikowane, ułóż odpowiedź
    odpowiednio do tego". Szkic dostawał rozpoznanie od 22 września, ale
    z jedną ogólną regułą: „odpowiadaj na tę prośbę". Model sam zgadywał, jak

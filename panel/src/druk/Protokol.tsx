@@ -6,12 +6,10 @@ import { useZdjecieDowodu } from "../towar/useZdjecie";
 import { useFirmaDruku } from "./firma";
 import { STYL_ANEKSU, protokol } from "./szablony";
 
-/* ── Druk protokołu dla dostawcy (0.435.0) ─────────────────────────────────
-   W `biuro.html` druk otwierał się przez `window.open` i `document.write`:
-   karta bez adresu, której nie dało się odświeżyć ani wkleić koledze, a po
-   zamknięciu nie było do niej powrotu. Tu ma adres `/obsluga/druk/protokol/
-   :dokId` i rysuje się POZA ramą panelu — bez nagłówka i zakładek, bo to jest
-   kartka do wydruku, a nie ekran pracy.
+/* ── Druk protokołu dla dostawcy ───────────────────────────────────────────
+   Druk ma adres `/obsluga/druk/protokol/:dokId`, więc da się go odświeżyć,
+   wkleić koledze i do niego wrócić. Rysuje się POZA ramą panelu — bez
+   nagłówka i zakładek, bo to jest kartka do wydruku, a nie ekran pracy.
 
    Adres niesie `dokId`, nie `deliveryId`: numer faktury, dostawcę i datę
    daje podgląd dokumentu, a wyjątki bierze się po `deliveryId` z tego samego

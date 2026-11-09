@@ -28,15 +28,13 @@ import type {
   ScanResolution,
 } from "../types.js";
 
-/* ── Tryb A: rozkładanie faktur zakupu (redesign v2.0) ───────────────────────
+/* ── Tryb A: rozkładanie faktur zakupu ───────────────────────────────────────
    Jednostką pracy jest DOKUMENT (D2), nie sesja.
 
    Skutek magazynowy niesie sam dokument w Subiekcie (księgowany wprost na MAG),
    więc zapisujemy WYŁĄCZNIE lokalizację (D1) — zero MM, zero waiting_for_doc,
    zero zależności od bufora; dostawę można rozkładać, zanim księgowość
-   zaksięguje FZ.
-
-   Zwroty wróciły do obsługi ręcznej w Subiekcie w 0.17.0.                     */
+   zaksięguje FZ.                                                              */
 
 const nowIso = () => new Date().toISOString();
 
@@ -194,18 +192,15 @@ export function listDocuments(days = 14): DeliveryDocument[] {
 }
 
 /**
- * Sprzątanie dostaw otwartych PRZED wprowadzeniem odsiewu pozycji usługowych.
+ * Usuwa z otwartych dostaw nietknięte pozycje usługowe.
  *
- * Snapshot jest snapshotem i normalnie się go nie rusza — ale wiersz
- * `PRZESYŁKA` jest tam skutkiem naszego niedopatrzenia, a nie stanem faktury,
- * i bez tego zostałby w bazie na zawsze: dostawa raz otwarta nigdy nie wraca
- * do gałęzi snapshotującej. Efektem byłaby garść dostaw, których NIE DA SIĘ
- * domknąć, bo jedyna zaległa pozycja jest niemożliwa do odłożenia.
+ * Wiersz `PRZESYŁKA` w snapshocie nie jest stanem faktury, a dostawa raz
+ * otwarta nie wraca do gałęzi snapshotującej. Bez tego zostałaby dostawa,
+ * której NIE DA SIĘ domknąć, bo zaległa pozycja jest niemożliwa do odłożenia.
  *
  * Kasujemy WYŁĄCZNIE linie nietknięte (`todo`, zero odłożone, bez blokady).
- * Gdyby ktoś zdążył coś na tej linii zrobić — odłożyć „na siłę" albo zgłosić
- * problem — to jest ślad ludzkiej decyzji i kasowanie go byłoby zacieraniem
- * historii, a nie sprzątaniem.
+ * Ruszona linia to ślad ludzkiej decyzji i jej skasowanie byłoby zacieraniem
+ * śladu, a nie sprzątaniem.
  */
 function usunPozycjeUslugowe(deliveryId: number): void {
   const linie = db()
@@ -234,11 +229,9 @@ export interface PozycjaSnapshotu {
 /**
  * Co wejdzie (albo weszło) do snapshotu dokumentu. CZYTA, niczego nie zapisuje.
  *
- * Wydzielone z `openDelivery`, bo od 0.36.0 ma DWÓCH wołających: snapshot przy
- * otwieraniu i podgląd biura dla dokumentu, którego nikt jeszcze nie tknął.
- * Gdyby każdy liczył zestaw wierszy po swojemu, biuro i hala patrzyłyby na dwie
- * różne faktury — i nikt by się nie dowiedział, która jest prawdziwa, bo obie
- * wyglądałyby wiarygodnie.
+ * Wołają to snapshot przy otwieraniu i podgląd biura dla nietkniętego
+ * dokumentu. Gdyby każdy liczył zestaw wierszy po swojemu, biuro i hala
+ * patrzyłyby na dwie różne faktury.
  *
  * Fallbacki (`?? String(twId)`, `?? ""`) są częścią kontraktu, nie ostrożnością:
  * kartoteka potrafi zniknąć z read-modelu między importami, a wtedy obie strony
@@ -291,34 +284,19 @@ export function porownajAlejkowo(
 }
 
 /* ── Adres oczekiwany: co jest snapshotem, a co nie ──────────────────────────
-   POWSTAŁO PO ZGŁOSZENIU Z HALI: ten sam towar na dwóch dostawach. Magazynier
-   rozkłada pierwszą i nadaje nowy adres; w drugiej dostawie ten towar dalej
-   pokazuje STARY. Przyczyny są dwie i każda osobno wystarczy:
+   Snapshot ma sens dla danych DOKUMENTU (co i ile przyjechało) — tam chroni
+   pracę przed korektą faktury w trakcie. Adres nie jest daną dokumentu, tylko
+   kartoteki: zamrożony pokazywałby stary adres po odłożeniu tego towaru
+   w innej dostawie, a rozjazd (§4.3) podnosiłby fałszywy alarm ZAMIEŃ/DODAJ.
+   Dlatego:
 
-     1. `lok_oczekiwana` zapisywała się RAZ, przy otwarciu dostawy. Dostawa
-        otwarta wcześniej pokazywała stary adres już na zawsze — także długo po
-        tym, jak kartoteka w Subiekcie była poprawna.
-     2. Nawet dostawa otwarta ZARAZ po odłożeniu widziała stary adres, bo zapis
-        leżał jeszcze w kolejce: worker go nie wykonał, a read-model `sgt_towar`
-        odświeża się dopiero przy kolejnej synchronizacji z MSSQL.
-
-   Skutek nie kończył się na złym adresie. Rozjazd (§4.3) liczył się względem
-   zamrożonej wartości, więc odłożenie towaru pod adresem AKTUALNYM podnosiło
-   fałszywy alarm ZAMIEŃ/DODAJ i zapisywało `location_mismatch` do raportu
-   przepełnionych gniazd. Kolejność alejkowa też idzie po tym polu, czyli trasa
-   prowadziła do starej półki.
-
-   ROZSTRZYGNIĘCIE. Snapshot ma sens dla danych DOKUMENTU (co i ile przyjechało)
-   — tam chroni pracę przed korektą faktury w trakcie. Adres nie jest daną
-   dokumentu, tylko kartoteki, i zamrażanie go nie chroniło niczego. Dlatego:
-
-     - pozycja, której NIKT jeszcze nie ruszył, bierze adres ŻYWY,
+     - pozycja, której NIKT jeszcze nie ruszył, bierze adres ŻYWY, łącznie
+       z zapisem czekającym jeszcze w kolejce,
      - pozycja tknięta zachowuje swój snapshot, bo to zapis tego, czego
        spodziewaliśmy się w chwili wykonywania pracy.
 
    Cena jest jawna: gdy ktoś zmieni adres w trakcie czyjejś pracy, wiersz może
-   przeskoczyć w kolejności. Przeskakuje jednak dokładnie wtedy, kiedy człowiek
-   ma o tym wiedzieć, a alternatywą jest wysłanie go do złego regału.          */
+   przeskoczyć w kolejności. Alternatywą jest wysłanie go do złego regału.    */
 
 /** Statusy zadania kolejki, które jeszcze NIE dotarły do Subiekta. */
 const LOC_W_TOKU = ["pending", "processing", "waiting_for_doc", "error"];
@@ -396,9 +374,8 @@ export function adresyOczekiwane(twIds: number[]): Map<number, string | null> {
 /**
  * WSZYSTKIE adresy, na których towar leży — pickingowy jako pierwszy.
  *
- * Kartoteka trzyma ich kilka rozdzielonych spacjami (`locs.ts`), a do 0.118.0
- * czytaliśmy z tego pola wyłącznie pierwszy kod. Przy zwrocie to za mało:
- * sztuka wraca pojedynczo i najtaniej dołożyć ją tam, gdzie ten towar już
+ * Kartoteka trzyma ich kilka rozdzielonych spacjami (`locs.ts`). Sztuka ze
+ * zwrotu wraca pojedynczo i najtaniej dołożyć ją tam, gdzie ten towar już
  * leży — niekoniecznie na półkę pickingową, która bywa pełna.
  */
 export function adresyWszystkie(twIds: number[]): Map<number, string[]> {
@@ -555,7 +532,7 @@ export function getDelivery(id: number): DeliveryView | undefined {
   const twIds = rows.map((r) => r.tw_id as number);
   const stany = subiekt.stanyDlaTowarow(twIds);
   /* Jednostki tym samym trybem co stany: jedno zapytanie na całą listę.
-     Kolektor podpisuje nimi każdą ilość — do 0.51.0 wpisywał „szt" z palca. */
+     Kolektor podpisuje nimi każdą ilość. */
   const jednostki = subiekt.jednostkiDlaTowarow(twIds);
   // pozycja nietknięta bierze adres ŻYWY — powód i cena przy `adresyOczekiwane`
   const adresy = adresyOczekiwane(twIds);
@@ -626,15 +603,13 @@ export function getDelivery(id: number): DeliveryView | undefined {
 /**
  * Który wiersz dostawy otwiera skan danego towaru — reguła S26.
  *
- * Ten sam towar potrafi stać w dokumencie w DWÓCH wierszach. Do audytu
- * z 22 września 2026 mapa `tw_id → wiersz` brała po prostu OSTATNI, bez
- * patrzenia na status. Pierwszy wiersz był wtedy nieosiągalny skanem, sztuki
- * lądowały jako nadmiar na drugim, a pierwszy szedł przy ZAKOŃCZ jako brak.
+ * Ten sam towar potrafi stać w dokumencie w DWÓCH wierszach. Ostatni wiersz
+ * bez patrzenia na status robiłby pierwszy nieosiągalnym skanem.
  *
  * Reguła jest ta sama co przy wejściu z karty towaru (`wybierzPozycjeTowaru`
  * w `:core`): pierwszy wiersz, przy którym JEST co robić, a gdy takiego nie
- * ma — pierwszy w ogóle. Dwie różne reguły na to samo pytanie otwierały dwa
- * różne wiersze zależnie od drogi wejścia.
+ * ma — pierwszy w ogóle. Dwie różne reguły otwierałyby dwa różne wiersze
+ * zależnie od drogi wejścia.
  */
 export function wierszeTowarow<T extends { tw_id: number; status: string }>(linie: T[]): Map<number, T> {
   const m = new Map<number, T>();
@@ -668,7 +643,7 @@ export function resolveScan(deliveryId: number, rawCode: string, user: string): 
   }
   if (candidates.length === 0) {
     /* Kod nadany w WERTIS — FURTKA, sprawdzana dopiero, gdy kartoteka nie zna
-       kodu ani jako EAN, ani jako symbol (0.37.0). Bez niej kod nadany przy
+       kodu ani jako EAN, ani jako symbol. Bez niej kod nadany przy
        jednej dostawie nie działałby przy następnej, dopóki worker i import nie
        przepchną go do Subiekta — czyli dokładnie tam, gdzie ktoś go nadał, żeby
        działał od razu. */
@@ -718,10 +693,9 @@ export function resolveScan(deliveryId: number, rawCode: string, user: string): 
   if (!line) {
     return { kind: "off_document", code, twId: p.tw_id, sym: p.symbol, name: p.nazwa };
   }
-  /* Skan NIE ZAJMUJE pozycji. Blokady per pozycja wyszły w 0.47.0: przy tej
-     organizacji pracy jedną dostawę rozkłada jedna osoba, więc lock nie
-     rozstrzygał żadnego realnego sporu, a kosztował — wiszące „zajęte przez"
-     po kolektorze odłożonym na koniec zmiany i całą ścieżkę odbierania pracy.
+  /* Skan NIE ZAJMUJE pozycji. Jedną dostawę rozkłada jedna osoba, więc
+     blokada nie rozstrzygałaby realnego sporu, a zostawiałaby wiszące
+     „zajęte przez" po kolektorze odłożonym na koniec zmiany.
 
      Cena jest jawna: dwie osoby przy jednym kartonie mogą odłożyć tę samą
      pozycję dwa razy i licznik pokaże za dużo. Wykrywa się to na liście
@@ -785,10 +759,6 @@ export interface PutawayLineOpts {
  * Odłożenie linii: skan lokalizacji jest OBOWIĄZKOWY (D3) — to jedyny dowód,
  * że towar trafił tam, gdzie system myśli. Zapis lokalizacji idzie do kolejki
  * jako `set_location`; ŻADNEGO dokumentu MM (D1).
- *
- * (`closeBasket`). Dzięki temu niezmiennik „ADRES ZAWSZE PRZED
- * SPRZEDAWALNOŚCIĄ" trzyma się sam: `set_location` każdej pozycji jest
- * zakolejkowany wcześniej niż MM, a worker bierze zadania po `id` rosnąco.
  */
 export function putawayLine(
   lineId: number,
@@ -821,12 +791,11 @@ export function putawayLine(
   if (!Number.isFinite(putQty) || putQty <= 0) return { error: "Ilość musi być większa od zera" };
 
   const doneQty = line.ilosc_odlozona + putQty;
-  /* WYJĄTEK PRZEŻYWA ODŁOŻENIE (decyzja właściciela z 27 września 2026).
-     Status liczony z samej ilości nadpisywał `problem`, gdy po zgłoszeniu
-     odkładano resztę sztuk — a uszkodzone też idą na półkę. Na `problem` stoją
+  /* WYJĄTEK PRZEŻYWA ODŁOŻENIE. Uszkodzone sztuki też idą na półkę, więc
+     reszta odkładana po zgłoszeniu nie może nadpisać `problem`. Na nim stoją
      trzy reguły: wyjątek czeka na ZAKOŃCZ, licznik wyjątków i ZAKOŃCZ, który
-     brał zgłoszony brak za nowy. Wychodziło drugie zgłoszenie i drugie MM na
-     serwis. Tę regułę stosuje już `przeliczStatus` przy wycofaniu zgłoszenia. */
+     inaczej wziąłby zgłoszony brak za nowy. Tę samą regułę stosuje
+     `przeliczStatus` przy wycofaniu zgłoszenia. */
   const status = line.status === "problem" ? "problem" : doneQty >= line.ilosc_dok ? "done" : "partial";
   /* Rozjazd liczymy względem adresu, KTÓRY MAGAZYNIER MIAŁ NA EKRANIE, czyli
      żywego dla pozycji nietkniętej. Porównanie z zamrożonym snapshotem pytało
@@ -850,26 +819,19 @@ export function putawayLine(
   const juzMa = locAction === "add" ? current.includes(code) : current[0] === code;
   if (!juzMa) {
     /* DODAJ dokłada adres na KONIEC, nie na przód. Pierwszy kod pola jest
-       lokalizacją pickingową (`locs.ts`), więc wstawienie zeskanowanego kodu
-       przed pozostałe robiło z „leży w obu" przeprowadzkę — a przycisk na
-       kolektorze mówi „LEŻY W OBU — DODAJ" i o kolejności nie obiecuje nic.
-       Magazynier prosił o drugi adres, dostawał zmianę adresu podstawowego.
-
-       Zgłoszone przez właściciela; do 0.233.1 nie pilnował tego żaden test,
-       i tak właśnie ta gałąź rozjechała się z `computeNewLocs` w trasie karty
-       towaru, która od zawsze dokłada na koniec. */
+       lokalizacją pickingową (`locs.ts`), a przycisk „LEŻY W OBU — DODAJ"
+       nie obiecuje przeprowadzki. Tak samo dokłada `computeNewLocs` w trasie
+       karty towaru. */
     const newLocs =
       locAction === "add"
         ? Array.from(new Set([...current, code]))
         : // 'replace' — towar przeniesiony: nowa lokalizacja zastępuje pickingową
           Array.from(new Set([code, ...current.slice(1)]));
 
-    /* Pełne pole ODMAWIA, zamiast dać się uciąć w połowie kodu.
-       Dotąd stało tu ślepe `.slice(0, locFieldLimit)`. Przy `replace` obcinało
-       ogon starych adresów, ale gdy DODAJ dokłada na końcu, ucięciu podlega
-       kod właśnie zeskanowany — do kartoteki wjechałby adres, którego nikt nie
-       znajdzie. Komunikat mówi, co zrobić zamiast tego; tę samą regułę stosują
-       już trasa karty towaru i import z arkusza. */
+    /* Pełne pole ODMAWIA, zamiast dać się uciąć w połowie kodu. Przy DODAJ
+       ucięciu podlegałby kod właśnie zeskanowany, czyli adres, którego nikt
+       nie znajdzie. Tę samą regułę stosują trasa karty towaru i import
+       z arkusza. */
     const pole = newLocs.join(" ");
     if (pole.length > config.locFieldLimit) {
       return {
@@ -950,8 +912,8 @@ export function putawayLine(
 
 /**
  * Dostawa zamyka się sama, gdy każda pozycja jest odłożona. Pozycja z wyjątkiem
- * nie blokuje ZAKOŃCZ (liczy się jako rozstrzygnięta, D8), ale od 0.439.0 nie
- * zamyka dostawy sama — patrz komentarz w środku funkcji.
+ * nie blokuje ZAKOŃCZ (liczy się jako rozstrzygnięta, D8), ale nie zamyka
+ * dostawy sama — patrz komentarz w środku funkcji.
  */
 export function closeIfComplete(
   deliveryId: number,
@@ -978,19 +940,14 @@ export function closeIfComplete(
       .get(deliveryId) as { n: number }
   ).n;
   if (left > 0) return;
-  /* NADMIAR CZEKA NA CZŁOWIEKA. Do audytu z 22 września 2026 samo domknięcie
-     po ostatniej pozycji zgłaszało nadmiar dostawcy — bez podglądu, wbrew
-     regule przy ZAKOŃCZ, że zgłoszenie „nie ma prawa powstać z przycisku,
-     którego skutku nikt nie widział". Podwójne odłożenie tej samej pozycji
-     przez dwie osoby (świadoma cena braku blokad w `resolveScan`) stawało
-     się wtedy reklamacją, zanim ktokolwiek zdążył je poprawić. Dostawa
-     z nadmiarem zostaje więc otwarta, a zamyka ją ZAKOŃCZ z podglądem. */
+  /* NADMIAR CZEKA NA CZŁOWIEKA. Zgłoszenie nadmiaru dostawcy nie ma prawa
+     powstać z przycisku, którego skutku nikt nie widział. Podwójne odłożenie
+     tej samej pozycji przez dwie osoby (cena braku blokad w `resolveScan`)
+     stawałoby się reklamacją przed poprawką. Zamyka ją ZAKOŃCZ z podglądem. */
   if (!opts.jawnie && nadmiary(deliveryId).length > 0) return;
-  /* WYJĄTEK TEŻ CZEKA NA ZAKOŃCZ (decyzja właściciela po audycie z 22 września
-     2026). Do tej wersji zgłoszenie problemu na ostatniej pozycji zamykało
-     dostawę od razu. Wyjątek czeka jednak na decyzję (D8) — np. „dosłali
-     brakujące 4 sztuki" — a zamknięta dostawa nie miała już gdzie ich przyjąć.
-     Koszt dla zgłaszającego to jedno tapnięcie ZAKOŃCZ, nie ponowne otwieranie. */
+  /* WYJĄTEK TEŻ CZEKA NA ZAKOŃCZ. Wyjątek czeka na decyzję (D8) — np.
+     „dosłali brakujące 4 sztuki" — a zamknięta dostawa nie miałaby już gdzie
+     ich przyjąć. Koszt dla zgłaszającego to jedno tapnięcie ZAKOŃCZ. */
   if (!opts.jawnie) {
     const zWyjatkiem = (
       db()
@@ -1047,7 +1004,7 @@ export function nadmiary(deliveryId: number): Nadmiar[] {
   }));
 }
 
-/* -- Nadmiar idzie do biura sam (0.64.0) ------------------------------------
+/* -- Nadmiar idzie do biura sam ------------------------------------
    Ze zgłoszenia: „dodaj możliwość zatwierdzenia większej ilości niż jest na
    fakturze, idzie to do biura jako problem po zakończeniu dostawy".
 
@@ -1080,18 +1037,10 @@ function zglosNadmiary(deliveryId: number, user: string): void {
 
 /* ── „Rozłożone poza WERTIS" ─────────────────────────────────────────────────
    Dostawa rozłożona starą aplikacją (albo z ręki, w pośpiechu) nie ma w WERTIS
-   ANI JEDNEGO śladu — a postęp liczy się z `delivery_line`, więc odjęcie idzie
-   od zera i cała ilość wygląda na zaległą. Dokument stoi na liście rozkładania
-   jako nietknięty, a karta towaru mówi „w dostawie, nierozłożone" o towarze,
-   który leży w regale.
-
-   Do 0.40.0 nie było z tego wyjścia. Dokument RAZ OTWARTY w WERTIS zostaje na
-   liście niezależnie od wieku (celowy wyjątek w imporcie: skrócenie okna nie ma
-   kasować niedokończonej pracy), a domyka się dopiero, gdy każda linia jest
-   `done`/`skipped`/`problem`. Towar już leży na półkach, więc nikt tych linii
-   nie zeskanuje. Jedyną drogą było zgłoszenie WYJĄTKU na każdej pozycji, czyli
-   wpisanie fikcyjnych niezgodności do protokołów rozbieżności — dokumentu
-   księgowego. Narzędzie do sprzątania nie ma prawa fałszować dowodów.
+   ANI JEDNEGO śladu — a postęp liczy się z `delivery_line`, więc cała ilość
+   wygląda na zaległą. Dokument RAZ OTWARTY zostaje na liście niezależnie od
+   wieku, a towaru z półek nikt już nie zeskanuje. Zgłaszanie WYJĄTKU na każdej
+   pozycji wpisałoby fikcję do protokołu rozbieżności, dokumentu księgowego.
 
    Dlatego osobny status i osobna operacja. Zamknięcie NIE UDAJE odłożenia:
    nie dopisuje ani jednej linii, nie zapisuje żadnego adresu, nie rusza
@@ -1289,25 +1238,18 @@ export function dokumentyPozaWertis(): Set<number> {
 }
 
 /* ── Zakończenie dostawy ────────────────────────────────────────────────────
-   Do 0.42.0 dostawa nie miała momentu zamknięcia: `closeIfComplete` domykał ją
-   sam, gdy OSTATNIA pozycja stała się terminalna. Praca, której nikt nie
-   dokończył, zostawała więc otwarta w nieskończoność, a braki ilościowe —
-   pozycje z odłożoną częścią — nie zamieniały się w nic. Magazynier, który
-   znalazł 7 sztuk z 10, musiał pamiętać, żeby OSOBNO zgłosić wyjątek; jeśli
-   nie pamiętał, różnica ginęła między dokumentem a półką bez śladu.
-
-   Ta funkcja jest tym brakującym momentem i robi DWIE rzeczy, świadomie różne:
+   Bez momentu zamknięcia niedokończona praca wisiałaby otwarta, a różnica
+   między dokumentem a półką ginęłaby bez śladu. ZAKOŃCZ robi DWIE rzeczy,
+   świadomie różne:
 
      - pozycja Z CZĘŚCIOWYM ODŁOŻENIEM (0 < odłożone < dokument) staje się
        wyjątkiem „zła ilość". Towar policzono i było go mniej — to jest fakt
        o DOSTAWIE i należy do protokołu rozbieżności;
-     - pozycja NIETKNIĘTA (zero odłożone) staje się `skipped`, bez zgłoszenia.
-       Brak pracy to nie brak towaru: nikt tego kartonu nie otworzył, więc
-       twierdzenie wobec dostawcy nie ma pokrycia. Karta towaru pokazuje ją
-       dalej jako „w dostawie", bo w regale jej nie ma.
+     - pozycja NIETKNIĘTA (zero odłożone) idzie wyborem człowieka (`nietkniete`),
+       bo brak pracy to nie zawsze brak towaru.
 
-   Rozróżnienie jest całą wartością tej operacji. Jedna reguła na obie sytuacje
-   znaczyłaby albo reklamacje bez pokrycia, albo ciche gubienie braków.       */
+   Jedna reguła na obie sytuacje znaczyłaby albo reklamacje bez pokrycia,
+   albo ciche gubienie braków.                                                */
 
 /** Co powstało przy zamknięciu — kolektor pokazuje to człowiekowi PRZED zapisem. */
 export interface PodsumowanieZakonczenia {
@@ -1426,12 +1368,10 @@ export function zakonczDostawe(
 
   const podsumowanie = podgladZakonczenia(deliveryId);
 
-  /* WYBÓR DLA NIETKNIĘTYCH JEST OBOWIĄZKOWY (decyzja właściciela po audycie
-     z 22 września 2026). Do tej pory nietknięte szły po cichu do `skipped`
-     i NIE trafiały do dostawcy, a odłożone częściowo — trafiały. Im większy
-     brak, tym mniej się go zgłaszało: 1 z 10 dawało reklamację i MM braku,
-     0 z 10 nie dawało nic, a 10 zafakturowanych sztuk wisiało w sprzedaży.
-     Serwer odmawia bez wyboru, bo stary kolektor wysłałby ZAKOŃCZ bez niego. */
+  /* WYBÓR DLA NIETKNIĘTYCH JEST OBOWIĄZKOWY. Ciche `skipped` zgłaszałoby
+     tym mniej, im większy brak: 1 z 10 dawało reklamację, 0 z 10 nic, a 10
+     zafakturowanych sztuk wisiało w sprzedaży. Serwer odmawia bez wyboru,
+     bo stary kolektor wysłałby ZAKOŃCZ bez niego. */
   const los = opts.nietkniete;
   if (podsumowanie.nietkniete.length > 0 && los !== "brak" && los !== "pomin") {
     return {
@@ -1499,10 +1439,8 @@ export function zakonczDostawe(
 
 /* ── Korekta ilości odłożonej ────────────────────────────────────────────────
    Rozkładający pomyli się w liczeniu i chce poprawić, ZANIM zamknie fakturę.
-   Do 0.45.0 nie było na to drogi: skan półki wyłącznie DODAJE sztuki, a jedynym
-   sposobem na cofnięcie było zgłoszenie wyjątku — czyli wpis do protokołu
-   rozbieżności, dokumentu idącego do dostawcy. Pomyłka w liczeniu zamieniała
-   się w reklamację.
+   Skan półki wyłącznie DODAJE sztuki, a zgłoszenie wyjątku zamieniłoby
+   pomyłkę w liczeniu w reklamację.
 
    Korekta NIE RUSZA SUBIEKTA i to jest jej cała lekkość: adres został zapisany
    przy odkładaniu i zostaje zapisany. `ilosc_odlozona` jest wyłącznie licznikiem
@@ -1571,24 +1509,18 @@ export function korygujIlosc(
   // po zamknięciu dostawa bywa już policzona w protokole rozbieżności
   if (l.stanDostawy !== "open") return { error: "Dostawa jest już zamknięta" };
   if (l.status === "problem") {
-    /* Do tego wydania stało tu „najpierw rozwiąż go w wyjątkach" — i było
-       nieprawdą: rozwiązanie przez biuro NIE zdejmuje z pozycji stanu
-       `problem`, więc korekta odmawiała dalej. Droga, która działa, to
-       wycofanie własnego zgłoszenia (`cofanie-dostawy.ts`). */
+    /* Rozwiązanie przez biuro NIE zdejmuje z pozycji stanu `problem`, więc
+       odsyłamy do wycofania własnego zgłoszenia (`cofanie-dostawy.ts`). */
     return { error: "Pozycja ma zgłoszony wyjątek — jeśli to pomyłka, wycofaj zgłoszenie przy pozycji" };
   }
-  /* Do 0.64.0 stała tu odmowa „więcej nie da się odłożyć". Zniknęła razem
-     z dopuszczeniem nadmiaru przy odkładaniu: skoro `+` wolno przekroczyć
-     fakturę, to korekta MUSI umieć to samo. Inaczej jedyną drogą wyjścia
-     z omyłkowego nadmiaru byłoby zgłoszenie wyjątku, czyli reklamacja
+  /* Bez górnej granicy: skoro `+` wolno przekroczyć fakturę, korekta MUSI
+     umieć to samo. Inaczej wyjściem z omyłkowego nadmiaru byłaby reklamacja
      wystawiona za własną pomyłkę w liczeniu. */
 
   const przed = l.ilosc_odlozona ?? 0;
 
-  /* KOREKTA DO ZERA COFA TEŻ ADRES, gdy wiadomo jak (audyt z 22 września
-     2026). Zero znaczy „nic z tego nie leży na półce", a adres z odłożenia
-     już pojechał do Subiekta — przy ZAMIEŃ razem z utratą starego adresu
-     pickingowego. Kartoteka wskazywała więc półkę, na której towaru nie ma.
+  /* KOREKTA DO ZERA COFA TEŻ ADRES, gdy wiadomo jak. Adres z odłożenia już
+     pojechał do Subiekta, przy ZAMIEŃ razem z utratą starego pickingowego.
      Gdy przepisy cofnięcia pokrywają całą odłożoną ilość, korekta do zera
      jest tym samym co cofnięcie wszystkich odłożeń po kolei. */
   if (qty === 0 && przed > 0) {

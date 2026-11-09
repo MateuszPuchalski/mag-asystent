@@ -163,8 +163,7 @@ export function useImportGotowych() {
   const wyslij = useMutation({
     /* `zrodlo` trafia do audytu: zdjęcie z oferty i z folderu to dwie różne drogi. */
     /* `zamien` robi zdjęcie nowym głównym, a stare zostaje w Subiekcie jako
-       dodatkowe. Pole idzie tylko wtedy, gdy jest prawdą, więc zwykły import
-       wysyła dokładnie to co dotąd. */
+       dodatkowe. Pole idzie tylko wtedy, gdy jest prawdą. */
     mutationFn: ({ twId, gotowy, plik, zrodlo = "import", zamien = false }: {
       twId: number; gotowy: string; plik: string; zrodlo?: "import" | "allegro"; zamien?: boolean;
     }) =>

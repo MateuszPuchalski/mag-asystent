@@ -2,15 +2,15 @@ import React from "react";
 import type { ZalacznikSzkicu } from "../api/rozmowy";
 import { Edytor as EdytorOdpowiedzi } from "../skrzynka/Edytor";
 
-/* ── Edytor odpowiedzi w sprawie Allegro: USTAWIENIA, NIE KOPIA (0.549.0) ──
+/* ── Edytor odpowiedzi w sprawie Allegro: USTAWIENIA, NIE KOPIA ────────────
    Reklamacje odpowiadają tym samym edytorem co skrzynka, decyzją
-   właściciela z 28 września. Osobny edytor sprawy rozjeżdżał się ze skrzynką
-   przy każdym wydaniu, bo każdą poprawkę trzeba było pamiętać dwa razy.
+   właściciela. Osobny edytor rozjeżdżałby się ze skrzynką, bo każdą
+   poprawkę trzeba by pamiętać dwa razy.
 
    Ten plik trzyma tylko to, co w sprawie jest naprawdę inne:
    - napis „Wyślij odpowiedź”, bo rozmowa jest trójstronna i odbiorcą bywa
      doradca Allegro, więc „do klienta” bywałoby nieprawdą. Ekran reklamacji
-     podaje „Wyślij do klienta”, bo tak mówi makieta właściciela;
+     podaje „Wyślij do klienta”;
    - sufit 20 000 znaków z `MessageRequest.text`, nie 2000 z Centrum
      Wiadomości, bo to inny zasób;
    - brak notatki z wzmiankami: sprawa ma własną notatkę w kolumnie faktów;

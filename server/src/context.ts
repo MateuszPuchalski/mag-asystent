@@ -16,9 +16,8 @@ function header(req: FastifyRequest, name: string): string | null {
 /**
  * Kto wykonuje operację.
  *
- * Pierwszeństwo ma SESJA (skan badge'a zweryfikowany przez serwer). Nagłówek
- * `X-User` zostaje wyłącznie jako podpowiedź dla instalacji, które nie przeszły
- * jeszcze na badge'y — bo dało się go wpisać ręcznie, więc nigdy nie był
+ * Pierwszeństwo ma SESJA zweryfikowana przez serwer. Nagłówek `X-User` jest
+ * wyłącznie podpowiedzią — dało się go wpisać ręcznie, więc nie jest
  * dowodem tożsamości, tylko deklaracją.
  */
 export function userOf(req: FastifyRequest): string {
@@ -26,11 +25,10 @@ export function userOf(req: FastifyRequest): string {
 }
 
 /**
- * Nazwa z nagłówka — kodowana procentowo od 0.60.3.
+ * Nazwa z nagłówka — kodowana procentowo.
  *
  * Kolektor musi ją kodować, bo OkHttp odmawia wysłania nagłówka z jakimkolwiek
- * znakiem spoza ` `–`~` i robi to WYJĄTKIEM, który zabijał aplikację przy
- * nazwisku „Błażej". Kodowanie procentowe UTF-8 wybrano zamiast okrajania
+ * znakiem spoza ` `–`~` i robi to WYJĄTKIEM. Kodowanie procentowe UTF-8 wybrano zamiast okrajania
  * ogonków, bo ta wartość ląduje w `events.user_id`, czyli w dzienniku audytu.
  *
  * Trzy rzeczy, których to celowo NIE robi:
@@ -38,9 +36,8 @@ export function userOf(req: FastifyRequest): string {
  * 1. Nie dekoduje wszystkiego w `header()` — ten czyta też `x-session`
  *    i `x-device`, których nikt nie koduje, a hurtowe dekodowanie procentów
  *    tworzyłoby nową klasę niespodzianek.
- * 2. Nie wywraca żądania przy uszkodzonej sekwencji (`%zz` to `URIError`).
- *    Wartość przychodzi z zewnątrz — czyli obowiązuje ta sama zasada, przez
- *    którą ta poprawka w ogóle powstała, tyle że po naszej stronie drutu.
+ * 2. Nie wywraca żądania przy uszkodzonej sekwencji (`%zz` to `URIError`),
+ *    bo wartość przychodzi z zewnątrz.
  * 3. Nie wymaga kodowania: stara nazwa ASCII nie zawiera procentu, więc
  *    przechodzi tędy bez zmian. Starszy APK działa z nowym serwerem.
  */
@@ -112,15 +109,7 @@ interface ReqCtx {
   /** Konto ustalone z tokenu; wypełniane leniwie, żeby nie pytać bazy bez potrzeby. */
   userRef?: number | null;
   userName?: string | null;
-  /**
-   * Sesja rozpoznana przez bramkę — JEDNO rozpoznanie na żądanie.
-   *
-   * Do 0.23.0 trasy pytające o rolę wołały `sesja(currentToken())` same, każda
-   * po swojemu (`sesja(token())`, `sesja(currentToken() ?? "")`). Bramka
-   * rozpoznawała sesję chwilę wcześniej i wynik wyrzucała, więc to samo
-   * zapytanie do bazy szło dwa razy na żądanie — a „kto pyta" miało osiem
-   * niezależnych odpowiedzi zamiast jednej.
-   */
+  /** Sesja rozpoznana przez bramkę — JEDNO rozpoznanie na żądanie. */
   sesja?: SesjaZadania | null;
 }
 
@@ -161,20 +150,15 @@ export const currentUserName = (): string | null => store.getStore()?.userName ?
 export const sesjaZadania = (): SesjaZadania | null => store.getStore()?.sesja ?? null;
 
 /* ── Bramka sesji ───────────────────────────────────────────────────────────
-   Do tej pory token był ROZPOZNAWANY, ale nie WYMAGANY: sesji żądały trzy
-   miejsca (logowanie, `/api/users`, zdjęcie cudzego locka), a cała reszta —
-   w tym zmiana lokalizacji w Subiekcie i raport wydajności per pracownik —
-   przechodziła bez niczego, podpisując operację nagłówkiem `x-user` albo
-   słowem „anonim". Bramka jest tutaj, a nie w każdej trasie z osobna, bo
-   trasa dopisana jutro ma być domyślnie zamknięta, nie domyślnie otwarta.  */
+   Bramka jest tutaj, a nie w każdej trasie z osobna, bo trasa dopisana jutro
+   ma być domyślnie zamknięta, nie domyślnie otwarta.                        */
 
 /**
  * Trasy działające bez sesji. Lista jest jawna, krótka i zamknięta.
  *
  * Reguła wpuszczenia brzmi: BEZ TEJ TRASY KOLEKTORA NIE DA SIĘ DOPROWADZIĆ DO
- * STANU, W KTÓRYM DA SIĘ ZALOGOWAĆ. Do 0.52.0 znaczyło to wyłącznie pierwsze
- * uruchomienie instalacji; aktualizacja dokłada drugi taki przypadek i dlatego
- * zdanie zostało przepisane, a nie rozciągnięte.
+ * STANU, W KTÓRYM DA SIĘ ZALOGOWAĆ: pierwsze uruchomienie instalacji
+ * i aktualizacja kolektora.
  *
  * `POST /api/users` wygląda na wyłom, ale nim nie jest: trasa sama wpuszcza
  * bez sesji wyłącznie przy pustej bazie (pierwsze konto biura), a w każdym
@@ -185,7 +169,7 @@ const BEZ_SESJI: ReadonlyArray<[metoda: string, sciezka: string]> = [
   ["GET", "/api/setup"],
   ["POST", "/api/auth/login"],
   ["POST", "/api/users"],
-  /* Aktualizacja kolektora (0.52.0) — jedyne pozycje NIE dotyczące uruchomienia
+  /* Aktualizacja kolektora — jedyne pozycje NIE dotyczące uruchomienia
      instalacji. Powód jest inny i równie twardy: kolektor pyta o nową wersję
      przy otwarciu aplikacji, więc także wtedy, gdy sesji nie ma. Bez tego
      urządzenie z zepsutą albo przestarzałą aplikacją da się naprawić dopiero
@@ -206,7 +190,7 @@ const otwarta = (metoda: string, sciezka: string): boolean =>
  */
 const BEZ_AUDYTU_404: ReadonlyArray<RegExp> = [
   /^\/api\/products\/\d+\/zdjecie$/,
-  // Logo dostawcy (0.56.0) — ten sam profil: wiersz listy dostaw pyta o nie
+  // Logo dostawcy — ten sam profil: wiersz listy dostaw pyta o nie
   // przy każdym rysowaniu, a większość dostawców logo nie ma i mieć nie musi.
   /^\/api\/dostawcy\/\d+\/logo$/,
 ];
@@ -243,18 +227,12 @@ export function withRequestContext(app: FastifyInstance): void {
     if (!sciezka.startsWith("/api/")) return;
     if (otwarta(req.method, sciezka)) return;
 
-    /* Sesja albo jest, albo jej nie ma — trzeciego stanu nie ma od sierpnia
-       2026. Wcześniej bezczynność dłuższa niż 10 minut przełączała sesję
-       w `zablokowana`, a zapis z niej dostawał 423, żeby wymusić skan badge'a.
-       Razem z ekranem blokady zniknęła i ta bramka. */
     if (!s) return reply.code(401).send({ error: "Brak sesji — zaloguj się" });
   });
 
   /* ── Odrzucone żądania ────────────────────────────────────────────────────
-     „Skanowałem i się nie zapisało" nie zostawiało po stronie serwera ŻADNEGO
-     śladu: 400 za przekroczony limit pola, zły kod półki czy nieznany towar
-     wracały do kolektora i znikały. Reklamację dało się wtedy zbyć zdaniem
-     „nie widzę takiej operacji" — co jest prawdą i jednocześnie nieprawdą.
+     „Skanowałem i się nie zapisało" ma zostawić ślad po stronie serwera:
+     400 za limit pola, zły kod półki czy nieznany towar.
 
      Hook jest `onSend`, nie `onResponse`, bo tam ciała odpowiedzi już nie ma,
      a wpis bez POWODU odrzucenia nie odpowiada na żadne pytanie.             */
@@ -268,11 +246,8 @@ export function withRequestContext(app: FastifyInstance): void {
        jest nudny; PRÓBA ZAPISU bez sesji już nie — i ta zostaje logowana. */
     if (reply.statusCode === 401 && req.method === "GET") return payload;
 
-    /* To samo, potwierdzone eksportem z produkcji: 355 z 1000 zdarzeń w oknie
-       czterech dni to „404 Brak zdjęcia". Kolektor pyta o miniaturę KAŻDEGO
-       rysowanego wiersza, a instalacja bez włączonych `ZDJECIA_*` odpowiada
-       404 za każdym razem — 301 różnych kartotek, ani jednego trafienia.
-       Prawdziwych odrzuceń było w tym samym oknie PIĘĆ i wszystkie utonęły.
+    /* To samo przy miniaturach: kolektor pyta o zdjęcie KAŻDEGO rysowanego
+       wiersza, a instalacja bez `ZDJECIA_*` odpowiada 404 za każdym razem.
 
        Brak zdjęcia jest ODPOWIEDZIĄ, nie odmową: nikomu niczego nie odebrano,
        więc nie ma czego dochodzić w reklamacji. Lista jest wąska i jawna —
@@ -288,8 +263,8 @@ export function withRequestContext(app: FastifyInstance): void {
       sciezka: sciezkaDoAudytu(req, sciezka),
       status: reply.statusCode,
       /* WYŁĄCZNIE powód z odpowiedzi. Ciała ŻĄDANIA nie zapisujemy nigdy i to
-         jest zasada, nie przeoczenie: przez `POST /api/auth/pin` przechodzi
-         PIN, a log audytowy, który wycieka PIN-y, jest gorszy od jego braku. */
+         jest zasada, nie przeoczenie: przez logowanie przechodzi hasło, a log
+         audytowy, który wycieka hasła, jest gorszy od jego braku. */
       powod: powodOdrzucenia(payload),
     });
     return payload;
@@ -300,10 +275,8 @@ export function withRequestContext(app: FastifyInstance): void {
  * Ścieżka do wpisu odrzucenia — pod profilem klienta WZORZEC TRASY, nie adres.
  *
  * Adres `/api/obsluga/klient/<login>/…` niesie login kupującego, a `events`
- * nie ma retencji. Sprawa klienta (0.535.0) pilnuje, żeby jej zdarzenia
- * niosły numer sprawy zamiast loginu — i ten wysiłek przepadałby w pierwszym
- * 409, które dopisywało adres z loginem do tej samej tabeli. Tą samą drogą
- * login wyciekał już przy 404 profilu i przy odmowie notatki.
+ * nie ma retencji. Sprawa klienta pilnuje, żeby jej zdarzenia niosły numer
+ * sprawy zamiast loginu, a adres z loginem w odrzuceniu zniweczyłby to.
  *
  * Tylko ten przedrostek: gdzie indziej adres niesie nasze numery, a te są
  * tropem przy reklamacji odrzuconego skanu. Bez dopasowanej trasy (404

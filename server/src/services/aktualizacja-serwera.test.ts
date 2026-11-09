@@ -9,7 +9,7 @@ import {
   type Pobieracz,
 } from "./aktualizacja-serwera.js";
 
-/* Aktualizacja z panelu (0.492.0). Najważniejsze gwarancje:
+/* Aktualizacja z panelu. Najważniejsze gwarancje:
    - do wyboru są wyłącznie wydania NOWSZE i Z PACZKĄ;
    - zlecenie powstaje tylko wtedy, gdy zadanie ruszyło — inaczej wisiałoby
      jako „trwa" i blokowało przycisk na zawsze;
@@ -102,8 +102,8 @@ test("zlecenie: plik z wersją i osobą, zadanie uruchomione po nazwie", async (
   await sprawdzWydania(pobieracz({ [API]: JSON.stringify(WYDANIA), [RAW]: CHANGELOG }), "0.491.0");
   const wolane: string[] = [];
   ustawUruchamiacz(async (n) => { wolane.push(n); });
-  /* WERSJA serwera w testach jest niższa niż 0.493.0 tylko przypadkiem,
-     więc wybieramy wydanie, które na pewno jest na liście. */
+  /* WERSJA serwera w testach bywa dowolna, więc wybieramy wydanie, które na
+     pewno jest na liście. */
   const wersja = stanAktualizacji(k).wydania.find((w) => w.maPaczke)!.wersja;
   await zlecAktualizacje(wersja, "Anna", k, "2026-09-25T10:00:00.000Z");
   const z = JSON.parse(fs.readFileSync(path.join(k, "zlecenie.json"), "utf8"));
@@ -155,7 +155,7 @@ test("nieudana aktualizacja w zdrowiu przez dobę", () => {
   assert.equal(problemAktualizacji({ ...stan, etap: "gotowe" }, Date.parse("2026-09-25T12:00:00Z")), null);
 });
 
-/* Pasek postępu (0.504.0): krok z pliku instalatora trafia do stanu tylko
+/* Pasek postępu: krok z pliku instalatora trafia do stanu tylko
    w trakcie, tylko w poprawnym kształcie i tylko z TEJ aktualizacji. */
 test("postęp: poprawny kształt przechodzi, reszta odpada", () => {
   const at = "2026-09-25T16:48:10.000Z";

@@ -6,15 +6,10 @@ import { describe, expect, it } from "vitest";
    tekst, więc `main.tsx` NIE jest tutaj wykonywany. */
 import tsx from "./main.tsx?raw";
 
-/* ── Strażnik ramy okna (0.233.0, przepisany w 0.236.0) ──────────────────────
-   Rama przewróciła się DWA RAZY i oba razy przez jednostkę okna. Najpierw
-   `lg:h-dvh` z 0.165.0: przeglądarka, która nie zna `dvh`, wyrzuca całą
-   deklarację, a `lg:min-h-0` skasowało już `min-h-screen` — nie zostawał żaden
-   limit. Potem zapas `100vh` z 0.233.0, który usterki nie zamknął: `vh` liczy
-   okno UKŁADU, a ono bywa wyższe niż okno WIDOCZNE, więc strona dalej dawała
-   się przesunąć o kilkadziesiąt pikseli.
-
-   Od 0.236.0 rama nie używa żadnej jednostki okna: `position: fixed; inset: 0`.
+/* ── Strażnik ramy okna ──────────────────────────────────────────────────────
+   Jednostki okna przewracają ramę: przeglądarka, która nie zna `dvh`,
+   wyrzuca całą deklarację, a `vh` liczy okno UKŁADU, które bywa wyższe niż
+   okno WIDOCZNE. Rama nie używa więc żadnej: `position: fixed; inset: 0`.
    Ten plik pilnuje, żeby JSX nie wrócił do klasy Tailwinda z jednostką —
    niezmiennik pikselowy mierzy `e2e/dym.spec.ts` w prawdziwej przeglądarce,
    bo jsdom układu nie liczy.                                                */

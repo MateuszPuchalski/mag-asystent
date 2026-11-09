@@ -1,14 +1,12 @@
-import React from "react";
 import { describe, expect, it } from "vitest";
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type { WpisOsiZwrotu } from "../api/typy";
 import { Os, PrzebiegZwrotu } from "./Os";
 
-/* ── Oś zwrotu (0.313.0) ─────────────────────────────────────────────────────
-   Serwer oddawał ją przy szczególe sprawy od 0.156.0, panel miał na nią nawet
-   typ — i nikt jej nie rysował. Biuro patrzące na zamknięty zwrot nie widziało
-   ani kto go przyjął, ani za co poszła kwota, ani czy towar wrócił na półkę.
+/* ── Oś zwrotu ───────────────────────────────────────────────────────────────
+   Biuro patrzące na zamknięty zwrot ma widzieć, kto go przyjął, za co poszła
+   kwota i czy towar wrócił na półkę.
 
    Trzy rzeczy warte testu:
 
@@ -65,7 +63,7 @@ describe("Oś zwrotu", () => {
   });
 });
 
-/* ── Przebieg zwinięty do zdania (0.518.0) ──────────────────────────────────
+/* ── Przebieg zwinięty do zdania ────────────────────────────────────────────
    Zgłoszenie agentów: „przytłacza". Pełna lista stała otwarta pod każdym
    zwrotem; przy decyzji liczy się ostatni ruch, reszta jest jednym
    kliknięciem dalej — ten sam kształt co pasek zdarzeń rozmowy.            */

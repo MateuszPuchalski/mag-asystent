@@ -9,13 +9,13 @@ import { BladReklamacji } from "./reklamacje.js";
 import { LIMIT_ZALACZNIKA, TYPY_ZALACZNIKA, type WgrajZalacznik } from "./allegro-wysylka.js";
 import { DOZWOLONE_PO_LUDZKU, LIMIT_NASZ, MAKS_ZALACZNIKOW } from "./zalaczniki-wysylki.js";
 
-/* ── Załączniki WYCHODZĄCE w sprawie posprzedażowej (0.274.0) ────────────────
+/* ── Załączniki WYCHODZĄCE w sprawie posprzedażowej ──────────────────────────
    Decyzja właściciela z 7 września brzmiała „sam tekst" i trzymała się cztery
    dni. Odwrócił ją 11 września, więc panel dosyła plik razem z odpowiedzią —
    przy reklamacji częściej niż przy pytaniu, bo rozmowa reklamacyjna bywa
    sporem o to, co dokładnie widać na zdjęciu.
 
-   WZORZEC JEST ZE SKRZYNKI (0.195.0) I ŚWIADOMIE GO POWTARZAMY, nie
+   WZORZEC JEST ZE SKRZYNKI I ŚWIADOMIE GO POWTARZAMY, nie
    uogólniamy: plik idzie do Allegro OD RAZU (odmowa typu albo rozmiaru ma
    paść przy wybieraniu pliku, nie po napisaniu odpowiedzi), bajtów nie
    trzymamy u siebie ani chwili dłużej, a wiersz powstaje wyłącznie po udanym
@@ -170,7 +170,7 @@ export async function dodajZalacznikSprawy(
 
   /* Do dziennika idą NAZWA, TYP i ROZMIAR, nigdy bajty. Nazwa pliku bywa daną
      osobową i przyjmujemy to świadomie, tak samo jak przy załącznikach
-     przychodzących (polityka danych 0.143.0). */
+     przychodzących. */
   logEvent("reklamacja_zalacznik_dodany",
     z.autor.name, null,
     { id: z.reklamacjaId, allegroId, nazwa, typ: z.typ, rozmiar: z.dane.byteLength },

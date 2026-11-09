@@ -236,7 +236,7 @@ test("nazwa pliku z bazy nie wyprowadza odczytu poza katalog", () => {
   assert.equal(Z.sciezkaZdjecia("../../../etc/passwd"), null);
 });
 
-// ── Zdjęcie dodane z kolektora ma pierwszeństwo (0.88.0) ────────────────────
+// ── Zdjęcie dodane z kolektora ma pierwszeństwo ─────────────────────────────
 
 /* To jest cała zapasowa droga funkcji dodawania zdjęć: magazynier robi zdjęcie
    i widzi je na karcie NATYCHMIAST, niezależnie od tego, czy baza firmy ma

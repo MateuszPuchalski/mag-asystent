@@ -48,8 +48,7 @@ export function czasLokalny(iso: string): string {
  * Tak czyta go SQLite (`julianday`, `datetime`), a `Date.parse` — jako czas
  * LOKALNY maszyny. Kolumna, w której obok ISO z `Z` trafi się
  * `'2026-09-26 10:30:00'` z `datetime('now')`, porządkowałaby się wtedy
- * inaczej w SQL-u niż w kodzie: latem w Polsce o dwie godziny. Blizna
- * 0.497.1 (`znacznikiIso` w `db.ts`) pokazała to na ekranie; ten pomocnik
+ * inaczej w SQL-u niż w kodzie: latem w Polsce o dwie godziny. Ten pomocnik
  * trzyma porównania po stronie kodu na tym samym zegarze co zapytania.
  * Niepoprawny albo pusty znacznik daje `NaN`, jak `Date.parse`.
  */
@@ -90,7 +89,7 @@ export function stempelLokalny(iso: string): string {
   ).format(d)}`;
 }
 
-/* ── Tydzień na zegarze magazynu (0.497.0, raport tygodnia) ────────────────
+/* ── Tydzień na zegarze magazynu (raport tygodnia) ────────────────
    Raport tygodnia ma granice STAŁE: od poniedziałku 00:00 do następnego
    poniedziałku 00:00 czasu lokalnego. Okna analizy liczą „ostatnie N dni od
    teraz", więc ten sam raport otwarty we wtorek i w piątek dawał różne liczby.

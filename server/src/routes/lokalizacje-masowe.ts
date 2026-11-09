@@ -8,7 +8,7 @@ import {
   type WierszArkusza,
 } from "../services/lokalizacje-masowe.js";
 
-/* ── Masowa podmiana adresów z arkusza — trasa biura (0.138.0) ───────────────
+/* ── Masowa podmiana adresów z arkusza — trasa biura ───────────────
    JEDNA trasa o dwóch trybach, nie dwie. `zastosuj` domyślnie `false` znaczy
    podgląd: ten sam kod liczy raport w obu przebiegach, więc nie da się
    zastosować czegoś innego, niż się widziało na ekranie. Dwie osobne trasy
@@ -31,7 +31,7 @@ interface CialoImportu {
   wiersze?: WierszArkusza[];
   csv?: string;
   /**
-   * Które obecne kody zostawić, per symbol kartoteki (0.139.0).
+   * Które obecne kody zostawić, per symbol kartoteki.
    *
    * Mapa OBOK wierszy, a nie pole w wierszu, i to jest wymuszone przez CSV:
    * plik CSV rozbiera serwer, więc przeglądarka nie ma wierszy, do których
@@ -83,8 +83,7 @@ export async function lokalizacjeMasoweRoutes(app: FastifyInstance) {
    *
    * Podgląd sprawdza samą rolę. `autoryzuj()` pisze `privileged` do dziennika
    * przy KAŻDYM wywołaniu, a wybranie pliku to jeszcze nie operacja — wpis
-   * przy każdym otwarciu arkusza byłby tym samym szumem, który 0.52.3
-   * z dziennika usuwało. Zapis idzie już przez `autoryzuj()`.
+   * przy każdym otwarciu arkusza byłby szumem. Zapis idzie już przez `autoryzuj()`.
    */
   function odmowa(): { kod: number; error: string } | null {
     const s = sesjaZadania();

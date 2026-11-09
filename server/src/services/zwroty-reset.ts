@@ -1,7 +1,7 @@
 import { logEvent } from "./events.js";
 import { transaction, type Db } from "../db/db.js";
 
-/* ── Czyszczenie zwrotów przed ponownym pobraniem (0.199.0) ─────────────────
+/* ── Czyszczenie zwrotów przed ponownym pobraniem ───────────────────────────
    Zgłoszenie właściciela: „naklikałem testowo i niektóre zwroty zostały
    niepoprawnie obsłużone". Potrzebny jest czysty stan, a nie prostowanie
    pojedynczych decyzji ręką.

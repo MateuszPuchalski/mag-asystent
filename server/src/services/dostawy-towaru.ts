@@ -7,23 +7,18 @@ import { dokumentyPozaWertis } from "./delivery.js";
    Magazynier nie zastaje towaru w regale i nie ma jak sprawdzić, czy to dlatego,
    że dopiero przyszedł i leży nierozłożony.
 
-   Karta odpowiadała na to POZORNIE, i to jest gorsze od milczenia. Przy dostawie
-   krajowej skutek magazynowy niesie sam dokument w Subiekcie — księgowany wprost
-   na MAG — więc kafel „MAG · DOSTĘPNE" pokazuje 12 szt, kiedy sześć z nich stoi
-   na palecie w strefie przyjęć. Liczby nie da się pogodzić z tym, co magazynier
-   ma przed oczami, a karta nie mówi dlaczego.
+   Sam kafel stanu odpowiada na to POZORNIE. Przy dostawie krajowej skutek
+   magazynowy niesie dokument w Subiekcie — księgowany wprost na MAG — więc
+   „MAG · DOSTĘPNE" pokazuje 12 szt, kiedy sześć z nich stoi na palecie
+   w strefie przyjęć.
 
-   Kontener na MGP jest tu OD 0.22.0, odkąd rozkłada się tą samą ścieżką co
-   dostawa krajowa. To nie dubluje kafla MGP: kafel mówi, ILE stoi w przyjęciach,
+   Kontener na MGP rozkłada się tą samą ścieżką co dostawa krajowa. To nie
+   dubluje kafla MGP: kafel mówi, ILE stoi w przyjęciach,
    a ten wiersz — NA KTÓRYM dokumencie i ile z tego nie ma jeszcze adresu. Druga
    liczba jest zarazem wejściem do pracy, pierwsza tylko stanem. */
 
-/* Okno bierzemy Z KONFIGURACJI, a nie z własnej stałej. Wcześniej stało tu
-   `14` z komentarzem „tyle samo, co lista w zakładce rozkładania" — czyli
-   zgodności pilnowało zdanie, nie mechanizm. Zmiana `DOK_DNI_WSTECZ` na 30
-   przestawiała listę dostaw, a ten wiersz zostawiała na czternastu dniach:
-   karta mówiła wtedy „nic nie przyszło" o dokumencie, który wisiał obok
-   w zakładce rozkładania. */
+/* Okno bierzemy Z KONFIGURACJI (`DOK_DNI_WSTECZ`), a nie z własnej stałej:
+   ten wiersz ma widzieć te same dokumenty co lista w zakładce rozkładania. */
 
 export interface WDostawie {
   dokId: number;
@@ -84,9 +79,8 @@ export function nierozlozoneZDostaw(twId: number): WDostawie[] {
 
      SUMA po wierszach, nie ostatni wiersz. Ten sam towar potrafi stać
      w dokumencie dwa razy (S26), a adapter i tak sumuje ilość z dokumentu
-     po wszystkich pozycjach. Do audytu z 22 września 2026 mapa brała jeden
-     wiersz dostawy, więc odjęcie szło od sumy obu pozycji i karta mówiła
-     „w dostawie" o sztukach, które leżały na półce. */
+     po wszystkich pozycjach. Jeden wiersz dostawy odjęty od sumy obu pozycji
+     dawałby „w dostawie" o sztukach, które leżą na półce. */
   const postep = new Map<number, PostepLinii>();
   const wiersze = db()
     .prepare(

@@ -225,9 +225,8 @@ export async function authRoutes(app: FastifyInstance) {
         return reply.code(400).send({ error: `Hasło musi mieć co najmniej ${HASLO_MIN} znaków` });
       }
       setHaslo(Number(req.params.id), haslo);
-      /* Autorem jest KONKRETNA osoba, nie nazwa roli. Do 0.24.0 stało tu słowo
-         „biuro" — teraz byłoby wprost nieprawdziwe (zmienia admin), ale i
-         wcześniej audyt odpowiadał „biuro" na pytanie „kto odebrał hasło". */
+      /* Autorem jest KONKRETNA osoba, nie nazwa roli: audyt ma odpowiadać
+         na pytanie „kto odebrał hasło". */
       logEvent("user_haslo_changed", kto(), null, { userId: Number(req.params.id) });
       return { ok: true };
     }

@@ -2,15 +2,15 @@ import { useEffect, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { useIsFetching } from "@tanstack/react-query";
 
-/* ── Skok do karty z adresu (0.441.0, wspólny od 0.444.0) ──────────────
+/* ── Skok do karty z adresu ─────────────────────────────────────────────
    Adres niesie kartę (`?karta=…`), a ekran przewija do elementu
-   `#karta-<nazwa>`. Stał w stanie systemu; ustawienia są drugim odbiorcą
-   (strefa złota w analizie prowadzi do swoich reguł), a dwie kopie tej
-   logiki rozjechałyby się przy pierwszej poprawce.
+   `#karta-<nazwa>`. Odbiorcami są stan systemu i ustawienia, a dwie kopie
+   tej logiki rozjechałyby się przy pierwszej poprawce.
 
    Skok na wejściu i JESZCZE RAZ, gdy ucichną pierwsze odczyty. Kotwica
    istnieje od razu, ale karty nad nią rosną, kiedy dochodzą ich dane: skok
-   po samym narysowaniu lądował w kolejce zapisów, a nie przy koncie Allegro.
+   po samym narysowaniu wylądowałby w kolejce zapisów, a nie przy koncie
+   Allegro.
    Przy pierwszym narysowaniu nic jeszcze nie jest „w toku" (zapytania
    startują po nim), więc sam licznik odczytów kłamie — dlatego koniec liczy
    się dopiero po tym, jak ruch był widać.

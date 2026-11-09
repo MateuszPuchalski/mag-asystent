@@ -3,12 +3,10 @@ import type { Wyjatek as WyjatekHali } from "../api/dostawy";
 import { ilosc } from "../api/dostawy";
 import { Pole, Przycisk, czas } from "../ui";
 
-/* ── Wyjątek zgłoszony przez halę (0.435.0) ────────────────────────────────
-   „OTWARTY" pisany WPROST — w biurze brak plakietki „rozwiązany" trzeba było
-   kiedyś zinterpretować jako otwarty, a brak czegoś nie jest komunikatem.
+/* ── Wyjątek zgłoszony przez halę ──────────────────────────────────────────
+   „OTWARTY" pisany WPROST: brak czegoś nie jest komunikatem.
 
-   ROZWIĄZANIE W MIEJSCU, NIE W OKNIE. Biuro pytało oknem dialogowym, bo
-   `biuro.html` nie miało innego sposobu. Tu pole otwiera się pod wyjątkiem,
+   ROZWIĄZANIE W MIEJSCU, NIE W OKNIE. Pole otwiera się pod wyjątkiem,
    którego dotyczy — oko nie skacze na środek ekranu i z powrotem, a przy
    kilku wyjątkach jednej faktury widać, który się właśnie zamyka
    (dekalog pkt 5: mniej ruchu). Notatka jest opcjonalna i trafia do
@@ -17,9 +15,8 @@ import { Pole, Przycisk, czas } from "../ui";
 /**
  * Co policzyła hala — zdaniem, które znaczy jedno.
  *
- * BŁĘDNY ARTYKUŁ CZYTA SIĘ JAKO ZAMIANA (audyt 26.09.2026). Wspólny wzór
- * dawał „OEM-77-521 policzone: 6 z 6 szt. · zamiast 6" przy pozycji 0/6 —
- * wyglądało to na komplet zamówionego towaru. Chodzi o coś odwrotnego:
+ * BŁĘDNY ARTYKUŁ CZYTA SIĘ JAKO ZAMIANA. „6 z 6 szt." przy pozycji 0/6
+ * wyglądałoby na komplet zamówionego towaru, a chodzi o coś odwrotnego:
  * przyszło sześć sztuk CZEGO INNEGO w miejsce zamówionych.
  */
 function Policzone({ p }: { p: WyjatekHali }) {
@@ -44,16 +41,15 @@ export function Wyjatek({ p, trwa, blad, onRozwiaz }: {
 }) {
   const [otwarte, setOtwarte] = useState(false);
   const [nota, setNota] = useState("");
-  /* Zgłoszenie bez żadnego wskazania towaru — ani pozycji, ani symbolu.
-     Tak wyglądają typy sprzed 0.21.0, ale też każde zgłoszenie zrobione
-     na całą dostawę bez symbolu. Brak mówimy wprost: pusty wiersz wyglądał,
+  /* Zgłoszenie bez żadnego wskazania towaru — ani pozycji, ani symbolu,
+     np. zrobione na całą dostawę. Brak mówimy wprost: pusty wiersz wyglądałby,
      jakby ekran zgubił nazwę, a nie jakby jej nigdy nie było — a protokół
      dla dostawcy wyjdzie z takiego wiersza bez towaru. */
   const bezTowaru = p.lineId == null && !p.sym && !p.symObcy;
-  /* STATUS I PRZYCISK W STAŁEJ KOLUMNIE Z PRAWEJ (audyt 26.09.2026). We
-     wspólnym zawijanym wierszu plakietka „rozwiązany" spadała pod treść,
-     gdy opis był dłuższy, a „otwarty" z przyciskiem zostawały z prawej —
-     dwa stany stały w dwóch różnych miejscach. */
+  /* STATUS I PRZYCISK W STAŁEJ KOLUMNIE Z PRAWEJ. We wspólnym zawijanym
+     wierszu plakietka „rozwiązany" spadałaby pod treść przy dłuższym opisie,
+     a „otwarty" z przyciskiem zostawałby z prawej — dwa stany w dwóch
+     miejscach. */
   return <div className="border-t border-slate-100 py-1.5 text-sm first:border-t-0">
     <div className="flex items-start gap-2">
       <div className="flex min-w-0 flex-1 flex-wrap items-center gap-x-2 gap-y-1">

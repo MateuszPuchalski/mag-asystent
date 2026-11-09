@@ -4,11 +4,9 @@ import { useKolektory } from "../api/kolektory";
 import type { Zdrowie } from "../api/typy";
 import { godzina, ile } from "../ui";
 
-/* ── Tablica stanu: jeden kafelek na obszar (0.538.0) ──────────────────
-   Decyzja właściciela z 27 września 2026, wariant A z makiet. Stan systemu
-   był dziesięcioma kartami jedna pod drugą, a zdrowe zajmowały tyle miejsca
-   co te, które czegoś od biura chcą. Kolejka niosła dwadzieścia wierszy
-   „zapisane", integracja dziewięć wierszy mówiących „działa".
+/* ── Tablica stanu: jeden kafelek na obszar ────────────────────────────
+   Decyzja właściciela. Zdrowe obszary nie zajmują tyle miejsca co te, które
+   czegoś od biura chcą.
 
    Kafelek odpowiada na jedno pytanie: czy ten obszar czegoś ode mnie chce.
    Barwa i jedno zdanie, a cała karta dopiero pod nim. Dekalog p. 1 i 5:
@@ -37,8 +35,8 @@ export const doUwagi = (o: Obszar) => o.ton === "zle" || o.ton === "uwaga";
 const CZEKA = "…";
 
 /**
- * Stan każdego obszaru jednym zdaniem. Kolejność jest kolejnością kart
- * z 0.427.0 — kafelki i karty pod nimi czyta się w tym samym porządku.
+ * Stan każdego obszaru jednym zdaniem. Kolejność jest kolejnością kart —
+ * kafelki i karty pod nimi czyta się w tym samym porządku.
  */
 export function useObszary(admin: boolean, zdrowie: Zdrowie | undefined): Obszar[] {
   const kolejka = useKolejka().data;
@@ -141,7 +139,7 @@ export function Kafelki({ obszary, otwarte, przelacz }: {
       return <button key={o.id} type="button" onClick={() => przelacz(o.id)}
         aria-expanded={rozwiniety} aria-controls={`karta-${o.id}`}
         /* Otwarta karta dostaje pierścień grafitu, nie bursztyn: bursztyn
-           na tym ekranie znaczy „czeka na biuro" (ustalenie 02). */
+           na tym ekranie znaczy „czeka na biuro". */
         className={`flex min-h-16 flex-col gap-1 rounded-xl border px-3 py-2.5 text-left hover:border-slate-400 ${t.ramka} ${
           rozwiniety ? "ring-2 ring-wertis-ink/60" : ""}`}>
         <span className="flex items-center gap-1.5 text-sm font-semibold text-slate-700">

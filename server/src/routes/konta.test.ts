@@ -151,8 +151,8 @@ test("admin wyłącza konto i odbiera hasło, a audyt notuje KTO", async () => {
   assert.equal(po.active, 0);
   assert.equal(po.haslo_hash, null, "hasło odebrane, konto zostaje dla historii");
 
-  /* Do 0.24.0 audyt wpisywał tu słowo „biuro" niezależnie od tego, kto zmieniał.
-     Reklamacja „ktoś mi wyłączył konto" nie miała wtedy odpowiedzi. */
+  /* Audyt wpisuje osobę, nie rolę: reklamacja „ktoś mi wyłączył konto" ma
+     mieć odpowiedź. */
   const kto = db()
     .prepare("SELECT user_id FROM events WHERE type = 'user_active_changed'")
     .all() as Array<{ user_id: string }>;
@@ -171,7 +171,7 @@ test("listę kont widzą biuro i admin, hala nie", async () => {
   assert.equal(hala.statusCode, 403);
 });
 
-/* ── Sesje konta (0.111.0) ─────────────────────────────────────────────────── */
+/* ── Sesje konta ─────────────────────────────────────────────────── */
 
 test("sesje ogląda i tnie wyłącznie admin; cięcie unieważnia od zaraz", async () => {
   const admin = jako("admin");

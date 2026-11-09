@@ -15,7 +15,7 @@ import { listByDelivery, PROBLEM_TYPES_LABELS } from "./problems.js";
 import type { ProblemType, ProblemView } from "../types.js";
 import type { RawDocument } from "../adapters/subiekt.js";
 
-/* ── Podgląd dokumentu dla biura (0.36.0) ────────────────────────────────────
+/* ── Podgląd dokumentu dla biura ─────────────────────────────────────────────
    Podgląd pod `/biuro` pokazywał dostawy jako płaską tabelę z paskiem postępu.
    Biuro widziało „12/30" i nie miało jak sprawdzić, KTÓRE dwanaście, kto je
    odłożył ani gdzie faktycznie wylądowały — żeby to zobaczyć, trzeba było
@@ -140,9 +140,8 @@ interface WierszLinii {
 /**
  * Nagłówek dostawy odtworzony z NASZEGO wiersza `delivery`.
  *
- * Wołany dopiero wtedy, gdy dokumentu nie ma już w read-modelu. Do 0.235.0
- * biuro dostawało wtedy 404 — dostawa sprzed trzech tygodni była dla panelu
- * nieodróżnialna od dokumentu, który nigdy nie istniał. A wszystko, co biuro
+ * Wołany dopiero wtedy, gdy dokumentu nie ma już w read-modelu. Dostawa
+ * sprzed trzech tygodni nie jest dokumentem, który nigdy nie istniał. Wszystko, co biuro
  * o niej pyta (kto odłożył, gdzie, ile brakowało), leży w `delivery_line`
  * i nie zniknęło razem z oknem importu.
  *
@@ -223,7 +222,7 @@ export function podgladDokumentu(dokId: number): PodgladDokumentu | undefined {
     khId: doc.kh_id ?? null,
     /* Ta sama para pól co na liście dostaw (`listDocuments`), z tego samego
        powodu: panel ma wiedzieć, czy w ogóle pytać o obraz. Żądanie „na wszelki
-       wypadek" kończy się serią 404 w dzienniku — lekcja z 0.56.0. */
+       wypadek" kończy się serią 404 w dzienniku. */
     maLogo: doc.kh_id != null && ktorzyMajaLogo([doc.kh_id]).size > 0,
     dataWyst: doc.data_wyst,
     wBuforze: !!doc.w_buforze,
@@ -304,7 +303,7 @@ export function statystykiDostawcy(
   };
 }
 
-/* ── Analiza dostaw (0.100.0) ────────────────────────────────────────────────
+/* ── Analiza dostaw ──────────────────────────────────────────────────────────
    Czwarty zakres zakładki ANALIZA. Trzy pozostałe powstały z PRZENOSIN — ich
    liczby były już gdzieś liczone i chodziło o to, żeby stanęły tam, gdzie
    ich miejsce. Ten nie: zakładka DOSTAWY nie miała ani jednej karty wglądu,

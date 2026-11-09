@@ -53,8 +53,8 @@ export function rolaMagazynu(magId: number): RolaMagazynu {
  * konsekwencja tego, że prowadzą rozkładanie. MGP to strefa przyjęć, z której
  * bierze się towar; Zwroty czekają na rozliczenie; MAG jest domyślnym celem
  * każdego przesunięcia. Ukrycie MGP zostawiłoby magazyniera z dostawą do
- * rozłożenia i bez kafla mówiącego, ile jeszcze w tej strefie leży — a od
- * 0.22.0 także bez wejścia do przesunięcia stanu.
+ * rozłożenia i bez kafla mówiącego, ile jeszcze w tej strefie leży — a także
+ * bez wejścia do przesunięcia stanu.
  */
 export const daSieUkryc = (magId: number): boolean => rolaMagazynu(magId) === null;
 
@@ -102,7 +102,7 @@ export interface StanMagazynu {
   kod: string;
   stan: number;
   /**
-   * Rola magazynu — po niej kolektor wyróżnia REGAŁ ZWROTÓW (0.118.0).
+   * Rola magazynu — po niej kolektor wyróżnia REGAŁ ZWROTÓW.
    *
    * Kod magazynu jest napisem z konfiguracji klienta („ZWR", „ZWROTY", cokolwiek
    * biuro tam wpisało), więc rozpoznawanie go po nazwie w interfejsie byłoby

@@ -11,21 +11,16 @@ import type { MiejsceZmiany } from "./roznica";
 import { useSkrotyDzialaja } from "../nawigacja/fokus";
 
 /**
- * Szkic odpowiedzi z Copilota (§14.6, 0.231.0) — przycisk i karta pod edytorem.
+ * Szkic odpowiedzi z Copilota (§14.6) — przycisk i karta pod edytorem.
  *
- * Propozycja modelu NIE wchodzi do pola sama. Stoi obok jako karta, a do
- * szkicu agenta trafia jednym kliknięciem „Wstaw do odpowiedzi" (do 0.500.0
- * „Popraw w edytorze").
- *
- * ── JEDEN PRZYCISK ZAMIAST „WSTAW" I „ZASTĄP" (22 września 2026) ──────────
- * Decyzja właściciela. Od kiedy szkic czeka na agenta przy każdej wiadomości,
- * pole agenta jest przy otwarciu zwykle puste — a wtedy oba przyciski robiły
+ * ── JEDEN PRZYCISK ZAMIAST „WSTAW" I „ZASTĄP" ─────────────────────────────
+ * Decyzja właściciela. Szkic czeka na agenta przy każdej wiadomości, więc
+ * pole agenta jest przy otwarciu zwykle puste — a wtedy oba przyciski robiłyby
  * to samo. Przycisk jest więc jeden i przy pustym polu wstawia. Przy
  * niepustym ZMIENIA NAPIS na „Zastąp mój szkic": nadpisanie cudzej pracy ma
  * być świadome, a napis mówi, co się stanie, zanim ktoś kliknie.
  *
- * Bez kroku „to kosztuje": klik w jednej rozmowie JEST intencją. Partia nad
- * kolejką miała potwierdzenie, bo była kroplówką na dwadzieścia rozmów naraz.
+ * Bez kroku „to kosztuje": klik w jednej rozmowie JEST intencją.
  */
 export interface PropsSzkicuCopilota {
   /** `undefined` = stan jeszcze nie przyszedł — wtedy nie ma ani przycisku, ani zdania. */
@@ -38,7 +33,7 @@ export interface PropsSzkicuCopilota {
   /** Szkic agenta jest niepusty — przycisk mówi wtedy „Zastąp mój szkic". */
   maSzkicAgenta: boolean;
   /**
-   * Pole agenta trzyma TEN szkic, do edycji wprost (0.499.0). Ustawia go
+   * Pole agenta trzyma TEN szkic, do edycji wprost. Ustawia go
    * ekran, gdy sam wstawił szkic do pustego pola albo agent kliknął „Popraw
    * w edytorze"; gaśnie przy wyczyszczeniu pola i przy zmianie rozmowy.
    */
@@ -51,7 +46,7 @@ export interface PropsSzkicuCopilota {
   poprawka?: { przed: string; po: string } | null;
   wylaczony: boolean;
   /**
-   * DOPYTANIE (0.332.0). `undefined` = rozmowa jeszcze się nie wczytała.
+   * DOPYTANIE. `undefined` = rozmowa jeszcze się nie wczytała.
    * Pole stoi w propsach szkicu, a nie osobno, bo dopytanie jest pytaniem
    * O SZKIC: bez niego nie ma o czym rozmawiać i nie ma czego kwestionować.
    */
@@ -73,7 +68,7 @@ export interface PropsSzkicuCopilota {
 }
 
 /**
- * Czy szkic może stanąć W POLU agenta (0.495.0). Tylko świeży i jeszcze
+ * Czy szkic może stanąć W POLU agenta. Tylko świeży i jeszcze
  * nieoceniony: stary odpowiada na pytanie, którego już nie ma, a wpisany
  * w pole wyglądałby jak gotowa odpowiedź na bieżące. Taki zostaje w karcie,
  * z nazwaną nieświeżością i przyciskiem „Ułóż ponownie".
@@ -82,20 +77,17 @@ export function szkicDoPola(p: PropsSzkicuCopilota): boolean {
   return p.szkic !== null && p.szkic.ocena === null && !p.nieswiezy && !p.wylaczony;
 }
 
-/* ── SZKIC WCHODZI DO POLA JAKO TEKST, NIE JAKO PODPOWIEDŹ (0.499.0) ────────
+/* ── SZKIC WCHODZI DO POLA JAKO TEKST, NIE JAKO PODPOWIEDŹ ──────────────────
    Zgłoszenie właściciela z nagraniem: „wydaje mi się, że edycja powinna być
-   w tym samym oknie, z opcją wyczyszczenia wszystkiego". Od 0.495.0 szkic
-   stał w pustym polu jako szara podpowiedź. Pierwsza litera agenta ją
-   zasłaniała, a pod polem wyskakiwała karta z „Zastąp mój szkic". Poprawka
-   jednego słowa w szkicu wymagała więc najpierw przyjęcia go Tabem — kroku,
-   o którym nagranie pokazuje, że się go nie domyśla nikt.
+   w tym samym oknie, z opcją wyczyszczenia wszystkiego". Szara podpowiedź
+   kazałaby przyjmować szkic Tabem przed poprawką jednego słowa — kroku,
+   którego się nie domyśla nikt.
 
-   Szkic wchodzi teraz do pola jako zwykły tekst, gotowy do poprawiania.
-   Reguła z 0.231.0 — „propozycja nie wchodzi do pola sama" — ODCHODZI
-   decyzją właściciela, a jej sens zostaje w dwóch miejscach:
-   - do klienta nic nie wychodzi bez kliknięcia „Wyślij" — to się nie zmienia;
+   Szkic wchodzi więc do pola jako zwykły tekst, gotowy do poprawiania.
+   Bezpieczeństwo zostaje w dwóch miejscach:
+   - do klienta nic nie wychodzi bez kliknięcia „Wyślij";
    - wstawienie jest STANEM EKRANU, nie zapisem. Pole nie jest zapisywane
-     na serwer, więc otwarcie rozmowy dalej niczego nie mutuje.
+     na serwer, więc otwarcie rozmowy niczego nie mutuje.
 
    Wstawiamy tylko do PUSTEGO pola i tylko świeży szkic swojej rozmowy.
    Zapisany szkic zespołu wygrywa zawsze — to czyjaś praca. */
@@ -137,19 +129,13 @@ export function szkicNaStartRozmowy(dane: OsRozmowy, mojeId: number | null): str
 }
 
 /**
- * Copilot W JEDNEJ LINII, bez własnego rzędu (0.249.0).
+ * Copilot W JEDNEJ LINII, bez własnego rzędu.
  *
  * Zgłoszenie właściciela: „niepotrzebnie ułóż odpowiedź i add attachment mają
- * swój własny rząd". Miał rację — dwa rzędy szły na dwie rzeczy, z których
- * jedna jest pomocą przy pisaniu, a druga czynnością od święta.
+ * swój własny rząd".
  *
- * 0.247.0 próbowało już wciągnąć ten przycisk do rzędu przełącznika trybu
- * i zostało WYCOFANE, bo z Copilotem wyłączonym komponent renderuje ZDANIE
- * z serwera, nie przycisk, a zdanie łamało rząd na dwa wiersze. Wycofanie
- * leczyło objaw. Przyczyną było to, że jeden komponent zwracał raz przycisk,
- * raz akapit — więc wołający nie miał jak wiedzieć, ile miejsca zajmie.
- *
- * Teraz nie zajmuje NIGDY więcej niż jedną linię: zdanie się ucina, a całość
+ * Z Copilotem wyłączonym komponent renderuje ZDANIE z serwera, nie przycisk.
+ * Dlatego nie zajmuje NIGDY więcej niż jedną linię: zdanie się ucina, a całość
  * zostaje w podpowiedzi. `truncate` wymaga `min-w-0` u rodzica we flexie.
  */
 export function PrzyciskSzkicu({ p }: { p: PropsSzkicuCopilota }) {
@@ -160,7 +146,7 @@ export function PrzyciskSzkicu({ p }: { p: PropsSzkicuCopilota }) {
     return <span className="min-w-0 truncate text-xs text-slate-500" title={p.stan.powod ?? undefined}>
       {p.stan.powod}</span>;
   }
-  /* ── PRZYCISK TYLKO WTEDY, GDY SZKICU BRAK ALBO JEST STARY (22 września 2026)
+  /* ── PRZYCISK TYLKO WTEDY, GDY SZKICU BRAK ALBO JEST STARY
      Decyzja właściciela. Takt układa szkic sam, więc przy świeżej karcie
      „Ułóż odpowiedź" kazałby zapłacić drugi raz za to samo. Przycisk wraca,
      gdy karty nie ma (takt wyłączony, limit godzinowy, szkic odrzucony) albo
@@ -178,10 +164,9 @@ export function PrzyciskSzkicu({ p }: { p: PropsSzkicuCopilota }) {
 /**
  * Pasek szkicu: skąd, jak świeży, co z nim zrobić.
  *
- * `wPolu` (0.499.0): treść STOI W POLU jako tekst agenta, więc nie ma czego
+ * `wPolu`: treść STOI W POLU jako tekst agenta, więc nie ma czego
  * przyjmować ani wstawiać. Zostaje „Odrzuć", które mierzy los szkicu,
- * i zdanie mówiące, skąd tekst w polu. Przyjmowanie Tabem z 0.495.0
- * odeszło razem z podpowiedzią.
+ * i zdanie mówiące, skąd tekst w polu.
  */
 export function PasekSzkicu({ p, wPolu = false, miejsca }: {
   p: PropsSzkicuCopilota;
@@ -196,13 +181,11 @@ export function PasekSzkicu({ p, wPolu = false, miejsca }: {
   const s = p.szkic;
   if (!s) return null;
   const poprawka = wPolu && miejsca && miejsca.length > 0 ? miejsca : null;
-  /* ── METRYKA W DYMKU, NIE W WIERSZU (0.517.0) ────────────────────────
-     Model, godzina, kto i liczba znaków stały zawsze widoczne obok nazwy.
-     Agent sięga po nie wyjątkowo — przy reklamacji szkicu, nie przy
-     czytaniu — więc zeszły do podpowiedzi nad napisem. Liczba znaków
-     została widoczna w podpisie zwiniętej treści, gdzie decyduje
-     o rozwinięciu. Zeszło też „— poprawiaj wprost w polu": tekst stoi
-     w polu z kursorem, a zdanie powtarzało to, co widać. */
+  /* ── METRYKA W DYMKU, NIE W WIERSZU ──────────────────────────────────
+     Model, godzinę, autora i liczbę znaków agent czyta wyjątkowo — przy
+     reklamacji szkicu, nie przy czytaniu — więc stoją w podpowiedzi. Liczba
+     znaków stoi też w podpisie zwiniętej treści, gdzie decyduje
+     o rozwinięciu. */
   return <div className="mb-2 flex flex-wrap items-center gap-2 text-xs">
       <b className="cursor-help text-violet-900"
         title={`${s.model} · ${czas(s.at)} · ${s.przez} · ${s.tresc.length} znaków`}>
@@ -216,7 +199,7 @@ export function PasekSzkicu({ p, wPolu = false, miejsca }: {
       <span className="ml-auto flex flex-wrap items-center gap-2">
         {!wPolu && <Przycisk wariant="glowny" className="text-xs" disabled={p.wylaczony} onClick={p.onPopraw}
           aria-keyshortcuts="E">
-          {/* „WSTAW DO ODPOWIEDZI", NIE „POPRAW W EDYTORZE" (0.500.0). Przycisk
+          {/* „WSTAW DO ODPOWIEDZI", NIE „POPRAW W EDYTORZE". Przycisk
               niczego nie poprawia — przenosi szkic do pola. Napis ma nazywać
               SKUTEK, bo po skutek się klika (Nielsen: zgodność z rzeczywistością). */}
           {p.maSzkicAgenta ? "Zastąp mój szkic" : "Wstaw do odpowiedzi"}
@@ -233,7 +216,7 @@ export function PasekSzkicu({ p, wPolu = false, miejsca }: {
 }
 
 /**
- * Uwagi modelu — czego nie znalazł w faktach (0.495.0: „uwagi na marginesie").
+ * Uwagi modelu — czego nie znalazł w faktach („uwagi na marginesie").
  *
  * Osobny komponent, bo żyją dłużej niż karta. Karta znika z oceną szkicu,
  * a przyjęty tekst dalej stoi w polu i dalej opiera się na tym samym braku
@@ -248,19 +231,19 @@ export function UwagiSzkicu({ uwagi }: { uwagi: string[] }) {
 }
 
 /**
- * Karta szkicu. `wPolu` znaczy, że treść stoi już w polu agenta (0.495.0,
- * od 0.499.0 jako zwykły tekst) — wtedy karta nie powtarza ani treści, ani
+ * Karta szkicu. `wPolu` znaczy, że treść stoi już w polu agenta jako zwykły
+ * tekst — wtedy karta nie powtarza ani treści, ani
  * paska z przyciskami, bo oba stoją nad polem. Zostaje to, na czym szkic stoi.
  */
 export function KartaSzkicu({ p, wPolu = false, zwinieta = false }: {
   p: PropsSzkicuCopilota;
   wPolu?: boolean;
-  /** Agent właśnie wyczyścił pole (0.499.0) — treść nie wraca rozwinięta pod pustym polem. */
+  /** Agent właśnie wyczyścił pole — treść nie wraca rozwinięta pod pustym polem. */
   zwinieta?: boolean;
 }) {
   const s = p.szkic;
   /* Oceniony szkic zniknął z ekranu: odrzucony nie ma po co wisieć. Wiersz
-     w bazie zostaje dla pomiaru. WYJĄTEK od 0.499.0: szkic stojący w polu
+     w bazie zostaje dla pomiaru. WYJĄTEK: szkic stojący w polu
      zostaje z tym, na czym stoi — uwagami, odczytem zdjęć i dopytaniem —
      także po „Wstaw do odpowiedzi", bo agent właśnie go poprawia. */
   if (!s || (s.ocena !== null && !(wPolu && s.ocena !== "odrzucony"))) return null;
@@ -279,34 +262,23 @@ export function KartaSzkicu({ p, wPolu = false, zwinieta = false }: {
     : null;
   const zastrzezenia = podstawa ? podstawa.zastrzezenia : s.zastrzezenia;
   const twierdzenia = podstawa ? podstawa.twierdzenia : s.twierdzenia;
-  /* PRZYCISKI NA GÓRZE (0.232.1) — patrz `PasekSzkicu`. */
+  /* PRZYCISKI NA GÓRZE — patrz `PasekSzkicu`. */
   return <section className={wPolu ? "mt-2" : "mt-3 rounded-lg border border-violet-200 bg-violet-50 p-3"}
     aria-label={wPolu ? "Na czym stoi szkic Copilota" : "Szkic Copilota"}>
     {!wPolu && <PasekSzkicu p={p} />}
-    {/* ── SZKIC PŁYNIE, NIE PRZEWIJA SIĘ W OKIENKU (0.342.0) ─────────────────
-        Do 0.341.0 stało tu `max-h-56 overflow-y-auto`. Komentarz z 0.232.1
-        tłumaczył to tak: długi szkic rozpychał edytor, oś rozmowy zwijała się
-        do jednej linii, a dół karty — z przyciskami — ginął pod krawędzią.
-
-        Powód zniknął, a ograniczenie zostało. Przyciski przeniesiono NA GÓRĘ
-        w tym samym wydaniu, więc dół nie zabiera już niczego, co trzeba
-        kliknąć. Oś chroni `max-h-[60vh]` na edytorze — siatka założona
-        dokładnie po to, żeby wewnętrzne nie były potrzebne.
-
-        Zostawało więc okienko wysokości 224 px na tekst, który agent ma
-        PRZECZYTAĆ przed wysłaniem do klienta: pięćset znaków przez szparę,
-        w trzecim zagnieżdżonym pasku przewijania. Właściciel rozstrzygnął
-        spór wprost: czytelność szkicu wygrywa. Cena jest jawna — przy długim
-        szkicu bloki pod nim schodzą poniżej krawędzi i trzeba do nich
-        przewinąć. */}
-    {/* ── TREŚĆ ZWINIĘTA, GDY AGENT MA WŁASNĄ (0.495.0) ─────────────────
+    {/* ── SZKIC PŁYNIE, NIE PRZEWIJA SIĘ W OKIENKU ───────────────────────────
+        Przyciski stoją NA GÓRZE, więc dół nie zabiera niczego, co trzeba
+        kliknąć. Tekst, który agent ma PRZECZYTAĆ przed wysłaniem do klienta,
+        nie idzie przez szparę we własnym pasku przewijania. Właściciel
+        rozstrzygnął: czytelność szkicu wygrywa. Cena jest jawna — przy długim
+        szkicu bloki pod nim schodzą poniżej krawędzi. */}
+    {/* ── TREŚĆ ZWINIĘTA, GDY AGENT MA WŁASNĄ ───────────────────────────
         Przy pustym polu treść stoi W POLU, więc tu jej nie ma wcale. Karta
         z treścią zostaje w dwóch przypadkach: agent pisze swoje albo szkic
         jest nieświeży. Przy pierwszym treść jest zwinięta: agent zaczął
         pisać i pięćset rozwiniętych znaków pod polem wpychałoby jego tekst
         pod krawędź. Rozwija się jednym kliknięciem, bez nowego żądania.
-        Siatki `max-h-[60vh]`, o której mówi komentarz wyżej, już nie ma:
-        edytor stoi na końcu osi, w jednym przewijaniu z rozmową. */}
+        Edytor stoi na końcu osi, w jednym przewijaniu z rozmową. */}
     {!wPolu && <details open={!p.maSzkicAgenta && !zwinieta} className="mb-2">
       <summary className="cursor-pointer text-xs font-semibold text-violet-900">
         Treść szkicu · {s.tresc.length} znaków</summary>
@@ -314,7 +286,7 @@ export function KartaSzkicu({ p, wPolu = false, zwinieta = false }: {
         data-testid="szkic-copilota-tresc">{s.tresc}</pre>
     </details>}
     {zastrzezenia.length > 0 && <UwagiSzkicu uwagi={zastrzezenia} />}
-    {/* Rachunek POD tekstem, nie w nim (0.253.0): klient ma dostać gładką
+    {/* Rachunek POD tekstem, nie w nim: klient ma dostać gładką
         odpowiedź, a agent — to, na czym ona stoi. Klucz z czasu szkicu, żeby
         nowy szkic otwierał okno od nowa wg własnych twierdzeń. */}
     {/* ODCZYT PRZED RACHUNKIEM, bo jest materiałem, na którym rachunek stoi.

@@ -5,14 +5,12 @@ import { PokrycieSygnatur } from "../ustawienia/PokrycieSygnatur";
 import { PomiarCopilota } from "../ustawienia/PomiarCopilota";
 import { Eskalacja } from "../ustawienia/Eskalacja";
 
-/* ── Miary obsługi (w analizie od 0.444.0) ─────────────────────────────
-   Karty stały za zębatką od 0.168.0, bo ekran ustawień był wtedy
-   jedynym miejscem „tła pracy". To nie są ustawienia: niczego tu się nie
-   zmienia, a na każdą z nich patrzy się jak na wynik. Makieta ustawień
-   mówi to wprost — „pomiary obsługi przeszły do Analizy".
+/* ── Miary obsługi ─────────────────────────────────────────────────────
+   To nie są ustawienia: niczego tu się nie zmienia, a na każdą z nich
+   patrzy się jak na wynik — dlatego stoją w Analizie.
 
-   Komponenty zostały w `ustawienia/`: przeniesienie plików nic nie
-   zmienia w zachowaniu, a każda z tych kart ma własny test obok siebie.
+   Komponenty mieszkają w `ustawienia/`, a każda z tych kart ma własny test
+   obok siebie.
 
    KOMPONENT MONTUJE SIĘ WYŁĄCZNIE W ZAKRESIE „OBSŁUGA KLIENTA", więc jego
    odczyty biegną tylko wtedy — ta sama zasada co dla pozostałych zakresów:

@@ -4,14 +4,13 @@ import { Hourglass } from "lucide-react";
 import { useAlarmWymiany } from "../api/stan";
 import { ile } from "../ui";
 
-/* ── Spóźnione sprawy w nagłówku (0.446.0, z paska `biuro.html` 0.364.0) ──
+/* ── Spóźnione sprawy w nagłówku ────────────────────────────────────────
    Sprawa między halą a biurem, która stoi dłużej niż dziewięć na dziesięć
-   domkniętych w tym samym kanale. Biuro pokazywało ją plakietką przy ikonach
-   stanu, widoczną z KAŻDEJ zakładki. Strona zniknęła, a w panelu ta liczba
-   stała tylko w karcie wymiany — widział ją ten, kto już poszedł sprawdzić,
-   czyli nikt, kto jej potrzebował.
+   domkniętych w tym samym kanale. Liczba stoi w nagłówku, widoczna
+   z KAŻDEJ zakładki — w samej karcie wymiany widziałby ją tylko ten, kto
+   już poszedł sprawdzić.
 
-   Cztery reguły przeszły razem z plakietką, każda z blizny:
+   Cztery reguły:
    1. OKNO STAŁE (30 dni): sygnał nie zależy od tego, co ktoś wybrał w tabeli.
    2. PROWADZI DO TREŚCI: klik otwiera kartę, która wyjaśnia, co stoi.
    3. BURSZTYN, NIE CZERWIEŃ: nic nie stoi, praca idzie wolniej. Czerwień

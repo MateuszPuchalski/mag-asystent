@@ -3,35 +3,28 @@ import type { DokumentDostawy, ZamknietaPoza } from "../api/dostawy";
 import { useLogoDostawcy } from "../towar/useZdjecie";
 import { Pusto, WierszKolejki, czas, dataLokalna, dzien, ile } from "../ui";
 
-/* ── Kolejka dostaw (0.435.0) ──────────────────────────────────────────────
-   Przeniesiona z `biuro.html` razem z decyzjami, które tam kosztowały:
-
-   - WIERSZ W DWÓCH LINIACH (0.427.0, dekalog pkt 2). Numer z dostawcą
-     i wiekiem, pod nimi pasek z licznikiem. Stan słowem (W TOKU,
-     NIETKNIĘTA) z wiersza zszedł — mówił to samo co pasek: 0/40 to
-     nietknięta, 12/40 w toku.
+/* ── Kolejka dostaw ────────────────────────────────────────────────────────
+   - WIERSZ W DWÓCH LINIACH (dekalog pkt 2). Numer z dostawcą i wiekiem, pod
+     nimi pasek z licznikiem. Stanu słowem (W TOKU, NIETKNIĘTA) nie ma, bo
+     mówi to samo co pasek: 0/40 to nietknięta, 12/40 w toku.
    - W WIERSZU TYLKO SYGNAŁY, PO KTÓRE BIURO WCHODZI W DOKUMENT: otwarte
      wyjątki i nieprzeczytana odpowiedź z hali.
-   - CZEKA NA BIURO jest tu KUBEŁKIEM, a nie grupą na górze listy. W biurze
-     był grupą, bo tamta lista nie miała kubełków; tu ma, a ta sama sprawa
-     w dwóch miejscach listy to dwa kliknięcia do jednej rzeczy.
-   - LOGO DOSTAWCY Z LEWEJ (0.449.0, prośba właściciela). Po to logo
-     powstało w 0.56.0: firmę poznaje się wzrokiem, zanim przeczyta się numer.
-     Kolektor ma je tak od dawna, a panel pokazywał je tylko w kontekście
-     otwartego dokumentu — czyli dopiero po wyborze, kiedy już nie pomaga. */
+   - CZEKA NA BIURO jest KUBEŁKIEM, a nie grupą na górze listy: ta sama
+     sprawa w dwóch miejscach listy to dwa kliknięcia do jednej rzeczy.
+   - LOGO DOSTAWCY Z LEWEJ: firmę poznaje się wzrokiem, zanim przeczyta się
+     numer. */
 
 /* Miejsce na logo ma WYMIARY OD RAZU i stoi także przy dostawcy bez logo:
    nazwy zaczynają się wtedy w jednej kolumnie, a wiersz nie podskakuje
-   w chwili doczytania obrazu (ta sama reguła, co `slotLogo` w biurze).
+   w chwili doczytania obrazu.
    Pytamy wyłącznie o logo, które jest — `maLogo` przychodzi z listy, więc
    dostawca bez logo nie dobija serwera o 404. Obraz WYPEŁNIA miejsce
    (`object-contain`), a nie tylko się w nim mieści: `max-w-full` nie
-   powiększa, więc małe logo stało kropką w rogu pustego pola.
+   powiększa, więc małe logo stałoby kropką w rogu pustego pola.
 
-   MIEJSCE STOI TYLKO WTEDY, GDY KTOKOLWIEK NA LIŚCIE MA LOGO (audyt
-   26.09.2026). Równa kolumna nazw ma sens przy logo obok logo; przy liście,
-   na której żaden dostawca go nie ma, było to 56 px pustki przed każdym
-   numerem — wcięcie bez powodu, powtórzone w każdym wierszu. */
+   MIEJSCE STOI TYLKO WTEDY, GDY KTOKOLWIEK NA LIŚCIE MA LOGO. Równa kolumna
+   nazw ma sens przy logo obok logo; bez żadnego logo byłoby to 56 px pustki
+   przed każdym numerem. */
 function LogoWiersza({ d }: { d: DokumentDostawy }) {
   const url = useLogoDostawcy(d.khId, d.maLogo);
   return <span className="flex h-8 w-14 shrink-0 items-center" aria-hidden="true">
@@ -68,21 +61,18 @@ export function kubelekDokumentu(d: DokumentDostawy, zOdpowiedzia: Set<number>):
 }
 
 /**
- * Liczba wyjątków słowami — JEDNO brzmienie na liście i w dokumencie (audyt
- * 26.09.2026). Jedna faktura miała trzy różne liczby „wyjątków": otwarte
- * zgłoszenia w kolejce, pozycje ze statusem wyjątku w nagłówku i wszystkie
- * zgłoszenia z rozwiązanymi nad sekcją. Każda liczyła co innego, a słowo
- * było to samo. Tu liczy się zawsze OTWARTE i mówi się to wprost.
+ * Liczba wyjątków słowami — JEDNO brzmienie na liście i w dokumencie. Tu
+ * liczy się zawsze OTWARTE zgłoszenia i mówi się to wprost; inna liczba pod
+ * tym samym słowem wprowadzałaby w błąd.
  */
 export const otwarteWyjatki = (n: number) => ile(n, "otwarty wyjątek", "otwarte wyjątki", "otwartych wyjątków");
 
 /**
  * Wiek dokumentu słowami — od daty wystawienia, bo tylko ją lista zna.
  *
- * W DNIACH KALENDARZA, NIE W GODZINACH (audyt 26.09.2026). Data wystawienia
- * nie ma godziny, a liczenie od niej milisekund dawało „11 g 51 min" przy
- * fakturze z dzisiaj — dokładność, której dane nie mają, liczoną w dodatku
- * od północy UTC, czyli o dwie godziny obok zegara magazynu.
+ * W DNIACH KALENDARZA, NIE W GODZINACH. Data wystawienia nie ma godziny,
+ * a liczenie od niej milisekund dałoby „11 g 51 min" przy fakturze z dzisiaj
+ * — dokładność, której dane nie mają, liczoną w dodatku od północy UTC.
  */
 export function wiekDokumentu(data: string, teraz = new Date()): string {
   const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(data ?? "");
@@ -95,11 +85,11 @@ export function wiekDokumentu(data: string, teraz = new Date()): string {
 }
 
 /**
- * Pasek rozłożenia. ZIELEŃ TYLKO DLA SKOŃCZONEGO BEZ ZASTRZEŻEŃ (audyt
- * 26.09.2026): wyjątek liczy się jako pozycja domknięta (D8), więc faktura
- * z czterema otwartymi wyjątkami miała zielony pasek 2/2 — kolor mówił
- * „gotowe", a plakietka obok „czeka na ciebie". Wygrywał kolor, bo zajmuje
- * więcej miejsca. Przy otwartym wyjątku pasek zostaje bursztynowy.
+ * Pasek rozłożenia. ZIELEŃ TYLKO DLA SKOŃCZONEGO BEZ ZASTRZEŻEŃ: wyjątek
+ * liczy się jako pozycja domknięta (D8), więc zielony pasek przy otwartych
+ * wyjątkach mówiłby „gotowe", a plakietka obok „czeka na ciebie". Wygrywa
+ * kolor, bo zajmuje więcej miejsca. Przy otwartym wyjątku pasek zostaje
+ * bursztynowy.
  */
 function Pasek({ zrobione, wszystkie, czeka }: { zrobione: number; wszystkie: number; czeka: boolean }) {
   const proc = wszystkie ? Math.min(100, Math.round((zrobione / wszystkie) * 100)) : 0;
@@ -111,7 +101,7 @@ function Pasek({ zrobione, wszystkie, czeka }: { zrobione: number; wszystkie: nu
   </div>;
 }
 
-/* Rama wiersza mieszka od 0.438.0 w `ui/` — kosze używają tej samej. */
+/* Rama wiersza mieszka w `ui/` — kosze używają tej samej. */
 const Wiersz = WierszKolejki;
 
 export function KolejkaDostaw({ dokumenty, zOdpowiedzia, wybrany, onWybierz, pusto }: {
@@ -163,8 +153,7 @@ export function KolejkaDostaw({ dokumenty, zOdpowiedzia, wybrany, onWybierz, pus
 
 /**
  * Otwarte wyjątki, których dokumentu nie ma na liście — spoza okna importu
- * albo bez dostawy w ogóle. W biurze stały w karcie REKLAMACJE pod numerem
- * dokumentu; tutaj muszą mieć własny wiersz, bo lista dostaw ich nie zna,
+ * albo bez dostawy w ogóle. Muszą mieć własny wiersz, bo lista dostaw ich nie zna,
  * a zgłoszenie, którego nie widać, to zgłoszenie zgubione.
  */
 export function WierszeSpozaOkna({ grupy, wybrany, onWybierz }: {
@@ -190,17 +179,15 @@ export function WierszeSpozaOkna({ grupy, wybrany, onWybierz }: {
 /**
  * Dostawy zdjęte z listy poza WERTIS — kto i dlaczego, bo to odróżnia decyzję od pomyłki.
  *
- * POWÓD SIĘ NIE UCINA (audyt 26.09.2026): to jedyna odpowiedź na pytanie
- * „dlaczego tej faktury nikt nie rozkładał", a wielokropek zjadał ją
- * w połowie. Wiek stoi słowami, jak w pozostałych kubełkach — surowa data
- * „2026-08-16" była jedynym takim zapisem na ekranie.
+ * POWÓD SIĘ NIE UCINA: to jedyna odpowiedź na pytanie „dlaczego tej faktury
+ * nikt nie rozkładał". Wiek stoi słowami, jak w pozostałych kubełkach.
  */
 export function KolejkaPozaWertis({ lista, wybrany, onWybierz }: {
   lista: ZamknietaPoza[];
   wybrany: number | null;
   onWybierz: (dokId: number) => void;
 }) {
-  /* „w tym oknie" zeszło: ta lista nie ma okna, serwer oddaje każde zdjęcie. */
+  /* Bez „w tym oknie": ta lista nie ma okna, serwer oddaje każde zdjęcie. */
   if (!lista.length) return <Pusto waga="lista">Nic nie zdjęto z listy.</Pusto>;
   return <ul className="divide-y divide-slate-200">
     {lista.map((d) => <Wiersz key={d.dokId} aktywny={d.dokId === wybrany} onKlik={() => onWybierz(d.dokId)}>

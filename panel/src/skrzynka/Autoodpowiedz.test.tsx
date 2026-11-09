@@ -4,7 +4,7 @@ import userEvent from "@testing-library/user-event";
 import { Os } from "./Os";
 import type { WpisOsi } from "../api/typy";
 
-/* ── Autoodpowiedź biura na osi (0.218.0) ────────────────────────────────────
+/* ── Autoodpowiedź biura na osi ──────────────────────────────────────────────
    Skrzynka odbija każdy przychodzący list potwierdzeniem „Dziękujemy za
    kontakt": kilkanaście wierszy z godzinami pracy, po polsku i po angielsku,
    zero zdań o sprawie klienta. Właściciel: „zwijaj i oznaczaj".
@@ -45,7 +45,7 @@ describe("Autoodpowiedź na osi rozmowy", () => {
     expect(screen.queryByText(/generowana automatycznie/)).toBeNull();
   });
 
-  /* ── Stopka firmowa (0.219.1) ───────────────────────────────────────────
+  /* ── Stopka firmowa ─────────────────────────────────────────────────────
      Nazwa spółki, adres, NIP, KRS, REGON, telefon — siedem wierszy w każdej
      naszej wiadomości. Przy trzech odpowiedziach w wątku zajmowały na osi
      więcej miejsca niż wszystko, co naprawdę napisaliśmy.                  */
@@ -62,8 +62,8 @@ describe("Autoodpowiedź na osi rozmowy", () => {
     expect(screen.getByText(/NIP: 5423444020/)).toBeTruthy();
   });
 
-  /* Od 0.523.0 długa wypowiedź ze stopką ma JEDEN przełącznik, nie dwa:
-     oba odsłaniały resztę tego, co klient dostał. */
+  /* Długa wypowiedź ze stopką ma JEDEN przełącznik, nie dwa: oba
+     odsłaniałyby resztę tego, co klient dostał. */
   it("długa odpowiedź ze stopką odsłania treść i stopkę jednym kliknięciem", async () => {
     os(wpis({ automatyczna: false, tresc: "Prosimy o zgłoszenie reklamacji. " + "x".repeat(400),
       stopka: "WERTIS Sp. z o.o.\nNIP: 5423444020" }));
@@ -81,7 +81,7 @@ describe("Autoodpowiedź na osi rozmowy", () => {
     expect(screen.queryByRole("button", { name: /stopka/ })).toBeNull();
   });
 
-  /* ── Login w miejscu słowa „KLIENT" (0.219.2) ───────────────────────────
+  /* ── Login w miejscu słowa „KLIENT" ─────────────────────────────────────
      Właściciel: „login klienta powinien być na miejscu napisu KLIENT".
      Słowo „klient" jest prawdziwe o KAŻDEJ wiadomości przychodzącej, więc
      nie odróżnia niczego; login odróżnia rozmówcę.                        */
@@ -89,7 +89,7 @@ describe("Autoodpowiedź na osi rozmowy", () => {
     os(wpis({ automatyczna: false, odKlienta: true, autor: "bagslublin",
       tresc: "Dzień dobry" }));
 
-    /* Od 0.228.0 login jest PRZYCISKIEM (kopiuje się kliknięciem), a kanał
+    /* Login jest PRZYCISKIEM (kopiuje się kliknięciem), a kanał
        stoi obok, poza nim — kopiujemy sam login, nie zdanie o nim. */
     expect(screen.getByRole("button", { name: /Kopiuj login/ })).toHaveTextContent("bagslublin");
     expect(screen.getByText(/· Allegro/)).toBeTruthy();

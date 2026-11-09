@@ -3,14 +3,13 @@ import { Tag } from "lucide-react";
 import { useOutlet, usePrzeniesionoNaOutlet, zlote } from "../api/zwroty";
 import { Przycisk, Blad } from "../ui";
 
-/* ── Lista robocza regału outletowego (0.375.0) ─────────────────────────────
-   Decyzja właściciela z 16 września 2026: „na razie będziemy obsługiwać outlet
+/* ── Lista robocza regału outletowego ───────────────────────────────────────
+   Decyzja właściciela: „na razie będziemy obsługiwać outlet
    ręcznie". Magazyn outletowy stoi w Subiekcie, w aplikacji nie jest
    skonfigurowany, a regał jest jeden i oglądają go klienci stacjonarni.
 
-   Ta lista jest WARUNKIEM, pod którym w ogóle weszła trzecia ocena. „Przecena"
-   zeszła z ekranu w 0.209.0, bo kończyła się znacznikiem w bazie — a znacznik,
-   którego nikt nie czyta, jest ślepym zaułkiem. Tutaj znacznik ma czytelnika:
+   Ta lista jest WARUNKIEM trzeciej oceny: znacznik, którego nikt nie czyta,
+   byłby ślepym zaułkiem. Tutaj znacznik ma czytelnika:
    człowieka, który niesie używkę na regał i wystawia jej MM w Subiekcie.
 
    POKAZUJE SIĘ DOPIERO Z ZAWARTOŚCIĄ, jak pasek koszyka. Pusta byłaby stałym
@@ -20,10 +19,9 @@ import { Przycisk, Blad } from "../ui";
    oddaliśmy klientowi dokładnie tyle mniej. Kto wycenia regał, ma ją pod ręką
    zamiast szacować z pamięci.
 
-   ZWINIĘTA DO JEDNEGO WIERSZA (0.525.0), jak `PasekUwag` na tym samym
-   ekranie. Pełna lista z przyciskiem przy każdej pozycji stała na stałe nad
-   trzema kolumnami i zabierała kolejce kilka wierszy, choć regał obsługuje
-   się raz na jakiś czas, a nie przy każdym zwrocie. Liczba i zdanie
+   ZWINIĘTA DO JEDNEGO WIERSZA, jak `PasekUwag` na tym samym ekranie. Pełna
+   lista nad trzema kolumnami zabierałaby kolejce kilka wierszy, a regał
+   obsługuje się raz na jakiś czas. Liczba i zdanie
    o człowieku zostają na wierzchu; pozycje są jedno kliknięcie dalej. */
 
 export function NaOutlet() {

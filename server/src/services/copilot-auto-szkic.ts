@@ -13,32 +13,21 @@ import { TAKSONOMIA_WERSJA } from "./klasyfikacja-slownik.js";
 import { glosAllegro, zamknietyProblem } from "./glos-allegro.js";
 
 /**
- * Szkic sam dla nowego pytania pod ofertą (0.317.0).
+ * Szkic sam dla nowej wiadomości klienta.
  *
- * ── SKĄD TO WYDANIE ─────────────────────────────────────────────────────────
- * Właściciel: „make copilot run automatically on new questions". Do 0.315.0
- * szkic powstawał wyłącznie z kliknięcia „Ułóż odpowiedź", więc agent otwierał
- * rozmowę, czytał pytanie, klikał i czekał kilka sekund. Teraz propozycja
- * czeka na niego, zanim zdąży doczytać wiadomość klienta.
+ * Propozycja ma czekać na agenta, zanim zdąży doczytać wiadomość. Każda
+ * wiadomość klienta dostaje szkic (specyfikacja właściciela), także ta,
+ * której rozpoznanie każe coś zrobić — z faktem „rozpoznanie", który mówi
+ * modelowi, na jaką prośbę odpowiada.
  *
- * ── OD 22 WRZEŚNIA 2026 NIE TYLKO POD OFERTĄ ────────────────────────────────
- * Specyfikacja właściciela z 20 września: każda wiadomość klienta dostaje
- * szkic, a właściciel wybrał jej pełny zakres. Szkic powstaje więc także dla
- * wiadomości, której rozpoznanie każe coś zrobić — z faktem „rozpoznanie",
- * który mówi modelowi, na jaką prośbę odpowiada. Akapit niżej opisuje
- * rozstrzygnięcie z 0.317.0 i zostaje, bo tłumaczy, skąd ta pierwsza gałąź.
+ * ── PYTANIA POD OFERTĄ ──────────────────────────────────────────────────────
+ * Wiadomość niosąca `relatesTo.offer.id` to pytanie SPRZED zakupu, czyli
+ * przypadek, w którym Copilot ma komplet faktów: kartotekę oferty, treść
+ * aukcji i adres naszej aktywnej aukcji.
  *
- * ── DLACZEGO TYLKO PYTANIA POD OFERTĄ (0.317.0) ─────────────────────────────
- * Rozstrzygnięcie właściciela. Wiadomość niosąca `relatesTo.offer.id` to
- * pytanie SPRZED zakupu, czyli dokładnie ten przypadek, w którym Copilot ma
- * komplet faktów: kartotekę oferty, treść aukcji, a od 0.270.0 także adres
- * naszej aktywnej aukcji. Przy „dziękuję", zmianie adresu albo reklamacji
- * szkic z faktów oferty niewiele wnosi, a kosztuje tyle samo.
- *
- * ── DWA HAMULCE, BO NIKT JUŻ NIE KLIKA ──────────────────────────────────────
- * Kliknięcie było hamulcem samo w sobie: agent prosił o pracę dla siebie
- * i płacił za jedną rozmowę. Takt nie ma takiego ogranicznika, więc dostaje
- * dwa jawne: `autoNaPrzebieg` (ile na jeden przebieg) oraz `autoNaGodzine`
+ * ── DWA HAMULCE, BO NIKT NIE KLIKA ──────────────────────────────────────────
+ * Takt nie ma ogranicznika, jakim jest kliknięcie, więc dostaje dwa jawne:
+ * `autoNaPrzebieg` (ile na jeden przebieg) oraz `autoNaGodzine`
  * (twardy sufit), liczony z księgi `copilot_wywolanie` ŁĄCZNIE z wywołaniami
  * zakończonymi błędem — nieudane też kosztuje.
  *
@@ -50,9 +39,8 @@ import { glosAllegro, zamknietyProblem } from "./glos-allegro.js";
  * Świeżość mierzy jedno pole, to samo, którym ekran mówi „klient dopisał".
  *
  * Nie wysyła niczego do klienta: szkic jest propozycją, a wysyła agent.
- * Do 22 września 2026 stała za tym zasada nadrzędna nr 2 („człowiek wysyła
- * odpowiedź"); właściciel ją usunął. Wysyłka bez człowieka, gdy powstanie,
- * ma być osobnym kodem z własnymi bramkami — nie skutkiem ubocznym tego taktu.
+ * Wysyłka bez człowieka, gdy powstanie, ma być osobnym kodem z własnymi
+ * bramkami — nie skutkiem ubocznym tego taktu.
  */
 
 /**
@@ -97,7 +85,7 @@ export interface WynikAutoSzkicow {
  * odpowiada na tę wiadomość". Obejmuje oba przypadki naraz: brak szkicu
  * i szkic sprzed dopisku klienta.
  *
- * `auto_odpowiedz=0` odsiewa echo naszego potwierdzenia (0.227.0): liczona
+ * `auto_odpowiedz=0` odsiewa echo naszego potwierdzenia: liczona
  * jako wiadomość klienta kazałaby układać szkic na własną autoodpowiedź.
  */
 const CZEKAJACE = `

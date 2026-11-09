@@ -53,9 +53,8 @@ CREATE INDEX IF NOT EXISTS ix_events_type ON events(type);
 -- tygodniu") skanuje całą tabelę — a events rośnie z każdym skanem.
 CREATE INDEX IF NOT EXISTS ix_events_time ON events(created_at);
 CREATE INDEX IF NOT EXISTS ix_events_user_time ON events(user_id, created_at);
--- „Co się działo z TYM towarem" to najczęstsze pytanie przy reklamacji, a do
--- sierpnia 2026 `tw_id` nie miało ŻADNEGO indeksu — nawet historia na karcie
--- towaru skanowała całą tabelę, która rośnie z każdym skanem.
+-- „Co się działo z TYM towarem" to najczęstsze pytanie przy reklamacji.
+-- Bez indeksu historia na karcie towaru skanuje całą tabelę.
 CREATE INDEX IF NOT EXISTS ix_events_tw_time ON events(tw_id, created_at);
 
 -- ── Rozmowy wielokanałowe ────────────────────────────────────────────────
@@ -82,9 +81,7 @@ CREATE TABLE IF NOT EXISTS conversation (
   unread                   INTEGER NOT NULL DEFAULT 0,
   created_at               TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')),
   updated_at               TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')),
-  -- Status rozmowy (§7 projektu panelu, 0.158.0). Do tego wydania kolumny nie
-  -- było wcale: kolejka nie odróżniała sprawy załatwionej od nietkniętej.
-  -- Lista jest ZAMKNIĘTA i pochodzi wprost z §7, a `CHECK` jest tu strażnikiem
+  -- Status rozmowy (§7 projektu panelu). Lista jest ZAMKNIĘTA i pochodzi wprost z §7, a `CHECK` jest tu strażnikiem
   -- projektu: status spoza niej znaczyłby, że ktoś dołożył pojęcie, którego
   -- dokument nie zna. Ten sam warunek stoi w migracji `db.ts`.
   status                   TEXT NOT NULL DEFAULT 'new' CHECK(status IN
@@ -93,13 +90,13 @@ CREATE TABLE IF NOT EXISTS conversation (
   -- Do kiedy odłożona. Osobno od statusu, bo `snoozed` bez terminu byłby
   -- stanem, z którego nic nie wyprowadza — §7 nie zna „odłożonej na zawsze".
   snoozed_until            TEXT,
-  -- Priorytet rozmowy (§10.2, 0.181.0). Dwie wartości, jak przy zadaniach
+  -- Priorytet rozmowy (§10.2). Dwie wartości, jak przy zadaniach
   -- terenowych — trzecia („niski") nie ma pytania, na które odpowiada, bo
   -- kolejność i tak niesie czas oczekiwania. Flaga jest RĘCZNA: automat nie
   -- ma z czego jej wyliczyć, dopóki nie ma terminu odpowiedzi (§26).
   priorytet                TEXT NOT NULL DEFAULT 'normalny'
                            CHECK(priorytet IN ('normalny','pilny')),
-  -- ── SPRAWA REKLAMACYJNA U NAS (0.390.0) ──────────────────────────────────
+  -- ── SPRAWA REKLAMACYJNA U NAS ──────────────────────────────────────────
   -- Klient pyta „mam zrobić reklamację, czy inaczej temat załatwimy?" i to
   -- jest reklamacja w sensie handlowym, choć w Allegro nie ma jej wcale.
   --
@@ -111,7 +108,7 @@ CREATE TABLE IF NOT EXISTS conversation (
   -- FLAGA, nie status: rozmowa oznaczona dalej ma swój status z §7 („czeka na
   -- nas", „odłożona"), bo to dwie różne osie. Wpisanie „reklamacyjna" do
   -- `status` zabrałoby tamtą oś dokładnie tym rozmowom, które jej najbardziej
-  -- potrzebują — blizna 0.121.0 w innym ubraniu.
+  -- potrzebują.
   --
   -- RĘCZNA, jak priorytet. Automat rozpozna słowo „reklamacja" w treści, ale
   -- nie odróżni pytania od zapowiedzi; Copilot klasyfikuje osobno (§14.5)
@@ -132,14 +129,13 @@ CREATE TABLE IF NOT EXISTS message (
   -- surowego lądowiska — a wtedy `conversation`/`message` nie byłyby modelem.
   related_object_type TEXT,
   related_object_id   TEXT,
-  -- Zamówienie, którego dotyczy wiadomość (0.166.0). Allegro daje `relatesTo`
+  -- Zamówienie, którego dotyczy wiadomość. Allegro daje `relatesTo`
   -- z DWIEMA niezależnymi gałęziami, `offer` i `order`, i wiadomość może
   -- nieść obie naraz — dlatego osobna kolumna, a nie trzecia wartość
-  -- `related_object_type`. Do 0.165.0 gałąź `order` była wyrzucana przy
-  -- mapowaniu, choć sonda pokazuje ją częściej niż ofertę (7 z 33 wobec 5).
+  -- `related_object_type`.
   related_order_id    TEXT,
   sent_at             TEXT NOT NULL,
-  -- Nasza automatyczna odpowiedź „Dziękujemy za kontakt" (0.227.0). Liczona RAZ,
+  -- Nasza automatyczna odpowiedź „Dziękujemy za kontakt". Liczona RAZ,
   -- przy zapisie, przez `czyAutoresponder` — a nie przy każdym odczycie i nie
   -- drugi raz w SQL-u. Dwie kopie tej reguły rozjechałyby się przy pierwszej
   -- poprawce, a objawem byłaby rozmowa uznana za odpisaną, bo odbiła się echem.
@@ -155,39 +151,20 @@ CREATE TABLE IF NOT EXISTS message (
 );
 CREATE INDEX IF NOT EXISTS ix_message_conversation ON message(conversation_id, sent_at);
 
--- ── NAKŁADKI SPRAW JUŻ NIE MA (0.388.0) ────────────────────────────────────
--- `sprawa_klienta` i `sprawa_klienta_rozmowa` odeszły razem z kodem, który je
--- czytał; `migrate()` kasuje je u klienta (`bezNakladkiSpraw` w `db/db.ts`).
---
--- Sprawa była klamrą nad rozmowami: tytułem i listą wątków, bez statusu, bez
--- osi, bez terminu. Powstała w 0.161.0 z decyzji podjętej PRZED liczbami,
--- których żądało pytanie 1 `docs/obsluga-klienta.md` — i te liczby nie padły
--- nigdy. Od 0.387.0 na to samo pytanie odpowiada DROGA ZAKUPU: po numerze
--- zamówienia, przez cztery kolejki, bez kliknięcia.
---
--- OBIE NAZWY ZOSTAJĄ SPALONE. Tabela nazwana tak samo powstałaby stąd
--- i znikała sekundę później przy każdym starcie — ta sama pułapka co
--- z `dopasowanie` w `bezObslugiKlienta` (`db/db.ts`).
+-- ── NAZWY SPALONE ──────────────────────────────────────────────────────────
+-- `migrate()` kasuje przy każdym starcie tabele z list `bezNakladkiSpraw`
+-- i `bezDoboruIWiedzy` (`db/db.ts`). Tabela nazwana tak samo powstałaby
+-- stąd i znikała sekundę później.
 
--- ── DOBORU I BAZY WIEDZY JUŻ NIE MA ─────────────────────────────────────────
--- Decyzja właściciela: oba stały na chwiejnym fundamencie i wyszły w całości,
--- razem z kodem. `migrate()` kasuje ich tabele u klienta (`bezDoboruIWiedzy`
--- w `db/db.ts`), a pełna lista nazw stoi tam.
---
--- TE NAZWY ZOSTAJĄ SPALONE z tego samego powodu co nakładka spraw wyżej:
--- tabela nazwana tak samo powstałaby stąd i znikała przy każdym starcie.
-
--- ── Klasyfikacja wiadomości: DECYZJE z wersjami (22 września 2026) ─────────
+-- ── Klasyfikacja wiadomości: DECYZJE z wersjami ────────────────────────────
 -- Odpowiada na pytanie „O CO CHODZI w tej wiadomości" i jest PROSTOPADŁA do
 -- statusu, który odpowiada na „CZYJ JEST RUCH". Rozmowa `waiting_for_customer`
 -- bywa reklamacją, a `new` bywa pytaniem o dostępność — mieszanie tych dwóch
 -- wymiarów zepsułoby oba.
 --
--- ZASTĘPUJE `klasyfikacja_rozmowy` z 0.191.0. Tamta miała jeden wiersz na
--- ROZMOWĘ i nadpisywała go przy każdym dopisku klienta, więc gubiła, co model
--- sądził wcześniej. Specyfikacja z 20 września żąda historii: poprawka
--- człowieka albo ponowne rozpoznanie to NOWA WERSJA, a poprzednia gaśnie.
--- Stare wiersze przenosi `przeniesKlasyfikacjeRozmow()` w `migrate()`.
+-- Specyfikacja żąda historii: poprawka człowieka albo ponowne rozpoznanie
+-- to NOWA WERSJA, a poprzednia gaśnie. Wiersze dawnej `klasyfikacja_rozmowy`
+-- przenosi `przeniesKlasyfikacjeRozmow()` w `migrate()`.
 --
 -- OSOBNA TABELA, nie kolumny na `conversation`: `conversation.version` pilnuje
 -- przejęcia rozmowy i szkicu, a decyzja podnosząca ją wywracałaby komuś szkic
@@ -210,7 +187,7 @@ CREATE TABLE IF NOT EXISTS decyzja_klasyfikacji (
   aktywna                INTEGER NOT NULL DEFAULT 1 CHECK (aktywna IN (0,1)),
   zrodlo                 TEXT NOT NULL CHECK (zrodlo IN ('ALLEGRO_MAPPING','MODEL','FALLBACK')),
   status                 TEXT NOT NULL CHECK (status IN ('SUCCESS','FAILED','NEEDS_REVIEW')),
-  -- BEZ `CHECK` NA KATEGORIACH I AKCJACH (blizna 0.135.0). Słownik ma rosnąć
+  -- BEZ `CHECK` NA KATEGORIACH I AKCJACH. Słownik ma rosnąć
   -- od pomiaru, a `CHECK` zamieniłby każde rozszerzenie w przebudowę tabeli.
   -- Strażnik stoi w `services/klasyfikacja-slownik.ts` i w typie panelu.
   -- Wiersze sprzed słownika v2 niosą stare nazwy (`dobor`) — rozróżnia je
@@ -275,7 +252,7 @@ CREATE UNIQUE INDEX IF NOT EXISTS ux_decyzja_wersja
 CREATE INDEX IF NOT EXISTS ix_decyzja_rozmowa
   ON decyzja_klasyfikacji(conversation_id, aktywna, message_id);
 
--- ── Przepływ kategorii w trybie cienia (6 października 2026) ───────────────
+-- ── Przepływ kategorii w trybie cienia ─────────────────────────────────────
 -- Co automat BY zrobił przy decyzji klasyfikatora: wysłał szkic, zlecił krok
 -- hali albo oznaczył sprawę jako pilną. Nic z tego nie dzieje się samo.
 -- Werdykt agenta albo los szkicu przy wysyłce daje pomiar zgodności per
@@ -305,7 +282,7 @@ CREATE TABLE IF NOT EXISTS propozycja_przeplywu (
   werdykt_at       TEXT,
   werdykt_przez    TEXT,
   werdykt_user_id  INTEGER REFERENCES app_user(user_id),
-  -- ── Wykonanie na żywo (6 października 2026) ──────────────────────────────
+  -- ── Wykonanie na żywo ────────────────────────────────────────────────────
   -- Tylko przy 'wyslij' kategorii włączonej w `PRZEPLYW_NA_ZYWO`. Kiedy
   -- automat wysłał szkic sam, którym wierszem kolejki i co poszło nie tak.
   -- Błąd zostaje na stałe, bo ponowienie co takt szłoby na koszt klienta.
@@ -328,10 +305,7 @@ CREATE INDEX IF NOT EXISTS ix_propozycja_rozmowa ON propozycja_przeplywu(convers
 -- STOJĄ TU TOKENY, NIE ZŁOTÓWKI. Cennik mieszka w `services/copilot-koszt.ts`
 -- z datą odczytu; kwota zapisana w bazie jest kłamstwem od dnia zmiany cennika,
 -- a liczba tokenów jest faktem na zawsze.
--- ── Dopytanie Copilota (0.332.0) ───────────────────────────────────────────
--- Właściciel: „dodaj możliwość kontynuowania rozmowy z modelem, możliwość
--- dopytania, rozwiania wątpliwości".
---
+-- ── Dopytanie Copilota ─────────────────────────────────────────────────────
 -- WIERSZ TO WYMIANA, nie tura. Pytanie i odpowiedź powstają w jednym
 -- wywołaniu i bez siebie nie znaczą nic: pytanie bez odpowiedzi to ślad po
 -- nieudanym żądaniu, a odpowiedź bez pytania nie ma czego dotyczyć. Wiersz
@@ -368,11 +342,11 @@ CREATE TABLE IF NOT EXISTS copilot_pytanie (
   at              TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')),
   przez           TEXT NOT NULL,
   przez_user_id   INTEGER REFERENCES app_user(user_id),
-  -- Narzędzia, po które model sięgnął (0.507.0): [{nazwa, argument, znakow}].
+  -- Narzędzia, po które model sięgnął: [{nazwa, argument, znakow}].
   narzedzia       TEXT NOT NULL DEFAULT '[]',
   -- Poprawka szkicu, opis nad tabelą. NULL w obu = wymiana bez wersji.
   -- Ostatnia kolumna stoi bez komentarza nad sobą: starszy SQLite nie zdejmie
-  -- jej przez DROP COLUMN, gdy tuż przed nią stoi `--` (blizna w `db.ts`).
+  -- jej przez DROP COLUMN, gdy tuż przed nią stoi `--`.
   szkic_przed     TEXT,
   szkic_po        TEXT,
   szkic_odrzucony TEXT,
@@ -411,7 +385,7 @@ CREATE TABLE IF NOT EXISTS copilot_wywolanie (
   -- (ekstrakcja, szkic, OCR) dopiszą tu swoje zadania.
   zadanie         TEXT NOT NULL,
   conversation_id INTEGER REFERENCES conversation(id) ON DELETE SET NULL,
-  -- Sprawa posprzedażowa (0.275.0). Reklamacja nie ma wiersza w `conversation`,
+  -- Sprawa posprzedażowa. Reklamacja nie ma wiersza w `conversation`,
   -- więc rozpoznanie karty faktów wisi tutaj, a nie tam.
   reklamacja_id   INTEGER REFERENCES reklamacja_klienta(id) ON DELETE SET NULL,
   model           TEXT NOT NULL,
@@ -425,11 +399,11 @@ CREATE TABLE IF NOT EXISTS copilot_wywolanie (
   blad            TEXT,
   przez_user_id   INTEGER REFERENCES app_user(user_id),
   at              TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')),
-  -- Zapytania do wyszukiwarki (0.507.0). Płatne od sztuki, nie od tokenu,
+  -- Zapytania do wyszukiwarki. Płatne od sztuki, nie od tokenu,
   -- więc osobna kolumna; pomiar dolicza je do kosztu.
   wyszukiwania    INTEGER NOT NULL DEFAULT 0,
   -- Znaczniki pomiaru, pisze je `services/copilot-ksiega.ts`. NULL znaczy
-  -- „nie wiemy”: wiersz sprzed znaczników albo wywołanie bez tej liczby.
+  -- „nie wiemy”.
   -- Kod błędu ze słownika, nie zdanie; przy dopytaniu niesie też powód
   -- odrzuconej poprawki, choć wymiana się udała. Wersja to `PROMPT_*`
   -- z adaptera, źródło to droga wywołania (klik, takt i reszta).
@@ -527,13 +501,8 @@ CREATE TABLE IF NOT EXISTS szkic_copilota (
   przez_user_id   INTEGER REFERENCES app_user(user_id),
   ocena           TEXT CHECK (ocena IS NULL OR ocena IN ('wstawiony','zastapiony','odrzucony')),
   ocena_at        TEXT,
-  -- ── SKĄD MODEL TO WIE (0.253.0) ────────────────────────────────────────
-  -- JSON: lista `{teza, zrodlo, odwolanie, pewnosc}`. Do 0.252.0 model nie
-  -- miał prawa użyć własnej wiedzy — każdy numer spoza faktów odrzucał cały
-  -- szkic. Właściciel zdjął ten zakaz i postawił w jego miejsce inny warunek:
-  -- „pełna swoboda, ale niech przy tym załącza źródła".
-  --
-  -- Ta kolumna JEST tą ceną. Wiedza własna modelu wolno wchodzi do szkicu
+  -- ── SKĄD MODEL TO WIE ──────────────────────────────────────────────────
+  -- JSON: lista `{teza, zrodlo, odwolanie, pewnosc}`. Wiedza własna modelu wolno wchodzi do szkicu
   -- dokładnie wtedy, gdy stoi tutaj wpisana i podpisana źródłem; zdanie bez
   -- wpisu dalej wywraca szkic. Pewność przyznaje SERWER, nie model — patrz
   -- `ustalPewnosc` w `services/copilot-szkic.ts`.
@@ -562,7 +531,7 @@ CREATE TABLE IF NOT EXISTS szkic_copilota (
 );
 
 -- ── Identyfikatory części z opisów (§11.2, etap E3) ─────────────────────────
--- Parser zamienników od 0.61.0 wycina z opisów kartotek tokeny, które NIE są
+-- Parser zamienników wycina z opisów kartotek tokeny, które NIE są
 -- naszymi symbolami — numery OEM i katalogi obcych producentów — i wyrzuca
 -- je. Ta tabela je zatrzymuje, żeby numer z pytania klienta trafiał
 -- w kartotekę w drugą stronę: numer → towar. Przy odczycie byłby to skan
@@ -571,38 +540,24 @@ CREATE TABLE IF NOT EXISTS szkic_copilota (
 -- To TABELA POCHODNA: wiersze `zrodlo='opis'` powstają przy przebudowie po
 -- każdym imporcie z Subiekta i giną przy następnej. Wpisy `reczne` (biuro
 -- dopisało numer z katalogu) przebudowa omija. Bez klucza obcego do
--- `sgt_towar` — import odtwarza read-model (blizna 0.154.0).
+-- `sgt_towar` — import odtwarza read-model.
 CREATE TABLE IF NOT EXISTS towar_identyfikator (
   id              INTEGER PRIMARY KEY AUTOINCREMENT,
   tw_id           INTEGER NOT NULL,
   tw_symbol       TEXT NOT NULL,
   -- `katalog_obcy` nie ma parsera — to rezerwa dla wpisu ręcznego. CHECK
-  -- zamknięty od razu, bo rozszerzenie to przebudowa tabeli (blizna 0.135.0).
+  -- zamknięty od razu, bo rozszerzenie to przebudowa tabeli.
   --
-  -- `zamiennik` doszedł w 0.234.0 i kosztował dokładnie tę przebudowę.
-  -- Numery obcych katalogów stoją w opisach nie tylko po `OEM:`, ale też po
-  -- `Zamiennik:`, `Zamiennie:` i `ZAM:` — a stamtąd czytał je wyłącznie parser
-  -- zamienników, który wyrzuca wszystko, co nie jest NASZĄ kartoteką. Numer
-  -- z pytania klienta nie prowadził więc do towaru, choć stał w opisie.
+  -- `zamiennik`: numery obcych katalogów stoją w opisach także po
+  -- `Zamiennik:`, `Zamiennie:` i `ZAM:`, a parser zamienników je wyrzuca.
   -- Osobny rodzaj, a nie `oem`: sekcja zamienników jest słabszym świadectwem
   -- niż numer producenta i ekran ma to mówić (§11.3).
   rodzaj          TEXT NOT NULL CHECK (rodzaj IN ('oem','nr_oryg','katalog_obcy','stare_sku','zamiennik')),
   wartosc         TEXT NOT NULL,
   -- `zwin(wartosc)`: `532 16 56-30`, `5321656-30` i `532165630` to jeden numer.
   wartosc_norm    TEXT NOT NULL,
-  -- `oferta` doszło w 0.264.0 i kosztowało drugą przebudowę tej tabeli.
-  -- Numery, które sprzedawca wpisał w opisie oferty Allegro, nie były
-  -- wyszukiwalne: indeks czyta opisy KARTOTEK, nie ofert. Osobne źródło,
-  -- a nie `opis`, bo tamte wiersze kasuje przebudowa po każdym imporcie
-  -- z Subiekta, a numeru z oferty nie ma z czego odtworzyć. I nie `reczne`,
-  -- bo agent go nie napisał — kliknął przycisk, a to mówi dziennik.
-  --
-  -- `dostawca` doszło przy imporcie odsyłaczy od dostawców i kosztowało
-  -- trzecią przebudowę.
-  --
-  -- `oferta` i `dostawca` zostają w CHECK, choć nic ich już nie pisze: oba
-  -- karmiła baza wiedzy, która zeszła, a migracja skasowała ich wiersze.
-  -- Zawężenie CHECK-a to czwarta przebudowa tabeli bez żadnego zysku.
+  -- `oferta` i `dostawca` zostają w CHECK, choć nic ich nie pisze.
+  -- Zawężenie CHECK-a to przebudowa tabeli bez żadnego zysku.
   zrodlo          TEXT NOT NULL CHECK (zrodlo IN ('opis','reczne','oferta','dostawca')),
   dodal           TEXT NOT NULL,
   dodal_user_id   INTEGER REFERENCES app_user(user_id),
@@ -669,7 +624,7 @@ CREATE INDEX IF NOT EXISTS ix_conversation_comment_time
 CREATE TABLE IF NOT EXISTS conversation_mention (
   comment_id INTEGER NOT NULL REFERENCES conversation_comment(id) ON DELETE CASCADE,
   user_id    INTEGER NOT NULL REFERENCES app_user(user_id),
-  -- Kiedy wzmiankowany ją ODHACZYŁ (0.160.0). NULL znaczy „jeszcze czeka".
+  -- Kiedy wzmiankowany ją ODHACZYŁ. NULL znaczy „jeszcze czeka".
   -- Znacznik jest PER PARA: dwie osoby wzmiankowane w jednym komentarzu
   -- odhaczają go niezależnie, bo każda ma z nim inną sprawę do załatwienia.
   -- Odhaczenie jest JAWNYM kliknięciem, nie skutkiem otwarcia listy —
@@ -680,26 +635,17 @@ CREATE TABLE IF NOT EXISTS conversation_mention (
   PRIMARY KEY(comment_id, user_id)
 );
 -- Indeks po (user_id, seen_at) zakłada MIGRACJA, nie ten plik: `schema.sql`
--- wykonuje się PRZED nią, a na bazie sprzed 0.160.0 kolumny `seen_at` jeszcze
--- wtedy nie ma i `CREATE INDEX` wywróciłby start serwera.
+-- wykonuje się PRZED nią, a na starej bazie kolumny `seen_at` jeszcze wtedy
+-- nie ma i `CREATE INDEX` wywróciłby start serwera.
 
--- ── Konta pracowników (plan §7) ────────────────────────────────────────────
--- Do lipca 2026 „użytkownik" to był DOWOLNY łańcuch wpisywany ręcznie na
--- kolektorze i wysyłany w nagłówku X-User. Skutek: `events.user_id` zawiera
--- literówki i warianty tej samej osoby (Jan, jan, Jan K, JanK), więc audyt
--- nadawał się tylko do czytania oczami — nie do żadnego zestawienia. Do tego
--- każdy mógł podać się za kogokolwiek jednym wpisem.
---
--- Wejście to LOGIN I HASŁO — ten sam wzorzec, co reszta systemów w firmie.
--- Wcześniej był nim skan plakietki; wyszedł w 0.20.0 razem z PIN-em.
--- ── Kolejka wysyłek (0.148.0) ──────────────────────────────────────────────
+-- ── Kolejka wysyłek ────────────────────────────────────────────────────────
 -- Jeden wiersz na PRÓBĘ wysyłki, nie na wysłaną wiadomość. Bez tego rozdziału
 -- niejednoznaczny timeout nie ma gdzie zostać: żądanie poszło, odpowiedź nie
 -- wróciła, a `message` mówiłby albo „wysłano", albo nic — obie odpowiedzi
 -- nieprawdziwe.
 --
 -- `CHECK` na statusie stoi od razu z pełnym zbiorem z §7 projektu panelu.
--- Rozszerzanie CHECK w SQLite wymaga przebudowy tabeli (blizna 0.135.0),
+-- Rozszerzanie CHECK w SQLite wymaga przebudowy tabeli,
 -- więc dokładanie wartości po jednej kosztowałoby migrację za każdym razem.
 CREATE TABLE IF NOT EXISTS outbox (
   id                       INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -721,11 +667,8 @@ CREATE TABLE IF NOT EXISTS outbox (
   created_at               TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')),
   finished_at              TEXT
 ,
-  -- LOS SZKICU COPILOTA przy tej wysyłce (22 września 2026): `bez_zmian`,
-  -- `poprawiony` albo NULL, gdy na to pytanie szkicu nie było. Specyfikacja
-  -- mierzy „unedited approvals, edited approvals and rejections"; odrzucenie
-  -- niesie już `szkic_copilota.ocena`, a tu stoi to, czego wtedy nie było:
-  -- co agent zrobił z propozycją, zanim ją WYSŁAŁ.
+  -- LOS SZKICU COPILOTA przy tej wysyłce: `bez_zmian`, `poprawiony` albo
+  -- NULL, gdy szkicu nie było. Odrzucenie niesie `szkic_copilota.ocena`.
   szkic_los                TEXT CHECK (szkic_los IS NULL OR szkic_los IN ('bez_zmian','poprawiony'))
 );
 CREATE INDEX IF NOT EXISTS ix_outbox_rozmowa ON outbox(conversation_id, id);
@@ -733,7 +676,7 @@ CREATE INDEX IF NOT EXISTS ix_outbox_rozmowa ON outbox(conversation_id, id);
 CREATE TABLE IF NOT EXISTS app_user (
   user_id    INTEGER PRIMARY KEY AUTOINCREMENT,
   -- NULL jest stanem prawidłowym i celowym: konto-ślad. Powstaje przy migracji
-  -- historii (`events.user_id` → konto) i po przejściu z plakietek. Ma na co
+  -- historii (`events.user_id` → konto). Ma na co
   -- wskazywać audyt, ale nie ma czym się zalogować — i tak ma zostać.
   login      TEXT UNIQUE,
   -- scrypt, sól per konto, format `sol_hex:hash_hex`. NULL = konto nie loguje się.
@@ -751,8 +694,8 @@ CREATE TABLE IF NOT EXISTS device_session (
   user_id    INTEGER NOT NULL REFERENCES app_user(user_id),
   device_id  TEXT,
   created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')),
-  -- Ostatnia aktywność. NICZEGO NIE BRAMKUJE od czasu usunięcia blokady po
-  -- bezczynności — jest jedynym śladem, kiedy dany kolektor się odezwał, i tyle.
+  -- Ostatnia aktywność. NICZEGO NIE BRAMKUJE — jest jedynym śladem, kiedy
+  -- dany kolektor się odezwał.
   last_seen  TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')),
   revoked_at TEXT
 );
@@ -771,12 +714,8 @@ CREATE TABLE IF NOT EXISTS sgt_towar (
   nazwa       TEXT NOT NULL,
   ean         TEXT,
   unit        TEXT NOT NULL DEFAULT 'szt.',
-  -- MARTWA od 0.7.0. „Zamówione" nie ma prostej kolumny w Subiekcie — pochodzi
-  -- z dokumentów ZD — więc importer produkcyjny wpisywał tu 0 na sztywno i kafel
-  -- „zam. u dostawcy" nie zapalił się ani razu na prawdziwych danych. Zastąpiona
-  -- przez sgt_zamowienie/sgt_zam_pozycja, które działają tak samo w demo i na
-  -- produkcji. Kolumna ZOSTAJE, bo DROP COLUMN w SQLite to przepisanie tabeli:
-  -- nikt jej już nie czyta ani nie zapisuje.
+  -- MARTWA: „zamówione" liczą sgt_zamowienie/sgt_zam_pozycja. Kolumna
+  -- ZOSTAJE, bo DROP COLUMN w SQLite to przepisanie tabeli.
   ordered     REAL NOT NULL DEFAULT 0,
   opis        TEXT,
   lokalizacja TEXT NOT NULL DEFAULT '',         -- string rozdzielany spacją (wariant B, spec D1)
@@ -804,11 +743,7 @@ CREATE TABLE IF NOT EXISTS sgt_stan (
   PRIMARY KEY (tw_id, mag_id)
 );
 
--- ── Ceny z kartoteki Subiekta (0.396.0) ───────────────────────────────────────
--- Zgłoszenie właściciela: „nie widzę cen z Subiekta przy towarach". I nie
--- widział, bo tej kolumny nigdy nie było — kartoteka niosła symbol, nazwę, EAN,
--- jednostkę, opis i lokalizację, ani jednej kwoty.
---
+-- ── Ceny z kartoteki Subiekta ─────────────────────────────────────────────────
 -- OSOBNA TABELA, nie kolumny na `sgt_towar`, i to nie jest kwestia gustu:
 -- właściciel wybrał WSZYSTKIE poziomy cen, a ich liczba jest cechą konkretnej
 -- firmy, nie schematu. Osiem kolumn `cena_1..cena_8` kłamałoby w obie strony
@@ -835,8 +770,8 @@ CREATE TABLE IF NOT EXISTS sgt_cena (
   waluta       TEXT NOT NULL DEFAULT 'PLN',
   PRIMARY KEY (tw_id, poziom)
 );
--- Bez klucza obcego do `sgt_towar`: import kasuje i odtwarza read-model
--- (blizna 0.154.0), więc FK wywracałby kolejność czyszczenia tabel.
+-- Bez klucza obcego do `sgt_towar`: import kasuje i odtwarza read-model,
+-- więc FK wywracałby kolejność czyszczenia tabel.
 
 CREATE TABLE IF NOT EXISTS sgt_dokument (
   dok_id     INTEGER PRIMARY KEY,
@@ -846,7 +781,7 @@ CREATE TABLE IF NOT EXISTS sgt_dokument (
   mag_id     INTEGER NOT NULL,                  -- magazyn skutku: MAG (tryb A) | MGP | Zwroty
   dostawca   TEXT,
   -- Identyfikator kontrahenta z Subiekta. Po nim, a nie po nazwie, przypina
-  -- się logo dostawcy (0.56.0): symbol wolno w Subiekcie poprawić, a ta sama
+  -- się logo dostawcy: symbol wolno w Subiekcie poprawić, a ta sama
   -- firma potrafi wystąpić pod dwoma napisami. NULL = dokument bez płatnika.
   kh_id      INTEGER,
   w_buforze  INTEGER NOT NULL DEFAULT 0,
@@ -897,7 +832,7 @@ CREATE TABLE IF NOT EXISTS counters (
   value INTEGER NOT NULL
 );
 INSERT OR IGNORE INTO counters(name, value) VALUES ('mm', 46);
--- licznik kodów kartonów (0.122.0). Jedyny licznik, który liczy NA SERIO
+-- licznik kodów kartonów. Jedyny licznik, który liczy NA SERIO
 -- i w produkcji: karton nie ma dokumentu w Subiekcie, więc numeru nie ma mu
 -- kto nadać poza aplikacją. `OR IGNORE` obsługuje bazę nową i zastaną naraz,
 -- bo schemat wykonuje się przy każdym starcie.
@@ -918,9 +853,8 @@ CREATE TABLE IF NOT EXISTS delivery (
   sgt_dok_numer TEXT NOT NULL,
   dostawca      TEXT,
   data_dok      TEXT,
-  -- `abandoned` zostaje w słowniku wartości dla wierszy historycznych: ustawiał
-  -- go mechanizm flagi faktury, którego już nie ma. Nowe dostawy chodzą
-  -- open → done albo open → external.
+  -- `abandoned` zostaje w słowniku wartości dla wierszy historycznych. Nowe
+  -- dostawy chodzą open → done albo open → external.
   --
   -- `external` = ROZŁOŻONE POZA WERTIS. Osobna wartość, nie `done`, i to jest
   -- sedno: `done` znaczy „ludzie odłożyli to tutaj, mamy z tego skany", a tego
@@ -983,11 +917,9 @@ CREATE INDEX IF NOT EXISTS ix_dline_tw ON delivery_line(delivery_id, tw_id);
 -- pomaga, a archiwum dostaw nie jest nigdy czyszczone.
 CREATE INDEX IF NOT EXISTS ix_dline_towar ON delivery_line(tw_id);
 
--- ── Notatki biura do dostawy (0.43.0) ──────────────────────────────────────
+-- ── Notatki biura do dostawy ───────────────────────────────────────────────
 -- Dostawca dosyła czasem brak, którego NIE MA na fakturze — biuro wie o tym
--- z rozmowy albo z maila, a rozkładający nie ma tego skąd wiedzieć. Do 0.43.0
--- jedyną drogą było „powiedz Krzyśkowi, jak przyjdzie", czyli kanał, który
--- gubi się przy zmianie i nie zostawia śladu.
+-- z rozmowy albo z maila, a rozkładający nie ma tego skąd wiedzieć.
 --
 -- Klucz to `sgt_dok_id`, a NIE `delivery_id`, i to jest cała różnica: biuro
 -- pisze notatkę, zanim ktokolwiek otworzy rozkładanie, więc lokalnego wiersza
@@ -1007,7 +939,7 @@ CREATE TABLE IF NOT EXISTS delivery_note (
   odpowiedz  TEXT,
   odp_at     TEXT,
   odp_by     TEXT,
-  -- NULL = biuro jeszcze nie widziało odpowiedzi (0.57.0). Stan trzymamy
+  -- NULL = biuro jeszcze nie widziało odpowiedzi. Stan trzymamy
   -- W BAZIE, nie w przeglądarce: biuro to dwa biurka, a licznik z localStorage
   -- pokazywałby każdemu co innego i wracałby po wyczyszczeniu przeglądarki.
   odp_widziana_at TEXT
@@ -1017,8 +949,8 @@ CREATE INDEX IF NOT EXISTS ix_note_dok ON delivery_note(sgt_dok_id);
 CREATE INDEX IF NOT EXISTS ix_note_otwarte ON delivery_note(sgt_dok_id, odpowiedz);
 
 -- ── Faza 2: wyjątki jako obiekt pierwszej klasy (D8) ────────────────────────
--- Bez tego nie da się zmierzyć, ile kosztują. Kategorie zamknięte — od 0.21.0
--- są to DOSŁOWNIE kategorie firmowego formularza „Niezgodność w dostawie",
+-- Bez tego nie da się zmierzyć, ile kosztują. Kategorie zamknięte — to
+-- DOSŁOWNIE kategorie firmowego formularza „Niezgodność w dostawie",
 -- żeby biuro przepisywało gotowe wiersze, a nie dopytywało z pamięci.
 -- Zdjęcie obowiązkowe przy `damaged` i `wrong_item` — egzekwowane w serwisie,
 -- bo to reguła domenowa, nie schematu.
@@ -1031,8 +963,7 @@ CREATE TABLE IF NOT EXISTS problem (
   typ           TEXT NOT NULL,      -- wrong_item|missing_item|damaged|qty_mismatch|extra_item (+ historyczne)
   ilosc         REAL,               -- ilość faktyczna, której dotyczy zgłoszenie
   -- Numer katalogowy artykułu spoza dokumentu: co PRZYSZŁO przy `wrong_item`,
-  -- co przyjechało nadto przy `extra_item`. Do 0.21.0 takiego towaru nie dało
-  -- się zgłosić w ogóle — skan kończył się toastem „nie jest w tym dokumencie".
+  -- co przyjechało nadto przy `extra_item`.
   sym_obcy      TEXT,
   -- Ile miało przyjść tego, co zamówiono, a nie dostarczono (`wrong_item`).
   -- Symbol tego artykułu wynika z `line_id`, więc nie ma go tu drugi raz.
@@ -1046,10 +977,8 @@ CREATE TABLE IF NOT EXISTS problem (
   created_by    TEXT,
   resolved_at   TEXT,
   resolved_note TEXT,
-  -- KTO rozstrzygnął (0.357.0). Do 0.356.0 nazwisko szło wyłącznie do księgi
-  -- zdarzeń, a hala i tak nie widziała rozstrzygnięcia w ogóle. Gdy zaczyna je
-  -- widzieć, „biuro zamknęło" bez nazwiska jest gorsze niż cisza: magazynier
-  -- ma iść z pytaniem do człowieka, nie do tabeli.
+  -- KTO rozstrzygnął. Hala widzi rozstrzygnięcie, a „biuro zamknęło" bez
+  -- nazwiska jest gorsze niż cisza: magazynier ma iść z pytaniem do człowieka.
   resolved_by   TEXT,
   -- Skąd zgłoszenie. NULL = złożył je człowiek przy palecie. `zakonczenie`
   -- i `nadmiar` powstają SAME przy zamknięciu dostawy (braki z przycisku
@@ -1073,7 +1002,7 @@ CREATE TABLE IF NOT EXISTS ean_conflict (
 );
 CREATE INDEX IF NOT EXISTS ix_ean_conflict_ean ON ean_conflict(ean);
 
--- ── Co biuro postanowiło z kolizją (0.360.0) ──────────────────────────────
+-- ── Co biuro postanowiło z kolizją ────────────────────────────────────────
 -- `ean_conflict` to DZIENNIK TRAFIEŃ: jeden wiersz na każde spotkanie kodu
 -- w alejce, raport agreguje je po kodzie. Rozstrzygnięcie dotyczy KODU, nie
 -- pojedynczego trafienia — kolumna `resolved_at` na dzienniku kazałaby pisać
@@ -1099,15 +1028,13 @@ CREATE TABLE IF NOT EXISTS ean_rozstrzygniecie (
   -- `at`. „Po decyzji" liczone po samym znaczniku nie rozstrzyga remisu:
   -- `seen_at` i `at` mają rozdzielczość milisekundy, a decyzja zapisana w tej
   -- samej milisekundzie co trafienie nie umie powiedzieć, które było
-  -- pierwsze. Ta sama pułapka, którą 0.352.0 wyjęło z raportu skuteczności,
-  -- i to samo lekarstwo: remis rozstrzyga `id`, bo jest
+  -- pierwsze. Remis rozstrzyga `id`, bo jest
   -- AUTOINCREMENT-em, czyli jedynym ściśle rosnącym porządkiem w dzienniku.
   po_trafieniu_id INTEGER NOT NULL DEFAULT 0
 );
 
--- ── Kody kreskowe nadane w WERTIS (0.37.0) ────────────────────────────────
--- Magazynier trzyma karton, na kartonie jest kod, a kartoteka go nie ma — do
--- 0.37.0 jedynym wyjściem było „zapamiętaj i powiedz biuru", czyli nic.
+-- ── Kody kreskowe nadane w WERTIS ─────────────────────────────────────────
+-- Magazynier trzyma karton, na kartonie jest kod, a kartoteka go nie ma.
 --
 -- Kod ląduje TUTAJ od razu i dopiero potem, przez kolejkę, w Subiekcie. Ta
 -- kolejność jest celowa: zapis do Subiekta bywa opóźniony (worker), a bywa
@@ -1135,13 +1062,7 @@ CREATE TABLE IF NOT EXISTS ean_alias (
 );
 CREATE INDEX IF NOT EXISTS ix_ean_alias_tw ON ean_alias(tw_id);
 
--- Meldunek procesu (API i worker). POWSTAŁO, ŻEBY ROZJAZD KONFIGURACJI DAŁ SIĘ
--- ZOBACZYĆ. API i worker to osobne procesy; worker bez SGT_MODE=mssql pisze do
--- lokalnej bazy i ZGŁASZA SUKCES, więc awaria nie ma żadnego objawu. Zalecana
--- w dokumentacji weryfikacja `curl /api/health` nie mogła tego wykryć, bo
--- raportowała wyłącznie proces API. Teraz każdy proces melduje swój tryb tutaj,
--- a /api/health je porównuje.
--- ── Cache zdjęć kartotek (0.30.0) ─────────────────────────────────────────
+-- ── Cache zdjęć kartotek ──────────────────────────────────────────────────
 -- NIE jest częścią read-modelu sgt_* i dlatego NIE stoi na liście kasowanej
 -- przy imporcie (subiekt.mssql.ts): wpis musi przeżyć synchronizację, bo jego
 -- jedynym zadaniem jest sprawić, żeby blob NIE jechał z bazy Subiekta drugi raz.
@@ -1161,7 +1082,7 @@ CREATE TABLE IF NOT EXISTS zdjecie_cache (
 );
 CREATE INDEX IF NOT EXISTS ix_zdjecie_uzyto ON zdjecie_cache(uzyto_at);
 
--- Logo dostawcy (0.56.0). Wgrywane ręcznie w panelu biura, pokazywane po lewej
+-- Logo dostawcy. Wgrywane ręcznie w panelu biura, pokazywane po lewej
 -- stronie wiersza na liście dostaw w kolektorze.
 --
 -- OBRAZ SIEDZI W BAZIE, a nie na dysku obok zdjęć kartotek — i to jest różnica
@@ -1183,7 +1104,7 @@ CREATE TABLE IF NOT EXISTS dostawca_logo (
   dodane_by TEXT NOT NULL
 );
 
--- Zdjęcie kartoteki DODANE Z KOLEKTORA (0.88.0).
+-- Zdjęcie kartoteki DODANE Z KOLEKTORA.
 --
 -- OBRAZ SIEDZI W BAZIE, nie w data/zdjecia, i to jest ta sama różnica co przy
 -- `dostawca_logo` obok. `zdjecie_cache` jest CACHE'M: wolno go skasować, bo
@@ -1209,7 +1130,7 @@ CREATE TABLE IF NOT EXISTS zdjecie_wlasne (
   w_subiekcie_at TEXT                -- NULL = do kartoteki jeszcze nie weszło
 );
 
--- Podgląd między zrobieniem zdjęcia a jego zatwierdzeniem (0.88.0).
+-- Podgląd między zrobieniem zdjęcia a jego zatwierdzeniem.
 --
 -- Istnieje, bo wycięcie tła bywa nieudane i człowiek ma je zobaczyć, ZANIM
 -- cokolwiek trafi do bazy firmy. Trzymamy obie wersje: wyciętą i oryginał —
@@ -1228,6 +1149,9 @@ CREATE TABLE IF NOT EXISTS zdjecie_podglad (
 );
 CREATE INDEX IF NOT EXISTS ix_zdjecie_podglad_czas ON zdjecie_podglad(utworzone_at);
 
+-- Meldunek procesu. API i worker to osobne procesy, a worker bez
+-- SGT_MODE=mssql pisze do lokalnej bazy i ZGŁASZA SUKCES. Każdy proces
+-- melduje tu swój tryb, a /api/health je porównuje.
 CREATE TABLE IF NOT EXISTS process_state (
   name       TEXT PRIMARY KEY,   -- 'api' | 'worker' | 'sfera' (worker MM, sfera-worker/)
   pid        INTEGER NOT NULL,
@@ -1268,9 +1192,9 @@ CREATE TABLE IF NOT EXISTS zbiorka (
 CREATE INDEX IF NOT EXISTS ix_zbiorka_tw_data ON zbiorka(tw_id, data);
 CREATE INDEX IF NOT EXISTS ix_zbiorka_data ON zbiorka(data);
 
--- Reguły strefy złotej — edytowalne z panelu biura (0.50.0). Do tej wersji
--- reguły były stałą w kodzie (services/strefa-zlota.ts); tamta tablica została
--- ZIARNEM wsiewanym przy migracji, gdy tabela jest pusta. Raport reslot
+-- Reguły strefy złotej — edytowalne z panelu biura. Tablica w
+-- services/strefa-zlota.ts jest ZIARNEM wsiewanym przy migracji, gdy tabela
+-- jest pusta. Raport reslot
 -- i adnotacja na karcie czytają te same wiersze — jedno źródło prawdy.
 -- `alejka` XOR (`regal_od`,`regal_do`): cała alejka albo zakres regałów.
 CREATE TABLE IF NOT EXISTS strefa_regula (
@@ -1281,11 +1205,10 @@ CREATE TABLE IF NOT EXISTS strefa_regula (
   poziomy  TEXT NOT NULL            -- CSV numerów poziomów, np. '2,3,4'
 );
 
--- ── Dane firmy na wydrukach (0.444.0) ─────────────────────────────────────
+-- ── Dane firmy na wydrukach ───────────────────────────────────────────────
 -- Nagłówek protokołu rozbieżności: nazwa, NIP, adres, osoba do kontaktu.
--- Do tej wersji leżały w localStorage przeglądarki (`wertis.firma`), więc
--- każde biurko miało własną kopię, a nowe biurko drukowało protokół bez
--- nagłówka — i nikt tego nie widział przed wysyłką do dostawcy. Jeden wiersz,
+-- W bazie, nie w przeglądarce, bo każde biurko drukuje ten sam nagłówek.
+-- Jeden wiersz,
 -- bo firma jest jedna; CHECK robi z tego regułę, nie zwyczaj (jak przy
 -- `allegro_token`). To dane SPRZEDAWCY, nie kupującego: reguła prywatności
 -- z CLAUDE.md dotyczy adresu klienta i tu nie sięga.
@@ -1301,14 +1224,7 @@ CREATE TABLE IF NOT EXISTS firma (
   zmieniono_przez TEXT NOT NULL
 );
 
--- ── Obsługa klienta: skasowana w 0.140.0 ───────────────────────────────────
--- Stały tu rejestry pytań, dyskusji, opinii i zwrotów Allegro plus nakładka
--- spraw. Wszystkie zniknęły razem z kodem, który je czytał: model danych stał
--- na kształcie odpowiedzi API, którego nikt nie sprawdził na żywym koncie,
--- a każda kolejna warstwa dziedziczyła po nim niepewność. Nowa obsługa
--- powstaje od zera (patrz docs/obsluga-klienta.md) i przyniesie własne tabele.
-
--- ── Zadania terenowe obsługi klienta (0.141.0) ───────────────────────────────
+-- ── Zadania terenowe obsługi klienta ─────────────────────────────────────────
 -- Biuro nie wysyła magazynierowi wiadomości na prywatny komunikator. Zleca
 -- konkretną czynność przy towarze, a wynik wraca do tego samego panelu.
 CREATE TABLE IF NOT EXISTS zadanie_terenowe (
@@ -1316,42 +1232,23 @@ CREATE TABLE IF NOT EXISTS zadanie_terenowe (
   rodzaj TEXT NOT NULL CHECK (rodzaj IN ('pomiar','zdjecie','weryfikacja','inne')),
   tytul TEXT NOT NULL,
   instrukcja TEXT NOT NULL,
-  -- ── DWÓCH ODBIORCÓW, DWA POLA (0.408.0) ───────────────────────────────────
-  -- Zgłoszenie właściciela: „zadania zlecane dla magazynu mają za dużo
-  -- informacji; powinno być tylko, jakiego produktu dotyczy zadanie — lub bez
-  -- produktu — i co ma zrobić".
-  --
-  -- Do 0.407.0 zlecenie z rozmowy sklejało w `instrukcja` CZTERY linie: całą
-  -- treść pytania klienta, numer oferty Allegro, zdanie o tym, kto wskazał
-  -- kartotekę, i dopiero na końcu wskazówkę biura. Magazynier dostawał na
-  -- kolektor pytanie kupującego i numer oferty, których do niczego nie
-  -- używa, a jedyne zdanie mówiące, CO ZROBIĆ, stało pod nimi.
-  --
-  -- Kontekstu nie dało się po prostu skasować: karta zadania w biurze nie ma
-  -- odnośnika do rozmowy, więc byłby to jedyny ślad po tym, skąd zadanie się
-  -- wzięło. Rozdzielamy go zamiast kasować — `instrukcja` jedzie na halę,
-  -- `kontekst` zostaje w biurze.
-  --
-  -- STARE WIERSZE ZOSTAJĄ Z NULL i ze sklejoną instrukcją. Przepisywanie ich
-  -- wymagałoby rozcinania tekstu po nagłówkach, które ktoś mógł ręcznie
-  -- zmienić — a to są zadania dawno zamknięte.
+  -- ── DWÓCH ODBIORCÓW, DWA POLA ─────────────────────────────────────────────
+  -- `instrukcja` jedzie na halę i mówi tylko, CO ZROBIĆ. `kontekst` (pytanie
+  -- klienta, oferta) zostaje w biurze jako ślad, skąd zadanie się wzięło.
+  -- NULL ma stary wiersz ze sklejoną instrukcją.
   kontekst TEXT,
   -- ON DELETE SET NULL, bo `sgt_towar` jest READ-MODELEM odtwarzanym przy
   -- każdym imporcie z Subiekta: `importFromMssql` kasuje całą tabelę i wstawia
-  -- ją od nowa. Bez tej klauzuli klucz obcy trzymał wiersz towaru w zakładnikach
-  -- i KASOWANIE PADAŁO, a razem z nim całe API — import biegnie przed
-  -- nasłuchem, więc jedno zadanie ze wskazanym towarem kładło serwer w pętli
-  -- restartów. Zadanie i tak niesie własny snapshot symbolu oraz nazwy, więc
+  -- ją od nowa. Bez tej klauzuli kasowanie pada, a import biegnie przed
+  -- nasłuchem, więc serwer wpadałby w pętlę restartów. Zadanie i tak niesie własny snapshot symbolu oraz nazwy, więc
   -- utrata samego powiązania nic mu nie zabiera.
   tw_id INTEGER REFERENCES sgt_towar(tw_id) ON DELETE SET NULL,
   zrodlo TEXT NOT NULL DEFAULT 'reczne',
   zrodlo_ref TEXT,
   priorytet TEXT NOT NULL DEFAULT 'normalny' CHECK (priorytet IN ('normalny','pilny')),
-  -- `odeslane` (0.352.0) to PIĄTY status i jedyny, w którym zadanie wraca
-  -- z hali do biura nierozwiązane. Do 0.351.0 hala miała jedno wyjście —
-  -- wynik — więc magazynier stojący przed pustą półką albo kłamał wynikiem
-  -- („nie ma na K-12"), albo zostawiał zadanie w `w_toku` na zawsze. Oba
-  -- kłamstwa trafiały do §22 jako „czas realizacji zadania magazynowego".
+  -- `odeslane` to jedyny status, w którym zadanie wraca z hali do biura
+  -- nierozwiązane. Bez niego magazynier przed pustą półką kłamałby wynikiem
+  -- albo zostawiał zadanie w `w_toku`, a oba fałszują §22.
   status TEXT NOT NULL DEFAULT 'nowe'
     CHECK (status IN ('nowe','w_toku','wykonane','anulowane','odeslane')),
   utworzono_at TEXT NOT NULL, utworzono_przez TEXT NOT NULL,
@@ -1361,7 +1258,7 @@ CREATE TABLE IF NOT EXISTS zadanie_terenowe (
   wynik TEXT, wykonano_at TEXT, wykonano_przez TEXT,
   wykonano_user_id INTEGER REFERENCES app_user(user_id),
   anulowano_at TEXT, anulowano_przez TEXT,
-  -- Odesłanie z hali (0.352.0). KOD jest obowiązkowy, treść nie: kciuk
+  -- Odesłanie z hali. KOD jest obowiązkowy, treść nie: kciuk
   -- w rękawicy ma dotknąć jednego kafla, a nie pisać trzech zdań na
   -- kolektorze (dekalog ergonomii, punkty o mniejszej liczbie interakcji).
   -- Biuro dostaje więc zawsze powód rozstrzygalny maszynowo, a szczegół
@@ -1370,9 +1267,8 @@ CREATE TABLE IF NOT EXISTS zadanie_terenowe (
   odeslano_user_id INTEGER REFERENCES app_user(user_id),
   powod_kod TEXT CHECK (powod_kod IS NULL OR powod_kod IN ('brak_towaru','nie_da_sie')),
   powod TEXT,
-  -- Zadanie może pochodzić z rozmowy z klientem (0.142.0). NULL znaczy
-  -- „zlecone ręcznie z panelu" i tak zostaje dla wszystkiego sprzed tej
-  -- wersji — migracja nie zgaduje powiązań po dacie ani po treści.
+  -- Zadanie może pochodzić z rozmowy z klientem. NULL znaczy „zlecone
+  -- ręcznie z panelu"; migracja nie zgaduje powiązań po dacie ani po treści.
   conversation_id INTEGER REFERENCES conversation(id) ON DELETE SET NULL,
   message_id INTEGER REFERENCES message(id) ON DELETE SET NULL
 );
@@ -1383,12 +1279,9 @@ CREATE INDEX IF NOT EXISTS ix_zadanie_terenowe_przypisane
 CREATE INDEX IF NOT EXISTS ix_zadanie_terenowe_towar
   ON zadanie_terenowe(tw_id, utworzono_at);
 
--- ── Zdjęcia przy zadaniu terenowym (0.352.0) ──────────────────────────────
+-- ── Zdjęcia przy zadaniu terenowym ────────────────────────────────────────
 -- Projekt panelu §13.3 wymienia „robi zdjęcie" obok wyniku i powodu odesłania.
--- Do 0.351.0 hala mogła odpowiedzieć biuru wyłącznie tekstem, a są pytania,
--- na które tekst nie odpowiada: „czy to ta sama wtyczka", „co jest na
--- tabliczce", „jak wygląda pęknięcie". Agent przepisywał wtedy opis ze słów
--- magazyniera i wysyłał go kupującemu jako własne ustalenie.
+-- Są pytania, na które tekst nie odpowiada: „co jest na tabliczce".
 --
 -- TABELA, NIE KOLUMNA. Zadanie żyje dłużej niż jedna odpowiedź: hala odsyła je
 -- ze zdjęciem pustej półki, biuro ponawia, a druga próba kończy się pomiarem
@@ -1437,13 +1330,12 @@ CREATE TABLE IF NOT EXISTS allegro_inbox_thread (
   -- NULL jest POPRAWNĄ wartością obu tych kolumn i mówi o tym schemat Allegro:
   -- `Thread` wymaga wyłącznie `id` i `read`, a `lastMessageDateTime`
   -- i `interlocutor` są opcjonalne i dopuszczają null. Wątek bez ostatniej
-  -- wiadomości to wątek świeżo założony, a nie wątek uszkodzony — do 0.151.0
-  -- stało tu `NOT NULL` i taki wątek nie miał jak wejść do skrzynki.
+  -- wiadomości to wątek świeżo założony, a nie wątek uszkodzony.
   last_message_at TEXT,
   interlocutor_login TEXT,
   surowe_json TEXT NOT NULL,
   synced_at TEXT NOT NULL,
-  -- STRUKTURA WĄTKU z `beta.v1` (22 września 2026) — osobnym odczytem
+  -- STRUKTURA WĄTKU z `beta.v1` — osobnym odczytem
   -- `GET /messaging/threads/{id}`, bo lista chodzi po `public.v1`, a tam tych
   -- pól nie ma. Wartość zapisuje się TAK, JAK PRZYSZŁA, także spoza
   -- znanego słownika (specyfikacja: „preserve unknown values"). NULL w
@@ -1457,8 +1349,7 @@ CREATE TABLE IF NOT EXISTS allegro_inbox_thread (
   struktura_at TEXT
 );
 -- Kolumny odpowiadają POLOM ALLEGRO, nie naszym wyobrażeniom o nich.
--- Do 0.151.0 stało tu `author_role NOT NULL` i `read NOT NULL` — dwa pola,
--- których Centrum wiadomości nie przysyła w ogóle. To lądowisko ma trzymać
+-- To lądowisko ma trzymać
 -- odpowiedź w kształcie, w jakim przyszła; własny słownik należy do modelu
 -- kanonicznego (`message.direction`), nie tutaj.
 CREATE TABLE IF NOT EXISTS allegro_inbox_message (
@@ -1473,8 +1364,7 @@ CREATE TABLE IF NOT EXISTS allegro_inbox_message (
   -- `status` (np. `DELIVERED`) mówi o DORĘCZENIU, nie o przeczytaniu.
   -- Przeczytanie niesie wątek, nie wiadomość.
   status TEXT,
-  -- Data POJEDYNCZEJ wiadomości. Dopóki jej nie czytaliśmy, oś czasu rozmowy
-  -- stała na dacie wątku i wszystkie wiadomości miały jedną godzinę.
+  -- Data POJEDYNCZEJ wiadomości, bo data wątku dałaby wszystkim jedną godzinę.
   created_at TEXT,
   related_object_type TEXT,
   related_object_id TEXT,
@@ -1483,10 +1373,7 @@ CREATE TABLE IF NOT EXISTS allegro_inbox_message (
 CREATE INDEX IF NOT EXISTS ix_allegro_inbox_message_thread
   ON allegro_inbox_message(thread_id);
 
--- Osobny, pojedynczy model stanu synchronizatora (nie stan tokena).
--- Załączniki wiadomości (0.155.0). Sonda z żywego konta pokazała je w 7 z 39
--- wiadomości — do tej pory agent ich nie widział, choć klient przysyłał
--- zdjęcie części.
+-- Załączniki wiadomości.
 --
 -- `url` JEST NULLOWALNE i to nie jest ostrożność na wyrost: schemat Allegro
 -- (`MessageAttachmentInfo`) wymaga wyłącznie `fileName` i `status`. Załącznik
@@ -1506,12 +1393,12 @@ CREATE TABLE IF NOT EXISTS message_attachment (
 CREATE INDEX IF NOT EXISTS ix_message_attachment_wiadomosc
   ON message_attachment(message_id);
 -- Klucz naturalny `UNIQUE(message_id, file_name)` zakłada `migrate()`
--- (`zalacznikiBezDubli`), nie ten plik: bazy sprzed przyrostu „zdjęcia
--- w rozmowach" mają duplikaty, a `schema.sql` wykonuje się przed migracją.
--- Załączniki są od tego przyrostu UPSERTOWANE przy każdym przebiegu
--- (`services/zalaczniki-wiadomosci.ts`), bo `NEW` musi móc stać się `SAFE`.
+-- (`zalacznikiBezDubli`), nie ten plik: stare bazy mają duplikaty, a
+-- `schema.sql` wykonuje się przed migracją. Załączniki są UPSERTOWANE przy
+-- każdym przebiegu (`services/zalaczniki-wiadomosci.ts`), bo `NEW` musi móc
+-- stać się `SAFE`.
 
--- ── Załącznik CZEKAJĄCY na wysyłkę (0.195.0) ────────────────────────────────
+-- ── Załącznik CZEKAJĄCY na wysyłkę ──────────────────────────────────────────
 -- `message_attachment` opisuje pliki, które PRZYSZŁY; ta tabela — te, które
 -- dopiero pójdą. Dwie tabele, bo to dwa różne byty: tamten wisi przy istniejącej
 -- wiadomości, ten przy szkicu, którego wiadomością jeszcze nie ma.
@@ -1537,6 +1424,7 @@ CREATE TABLE IF NOT EXISTS wysylka_zalacznik (
 CREATE INDEX IF NOT EXISTS ix_wysylka_zalacznik_rozmowa
   ON wysylka_zalacznik(conversation_id);
 
+-- Osobny, pojedynczy model stanu synchronizatora (nie stan tokena).
 CREATE TABLE IF NOT EXISTS allegro_inbox_sync_state (
   id INTEGER PRIMARY KEY CHECK (id = 1),
   cursor_at TEXT,
@@ -1567,7 +1455,7 @@ CREATE TABLE IF NOT EXISTS allegro_inbox_sync_state (
   beta_powod TEXT
 );
 
--- ── Zwroty klienckie z Allegro (0.150.0) ────────────────────────────────────
+-- ── Zwroty klienckie z Allegro ──────────────────────────────────────────────
 -- Zwrot jest DWOMA BYTAMI O JEDNYM NUMERZE: sprawą klienta w Allegro (zegar
 -- ustawowy, pieniądze) i procesem magazynowym w Subiekcie (paczka wraca,
 -- korekta, MM na bufor). Te tabele spinają oba i NIE budują trzeciego obiegu
@@ -1590,8 +1478,7 @@ CREATE TABLE IF NOT EXISTS allegro_zwrot (
 
 -- Model pracy. KUBEŁKA NIE MA W KOLUMNIE: wynika z faktów niżej i liczy go
 -- `services/zwroty.ts`. Zdenormalizowany kubełek rozjechałby się z werdyktem
--- przy pierwszym zapisie, który go zapomni — a to jest dokładnie ten gatunek
--- usterki, który kosztował licznik błędów w 0.147.0.
+-- przy pierwszym zapisie, który go zapomni.
 CREATE TABLE IF NOT EXISTS zwrot_klienta (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   channel_account_id INTEGER NOT NULL REFERENCES channel_account(id),
@@ -1609,7 +1496,7 @@ CREATE TABLE IF NOT EXISTS zwrot_klienta (
   -- decyzji jest tu informacją, a nie szczegółem.
   rejection_code TEXT,
   rejection_reason TEXT,
-  -- ── Decyzje biura (zapisywane od 0.151.0) ──────────────────────────────
+  -- ── Decyzje biura ──────────────────────────────────────────────────────
   werdykt TEXT CHECK (werdykt IN ('przyjety','odrzucony')),
   werdykt_at TEXT, werdykt_przez TEXT,
   werdykt_user_id INTEGER REFERENCES app_user(user_id),
@@ -1622,9 +1509,8 @@ CREATE TABLE IF NOT EXISTS zwrot_klienta (
   -- Ile z kwoty to DOSTAWA. Osobno od sumy, bo bez tego nie da się odtworzyć,
   -- czy operator ją oddał, czy tylko pozycje wyszły akurat na tyle samo.
   kwota_dostawa_grosze INTEGER,
-  -- ── Zapis do Allegro (0.190.0) ─────────────────────────────────────────
-  -- Do 0.190.0 panel zapisywał WYŁĄCZNIE fakt, że ktoś oddał pieniądze ręcznie
-  -- w panelu Allegro. Te kolumny opisują nasz własny zapis przez API.
+  -- ── Zapis do Allegro ───────────────────────────────────────────────────
+  -- Te kolumny opisują nasz własny zapis zwrotu pieniędzy przez API.
   --
   -- `zwrot_pieniedzy_command_id` powstaje RAZ na zwrot i nie zmienia się przy
   -- ponowieniu. To jest cała idempotencja tej końcówki: Allegro obiecuje, że
@@ -1646,7 +1532,7 @@ CREATE TABLE IF NOT EXISTS zwrot_klienta (
   odmowa_at TEXT, odmowa_przez TEXT,
   odmowa_user_id INTEGER REFERENCES app_user(user_id),
   kwota_at TEXT, kwota_przez TEXT,
-  -- Oś czasu zwrotu PO STRONIE ALLEGRO (0.164.0) — nie mylić z `werdykt`
+  -- Oś czasu zwrotu PO STRONIE ALLEGRO — nie mylić z `werdykt`
   -- ani `zamkniety_at`, które są naszymi decyzjami. Jedenaście wartości
   -- opisuje `docs/allegro-ksztalt.md`; BEZ `CHECK`, bo schemat Allegro
   -- wymienia je słownie i nie zamyka enumem, a nieznana wartość ma przejść,
@@ -1654,44 +1540,39 @@ CREATE TABLE IF NOT EXISTS zwrot_klienta (
   --
   -- Dwie z nich mówią o PROWIZJI, nie o pieniądzach klienta:
   -- `COMMISSION_REFUND_CLAIMED` i `COMMISSION_REFUNDED`. Kolejka bramek NIE
-  -- routuje po tym polu — w obserwacji z 2 września 95 zwrotów na 100 miało
-  -- `COMMISSION_REFUNDED`, więc routowanie opustoszyłoby ją prawie całkiem.
+  -- routuje po tym polu — prawie każdy zwrot ma `COMMISSION_REFUNDED`.
   status_allegro TEXT,
-  -- Login kupującego (0.169.0). Zwrot niesie go ZAWSZE, a zamówienie bywa
-  -- jeszcze niepobrane — dlatego stoi tu, a nie tylko przy zamówieniu. To
-  -- jedyna dana osobowa dopuszczona przez politykę danych zwrotów wprost;
-  -- imienia i nazwiska Allegro przy zwrocie nie podaje w ogóle.
-  -- ── Skąd wziął się ten wiersz (0.172.0) ────────────────────────────────────
+  -- ── Skąd wziął się ten wiersz ──────────────────────────────────────────────
   -- `allegro` to zwrot ZGŁOSZONY przez klienta. `nieodebrana` to paczka, która
   -- wróciła sama, bo nikt jej nie odebrał — Allegro takiego bytu nie zna wcale
   -- (`CustomerReturn` powstaje z deklaracji klienta), a pieniądze i tak trzeba
   -- oddać. Bez tej kolumny obie rzeczy wyglądałyby na ekranie identycznie.
   zrodlo TEXT NOT NULL DEFAULT 'allegro' CHECK(zrodlo IN ('allegro','nieodebrana')),
   -- Numer listu przewozowego — WYŁĄCZNIE dla paczek nieodebranych i to jest
-  -- świadomy wyjątek od polityki z 0.163.0. Tam numeru nie zapisujemy, bo leży
+  -- świadomy wyjątek od polityki zwrotów. Tam numeru nie zapisujemy, bo leży
   -- w kopii odpowiedzi Allegro i tam go szukamy. Tu takiej kopii NIE MA:
   -- paczka nie ma zwrotu w Allegro, więc numer z etykiety jest jedynym
   -- uchwytem, po którym da się ją potem znaleźć skanem.
   waybill TEXT,
   notatka TEXT,
-  -- ── Kiedy paczka DO NAS dotarła (0.187.0) ───────────────────────────────
+  -- ── Kiedy paczka DO NAS dotarła ─────────────────────────────────────────
   -- `paczka_at` to data NADANIA przez klienta i tylko tyle. Moment doręczenia
   -- podaje osobna końcówka `/order/carriers/{id}/tracking`, po numerze listu.
-  -- Do 0.186.0 panel twierdził, że Allegro tej daty nie podaje — nieprawda
-  -- wzięta ze zbyt wąskiego czytania jednego schematu.
   --
-  -- Numeru listu nadal tu NIE MA (polityka 0.163.0): synchronizacja ma go
+  -- Numeru listu tu NIE MA (polityka zwrotów): synchronizacja ma go
   -- w ręku podczas przebiegu i zapisuje sam WYNIK odpytania.
   dostarczono_at TEXT,
   -- Ostatni kod przewoźnika: IN_TRANSIT, NOTICE_LEFT, ISSUE, RETURNED…
   -- Bez `CHECK`, bo lista przewoźników bywa szersza niż specyfikacja Allegro
   -- (sonda złapała już `UNKNOWN` przy `carrierId`).
   przesylka_status TEXT,
+  -- Login kupującego. Zwrot niesie go ZAWSZE, a zamówienie bywa jeszcze
+  -- niepobrane — dlatego stoi tu, a nie tylko przy zamówieniu.
   kupujacy_login TEXT,
   -- Przewoźnik z pierwszej paczki. Bez `CHECK`: Allegro nie publikuje
   -- zamkniętej listy, a sonda złapała `UNKNOWN`, którego nie ma w specyfikacji.
   przewoznik TEXT,
-  -- Nazwa odbiorcy Z NAKLEJKI (0.367.0) — druga dana osobowa dopuszczona
+  -- Nazwa odbiorcy Z NAKLEJKI — druga dana osobowa dopuszczona
   -- w zwrotach i jedyna dołożona decyzją właściciela, nie przez Allegro.
   --
   -- Paczki nadaje klient albo kurier, więc numeru listu z wracającego kartonu
@@ -1704,10 +1585,9 @@ CREATE TABLE IF NOT EXISTS zwrot_klienta (
   -- JEDNA kolumna na imię, nazwisko albo nazwę firmy. Szukanie ich nie
   -- rozróżnia. Reszty adresu tu NIE MA i nie będzie: zwrot bierze ją
   -- z zamówienia, a druga kopia rozjechałaby się przy pierwszej zmianie
-  -- adresu u Allegro. Blokadę adresu zdjęto w 0.422.0 wyłącznie po stronie
-  -- `zamowienie_klienta`.
+  -- adresu u Allegro.
   odbiorca_nazwa TEXT,
-  -- ── Dokument sprzedaży z Subiekta (0.174.0) ─────────────────────────────
+  -- ── Dokument sprzedaży z Subiekta ───────────────────────────────────────
   -- Numer, po którym biuro odnajduje sprzedaż, żeby wystawić korektę. Wskazuje
   -- go CZŁOWIEK z listy kandydatów albo automat, ale wyłącznie wtedy, gdy na
   -- dokumencie stoi numer zamówienia — nakładka pozycji jest poszlaką, a zły
@@ -1780,7 +1660,7 @@ CREATE INDEX IF NOT EXISTS ix_zwrot_platnosci_zamowienie
 CREATE TABLE IF NOT EXISTS zwrot_klienta_pozycja (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   zwrot_id INTEGER NOT NULL REFERENCES zwrot_klienta(id) ON DELETE CASCADE,
-  -- Skąd wziął się ten wiersz (0.184.0). `allegro` = ze zgłoszenia klienta,
+  -- Skąd wziął się ten wiersz. `allegro` = ze zgłoszenia klienta,
   -- `biuro` = dopisany u nas, bo w kartonie było więcej, niż klient zgłosił.
   --
   -- Kolumna nie jest opisem, tylko OSŁONĄ. Synchronizacja kasuje pozycje,
@@ -1801,22 +1681,17 @@ CREATE TABLE IF NOT EXISTS zwrot_klienta_pozycja (
   -- Adres oferty wprost z `items[].url` — JEDYNY odnośnik, który specyfikacja
   -- Allegro opisuje, więc jedyny bez znacznika `[WERYFIKUJ]`.
   url TEXT,
-  -- Oceny są TRZY od 0.375.0. Dwie pierwsze mają swój koszyk i swój dokument
-  -- MM; „outlet" nie ma ani jednego i to jest cała jego treść — towar używany
-  -- jedzie na regał outletowy, a przesunięcie robi człowiek w Subiekcie.
-  --
-  -- To NIE jest powrót „przeceny" zdjętej w 0.209.0, choć stoi w tym samym
-  -- miejscu. Tamta kończyła się znacznikiem: nie dokładała do koszyka, nie
-  -- ruszała stanu, nie zakładała zadania i nie prowadziła DONIKĄD. Ta kończy
-  -- się LISTĄ ROBOCZĄ, którą ktoś odklikuje po wystawieniu MM ręką
-  -- (`outlet_at`) — i dlatego wolno jej tu stać.
+  -- Oceny są TRZY. Dwie pierwsze mają swój koszyk i swój dokument MM;
+  -- „outlet" nie ma ani jednego — towar używany jedzie na regał outletowy,
+  -- a przesunięcie robi człowiek w Subiekcie. Kończy się LISTĄ ROBOCZĄ,
+  -- którą ktoś odklikuje po wystawieniu MM ręką (`outlet_at`).
   ocena TEXT CHECK (ocena IN ('stan','utylizacja','outlet')),
   ocena_at TEXT, ocena_przez TEXT,
   -- Kiedy i kto przeniósł tę pozycję na regał outletowy RĘKĄ. Puste przy
   -- ocenie „outlet" znaczy „czeka na przeniesienie" — na tym stoi lista.
   outlet_at TEXT,
   outlet_przez TEXT,
-  -- ── Potrącenie za utratę wartości (0.170.0) ────────────────────────────────
+  -- ── Potrącenie za utratę wartości ──────────────────────────────────────────
   -- Ile MNIEJ oddajemy za tę pozycję, bo wróciła używana albo uszkodzona.
   -- Kwota, nie procent: klient widzi złotówki, a zaokrąglanie procentu przy
   -- każdej pozycji dawałoby końcówki, których nikt nie umie wytłumaczyć.
@@ -1835,31 +1710,16 @@ CREATE TABLE IF NOT EXISTS zwrot_klienta_pozycja (
   -- Klucz naturalny pozycji: `offer_id|nazwa`, wyliczany w kodzie. Kolumna
   -- istnieje, bo SQLite traktuje NULL-e w UNIQUE jako RÓŻNE — a `offer_id`
   -- bywa puste, więc `UNIQUE (zwrot_id, offer_id, nazwa)` przepuszczałoby
-  -- duplikaty dokładnie tam, gdzie najbardziej bolą.
-  --
-  -- Do 0.153.1 pozycje kasowało się i wstawiało od nowa przy każdym
-  -- przebiegu, a pracę człowieka odtwarzało z mapy. Kosztowało to dwie
-  -- rzeczy: `id` pozycji zmieniało się pod otwartym panelem (potwierdzenie
-  -- trafiało w cudzy wiersz albo w „nie znaleziono"), a dwie pozycje o tej
-  -- samej nazwie bez `offer_id` sklejały się w jeden klucz mapy i jedna
-  -- traciła ocenę. Upsert po tym kluczu znosi oba.
+  -- duplikaty dokładnie tam, gdzie najbardziej bolą. Upsert po kluczu trzyma
+  -- `id` pozycji stałe pod otwartym panelem.
   klucz TEXT NOT NULL,
-  -- ── Kartoteka Subiekta (0.152.0) ──────────────────────────────────────
+  -- ── Kartoteka Subiekta ────────────────────────────────────────────────
   -- Bez niej pozycja nie ma zdjęcia: `zdjecie_cache` i `zdjecie_wlasne` są
   -- kluczowane po `tw_id`, więc to jedyna droga do obrazu.
   --
-  -- BEZ KLUCZA OBCEGO DO `sgt_towar`, i to jest poprawka z 0.154.0. Do niej
-  -- stało tu `REFERENCES sgt_towar(tw_id) ON DELETE SET NULL` — a import
-  -- z Subiekta kasuje CAŁY read-model i wstawia go od nowa co
-  -- `MSSQL_SYNC_MS` (domyślnie minutę). Skutek: każda potwierdzona przez
-  -- człowieka kartoteka znikała po minucie, cicho. Ponowny INSERT tego
-  -- samego `tw_id` nie cofa `SET NULL`.
-  --
-  -- Przewrotność tamtego stanu: instalacja sprzed 0.152.0 dostała kolumnę
-  -- przez `ALTER TABLE`, który w SQLite nie umie dołożyć klucza obcego,
-  -- więc TRZYMAŁA powiązania. Traciła je dopiero baza świeża.
-  --
-  -- Wzorzec bierzemy z `ean_alias.tw_id`: zwykły INTEGER, żadnych
+  -- BEZ KLUCZA OBCEGO DO `sgt_towar`: import z Subiekta kasuje CAŁY
+  -- read-model co `MSSQL_SYNC_MS`, a `ON DELETE SET NULL` gubiłby
+  -- potwierdzone przez człowieka kartoteki. Wzorzec bierzemy z `ean_alias.tw_id`: zwykły INTEGER, żadnych
   -- `REFERENCES`. Powiązanie nadane przez człowieka NIE jest częścią
   -- read-modelu i nie ma prawa ginąć razem z nim. Wiszące `tw_id` odsiewa
   -- odczyt, który i tak sprawdza istnienie towaru, a `tw_symbol` niesie
@@ -1880,12 +1740,11 @@ CREATE INDEX IF NOT EXISTS ix_zwrot_klienta_pozycja_zwrot
 -- schematu `klucz` jeszcze nie istnieje i indeks wywalałby start. To ta sama
 -- reguła co przy `ix_events_ref_time`.
 
--- ── Pamięć powiązań oferta → kartoteka (0.154.0) ────────────────────────────
+-- ── Pamięć powiązań oferta → kartoteka ──────────────────────────────────────
 -- Człowiek wskazuje kartotekę RAZ. Ten sam towar wraca za miesiąc na innym
 -- zwrocie i dostaje to wskazanie jako PROPOZYCJĘ — inaczej praca powtarzałaby
 -- się w nieskończoność. Propozycja, nie wiązanie: decyzja właściciela
--- z audytu zwrotów (15 września 2026) „automat proponuje". Stało tu, że
--- towar „ma się powiązać sam", a kod od 0.219.0 wiązał sam wyłącznie po SKU.
+-- „automat proponuje". Sam wiąże wyłącznie dopasowanie po SKU.
 --
 -- Wzorzec i uzasadnienie wprost z `ean_alias`: BEZ klucza obcego do
 -- `sgt_towar`, bo wpis ma przeżyć import kasujący read-model. To nie jest
@@ -1901,10 +1760,10 @@ CREATE TABLE IF NOT EXISTS oferta_kartoteka (
   tw_symbol TEXT NOT NULL,
   -- SKU, po którym trafiło, gdy trafiło. NULL = człowiek wskazał ręcznie.
   sku TEXT,
-  -- Sygnatura oferty W CHWILI wskazania (0.219.0). Sprzedawca przepina
-  -- sygnaturę, gdy towar od jednego dostawcy się wyczerpie — para zapamiętana
-  -- przy dawnej sygnaturze przestaje wtedy obowiązywać. NULL = wiersz sprzed
-  -- 0.219.0 albo oferta bez snapshotu; taki wiersz obowiązuje jak dotąd.
+  -- Sygnatura oferty W CHWILI wskazania. Sprzedawca przepina sygnaturę, gdy
+  -- towar od jednego dostawcy się wyczerpie — para zapamiętana przy dawnej
+  -- sygnaturze przestaje wtedy obowiązywać. NULL = brak snapshotu; taki
+  -- wiersz obowiązuje zawsze.
   sku_wtedy TEXT,
   wskazano_at TEXT NOT NULL,
   wskazano_przez TEXT NOT NULL,
@@ -1912,12 +1771,8 @@ CREATE TABLE IF NOT EXISTS oferta_kartoteka (
 );
 CREATE INDEX IF NOT EXISTS ix_oferta_kartoteka_tw ON oferta_kartoteka(tw_id);
 
--- Oś zwrotu. Wpisy wiszą przy ŹRÓDLE, nie przy sprawie — blizna 0.130.0,
--- gdzie historia ginęła przy scalaniu.
--- ── Wnioski o rabat transakcyjny (0.164.0) ─────────────────────────────────
--- Zwrot prowizji od sprzedaży. Do 0.162.1 firma klikała po niego ręcznie przy
--- każdym zwrocie w panelu Allegro; obserwacja z 2 września pokazuje, ile to
--- pracy: `type` to MANUAL ×60 i AUTOMATIC ×40 na sto wniosków.
+-- ── Wnioski o rabat transakcyjny ───────────────────────────────────────────
+-- Zwrot prowizji od sprzedaży.
 --
 -- Tabela jest LUSTREM odczytu z `/order/refund-claims`, nie naszym rejestrem
 -- decyzji — stąd sam `external_id` jako klucz naturalny i żadnych kolumn
@@ -1951,6 +1806,8 @@ CREATE TABLE IF NOT EXISTS allegro_rabat (
 CREATE INDEX IF NOT EXISTS ix_allegro_rabat_pozycja
   ON allegro_rabat(line_item_id);
 
+-- Oś zwrotu. Wpisy wiszą przy ŹRÓDLE, nie przy sprawie, bo przy scalaniu
+-- spraw historia by ginęła.
 CREATE TABLE IF NOT EXISTS zwrot_zdarzenie (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   zwrot_id INTEGER NOT NULL REFERENCES zwrot_klienta(id) ON DELETE CASCADE,
@@ -1977,14 +1834,13 @@ CREATE TABLE IF NOT EXISTS allegro_zwroty_sync_state (
   last_error_code INTEGER,
   error_count INTEGER NOT NULL DEFAULT 0,
   next_attempt_at TEXT,
-  -- Ile zwrotów Allegro miało jeszcze do oddania, gdy przebieg się skończył
-  -- (0.209.0). Bezpiecznik stron urywał listę CICHO: przebieg kończył się
-  -- sukcesem, kursor szedł naprzód, a reszta nie wracała nigdy. `NULL` znaczy
+  -- Ile zwrotów Allegro miało jeszcze do oddania, gdy przebieg się skończył.
+  -- Bez tego bezpiecznik stron urywałby listę CICHO. `NULL` znaczy
   -- „nie wiem" — Allegro nie podało liczby — i to co innego niż zero.
   pozostalo INTEGER
 );
 
--- ── Zamówienia klienckie z Allegro (0.152.0) ────────────────────────────────
+-- ── Zamówienia klienckie z Allegro ──────────────────────────────────────────
 -- Zwrot niesie sam numer zamówienia, a decyzja potrzebuje jego treści: co
 -- jeszcze klient kupił, ile kosztowała dostawa i jaki SKU ma sprzedana
 -- oferta. To ostatnie jest tu najważniejsze — `offer.external.id` to
@@ -2011,23 +1867,16 @@ CREATE TABLE IF NOT EXISTS zamowienie_klienta (
   -- Login kupującego — pierwsza dana osobowa, którą polityka danych skrzynki
   -- dopuszcza wprost. Bez niej nie da się powiązać zamówienia z rozmową.
   kupujacy_login TEXT,
-  -- Nazwa odbiorcy z `delivery.address` (0.367.0). Druga i ostatnia taka
-  -- dana; reszta tamtego obiektu — ulica, miasto, kod, telefon — nie
-  -- przechodzi przez mapowanie i nie ma tu kolumny.
-  --
-  -- To ODBIORCA DOSTAWY, nie kupujący: `CheckoutFormDeliveryAddress` ma
+  -- Nazwa odbiorcy z `delivery.address`. To ODBIORCA DOSTAWY, nie kupujący: `CheckoutFormDeliveryAddress` ma
   -- `firstName` i `lastName` w `required`, i to ta nazwa stoi na naklejce,
   -- po której operator szuka wracającej paczki. Bywa inna niż kupujący.
   -- Gdy jest `companyName`, bierzemy jego: paczka firmowa nosi nazwę firmy
   -- zamiast osoby i bez tego zostałaby nieodnajdywalna.
   odbiorca_nazwa TEXT,
-  -- ── CAŁY ADRES DOSTAWY (0.422.0) ────────────────────────────────────────
-  -- Decyzją właściciela blokada adresu zdjęta. Do 0.421.1 z `delivery.address`
-  -- wchodziła TYLKO nazwa — reszta nie miała nawet kolumn, żeby mapowanie nie
-  -- zapisało jej przez pomyłkę. Powód zdjęcia: agent dostaje od klienta numer
-  -- telefonu i nie miał po czym znaleźć zamówienia, a dwaj klienci o tym
-  -- samym nazwisku byli w panelu nierozróżnialni. Zakres i uzasadnienie stoją
-  -- w `docs/obsluga-klienta.md`.
+  -- ── CAŁY ADRES DOSTAWY ──────────────────────────────────────────────────
+  -- Decyzją właściciela: agent dostaje od klienta numer telefonu i ma po
+  -- czym znaleźć zamówienia, a dwaj klienci o tym samym nazwisku są
+  -- rozróżnialni. Zakres i uzasadnienie stoją w `docs/obsluga-klienta.md`.
   --
   -- `phoneNumber` NIE JEST polem wymaganym w `CheckoutFormDeliveryAddress`
   -- (lista `required` w `docs/allegro/swagger.yaml`), więc bywa puste i ekran
@@ -2041,19 +1890,17 @@ CREATE TABLE IF NOT EXISTS zamowienie_klienta (
   odbiorca_ulica TEXT,
   odbiorca_miasto TEXT,
   odbiorca_kod TEXT,
-  -- Koszt dostawy, czyli składnik, którego zwrotowi BRAKOWAŁO w 0.150.0.
-  -- Bez niego wariant „bez wysyłki" był nieodróżnialny od pełnej kwoty.
+  -- Koszt dostawy. Bez niego wariant zwrotu „bez wysyłki" byłby
+  -- nieodróżnialny od pełnej kwoty.
   dostawa_grosze INTEGER,
   dostawa_metoda TEXT,
-  -- Forma płatności (0.169.0). Przy zwrocie to nie ciekawostka:
+  -- Forma płatności. Przy zwrocie to nie ciekawostka:
   -- `CASH_ON_DELIVERY` znaczy, że nie ma karty, na którą oddać pieniądze.
   platnosc_typ TEXT,
   platnosc_at TEXT,
-  -- Identyfikator płatności (0.190.0). `POST /payments/refunds` żąda go
-  -- WPROST (`payment.id` w `required` schematu `InitializeRefund`), a bez
-  -- niego oddanie pieniędzy przez API nie ma jak powstać. Formularz zakupowy
-  -- niósł go od zawsze (`CheckoutFormPaymentReference.id`) — mapowanie brało
-  -- z tego obiektu wyłącznie typ i moment.
+  -- Identyfikator płatności (`CheckoutFormPaymentReference.id`).
+  -- `POST /payments/refunds` żąda go WPROST (`payment.id` w `required`
+  -- schematu `InitializeRefund`).
   platnosc_id TEXT,
   -- Czy kupujący zażądał faktury. SAMA FLAGA — dane firmy z `invoice.address`
   -- niosą ulicę i miasto, a adresy nie przechodzą przez mapowanie.
@@ -2062,11 +1909,11 @@ CREATE TABLE IF NOT EXISTS zamowienie_klienta (
   waluta TEXT NOT NULL DEFAULT 'PLN',
   kupiono_at TEXT,
   zmieniono_at TEXT,
-  -- ── STATUS PRZESYŁKI DO KLIENTA (0.393.0) ────────────────────────────────
+  -- ── STATUS PRZESYŁKI DO KLIENTA ──────────────────────────────────────────
   -- Ładunek zamówienia (`CheckoutFormDeliveryReference`) NIE NIESIE numeru
   -- przesyłki ani statusu — ma adres, metodę, koszt i okno dostawy. Numery
   -- stoją pod OSOBNĄ końcówką `GET /order/checkout-forms/{id}/shipments`,
-  -- a status pod tą samą, którą zwroty odpytują od 0.187.0:
+  -- a status pod tą samą, którą odpytują zwroty:
   -- `GET /order/carriers/{carrierId}/tracking?waybill=…`.
   --
   -- Dlatego to są kolumny, a nie pola mapowania: przyjeżdżają DWOMA
@@ -2075,7 +1922,7 @@ CREATE TABLE IF NOT EXISTS zamowienie_klienta (
   --
   -- `przesylka_sprawdzono_at` jest po to, żeby ekran umiał odróżnić „jeszcze
   -- nie pytaliśmy" od „pytaliśmy i Allegro nic nie ma". To dwa różne zdania
-  -- i dwa różne następne ruchy agenta — blizna 0.283.0 w innym miejscu.
+  -- i dwa różne następne ruchy agenta.
   przesylka_waybill TEXT,
   przesylka_przewoznik TEXT,
   przesylka_status TEXT,
@@ -2111,14 +1958,9 @@ CREATE TABLE IF NOT EXISTS zamowienie_klienta_pozycja (
 CREATE INDEX IF NOT EXISTS ix_zamowienie_klienta_pozycja_zam
   ON zamowienie_klienta_pozycja(zamowienie_id);
 
--- Pamięć NEGATYWU: numery zamówień, których Allegro nie zna (0.249.1).
---
--- Portal deweloperski pokazał 432 wywołania `GET /order/checkout-forms/{id}`
--- zakończone 404 w krótkim czasie. To nie był skok ruchu, tylko pętla bez
--- wyjścia: numer prowadzący ze zwrotu albo z wiadomości nigdy nie dostawał
--- wiersza w `zamowienie_klienta`, więc warunek `k.id IS NULL` był prawdą na
--- zawsze i ten sam zbiór ≤20 numerów wracał w KAŻDYM przebiegu tickera.
--- Brak odpowiedzi JEST odpowiedzią i trzeba go zapamiętać.
+-- Pamięć NEGATYWU: numery zamówień, których Allegro nie zna. Bez niej numer
+-- bez wiersza w `zamowienie_klienta` wracałby na 404 w KAŻDYM przebiegu
+-- tickera. Brak odpowiedzi JEST odpowiedzią i trzeba go zapamiętać.
 --
 -- OSOBNA TABELA, a nie kolumna `brak_u_allegro_at` z wierszem-szkieletem
 -- w `zamowienie_klienta`: tamta tabela jest MODELEM PRACY, który czytają
@@ -2151,22 +1993,17 @@ CREATE TABLE IF NOT EXISTS zamowienie_klienta_brak (
   PRIMARY KEY (channel_account_id, external_id)
 );
 
--- Snapshot OFERTY kanału (0.178.0). Wiadomość niesie sam numer oferty
--- (`relatesTo.offer.id`), a mail powiadamiający z Allegro pokazuje obok niego
--- tytuł, cenę i zdjęcie. Panel pokazywał do 0.177.1 goły numer, więc agent
--- szukał towaru drugi raz — w panelu Allegro, czyli dokładnie tam, gdzie
--- `panel-obslugi-klienta.md` §25 obiecuje nie zaglądać.
+-- Snapshot OFERTY kanału. Wiadomość niesie sam numer oferty
+-- (`relatesTo.offer.id`), a agent ma widzieć tytuł, cenę i zdjęcie bez
+-- zaglądania do panelu Allegro (`panel-obslugi-klienta.md` §25).
 --
 -- SNAPSHOT, nie odczyt na żywo (§15.2): tytuł i cena mają opisywać ofertę
 -- z chwili, w której klient pytał. Oferta bywa poprawiana i kończona, a
 -- rozmowa sprzed tygodnia ma zostać czytelna.
 --
--- ZDJĘCIE JEST OD 0.213.0, a do 0.210.0 nie było — z uzasadnieniem, które
--- zakazywało czego innego, niż się wydawało. Brzmiało: „obrazek z serwera
--- Allegro znaczyłby wyjście przeglądarki biura poza własną sieć". To jest
--- zakaz HOTLINKA i on obowiązuje dalej: `<img src="https://a.allegroimg.com/…">`
--- w panelu nie stanie. Plik ciągnie SERWER, panel dostaje go z naszej trasy —
--- czyli dokładnie tak, jak zdjęcia kartotek od 0.30.0.
+-- ZAKAZ HOTLINKA: `<img src="https://a.allegroimg.com/…">` w panelu nie
+-- stanie, bo przeglądarka biura nie wychodzi poza własną sieć. Plik ciągnie
+-- SERWER, panel dostaje go z naszej trasy, jak zdjęcia kartotek.
 --
 -- Trzymamy sam ADRES, nie bajty: obraz mieszka w `zdjecie_oferty_cache`, który
 -- wolno skasować w każdej chwili. Ten wiersz ma przeżyć czyszczenie cache'u.
@@ -2184,26 +2021,19 @@ CREATE TABLE IF NOT EXISTS offer_snapshot (
   -- `publication.status` z Allegro. Bez `CHECK`: lista wartości jest po ich
   -- stronie i rośnie, a zablokowany zapis byłby gorszy niż nieznana wartość.
   status TEXT,
-  -- `primaryImage.url` — zdjęcie LISTINGOWE oferty (0.213.0). Specyfikacja
+  -- `primaryImage.url` — zdjęcie LISTINGOWE oferty. Specyfikacja
   -- opisuje je wprost: „The image used as a thumbnail on the listings"
   -- (`OfferListingDtoImage`, docs/allegro/swagger.yaml). Jedzie w tej samej
   -- odpowiedzi `GET /sale/offers`, którą i tak pobieramy po tytuł i cenę, więc
   -- nie kosztuje ani jednego żądania więcej.
   --
-  -- TRZY WARTOŚCI, TRZY ZNACZENIA (0.214.0). `NULL` = nikt jeszcze nie pytał
-  -- Allegro o tę ofertę (wiersz sprzed 0.213.0 albo świeżo dołożony);
-  -- `''` = pytaliśmy i `primaryImage` nie przyszło — `OfferListingDto` nie ma
-  -- bloku `required`, więc to jest normalna odpowiedź; adres = mamy obraz.
-  --
-  -- Do 0.213.0 pierwsze dwa dzieliły `NULL` i nie dawało się ich rozróżnić.
-  -- Kosztowało to ekran mówiący „bez zdjęcia" przy ofercie, która na Allegro
-  -- zdjęcie miała — bo snapshot był po prostu starszy niż ta kolumna.
+  -- TRZY WARTOŚCI, TRZY ZNACZENIA. `NULL` = nikt jeszcze nie pytał Allegro
+  -- o tę ofertę; `''` = pytaliśmy i `primaryImage` nie przyszło —
+  -- `OfferListingDto` nie ma bloku `required`; adres = mamy obraz.
   primary_image_url TEXT,
   synced_at TEXT NOT NULL,
-  -- ── TREŚĆ OFERTY DLA COPILOTA (0.253.0) ────────────────────────────────
-  -- Właściciel: „często oferta ma w sobie opis, do jakich wersji pasuje,
-  -- wymiary z oferty, dane techniczne". To jest wiedza, którą sprzedawca już
-  -- zapisał, a Copilot odpowiadał bez niej — znał wyłącznie tytuł.
+  -- ── TREŚĆ OFERTY DLA COPILOTA ──────────────────────────────────────────
+  -- Opis, parametry i zgodność to wiedza, którą sprzedawca już zapisał.
   --
   -- OSOBNA KOŃCÓWKA, więc osobna świeżość. Tytuł, cenę i zdjęcie oddaje
   -- `GET /sale/offers` po dwadzieścia ofert na żądanie; opis, parametry
@@ -2244,7 +2074,7 @@ CREATE TABLE IF NOT EXISTS offer_snapshot (
   UNIQUE (channel_account_id, external_id)
 );
 
--- ── Cache zdjęć ofert Allegro (0.213.0) ──────────────────────────────────────
+-- ── Cache zdjęć ofert Allegro ────────────────────────────────────────────────
 -- Osobna tabela i OSOBNY KATALOG względem `zdjecie_cache`, choć oba trzymają
 -- obrazy. Powód jest mechaniczny: każdy cache ma własną sprzątaczkę liczącą
 -- sumę bajtów SWOICH wpisów, a dwie sprzątaczki nad jednym katalogiem kasują
@@ -2294,7 +2124,7 @@ CREATE TABLE IF NOT EXISTS zdjecie_oferty_wybor (
   wybrano_przez TEXT NOT NULL,
   -- Którą drogą oferta trafiła: 'sygnatura' albo 'kod_producenta'. Kod
   -- producenta to słabszy dowód, więc biuro musi umieć odsiać te zdjęcia.
-  -- NULL przy braku oferty i w wierszach sprzed tej kolumny.
+  -- NULL przy braku oferty i w starych wierszach.
   po TEXT
 );
 
@@ -2305,7 +2135,7 @@ CREATE TABLE IF NOT EXISTS zdjecie_oferty_wybor (
 --
 -- Kod kosza WRACA DO OBIEGU: etykieta na fizycznym koszu jest wielorazowa,
 -- więc unikalność obowiązuje tylko wśród koszy nierozłożonych — stąd indeks
--- częściowy zamiast UNIQUE na kolumnie. Anulowany karton (0.123.0) też oddaje
+-- częściowy zamiast UNIQUE na kolumnie. Anulowany karton też oddaje
 -- kod: pudło, którego nikt nie rozłoży, nie ma prawa blokować numeru.
 -- Predykat jest ŻYWY — przy zmianie trzeba przebudować indeks w `migrate()`,
 -- bo `CREATE ... IF NOT EXISTS` nie rusza indeksu, który już stoi u klienta.
@@ -2325,17 +2155,12 @@ CREATE TABLE IF NOT EXISTS kosz (
   rozlozono_at  TEXT,
   rozlozono_przez TEXT
   -- Reszta kolumn (mm_dok_id, rodzaj, powrot_queue_id, powrot_poza_aplikacja)
-  -- dochodzi migracją: tabela stoi na produkcji od 0.59.0.
+  -- dochodzi migracją, bo tabela stoi już na produkcji.
 );
 CREATE UNIQUE INDEX IF NOT EXISTS ix_kosz_kod_aktywny ON kosz(kod)
   WHERE status NOT IN ('rozlozony', 'anulowany');
 
--- Pozycje kosza — SNAPSHOT z chwili otwarcia przyjęcia: to, co fizycznie leży
--- w koszu, przepisane z dokumentu MM ZWROTY. Snapshot danych DOKUMENTU chroni
--- pracę magazyniera przed późniejszą zmianą; ADRES snapshotem nie jest —
--- liczy się żywy, jak przy dostawach (lekcja z `adresyOczekiwane`
--- w services/delivery.ts).
--- ── Skład kompletu, wzięty z paragonu (0.328.0) ───────────────────────────
+-- ── Skład kompletu, wzięty z paragonu ─────────────────────────────────────
 -- Niektóre oferty sprzedają się jako komplet, a na magazynie leżą osobno.
 -- `oferta_kartoteka` ma klucz (konto, oferta), więc jedna oferta wskazuje
 -- DOKŁADNIE jedną kartotekę — komplet nie ma jak wskazać trzech.
@@ -2361,6 +2186,10 @@ CREATE TABLE IF NOT EXISTS oferta_komplet (
   PRIMARY KEY (channel_account_id, offer_id, tw_id)
 );
 
+-- Pozycje kosza — SNAPSHOT z chwili otwarcia przyjęcia: to, co fizycznie leży
+-- w koszu, przepisane z dokumentu MM ZWROTY. Snapshot danych DOKUMENTU chroni
+-- pracę magazyniera przed późniejszą zmianą; ADRES snapshotem nie jest —
+-- liczy się żywy, jak przy dostawach (`adresyOczekiwane` w services/delivery.ts).
 CREATE TABLE IF NOT EXISTS kosz_pozycja (
   id            INTEGER PRIMARY KEY AUTOINCREMENT,
   kosz_id       INTEGER NOT NULL REFERENCES kosz(id),
@@ -2372,22 +2201,22 @@ CREATE TABLE IF NOT EXISTS kosz_pozycja (
   lok_faktyczna TEXT,                          -- zeskanowana przy odkładaniu (fakt)
   odlozono_at   TEXT,
   odlozono_przez TEXT,
-  -- Dlaczego pozycji nie odłożono (0.77.0). Nazwa statusu `skipped` jest ta
+  -- Dlaczego pozycji nie odłożono. Nazwa statusu `skipped` jest ta
   -- sama co w delivery_line, bo to ten sam byt: praca zdjęta z rutyny z podaną
   -- przyczyną. Pominięta pozycja NIE dostaje MM — nigdzie nie pojechała.
   powod         TEXT,
   pominieto_at  TEXT,                          -- kiedy; po tym liczy się wiek sprawy
-  -- Zamknięcie sprawy przez BIURO (0.77.0). Pozycja zostaje pominięta — to
+  -- Zamknięcie sprawy przez BIURO. Pozycja zostaje pominięta — to
   -- fakt z hali i historii się nie przepisuje — ale znika z listy pracy.
   -- Notatka mówi, czym się skończyło: znaleziony, reklamowany, skorygowany.
   zalatwione_at TEXT,
   zalatwione_przez TEXT,
   zalatwione_notatka TEXT,
-  -- Zadanie zapisu ADRESU z tego odłożenia (0.79.0). Trzymane po to, żeby
+  -- Zadanie zapisu ADRESU z tego odłożenia. Trzymane po to, żeby
   -- cofnięcie pomyłki wiedziało, czy adres zdążył pójść do Subiekta: zadanie
   -- oczekujące da się anulować, zapisanego nie cofa już aplikacja.
   loc_queue_id  INTEGER REFERENCES sfera_queue(id),
-  -- „Wrócę do tego" (0.79.0): pozycja zjeżdża na KONIEC listy, zachowując stan
+  -- „Wrócę do tego": pozycja zjeżdża na KONIEC listy, zachowując stan
   -- `todo`. To co innego niż pominięcie — towar jest w koszu, tylko nie teraz.
   -- Znacznik czasu, nie flaga, bo dwie odłożone na później mają zachować
   -- kolejność między sobą.
@@ -2399,24 +2228,14 @@ CREATE TABLE IF NOT EXISTS kosz_pozycja (
 );
 CREATE INDEX IF NOT EXISTS ix_kosz_poz ON kosz_pozycja(kosz_id);
 
--- ── Przyjęcia na regał zwrotów (MM z Subiekta) ──────────────────────────────
--- Prawdziwy obieg magazynu jest starszy niż ta aplikacja: biuro składa koszyk
--- ze zwróconym towarem, wystawia w Subiekcie przesunięcie MM z magazynu
--- głównego NA regał zwrotów i pisze numer tego dokumentu ODRĘCZNIE na kartce
--- przypiętej do kosza („1209"). Kosz jedzie na halę, magazynier rozkłada
--- zawartość na regały, a dokument powrotny (ZWR→MAG) wystawia biuro.
---
--- Read-model, nie prawda: wipe+insert przy każdym imporcie, dokładnie jak
--- sgt_sprzedaz. Aplikacja czyta stąd WYŁĄCZNIE listę „co jest w koszu".
--- ── Dokumenty sprzedaży (FS/PA) — read-model wskrzeszony w 0.174.0 ──────────
+-- ── Dokumenty sprzedaży (FS/PA) ──────────────────────────────────────────────
 -- Biuro zwrotów potrzebuje NUMERU dokumentu: po nim, i tylko po nim, odnajduje
--- sprzedaż w Subiekcie, żeby wystawić korektę. Do 0.140.0 stały tu tabele
--- `sgt_sprzedaz*`; ta nazwa jest SPALONA (migracja kasuje ją przy każdym
--- starcie), więc read-model wraca jako `sgt_faktura`.
+-- sprzedaż w Subiekcie, żeby wystawić korektę. Nazwa `sgt_sprzedaz*` jest
+-- SPALONA (migracja kasuje ją przy każdym starcie).
 --
--- Nazwy `kontrahent` tu NIE MA i to jest decyzja, nie przeoczenie. Stary model
--- kopiował `kh_Symbol`, a przy sprzedaży konsumenckiej bywa tam imię i nazwisko
--- człowieka — polityka danych dopuszcza wprost sam login kupującego. Tak samo
+-- Nazwy `kontrahent` tu NIE MA i to jest decyzja, nie przeoczenie. `kh_Symbol`
+-- przy sprzedaży konsumenckiej bywa imieniem i nazwiskiem człowieka — polityka
+-- danych dopuszcza wprost sam login kupującego. Tak samo
 -- odpada `dok_Uwagi`: pięćset znaków dowolnego tekstu, w które ktoś kiedyś
 -- wpisze adres albo telefon.
 --
@@ -2429,14 +2248,13 @@ CREATE TABLE IF NOT EXISTS sgt_faktura (
   -- zamówienia Allegro jest UUID-em o 36 znakach, więc CAŁY tam nie wejdzie —
   -- kolumna zostaje, bo integracja bywa ustawiona na własny, krótszy numer.
   nr_oryg   TEXT,
-  -- Identyfikator zamówienia Allegro WYCIĘTY z `dok_Uwagi` po stronie SQL
-  -- (0.175.0). Samej kolumny uwag nie kopiujemy — przechodzi wyłącznie ciąg
+  -- Identyfikator zamówienia Allegro WYCIĘTY z `dok_Uwagi` po stronie SQL.
+  -- Samej kolumny uwag nie kopiujemy — przechodzi wyłącznie ciąg
   -- o kształcie UUID-a; uzasadnienie w `adapters/subiekt.uuid.ts`.
   -- Bez indeksu, i to celowo: kolumna dochodzi migracją, a indeks w tym pliku
-  -- wywracałby start na bazie sprzed 0.175.0 (ta sama mina co przy
-  -- `ix_conversation_mention_user`). Dopasowanie i tak czyta okno dat.
+  -- wywracałby start na starej bazie. Dopasowanie i tak czyta okno dat.
   zamowienie_z_uwag TEXT,
-  -- Dokument KORYGOWANY (`dok__Dokument.dok_DoDokId`, 0.201.0). Niepuste tylko
+  -- Dokument KORYGOWANY (`dok__Dokument.dok_DoDokId`). Niepuste tylko
   -- na korektach; po nim automat wiąże korektę ze zwrotem. Bez indeksu z tego
   -- samego powodu co przy `zamowienie_z_uwag` — kolumna dochodzi migracją.
   koryguje_dok_id INTEGER,
@@ -2444,11 +2262,10 @@ CREATE TABLE IF NOT EXISTS sgt_faktura (
 );
 CREATE INDEX IF NOT EXISTS ix_faktura_data ON sgt_faktura(data_wyst);
 CREATE INDEX IF NOT EXISTS ix_faktura_oryg ON sgt_faktura(nr_oryg);
--- Korekty, które poprzedni import już widział (0.350.1). NIE jest częścią
--- read-modelu kasowanego przy imporcie — to pamięć między importami. Korekta
--- wchodzi do `sgt_faktura` dopiero przy drugim odczycie, bo import czyta
--- z NOLOCK i złapał kiedyś ZW z zapisu, który Subiekt wycofał
--- (`adapters/korekty-dojrzale.ts`).
+-- Korekty, które poprzedni import już widział. NIE jest częścią read-modelu
+-- kasowanego przy imporcie — to pamięć między importami. Korekta wchodzi do
+-- `sgt_faktura` dopiero przy drugim odczycie, bo import czyta z NOLOCK i może
+-- złapać zapis, który Subiekt wycofa (`adapters/korekty-dojrzale.ts`).
 CREATE TABLE IF NOT EXISTS sgt_korekta_widziana (
   dok_id          INTEGER PRIMARY KEY,
   pierwszy_raz_at TEXT NOT NULL
@@ -2465,6 +2282,14 @@ CREATE INDEX IF NOT EXISTS ix_faktura_poz_dok ON sgt_faktura_pozycja(dok_id);
 -- każde otwarcie zwrotu skanowałoby pozycje z całego okna importu.
 CREATE INDEX IF NOT EXISTS ix_faktura_poz_tw ON sgt_faktura_pozycja(tw_id);
 
+-- ── Przyjęcia na regał zwrotów (MM z Subiekta) ──────────────────────────────
+-- Biuro składa koszyk ze zwróconym towarem, wystawia w Subiekcie przesunięcie
+-- MM z magazynu głównego NA regał zwrotów i pisze numer tego dokumentu
+-- ODRĘCZNIE na kartce przypiętej do kosza („1209"). Kosz jedzie na halę,
+-- magazynier rozkłada zawartość, a dokument powrotny (ZWR→MAG) wystawia biuro.
+--
+-- Read-model, nie prawda: wipe+insert przy każdym imporcie. Aplikacja czyta
+-- stąd WYŁĄCZNIE listę „co jest w koszu".
 CREATE TABLE IF NOT EXISTS sgt_mm_zwrot (
   dok_id    INTEGER PRIMARY KEY,
   nr_pelny  TEXT NOT NULL,           -- „MM 1240/MAG/2026"
@@ -2484,7 +2309,7 @@ CREATE TABLE IF NOT EXISTS sgt_mm_zwrot_pozycja (
   dok_id INTEGER NOT NULL REFERENCES sgt_mm_zwrot(dok_id),
   tw_id  INTEGER NOT NULL,
   ilosc  REAL NOT NULL,
-  -- Snapshot z dokumentu (0.76.1). Kartoteka zablokowana w Subiekcie nie wchodzi
+  -- Snapshot z dokumentu. Kartoteka zablokowana w Subiekcie nie wchodzi
   -- do importu, a taki towar leży na regale zwrotów najczęściej — bez tych
   -- dwóch kolumn pozycja miałaby w koszu identyfikator zamiast nazwy.
   symbol TEXT NOT NULL DEFAULT '',
@@ -2503,18 +2328,16 @@ CREATE TABLE IF NOT EXISTS przyjecie_pominiete (
   przez  TEXT NOT NULL
 );
 
--- ── Reklamacje klienckie z Allegro (0.222.0) ────────────────────────────────
+-- ── Reklamacje klienckie z Allegro ──────────────────────────────────────────
 -- Allegro trzyma dyskusje i reklamacje w JEDNYM zasobie `/sale/issues`,
 -- rozróżnia je polem `type` (`DISPUTE`|`CLAIM`). Panel prowadzi wyłącznie
--- reklamacje — decyzja właściciela z 6 września 2026. Filtr stoi w mapowaniu
+-- reklamacje — decyzja właściciela. Filtr stoi w mapowaniu
 -- synchronizatora, a nie tutaj: kolumna `typ` zostaje, bo bez niej nie dałoby
 -- się pokazać, że coś odsialiśmy.
 --
 -- NAZWA `reklamacja_klienta`, nie `reklamacja`. Wzór ten sam co przy
 -- `zwrot_klienta`: krótkie nazwy po starej obsłudze klienta
--- kasuje `bezObslugiKlienta()` przy każdym starcie. `reklamacja` nie stoi na
--- tamtej liście, bo stare reklamacje żyły jako kolumny `rekl_*` w
--- `zwrot_pozycja` — ale sufiks zdejmuje to pytanie na zawsze.
+-- kasuje `bezObslugiKlienta()` przy każdym starcie.
 CREATE TABLE IF NOT EXISTS allegro_reklamacja (
   id TEXT PRIMARY KEY,
   created_at TEXT NOT NULL,
@@ -2536,15 +2359,13 @@ CREATE TABLE IF NOT EXISTS reklamacja_klienta (
   order_id TEXT,
   -- `checkoutForm.createdAt` — JEDYNA data zamówienia, jaką niesie ładunek
   -- sprawy (`PostPurchaseIssueCheckoutForm` ma dokładnie dwa pola: `id`
-  -- i `createdAt`). Do 0.282.0 wyrzucaliśmy ją na etapie typu, a Copilot
-  -- wypisywał „data zakupu" w liście braków — pytał o to, co przyszło z nią
-  -- w tej samej odpowiedzi.
+  -- i `createdAt`).
   --
   -- TO NIE JEST `boughtAt`. Kanoniczna data zakupu stoi przy POZYCJI
   -- zamówienia (`LineItem.boughtAt`) i bywa inna, gdy koszyk zbierano przez
   -- kilka dni. Gdy mamy wiersz `zamowienie_klienta`, wygrywa tamta; ta jest
-  -- zawsze dostępna i dlatego zostaje. Ekran nazywa je RÓŻNIE i to jest
-  -- sedno: blizna 0.121.0 wzięła się z nazwania jednego zegara drugim.
+  -- zawsze dostępna i dlatego zostaje. Ekran nazywa je RÓŻNIE, bo nazwanie
+  -- jednego zegara drugim myli agenta.
   zamowienie_at TEXT,
   offer_id TEXT,
   kupujacy_login TEXT,
@@ -2565,8 +2386,7 @@ CREATE TABLE IF NOT EXISTS reklamacja_klienta (
   waluta TEXT NOT NULL DEFAULT 'PLN',
   status_allegro TEXT,
   -- ZEGAR CZYTAMY, NIE LICZYMY. `decisionDueDate` to termin na uznanie albo
-  -- odrzucenie reklamacji; poprzednia implementacja liczyła ustawowe 14 dni
-  -- sama, bo nie wiedziała, że pole istnieje. NULL znaczy „Allegro terminu nie
+  -- odrzucenie reklamacji. NULL znaczy „Allegro terminu nie
   -- podało" i to co innego niż „termin minął".
   decyzja_do TEXT,
   status_do TEXT,
@@ -2578,7 +2398,7 @@ CREATE TABLE IF NOT EXISTS reklamacja_klienta (
   -- ekran obiecywałby odpowiedź, którą Allegro odrzuci z 409.
   czat_aktywny INTEGER NOT NULL DEFAULT 1,
   wiadomosci_ile INTEGER NOT NULL DEFAULT 0,
-  -- Czy rozmowę urwał NASZ bezpiecznik stron (0.273.0). Rozmowa dłuższa niż
+  -- Czy rozmowę urwał NASZ bezpiecznik stron. Rozmowa dłuższa niż
   -- `MAKS_STRON_CZATU` × 100 wiadomości nie zmieści się w jednym przebiegu,
   -- a bez tego znaku wiersz wracałby po nią w kółko i głodził budżet innych
   -- spraw — ekran obiecywałby przy tym resztę, która nie ma skąd przyjść.
@@ -2601,11 +2421,10 @@ CREATE TABLE IF NOT EXISTS reklamacja_klienta (
   prowadzi_user_id INTEGER REFERENCES app_user(user_id),
   prowadzi_at TEXT,
   notatka TEXT,
-  -- ── Droga powrotna z notatki (0.280.0) ────────────────────────────────────
+  -- ── Droga powrotna z notatki ──────────────────────────────────────────────
   -- Notatka jest polem SWOBODNYM, które nadpisuje ten, kto pisze ostatni.
-  -- Do 0.280.0 poprzedniego zdania nie dało się odzyskać niczym: do dziennika
-  -- idzie świadomie sama DŁUGOŚĆ, bo treść bywa zdaniem o kliencie,
-  -- a `events` nie ma retencji (§9 architektury).
+  -- Do dziennika idzie świadomie sama DŁUGOŚĆ, bo treść bywa zdaniem
+  -- o kliencie, a `events` nie ma retencji (§9 architektury).
   --
   -- JEDEN SZCZEBEL, nie tabela historii. Cofnięcie jest ZAMIANĄ: bieżąca treść
   -- ląduje tutaj, więc drugie kliknięcie wraca tam, gdzie było. Tabela historii
@@ -2623,8 +2442,8 @@ CREATE TABLE IF NOT EXISTS reklamacja_klienta (
   -- i przestawia ją wyłącznie synchronizacja; tu stoi to, co MY wysłaliśmy.
   -- Pochodzenie decyzji jest informacją: werdykt z Centrum Sprzedaży zostawia
   -- `werdykt` pusty przy `status_allegro='CLAIM_ACCEPTED'` i to widać.
-  -- PEŁNY zbiór jedenastu wartości `ClaimStatusChangeRequest.status` od razu
-  -- (blizna 0.135.0: `CHECK` nie rośnie bez przebudowy tabeli).
+  -- PEŁNY zbiór jedenastu wartości `ClaimStatusChangeRequest.status` od razu,
+  -- bo `CHECK` nie rośnie bez przebudowy tabeli.
   werdykt TEXT CHECK (werdykt IS NULL OR werdykt IN (
     'ACCEPTED_REPAIR','ACCEPTED_REFUND','ACCEPTED_EXCHANGE','ACCEPTED_PARTIAL_REFUND',
     'REJECTED_ADDITIONAL_REQUIREMENTS_NOT_COMPLETED','REJECTED_PRODUCT_NOT_RETURNED',
@@ -2656,7 +2475,7 @@ CREATE TABLE IF NOT EXISTS reklamacja_klienta (
   -- `offer.quantity` — ile sztuk oferty obejmuje sprawa. Sufit częściowego
   -- zwrotu pieniędzy, gdy klient nie podał własnej kwoty: cena × ilość.
   ilosc INTEGER,
-  -- ── Prośba o zakończenie DYSKUSJI (0.245.0) ───────────────────────────────
+  -- ── Prośba o zakończenie DYSKUSJI ─────────────────────────────────────────
   -- WŁASNE kolumny, nie `werdykt_*`, i to nie jest kwestia porządku. Werdykt
   -- to formalne rozstrzygnięcie reklamacji z jedenastu wartości; `END_REQUEST`
   -- jest prośbą wysłaną kupującemu w dyskusji i Allegro nigdzie nie obiecuje,
@@ -2667,7 +2486,7 @@ CREATE TABLE IF NOT EXISTS reklamacja_klienta (
   -- w `status_allegro` po synchronizacji.
   -- DWIE wartości, nie cztery jak przy werdykcie. Porażka kodem NIE dotyka
   -- tego wiersza: zostaje w `reklamacja_outbox`, a agent może spróbować jeszcze
-  -- raz — ten sam wzorzec co krok „towar do odesłania?" z 0.242.0. Na wierszu
+  -- raz — ten sam wzorzec co krok „towar do odesłania?". Na wierszu
   -- stoi więc wyłącznie to, po czym drugiej próby robić NIE WOLNO.
   zakonczenie_status TEXT CHECK (zakonczenie_status IS NULL OR
     zakonczenie_status IN ('sent','send_uncertain')),
@@ -2683,15 +2502,15 @@ CREATE INDEX IF NOT EXISTS ix_reklamacja_termin
 CREATE INDEX IF NOT EXISTS ix_reklamacja_zamowienie
   ON reklamacja_klienta(order_id);
 
--- Czat sprawy. Idempotencja po identyfikatorze wiadomości z Allegro — blizna
--- 0.128.0: drugi przebieg nie ma prawa robić duplikatów.
+-- Czat sprawy. Idempotencja po identyfikatorze wiadomości z Allegro: drugi
+-- przebieg nie ma prawa robić duplikatów.
 CREATE TABLE IF NOT EXISTS reklamacja_wiadomosc (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   reklamacja_id INTEGER NOT NULL REFERENCES reklamacja_klienta(id),
   external_id TEXT NOT NULL,
   -- `author.login` bywa PUSTY i to jest udokumentowane: schemat mówi „not
-  -- present if role is ADMIN, SYSTEM or FULFILLMENT". Doradca Allegro odpisał
-  -- w 61 sprawach na 100, więc to jest przypadek typowy, nie brzegowy.
+  -- present if role is ADMIN, SYSTEM or FULFILLMENT". Doradca Allegro pisze
+  -- często, więc to jest przypadek typowy, nie brzegowy.
   autor_login TEXT,
   autor_rola TEXT,
   tresc TEXT NOT NULL DEFAULT '',
@@ -2701,7 +2520,7 @@ CREATE TABLE IF NOT EXISTS reklamacja_wiadomosc (
 CREATE INDEX IF NOT EXISTS ix_reklamacja_wiadomosc_czas
   ON reklamacja_wiadomosc(reklamacja_id, utworzono_at);
 
--- Załączniki. PLIKÓW NIE TRZYMAMY — polityka danych skrzynki z 0.143.0.
+-- Załączniki. PLIKÓW NIE TRZYMAMY — polityka danych skrzynki.
 -- Zostaje nazwa i adres u Allegro; pobranie idzie przez nasz serwer, żeby
 -- token firmy nie opuścił maszyny.
 CREATE TABLE IF NOT EXISTS reklamacja_zalacznik (
@@ -2727,8 +2546,8 @@ CREATE TABLE IF NOT EXISTS allegro_reklamacje_sync_state (
   error_count INTEGER NOT NULL DEFAULT 0,
   next_attempt_at TEXT,
   -- Ile spraw Allegro miało jeszcze do oddania, gdy przebieg się skończył.
-  -- `NULL` znaczy „nie wiem", zero — „lista skończyła się sama". Blizna
-  -- 0.127.0: rejestr widział pierwszą setkę i gubił resztę po cichu.
+  -- `NULL` znaczy „nie wiem", zero — „lista skończyła się sama". Bez tego
+  -- reszta ponad sufit stron ginęłaby po cichu.
   pozostalo INTEGER,
   -- Ile spraw odsialiśmy jako dyskusje. Nie jest to błąd, tylko decyzja
   -- właściciela — ale liczba musi być widoczna, żeby nikt nie szukał
@@ -2736,24 +2555,7 @@ CREATE TABLE IF NOT EXISTS allegro_reklamacje_sync_state (
   dyskusji INTEGER
 );
 
--- ── Kolejka odpowiedzi w reklamacjach (0.224.0) ─────────────────────────────
--- Jeden wiersz na PRÓBĘ wysyłki, nie na wysłaną wiadomość — dokładnie jak
--- `outbox` przy skrzynce. Bez tego rozdziału niejednoznaczny timeout nie ma
--- gdzie zostać: żądanie poszło, odpowiedź nie wróciła, a `reklamacja_wiadomosc`
--- mówiłaby albo „wysłano", albo nic — obie odpowiedzi nieprawdziwe.
---
--- OSOBNA TABELA, nie kolumna `rodzaj` w `outbox`. Tamta ma `conversation_id`
--- jako NOT NULL z kluczem obcym do `conversation` i `expected_last_message_id`
--- do `message`; reklamacja nie ma ani jednego, ani drugiego. Wspólna tabela
--- znaczyłaby dwie kolumny obce, z których zawsze jedna jest pusta.
---
--- `CHECK` z PEŁNYM zbiorem od razu — blizna 0.135.0: SQLite nie rozszerza
--- `CHECK` bez przebudowy tabeli, więc dokładanie wartości po jednej
--- kosztowałoby migrację za każdym razem.
--- Załączniki WYCHODZĄCE przy odpowiedzi w sprawie (0.274.0). Lustro
--- `wysylka_zalacznik` ze skrzynki: plik leży u Allegro od chwili dodania,
--- u nas zostaje sam numer, nazwa i rozmiar. BAJTÓW NIE TRZYMAMY.
--- ── Copilot reklamacyjny: karta faktów ze sprawy (0.275.0) ──────────────────
+-- ── Copilot reklamacyjny: karta faktów ze sprawy ────────────────────────────
 -- ZBIERA DANE, NIE RADZI. Kolumny opisują to, czego agent szuka w rozmowie za
 -- każdym razem ręcznie; werdyktu wśród nich nie ma i nie będzie — uznanie
 -- i odrzucenie są nieodwracalne wobec kupującego i należą do człowieka.
@@ -2771,14 +2573,13 @@ CREATE TABLE IF NOT EXISTS reklamacja_karta (
   -- kosztowałyby dwa złączenia przy każdym otwarciu sprawy i nic nie dawały.
   dowody             TEXT NOT NULL DEFAULT '[]',
   brakuje            TEXT NOT NULL DEFAULT '[]',
-  -- ── Rada maszyny (0.276.0) ────────────────────────────────────────────────
-  -- Do 0.275.0 tych kolumn nie było, bo Copilot miał wyłącznie zbierać fakty.
-  -- Właściciel odwrócił tę decyzję: „copilot powinien też radzić w reklamacji".
+  -- ── Rada maszyny ──────────────────────────────────────────────────────────
+  -- Decyzja właściciela: „copilot powinien też radzić w reklamacji".
   -- BEZ `CHECK` na wartość, z tego samego powodu co przy `zadanie` w księdze:
   -- dwunasta wartość (`POPROSIC_O_DOWODY`) jest nasza, a lista Allegro może
   -- urosnąć — strażnik stoi w `REKOMENDACJE` w `services/copilot-reklamacja.ts`
   -- i w schemacie zod adaptera, czyli tam, gdzie da się go poszerzyć bez
-  -- przebudowy tabeli (blizna 0.135.0).
+  -- przebudowy tabeli.
   rekomendacja       TEXT,
   pewnosc            TEXT,
   uzasadnienie       TEXT,
@@ -2790,7 +2591,7 @@ CREATE TABLE IF NOT EXISTS reklamacja_karta (
   -- wysłał. Żadnej ankiety — rekomendacja jest typowana tym samym słownikiem.
   ocena              TEXT CHECK (ocena IS NULL OR ocena IN ('trafna','nietrafna')),
   ocena_at           TEXT,
-  -- Które zdjęcie było którym `Z` (0.283.0). Bez tej mapy cytat `Z2` na karcie
+  -- Które zdjęcie było którym `Z`. Bez tej mapy cytat `Z2` na karcie
   -- jest niesprawdzalny: agent widzi numer i nie ma jak dojść, o który plik
   -- chodziło. Sprawdzalny cytat jest całą doktryną tego modułu, więc mapa
   -- zostaje przy karcie, a nie tylko w pamięci jednego wywołania.
@@ -2802,7 +2603,7 @@ CREATE TABLE IF NOT EXISTS reklamacja_karta (
   at                 TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now'))
 );
 
--- ── Tagi spraw posprzedażowych (0.279.0) ────────────────────────────────────
+-- ── Tagi spraw posprzedażowych ──────────────────────────────────────────────
 -- Właściciel poprosił o tagi w jednym celu: „abym łatwiej mógł znaleźć
 -- reklamacje, którymi się zajmuję". Tag jest więc SITEM, nie ozdobą, i nie ma
 -- prawa przestawiać kolejki — §14.5 rozstrzygnął to przy kategoriach Copilota,
@@ -2842,11 +2643,10 @@ CREATE TABLE IF NOT EXISTS reklamacja_tag_sprawy (
 );
 CREATE INDEX IF NOT EXISTS ix_reklamacja_tag_sprawy_tag
   ON reklamacja_tag_sprawy(tag_id);
--- TABELI `zwrot_tag_sprawy` JUŻ NIE MA (0.370.0). Tagi przy zwrotach zeszły
--- na zgłoszenie właściciela „uprość panel zwrotów do wymaganego minimum".
--- Reklamacje i dyskusje mają je dalej, na `reklamacja_tag_sprawy` i wspólnym
--- słowniku `reklamacja_tag` — zeszła jedna oś wiązań, nie maszyneria.
 
+-- Załączniki WYCHODZĄCE przy odpowiedzi w sprawie. Lustro
+-- `wysylka_zalacznik` ze skrzynki: plik leży u Allegro od chwili dodania,
+-- u nas zostaje sam numer, nazwa i rozmiar. BAJTÓW NIE TRZYMAMY.
 CREATE TABLE IF NOT EXISTS reklamacja_zalacznik_wysylki (
   id             INTEGER PRIMARY KEY AUTOINCREMENT,
   reklamacja_id  INTEGER NOT NULL REFERENCES reklamacja_klienta(id) ON DELETE CASCADE,
@@ -2861,6 +2661,16 @@ CREATE TABLE IF NOT EXISTS reklamacja_zalacznik_wysylki (
 CREATE INDEX IF NOT EXISTS ix_reklamacja_zalacznik_wysylki_sprawa
   ON reklamacja_zalacznik_wysylki(reklamacja_id);
 
+-- ── Kolejka odpowiedzi w reklamacjach ───────────────────────────────────────
+-- Jeden wiersz na PRÓBĘ wysyłki, nie na wysłaną wiadomość — dokładnie jak
+-- `outbox` przy skrzynce, z tego samego powodu: niejednoznaczny timeout.
+--
+-- OSOBNA TABELA, nie kolumna `rodzaj` w `outbox`. Tamta ma `conversation_id`
+-- jako NOT NULL z kluczem obcym do `conversation` i `expected_last_message_id`
+-- do `message`; reklamacja nie ma ani jednego, ani drugiego.
+--
+-- `CHECK` z PEŁNYM zbiorem od razu, bo SQLite nie rozszerza `CHECK` bez
+-- przebudowy tabeli.
 CREATE TABLE IF NOT EXISTS reklamacja_outbox (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   reklamacja_id INTEGER NOT NULL REFERENCES reklamacja_klienta(id) ON DELETE CASCADE,
@@ -2869,13 +2679,12 @@ CREATE TABLE IF NOT EXISTS reklamacja_outbox (
   -- klucze i dwie wiadomości u kupującego.
   idempotency_key TEXT NOT NULL UNIQUE,
   body TEXT NOT NULL,
-  -- `MessageRequest.type`. Do przyrostu trzeciego zawsze `REGULAR`; krok
-  -- „towar do odesłania?" wysyła `RETURN_REQUIRED_CUSTOM` albo
-  -- `RETURN_NOT_REQUIRED` tą samą końcówką, więc typ jest cechą PRÓBY.
-  -- `RETURN_REQUIRED_SELLER_LABEL` w zbiorze od razu (blizna 0.135.0), choć
-  -- etykiety od sprzedawcy panel jeszcze nie wysyła.
+  -- `MessageRequest.type`. Krok „towar do odesłania?" wysyła
+  -- `RETURN_REQUIRED_CUSTOM` albo `RETURN_NOT_REQUIRED` tą samą końcówką,
+  -- więc typ jest cechą PRÓBY. `RETURN_REQUIRED_SELLER_LABEL` stoi w zbiorze,
+  -- choć etykiety od sprzedawcy panel jeszcze nie wysyła.
   --
-  -- `END_REQUEST` doszedł w 0.245.0 razem z ekranem dyskusji i jest jedyną
+  -- `END_REQUEST` (ekran dyskusji) jest jedyną
   -- wartością, której Allegro NIE przyjmie przy reklamacji („`END_REQUEST` is
   -- only allowed for disputes"). Odwrotnie niż trzy `RETURN_*`, które są
   -- wyłącznie dla reklamacji — jeden zbiór na dwa rodzaje spraw, bo skrzynka
@@ -2949,7 +2758,7 @@ CREATE TABLE IF NOT EXISTS reklamacja_u_dostawcy (
   wersja        INTEGER NOT NULL DEFAULT 1
 );
 
--- Notatka biura o KLIENCIE (24 września 2026, profil klienta). Klucz to login
+-- Notatka biura o KLIENCIE (profil klienta). Klucz to login
 -- Allegro bez wielkości liter — ten sam kupujący bywa zapisany „Chips20"
 -- i „chips20". Jedna notatka na klienta, nie lista: profil ma mówić, co warto
 -- wiedzieć teraz, a historia zmian stoi w dzienniku (`klient_notatka`) i jedno
@@ -2963,15 +2772,15 @@ CREATE TABLE IF NOT EXISTS klient_notatka (
   przez_user_id  INTEGER REFERENCES app_user(user_id)
 );
 
--- Sprawa klienta (26 września 2026, 0.535.0, S6 `docs/obsluga-klienta-calosc.md`).
+-- Sprawa klienta (S6 `docs/obsluga-klienta-calosc.md`).
 -- Jeden wiersz na login: KTO prowadzi i JAKI jest nasz następny krok z terminem.
 -- To nie jest piąta kolejka ze wspólnym statusem — kolejki mają swoje statusy,
 -- a tu stoi tylko to, czego żadna z nich nie wie. Nazwa nie jest `sprawa_klienta`,
--- bo `migrate()` kasuje tamtą przy każdym starcie (nakładka spraw, 0.388.0).
--- Bez CHECK: poszerzenie CHECK to przebudowa tabeli (blizna 0.135.0). Stan
+-- bo `migrate()` kasuje tamtą przy każdym starcie.
+-- Bez CHECK: poszerzenie CHECK to przebudowa tabeli. Stan
 -- wynika z `zakonczono_at` (NULL = w toku); krok zostaje po zakończeniu, bo
 -- „Cofnij” przywraca go bez pytania. Prowadzący ma nazwę DLA OKA i id DLA
--- MASZYNY — sama nazwa rozjechała się już raz (0.278.0). `znane_json` to odcisk
+-- MASZYNY, bo dwie osoby bywają o tym samym imieniu. `znane_json` to odcisk
 -- faktów po stronie klienta z chwili ostatniego ruchu człowieka; „nowe” to różnica
 -- względem odcisku teraz, liczona przy odczycie (services/prowadzenie-klienta.ts).
 -- `id` trafia do dziennika zamiast loginu — `events` nie ma retencji.
@@ -2997,12 +2806,9 @@ CREATE TABLE IF NOT EXISTS klient_prowadzenie (
   przed_zakonczeniem_zmieniono_at TEXT
 );
 
--- Dosyłka sprawy klienta (0.536.0, drugi przyrost S6). Właściciel podał
--- 27 września 2026, że przy złym towarze biuro odmawia wypłaty kodem
--- NEW_ITEM_SENT i wysyła poprawny towar nową etykietą z Sellasist.
--- MISSING_PART_SENT doszedł w 0.536.0, bo brakująca część jedzie tak samo,
--- drugą paczką; to do oceny właściciela. Krok „dosłać” był dotąd samym
--- zdaniem; tu stoi numer drugiej paczki i WYNIK śledzenia, nie historia.
+-- Dosyłka sprawy klienta (S6). Przy złym towarze biuro odmawia wypłaty kodem
+-- NEW_ITEM_SENT albo MISSING_PART_SENT i wysyła towar nową etykietą
+-- z Sellasist. Tu stoi numer drugiej paczki i WYNIK śledzenia, nie historia.
 -- Jeden wiersz na sprawę i zamówienie. Odmowa zwrotu zgłoszonego PO założeniu
 -- wiersza zastępuje dosyłkę, a wcześniejsza ją przejmuje (`dosylka.ts`).
 -- Autora tu nie ma — stoi w dzienniku, a kolumna z kluczem do `app_user`
@@ -3044,7 +2850,7 @@ CREATE TABLE IF NOT EXISTS klient_dosylka (
 -- Osoby mają nazwę DLA OKA i id DLA MASZYNY, bez klucza do `app_user`:
 -- klucz blokowałby kasowanie kont (pułapka z `klient_prowadzenie`).
 -- Bez adresu i telefonu: tożsamością klienta jest login (docs/obsluga-klienta.md).
--- Bez CHECK: poszerzenie słownika byłoby przebudową tabeli (blizna w schemacie).
+-- Bez CHECK: poszerzenie słownika byłoby przebudową tabeli.
 -- `id` trafia do dziennika zamiast loginu, bo `events` nie ma retencji.
 CREATE TABLE IF NOT EXISTS pomylka_wysylki (
   id                INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -3078,10 +2884,10 @@ CREATE UNIQUE INDEX IF NOT EXISTS ux_pomylka_wysylki_zamowienie
 CREATE INDEX IF NOT EXISTS ix_pomylka_wysylki_konto_zam ON pomylka_wysylki(konto, zamowienie);
 CREATE INDEX IF NOT EXISTS ix_pomylka_wysylki_login ON pomylka_wysylki(login);
 
--- ── Test na żywym Allegro (0.495.0) ─────────────────────────────────────────
+-- ── Test na żywym Allegro ───────────────────────────────────────────────────
 -- Raz dziennie serwer przechodzi te same drogi co produkcja, bez atrap, i zapisuje
--- tu WYNIK każdego kroku. Powód: przez 150 wydań Copilot „widział zdjęcia” tylko
--- w testach z podstawionym pobieraczem. Treści tu nie ma — krok, wynik, zdanie
+-- tu WYNIK każdego kroku, bo test z atrapą nie dowodzi, że droga działa
+-- naprawdę. Treści tu nie ma — krok, wynik, zdanie
 -- bez adresów i czas. Stare przebiegi odchodzą po 90 dniach.
 CREATE TABLE IF NOT EXISTS sonda_rzeczywistosci (
   id        INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -3093,7 +2899,7 @@ CREATE TABLE IF NOT EXISTS sonda_rzeczywistosci (
 );
 CREATE INDEX IF NOT EXISTS ix_sonda_rzeczywistosci_przebieg ON sonda_rzeczywistosci(przebieg);
 
--- Migawka stanu raz na dobę lokalną (0.497.0, raport tygodnia). Dziennik
+-- Migawka stanu raz na dobę lokalną (raport tygodnia). Dziennik
 -- `events` pamięta CZYNNOŚCI, ale nie STAN: ile czekało DO DECYZJI, ile
 -- zwrotów stało w kubełku, jak długo czekał klient. Te liczby istnieją tylko
 -- w chwili odczytu i jutro nie da się ich odtworzyć — bez migawki pytanie
@@ -3105,7 +2911,7 @@ CREATE TABLE IF NOT EXISTS migawka_dnia (
   stan  TEXT NOT NULL                -- JSON `Migawka`, patrz services/migawka-dnia.ts
 );
 
--- Raport tygodnia (0.497.0). ZAMROŻONY przy zapisie: liczby z tygodnia 38
+-- Raport tygodnia. ZAMROŻONY przy zapisie: liczby z tygodnia 38
 -- mają za miesiąc brzmieć tak samo jak w dniu, w którym ktoś je omawiał.
 -- Poprawka reguły liczenia zmienia raporty NASTĘPNE, a starych nie przepisuje
 -- po cichu — `wersja` mówi, którą regułą policzono dany tydzień.
@@ -3118,7 +2924,7 @@ CREATE TABLE IF NOT EXISTS raport_tygodnia (
   dane       TEXT NOT NULL           -- JSON `RaportTygodnia`
 );
 
--- Pominięcia w skrzynce (26 września 2026, 0.532.0). Rozmowa otwarta
+-- Pominięcia w skrzynce. Rozmowa otwarta
 -- i zostawiona bez wysyłki, zakończenia, odłożenia i notatki. Tylko
 -- LICZNIK doby lokalnej i klasy: bez autora, bez rozmowy, bez godziny.
 -- Każda z tych trzech kolumn odtworzyłaby, KTO odpuścił, a to monitoring
@@ -3195,8 +3001,7 @@ CREATE TABLE IF NOT EXISTS sellasist_do_pobrania (
 -- Pomyłki zbierania złapane przy pakowaniu: wejście zamówienia w status
 -- z `SELLASIST_STATUSY_POMYLKA`, jeden wiersz na wpis dziennika Sellasist.
 -- KTO ZBIERAŁ to numer pracownika Sellasist z wpisu, który przed tą pomyłką
--- przestawił zamówienie w status zebranego. Decyzja właściciela z 22
--- października 2026. Zestawienie osób widzi całe biuro, jak rachunek win
+-- przestawił zamówienie w status zebranego (decyzja właściciela). Zestawienie osób widzi całe biuro, jak rachunek win
 -- rejestru (docs/obsluga-klienta.md). Strumień dziennika dalej `user_id` nie
 -- czyta, pyta o niego tylko ustalenie zbierającego (sellasist-sync.ts).
 CREATE TABLE IF NOT EXISTS sellasist_pomylka_zlapana (
@@ -3244,7 +3049,7 @@ CREATE TABLE IF NOT EXISTS sellasist_sync_state (
   kursor_at       TEXT,                 -- data ostatniego wpisu dziennika, ISO UTC
   kursor_id       INTEGER,              -- jego numer; wpisy z tą samą datą i niższym numerem już były
   last_success_at TEXT,
-  pierwszy_sukces_at TEXT,              -- od tej doby liczby dzienne są pełne; wcześniej lustra nie było
+  pierwszy_sukces_at TEXT,              -- od tej doby liczby dzienne są pełne
   pomylki_od_at   TEXT,                 -- kursor z chwili włączenia SELLASIST_STATUSY_POMYLKA; NULL = nie liczymy
   last_attempt_at TEXT,
   blad            TEXT,                 -- stałe zdanie ostatniej porażki, nigdy treść odpowiedzi

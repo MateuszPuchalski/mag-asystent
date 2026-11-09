@@ -6,18 +6,13 @@ import { Liczba } from "../ui/wykres";
 import { KartaWgladu, Tabela, Td } from "../ui/wglad";
 import { Potwierdz } from "../ui/Potwierdz";
 
-/* ── Kolejka zapisów do Subiekta (z `biuro.html`, 0.441.0) ───────────────
+/* ── Kolejka zapisów do Subiekta ──────────────────────────────────────────
    Jedyna rzecz w stanie systemu, przez którą stan w Subiekcie może się nie
-   zgadzać z tym, co zrobiła hala — dlatego stoi na górze (0.427.0).
+   zgadzać z tym, co zrobiła hala — dlatego stoi na górze.
 
    Miejsce, w którym problem WIDAĆ, jest miejscem, w którym da się go
-   naprawić (0.111.0): PONÓW przy błędzie i ANULUJ przy oczekującym wołają te
-   same trasy co kolektor. Biuro pisało jeszcze „ponawia się je na
-   kolektorze — ta strona tylko czyta", choć od 0.111.0 to nie była prawda;
-   to zdanie nie przeszło.
-
-   „Ta sama trasa" zeszło z opisu karty (0.509.0): to wiedza o serwerze,
-   a biuro potrzebuje tylko tego, GDZIE da się ponowić. */
+   naprawić: PONÓW przy błędzie i ANULUJ przy oczekującym wołają te same
+   trasy co kolektor. Opis karty mówi tylko, GDZIE da się ponowić. */
 
 const STATUS: Record<string, [string, string]> = {
   error: ["błąd", "bg-red-100 text-ranga-zle"],
@@ -43,8 +38,8 @@ export function KartaKolejki() {
   /* Najpierw błędy, potem reszta, najwyżej dwadzieścia wierszy: to podgląd
      stanu, a nie pełna kolejka — ta ma sto pozycji i nikt jej nie przewija.
 
-     „ZAPISANE" POD PRZYCISKIEM (0.538.0). Karta stała na dwudziestu
-     wierszach „zapisane", a ruchu wymagają tylko błąd i oczekujące. Lista
+     „ZAPISANE" POD PRZYCISKIEM. Dwadzieścia wierszy „zapisane" zasłoniłoby
+     błąd i oczekujące, a tylko one wymagają ruchu. Lista
      zapisanych zostaje jednym kliknięciem dalej, bo po nią sięga się, gdy
      hala pyta „czy moja lokalizacja weszła". */
   const wszystkie = kolejka.data?.items ?? [];

@@ -250,7 +250,7 @@ test("walidacja reguły łapie każdy sposób na bezsens", () => {
   assert.match(S.bladReguly({ alejka: "A", poziomy: "2,x" })!, /liczby/);
 });
 
-/* ── Ta sama podpowiedź na pozycji dostawy (0.70.0) ─────────────────────────
+/* ── Ta sama podpowiedź na pozycji dostawy ──────────────────────────────────
    Magazynier stoi z towarem w ręce i WŁAŚNIE wybiera półkę — to lepszy moment
    na „ten jedzie do strefy złotej" niż zaglądanie na kartę. Pilnujemy dwóch
    rzeczy naraz: że podpowiedź dochodzi na pozycję i że NIE dochodzi tam,

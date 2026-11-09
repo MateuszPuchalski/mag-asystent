@@ -68,7 +68,7 @@ export function katalogiWGore(start: string): string[] {
   }
 }
 
-/* ── Katalog roboczy I JEGO RODZICE (0.153.1) ────────────────────────────────
+/* ── Katalog roboczy I JEGO RODZICE ────────────────────────────────
    Do 0.153.0 lista kończyła się na samym katalogu roboczym i to wystarczało
    wyłącznie usługom: NSSM ma `AppDirectory C:\wertis`, więc plik leży dokładnie
    tam. Każde narzędzie z konsoli npm uruchamia W KATALOGU WORKSPACE'U —

@@ -69,8 +69,7 @@ test("błędy i POST-y przechodzą bez ETagu", async () => {
 });
 
 test("przekierowanie ze starego /biuro (poza /api/) zostaje nietknięte", async () => {
-  /* Do 0.446.0 stała tu strona biura; teraz adres przekierowuje do
-     panelu. Hak ETagu obejmuje wyłącznie `/api/`, więc 302 idzie bez niego. */
+  /* Adres strony biura przekierowuje do panelu. Hak ETagu obejmuje wyłącznie `/api/`, więc 302 idzie bez niego. */
   const r = await app.inject({ method: "GET", url: "/biuro" });
   assert.equal(r.statusCode, 302);
   assert.equal(r.headers.etag, undefined);

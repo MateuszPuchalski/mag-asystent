@@ -9,10 +9,9 @@ import {
 import { logEvent } from "./events.js";
 import { ostatniRuch } from "./ruch.js";
 
-/* ── Aktualizacja automatyczna (0.494.0) ────────────────────────────────────
-   Przycisk z 0.492.0 zrobił jedną aktualizację tanią, ale ktoś wciąż musiał
-   kliknąć — przy trzydziestu wydaniach dziennie serwer stał na wersji, którą
-   ktoś ostatnio pamiętał wgrać. Automat klika sam, przez to samo zadanie
+/* ── Aktualizacja automatyczna ──────────────────────────────────────────────
+   Przy kilkudziesięciu wydaniach dziennie serwer stałby na wersji, którą ktoś
+   ostatnio pamiętał wgrać. Automat klika sam, przez to samo zadanie
    Harmonogramu i z tym samym wycofaniem przy porażce.
 
    Kiedy NIE klika, i dlaczego każda z tych bramek jest osobno:

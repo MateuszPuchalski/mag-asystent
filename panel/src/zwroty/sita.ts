@@ -1,6 +1,6 @@
 import type { Zwrot } from "../api/typy";
 
-/* ── Cztery sita DO DECYZJI (0.539.0) ───────────────────────────────────────
+/* ── Cztery sita DO DECYZJI ─────────────────────────────────────────────────
    Zgłoszenie właściciela: „jak sprawdzić te 645?". Kubełek mieszał zwroty
    z paczką u nas, paczki w drodze i zgłoszenia, za którymi nic nie przyszło.
    Po samym terminie tego nie widać, a każda grupa wymaga innego ruchu:
@@ -19,9 +19,8 @@ import type { Zwrot } from "../api/typy";
    nie nadał — zwrot 5ZRQ/2026. Sito pokazuje, ile ich jest, zanim ktokolwiek
    zmieni tę regułę.
 
-   TO NIE JEST SITO Z 0.315.0. Tamto dzieliło po prowadzącym (Moje/Niczyje)
-   i zeszło w 0.370.0, bo zwroty prowadzi całe biuro. Te dzielą po stanie
-   paczki, czyli po tym, jaki ruch jest do zrobienia. */
+   Sita dzielą po stanie paczki, czyli po tym, jaki ruch jest do zrobienia,
+   a nie po prowadzącym — zwroty prowadzi całe biuro. */
 
 export type SitoDecyzji = "doreczone" | "w_drodze" | "bez_skanu" | "nie_odeslal";
 

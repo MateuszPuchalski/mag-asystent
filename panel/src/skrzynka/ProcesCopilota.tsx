@@ -3,13 +3,10 @@ import { Zwijka } from "./Zwijka";
 import type { PoziomPewnosci, TwierdzenieCopilota, ZrodloTwierdzenia } from "../api/typy";
 
 /**
- * Okno „Skąd to wiem" (0.253.0) — rachunek Copilota za tekst, który agent
+ * Okno „Skąd to wiem" — rachunek Copilota za tekst, który agent
  * zaraz wyśle klientowi.
  *
- * Powstało z decyzji właściciela. Do 0.252.0 model nie miał prawa użyć własnej
- * wiedzy: numer spoza faktów wywracał cały szkic, więc szkic był suchy, ale
- * sprawdzalny bez czytania czegokolwiek. Właściciel zdjął zakaz pod warunkiem
- * — „pełna swoboda, ale niech przy tym załącza źródła, sztywno oceniany poziom
+ * Model może użyć własnej wiedzy pod warunkiem właściciela — „pełna swoboda, ale niech przy tym załącza źródła, sztywno oceniany poziom
  * pewności" — i to okno jest miejscem, w którym ten warunek stoi na ekranie.
  *
  * DLACZEGO OSOBNO OD SZKICU. Klient ma dostać gładki tekst, a nie tekst
@@ -50,7 +47,7 @@ export function ProcesCopilota({ twierdzenia }: { twierdzenia: TwierdzenieCopilo
   const ile = twierdzenia.filter(doSprawdzenia).length;
   if (twierdzenia.length === 0) return null;
 
-  /* ZWIJKA ZAMIAST WŁASNEGO `useState` (0.342.0). Kształt i słowa bez zmian —
+  /* ZWIJKA ZAMIAST WŁASNEGO `useState`. Kształt i słowa bez zmian —
      zmienia się tylko to, że trzy bloki karty Copilota mają jedną
      implementację zwijania zamiast trzech kopii tej samej logiki.
 

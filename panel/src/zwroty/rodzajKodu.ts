@@ -1,9 +1,8 @@
-/* ── Etykieta czy towar: rozpoznanie skanu (0.468.0) ─────────────────────────
+/* ── Etykieta czy towar: rozpoznanie skanu ───────────────────────────────────
    Zgłoszenie właściciela: „zakładka zwrotów powinna cały czas nasłuchiwać
    skanu etykiety zwrotowej oraz odróżniać ją od skanu EAN-u produktu".
-   Do tego wydania każdy skan szedł do szukania zwrotu, a EAN towaru kończył
-   się zdaniem „Nie znam kodu" — choć operator miał produkt w ręku i chciał go
-   włożyć do pudła.
+   EAN towaru nie może kończyć się zdaniem „Nie znam kodu", gdy operator ma
+   produkt w ręku i chce go włożyć do pudła.
 
    KSZTAŁT PLUS CYFRA KONTROLNA, a nie sama długość. EAN-8, UPC-A (12),
    EAN-13 i GTIN-14 to same cyfry z cyfrą kontrolną GS1. Etykiety przewoźników

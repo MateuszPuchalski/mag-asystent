@@ -1,14 +1,11 @@
 import React from "react";
 import { Info } from "lucide-react";
 import { dzien } from "../ui";
-import { sprawSlowo } from "./Moje";
 import type { ProgKolejki } from "../api/typy";
 
-/* ── Tło pracy w JEDNYM cienkim wierszu (0.392.0) ────────────────────────────
-   Zgłoszenie właściciela ze zrzutem: „schowaj to gdzieś, zajmuje dużo
-   miejsca". Nad kolejką stały DWIE karty pełnej szerokości — próg daty
-   i stan synchronizacji — czyli około dziewięćdziesięciu pikseli na rzeczy,
-   których biuro nie czyta przy każdej sprawie.
+/* ── Tło pracy w JEDNYM cienkim wierszu ──────────────────────────────────────
+   Próg daty i stan synchronizacji to rzeczy, których biuro nie czyta przy
+   każdej sprawie, więc nie zajmują nad kolejką dwóch kart pełnej szerokości.
 
    To jest TŁO PRACY, nie praca. Dekalog ergonomii, punkt 2: pierwszeństwo ma
    to, co rozstrzyga bieżącą czynność; reszta zostaje wizualnie drugorzędna.
@@ -17,28 +14,14 @@ import type { ProgKolejki } from "../api/typy";
    Zwinięcie do jednej szarej linii dotyczy stanu normalnego. Gdy próg chowa
    sprawy z ŻYWYM TERMINEM, gdy synchronizacja stoi albo gdy lista jest
    niekompletna — pasek wraca do pełnej, kolorowej karty. Schowanie alarmu
-   pod „i" byłoby kupieniem pikseli za pracę, której nikt nie zobaczy;
-   `PasekProgu` zapłacił za tę regułę w 0.385.0, a zwroty w 0.339.0.        */
-
-/** Czy cokolwiek w tle woła o uwagę — wtedy pasek zostaje kartą. */
-export function tloAlarmuje(p: {
-  prog?: ProgKolejki | null;
-  zlaSynchronizacja?: boolean;
-  pozostaloDoPobrania?: number | null;
-}): boolean {
-  return Boolean(
-    (p.prog && !p.prog.zdjety && p.prog.ukrytychZTerminem > 0)
-    || p.zlaSynchronizacja
-    || (p.pozostaloDoPobrania && p.pozostaloDoPobrania > 0),
-  );
-}
+   pod „i" byłoby kupieniem pikseli za pracę, której nikt nie zobaczy.      */
 
 /**
  * Cichy wiersz tła — próg, stan kanału i ich dwie akcje.
  *
- * Rysuje się TYLKO w stanie spokojnym; alarm ma własne, głośne paski i one
- * zostają bez zmian. Wołający sprawdza to `tloAlarmuje` i wybiera jedno
- * z dwóch — dlatego ten komponent nie zna słowa „czerwony".
+ * Rysuje się TYLKO w stanie spokojnym; alarm ma własne, głośne paski
+ * i o tym, który narysować, decyduje wołający — dlatego ten komponent nie
+ * zna słowa „czerwony".
  */
 export function PasekTla({ prog, onPrzelaczProg, stanTekst, onSynchronizuj, trwaSync }: {
   prog?: ProgKolejki | null;
@@ -52,10 +35,9 @@ export function PasekTla({ prog, onPrzelaczProg, stanTekst, onSynchronizuj, trwa
   const mowiOProgu = Boolean(prog?.od && (prog.zdjety || prog.ukrytych > 0));
   if (!mowiOProgu && !stanTekst) return null;
 
-  /* `slate-600`, nie `slate-500` (0.546.0). Wiersz stoi wprost na tle strony
+  /* `slate-600`, nie `slate-500`. Wiersz stoi wprost na tle strony
      (`#F1F5F9`), a tam `slate-500` przy 11 px daje 4.34:1, poniżej progu
-     4.5:1. Strażnik `Kontrast` tego nie widzi, bo tło przychodzi od rodzica;
-     złapał to dopiero pomiar axe w przeglądarce. */
+     4.5:1. Strażnik `Kontrast` tego nie widzi, bo tło przychodzi od rodzica. */
   return <div className="flex shrink-0 flex-wrap items-center gap-x-3 gap-y-1
     px-1 text-podpis text-slate-600">
     <Info size={12} className="shrink-0 text-slate-400" aria-hidden="true" />

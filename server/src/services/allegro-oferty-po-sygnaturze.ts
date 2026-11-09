@@ -8,25 +8,14 @@ import { naGrosze } from "./allegro-zwroty-sync.js";
 import { zwin } from "../tekst.js";
 
 /**
- * Którą z NASZYCH ofert sprzedajemy tę kartotekę (0.270.0).
+ * Którą z NASZYCH ofert sprzedajemy tę kartotekę.
  *
- * ── SKĄD TO WYDANIE ─────────────────────────────────────────────────────────
- * Właściciel, czytając szkic o presostacie: „model powinien proponować oferty,
- * jeśli jest pewny linki do ofert". Szkic zamiast linku pisał klientowi, żeby
- * poszukał po nazwie albo po kodzie EAN — czyli zadawał mu pracę, którą my
- * mamy zrobioną.
- *
- * Powód nie był w instrukcji modelu. **System nie miał katalogu własnych
- * ofert.** `allegro-oferty-sync.ts` mówi to w nagłówku wprost: „ten przebieg
- * nie chodzi po ofertach konta — dociąga wyłącznie te, na które wskazuje
- * wiadomość". Czyli `offer_snapshot` zna aukcje, pod którymi ktoś napisał,
- * i nic więcej. Odwrotnego wyszukania — „która nasza oferta sprzedaje
- * kartotekę X" — nie było w całym repozytorium, więc model nie dostawał ani
- * jednego adresu i nie mógł go podać.
+ * Szkic ma podać klientowi link do aukcji, a nie kazać mu szukać po nazwie
+ * albo EAN-ie. `offer_snapshot` zna tylko aukcje, pod którymi ktoś napisał,
+ * więc odwrotne wyszukanie „która nasza oferta sprzedaje kartotekę X" stoi tu.
  *
  * ── DLACZEGO PYTANIE, A NIE KATALOG ─────────────────────────────────────────
- * Alternatywą było przeciągnięcie wszystkich ofert konta do bazy własnym
- * taktem. Odrzucone: katalog trzeba by odświeżać, a nieświeży katalog produkuje
+ * Katalog wszystkich ofert konta trzeba by odświeżać, a nieświeży produkuje
  * linki do aukcji, których już nie ma — czyli dokładnie tę awarię, której ta
  * funkcja ma zapobiec. `external.id` w specyfikacji jest TABLICĄ, więc komplet
  * kandydatów szkicu kosztuje JEDNO żądanie i wraca zawsze aktualny.
@@ -35,8 +24,7 @@ import { zwin } from "../tekst.js";
  * Także limit 429, inaczej niż przy `dociagnijTresc`. Tamta reguła chroni
  * przed pogłębianiem przerwy drugim żądaniem — a to jest OSTATNIE żądanie
  * do Allegro na drodze szkicu, więc nie ma czego chronić. Szkic bez linku
- * jest wart tyle, ile był wart do 0.269.0; szkic, który nie powstał, nie jest
- * wart nic.
+ * jest coś wart; szkic, który nie powstał, nie jest wart nic.
  */
 
 /**

@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import { useState } from "react";
 import { AlertTriangle } from "lucide-react";
 import { Przycisk } from "../ui";
 
@@ -6,19 +6,14 @@ import { Przycisk } from "../ui";
  * Pytanie bez numeru oferty (§4.3, otwarcie `docs/obsluga-klienta.md`).
  *
  * Ekran mówi o braku wprost, zamiast podstawiać ofertę zgadniętą z treści.
- * To zdanie stało do 0.506.0 także NA ekranie — agentowi mówiło o ekranie,
- * nie o kliencie. Na ekranie zostaje skutek: nie wiadomo, o jaki towar chodzi.
- * Tak wygrywały kiedyś „zdemontowanym" i „Pozdrawiam", bo dobór fraz brał
- * słowa po DŁUGOŚCI, a „szarpaku" wypadało przez limit trzech fraz.
+ * Na ekranie stoi skutek: nie wiadomo, o jaki towar chodzi.
  *
- * ── JEDNA LINIJKA (0.548.0, wariant C skrzynki) ──────────────────────────
- * Decyzja właściciela z 28 września 2026. Baner stał w trzech rzędach nad
- * osią rozmowy: tytuł ze zdaniem, dwa przyciski, odstępy. Oś, po którą agent
- * tu przyszedł, zaczynała się przez to niżej. Teraz brak i obie czynności
- * stoją w jednym rzędzie i zawijają się tylko przy braku miejsca.
+ * ── JEDNA LINIJKA ─────────────────────────────────────────────────────────
+ * Decyzja właściciela. Brak i obie czynności stoją w jednym rzędzie i zawijają
+ * się tylko przy braku miejsca, żeby oś rozmowy zaczynała się wysoko.
  *
- * Zdanie „Nie wiadomo, o który towar pyta klient" zeszło do dymka. Tytuł
- * i dwie czynności mówią już to samo: czego brakuje i jak to uzupełnić.
+ * Zdanie „Nie wiadomo, o który towar pyta klient" stoi w dymku. Tytuł
+ * i dwie czynności mówią to samo: czego brakuje i jak to uzupełnić.
  * Prawa kolumna nie powtarza braku akapitami — mówi go streszczeniem
  * wiersza „Oferta i towar" (`Kontekst.tsx`).
  */

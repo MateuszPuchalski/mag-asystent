@@ -6,7 +6,7 @@ import { dataLokalna } from "../czas.js";
 import { wilson, type Udzial } from "./copilot-klasyfikacja.js";
 import { KATEGORIE, TAKSONOMIA_WERSJA } from "./klasyfikacja-slownik.js";
 
-/* ── Pomiar tarcia w skrzynce (0.500.0) ─────────────────────────────────────
+/* ── Pomiar tarcia w skrzynce ───────────────────────────────────────────────
    Zgłoszenie właściciela: „jak zrobić aplikację bardziej intuicyjną”. Zmiany
    w etykietach, cofnięcia i podpowiedzi klawiszy da się ocenić tylko liczbą,
    inaczej każde wydanie wygrywa spór o wygląd samym tym, że jest nowsze.
@@ -27,20 +27,20 @@ import { KATEGORIE, TAKSONOMIA_WERSJA } from "./klasyfikacja-slownik.js";
 
    CZYSTY ODCZYT. `events` i `outbox` już stoją w bazie; otwarcie Analizy
    niczego nie zapisuje. Rozbicie na osoby to monitoring pracowniczy, więc
-   czyta je wyłącznie administrator (0.431.0) — pilnuje tego trasa.
+   czyta je wyłącznie administrator — pilnuje tego trasa.
 
-   ── Pomiary pod decyzje (26 września 2026, 0.532.0) ─────────────────────
+   ── Pomiary pod decyzje ─────────────────────────────────────────────────
    Właściciel chce rozstrzygać politykę skrzynki danymi, nie przekonaniem.
    Cztery pytania, każde z własną sekcją odpowiedzi:
 
    a. OKNO COFNIĘCIA — czy dziesięć sekund to za długo. Odpowiada rozkład
       czasu od odłożenia wysyłki do „Cofnij". Gdy prawie wszystkie cofnięcia
       padają w pierwszych sekundach, reszta okna to czekanie klienta za nic.
-   b. TARCIE PRZY SZKICU — czy „Wyślij bez zmian" (0.500.0) działa. Tarcie
+   b. TARCIE PRZY SZKICU — czy „Wyślij bez zmian" działa. Tarcie
       staje wyłącznie przy szkicu z twierdzeniami spoza faktów, więc udział
       „bez zmian" liczy się osobno dla szkiców z takimi twierdzeniami i bez.
    c. GOTOWOŚĆ DO AUTOWYSYŁKI — dowód per klasa, nie sama wysyłka. Spec
-      z 20 września chce bramki per klasa i tygodnia dowodów, więc karta
+      chce bramki per klasa i tygodnia dowodów, więc karta
       podaje przedział Wilsona i liczbę dni z danymi, nie goły procent.
    d. POMINIĘCIA — rozmowa otwarta i zostawiona bez ruchu. Tylko licznik
       dnia i kategorii, bez człowieka i bez rozmowy (`zapiszPominiecie`).
@@ -94,7 +94,7 @@ export interface TarcieSzkicu {
   /** Szkice wysłane przed zapisem tego faktu przy wysyłce — nie wiemy, które to. */
   bezDanych: number;
   /**
-   * Przed i po 0.500.0, z całej historii, nie z okna. Granica to pierwsza
+   * Przed i po wejściu tarcia, z całej historii, nie z okna. Granica to pierwsza
    * wysyłka z pomiarem czasu od otwarcia — ten pomiar wszedł razem z tarciem.
    * `null`, gdy po którejś stronie granicy nie ma ani jednego szkicu.
    */
@@ -193,7 +193,7 @@ export function rozkladCofniec(czasyMs: number[]): Pick<OknoCofniecia, "kubelki"
  * Z DECYZJI, NIE Z PAYLOADU. `decyzja_klasyfikacji` trzyma historię wersji
  * i nie jest nadpisywana jak szkic, więc klasę da się odtworzyć po fakcie —
  * także dla wysyłek sprzed tego pomiaru. Kolejność po czasie wiadomości,
- * przy remisie po `id`, jak w `wysylka.ts` (blizna z 23 września 2026).
+ * przy remisie po `id`, jak w `wysylka.ts`.
  */
 function klasyWysylek(
   database: DatabaseSync, od: string,
@@ -385,21 +385,20 @@ export function pomiarTarcia(
 }
 
 /**
- * Udział szkiców bez zmian przed i po 0.500.0 — z całej historii.
+ * Udział szkiców bez zmian przed i po wejściu tarcia — z całej historii.
  *
  * GRANICĄ JEST DANA, NIE DATA W KODZIE. Serwer biura aktualizuje się, kiedy
- * chce właściciel, więc 25 września 2026 nie musi być dniem wejścia tarcia.
+ * chce właściciel, więc data wydania nie musi być dniem wejścia tarcia.
  * Pomiar czasu od otwarcia (`msOdOtwarcia`) wszedł tym samym wydaniem co
  * tarcie, więc pierwsza wysyłka, która go niesie, wyznacza granicę tutaj.
  *
- * Porównanie mierzy CAŁE wydanie 0.500.0, nie samo tarcie: to samo wydanie
- * zmieniło napisy przycisków, a 0.499.0 dzień wcześniej wstawiło szkic do
- * pola. Karta mówi to przy liczbie. Twierdzeń sprzed 0.532.0 nie znamy,
- * więc rozbicia „z twierdzeniami" przed granicą nie ma i być nie może.
+ * Porównanie mierzy CAŁE wydanie, nie samo tarcie: to samo wydanie zmieniło
+ * napisy przycisków. Karta mówi to przy liczbie. Twierdzeń sprzed granicy nie
+ * znamy, więc rozbicia „z twierdzeniami" przed nią nie ma i być nie może.
  */
 function przedIPo(database: DatabaseSync): TarcieSzkicu["przedPo"] {
-  /* Dolna data to tylko skrót skanu: 0.500.0 wyszło 25 września 2026,
-     więc wcześniej żadna wysyłka nie mogła nieść pomiaru czasu. */
+  /* Dolna data to tylko skrót skanu: wcześniej żadna wysyłka nie mogła
+     nieść pomiaru czasu. */
   const pierwsze = database.prepare(`SELECT created_at, payload FROM events
     WHERE type='rozmowa_wyslana' AND created_at >= '2026-09-25' AND payload LIKE '%"msOdOtwarcia":%'
     ORDER BY created_at, id LIMIT 1`).get() as { created_at: string; payload: string } | undefined;
@@ -445,10 +444,10 @@ export function czasCofniecia(v: unknown): number | null {
 }
 
 /**
- * Agent zawrócił odpowiedź w oknie „Cofnij" (0.500.0). Czekanie mieszka
+ * Agent zawrócił odpowiedź w oknie „Cofnij". Czekanie mieszka
  * w przeglądarce (`skrzynka/Odlozone.tsx`), więc bez tego wpisu serwer
  * nigdy by się o cofnięciu nie dowiedział. To jedyny zapis tej ścieżki.
- * Od 0.532.0 wpis niesie też czas cofnięcia — pytanie (a) w nagłówku.
+ * Wpis niesie też czas cofnięcia — pytanie (a) w nagłówku.
  */
 export function zapiszCofniecieWysylki(
   database: DatabaseSync, conversationId: number, autor: { id: number; name: string },

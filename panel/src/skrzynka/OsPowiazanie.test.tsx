@@ -3,9 +3,8 @@ import { render, screen } from "@testing-library/react";
 import { Os } from "./Os";
 import type { WpisOsi } from "../api/typy";
 
-/* Powiązanie wiadomości z towarem (0.166.0). Mail Allegro „Wiadomość dotyczy"
-   pokazuje tytuł i zamówienie; panel do 0.165.0 pokazywał goły numer oferty,
-   a numer zamówienia wyrzucał przy mapowaniu. */
+/* Powiązanie wiadomości z towarem. Mail Allegro „Wiadomość dotyczy"
+   pokazuje tytuł i zamówienie, więc panel też — nie goły numer oferty. */
 describe("Powiązanie wiadomości na osi", () => {
   const wpis = (n: Partial<WpisOsi> = {}): WpisOsi => ({
     id: "msg-1", rodzaj: "wiadomosc", autor: "kupujacy_7", odKlienta: true,
@@ -30,7 +29,7 @@ describe("Powiązanie wiadomości na osi", () => {
     expect(z).toHaveAttribute("title", "2f8c1a3e-9b7d-4c1e-8a2b-000000000001");
   });
 
-  /* Od 0.523.0 oferta i zamówienie rozmowy stoją raz, w paśmie i kolumnie
+  /* Oferta i zamówienie rozmowy stoją raz, w paśmie i kolumnie
      kontekstu. Wiadomość powtarza je tylko wtedy, gdy wskazuje coś innego. */
   const osRozmowy = (w: WpisOsi, powiazanie: { ofertaId: string | null; zamowienieId: string | null }) =>
     render(<Os rozmowaId={1} wpisy={[w]} zrodloPomiaru={null} mozeZlecac={false}
@@ -59,11 +58,9 @@ describe("Powiązanie wiadomości na osi", () => {
   });
 });
 
-/* ── Kto to powiedział (0.193.0) ─────────────────────────────────────────────
-   Makieta `docs/projekt-widokow/Main.dc.html` odróżnia rodzaje kart czterema
-   cechami — tłem, ramką, ikoną i wcięciem — plus podpisem rodzaju. Front
-   doszedł do jednej: tło #ffffff kontra #f8fafc, przy tej samej ramce.
-   Na ekranie wiadomość klienta i nasza odpowiedź wyglądały identycznie.     */
+/* ── Kto to powiedział ───────────────────────────────────────────────────────
+   Rodzaje kart różnią się czterema cechami — tłem, ramką, ikoną i wcięciem —
+   plus podpisem rodzaju. Sama różnica tła byłaby na ekranie niewidoczna.    */
 describe("Rodzaj wpisu widać, zanim się go przeczyta", () => {
   const wpis = (n: Partial<WpisOsi> = {}): WpisOsi => ({
     id: "msg-1", rodzaj: "wiadomosc", autor: "kupujacy_7", odKlienta: true,
@@ -73,13 +70,11 @@ describe("Rodzaj wpisu widać, zanim się go przeczyta", () => {
     mozeZlecac={false} onZrodlo={() => {}} onWstawDoSzkicu={() => {}} />);
 
   it("wiadomość klienta i nasza odpowiedź mają RÓŻNE podpisy rodzaju", () => {
-    /* Od 0.219.2 podpis klienta niesie JEGO LOGIN zamiast słowa „Klient" —
-       decyzja właściciela. Test pilnuje dalej tego samego, co w 0.193.0: że
-       obie strony rozmowy mają podpis i że są to podpisy RÓŻNE. Zmieniła się
-       treść po stronie klienta, nie reguła. */
+    /* Podpis klienta niesie JEGO LOGIN zamiast słowa „Klient" — decyzja
+       właściciela. Obie strony rozmowy mają podpis i są to podpisy RÓŻNE. */
     os([wpis(), wpis({ id: "msg-2", odKlienta: false, autor: "Biuro" })]);
-    /* Od 0.228.0 login jest przyciskiem kopiowania, więc podpis klienta czyta
-       się z dwóch węzłów. Reguła bez zmian: obie strony mają RÓŻNE podpisy. */
+    /* Login jest przyciskiem kopiowania, więc podpis klienta czyta się
+       z dwóch węzłów. */
     expect(screen.getByRole("button", { name: /Kopiuj login/ }))
       .toHaveTextContent("kupujacy_7");
     expect(screen.getByText("Odpowiedź firmy")).toBeInTheDocument();
@@ -89,8 +84,7 @@ describe("Rodzaj wpisu widać, zanim się go przeczyta", () => {
     /* Klient przy lewej krawędzi, my przy prawej. To ta cecha działa, zanim
        wzrok dojdzie do podpisu.
 
-       Do 0.197.4 robiły to stałe wcięcia `mr-10`/`ml-10`. Od 0.198.0 kolumna
-       rośnie z monitorem, więc wypowiedzi mają próg czytelności i dosuwają
+       Kolumna rośnie z monitorem, więc wypowiedzi mają próg czytelności i dosuwają
        się marginesem automatycznym — inaczej obie zaczynałyby się w tym samym
        miejscu, a strona przestałaby cokolwiek znaczyć. */
     const { container } = os([wpis(), wpis({ id: "msg-2", odKlienta: false, autor: "Biuro" })]);

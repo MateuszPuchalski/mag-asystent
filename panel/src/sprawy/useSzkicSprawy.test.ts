@@ -2,9 +2,9 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { act, renderHook } from "@testing-library/react";
 import { useSzkicSprawy } from "./useSzkicSprawy";
 
-/* ── Szkic przeżywa zmianę sprawy (0.423.0) ──────────────────────────────────
-   Test pilnuje DWÓCH rzeczy naraz i to jest cały sens tego hooka. Nowa:
-   napisana odpowiedź wraca po przełączeniu. Stara, której nie wolno zgubić
+/* ── Szkic przeżywa zmianę sprawy ────────────────────────────────────────────
+   Test pilnuje DWÓCH rzeczy naraz i to jest cały sens tego hooka. Pierwsza:
+   napisana odpowiedź wraca po przełączeniu. Druga, której nie wolno zgubić
    przy naprawianiu nowej: szkic jednej sprawy nigdy nie pojawia się w drugiej.
    Poprawka, która daje pierwsze kosztem drugiego, jest gorsza od usterki.   */
 

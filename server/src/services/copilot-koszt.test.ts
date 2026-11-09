@@ -29,9 +29,9 @@ test("model spoza cennika nie jest darmowy", () => {
   assert.equal(znanyModel("claude-opus-5"), true);
 });
 
-/* Modele 5.5 to cel przejścia z claude-opus-5. Bez wpisu w cenniku liczyłyby
-   się po stawce najdroższej i porównanie modeli na ekranie pomiaru kłamałoby
-   na korzyść starego. Stawki z cennika Anthropic, 21 października 2026. */
+/* Modele 5.5 bez wpisu w cenniku liczyłyby się po stawce najdroższej
+   i porównanie modeli na ekranie pomiaru kłamałoby na korzyść starego.
+   Stawki z cennika Anthropic, 21 października 2026. */
 const MILION = 1_000_000;
 const tylko = (pole: "wej" | "wyj" | "cacheZapis" | "cacheOdczyt") =>
   ({ wej: 0, wyj: 0, cacheZapis: 0, cacheOdczyt: 0, [pole]: MILION });

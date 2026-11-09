@@ -15,9 +15,9 @@ import { TarcieSkrzynki } from "../analiza/TarcieSkrzynki";
 import { ZakresTygodnia } from "../analiza/ZakresTygodnia";
 import { Wskazniki } from "../analiza/Wskazniki";
 
-/* ── ANALIZA (0.440.0) ───────────────────────────────────────────────────
-   Przeniesiona z ANALIZY w `biuro.html`. Wgląd, nie praca: nic tu nie czeka
-   na decyzję, a jedyny zapis to wgranie CSV zbiórek, które robi człowiek.
+/* ── ANALIZA ─────────────────────────────────────────────────────────────
+   Wgląd, nie praca: nic tu nie czeka na decyzję, a jedyny zapis to wgranie
+   CSV zbiórek, które robi człowiek.
 
    DWA ZAKRESY, KAŻDY ZE SWOIM OKNEM. Trasy przyjmują różne okna — dostawy
    30/90/180, praca hali 7/30/90 — bo dostaw jest mniej i tydzień bywa
@@ -27,16 +27,13 @@ import { Wskazniki } from "../analiza/Wskazniki";
    i z powrotem nie gubi wyboru.
 
    DOSTAWY PIERWSZE. Cel biura z §7 to droga towaru przez magazyn, a „u kogo
-   są problemy" jest pytaniem, z którym się tu przychodzi. Makieta F0 stawia
-   je na starcie tak samo.
+   są problemy" jest pytaniem, z którym się tu przychodzi.
 
-   ZAKRES „OBSŁUGA KLIENTA" doszedł 23 września 2026. Do tej wersji go nie
-   było, choć makieta F0 go pokazała: brakowało źródła danych, a przeprowadzka
-   nie wymyśla liczb. Źródłem jest czas odpowiedzi liczony z wiadomości —
-   patrz `analiza/ZakresObslugi.tsx`. Pod nim od 0.444.0 stoi sześć miar
-   obsługi, które mieszkały za zębatką (`analiza/MiaryObslugi.tsx`).
+   ZAKRES „OBSŁUGA KLIENTA" liczy czas odpowiedzi z wiadomości — patrz
+   `analiza/ZakresObslugi.tsx`. Pod nim stoi sześć miar obsługi
+   (`analiza/MiaryObslugi.tsx`).
 
-   ZAKRES „TYDZIEŃ" (0.497.0) nie ma okna: raport tygodnia ma granice
+   ZAKRES „TYDZIEŃ" nie ma okna: raport tygodnia ma granice
    stałe, od poniedziałku do poniedziałku, i liczy go serwer sam. Czipy okna
    znikają, bo czip, który niczego nie zmienia, jest decyzją za dużo.
 
@@ -113,10 +110,11 @@ export function Analiza() {
       {zakres === "obsluga" && <>
         {obsluga.data && <ZakresObslugi a={obsluga.data} />}
         {/* Tarcie zaraz pod czasem odpowiedzi: tamto mówi, jak szybko,
-            to — ile kosztował sam ekran (0.500.0). */}
+            to — ile kosztował sam ekran. */}
         <TarcieSkrzynki dni={okna.obsluga} />
-        {/* Liczby reklamacji zeszły z kolejki, bo to wgląd: tam wybiera się
-            widok, tu patrzy, jak idzie. Własnego okna nie mają, liczy je serwer. */}
+        {/* Liczby reklamacji stoją tu, nie w kolejce, bo to wgląd: tam
+            wybiera się widok, tu patrzy, jak idzie. Własnego okna nie mają,
+            liczy je serwer. */}
         <ReklamacjeWLiczbach />
         <MiaryObslugi />
       </>}

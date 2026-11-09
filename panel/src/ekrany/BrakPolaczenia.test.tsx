@@ -8,9 +8,8 @@ import { Kosze } from "./Kosze";
 import { Skrzynka } from "./Skrzynka";
 import { Zwroty } from "./Zwroty";
 
-/* ── BRAK POŁĄCZENIA TO NIE BRAK PRACY (0.546.0) ────────────────────────────
-   Pomiar z zabitym serwerem: Dostawy mówiły „Nic nie czeka na biuro — hala
-   rozkłada bez pytań" i liczniki „0" obok „Błąd 502". Agent brał awarię za
+/* ── BRAK POŁĄCZENIA TO NIE BRAK PRACY ──────────────────────────────────────
+   „Nic nie czeka na biuro" i liczniki „0" obok „Błąd 502" agent wziąłby za
    koniec pracy. Tu każdy odczyt pada tak, jak pada przy restarcie serwera,
    a ekran ma powiedzieć, że nie wie — nie, że nic nie ma. */
 

@@ -1,5 +1,4 @@
 import userEvent from "@testing-library/user-event";
-import React from "react";
 import { describe, expect, it, vi } from "vitest";
 import { render, screen } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
@@ -8,16 +7,15 @@ import { Rozmowa as EkranRozmowy } from "./Rozmowa";
 import type { OsRozmowy, PropozycjaPrzeplywu, Rozmowa } from "../api/typy";
 import { atrapaZapisow } from "../test/zapisy";
 
-/* ── Nagłówek rozmowy w skrzynce (0.395.0) ───────────────────────────────────
+/* ── Nagłówek rozmowy w skrzynce ─────────────────────────────────────────────
    Zgłoszenie właściciela ze zrzutem: „usuń guzik przejmuję rozmowę, to powinno
    dziać się automatycznie". Testy pilnują trzech rzeczy:
 
-   1. GUZIKA NIE MA. Wysyłka odpowiedzi przypisuje rozmowę niczyją od 0.159.0,
-      w tej samej transakcji, co wiadomość — przycisk prosił o kliknięcie,
-      które i tak padało minutę później.
-   2. ZDANIE ZOSTAJE. Po zniknięciu przycisku agent nie ma skąd wiedzieć, kiedy
-      rozmowa stanie się jego; pustka byłaby gorsza od guzika.
-   3. PROWADZĄCEGO WIDAĆ DALEJ. Zdjęto czynność, nie informację — „kto to ma"
+   1. GUZIKA NIE MA. Wysyłka odpowiedzi przypisuje rozmowę niczyją w tej
+      samej transakcji, co wiadomość.
+   2. JEST ZDANIE. Bez niego agent nie ma skąd wiedzieć, kiedy rozmowa stanie
+      się jego.
+   3. PROWADZĄCEGO WIDAĆ. Bez czynności, ale z informacją — „kto to ma"
       jest pierwszym pytaniem przy cudzej rozmowie.                          */
 
 const rozmowa = (n: Partial<Rozmowa> = {}): Rozmowa => ({
@@ -67,8 +65,7 @@ describe("Nagłówek rozmowy", () => {
   });
 
   it("mówi, że rozmowę przypisze PIERWSZA ODPOWIEDŹ", async () => {
-    /* To zdanie jest ceną zdjęcia przycisku: bez niego znika czynność i nie
-       przychodzi nic, co by ją wytłumaczyło. Od 0.506.0 „nikt" i „Ty" stoją
+    /* To zdanie tłumaczy, czemu nie ma przycisku przejęcia. „Nikt" i „Ty" stoją
        w menu „⋯" — na wierzchu zostaje wyjątek, czyli cudza rozmowa. */
     render(<EkranRozmowy {...props()} />);
     expect(screen.queryByTitle("Prowadzi nikt — przypisze pierwsza odpowiedź")).toBeNull();
@@ -89,7 +86,7 @@ describe("Nagłówek rozmowy", () => {
   });
 });
 
-/* ── Brakujący zakup nad polem odpowiedzi — wpięcie w ekran (0.547.0) ──────
+/* ── Brakujący zakup nad polem odpowiedzi — wpięcie w ekran ────────────────
    Komponent ma własne testy. Te pilnują wpięcia: pasek stoi w ekranie rozmowy
    bez zamówienia, dopisuje pytanie do szkicu, a błąd wiązania nie przechodzi
    do następnej rozmowy. */

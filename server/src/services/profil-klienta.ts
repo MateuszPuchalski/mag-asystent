@@ -12,15 +12,13 @@ import { odmowyBezDosylki } from "./odmowy-dosylki.js";
 import { pomylkiKlienta, type Pomylka } from "./pomylki.js";
 
 /* ── Profil klienta: wszystko, co z nim związane, w jednym widoku ────────────
-   (24 września 2026, zgłoszenie właściciela). Historia klienta istniała od S2
-   spoiwa, ale zawsze PRZY sprawie — w zakładce KLIENT rozmowy albo w szufladzie
-   zwrotu. Klient jako byt nie miał adresu: nie dało się do niego wejść
-   z szukania ani wkleić koledze linku „zobacz, kto to”.
+   Klient jako byt ma adres: da się do niego wejść z szukania i wkleić koledze
+   link „zobacz, kto to”, a nie tylko oglądać go PRZY sprawie.
 
    ODCZYT Z ISTNIEJĄCYCH TABEL, poza notatką i sprawą klienta. Liczby, sygnały
    i sprawy otwarte liczą się przy otwarciu z zamówień, zwrotów, spraw
    i rozmów. Piątej tabeli ze wspólnym statusem nad kolejkami nie ma i nie
-   będzie. Sprawa klienta (0.535.0, S6) nim nie jest: nie zbiera statusów
+   będzie. Sprawa klienta (S6) nim nie jest: nie zbiera statusów
    kolejek, tylko niesie NASZ następny krok z terminem i prowadzącego — to,
    czego żadna kolejka nie wie, bo „czekamy na zwrot, potem dosyłamy”
    przechodzi przez kilka z nich. Powód i granice w `prowadzenie-klienta.ts`.
@@ -105,7 +103,7 @@ export interface ProfilKlienta {
    */
   podpowiedzZakonczenia: boolean;
   /**
-   * Czemu podpowiedź stoi (0.536.0). „dosylka”: poprawny towar doszedł, więc
+   * Czemu podpowiedź stoi. „dosylka”: poprawny towar doszedł, więc
    * wymiana się spełniła, choć termin kroku jeszcze nie nadszedł. Boolean
    * obok zostaje, bo czytają go ekran i testy sprzed tego wydania.
    */
@@ -245,7 +243,7 @@ export function profilKlienta(
 
   /* Paczka niedoręczona tydzień po zakupie — tylko gdy PYTALIŚMY przewoźnika.
      Brak daty doręczenia bez pytania znaczy „nie wiemy”, nie „nie doszła”.
-     Zamówienie z dosyłką (0.536.0) odpada: sygnał mówi o PIERWSZEJ paczce,
+     Zamówienie z dosyłką odpada: sygnał mówi o PIERWSZEJ paczce,
      a los towaru tego zamówienia niesie już dosyłka na karcie sprawy.
      Zdanie „niedoręczone” obok „Dosyłka doręczona” przeczyłoby samo sobie. */
   const od7 = new Date(teraz.getTime() - 7 * DZIEN).toISOString();

@@ -3,7 +3,7 @@ import { Banknote, CircleCheck, CircleX, Eye, FileText, Scale, type LucideIcon }
 import type { Kubelek } from "../api/typy";
 import { KUBELKI } from "./Kolejka";
 
-/* ── Oś etapów zwrotu (0.453.0) ──────────────────────────────────────────────
+/* ── Oś etapów zwrotu ────────────────────────────────────────────────────────
    Zgłoszenie właściciela po przeglądzie ekranu: „ulżyj przeładowaniu tekstem,
    użyj ikon". Ekran mówił, gdzie jest zwrot, zdaniami rozsianymi po sekcjach —
    „Najpierw przyjmij zwrot — pieniądze oddaje się po werdykcie" pod
@@ -24,7 +24,7 @@ import { KUBELKI } from "./Kolejka";
    sprawa nigdy nie wejdzie, byłyby obietnicą bez pokrycia.                   */
 
 /**
- * Ikona kubełka — JEDNA dla osi etapów i kafli kolejki (0.454.0).
+ * Ikona kubełka — JEDNA dla osi etapów i kafli kolejki.
  *
  * Słownik ikon z projektu „Zwroty — mniej tekstu" ma zasadę: jedna ikona,
  * jedno znaczenie w całym panelu. Dwie mapy — tu i przy kaflach — rozjechałyby
@@ -43,16 +43,15 @@ const NAZWY: Record<Kubelek, string> = {
 
 const DROGA: Kubelek[] = ["decyzja", "ocena", "zwrot", "korekta", "zamkniety"];
 
-/* ── PIENIĄDZE PO KOREKCIE (0.479.0) ────────────────────────────────────
-   Od 0.476.0 zwrot z korektą wraca do DO ZWROTU, póki pieniądze nie wyjdą.
-   Oś rysowała wtedy korektę jako krok PRZED nami, choć numer już stał —
-   przegląd zwrotów z 23 września. Kolejność idzie więc za faktem: korekta za
+/* ── PIENIĄDZE PO KOREKCIE ──────────────────────────────────────────────
+   Zwrot z korektą wraca do DO ZWROTU, póki pieniądze nie wyjdą. Korekta z
+   numerem nie jest wtedy krokiem PRZED nami. Kolejność idzie za faktem: korekta za
    nami, zwrot pieniędzy teraz. Podpowiedź mówi, na co ten przystanek czeka. */
 const DROGA_PO_KOREKCIE: Kubelek[] = ["decyzja", "ocena", "korekta", "zwrot", "zamkniety"];
 
 export function Etapy({ kubelek, poKorekcie = false }: {
   kubelek: Kubelek;
-  /** Zwrot ma już korektę, a czeka na wyjście pieniędzy (0.479.0). */
+  /** Zwrot ma już korektę, a czeka na wyjście pieniędzy. */
   poKorekcie?: boolean;
 }) {
   const droga: Kubelek[] = kubelek === "odrzucony" ? ["decyzja", "odrzucony"]

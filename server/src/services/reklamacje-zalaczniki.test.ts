@@ -7,7 +7,7 @@ import {
   dodajZalacznikSprawy, usunZalacznikSprawy, zalacznikiDoWyslania,
 } from "./reklamacje-zalaczniki.js";
 
-/* ── Załączniki wychodzące w sprawie (0.274.0) ───────────────────────────────
+/* ── Załączniki wychodzące w sprawie ─────────────────────────────────────────
    Trzy rzeczy warte testu, bo każda kosztowałaby plik u kupującego:
 
    1. WALIDACJA PRZED SIECIĄ. Odmowa typu albo rozmiaru ma paść przy wybieraniu

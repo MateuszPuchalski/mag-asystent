@@ -4,9 +4,7 @@ import { fileURLToPath } from "node:url";
 import react from "@vitejs/plugin-react";
 import { wtyczkaZmian } from "./wtyczka-zmian";
 
-/* Testy frontu do 0.146.0 nie istniały wcale — `docs/obsluga-klienta.md` §7
-   wymienia je wprost jako to, co kupujemy za ośmiu zależności. Środowisko to
-   jsdom: sprawdzamy, co widzi agent, a nie co zwraca funkcja. */
+/* Środowisko to jsdom: sprawdzamy, co widzi agent, a nie co zwraca funkcja. */
 export default defineConfig({
   /* Wtyczka zmian także tu: rama panelu importuje `virtual:wertis-zmiany`. */
   plugins: [react(), wtyczkaZmian(path.join(path.dirname(fileURLToPath(import.meta.url)), ".."))],

@@ -1,11 +1,10 @@
-import React from "react";
 import { describe, expect, it, vi } from "vitest";
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { IloscZwrocona } from "./IloscZwrocona";
 import type { PozycjaZwrotu } from "../api/typy";
 
-/* ── Ile sztuk naprawdę wróciło (0.212.0) ───────────────────────────────────
+/* ── Ile sztuk naprawdę wróciło ─────────────────────────────────────────────
    Klient zgłasza dwie, w kartonie przyjeżdża jedna. Liczy biuro — decyzja
    właściciela. Testy pilnują trzech rzeczy: pole nie zaśmieca typowego
    zwrotu, zapisana liczba jest widoczna wszędzie, a więcej niż zgłoszono

@@ -6,7 +6,7 @@ import { useImportZbiorek, useKandydaci, useStanSellasist, type WynikImportuZbio
 import { Blad, Przycisk, czas, dzienMiesiac } from "../ui";
 import { KartaWgladu, Tabela, Td } from "../ui/wglad";
 
-/* ── Strefa złota — kandydaci do przeniesienia (0.440.0) ────────────────
+/* ── Strefa złota — kandydaci do przeniesienia ──────────────────────────
    Towary z górnych 15% rotacji, które stoją poza strefą złotą. Dane bierzemy
    ze zbiórek, które serwer sam przepisuje z Sellasist, gdy integracja stoi.
    Wgranie CSV zostaje drogą zapasową: na czas bez integracji i na okres
@@ -17,7 +17,7 @@ import { KartaWgladu, Tabela, Td } from "../ui/wglad";
    zbiórki przestały płynąć, czy rotacja się nie zmieniła. Data ostatniego
    udanego przebiegu i liczby z siedmiu dób rozstrzygają to bez zgadywania.
 
-   REGUŁY STOJĄ ZA ZĘBATKĄ PANELU (od 0.444.0, wcześniej w `/biuro`).
+   REGUŁY STOJĄ ZA ZĘBATKĄ PANELU.
    Zdanie o nich jest drogowskazem, nie ozdobą: pusta lista bez niego wygląda
    na awarię, a nie na brak reguł. Dlatego prowadzi wprost do karty reguł
    (`?karta=strefa`), zamiast opisywać, gdzie kliknąć. */

@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import { useState } from "react";
 import { Bot } from "lucide-react";
 import type { PropozycjaPrzeplywu } from "../api/typy";
 import { useWerdyktPrzeplywu } from "../api/copilot";

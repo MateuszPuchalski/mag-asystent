@@ -3,10 +3,9 @@ import { useKolizje, useRozstrzygnijKolizje, type KolizjaKodu } from "../api/sta
 import { Blad, Pole, Przycisk, czas } from "../ui";
 import { KartaWgladu, Tabela, Td } from "../ui/wglad";
 
-/* ── Kolizje kodów kreskowych (z `biuro.html` 0.360.0, 0.441.0) ──────────
-   Jeden kod na kilku kartotekach zatrzymuje pracę w alejce. Do 0.358.0 ta
-   lista była dziennikiem bez wyjścia: biuro i hala widziały ten sam problem,
-   a żadna strona nie mogła drugiej nic powiedzieć.
+/* ── Kolizje kodów kreskowych ─────────────────────────────────────────────
+   Jeden kod na kilku kartotekach zatrzymuje pracę w alejce. Biuro i hala
+   widzą ten sam problem, więc decyzja biura wraca do hali.
 
    DWA RODZAJE DECYZJI, bo hala reaguje na nie ODWROTNIE. `poprawione` znaczy
    „kolizja zniknie", więc kolejne trafienie dowodzi, że poprawka nie
@@ -14,8 +13,8 @@ import { KartaWgladu, Tabela, Td } from "../ui/wglad";
    symbolu. Serwer liczy trafienia PO decyzji, więc nieudana poprawka
    ujawnia się sama, bez niczyjej oceny.
 
-   Błąd zapisu stoi pod tabelą, nie w `alert()` jak w biurze: okno
-   przeglądarki znika po kliknięciu i zabiera ze sobą treść błędu. */
+   Błąd zapisu stoi pod tabelą, nie w `alert()`: okno przeglądarki znika po
+   kliknięciu i zabiera ze sobą treść błędu. */
 
 type Rodzaj = "poprawione" | "dopuszczone";
 
@@ -28,9 +27,8 @@ const OPIS: Record<Rodzaj, string> = {
 
 function Decyzja({ k }: { k: KolizjaKodu }) {
   const r = k.rozstrzygniecie;
-  /* Bez decyzji nie ma czego pokazać: przyciski stoją od razu w wierszu.
-     Do 0.538.0 stała tu kreska, a przyciski linijkę niżej, więc każdy
-     wiersz miał dwie wysokości i lista dziewięciu kodów zajmowała ekran. */
+  /* Bez decyzji nie ma czego pokazać: przyciski stoją od razu w wierszu,
+     żeby każdy wiersz miał jedną wysokość. */
   if (!r) return null;
   return <div>
     <b>{r.rodzaj === "poprawione" ? "Poprawione" : "Dopuszczone"}</b>

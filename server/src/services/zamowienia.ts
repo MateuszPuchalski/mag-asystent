@@ -3,11 +3,9 @@ import { linkZamowienia } from "./allegro-linki.js";
 import { kartotekaOferty } from "./dopasowanie-sku.js";
 import { stanZdjeciaOferty, type StanZdjeciaOferty } from "./zdjecia-ofert.js";
 
-/* ── Zamówienie klienta jako DTO (0.166.0) ──────────────────────────────────
-   Do 0.165.0 mapowanie wiersza `zamowienie_klienta` na kształt dla panelu
-   stało inline w `zwroty.ts`. Rozmowa od 0.166.0 pokazuje to samo zamówienie
-   (z `message.related_order_id`), a dwa mapowania jednego wiersza
-   rozjechałyby się przy pierwszym nowym polu — dlatego jedno, tutaj.        */
+/* ── Zamówienie klienta jako DTO ────────────────────────────────────────────
+   Zwrot i rozmowa pokazują to samo zamówienie, a dwa mapowania jednego
+   wiersza rozjechałyby się przy pierwszym nowym polu — dlatego jedno, tutaj. */
 
 /** Pozycja zamówienia; `zwracana` mówi, które z nich wracają do nas. */
 export interface PozycjaZamowienia {
@@ -20,7 +18,7 @@ export interface PozycjaZamowienia {
   waluta: string;
   zwracana: boolean;
   /**
-   * Kartoteka Subiekta za pozycją (0.215.0): pamięć wskazań tej oferty, a bez
+   * Kartoteka Subiekta za pozycją: pamięć wskazań tej oferty, a bez
    * niej SKU sprzedawcy z pozycji. `null` = nie ma czego pokazać. Zdanie
    * `twZrodlo` pisze `dopasowanie-sku.ts`, panel go nie układa (§4.3).
    *
@@ -29,24 +27,15 @@ export interface PozycjaZamowienia {
   twSymbol: string | null;
   twZrodlo: string | null;
   /**
-   * Co wiadomo o zdjęciu OFERTY tej pozycji (0.217.0).
+   * Co wiadomo o zdjęciu OFERTY tej pozycji.
    *
-   * Do 0.216.0 stan tu nie jechał — z uzasadnieniem, że pozycja niesie
-   * `offerId`, a hak obrazów pamięta negatyw, więc to najwyżej jedno 404 na
-   * ofertę i sesję. Rachunek się zgadzał, ale mierzył nie to co trzeba:
-   * kosztem nie były żądania, tylko ZDANIE NA EKRANIE. Bez stanu kafel pisze
-   * „bez zdjęcia" zarówno wtedy, gdy Allegro obrazu nie ma, jak i wtedy, gdy
-   * po prostu jeszcze o niego nie pytaliśmy — a to jest dokładnie ta pomyłka,
-   * którą 0.214.0 naprawiło przy pozycji zwrotu (blizna: właściciel przysłał
-   * zrzut oferty, która na Allegro zdjęcie miała).
-   *
-   * Przy okazji znika też tamto 404, ale to skutek uboczny, nie powód.
+   * Bez stanu kafel pisałby „bez zdjęcia" zarówno wtedy, gdy Allegro obrazu
+   * nie ma, jak i wtedy, gdy jeszcze o niego nie pytaliśmy.
    */
   ofertaZdjecie: StanZdjeciaOferty;
   /**
-   * Ile sztuk WRACA (0.176.0). Plakietka „wraca" stała dotąd obok liczby
-   * kupionych sztuk i czytało się to jako „wracają dwie" przy zwrocie jednej.
-   * Zgłosił to właściciel: „w tym zamówieniu wracała jedna sztuka".
+   * Ile sztuk WRACA. Sama plakietka „wraca" obok liczby kupionych sztuk
+   * czyta się jako „wracają dwie" przy zwrocie jednej.
    */
   wracaIlosc: number;
 }
@@ -57,9 +46,9 @@ export interface Zamowienie {
   externalId: string;
   status: string | null;
   kupujacyLogin: string | null;
-  /** Nazwa odbiorcy Z NAKLEJKI (0.367.0) — po niej szuka się wracającej paczki. */
+  /** Nazwa odbiorcy Z NAKLEJKI — po niej szuka się wracającej paczki. */
   odbiorcaNazwa: string | null;
-  /* Reszta adresu dostawy (0.422.0). `odbiorcaTelefon` bywa `null` także przy
+  /* Reszta adresu dostawy. `odbiorcaTelefon` bywa `null` także przy
      zamówieniu z pełnym adresem: `phoneNumber` nie stoi w `required` schematu
      `CheckoutFormDeliveryAddress`. Ekran ma to znieść, nie zgadywać. */
   odbiorcaTelefon: string | null;
@@ -176,7 +165,7 @@ export function zamowienieRozmowy(
   });
 }
 
-/* ── Paczki jednego klienta: co on w ogóle u nas kupił (0.365.0) ─────────────
+/* ── Paczki jednego klienta: co on w ogóle u nas kupił ───────────────────────
    Zgłoszenie właściciela: „kupujący może mieć wiele paczek kupionych
    w historii sklepu, więc muszę mieć możliwość wybrania paczki".
 
@@ -211,20 +200,19 @@ export interface PaczkaKlienta {
    * tego samego.
    */
   maZwrot: boolean;
-  /** Nazwa odbiorcy z naklejki (0.367.0) — to po niej operator rozpoznaje paczkę. */
+  /** Nazwa odbiorcy z naklejki — to po niej operator rozpoznaje paczkę. */
   odbiorcaNazwa: string | null;
-  /* ── Reszta adresu (0.422.0) ─────────────────────────────────────────────
+  /* ── Reszta adresu ───────────────────────────────────────────────────────
      Nie po to, żeby po nich szukać, tylko żeby ROZRÓŻNIĆ trafienia. Szukanie
-     po fragmencie nazwiska od 0.367.0 świadomie pokazuje cudze zakupy przy
-     zbieżności nazwisk i mówi o tym wprost — a operator nie miał wtedy
-     niczego, czym by tych dwoje od siebie odróżnił. Ulica rozstrzyga to
+     po fragmencie nazwiska świadomie pokazuje cudze zakupy przy zbieżności
+     nazwisk i mówi o tym wprost. Ulica rozstrzyga to
      w jednym spojrzeniu; miasto samo nie, bo zbieżność bywa w jednym mieście. */
   odbiorcaTelefon: string | null;
   odbiorcaUlica: string | null;
   odbiorcaMiasto: string | null;
   odbiorcaKod: string | null;
   /**
-   * Login kupującego (0.367.0).
+   * Login kupującego.
    *
    * Paczkę znalezioną po NAZWISKU trzeba zapisać z loginem, a operator go
    * wtedy nie zna — zna go serwer, który właśnie tę paczkę wskazał. Bez tego
@@ -233,7 +221,7 @@ export interface PaczkaKlienta {
    */
   kupujacyLogin: string | null;
   /**
-   * Zamówienie w panelu sprzedawcy Allegro (0.451.0).
+   * Zamówienie w panelu sprzedawcy Allegro.
    *
    * Rejestracja paczki odeszła decyzją właściciela: „ja tylko wyszukuję ją
    * w Allegro". Ta lista kończy się więc tam, gdzie kończy się praca — na
@@ -274,17 +262,16 @@ function doLike(fraza: string): string {
  * PORÓWNANIE BEZ WIELKOŚCI LITER, bo uchwyt przyjeżdża przeklejony
  * z wiadomości albo przepisany z naklejki, a wielkość liter bywa różna.
  *
- * DWA UCHWYTY, DWIE RÓŻNE ZASADY DOPASOWANIA (0.367.0):
+ * DWA UCHWYTY, DWIE RÓŻNE ZASADY DOPASOWANIA:
  *
  *   • LOGIN — w CAŁOŚCI. Fragment loginu wskazywałby cudze zakupy, a to jest
- *     ekran, z którego wychodzi się z czyimś numerem zamówienia w ręku. Tak
- *     stało od 0.365.0 i tak zostaje.
+ *     ekran, z którego wychodzi się z czyimś numerem zamówienia w ręku.
  *   • NAZWA ODBIORCY — po FRAGMENCIE, od `MIN_NAZWY` znaków. Nikt nie przepisze
  *     nazwiska z naklejki znak w znak tak, jak zapisało je Allegro: bywa
  *     z drugim imieniem, z firmą przed nazwiskiem albo z ogonkiem zjedzonym
  *     przez drukarkę. Żądanie dokładności zamieniłoby ten uchwyt w martwy.
  *
- *   • TELEFON — od 0.422.0, po KOŃCÓWCE, od `MIN_TELEFONU` cyfr. Obie strony
+ *   • TELEFON — po KOŃCÓWCE, od `MIN_TELEFONU` cyfr. Obie strony
  *     sprowadzamy do samych cyfr, bo `+48 663 509 353` wpisane przez klienta
  *     i `++48663509353` zapisane przez Allegro to ten sam numer w trzech
  *     kształtach. Końcówka, nie równość: prefiks kraju bywa po jednej
@@ -292,7 +279,7 @@ function doLike(fraza: string): string {
  *
  * Różnica jest świadoma i ma cenę: fragment nazwiska POKAŻE cudze zakupy,
  * jeśli dwoje ludzi nazywa się tak samo. Dlatego wiersz listy niesie nazwę
- * odbiorcy, a od 0.422.0 także ulicę, miasto i telefon — wybiera człowiek,
+ * odbiorcy, a także ulicę, miasto i telefon — wybiera człowiek,
  * patrząc na wszystkie trafienia naraz. Telefon takiej ceny nie ma: dwoje
  * ludzi o jednym nazwisku ma dwa różne numery.
  */

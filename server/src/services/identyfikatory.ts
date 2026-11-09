@@ -6,7 +6,7 @@ import { oczysc, segmentyPoEtykiecie } from "./opis-sekcje.js";
 /**
  * Identyfikatory części z opisów kartotek (§11.2, etap E3).
  *
- * Parser zamienników od 0.61.0 czyta te same opisy i WYRZUCA wszystko, co nie
+ * Parser zamienników czyta te same opisy i WYRZUCA wszystko, co nie
  * jest naszym symbolem: z 2304 tokenów sekcji zamienników 478 trafiało
  * w kartotekę, reszta to numery OEM i katalogi obcych producentów. Ten plik
  * zatrzymuje je w `towar_identyfikator`, żeby numer z pytania klienta
@@ -16,8 +16,6 @@ import { oczysc, segmentyPoEtykiecie } from "./opis-sekcje.js";
  */
 
 export type RodzajIdentyfikatora = "oem" | "nr_oryg" | "katalog_obcy" | "stare_sku" | "zamiennik";
-export const RODZAJE_IDENTYFIKATORA: RodzajIdentyfikatora[] =
-  ["oem", "nr_oryg", "katalog_obcy", "stare_sku", "zamiennik"];
 export const NAZWA_RODZAJU: Record<RodzajIdentyfikatora, string> = {
   oem: "OEM", nr_oryg: "nr oryginału", katalog_obcy: "katalog obcy", stare_sku: "stare SKU",
   /* Zdanie mówi, SKĄD numer — sekcja zamienników jest słabszym świadectwem
@@ -27,7 +25,7 @@ export const NAZWA_RODZAJU: Record<RodzajIdentyfikatora, string> = {
 
 /* Etykiety Z DWUKROPKIEM — bez niego `OEM` w prozie („silnik OEM Honda")
    byłoby etykietą. Koniec sekcji rozstrzyga `KONIEC_SEKCJI` z `opis-sekcje.ts`,
-   nie whitelista (decyzja 0.61.0). `katalog_obcy` parsera nie ma — to
+   nie whitelista. `katalog_obcy` parsera nie ma — to
    rezerwa dla wpisu ręcznego biura. */
 const ETYKIETY: Array<{ rodzaj: RodzajIdentyfikatora; re: RegExp }> = [
   /* `OME:` to literówka z czterech opisów (`OME: 591852 // 793463 // 793493`).
@@ -36,7 +34,7 @@ const ETYKIETY: Array<{ rodzaj: RodzajIdentyfikatora; re: RegExp }> = [
   { rodzaj: "oem", re: /\bO(?:EM|ME)\s*:/gi },
   { rodzaj: "nr_oryg", re: /\b(?:nr\.?\s*oryg(?:inaln[ya]|\.)?|numery?\s+(?:cz[eę][sś]ci\s+)?oryginaln(?:y|ej)(?:\s+cz[eę][sś]ci)?)\s*:/gi },
   { rodzaj: "stare_sku", re: /\bstare\s+sku\s*:/gi },
-  /* SEKCJA ZAMIENNIKÓW (0.234.0). Ta sama rodzina etykiet co w
+  /* SEKCJA ZAMIENNIKÓW. Ta sama rodzina etykiet co w
      `zamienniki.ts` — świadomie, bo mówi o tej samej liście. Tamten parser
      czyta ją po SWOJEMU: zostawia wyłącznie tokeny będące NASZĄ kartoteką,
      a numery obcych katalogów wyrzuca. W eksporcie kartotek z 8 września
@@ -113,7 +111,7 @@ const kartoteki = (database: DatabaseSync) => database.prepare(
   Array<{ tw_id: number; symbol: string; opis: string }>;
 
 /**
- * NASZ SYMBOL NIE JEST IDENTYFIKATOREM OBCYM (0.234.0).
+ * NASZ SYMBOL NIE JEST IDENTYFIKATOREM OBCYM.
  *
  * Sekcja zamienników miesza jedno z drugim: `Zamiennie: 15-06002 / RO1205 /
  * W28-0503`. Nasze kartoteki czyta stamtąd `zamienniki.ts` i pokazuje jako
@@ -129,15 +127,11 @@ export function naszeSymbole(database: DatabaseSync): Set<string> {
 }
 
 /**
- * Wiersze `zrodlo='opis'` giną i powstają od nowa; `reczne` przebudowa omija.
+ * Wiersze `zrodlo='opis'` giną i powstają od nowa; reszta źródeł (`reczne`,
+ * `oferta`, `dostawca`) przebudowa omija, bo czyta wyłącznie opisy KARTOTEK
+ * i tamtych numerów nie umiałaby odtworzyć.
  * `INSERT OR IGNORE` po `(tw_id, rodzaj, wartosc_norm)`: gdy biuro dopisało
  * ręcznie to, co stoi w opisie, zostaje wpis ręczny — z podpisem człowieka.
- *
- * Od 0.264.0 omija także `zrodlo='oferta'`, a od importu odsyłaczy
- * `zrodlo='dostawca'` — i to bez żadnej poprawki tutaj:
- * `DELETE` był zawężony do `'opis'` od początku. Zdanie stoi w komentarzu,
- * bo zdanie wyżej wymienia dwa źródła i wygląda na wyczerpujące — a numeru
- * z oferty ta funkcja nie umiałaby odtworzyć: czyta opisy KARTOTEK.
  */
 export function przebudujIdentyfikatory(database: DatabaseSync = db()): { kartotek: number; identyfikatorow: number; ms: number } {
   const start = Date.now();

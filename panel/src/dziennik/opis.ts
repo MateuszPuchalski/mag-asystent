@@ -1,7 +1,6 @@
-/* ── „Co się stało" jednym zdaniem z danych wpisu (0.540.0) ─────────────
-   Szczegół wpisu był surowym JSON-em pod „szczegóły". Żeby wiedzieć, że
-   zapis nie wszedł, bo kartoteka była w edycji, trzeba było kliknąć
-   i przeczytać `{"queueId":8,"proby":3,"blad":…}`.
+/* ── „Co się stało" jednym zdaniem z danych wpisu ───────────────────────
+   Żeby wiedzieć, że zapis nie wszedł, bo kartoteka była w edycji, nie trzeba
+   czytać `{"queueId":8,"proby":3,"blad":…}`.
 
    WŁASNE ZDANIE DLA TYPÓW, KTÓRE CZYTA SIĘ NAJCZĘŚCIEJ: kolektor, dostawy,
    zapisy do Subiekta i błędy. Reszta dostaje pary „klucz wartość" wprost

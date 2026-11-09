@@ -6,18 +6,17 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Dziennik } from "./Dziennik";
 import type { WpisAudytu } from "../api/wglad";
 
-/* ── DZIENNIK w panelu (0.440.0) ─────────────────────────────────────────
-   Gwarancje przeniesione z DZIENNIKA w `biuro.html` i dwie nowe:
+/* ── DZIENNIK w panelu ───────────────────────────────────────────────────
+   Gwarancje:
 
    1. ZERO ZAPISU PRZY PATRZENIU — otwarcie i filtrowanie to same odczyty.
    2. FILTR DZIAŁA BEZ „SZUKAJ" — zmiana pola sama zmienia zapytanie.
    3. OSOBA z listy kont; jej brak (403) nie wywraca dziennika.
    4. CSV idzie tym samym filtrem co tabela, z sesją w nagłówku.
    5. Doba filtra jest LOKALNA — szczegół w `dziennik/rodziny.test.ts`.
-   6. Rzadkie filtry są zwinięte (0.514.0), ale ustawiony filtr nigdy się
-      nie chowa.
-   7. (0.540.0) Po polsku: nazwa zdarzenia zamiast klucza, opis zamiast
-      schowanego JSON-u, pomiary techniczne schowane, okres jednym polem. */
+   6. Rzadkie filtry są zwinięte, ale ustawiony filtr nigdy się nie chowa.
+   7. Po polsku: nazwa zdarzenia zamiast klucza, opis zamiast schowanego
+      JSON-u, pomiary techniczne schowane, okres jednym polem. */
 
 const wpis = (id: number, o: Partial<WpisAudytu> = {}): WpisAudytu => ({
   id, typ: "putaway_line_done", czas: "2026-09-22T12:31:05.000Z", uzytkownik: "j.wrona", userRef: 3,

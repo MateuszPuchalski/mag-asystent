@@ -6,7 +6,7 @@ import os from "node:os";
 import path from "node:path";
 import type { FastifyInstance } from "fastify";
 
-/* ── Aktualizacja kolektora z serwera (0.52.0) ───────────────────────────────
+/* ── Aktualizacja kolektora z serwera ───────────────────────────────
    Dwie rzeczy są tu warte testu bardziej niż reszta.
 
    Pierwsza: OBIE TRASY MUSZĄ ODPOWIADAĆ BEZ SESJI. Kolektor pyta o wersję przy
@@ -107,7 +107,7 @@ test("człon wersji powyżej 999 jest odrzucany, a nie zwijany do sąsiedniej we
 });
 
 test("setny minor ma swój kod, a nie kod następnego majora", async () => {
-  /* Granica przekroczona przy wydaniu 0.100.0 i to jest cały powód tego testu.
+  /* Granica przekroczona przy minorze 100 to cały powód tego testu.
      Przy zapasie 99 `0.100.0` dawało 10 000 — dokładnie tyle, co `1.0.0` —
      a strażnik `minor > 99` odrzucał ten plik, więc kolektory przestałyby
      widzieć aktualizację BEZ ANI JEDNEGO błędu. Wzór musi zostać zgodny

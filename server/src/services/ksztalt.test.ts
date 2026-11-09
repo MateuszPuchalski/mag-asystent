@@ -107,7 +107,7 @@ test("nazwa zakazana blokuje wartość nawet zapisaną wersalikami", () => {
   ]);
 });
 
-/* ── Numer listu przewozowego wyciekł do raportu (0.155.0) ───────────────────
+/* ── Numer listu przewozowego wyciekł do raportu ─────────────────────────────
    Z prawdziwego przebiegu sondy, sekcja zwrotów:
 
        | `parcels[].waybill` | null, tekst | 94 | 88 |
@@ -128,9 +128,8 @@ test("nazwa zakazana blokuje wartość nawet zapisaną wersalikami", () => {
    zaczyna się od cyfry, więc wzorzec słownika je odsiewa — i mapa nigdy nie
    rośnie ponad sufit dwunastu wartości, który miał być drugą zaporą.
 
-   Pierwsze podejście do tego testu dawało dwadzieścia numerów w formacie
-   InPost i PRZECHODZIŁO na zepsutym kodzie: sufit się przepełniał i wartości
-   znikały same. Test niczego wtedy nie mierzył. */
+   Mieszanka formatów jest celowa: dwadzieścia numerów w formacie InPost
+   przepełniłoby sufit i test przechodziłby na zepsutym kodzie. */
 const ZWROTY = Array.from({ length: 20 }, (_, i) => ({
   id: `ret-${i}`,
   parcels: [{
@@ -178,7 +177,7 @@ test("mała próbka nie kasuje słownika — nie ma z czego liczyć powtórzeń"
   assert.equal(pola.find((p) => p.sciezka === "rodzaj")?.wartosci.length, 3);
 });
 
-/* ── Klucz listy w odpowiedzi (0.164.0) ──────────────────────────────────────
+/* ── Klucz listy w odpowiedzi ────────────────────────────────────────────────
    Ta funkcja przemilczała całą sekcję raportu i nie miała testu, bo siedziała
    jako prywatna stała w `sonda-run.ts`. Sonda pytała o `messages`, a rozmowa
    dyskusji przyjeżdża pod kluczem `chat` — HTTP 200, ciało pełne wiadomości,

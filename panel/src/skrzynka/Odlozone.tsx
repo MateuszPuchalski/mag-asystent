@@ -1,22 +1,21 @@
-import React, { useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import { Check, Send, X } from "lucide-react";
 
-/* ── WYSYŁKA Z DZIESIĘCIOMA SEKUNDAMI NA COFNIĘCIE (23 września 2026) ─────────
-   Decyzja właściciela. Odpowiedź szła do Allegro w chwili kliknięcia i nie
-   dało się jej zawrócić — a w kolejce przerabianej z góry na dół pomyłka ma
-   trzy znane kształty: zła rozmowa, zły szkic, przypadkowy Enter.
+/* ── WYSYŁKA Z DZIESIĘCIOMA SEKUNDAMI NA COFNIĘCIE ───────────────────────────
+   Decyzja właściciela. W kolejce przerabianej z góry na dół pomyłka ma trzy
+   znane kształty: zła rozmowa, zły szkic, przypadkowy Enter.
 
    COFNIĘCIE ZAMIAST POTWIERDZENIA. Okno „czy na pewno?" przy każdej odpowiedzi
    uczy klikać „tak" bez czytania; dziesięć sekund z przyciskiem „Cofnij" nie
    zatrzymuje nikogo, kto się nie pomylił. Ten sam wzór co cofnięcia koszy
-   z 0.79.0 (§25a.5).
+   (§25a.5).
 
    CZEKANIE MIESZKA W PRZEGLĄDARCE, NIE NA SERWERZE — i to jest świadoma cena.
    Zamknięcie karty w tych dziesięciu sekundach zatrzymuje wysyłkę; ekran
    pyta wtedy o zgodę (`beforeunload`). Odwrotna usterka byłaby gorsza:
    odpowiedź, która wychodzi sama, gdy agent już jej nie widzi. Serwer
    sprawdza świeżość dopiero przy właściwym wysłaniu, więc dopisek klienta
-   w tym czasie zatrzymuje wysyłkę tak jak dotąd.
+   w tym czasie zatrzymuje wysyłkę.
 
    Ten komponent jest CZYSTY: licznik sekund i przyciski. Czas, wysyłkę
    i powrót do rozmowy trzyma `ekrany/Skrzynka.tsx`. */

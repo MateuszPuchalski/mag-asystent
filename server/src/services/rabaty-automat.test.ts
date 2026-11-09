@@ -8,9 +8,9 @@ import {
   AUTOMAT_RABATU, KARENCJA_MIN, MAKS_NA_PRZEBIEG, zlozBrakujaceWnioski,
 } from "./rabaty-automat.js";
 
-/* ── Automat wniosków o rabat (0.320.0) ──────────────────────────────────────
+/* ── Automat wniosków o rabat ────────────────────────────────────────────────
    Zgłoszenie właściciela: wniosek ma iść sam, zaraz po tym, jak dowiadujemy
-   się o odstąpieniu. Ręczny przycisk z 0.164.0 działa, ale trzeba o nim
+   się o odstąpieniu. Ręczny przycisk działa, ale trzeba o nim
    pamiętać przy każdym z kilkuset zwrotów — a prowizja, po którą nikt nie
    kliknął, zostaje u Allegro.
 

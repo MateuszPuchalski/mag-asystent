@@ -3,7 +3,7 @@ import type { Tag } from "../api/typy";
 import { Przycisk } from "../ui";
 import { KartaWgladu } from "../ui/wglad";
 
-/* ── Słownik tagów spraw (0.279.0) ───────────────────────────────────────────
+/* ── Słownik tagów spraw ─────────────────────────────────────────────────────
    Właściciel wybrał słownik EDYTOWALNY, więc nazwy dopisuje biuro, a nie
    wydanie. Dopisywanie stoi przy sprawie — tam, gdzie rodzi się potrzeba.
    Tutaj zostaje to, czego przy jednej sprawie robić nie wolno: zmiana nazwy
@@ -19,10 +19,8 @@ import { KartaWgladu } from "../ui/wglad";
    sprawie, byłaby ścianą w połowie czynności; licznik w tym miejscu mówi
    o niej wcześniej. Dekalog p. 6: ograniczenie jest tańsze od komunikatu.
 
-   KARTA JAK SĄSIEDNIE (0.521.0). Jako jedyna na ekranie miała gołą kartę,
-   własny nagłówek i podkreślone napisy zamiast przycisków — inny kształt
-   tej samej rangi kazał czytać, czy to coś innego. Teraz `KartaWgladu`
-   i `Przycisk`, jak konta i logo obok. */
+   KARTA JAK SĄSIEDNIE: `KartaWgladu` i `Przycisk`, jak konta i logo obok.
+   Inny kształt tej samej rangi kazałby czytać, czy to coś innego. */
 
 const MALY = "!px-2.5 !py-1 !text-xs";
 

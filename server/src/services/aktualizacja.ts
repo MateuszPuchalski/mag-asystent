@@ -3,13 +3,8 @@ import fs from "node:fs";
 import path from "node:path";
 import { config } from "../config.js";
 
-/* ── APK kolektora do samodzielnej aktualizacji (0.52.0) ─────────────────────
-   Do 0.52.0 nowy APK trafiał na kolektory wyłącznie ręką człowieka: zalogowanie
-   do GitHuba, pobranie artefaktu, obejście wszystkich urządzeń przez MDM albo
-   `adb install`. Jedynym sygnałem, że trzeba to zrobić, był bursztynowy pasek
-   „wersje różne" na dole ekranu — mówiący o problemie i nieoferujący wyjścia.
-
-   Teraz plik leży na serwerze w sieci magazynu, a kolektor pyta o niego przy
+/* ── APK kolektora do samodzielnej aktualizacji ──────────────────────────────
+   Plik leży na serwerze w sieci magazynu, a kolektor pyta o niego przy
    otwarciu aplikacji. Kolektor NIE WYCHODZI do internetu; do serwera plik
    przynosi instalator przy `-Aktualizuj`.
 
@@ -18,7 +13,7 @@ import { config } from "../config.js";
    pola — formatu, który Android potrafi zmienić między wersjami. Nazwa jest
    widoczna w `dir`, więc pomyłkę widać przed wdrożeniem, a nie po nim.
 
-   ROZMIAR I SUMA ZAWSZE Z PLIKU. Ta sama lekcja, którą niesie już trasa zdjęć
+   ROZMIAR I SUMA ZAWSZE Z PLIKU. Ta sama zasada co w trasie zdjęć
    (`routes/products.ts`): długość wzięta skądkolwiek indziej niż ze `stat`
    ucina ciało odpowiedzi bez żadnego błędu, a plik wygląda na uszkodzony.    */
 
@@ -51,14 +46,6 @@ export function katalogApk(): string {
  * Człon powyżej 999 odrzucamy. Kolizja („0.47.1000" i „0.48.0" dawałyby ten sam
  * wynik) czyta się jako „ta sama wersja", czyli aktualizacja po cichu znika
  * zamiast być błędna głośno.
- *
- * ZAPAS PODNIESIONY Z 99 DO 999 przy wydaniu 0.100.0 i to nie jest kosmetyka.
- * Przy starym mnożniku `0.100.0` dawało 10 000 — dokładnie tyle, co `1.0.0` —
- * a `0.101.0` przebijało `1.0.0`. Gorzej: ten strażnik odrzucał wtedy minor
- * setny, więc plik `wertis-kolektor-0.100.0.apk` PRZESTAŁBY być widoczny dla
- * kolektorów i aktualizacja zniknęłaby bez śladu. Nowe kody są większe od
- * wszystkich starych (0.99.0: 9 900 → 99 000), więc Android przyjmuje je jako
- * nowsze i przejście przez tę granicę niczego nie psuje.
  */
 export function kodWersji(major: number, minor: number, patch: number): number | null {
   if (minor > 999 || patch > 999) return null;

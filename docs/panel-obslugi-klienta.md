@@ -729,8 +729,7 @@ szarej bieżni: `bg-wertis-ink` przy wybranej, `bg-slate-100` przy niewybranej,
 z tych", a bez tła mówi „oto kilka rzeczy do kliknięcia". Kształt mieszka
 w `FiltrSegmentowy` (`panel/src/ui/index.tsx`) i pilnuje go
 `panel/src/ui/FiltrSegmentowy.test.tsx`; zwolnienie wymaga komentarza
-`segment: <powód>`. `Zakladki` biorą stamtąd pigułkę i różnią się jednym:
-równą szerokością.
+`segment: <powód>`.
 
 **Próg dotyku mieszka odtąd w komponencie (0.262.0).** `py-1` przy interlinii
 12/16 daje 24 px, czyli próg 2.5.8 z WCAG 2.2 AA. Do 0.261.0 pilnowała tego

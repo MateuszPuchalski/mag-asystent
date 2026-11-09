@@ -22,7 +22,7 @@ function mapRow(r: QueueRow) {
     type: r.type,
     status: r.status,
     label: r.label,
-    /* „MM" tylko przy MM. Numer ZW (0.349.0) niesie własny symbol, a dopisek
+    /* „MM" tylko przy MM. Numer ZW niesie własny symbol, a dopisek
        „dok. MM ZW 12/MAG/09/2026" wysłałby magazyniera po zły dokument. */
     detail: r.detail + (r.sgt_doc_number
       ? ` · dok. ${r.type === "mm" ? "MM " : ""}${r.sgt_doc_number}` : ""),
@@ -59,7 +59,7 @@ export async function queueRoutes(app: FastifyInstance) {
         "UPDATE sfera_queue SET status='pending', attempts=0, error_msg=NULL, next_attempt_at=NULL, processed_at=NULL WHERE id=?"
       )
       .run(id);
-    /* Ręczne ponowienie zapisu do bazy firmy (0.431.0). Do tej wersji nie
+    /* Ręczne ponowienie zapisu do bazy firmy. Do tej wersji nie
        zostawiało śladu: dziennik biura nie umiał powiedzieć, kto wysłał
        drugi raz zapis, który raz już się nie udał. Rola zostaje bez zmian,
        bo PONÓW woła też kolektor, przy półce. */

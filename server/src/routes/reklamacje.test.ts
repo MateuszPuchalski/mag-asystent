@@ -292,7 +292,7 @@ test("reklamacja spoza bazy to 404, nie pusty obiekt", async () => {
 });
 
 test("otwarcie kolejki i otwarcie sprawy nie zapisują NICZEGO", async () => {
-  /* Umowa z 0.18.0. Liczymy wiersze we WSZYSTKICH tabelach, których ten ekran
+  /* Umowa „zero zapisu przy patrzeniu”. Liczymy wiersze we WSZYSTKICH tabelach, których ten ekran
      dotyka — nie tylko w dzienniku, bo zapis potrafi wylądować obok. */
   const { naglowki } = login("biuro", "Ala czwarta");
   const licz = () => {

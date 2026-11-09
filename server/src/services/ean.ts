@@ -29,7 +29,7 @@ export interface KolizjaTowar {
 }
 
 /**
- * Co biuro postanowiło z kodem (0.360.0).
+ * Co biuro postanowiło z kodem.
  *
  * DWA RODZAJE, bo hala reaguje na nie odwrotnie — patrz `schema.sql`.
  * `poprawione` obiecuje, że kolizja zniknie; `dopuszczone` mówi, że zostanie
@@ -72,8 +72,8 @@ export function rozstrzygnijKolizje(
   if (!widziany) return { error: "Ten kod nie zatrzymał jeszcze nikogo w alejce" };
 
   /* Granicą jest OSTATNIE TRAFIENIE, nie chwila zapisu. Po samym znaczniku
-     trafienie z tej samej milisekundy co decyzja wpadało po złej stronie —
-     ta sama blizna co w raporcie skuteczności doboru (0.352.0). */
+     trafienie z tej samej milisekundy co decyzja wpadałoby po złej stronie
+     — jak w raporcie skuteczności doboru. */
   const ostatnie = db().prepare(
     "SELECT COALESCE(MAX(id),0) AS id FROM ean_conflict WHERE ean=?").get(kod) as { id: number };
   db().prepare(
@@ -102,7 +102,7 @@ export function eanConflictReport(): Array<{
    * Trafienia PO rozstrzygnięciu — 0, gdy decyzji nie ma.
    *
    * Liczone po `id` dziennika, nie po znaczniku: trafienie z tej samej
-   * milisekundy co decyzja nie dałoby się rozstrzygnąć czasem (0.352.0).
+   * milisekundy co decyzja nie dałoby się rozstrzygnąć czasem.
    *
    * Przy `poprawione` liczba większa od zera jest DOWODEM, że poprawka nie
    * zadziałała, i nie wymaga niczyjej oceny: biuro obiecało, że kolizja

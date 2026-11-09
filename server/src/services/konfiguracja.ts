@@ -3,15 +3,14 @@ import { config, type Config } from "../config.js";
 import { wartoscObowiazujaca } from "../konfiguracja-obowiazuje.js";
 import { KLUCZE, NAZWY_GRUP, type Edycja, type Grupa, type Kto, type Program } from "../konfiguracja-rejestr.js";
 
-/* ── Stan konfiguracji do panelu (0.488.0) ───────────────────────────────────
+/* ── Stan konfiguracji do panelu ─────────────────────────────────────────────
    Odpowiedź na pytanie „na czym ten serwer faktycznie chodzi" bez pulpitu
-   zdalnego. Dotąd znała ją tylko maszyna z Subiektem: plik `wertis.env`,
-   zmienne środowiskowe usług NSSM i wartości domyślne w kodzie, każde w innym
-   miejscu.
+   zdalnego: plik `wertis.env`, zmienne środowiskowe usług NSSM i wartości
+   domyślne w kodzie stoją każde w innym miejscu.
 
    Źródło każdej wartości idzie obok niej, bo to ono tłumaczy niespodzianki.
-   Wartość przykryta zmienną środowiskową usługi była już raz przyczyną
-   wdrożenia, które przeszło kreator i wylądowało na demówce (`env-file.ts`).
+   Wartość przykryta zmienną środowiskową usługi potrafi przenieść wdrożenie
+   po kreatorze na demówkę (`env-file.ts`).
 
    SEKRETY NIE WYCHODZĄ. Dla klucza `tajny` odpowiedź niesie wyłącznie to, czy
    jest ustawiony. Trasa jest za rolą admina, ale odpowiedź HTTP bywa
@@ -36,22 +35,22 @@ export interface WierszKonfiguracji {
   /** `null` dla sekretu i dla wartości domyślnej. */
   wartosc: string | null;
   /**
-   * Jak edytować z panelu (0.491.0); `null` = tylko plik albo instalator.
+   * Jak edytować z panelu; `null` = tylko plik albo instalator.
    * Klucz przykryty zmienną usługi też dostaje `null`: zapis w pliku nic by
    * nie zmienił, więc panel nie ma czego proponować.
    */
   edycja: Edycja | null;
   /**
-   * Rodzaj wartości NIEZALEŻNIE od edycji (0.543.0). Klucz przykryty zmienną
+   * Rodzaj wartości NIEZALEŻNIE od edycji. Klucz przykryty zmienną
    * usługi traci `edycja`, a panel dalej musi wiedzieć, że pokazuje datę.
    */
   rodzaj: Edycja["rodzaj"] | null;
-  /** Nazwa po polsku dla decyzji właściciela (0.543.0); `null` gdzie indziej. */
+  /** Nazwa po polsku dla decyzji właściciela; `null` gdzie indziej. */
   nazwa: string | null;
   jednostka: readonly [string, string, string] | null;
   wartosci: Readonly<Record<string, string>> | null;
   /**
-   * Wartość, na której serwer pracuje TERAZ, w kształcie z pliku (0.543.0).
+   * Wartość, na której serwer pracuje TERAZ, w kształcie z pliku.
    * Przy domyślnej to jedyne miejsce, skąd panel wie, ile ona wynosi.
    * `null` dla sekretu i dla klucza, którego domyślnej serwer nie zna.
    */

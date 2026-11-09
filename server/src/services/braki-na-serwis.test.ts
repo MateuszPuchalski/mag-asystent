@@ -6,18 +6,15 @@ import path from "node:path";
 
 /* ── Brak w dostawie jedzie na magazyn serwisowy ─────────────────────────────
    Decyzja właściciela: „gdy rozkładający dostawę zgłosi braki, brakujący towar
-   powinien być przeniesiony na magazyn serwis". Do tego wydania zgłoszenie
-   braku było wyłącznie ZDANIEM: wiersz w `problem`, pozycja w protokole dla
-   dostawcy i tyle. Stanu nie ruszało nic.
+   powinien być przeniesiony na magazyn serwis".
 
-   Dlaczego to bolało: fakturę zakupu Subiekt księguje w CAŁOŚCI, więc towar,
-   którego w palecie nie było, wisiał na magazynie głównym jako sprzedawalny.
-   Sklep obiecywał go klientom, a magazynier wracał z półki z niczym.
+   Fakturę zakupu Subiekt księguje w CAŁOŚCI, więc towar, którego w palecie
+   nie było, wisiałby na magazynie głównym jako sprzedawalny.
 
    MAGAZYN USTAWIAMY PRZED IMPORTEM. `config` powstaje raz, przy wczytaniu
    modułu, więc test z innym ustawieniem musi mieszkać w OSOBNYM pliku —
    jeden proces to jedna konfiguracja. Plik obok (`problems.test.ts`) biegnie
-   BEZ `MAG_ID_SERWIS` i pilnuje zachowania sprzed tego wydania.             */
+   BEZ `MAG_ID_SERWIS` i pilnuje zachowania bez magazynu serwisowego.        */
 
 process.env.MAG_ID_SERWIS = "7";
 process.env.DB_PATH = path.join(fs.mkdtempSync(path.join(os.tmpdir(), "wertis-serwis-")), "t.db");
@@ -94,7 +91,7 @@ const zdarzenia = (typ: string): Array<Record<string, unknown>> =>
 /* ── Ile sztuk brakuje ───────────────────────────────────────────────────── */
 
 test("formuła braku jest ODWROTNA między kategoriami", () => {
-  /* To jest jedyny naprawdę groźny szczegół tego wydania. Arkusz kolektora pyta
+  /* Najgroźniejszy szczegół. Arkusz kolektora pyta
      przy „Braku w przesyłce", ILE BRAKUJE, a przy „Złej ilości" — ILE PRZYSZŁO
      (`ProblemSheet.etykietaIlosci`). Jedna formuła na oba przypadki przesunęłaby
      złą liczbę sztuk, a MM nie cofa się jednym kliknięciem. */
@@ -153,7 +150,7 @@ test("zła ilość przesuwa TYLKO różnicę", () => {
 });
 
 test("nadmiar przy zamknięciu dostawy nie rusza stanu", () => {
-  /* Automatyczne zgłoszenie nadmiaru (0.64.0) idzie tą samą drogą, z ilością
+  /* Automatyczne zgłoszenie nadmiaru idzie tą samą drogą, z ilością
      FAKTYCZNĄ większą od dokumentu. Gdyby formuła brała moduł różnicy, każde
      zamknięcie dostawy z nadmiarem wystawiałoby MM na towar, który leży. */
   const r = zglos({ typ: "qty_mismatch", qty: 13, zachowajStatusLinii: true });

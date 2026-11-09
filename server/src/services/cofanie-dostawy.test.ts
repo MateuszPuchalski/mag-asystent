@@ -5,13 +5,9 @@ import os from "node:os";
 import path from "node:path";
 
 /* ── Cofanie pomyłek przy rozkładaniu dostawy ────────────────────────────────
-   ZGŁOSZENIE WŁAŚCICIELA: „jak już zaznaczyłem, że wszystko jest, a się
-   pomyliłem, to nie mogę tego cofnąć".
-
    Ten plik pilnuje czterech dróg powrotu i ich granic. Najważniejsza jest
-   pierwsza: odłożenie OSTATNIEJ pozycji domyka dostawę, a do tego wydania
-   zamknięta dostawa nie przyjmowała już żadnej poprawki. Pomyłka przy końcu
-   palety była więc jedyną, której nie dało się naprawić.                     */
+   pierwsza: odłożenie OSTATNIEJ pozycji domyka dostawę, a pomyłka przy końcu
+   palety też musi dać się naprawić.                                          */
 
 process.env.DB_PATH = path.join(fs.mkdtempSync(path.join(os.tmpdir(), "wertis-cofanie-")), "t.db");
 process.env.MAG_ID_MAG = "1";
@@ -387,9 +383,8 @@ test("cudze, rozstrzygnięte i automatyczne zgłoszenie nie dają się wycofać"
 });
 
 test("wyjątek na ostatniej pozycji NIE domyka dostawy — czeka na ZAKOŃCZ", () => {
-  /* Decyzja właściciela po audycie z 22 września 2026. Wyjątek czeka na
-     decyzję („dosłali brakujące sztuki"), a zamknięta dostawa nie miała już
-     gdzie ich przyjąć. */
+  /* Decyzja właściciela. Wyjątek czeka na decyzję („dosłali brakujące
+     sztuki"), a zamknięta dostawa nie miałaby gdzie ich przyjąć. */
   const { id, linie } = dostawa([{ tw: 1, sym: "KOSA-1", lok: "A01-01-01", ilosc: 10 }]);
   const p = P.raiseProblem({ deliveryId: id, lineId: linie[0], typ: "qty_mismatch", qty: 6 }, "jan");
   assert.ok("id" in p);

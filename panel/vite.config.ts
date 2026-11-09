@@ -8,7 +8,7 @@ import { wtyczkaZmian } from "./wtyczka-zmian";
 
 const tutaj = path.dirname(fileURLToPath(import.meta.url));
 
-/* ── PIECZĄTKA WERSJI W ZBUDOWANYM PANELU (audyt, 15 września 2026) ────────
+/* ── PIECZĄTKA WERSJI W ZBUDOWANYM PANELU ──────────────────────────────────
    Panel i serwer buduje się dwoma różnymi poleceniami, a `npm run build`
    w `server/` NIE przebudowuje panelu. Skutek jest cichy i najgorszy z
    możliwych: `/api/health` melduje nową wersję, bo proces API wstał z nowego

@@ -1,14 +1,11 @@
-import React from "react";
 import { UserRound } from "lucide-react";
 
 /**
- * Prowadzący rozmowę jako kółko w nagłówku (23 września 2026).
+ * Prowadzący rozmowę jako kółko w nagłówku.
  *
- * Wspólny `sprawy/Prowadzi.tsx` zostaje w reklamacjach, bo tam
- * niesie przycisk wzięcia sprawy. W skrzynce przycisku nie ma od 0.395.0 —
- * rozmowę przypisuje pierwsza odpowiedź — więc zostawał sam napis na całą
- * linię. Kółko mówi to samo jednym znakiem: przerywane i puste, gdy nikt;
- * z inicjałem, gdy ktoś; w zieleni, gdy patrzący.
+ * W skrzynce rozmowę przypisuje pierwsza odpowiedź, więc nagłówek nie
+ * potrzebuje przycisku. Kółko mówi to jednym znakiem: przerywane i puste,
+ * gdy nikt; z inicjałem, gdy ktoś; w zieleni, gdy patrzący.
  */
 export function ProwadziZnak({ prowadzi, ja }: { prowadzi: string | null; ja: boolean }) {
   const zdanie = prowadzi

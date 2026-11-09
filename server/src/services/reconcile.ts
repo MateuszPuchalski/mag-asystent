@@ -39,7 +39,7 @@ export interface Rekoncyliacja {
 
 /* Granice w tym pliku piszemy `strftime(…'Z'…)`, nie `datetime()`: znaczniki
    kolejki mają `T`, a `datetime()` spację, więc `<` gubiło dobę graniczną.
-   Powód przy `GRANICA_OKNA` w `raporty.ts` (0.494.1). */
+   Powód przy `GRANICA_OKNA` w `raporty.ts`. */
 
 /** 1. Adres w Subiekcie vs ostatni udany zapis aplikacji (24 h). */
 function lokalizacje(): { rozjazdy: Rozjazd[]; sprawdzono: number } {
@@ -159,7 +159,7 @@ function mmCzekajace(): Rozjazd[] {
 /**
  * 5. Koszyki zwrotów zamknięte ponad dobę temu, którym wciąż brakuje korekty.
  *
- * Od 0.200.0 MM koszyka czeka na komplet numerów korekt — bo zdejmuje towar
+ * MM koszyka czeka na komplet numerów korekt — bo zdejmuje towar
  * z magazynu głównego, a ten wraca tam dopiero po korekcie. Czekanie jest
  * więc POPRAWNE, ale bezterminowe czekanie jest cichym zakleszczeniem: kosz
  * stoi na hali, magazynier nie ma czego rozłożyć, a nikt nie pyta dlaczego.
@@ -184,20 +184,17 @@ function koszeBezKorekty(): Rozjazd[] {
  * 6. Kosze rozłożone ponad dobę temu, którym nie wyszedł powrót z bufora.
  *
  * Towar leży wtedy na półce w hali, a stan wisi na regale zwrotów — czyli
- * nie jest sprzedawalny, choć fizycznie jest na miejscu. Do 0.264.0 ten stan
- * nie miał ani automatu, ani alarmu: dokument powrotny wystawiało biuro ręką
- * w Subiekcie i nikt nie liczył, ile razy o nim zapomniano.
+ * nie jest sprzedawalny, choć fizycznie jest na miejscu.
  *
- * Od 0.266.0 dokument zamawia aplikacja, ale czeka na zapisanie adresów —
- * i to czekanie może stanąć, gdy zadanie adresu wisi w błędzie. Ten wiersz
- * jest właśnie o tym: warunek, który miał trwać sekundy, trwa dobę.
+ * Dokument zamawia aplikacja, ale czeka na zapisanie adresów — i to czekanie
+ * może stanąć, gdy zadanie adresu wisi w błędzie. Ten wiersz jest właśnie
+ * o tym: warunek, który miał trwać sekundy, trwa dobę.
  *
- * Od 0.277.0 wchodzą tu TAKŻE kosze z dokumentu MM: dokument powrotny przestał
- * być robotą biura, więc jego brak przestał być stanem normalnym. Kosz, którego
+ * Wchodzą tu TAKŻE kosze z dokumentu MM. Kosz, którego
  * kierunku aplikacja nie zna (dokument poza oknem importu), zgłasza się tym
  * samym wierszem i to jest jedyne miejsce, w którym biuro się o nim dowie.
  *
- * Nie wchodzą kosze rozłożone przed tymi wydaniami: rozliczyło je biuro ręką,
+ * Nie wchodzą kosze rozliczone przez biuro ręką,
  * więc raport wypisywałby historię jako pracę (`powrot_poza_aplikacja`).
  *
  * Nie wchodzi też kosz z aplikacji, którego MM NA regał jeszcze nie weszło.
@@ -206,7 +203,7 @@ function koszeBezKorekty(): Rozjazd[] {
  * adresy" kazałoby szukać nie tam.
  */
 function koszeBezPowrotuRozjazdy(): Rozjazd[] {
-  /* Warunek mieszka w `kosze.ts` od 0.505.0 — ten sam czyta ekran koszy.
+  /* Warunek mieszka w `kosze.ts` — ten sam czyta ekran koszy.
      Ruch w zdaniu zależy od przyczyny: kosz bez znanego kierunku NIE czeka
      na adresy, więc „sprawdź adresy" kazałoby szukać nie tam. */
   const RUCH = {
@@ -229,9 +226,8 @@ function koszeBezPowrotuRozjazdy(): Rozjazd[] {
  *
  * Allegro tych pieniędzy nigdy nie trzymało, więc przycisk ODDAJ PIENIĄDZE
  * jest tam zamknięty z definicji — wypłata idzie przelewem z banku firmy.
- * Do 0.268.0 aplikacja nie miała gdzie tego zapisać, a zwrot zamykał się
- * korektą i schodził z kolejki: klient bez pieniędzy wyglądał wtedy dokładnie
- * jak klient rozliczony.
+ * Zwrot zamyka się korektą i schodzi z kolejki, więc klient bez pieniędzy
+ * wygląda tam dokładnie jak klient rozliczony.
  *
  * Sygnał `przelew_czeka` mówi to na ekranie, ale ekran trzeba otworzyć — ten
  * wiersz mówi to raportowi, który biuro czyta rano. Próg doby jest ten sam co
@@ -267,10 +263,8 @@ function zwrotyBezPrzelewu(): Rozjazd[] {
 /**
  * 8. Zwroty w pracy, którym termin ustawowy minął albo mija w ciągu doby.
  *
- * DO 0.210.0 TERMINU PILNOWAŁ WYŁĄCZNIE KOLOR WIERSZA. Sygnał „termin" zapala
- * się przy trzech dniach, ale zapala się NA EKRANIE — a rekoncyliacja
- * i `/api/health` nie znały zwrotów w ogóle. Czternaście dni ustawowych mijało
- * bez jednego alarmu, jeśli przez tydzień nikt nie otworzył panelu.
+ * Sygnał „termin" zapala się przy trzech dniach, ale NA EKRANIE. Bez tej
+ * kontroli termin ustawowy mija bez alarmu, jeśli nikt nie otworzy panelu.
  *
  * To jedyna kontrola w tym pliku o skutku PRAWNYM, nie operacyjnym: po
  * terminie kupującemu należą się odsetki, a sprzedawca traci argument
@@ -283,7 +277,7 @@ function zwrotyBezPrzelewu(): Rozjazd[] {
 function zwrotyPoTerminie(): Rozjazd[] {
   return listaZwrotow(db())
     .filter((z) => z.kubelek !== "zamkniety" && z.kubelek !== "odrzucony")
-    /* Bez terminu nie ma czego pilnować (0.339.0): paczka jeszcze nie wróciła,
+    /* Bez terminu nie ma czego pilnować: paczka jeszcze nie wróciła,
        więc zegar obsługi nie ruszył. Dopisanie ich do raportu kazałoby gonić
        pracę, której nie da się wykonać. */
     .filter((z): z is typeof z & { dniDoTerminu: number } => z.dniDoTerminu !== null)
@@ -291,7 +285,7 @@ function zwrotyPoTerminie(): Rozjazd[] {
     .map((z) => ({
       rodzaj: "zwrot_po_terminie" as const,
       klucz: z.numer ?? z.externalId,
-      /* TERMIN OBSŁUGI, nie ustawowy (0.339.0) — siedem dni od doręczenia
+      /* TERMIN OBSŁUGI, nie ustawowy — siedem dni od doręczenia
          paczki, regulamin Allegro. Zdanie mówi to wprost, bo raport czyta
          człowiek, który zna oba zegary i musi wiedzieć, o którym mowa. */
       opis: z.dniDoTerminu < 0
@@ -304,7 +298,7 @@ function zwrotyPoTerminie(): Rozjazd[] {
 }
 
 /**
- * Zwrot rozliczony przez Allegro, po którym została NASZA robota (0.339.0).
+ * Zwrot rozliczony przez Allegro, po którym została NASZA robota.
  *
  * Od tego wydania status `FINISHED` zdejmuje zwrot z kolejki pracy — decyzja
  * właściciela po zgłoszeniu „pokazuje zwroty, za które pieniądze zostały już
@@ -312,7 +306,7 @@ function zwrotyPoTerminie(): Rozjazd[] {
  * w ciszy: pieniądze wróciły do klienta, ale korekta w Subiekcie i towar na
  * półce to osobna robota, a zwrot właśnie przestał o nią prosić.
  *
- * Bez korekty NIE WYJDZIE TEŻ MM (bramka 0.200.0), więc koszyk z tym zwrotem
+ * Bez korekty NIE WYJDZIE TEŻ MM, więc koszyk z tym zwrotem
  * stanąłby w miejscu na zawsze — i to jest drugi powód, dla którego ta
  * kontrola istnieje. Raport jest tu jedynym miejscem, w którym taki zwrot
  * jeszcze się odezwie.
@@ -321,14 +315,14 @@ function zwrotyPoTerminie(): Rozjazd[] {
  */
 function zwrotyRozliczoneBezKorekty(): Rozjazd[] {
   return listaZwrotow(db())
-    /* ZATRZASK, nie wskaźnik „teraz" (0.345.0) — ten sam powód co przy
+    /* ZATRZASK, nie wskaźnik „teraz" — ten sam powód co przy
        kubełku: zwrot rozliczony idzie dalej osią czasu Allegro. */
     .filter((z) => z.rozliczonyAllegroAt
       || STATUSY_ODDANE.has(String(z.statusAllegro ?? "")))
-    /* TYLKO OD PROGU (0.340.0). Historia firmy niesie setki zwrotów
+    /* TYLKO OD PROGU. Historia firmy niesie setki zwrotów
        rozliczonych w panelu Allegro, których korekt nikt już wstecz nie
        wystawi — raport o nich uczyłby przewijać raport. Próg stoi
-       w `ZWROT_ROZLICZONE_OD` i domyślnie jest dniem wdrożenia 0.340.0.
+       w `ZWROT_ROZLICZONE_OD` i domyślnie jest dniem wdrożenia tej kontroli.
        Pusty próg (`ZWROT_ROZLICZONE_OD=`) znaczy „wołaj o wszystkie" — tak
        samo jak przy pozostałych progach dat w konfiguracji. */
     .filter((z) => {
@@ -354,7 +348,7 @@ function zwrotyRozliczoneBezKorekty(): Rozjazd[] {
       klucz: z.numer ?? z.externalId,
       /* NUMER W ZDANIU, jak w kontrolach wyżej: raport czyta się jako listę
          zdań, a nie jako tabelę z kluczem obok. */
-      /* Źródło wypłaty w nawiasie (0.493.0): zatrzask z operacji płatności
+      /* Źródło wypłaty w nawiasie: zatrzask z operacji płatności
          przychodzi bez statusu zwrotu i zdanie mówiło wtedy „(null)". */
       opis: `Zwrot ${z.numer ?? z.externalId}: Allegro oddało pieniądze ` +
         `(${z.statusAllegro ?? "operacje płatności"}), a u nas został${braki.length > 1 ? "y" : ""}: ` +
@@ -399,7 +393,7 @@ export function reconcileCsv(r: Rekoncyliacja): string {
 /**
  * Raport rozjazdów do `reconcile/<data>.csv` obok bazy; `null` przy zerze.
  *
- * Wspólne dla `npm run reconcile` i nocnego przebiegu serwera (0.487.0).
+ * Wspólne dla `npm run reconcile` i nocnego przebiegu serwera.
  * Dwie kopie tego kodu pisałyby raport w dwa różne miejsca przy pierwszej
  * zmianie, a człowiek szuka go w jednym.
  */

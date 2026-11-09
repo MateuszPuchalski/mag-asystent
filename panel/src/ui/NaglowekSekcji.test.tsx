@@ -10,12 +10,9 @@ import { NaglowekSekcji } from "./index";
 const ZRODLA = import.meta.glob(["../**/*.tsx", "!../**/*.test.tsx", "!../ui/index.tsx"],
   { query: "?raw", eager: true, import: "default" }) as Record<string, string>;
 
-/* ── Jedna ranga, jeden kształt (0.256.0) ────────────────────────────────────
-   `NaglowekSekcji` powstał w 0.249.0 i do 0.255.0 używały go TRZY pliki.
-   Obok stało siedemnaście ręcznie sklejonych nagłówków tej samej rangi:
-   w pięciu wagach (`font-bold`, `font-semibold`, gołe `<b>`) i dwóch
-   rozmiarach (11 px i 12 px). Pięć zapisów jednej roli to nie wariant, tylko
-   brak decyzji — a czytelnik nie ma jak poznać, że to jeden poziom.
+/* ── Jedna ranga, jeden kształt ──────────────────────────────────────────────
+   Kilka zapisów jednej roli to nie wariant, tylko brak decyzji — a
+   czytelnik nie ma jak poznać, że to jeden poziom.
 
    CO PILNUJE. Że łańcuch „wersaliki + rozstrzelenie + szarość" nie odradza się
    poza komponentem. Nie zabrania wersalików w ogóle: plakietka (`Plakietka`),
@@ -69,10 +66,9 @@ describe("Nagłówek sekcji: znacznik i barwa", () => {
     expect(k).toContain("text-emerald-800");
     expect(k).not.toContain("text-slate-500");
     expect(k).toContain("uppercase");
-    /* Od 0.258.0 szczebel nazywa się `text-podpis` — 11 px z interlinią 16 px.
-       Arbitralne `text-[11px]` nie miało w Tailwindzie żadnej interlinii, więc
-       82 miejsca dziedziczyły 1,5 z przeglądarki. Intencja testu bez zmian:
-       nagłówek jest DROBNY i to jest jego cała siła. */
+    /* Szczebel `text-podpis` — 11 px z interlinią 16 px. Arbitralne
+       `text-[11px]` nie ma w Tailwindzie żadnej interlinii. Nagłówek jest
+       DROBNY i to jest jego cała siła. */
     expect(k).toContain("text-podpis");
   });
 

@@ -3,12 +3,8 @@ import { config } from "../config.js";
 import { logEvent } from "./events.js";
 import type { Db } from "../db/db.js";
 
-/* ── Czy pieniądze naprawdę wróciły do klienta (0.426.0) ─────────────────────
-   Zgłoszenie właściciela: „zwroty pokazuje że są do decyzji mimo że w Allegro
-   zwrot został już dawno zrobiony". W kolejce stało 934 takich spraw, wszystkie
-   sierpniowe i wszystkie po terminie.
-
-   ── DLACZEGO KUBEŁEK NIE MÓGŁ WIEDZIEĆ ────────────────────────────────────
+/* ── Czy pieniądze naprawdę wróciły do klienta ───────────────────────────────
+   ── DLACZEGO STATUS ZWROTU NIE WYSTARCZA ──────────────────────────────────
    W całym modelu `CustomerReturn` jedynym polem mówiącym „wypłata poszła" jest
    `status` o wartości `FINISHED` albo `FINISHED_APT`. Sprawdzone w schemacie:
    `CustomerReturn.refund` niesie WYŁĄCZNIE `bankAccount` — ani kwoty, ani daty,
@@ -19,20 +15,14 @@ import type { Db } from "../db/db.js";
        DELIVERED → FINISHED → COMMISSION_REFUND_CLAIMED → COMMISSION_REFUNDED
 
    Dwa ostatnie dotyczą NASZEJ PROWIZJI, nie pieniędzy klienta — mówi to wprost
-   opis pola w schemacie i potwierdził to właściciel. Kto nie odpytał Allegro
-   dokładnie w oknie `FINISHED`, nie dowie się o wypłacie nigdy. Zatrzask
-   `rozliczony_allegro_at` z 0.345.0 istnieje właśnie po to, ale zatrzaskuje
-   tylko to, co zobaczył.
-
-   Na sierpniową zaległość złożyły się trzy rzeczy naraz: takt co pięć minut,
-   NASZ WŁASNY automat rabatów spychający oś z `FINISHED` zaraz po zaciągnięciu
-   odstąpienia (0.320.0) i odświeżanie znanych zwrotów, które powstało dopiero
-   15 września. Zwroty sprzed tej daty nie wracały na listę ani razu.
+   opis pola w schemacie. Kto nie odpytał Allegro dokładnie w oknie
+   `FINISHED`, nie dowie się o wypłacie nigdy. Zatrzask
+   `rozliczony_allegro_at` zatrzaskuje tylko to, co zobaczył.
 
    ── FAKT ZAMIAST ULOTNEGO STATUSU ────────────────────────────────────────
    `GET /payments/payment-operations` oddaje historię operacji płatniczych
    sprzedawcy, a `payment.id` jest jej PARAMETREM. Identyfikator płatności
-   trzymamy przy zamówieniu od 0.190.0, więc pytanie jest punktowe: „czy na tej
+   trzymamy przy zamówieniu, więc pytanie jest punktowe: „czy na tej
    płatności jest obciążenie zwrotem". Odpowiedź nie wygasa i nie zależy od
    tego, czy ktoś patrzył we właściwej minucie.
 
@@ -113,17 +103,13 @@ export const WYPLATY_NA_PRZEBIEG = 100;
  * Zamknięty, który czeka na pieniądze, jest w pracy — powód niżej. Zwrot
  * odrzucony odpada razem z nimi: tam pieniądze nie miały wyjść.
  *
- * NAJDAWNIEJ SPRAWDZANE PIERWSZE, NIE NAJSTARSZE (0.506.1). Do tego wydania
- * lista szła po dacie zgłoszenia, sto na przebieg, bez pamięci, kogo już
- * pytała. Gdy zwrotów bez rozliczenia jest ponad setka, czoło listy zajmują
- * te, które rozliczenia nie dostaną nigdy — nienadane paczki, sprawy
- * zamknięte regułą wieku — a nowszy zwrot nie doczeka się pytania ani razu.
- * Wyszło to przy zwrocie 6016/2026 (wypłata 23 września, panel dalej „do
- * zwrotu"). Teraz nigdy niepytane idą pierwsze, po dacie zgłoszenia, a potem
- * te, o które pytaliśmy najdawniej.
+ * NAJDAWNIEJ SPRAWDZANE PIERWSZE, NIE NAJSTARSZE. Czoło listy po dacie
+ * zgłoszenia zajmowałyby zwroty, które rozliczenia nie dostaną nigdy, a nowszy
+ * nie doczekałby się pytania. Nigdy niepytane idą pierwsze, po dacie
+ * zgłoszenia, a potem te, o które pytaliśmy najdawniej.
  */
 /**
- * Jak długo pytamy o wypłatę zwrotu ZAMKNIĘTEGO korektą (0.505.0). Dłużej niż
+ * Jak długo pytamy o wypłatę zwrotu ZAMKNIĘTEGO korektą. Dłużej niż
  * termin i dzień automatu Allegro, bo pobranie i paczka nieodebrana czekają
  * na pieniądze dłużej (`pieniadzeCzekaja`). Dalej to już historia.
  */
@@ -132,12 +118,9 @@ const ZAMKNIETY_PYTAMY_DNI = 60;
 export function zwrotyDoSprawdzeniaWyplaty(
   database: Db, konto: number, limit = WYPLATY_NA_PRZEBIEG, teraz = new Date(),
 ): DoSprawdzeniaWyplaty[] {
-  /* ZAMKNIĘTY, A NIEZAPŁACONY TEŻ JEST W PRACY (0.505.0). Od 0.476.0 zwrot
-     zamknięty korektą wraca do DO ZWROTU, dopóki pieniądze nie wyjdą — ZW
-     automatem zamyka go minutę po kwocie. Ta lista brała jednak tylko
-     zwroty BEZ zamknięcia, więc o wypłatę zrobioną ręką w Allegro nie pytała
-     nikogo. Zgłoszenie właściciela, zwrot X5XY/2026: „dlaczego pokazuje do
-     zwrotu, mimo że pieniądze zostały zwrócone?".
+  /* ZAMKNIĘTY, A NIEZAPŁACONY TEŻ JEST W PRACY. Zwrot zamknięty korektą
+     wraca do DO ZWROTU, dopóki pieniądze nie wyjdą, a wypłatę zrobioną ręką
+     w Allegro widać tylko z tego pytania.
 
      Warunek to lustro `pieniadzeCzekaja`: przyjęty, z kwotą, bez naszego
      zlecenia, bez zapisanego przelewu i bez odmowy. Reszta zamkniętych to

@@ -1,11 +1,10 @@
 import { describe, expect, it } from "vitest";
 import { rozbierzFormularz, scisle, zawieraOpis } from "./tresc";
 
-/* ── Treść wiadomości reklamacyjnej (0.415.0) ────────────────────────────────
-   WEJŚCIA SĄ PRAWDZIWE, nie wymyślone, i to jest cała lekcja tego wydania.
-   0.412.0 miało test dubla, test przechodził, a na produkcji poprawka nie
-   zadziałała ani razu — bo karmiliśmy ją parą, którą sami napisaliśmy. Tekst
-   niżej jest przepisany ze zrzutu właściciela ze sprawy szarpaka.            */
+/* ── Treść wiadomości reklamacyjnej ──────────────────────────────────────────
+   WEJŚCIA SĄ PRAWDZIWE, nie wymyślone: test karmiony parą, którą sami
+   napisaliśmy, przechodzi, choć na produkcji poprawka nie działa. Tekst
+   niżej jest przepisany z prawdziwej sprawy szarpaka.                       */
 
 const OPIS = "Po kilku użyciach szarpak przestał wciągać sznurek do środka .";
 

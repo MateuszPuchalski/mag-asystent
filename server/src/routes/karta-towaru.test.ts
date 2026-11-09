@@ -117,7 +117,7 @@ test("po odłożeniu całości sekcja znika z karty", async () => {
 });
 
 
-/* ── Ceny z kartoteki Subiekta (0.396.0) ─────────────────────────────────────
+/* ── Ceny z kartoteki Subiekta ─────────────────────────────────────
    Zgłoszenie właściciela: „nie widzę cen z Subiekta przy towarach". Ten sam
    powód, dla którego strzeżemy `wDostawie`: serwis może liczyć dobrze, a pole
    i tak zostanie po drodze. Bez tych testów pominięcie `ceny`

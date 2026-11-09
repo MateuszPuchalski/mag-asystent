@@ -184,7 +184,7 @@ test("odkodujEncje: nbsp na zwykłą spację, typografia dekodowana", () => {
   assert.equal(odkodujEncje("&bdquo;x&rdquo; &ndash; 5&deg;"), "„x” – 5°");
 });
 
-/* ── Alfabety spoza polskiego (0.250.0) ──────────────────────────────────────
+/* ── Alfabety spoza polskiego ──────────────────────────────────────
    Zgłoszenie właściciela: „często piszą do nas Węgrzy, Słowacy i Czesi
    i dostajemy takie znaki `Z&aacute;silka nebyla doručena`". Do 0.249.1
    tablica znała WYŁĄCZNIE polskie znaki, więc `&aacute;` zostawało dosłownie.
@@ -242,7 +242,7 @@ test("odkodujEncje: miękki dywiz NIE jest dekodowany", () => {
   assert.equal(odkodujEncje("ge&shy;trennt"), "ge&shy;trennt");
 });
 
-/* ── Podpis bez nazwiska (0.232.1) ──────────────────────────────────────── */
+/* ── Podpis bez nazwiska ──────────────────────────────────────── */
 import { bezPodpisu } from "./tekst.js";
 
 test("bezPodpisu wycina autora po dacie w trzech kształtach podpisu", () => {

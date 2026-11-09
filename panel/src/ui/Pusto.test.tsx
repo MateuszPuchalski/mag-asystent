@@ -10,26 +10,20 @@ import { Pusto } from "./index";
 const ZRODLA = import.meta.glob(["../**/*.tsx", "!../**/*.test.tsx", "!../ui/index.tsx"],
   { query: "?raw", eager: true, import: "default" }) as Record<string, string>;
 
-/* ── PUSTY STAN MA JEDNO ŹRÓDŁO KSZTAŁTU (0.267.0) ─────────────────────────────
-   Ustalenie 10 z audytu. `Pusto` obsługiwał dziesięć miejsc, a obok stało
-   dziewiętnaście akapitów sklejonych ręcznie w dwóch wariantach: `p-4 text-sm
-   text-slate-500` i `p-6 text-center text-sm text-slate-500`. Trzy zapisy
-   jednej roli — ten sam wzór, co przy nagłówku sekcji w 0.256.0 i przy filtrze
-   segmentowym w 0.262.0.
+/* ── PUSTY STAN MA JEDNO ŹRÓDŁO KSZTAŁTU ─────────────────────────────────────
+   Kilka ręcznych zapisów jednej roli to brak decyzji.
 
    CO PILNUJE — dwie rzeczy:
 
      1. Ręczny pusty stan listy nie odradza się poza `ui/index.tsx`.
      2. Ikona idzie REFERENCJĄ komponentu, nie gotowym elementem. Element
-        pozwalał podać własny `size` i tak rozmiar rozjechał się na 32, 38
-        i 40 px, a `text-slate-300` trafiło na trzy ikony z dziesięciu.
+        pozwala podać własny `size` i barwę, więc rozmiar się rozjeżdża.
 
    CZEGO NIE PILNUJE. Nie wie, czy pusty stan w ogóle powstał: da się dołożyć
    listę, która przy zerze wierszy nie mówi nic, i bramka tego nie zobaczy.
    Nie rozpoznaje też ROLI — drobne podpisy w kartach („brak identyfikatorów
    w opisie") to etykiety WARTOŚCI, nie puste stany, i mają zostać tam, gdzie
-   są. Pierwsze podejście do tego wydania wciągnęło je tutaj wzorcem po
-   klasach i dało czterdzieści sześć zamian zamiast dziewiętnastu.
+   są.
 
    ZWOLNIENIA SĄ JAWNE. Komentarz `pustka: <powód>` w linii albo do sześciu
    linii nad nią, powód co najmniej trzy wyrazy — ten sam mechanizm i próg co
@@ -62,7 +56,7 @@ function znajdz(wzorzec: RegExp): string[] {
 
 describe("Pusty stan listy ma jeden kształt", () => {
   it("nikt nie skleja go ręcznie poza `ui/index.tsx`", () => {
-    /* Oba warianty, które stały w panelu do 0.265.0. Wzorzec celuje w akapit
+    /* Oba warianty ręcznego pustego stanu. Wzorzec celuje w akapit
        z paddingiem i szarością — czyli w pasmo zajmujące miejsce listy,
        a nie w dowolny drobny podpis. */
     expect(znajdz(/<p className="p-[46] [^"]*text-sm text-slate-500">/)).toEqual([]);
@@ -75,8 +69,7 @@ describe("Pusty stan listy ma jeden kształt", () => {
        Reguła celuje WYŁĄCZNIE w `Pusto`. `NaglowekSekcji` i `Sekcja` też mają
        prop `ikona` i też biorą gotowy element — słusznie, bo ich ikona stoi
        w rzędzie z tekstem i ma 13 albo 14 px, czyli rozmiar dobierany do
-       sąsiada. Pierwsza wersja tej reguły nie robiła tego rozróżnienia
-       i zgłaszała osiem miejsc, w których wszystko jest w porządku. */
+       sąsiada. */
     const winne: string[] = [];
     for (const [plik, zrodlo] of Object.entries(ZRODLA)) {
       const linie = bezKomentarzy(zrodlo).split("\n");
@@ -92,9 +85,8 @@ describe("Pusty stan listy ma jeden kształt", () => {
 
 describe("Pusto: dwie wagi, dwa kształty", () => {
   it('waga „ekran” wypełnia kolumnę i stoi na drabinie', () => {
-    /* Do 0.265.0 komponent NIE MIAŁ klasy rozmiaru i dziedziczył 16 px z `body`
-       — jedyny taki w panelu po 0.258.0, czyli po wydaniu, które drabinę
-       zakładało. `text-tresc`, bo to jest zdanie, które się czyta. */
+    /* Bez klasy rozmiaru komponent dziedziczyłby 16 px z `body`.
+       `text-tresc`, bo to jest zdanie, które się czyta. */
     const { container } = render(<Pusto ikona={Inbox}>Wybierz rozmowę z listy</Pusto>);
     const k = container.firstElementChild!.className;
     expect(k).toContain("text-tresc");
@@ -121,8 +113,8 @@ describe("Pusto: dwie wagi, dwa kształty", () => {
   });
 
   it("ikona i zdanie stoją w jednej grupie, więc siatka centruje je razem", () => {
-    /* Siatka z dwojgiem dzieci rozkładała ikonę i zdanie na dwie połowy
-       kolumny, trzysta pikseli od siebie (0.546.0). jsdom nie liczy układu,
+    /* Siatka z dwojgiem dzieci rozkłada ikonę i zdanie na dwie połowy
+       kolumny, setki pikseli od siebie. jsdom nie liczy układu,
        więc test pilnuje przyczyny: siatka ma dokładnie jedno dziecko. */
     const { container } = render(<Pusto ikona={Inbox}>Wybierz rozmowę z listy</Pusto>);
     const siatka = container.firstElementChild!;

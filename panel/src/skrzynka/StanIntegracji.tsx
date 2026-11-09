@@ -1,8 +1,6 @@
-import React from "react";
 import type { Zdrowie } from "../api/typy";
-import { BARWA_RANGI, czas, type Ranga } from "../ui";
+import { BARWA_RANGI, czas, wiek, type Ranga } from "../ui";
 import { KartaWgladu } from "../ui/wglad";
-import { wiek } from "./AlarmSynchronizacji";
 
 /* Ranga statusu, nie jego barwa: „czerwony" przestałby znaczyć cokolwiek
    przy zmianie palety, a `authentication_error` zawsze woła admina. */
@@ -19,14 +17,10 @@ export function StanIntegracji({ zdrowie, odczyt }: { zdrowie: Zdrowie | undefin
   const o = zdrowie.obsluga;
 
   const wiersze: Array<[string, string, Ranga]> = [
-    /* POŁĄCZENIE TO NIE SYNCHRONIZACJA — poprawka z 0.152.0. Do niej etykieta
-       „Połączenie Allegro" niosła `allegroInbox.status`, czyli stan
-       SYNCHRONIZACJI. Niesparowane konto wyglądało jak awaria synchronizacji
-       i właściciel szukał przyczyny w dzienniku usługi zamiast na ekranie.
-
-       Wiersz o połączeniu zszedł stąd (0.509.0), bo ten sam fakt, ze słowem
-       zamiast kodu i z przyciskiem „Połącz", niesie karta „Konto Allegro" tuż
-       nad tą. Rozdział z 0.152.0 zostaje: ta tabela mówi o synchronizacji. */
+    /* POŁĄCZENIE TO NIE SYNCHRONIZACJA: niesparowane konto nie może wyglądać
+       jak awaria synchronizacji. Połączenie, ze słowem zamiast kodu
+       i z przyciskiem „Połącz", niesie karta „Konto Allegro" tuż nad tą. Ta
+       tabela mówi o synchronizacji. */
     ["Synchronizacja", i.status, RANGA_STATUSU[i.status] ?? "nic"],
     ["Ostatnia próba", i.ostatniaProba
       ? `${czas(i.ostatniaProba)}${i.kodOstatniegoBledu ? ` · ${i.kodOstatniegoBledu}` : ""}`
@@ -48,12 +42,12 @@ export function StanIntegracji({ zdrowie, odczyt }: { zdrowie: Zdrowie | undefin
        że nie wiadomo, czy poszła. Zasada 10 projektu każe to pokazać, więc
        wiersz zmienia rangę, zamiast stać zawsze na szaro. */
     ["Kolejka wysyłek", o.kolejkaWysylek, o.wysylkiDoSprawdzenia ? "uwaga" : "nic"],
-    /* Wiersz „Subiekt GT" zszedł (0.509.0): to, czy worker żyje, mówi karta
+    /* Wiersz „Subiekt GT" zszedł: to, czy worker żyje, mówi karta
        „Serwer" na tym samym ekranie, i mówi więcej — kiedy go widziano i że
        bez niego zapisy do Subiekta nie wchodzą. */
   ];
 
-  /* Rama kart wglądu (0.509.0), jak każda karta obok. Własny nagłówek miał
+  /* Rama kart wglądu, jak każda karta obok. Własny nagłówek miał
      inny krój i nazwę trasy „/api/health" — głos programisty, nie biura.
      Zostaje godzina odczytu, bo mówi, jak świeże są te wiersze. */
   return <KartaWgladu id="karta-integracje" tytul="Stan integracji"

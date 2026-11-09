@@ -2,7 +2,7 @@ import React from "react";
 import type { LucideIcon } from "lucide-react";
 
 /**
- * ZWIJANY BLOK — jedna implementacja dla całej karty Copilota (0.342.0).
+ * ZWIJANY BLOK — jedna implementacja dla całej karty Copilota.
  *
  * Zgłoszenie właściciela: „panel jest zbyt zatłoczony, użyj technik, aby
  * zwiększyć obszar roboczy". Na jego zrzucie pod szkicem stały trzy bloki,
@@ -23,7 +23,7 @@ import type { LucideIcon } from "lucide-react";
  * odświeżeniu zamykałoby blok agentowi pod ręką; rodzic steruje resetem przez
  * `key`, tak jak robi to karta szkicu czasem powstania szkicu.
  *
- * `pamietajJako` (0.389.0) przedłuża ten stan poza jedno wejście na ekran.
+ * `pamietajJako` przedłuża ten stan poza jedno wejście na ekran.
  * Zwinięcie bloku jest NAWYKIEM STANOWISKA, a nie decyzją na jedną sprawę:
  * agent, który zwija Copilota, robi to dlatego, że pracuje bez niego, a nie
  * dlatego, że akurat ta reklamacja go nie potrzebuje. Bez pamięci musiałby

@@ -5,7 +5,7 @@ import os from "node:os";
 import path from "node:path";
 import { DatabaseSync } from "node:sqlite";
 
-/* ── Sesje rozkładania wychodzą razem z trybem kontenerowym (0.22.0) ─────────
+/* ── Sesje rozkładania wychodzą razem z trybem kontenerowym ─────────
    Kasowanie tabel jest tanie, ale ma jeden sposób, żeby pójść źle: baza chodzi
    z `PRAGMA foreign_keys = ON`, a `putaway_items` wskazywało kluczem obcym na
    `putaway_sessions`. Rodzic skasowany przed dzieckiem wywala start API

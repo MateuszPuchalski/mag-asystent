@@ -1,9 +1,9 @@
 import { describe, expect, it } from "vitest";
 import { LOGO_MAX_ZNAKOW, ramkaWidoczna, wBoku, zmniejszajAzZmiesci } from "./logo";
 
-/* ── Rachunek logo dostawcy (0.444.0) ──────────────────────────────────────
+/* ── Rachunek logo dostawcy ────────────────────────────────────────────────
    Płótna jsdom nie ma, więc testujemy to, co w `naPng` jest rachunkiem:
-   ramkę widocznej treści (to ona usuwa „powietrze" z 0.87.0) i pętlę
+   ramkę widocznej treści (to ona usuwa przezroczyste „powietrze") i pętlę
    zmniejszania, która ratuje zdjęcie szyldu przed limitem serwera. */
 
 /** Obraz RGBA `w×h` z pikselami widocznymi tam, gdzie `widoczny(x,y)`. */

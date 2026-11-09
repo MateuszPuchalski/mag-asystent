@@ -6,21 +6,17 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Dowody } from "./Dowody";
 import type { Zwrot } from "../api/typy";
 
-/* ── Notatka biura przy zwrocie (0.313.0) ────────────────────────────────────
-   Kolumna `notatka` stała w bazie od 0.172.0 i wypełniała ją WYŁĄCZNIE
-   rejestracja paczki nieodebranej. Przy zwrocie z Allegro nie było gdzie
-   zapisać ustalenia — wracało ono do panelu Allegro albo do niczyjej pamięci.
-
-   Reklamacje dostały to samo w 0.280.0 i stoi tam w tej samej kolumnie, więc
-   dwa ekrany obsługi mają jeden nawyk, nie dwa.
+/* ── Notatka biura przy zwrocie ──────────────────────────────────────────────
+   Ustalenie przy zwrocie z Allegro ma gdzie zostać. Reklamacje mają to samo
+   w tej samej kolumnie, więc dwa ekrany obsługi mają jeden nawyk, nie dwa.
 
    Cztery rzeczy warte testu:
 
    1. ZAPIS JAWNYM PRZYCISKIEM, nie przy każdym znaku: zapis po literze
       podnosiłby wersję zwrotu i wywracał kontrolę świeżości u kolegi.
-   2. NIE MA ZMIANY → NIE MA PRZYCISKU (od 0.518.0; wcześniej nieaktywny).
+   2. NIE MA ZMIANY → NIE MA PRZYCISKU, nawet nieaktywnego.
       Zapis tego samego zdania kosztuje wersję i nie mówi nic nowego, a główny
-      przycisk bez działania ściągał wzrok przy każdym zwrocie.
+      przycisk bez działania ściągałby wzrok przy każdym zwrocie.
    3. NIE MA CZEGO COFAĆ → NIE MA PRZYCISKU. Pierwsza notatka nie ma dokąd
       wracać, a przycisk bez działania kłamie.
    4. AUTOR I GODZINA STOJĄ PRZY NOTATCE, nie w osobnej sekcji.             */

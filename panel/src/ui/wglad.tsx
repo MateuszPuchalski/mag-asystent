@@ -1,11 +1,10 @@
 import React, { useState } from "react";
 import { FiltrSegmentowy, Karta, Pusto } from "./index";
 
-/* ── Rama kart wglądu (0.440.0, w `ui/` od 0.441.0) ──────────────────────
-   Biuro miało na ANALIZIE i w STANIE SYSTEMU kilkanaście kart w jednym
-   kształcie: nagłówek, zdanie „co ta liczba znaczy" i tabela. Tu ten kształt
-   stoi raz, żeby następna karta nie wymyślała go od nowa. Mieszkał
-   w `analiza/`, dopóki miał jednego odbiorcę; stan systemu jest drugim.
+/* ── Rama kart wglądu ────────────────────────────────────────────────────
+   Analiza i stan systemu mają kilkanaście kart w jednym kształcie:
+   nagłówek, zdanie „co ta liczba znaczy" i tabela. Tu ten kształt stoi raz,
+   żeby następna karta nie wymyślała go od nowa.
    Zdanie pod nagłówkiem nie jest ozdobą — mówi, jak NIE czytać liczby. */
 
 export function KartaWgladu({ tytul, opis, akcje, id, pusta, children }: {
@@ -13,10 +12,9 @@ export function KartaWgladu({ tytul, opis, akcje, id, pusta, children }: {
   /** Kotwica dla głębokiego linku (`?karta=…`) — stan systemu skacze do karty. */
   id?: string;
   /**
-   * Zdanie „czemu nic tu nie ma" — karta staje się JEDNĄ LINIĄ (0.542.0).
-   * Decyzja właściciela z 27 września 2026, wariant C Analizy: karta bez
-   * danych w oknie zajmowała tyle miejsca co karta z danymi. Zakres „Obsługa
-   * klienta" miał ich czternaście i przewijał się przez 3300 px zer i kresek.
+   * Zdanie „czemu nic tu nie ma" — karta staje się JEDNĄ LINIĄ. Karta bez
+   * danych w oknie nie zajmuje tyle miejsca co karta z danymi, bo zakres
+   * przewijałby się przez tysiące pikseli zer i kresek.
    * Zdanie zostaje, bo pusta karta bez powodu byłaby ciszą, nie odpowiedzią.
    */
   pusta?: string | null;
@@ -40,9 +38,9 @@ export function KartaWgladu({ tytul, opis, akcje, id, pusta, children }: {
  * Nagłówek kolumny: napis albo nazwa tylko dla czytnika ekranu.
  *
  * Kolumna z samymi przyciskami albo z logo nie potrzebuje napisu na ekranie,
- * ale czytnik ekranu czyta nagłówek przy każdej komórce (0.546.0). Pusty
- * napis dawał pusty `<th>` — naruszenie WCAG 1.3.1 w audycie axe — i przy
- * dwóch takich kolumnach ten sam klucz React dwa razy.
+ * ale czytnik ekranu czyta nagłówek przy każdej komórce. Pusty napis dałby
+ * pusty `<th>` — naruszenie WCAG 1.3.1 — i przy dwóch takich kolumnach ten
+ * sam klucz React dwa razy.
  */
 export type Naglowek = string | { ukryty: string };
 
@@ -71,12 +69,12 @@ export const Td = ({ className = "", children }: { className?: string; children:
   <td className={`py-1.5 pr-3 align-top ${className}`}>{children}</td>;
 
 /**
- * Jedna karta, kilka przekrojów tych samych liczb (0.542.0, wariant C).
+ * Jedna karta, kilka przekrojów tych samych liczb.
  *
- * „Według kategorii" i „według osoby" stały osobnymi kartami pod liczbą,
- * którą rozbijają. Czytało się je jak trzy różne pomiary, a to jeden pomiar
- * w dwóch przekrojach. Przełącznik trzyma je w karcie liczby; przekrój bez
- * danych (osoba dla roli biuro) po prostu nie przychodzi i nie ma pozycji.
+ * „Według kategorii" i „według osoby" to jeden pomiar w dwóch przekrojach,
+ * więc przełącznik trzyma je w karcie liczby; osobne karty czytałyby się
+ * jak trzy różne pomiary. Przekrój bez danych (osoba dla roli biuro) po
+ * prostu nie przychodzi i nie ma pozycji.
  */
 export function Przekroje({ pozycje }: {
   pozycje: Array<{ klucz: string; etykieta: string; tresc: React.ReactNode } | null | false | undefined>;

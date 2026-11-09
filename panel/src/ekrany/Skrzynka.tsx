@@ -59,9 +59,8 @@ function opisBledu(e: unknown): string {
 }
 
 export function Skrzynka() {
-  /* Wybrana rozmowa siedzi w ADRESIE, nie w stanie komponentu. Do 0.146.0
-     panel zapisywał `?rozmowa=N` przez `history.replaceState` i nigdy tego
-     nie odczytywał, więc odświeżenie strony gubiło wybór. */
+  /* Wybrana rozmowa siedzi w ADRESIE, nie w stanie komponentu, żeby
+     odświeżenie strony nie gubiło wyboru. */
   const { id } = useParams<{ id: string }>();
   const wybranaId = id ? Number(id) : null;
   const nawiguj = useNavigate();
@@ -75,12 +74,12 @@ export function Skrzynka() {
      do ekranu — hak trzyma go do restartu usługi. Mutacje siedzą tutaj, a nie
      w widokach: cały katalog `skrzynka/` to komponenty czyste. */
   const copilot = useCopilot();
-  /* Szkic z Copilota (0.231.0): jedna rozmowa na kliknięcie, wynik wraca
+  /* Szkic z Copilota: jedna rozmowa na kliknięcie, wynik wraca
      w `osRozmowy` i wchodzi do pola dopiero na „Wstaw" albo „Zastąp". */
   const ulozSzkic = useUlozSzkic();
   const ocenSzkic = useOcenSzkic();
   const [bladSzkicu, setBladSzkicu] = useState("");
-  /* Dopytanie (0.332.0). Limit znaków stoi TU jako stała panelu, a serwer ma
+  /* Dopytanie. Limit znaków stoi TU jako stała panelu, a serwer ma
      swoją — ta jest po to, żeby przycisk gasł przed żądaniem, tamta po to,
      żeby żądanie odpadło przed siecią. Dwie granice, jedna liczba. */
   const wymiany = useWymianyCopilota(wybranaId ?? 0);
@@ -93,13 +92,12 @@ export function Skrzynka() {
   const zdrowie = useZdrowie();
   const synchronizuj = useSynchronizuj();
   const wyslij = useWyslij();
-  /* ── DRUGA INSTANCJA DLA WYSYŁEK ODŁOŻONYCH (0.533.0) ──────────────────
-     Jedna mutacja niosła obie drogi, a `wysyla={wyslij.isPending}` gasił
-     przycisk BIEŻĄCEJ rozmowy, gdy po dziesięciu sekundach wychodziła
-     odpowiedź do POPRZEDNIEJ. Przy pracy w rytmie rozmowa na dziesięć sekund
-     trafiało to regularnie: „Wysyłam…" na przycisku, którego agent nie
-     kliknął, i Ctrl+Enter połknięty bez słowa. Stan odłożonych niesie
-     `odlozone` — tu liczy się tylko wysyłka tej rozmowy, „mimo to". */
+  /* ── DRUGA INSTANCJA DLA WYSYŁEK ODŁOŻONYCH ────────────────────────────
+     Jedna mutacja na obie drogi gasiłaby przycisk BIEŻĄCEJ rozmowy, gdy po
+     dziesięciu sekundach wychodzi odpowiedź do POPRZEDNIEJ: „Wysyłam…" na
+     przycisku, którego agent nie kliknął, i Ctrl+Enter połknięty bez słowa.
+     Stan odłożonych niesie `odlozone` — tu liczy się tylko wysyłka tej
+     rozmowy, „mimo to". */
   const wyslijWTle = useWyslij();
   const zapisz = useZapiszSzkic();
   const zlec = useZlecPomiar();
@@ -117,7 +115,7 @@ export function Skrzynka() {
   const dodajKomentarz = useDodajKomentarz();
 
   const [szkic, setSzkic] = useState("");
-  /* Czy pole trzyma szkic Copilota (0.499.0) — nad polem stoi wtedy zdanie
+  /* Czy pole trzyma szkic Copilota — nad polem stoi wtedy zdanie
      „Szkic Copilota w polu", a pod nim to, na czym szkic stoi. */
   const [zCopilota, setZCopilota] = useState(false);
   /* Ostatnia wersja z dopytania i tekst pola sprzed niej. Pole podświetla
@@ -151,7 +149,7 @@ export function Skrzynka() {
   const [bladStatusu, setBladStatusu] = useState("");
   const [przyRozmowie, setPrzyRozmowie] = useState<string | null>(null);
 
-  /* ── ODŁOŻONE WYSYŁKI I NASTĘPNA ROZMOWA (23 września 2026) ─────────────
+  /* ── ODŁOŻONE WYSYŁKI I NASTĘPNA ROZMOWA ────────────────────────────────
      Patrz `skrzynka/Odlozone.tsx`. Kolejka podaje listę WIDOCZNYCH rozmów
      (po kubełku i szukaniu), bo „następna" ma znaczyć następną w tym, co
      agent właśnie przerabia — nie w całej skrzynce. */
@@ -164,7 +162,7 @@ export function Skrzynka() {
   /* Licznik w tytule karty i powiadomienia systemowe — `skrzynka/Sygnaly.ts`. */
   const sygnaly = useSygnaly(lista.data?.rozmowy, (x) => nawiguj(`/obsluga/skrzynka/${x}`));
   /* Samo wejście w pytanie trzyma je dla tego agenta — do wyjścia albo do
-     odpowiedzi, która przydziela je na stałe (decyzja właściciela, 0.159.0). */
+     odpowiedzi, która przydziela je na stałe (decyzja właściciela). */
   useUchwytRozmowy(wybranaId);
   /* Znak „pisze" powstaje TU, przy polu tekstowym, a nie w hooku obecności:
      obecność znaczy „mam to otwarte", pisanie znaczy „zaraz odpowiem". Zlanie
@@ -176,11 +174,10 @@ export function Skrzynka() {
   const komentarzTeraz = useRef(komentarz);
   komentarzTeraz.current = komentarz;
   useEffect(() => {
-    /* ── NIEZAPISANY TEKST ZOSTAJE PRZY SWOJEJ ROZMOWIE (0.533.0) ──────────
-       Do tego wydania j/k, klik w wiersz albo powiadomienie nadpisywały pole
-       szkicem z serwera — niezapisana odpowiedź przepadała bez słowa. Gorzej
-       z notatką: nie czyścił jej nikt, więc zaczęta przy jednej rozmowie
-       zapisywała się przy NASTĘPNEJ. Pamięć karty trzyma tekst przy
+    /* ── NIEZAPISANY TEKST ZOSTAJE PRZY SWOJEJ ROZMOWIE ────────────────────
+       Bez tego j/k, klik w wiersz albo powiadomienie nadpisałyby pole
+       szkicem z serwera, a zaczęta notatka zapisałaby się przy NASTĘPNEJ
+       rozmowie. Pamięć karty trzyma tekst przy
        rozmowie, do której był pisany; powrót go oddaje, a obca rozmowa
        dostaje czyste pole. Zapis do pamięci to nie zapis stanu sprawy —
        reguła „zero zapisu przy patrzeniu" dotyczy serwera. */
@@ -188,7 +185,7 @@ export function Skrzynka() {
     setKomentarz(wybranaId === null ? "" : pamietanySzkic(PAMIEC_NOTATKI, wybranaId) ?? "");
     setWzmianki([]);
     setPoprawka(null);
-    /* SZKIC COPILOTA DO PUSTEGO POLA (0.499.0) — reguła i jej granice przy
+    /* SZKIC COPILOTA DO PUSTEGO POLA — reguła i jej granice przy
        `szkicNaStart`. To stan ekranu, nie zapis: otwarcie niczego nie mutuje.
        Klucz z czasu szkicu pamięta, że ten szkic już raz wszedł — agent, który
        wyczyścił pole, nie ma go dostać z powrotem przy następnym odczycie. */
@@ -230,10 +227,9 @@ export function Skrzynka() {
     }
   }, [wybranaId, rozmowa.data?.rozmowa.id]);
 
-  /* ── NIC NIE WCHODZI DO POLA, GDY AGENT JUŻ PATRZY (0.500.0) ──────────────
-     Do 0.500.0 szkic, który takt ułożył w tle przy otwartej rozmowie, sam
-     wypełniał puste pole — tekst pojawiał się agentowi pod ręką w trakcie
-     czytania wątku. Zasada najmniejszego zaskoczenia (Raskin, „The Humane
+  /* ── NIC NIE WCHODZI DO POLA, GDY AGENT JUŻ PATRZY ────────────────────────
+     Szkic, który takt ułoży w tle przy otwartej rozmowie, nie wypełnia pola
+     sam. Zasada najmniejszego zaskoczenia (Raskin, „The Humane
      Interface"): stan ekranu zmienia się na ruch człowieka, nie obok niego.
      Szkic spóźniony staje więc w karcie pod polem z „Wstaw do odpowiedzi".
 
@@ -256,11 +252,11 @@ export function Skrzynka() {
        spóźniony ma NIE uruchamiać tego efektu; powód wyżej. */
   }, [ja.data?.user.userId]);
 
-  /* ── POMINIĘCIE ROZMOWY (0.533.0) ────────────────────────────────────────
-     Pomiar pod decyzję właściciela z 26 września 2026: jak często agent
+  /* ── POMINIĘCIE ROZMOWY ──────────────────────────────────────────────────
+     Pomiar pod decyzję właściciela: jak często agent
      otwiera rozmowę i odchodzi bez ruchu — bez wysyłki, zakończenia,
-     odłożenia i notatki. Tego kosztu nie widział żaden licznik, a to on
-     mówi, ile rozmów bez możliwego ruchu stoi w kolejce.
+     odłożenia i notatki. Ten koszt mówi, ile rozmów bez możliwego ruchu
+     stoi w kolejce.
 
      NIGDY PRZY OTWARCIU. Raport idzie przy WYJŚCIU: przejście do innej
      rozmowy, wyjście z ekranu, zamknięcie karty. Zapis jest zbiorczy, bez
@@ -315,7 +311,7 @@ export function Skrzynka() {
     return () => window.removeEventListener("pagehide", f);
   }, []);
 
-  /* CHWILA OTWARCIA ROZMOWY — pomiar tarcia (0.500.0). Liczy się od
+  /* CHWILA OTWARCIA ROZMOWY — pomiar tarcia. Liczy się od
      wejścia w rozmowę do kliknięcia „Wyślij", nie do wyjścia odpowiedzi po
      dziesięciu sekundach: okno cofnięcia to nie szukanie po ekranie. */
   const otwartaOd = useRef(Date.now());
@@ -405,10 +401,10 @@ export function Skrzynka() {
     return () => window.removeEventListener("beforeunload", f);
   }, [czekajace]);
 
-  /* Po każdym przejściu dalej fokus schodzi na tło strony (0.533.0). Gdy
-     następna rozmowa była już w pamięci, fokus zostawał w polu albo na
-     przycisku wysyłki: j/k milkły, a drugie Ctrl+Enter trafiało w nietknięty
-     szkic NASTĘPNEJ rozmowy. */
+  /* Po każdym przejściu dalej fokus schodzi na tło strony. Inaczej przy
+     rozmowie z pamięci fokus zostałby w polu albo na przycisku wysyłki: j/k
+     milkłyby, a drugie Ctrl+Enter trafiłoby w nietknięty szkic NASTĘPNEJ
+     rozmowy. */
   function dalej(nast: number | null) {
     if (document.activeElement instanceof HTMLElement) document.activeElement.blur();
     if (nast !== null) nawiguj(`/obsluga/skrzynka/${nast}`);
@@ -416,13 +412,12 @@ export function Skrzynka() {
 
   function wyslijOdpowiedz(mimoNowejWiadomosci = false, mimoObecnosci = false, zakonczPo = false) {
     if (!rozmowa.data) return;
-    /* ── KONFLIKT PRZY KLIKNIĘCIU, NIE DZIESIĘĆ SEKUND PÓŹNIEJ (0.533.0) ───
+    /* ── KONFLIKT PRZY KLIKNIĘCIU, NIE DZIESIĘĆ SEKUND PÓŹNIEJ ─────────────
        Dwie rzeczy, które zatrzymają wysyłkę na serwerze, ekran zna już teraz:
        klient dopisał (szyna zdarzeń, `nowa`) i kolega trzyma rozmowę
-       (`oglada` w wierszu kolejki). Do tego wydania wysyłka i tak szła do
-       kolejki cofnięć, a czerwony dymek przychodził, gdy agent był dwie
-       rozmowy dalej — powrót kosztował wątek myślowy. Tu pytamy od razu,
-       tym samym paskiem i tym samym dialogiem co dotąd. */
+       (`oglada` w wierszu kolejki). Błąd z kolejki cofnięć przyszedłby, gdy
+       agent jest dwie rozmowy dalej, a powrót kosztuje wątek myślowy. Tu
+       pytamy od razu, tym samym paskiem i tym samym dialogiem. */
     if (!mimoNowejWiadomosci && nowa) {
       setNowa(false);
       void rozmowa.refetch();
@@ -478,11 +473,10 @@ export function Skrzynka() {
            a zgoda musi być jawna, tak samo jak tam. */
         } else if (e instanceof Konflikt && (e.szczegoly as SzczegolyWysylki).trzymajacyName) {
           setPrzyRozmowie((e.szczegoly as SzczegolyWysylki).trzymajacyName ?? "");
-        /* Trzeci rodzaj: rozmowę prowadzi KTO INNY na stałe. Od 0.395.0 to
-           jedyne wejście do dialogu przekazania — wcześniej otwierał go
-           przegrany wyścig o przycisk „PRZEJMIJ ROZMOWĘ", a przycisk zszedł
-           z ekranu. Jedno zdanie w pasku byłoby tu stratą: agent musi
-           zobaczyć, KTO prowadzi i mieć drogę poproszenia go o przekazanie. */
+        /* Trzeci rodzaj: rozmowę prowadzi KTO INNY na stałe. To jedyne
+           wejście do dialogu przekazania. Jedno zdanie w pasku byłoby tu
+           stratą: agent musi zobaczyć, KTO prowadzi i mieć drogę poproszenia
+           go o przekazanie. */
         } else if (e instanceof Konflikt
           && (e.szczegoly as SzczegolyKonfliktu).assignedUserId != null) {
           setKonflikt(e.szczegoly as SzczegolyKonfliktu);
@@ -492,7 +486,7 @@ export function Skrzynka() {
     });
   }
 
-  /* JEDEN PRZYCISK (22 września 2026): pusty szkic dostaje treść, pełny
+  /* JEDEN PRZYCISK: pusty szkic dostaje treść, pełny
      jest zastępowany — napis przycisku mówi to agentowi PRZED kliknięciem.
      Ocena zostaje zapisana, bo to ona chowa kartę po użyciu; los szkicu
      liczy już wysyłka (`szkic_los`), nie to kliknięcie. */
@@ -547,15 +541,15 @@ export function Skrzynka() {
     } });
   }
 
-  /* ── E I R PRZY KARCIE SZKICU (23 września 2026) ────────────────────────
+  /* ── E I R PRZY KARCIE SZKICU ───────────────────────────────────────────
      „Wstaw do odpowiedzi" i „Odrzuć" z klawiatury, ten sam strażnik co
      w kolejce: pole tekstowe wygrywa zawsze, bo „e" w słowie „jest" nie może
      wstawiać szkicu. Klawisze działają tylko przy karcie na ekranie —
      z cudzą rozmową albo bez propozycji nie robią nic. */
-  /* SZKIC JUŻ W POLU = KARTA BEZ „WSTAW" (0.533.0). Karta chowa wtedy
-     swój przycisk (`!wPolu` w `SzkicCopilota.tsx`), ale klawisz działał dalej:
-     poprawiony szkic, klik obok pola, „e" — i poprawki znikały bez cofnięcia,
-     a pomiar zapisywał „zastąpiony". Klawisz ma robić to, co widać. */
+  /* SZKIC JUŻ W POLU = KARTA BEZ „WSTAW". Karta chowa wtedy swój przycisk
+     (`!wPolu` w `SzkicCopilota.tsx`), więc klawisz też milczy. Inaczej
+     „e" po poprawkach zmazałoby je bez cofnięcia. Klawisz ma robić to, co
+     widać. */
   /* Zamknięty Problem z zakupem chowa całą odpowiedź razem z kartą szkicu
      (`Edytor`, `zamkniete`), więc E i R milkną tym samym warunkiem. */
   const kartaWidoczna = Boolean(rozmowa.data?.szkicCopilota && rozmowa.data.szkicCopilota.ocena === null)
@@ -586,7 +580,7 @@ export function Skrzynka() {
     if (nast !== null) przygotuj(nast);
   }, [otwarta, lista.dataUpdatedAt]);
 
-  /* ── ODŁÓŻ DO TERMINU (0.533.0) ─────────────────────────────────────────
+  /* ── ODŁÓŻ DO TERMINU ───────────────────────────────────────────────────
      Ten sam kształt co Zakończ: przejście dalej i pasek „Cofnij", bo
      odłożona schodzi z kubełka roboczego i pomyłki na liście nie widać.
      Cofnięcie zdejmuje odłożenie i wraca do rozmowy. */
@@ -612,25 +606,23 @@ export function Skrzynka() {
   const jestemAdminem = ja.data?.user.role === "admin";
   const alarm = Boolean(zdrowie.data?.allegroInbox.alarm);
 
-  /* Ekran trzyma się okna, a przewijają się kolumny (0.165.0) — ten sam nawyk
+  /* Ekran trzyma się okna, a przewijają się kolumny — ten sam nawyk
      co w zwrotach, bo dwa ekrany obsługi mają mieć jeden, nie dwa.
 
      Alarm stoi POZA gridem: jako wiersz `col-span-2` byłby wierszem
      warunkowym, a wtedy kolumny wpadałyby w niego przy pustym alarmie
      i blokada by znikała.
 
-     TABELA `StanIntegracji` odeszła stąd w 0.168.0 — za zębatkę, na ekran
-     ustawień. Skrzynka jest ekranem pracy, a trzynaście wierszy z
-     `/api/health` czyta się raz na tydzień. Alarm ZOSTAJE: zasada 10 projektu
-     mówi „awaria integracji musi być widoczna", a §21 żąda trwałego alarmu —
-     schowaniu podlegała tabela, nie ostrzeżenie. */
+     Tabela `StanIntegracji` stoi za zębatką, na ekranie ustawień: skrzynka
+     jest ekranem pracy. Alarm ZOSTAJE tutaj: zasada 10 projektu mówi „awaria
+     integracji musi być widoczna", a §21 żąda trwałego alarmu. */
   return <div className="flex flex-col gap-4 lg:h-full lg:min-h-0">
     <AlarmSynchronizacji zdrowie={zdrowie.data} trwa={synchronizuj.isPending}
       blad={bladSynchronizacji}
       synchronizuj={() => { setBladSynchronizacji(""); synchronizuj.mutate(undefined,
         { onError: (e) => setBladSynchronizacji((e as Error).message) }); }} />
 
-    {/* Trzy kolumny (§10.1, 0.180.0), wzorcem z ekranu zwrotów: skrajne stałe,
+    {/* Trzy kolumny (§10.1), wzorcem z ekranu zwrotów: skrajne stałe,
         środek `minmax(0,1fr)`. Samo `1fr` to skrót od `minmax(auto,1fr)` —
         środek rozpychałby się ponad przydział, gdy oś dostanie długi wyraz.
         `lg:grid-rows-[minmax(0,1fr)]` trzyma wysokość: pojedynczy wiersz
@@ -659,7 +651,7 @@ export function Skrzynka() {
 
     <div className="flex min-h-0 flex-col gap-4">
     {/* Uchwyt kolegi zatrzymuje wysyłkę, ale nigdy po cichu: zgoda jest jawna,
-        tak samo jak przy dopisku klienta z 0.110.0. */}
+        tak samo jak przy dopisku klienta. */}
     {przyRozmowie && <div className="card flex shrink-0 flex-wrap items-center gap-3 border-violet-300 bg-violet-50 p-3 text-sm">
       <span><b>{przyRozmowie}</b> siedzi teraz przy tej rozmowie.</span>
       <span className="text-slate-600">Dwie odpowiedzi na jedno pytanie to dwie różne prawdy u klienta.</span>
@@ -718,11 +710,11 @@ export function Skrzynka() {
         /* Cudza rozmowa = cudzy szkic: ten sam warunek, którym edytor blokuje pole. */
         wylaczony: rozmowa.data?.rozmowa.wlascicielId != null
           && rozmowa.data.rozmowa.wlascicielId !== (ja.data?.user.userId ?? null),
-        /* ZAMÓWIONY SZKIC WCHODZI DO PUSTEGO POLA (0.533.0). Reguła 0.500.0
-           („nic nie wchodzi do pola, gdy agent patrzy") chroni przed szkicem
-           z TŁA. Ten agent właśnie kliknął „Ułóż odpowiedź" i czekał —
-           kazać mu jeszcze wcisnąć E to krok bez decyzji. Pole z tekstem
-           zostaje nietknięte, a szkic czeka w karcie jak dotąd. */
+        /* ZAMÓWIONY SZKIC WCHODZI DO PUSTEGO POLA. Reguła „nic nie wchodzi
+           do pola, gdy agent patrzy" chroni przed szkicem z TŁA. Ten agent
+           właśnie kliknął „Ułóż odpowiedź" i czekał — kazać mu jeszcze
+           wcisnąć E to krok bez decyzji. Pole z tekstem zostaje nietknięte,
+           a szkic czeka w karcie. */
         onUloz: () => {
           if (!rozmowa.data) return;
           const id = rozmowa.data.rozmowa.id;
@@ -739,7 +731,7 @@ export function Skrzynka() {
             },
           });
         },
-        /* JEDEN PRZYCISK (22 września 2026): pusty szkic dostaje treść, pełny
+        /* JEDEN PRZYCISK: pusty szkic dostaje treść, pełny
            jest zastępowany — napis przycisku mówi to agentowi PRZED kliknięciem.
            Ocena zostaje zapisana, bo to ona chowa kartę po użyciu; los szkicu
            liczy już wysyłka (`szkic_los`), nie to kliknięcie. */
@@ -837,10 +829,8 @@ export function Skrzynka() {
       onPoprosOPrzekazanie={() => {
         /* Prośba o przekazanie to komentarz wewnętrzny, nie osobny mechanizm:
            właściciel czyta go w rozmowie, przy której siedzi. */
-        /* Do 0.533.0 prośba lądowała w polu ODPOWIEDZI DO KLIENTA, wbrew
-           zdaniu wyżej — nadpisywała tekst agenta i w cudzej rozmowie nie
-           dała się nawet wysłać. Idzie do notatki, a edytor przełącza się
-           na nią, żeby agent widział, gdzie pisze. */
+        /* Prośba idzie do notatki, nie do pola odpowiedzi do klienta, a
+           edytor przełącza się na nią, żeby agent widział, gdzie pisze. */
         if (!rozmowa.data) return;
         ustawKomentarz(`@${konflikt?.assignedUserName ?? ""} — przejmiesz tę rozmowę?`);
         setDoNotatki((n) => n + 1);
@@ -876,7 +866,7 @@ export function Skrzynka() {
         reklamacyjna.mutate({ id: rozmowa.data.rozmowa.id, reklamacyjna: nowy },
           { onError: (e) => setBladStatusu((e as Error).message) });
       }}
-      /* ── ZAKOŃCZ (23 września 2026) ─────────────────────────────────────
+      /* ── ZAKOŃCZ ────────────────────────────────────────────────────────
          Po zakończeniu ekran idzie do następnej rozmowy, jak po wysyłce:
          zakończona i tak schodzi z kubełka roboczego, więc zostanie przy
          niej znaczyłoby patrzenie na coś, czego na liście już nie ma. */
@@ -890,7 +880,7 @@ export function Skrzynka() {
           onSuccess: () => {
             oznaczDzialanie();
             dalej(nastepnaRozmowa(widoczne.current, id));
-            /* COFNIJ PO ZAKOŃCZENIU (0.500.0): rozmowa właśnie zniknęła
+            /* COFNIJ PO ZAKOŃCZENIU: rozmowa właśnie zniknęła
                z listy i z ekranu, więc pomyłki nie widać. Cofnięcie to ta sama
                „Otwórz ponownie", która stoi w nagłówku — plus powrót do niej. */
             setDoCofniecia({ klucz: Date.now(), opis: <>Zakończono rozmowę z <b>{klient}</b></>,
@@ -935,15 +925,14 @@ export function Skrzynka() {
       onPopraw={() => { setKonfliktWysylki(null); rozmowa.refetch(); }} />}
 
     <div className="shrink-0 space-y-4">
-      {/* Błąd listy BEZ danych stoi już w kolejce (0.546.0); tu tylko błąd
+      {/* Błąd listy BEZ danych stoi już w kolejce; tu tylko błąd
           odświeżenia, gdy stare rozmowy zostały na ekranie. */}
       <Blad>{blad || (lista.data ? (lista.error as Error | null)?.message : undefined)}</Blad>
     </div>
 
-    {/* JEDEN STOS PASKÓW, NAD KOLEJKĄ (0.533.0) — powód stosu w `Cofniecie.tsx`.
-        Stał na środku dołu, czyli NA pływającym pasku wysyłki środkowej
-        kolumny: przez dziesięć sekund po wysyłce przycisk „Wyślij" następnej
-        rozmowy był zasłonięty. Nad dołem kolejki zasłania najwyżej jej
+    {/* JEDEN STOS PASKÓW, NAD KOLEJKĄ — powód stosu w `Cofniecie.tsx`.
+        Na środku dołu zasłaniałby pływający pasek wysyłki: przycisk „Wyślij"
+        następnej rozmowy. Nad dołem kolejki zasłania najwyżej jej
         ostatnie wiersze, a te agent i tak ma pod j/k. Szerokość kolumny
         kolejki przy 1366 px, żeby nie wjeżdżać na środek. */}
     <div className="fixed bottom-4 left-4 z-40 flex w-[min(23rem,calc(100vw-2rem))] flex-col gap-2">
@@ -951,9 +940,9 @@ export function Skrzynka() {
     <Odlozone lista={odlozone}
       onCofnij={(k) => {
         const w = odlozone.find((o) => o.klucz === k);
-        /* Wpis do pomiaru tarcia (0.500.0) — tylko przy „Cofnij". „Wróć"
+        /* Wpis do pomiaru tarcia — tylko przy „Cofnij". „Wróć"
            po błędzie wysyłki to nie pomyłka agenta, tylko Allegro. */
-        /* Czas od odłożenia do „Cofnij" (0.533.0) — do pytania właściciela,
+        /* Czas od odłożenia do „Cofnij" — do pytania właściciela,
            czy dziesięć sekund to za długo. Liczony z odliczania na pasku. */
         if (w) {
           const ms = w.stan.rodzaj === "czeka" ? OKNO_COFNIECIA_MS - (w.stan.doKiedy - Date.now()) : undefined;

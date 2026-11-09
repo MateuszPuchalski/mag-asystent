@@ -6,7 +6,7 @@ import { kluczWysylki, niejednoznaczny } from "./idempotencja.js";
 import { zalacznikiDoWyslania } from "./reklamacje-zalaczniki.js";
 import { BladReklamacji, ReklamacjaConflict } from "./reklamacje.js";
 
-/* ── Odpowiedź w reklamacji (0.224.0) ────────────────────────────────────────
+/* ── Odpowiedź w reklamacji ──────────────────────────────────────────────────
    PIERWSZY zapis tego modułu wychodzący do Allegro. Wzorzec w całości
    z `services/wysylka.ts`: jeden wiersz na PRÓBĘ, klucz idempotencji liczony
    po naszej stronie, strzał POZA transakcją, a stan niejednoznaczny nazwany
@@ -177,8 +177,8 @@ export async function odpowiedzWSprawie(z: ZadanieOdpowiedzi): Promise<WynikOdpo
   /* TYP WCHODZI DO KLUCZA. Stanowisko o towarze z tym samym zdaniem, co
      zwykła wiadomość sprzed chwili, to inny zamiar — strażnik dubletu nie ma
      prawa oddać tamtej próby zamiast wysłać `RETURN_*`. Zwykła wiadomość
-     trzyma klucz jak w 0.224.0, żeby stare wiersze outboxu dalej pasowały. */
-  /* ZAŁĄCZNIKI WCHODZĄ DO KLUCZA (0.274.0). Ta sama treść z dołożonym
+     trzyma dawny kształt klucza, żeby stare wiersze outboxu dalej pasowały. */
+  /* ZAŁĄCZNIKI WCHODZĄ DO KLUCZA. Ta sama treść z dołożonym
      zdjęciem to inna wiadomość u kupującego, więc strażnik dubletu nie ma
      prawa oddać poprzedniej próby zamiast wysłać nową. Wspólny rdzeń
      `kluczWysylki` przyjmuje listę i sortuje ją sam — kolejność dodawania
@@ -329,9 +329,7 @@ export async function odpowiedzWSprawie(z: ZadanieOdpowiedzi): Promise<WynikOdpo
         WHERE id=?`).run(utworzono, z.reklamacjaId);
 
     /* ODPOWIEDŹ JEST PROWADZENIEM SPRAWY — stempel, gdy znacznika nie ma.
-       Cudzego nie ruszamy: to znacznik dla reszty biura, a nie własność.
-       Ta sama doktryna co przy odkładaniu towaru na półkę reklamacyjną
-       w implementacji sprzed 0.140.0. */
+       Cudzego nie ruszamy: to znacznik dla reszty biura, a nie własność. */
     if (k.prowadzi === null) {
       /* bez typu: ten sam wiersz co wyżej, za tą samą bramką. */
       database.prepare(
@@ -339,7 +337,7 @@ export async function odpowiedzWSprawie(z: ZadanieOdpowiedzi): Promise<WynikOdpo
       ).run(z.autor.name, z.reklamacjaId);
     }
 
-    /* ZAŁĄCZNIKI ZNIKAJĄ ZE SZKICU, bo właśnie poszły (0.274.0). Wiersz, który
+    /* ZAŁĄCZNIKI ZNIKAJĄ ZE SZKICU, bo właśnie poszły. Wiersz, który
        by został, wisiałby przy NASTĘPNEJ odpowiedzi i dosłałby ten sam plik
        drugi raz — cicho, bo nikt by go tam nie szukał. Znikają TYLKO te, które
        poszły: stanowisko o towarze nie bierze plików, więc szkic odpowiedzi
@@ -363,23 +361,4 @@ export async function odpowiedzWSprawie(z: ZadanieOdpowiedzi): Promise<WynikOdpo
      przelicza się sam z tego, co przyszło, więc sprawa wychodzi z DO ODPOWIEDZI
      przy najbliższej synchronizacji, a nie na nasze życzenie. */
   return { status: "sent", externalMessageId, kluczIdempotencji: klucz };
-}
-
-/**
- * Ile wysyłek wymaga oka człowieka.
- *
- * Ten sam kształt co `stanKolejkiWysylek()` przy skrzynce. `sending` bez końca
- * (padnięty proces) liczy się razem z porażkami: nikt tego nie sprząta, więc
- * niech przynajmniej widać.
- */
-export function stanKolejkiOdpowiedzi(database: Db = defaultDb()): {
-  wyslane: number; doSprawdzenia: number;
-} {
-  const licz = (sql: string) =>
-    Number((database.prepare(sql).get() as { n: number }).n);
-  return {
-    wyslane: licz("SELECT COUNT(*) n FROM reklamacja_outbox WHERE status='sent'"),
-    doSprawdzenia: licz(
-      "SELECT COUNT(*) n FROM reklamacja_outbox WHERE status IN ('sending','send_uncertain','send_failed')"),
-  };
 }

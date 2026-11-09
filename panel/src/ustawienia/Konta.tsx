@@ -9,30 +9,27 @@ import { Potwierdz } from "../ui/Potwierdz";
 import { KartaWgladu, Tabela, Td } from "../ui/wglad";
 import { useOkienko } from "../skrzynka/MenuRozmowy";
 
-/* ── Konta i sesje (z `biuro.html` 0.111.0, 0.444.0) ────────────────────
-   Do 0.111.0 reset hasła, wyłączenie konta i ucięcie sesji zgubionego
-   kolektora żyły wyłącznie jako polecenia curl w DEPLOY.md.
+/* ── Konta i sesje ─────────────────────────────────────────────────────
+   Reset hasła, wyłączenie konta i ucięcie sesji zgubionego kolektora.
 
-   PRZYCISKI WIDZI TYLKO ADMIN. Biuro pokazywało je wszystkim i zostawiało
-   odmowę serwerowi — bo strona nie znała roli. Panel ją zna (`useJa`), a
-   przycisk, który NA PEWNO skończy się odmową, to interakcja po nic (dekalog
-   pkt 1). Serwer odmawia dalej (`zarzadzanie_biurem`); ekran tylko nie
-   zaprasza do próby. Ten sam wzór co karta Allegro w stanie systemu.
+   PRZYCISKI WIDZI TYLKO ADMIN. Przycisk, który NA PEWNO skończy się
+   odmową, to interakcja po nic (dekalog pkt 1). Serwer odmawia dalej
+   (`zarzadzanie_biurem`); ekran tylko nie zaprasza do próby. Ten sam wzór
+   co karta Allegro w stanie systemu.
 
    Kont się tu nie kasuje: skasowane konto zostawiłoby dziennik bez autora.
 
-   ZAKŁADA SIĘ JE TU OD 0.490.0. Wcześniej tylko kreator na kolektorze albo
-   `curl` — czyli konto biura zakładał ktoś z kolektorem w ręku. Formularz
-   widzi biuro i admin; biuro dostaje wyłącznie rolę magazyniera, bo konto
-   biura albo admina serwer założy tylko adminowi (`zarzadzanie_biurem`).
+   ZAKŁADA SIĘ JE TU. Formularz widzi biuro i admin; biuro dostaje wyłącznie
+   rolę magazyniera, bo konto biura albo admina serwer założy tylko adminowi
+   (`zarzadzanie_biurem`).
 
-   HASŁO W POLU `password`, nie w okienku przeglądarki. Biuro pytało przez
-   `prompt()`, który pokazuje wpisywany tekst każdemu za plecami.
+   HASŁO W POLU `password`, nie w `prompt()`, który pokazuje wpisywany
+   tekst każdemu za plecami.
 
-   CZYNNOŚCI ZA „⋯" (0.521.0). Trzy przyciski w każdym wierszu dawały
-   tabelę, w której więcej było przycisków niż osób — a sięga się po nie
-   przy zgubionym kolektorze albo zapomnianym haśle. Ta sama zasada co „⋯"
-   rozmowy (0.506.0) i ten sam `useOkienko`: Escape i klik obok zamykają.
+   CZYNNOŚCI ZA „⋯". Trzy przyciski w każdym wierszu dawałyby tabelę,
+   w której więcej jest przycisków niż osób — a sięga się po nie przy
+   zgubionym kolektorze albo zapomnianym haśle. Ta sama zasada co „⋯"
+   rozmowy i ten sam `useOkienko`: Escape i klik obok zamykają.
 
    Czynności rozwijają się W WIERSZU, nie w pływającym okienku. `Tabela`
    przewija się w poziomie, a karta ucina, co wystaje: okienko nad ostatnim
@@ -183,9 +180,9 @@ export function Konta({ admin, biuro = false }: { admin: boolean; biuro?: boolea
   const role: RolaKonta[] = admin ? ["magazynier", "biuro", "admin"] : biuro ? ["magazynier"] : [];
 
   return <KartaWgladu id="karta-konta" tytul="Konta i sesje"
-    /* Zdanie admina zeszło (0.521.0): opisywało przyciski, które schowały
-       się za „⋯", a pytania przy Wyłącz i Wyloguj wszędzie mówią to samo
-       w chwili decyzji. Biuro dalej słyszy, czego tu nie zrobi i dlaczego. */
+    /* Bez zdania dla admina: pytania przy Wyłącz i Wyloguj wszędzie mówią
+       wszystko w chwili decyzji. Biuro dalej słyszy, czego tu nie zrobi
+       i dlaczego. */
     opis={admin
       ? undefined
       : biuro

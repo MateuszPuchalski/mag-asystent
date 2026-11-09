@@ -1,14 +1,13 @@
 import axe from "axe-core";
 
-/* ── STRAŻNIK DOSTĘPNOŚCI EKRANÓW (0.546.0) ─────────────────────────────────
+/* ── STRAŻNIK DOSTĘPNOŚCI EKRANÓW ───────────────────────────────────────────
    Po każdym teście ekranu (`src/ekrany/`, `src/druk/`) axe-core sprawdza
    wyrenderowany DOM regułami WCAG 2.2 A i AA. Test ekranu ma już dane, które
    agent widzi w pracy: sprawy, wiadomości, zwroty. Pomiar na nich łapie to,
    czego pusta kolejka w przeglądarce nie pokaże.
 
    DLACZEGO TU, A NIE W PRZEGLĄDARCE. Bramki przed wypchnięciem nie uruchamiają
-   Playwrighta, a strażnik poza bramkami nie jest strażnikiem. Koszt zmierzony
-   przy wprowadzeniu: 367 testów ekranów, +16 s na całym przebiegu.
+   Playwrighta, a strażnik poza bramkami nie jest strażnikiem.
 
    CZEGO NIE PILNUJE. Kontrastu: jsdom nie liczy układu ani barw, więc reguła
    `color-contrast` jest tu wyłączona. Ten kontrast mierzy się w przeglądarce
@@ -17,8 +16,7 @@ import axe from "axe-core";
    znaczy: nazwy, etykiety, role i struktura są w porządku. Nie znaczy: ekran
    przechodzi WCAG w całości.
 
-   Przy wprowadzeniu 1410 testów obsługi klienta i ekranów dało zero naruszeń,
-   więc próg jest zerowy od pierwszego dnia i nie ma listy wyjątków. */
+   Próg jest zerowy i nie ma listy wyjątków. */
 
 const OBSZAR = /\/src\/(ekrany|druk)\//;
 

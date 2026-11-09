@@ -1,19 +1,12 @@
 import { useCallback, useState } from "react";
 
-/* ── Szkic odpowiedzi przeżywa przełączenie sprawy (0.423.0) ─────────────────
-   USTERKA, KTÓRĄ ZNALAZŁ POMIAR, NIE ZGŁOSZENIE. Reklamacje trzymały
-   treść w `useState`, a `useEffect` na `[wybrana]` robił
-   `setTresc("")`. Agent pisał odpowiedź, wchodziła sprawa pilniejsza, wracał —
-   pole było puste. Bez ostrzeżenia i bez cofnięcia.
+/* ── Szkic odpowiedzi przeżywa przełączenie sprawy ───────────────────────────
+   Agent pisze odpowiedź, wchodzi sprawa pilniejsza, wraca — i pole ma
+   dalej jego tekst. Szkic pisany do jednej sprawy nie wyjeżdża przy tym do
+   drugiej po strzałce w kolejce, bo jest PRZYPISANY DO SPRAWY, a nie do pola.
 
-   Tamta linia broniła przed czymś innym i broniła skutecznie: bez niej szkic
-   pisany do jednej sprawy wyjeżdżałby do drugiej po strzałce w kolejce. Ten
-   hook daje jedno i drugie, bo szkic jest PRZYPISANY DO SPRAWY, a nie do pola.
-
-   JEDEN HOOK NA WSZYSTKIE KOLEJKI. Skrzynka ma własny mechanizm — trzyma szkic na
-   serwerze z wersją, bo tam to kupuje także pracę w dwóch przeglądarkach.
-   Tutaj serwer nie ma kolumny i ten przyrost jej nie dokłada; to jest zmiana
-   po stronie ekranu i tyle ma zasięgu, ile ma.
+   JEDEN HOOK NA WSZYSTKIE KOLEJKI. Szkic żyje po stronie ekranu; serwer
+   nie ma na niego kolumny.
 
    DLACZEGO `sessionStorage`, A NIE PAMIĘĆ KOMPONENTU. Pamięć ginie przy
    wyjściu z ekranu, a przełączenie na inną kolejkę to dokładnie ten ruch,
@@ -46,13 +39,11 @@ function pisz(k: string, v: string): void {
   }
 }
 
-/* ── TO SAMO DLA SKRZYNKI, TYLKO BEZ HOOKA (0.533.0) ─────────────────────────
-   Akapit wyżej mówi, że skrzynka ma własny mechanizm — szkic na serwerze
-   z wersją. Ma, ale zapisuje go wyłącznie „Zapisz szkic" schowane pod „▾",
-   więc niezapisana odpowiedź ginęła przy j/k dokładnie tak, jak tu przed
-   0.423.0. Skrzynka bierze ten sam magazyn i te same klucze, ale bez hooka:
-   jej pole ma więcej źródeł (szkic zespołu, szkic Copilota, powrót po
-   „Cofnij") i o tym, co wygrywa, decyduje ekran. */
+/* ── TO SAMO DLA SKRZYNKI, TYLKO BEZ HOOKA ───────────────────────────────────
+   Skrzynka zapisuje szkic na serwerze wyłącznie przez „Zapisz szkic", więc
+   niezapisana odpowiedź ginęłaby przy j/k. Bierze ten sam magazyn i te same
+   klucze, ale bez hooka: jej pole ma więcej źródeł (szkic zespołu, szkic
+   Copilota, powrót po „Cofnij") i o tym, co wygrywa, decyduje ekran. */
 
 /** Treść zapamiętana dla sprawy albo `null`, gdy nic nie zapamiętano. */
 export function pamietanySzkic(kolejka: string, id: number): string | null {

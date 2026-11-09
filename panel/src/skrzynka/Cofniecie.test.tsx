@@ -1,9 +1,8 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import React from "react";
 import { act, fireEvent, render, screen } from "@testing-library/react";
 import { Cofniecie, OKNO_COFNIECIA_CZYNNOSCI_MS, type DoCofniecia } from "./Cofniecie";
 
-/* ── „Cofnij" zamiast „czy na pewno" (0.500.0) ─────────────────────────────
+/* ── „Cofnij" zamiast „czy na pewno" ───────────────────────────────────────
    Pilnujemy trzech rzeczy: cofnięcie woła odwrotną czynność i zamyka pasek,
    pasek znika sam po oknie, a przerysowanie z tym samym wpisem nie odsuwa
    jego zniknięcia — inaczej odświeżana lista trzymałaby go bez końca.      */

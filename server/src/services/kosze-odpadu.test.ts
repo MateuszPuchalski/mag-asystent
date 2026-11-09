@@ -4,15 +4,14 @@ import fs from "node:fs";
 import { DatabaseSync } from "node:sqlite";
 import type { Db } from "../db/db.js";
 
-/* ── Koszyk odpadu (0.211.0) ────────────────────────────────────────────────
+/* ── Koszyk odpadu ──────────────────────────────────────────────────────────
    Decyzja właściciela: „utylizacja powinna przenosić na magazyn odpad ODP".
-   Do 0.210.0 ocena zapisywała się i na tym koniec — bez dokumentu, bez ruchu
-   stanu, bez listy. Towar leżał, a w Subiekcie nie było po nim śladu.
+   Bez dokumentu towar leżałby, a w Subiekcie nie byłoby po nim śladu.
 
    MAGAZYN USTAWIAMY PRZED IMPORTEM. `config` powstaje raz, przy wczytaniu
    modułu, więc test z innym ustawieniem musi mieszkać w OSOBNYM pliku —
    jeden proces to jedna konfiguracja. Plik obok (`kosze-zwrotow.test.ts`)
-   biegnie bez `MAG_ID_ODP` i pilnuje zachowania sprzed tego wydania.       */
+   biegnie bez `MAG_ID_ODP` i pilnuje zachowania bez magazynu odpadu.       */
 
 process.env.MAG_ID_ODP = "9";
 
@@ -51,7 +50,7 @@ function zwrot(d: Db, kto: { id: number; name: string }) {
   for (const tw of [11, 12]) {
     d.prepare("INSERT OR IGNORE INTO sgt_towar(tw_id,symbol,nazwa) VALUES (?,?,?)")
       .run(tw, `SYM-${tw}`, `Towar ${tw}`);
-    /* Wiersz stanu — od 0.372.2 kartoteka bez niego nie wchodzi do pudła. */
+    /* Wiersz stanu — kartoteka bez niego nie wchodzi do pudła. */
     d.prepare("INSERT OR IGNORE INTO sgt_stan(tw_id,mag_id,stan) VALUES (?,1,0)").run(tw);
   }
   const id = Number(d.prepare(`INSERT INTO zwrot_klienta
@@ -83,7 +82,7 @@ test("utylizacja idzie do OSOBNEGO koszyka, a nie do koszyka zwrotów", () => {
 
 test("ocena „utylizacja” sama dokłada do koszyka odpadu", () => {
   /* Naciśnięcie, które operator i tak wykonuje, JEST dołożeniem — tak samo
-     jak przy „na stan" od 0.192.0. */
+     jak przy „na stan". */
   const d = stanowisko();
   const KTO = biuro(d);
   const { poz } = zwrot(d, KTO);
@@ -115,7 +114,7 @@ test("zmiana oceny PRZENOSI pozycję między pudłami, nie zostawia jej w obu", 
 test("MM koszyka odpadu idzie na MAGAZYN ODPADU i czeka na korektę", () => {
   /* Bramka korekty obowiązuje odpad TAK SAMO jak zwroty: towar wraca na
      magazyn główny dopiero po korekcie, więc MM zdjęłoby stan, którego
-     jeszcze nie ma. To ta sama lekcja co 0.200.0. */
+     jeszcze nie ma. */
   const d = stanowisko();
   const KTO = biuro(d);
   const { id, poz } = zwrot(d, KTO);

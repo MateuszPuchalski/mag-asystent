@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { calaDostawa, szybkaSciezka } from "./regulaSzybkiej";
 import type { PozycjaZwrotu, Zwrot } from "../api/typy";
 
-/* ── Reguła szybkiej ścieżki (0.481.0) ────────────────────────────────────
+/* ── Reguła szybkiej ścieżki ──────────────────────────────────────────────
    Ścieżka puszcza kilka zapisów i wypłatę naraz, więc każdy przypadek, który
    wymaga człowieka, musi ją zatrzymać PRZED pierwszym zapisem. Te testy
    pilnują listy takich przypadków. */

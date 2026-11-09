@@ -126,7 +126,7 @@ test("p90 bierze najbliższą rangę — liczbę, którą MIAŁA któraś sprawa
   assert.equal(W.p90([]), null);
 });
 
-/* ── Alarm: co stoi dłużej, niż stoi zwykle (0.364.0) ────────────────────────
+/* ── Alarm: co stoi dłużej, niż stoi zwykle ──────────────────────────────────
    Własność „Wiek" mówi: widać, co czeka najdłużej, BEZ PYTANIA KOGOKOLWIEK.
    Tabela wyżej odpowiada na pytanie zadane — alarm ma odpowiedzieć na
    niezadane, a do tego potrzebuje progu. Próg nie jest tu niczyim werdyktem:
@@ -222,8 +222,7 @@ test("sprawa DOMKNIĘTA, choćby najdłuższa, nie jest spóźniona", () => {
 });
 
 test("NOTATKA jest kanałem — jej wyłączenie w 0.361.0 było pomyłką", () => {
-  /* 0.361.0 zostawiło notatki poza miarą, bo „odpowiedź bywa rozmową na kilka
-     tur". To zdanie jest nieprawdziwe o tej tabeli i mówi to sam kod:
+  /* „Odpowiedź bywa rozmową na kilka tur" nie jest prawdą o tej tabeli:
      `odpowiedzNaNotatke` odmawia nadpisania, bo odpowiedź jest JEDNA
      i ostateczna, a nowe ustalenie to NOWA NOTATKA. Kilka tur to kilka
      notatek, z których każda ma dwa końce.
@@ -259,7 +258,7 @@ test("NOTATKA jest kanałem — jej wyłączenie w 0.361.0 było pomyłką", () 
 
 test("odczyt odpowiedzi przez biuro NIE domyka wymiany", () => {
   /* Wymiana kończy się, gdy hala odpowiedziała — `odp_at`. Kiedy biuro tę
-     odpowiedź przeczytało (`odp_widziana_at`, 0.57.0) to osobne pytanie
+     odpowiedź przeczytało (`odp_widziana_at`) to osobne pytanie
      i ma własny licznik w nagłówku. Liczone jako koniec, wydłużałoby czas
      odpowiedzi HALI o zwłokę BIURA i mieszałoby dwie różne winy. */
   db().prepare(`INSERT INTO delivery_note(sgt_dok_id,tresc,created_at,created_by,odpowiedz,odp_at,odp_by,odp_widziana_at)

@@ -12,7 +12,7 @@ import {
 import { kluczIdempotencji, wyslijOdpowiedz } from "./wysylka.js";
 import { biezacaDecyzja, kategorieNaZywo } from "./przeplyw-kategorii.js";
 
-/* ── Przepływ kategorii na żywo (6 października 2026) ───────────────────────
+/* ── Przepływ kategorii na żywo ─────────────────────────────────────────────
    Decyzja właściciela: „build the live mode for order status". To jest
    PIERWSZA droga w kodzie, którą odpowiedź idzie do klienta bez kliknięcia
    człowieka. Dlatego każda wątpliwość rozstrzyga się na „nie wysyłaj":

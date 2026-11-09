@@ -4,7 +4,7 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 
-/* ── Nadmiar w dostawie (0.64.0) ─────────────────────────────────────────────
+/* ── Nadmiar w dostawie ──────────────────────────────────────────────────────
    Ze zgłoszenia: „dodaj możliwość zatwierdzenia większej ilości niż jest na
    fakturze, idzie to do biura jako problem po zakończeniu dostawy".
 
@@ -96,9 +96,8 @@ test("nadmiar sam w sobie NIE zgłasza niczego przed zamknięciem", () => {
 // ── zgłoszenie przy zamknięciu ───────────────────────────────────────────────
 
 test("nadmiar na ostatniej pozycji NIE domyka dostawy sam — czeka na ZAKOŃCZ", () => {
-  /* Audyt z 22 września 2026: samo domknięcie zgłaszało nadmiar dostawcy bez
-     podglądu. Podwójne odłożenie przez dwie osoby stawało się reklamacją,
-     zanim ktokolwiek zdążył je poprawić korektą. */
+  /* Samo domknięcie zgłosiłoby nadmiar dostawcy bez podglądu: podwójne
+     odłożenie przez dwie osoby stałoby się reklamacją przed korektą. */
   const l = linia(0);
   D.putawayLine(l, "A01-02-03", "Jan z hali", { qty: 12 });
   assert.equal(wyjatki().length, 0);
@@ -168,10 +167,9 @@ test("nadmiary() czyta, ale nie zapisuje", () => {
 // ── ponowne „cała reszta" po zgubionej odpowiedzi ────────────────────────────
 
 test("odłożenie całej reszty pozycji już odłożonej daje kod juz_odlozona i niczego nie dokłada", () => {
-  /* Audyt z 14 października 2026: odpowiedź na pierwsze odłożenie zginęła
-     w dziurze Wi-Fi, kolektor pokazywał pozycję jako nietkniętą, a komunikat
-     o ilości pchnął magazyniera do wpisania jej z ręki — druga partia wjechała
-     jako nadmiar, którego nie było. */
+  /* Odpowiedź na pierwsze odłożenie ginie w dziurze Wi-Fi, kolektor pokazuje
+     pozycję jako nietkniętą i magazynier wpisuje ilość z ręki. Druga partia
+     nie ma prawa wjechać jako nadmiar, którego nie było. */
   const l = linia(10, "done");
   const r = D.putawayLine(l, "A01-02-03", "Jan z hali");
   assert.ok("error" in r);

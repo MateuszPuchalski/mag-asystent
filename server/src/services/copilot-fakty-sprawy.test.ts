@@ -7,17 +7,16 @@ import {
   faktySprawy, odsiejZnane, SUFIT_OPISU, tekstFaktow, type FaktySprawy,
 } from "./copilot-fakty-sprawy.js";
 
-/* ── Fakty ze sprawy i sito na „brakuje" (0.282.0) ───────────────────────────
-   Test powstał z karty, którą właściciel wkleił z żywego panelu. Copilot
-   prosił agenta o datę zakupu i o numer zamówienia — o rzeczy, które Allegro
-   przysłało razem ze sprawą.
+/* ── Fakty ze sprawy i sito na „brakuje" ─────────────────────────────────────
+   Copilot nie ma prosić agenta o datę zakupu i numer zamówienia — o rzeczy,
+   które Allegro przysłało razem ze sprawą.
 
    Cztery rzeczy warte testu:
 
    1. PUSTE POLA NIE WCHODZĄ DO BLOKU. Wiersz „Termin decyzji: —" uczyłby
       model, że wiemy o terminie tyle, ile o kwocie.
    2. ETYKIETA MÓWI, KTÓRY TO ZEGAR. `boughtAt` i `checkoutForm.createdAt` to
-      różne momenty i nazwanie jednego drugim to blizna 0.121.0.
+      różne momenty i nie wolno nazwać jednego drugim.
    3. SITO WYCINA TO, CO PODALIŚMY — i tylko to.
    4. STRAŻNIK JEST WAŻNIEJSZY OD SITA. Pozycja wycięta za dużo kasuje
       najcenniejszą część karty, bo to „brakuje" trzyma sprawę w miejscu.   */

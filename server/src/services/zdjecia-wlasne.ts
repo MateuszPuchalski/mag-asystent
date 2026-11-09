@@ -5,10 +5,9 @@ import { rozpoznajMime } from "../adapters/zdjecia.sgt.js";
 import { enqueueSetZdjecie, type ZrodloZdjecia } from "./queue.js";
 import { logEvent } from "./events.js";
 
-/* ── Zdjęcie kartoteki dodane z kolektora (0.88.0) ───────────────────────────
+/* ── Zdjęcie kartoteki dodane z kolektora ────────────────────────────────────
    Magazynier stoi przy regale z towarem w ręku i widzi na karcie pusty slot.
-   Do 0.87.0 jedyną drogą było „powiedz biuru", czyli ta sama ślepa uliczka,
-   którą 0.37.0 zlikwidowało dla kodów kreskowych.
+   „Powiedz biuru" to ślepa uliczka, więc dodaje je sam.
 
    DWA STOPNIE, BO WYCINANIE TŁA BYWA NIEUDANE. Najpierw powstaje PODGLĄD:
    zdjęcie idzie na serwer, usługa `wertis-tlo` wycina tło, a człowiek ogląda

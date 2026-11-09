@@ -5,11 +5,10 @@ import {
   LIMIT_ZALACZNIKA, TYPY_ZALACZNIKA, wgrajZalacznikDoAllegro, type WgrajZalacznik,
 } from "./allegro-wysylka.js";
 
-/* ── Załączniki do odpowiedzi (0.195.0) ──────────────────────────────────────
-   Odczyt załączników klienta działa od 0.155.0; wysyłka nie istniała wcale.
+/* ── Załączniki do odpowiedzi ────────────────────────────────────────────────
    Przy pytaniach o części zdjęcie bywa CAŁĄ odpowiedzią — „ten gwint, nie
-   tamten" pokazuje się szybciej, niż opisuje — a agent musiał po to iść do
-   panelu Allegro, czyli dokładnie tam, skąd panel miał go zabrać (§25:
+   tamten" pokazuje się szybciej, niż opisuje — a agent nie ma po to iść do
+   panelu Allegro (§25:
    „agent obsłuży typowe pytanie bez otwierania panelu Allegro").
 
    PLIK IDZIE DO ALLEGRO OD RAZU, nie przy wysyłce wiadomości. Dwa powody.

@@ -5,17 +5,16 @@ import { Blad, Przycisk, czas, dataLokalna } from "../ui";
 import { Tabela, Td } from "../ui/wglad";
 import { KartaZwinieta } from "./KartaZwinieta";
 
-/* ── Rekoncyliacja (z `biuro.html`, 0.441.0) ────────────────────────────
+/* ── Rekoncyliacja ──────────────────────────────────────────────────────
    Czy Subiekt ma to, co zapisaliśmy. Liczona NA ŻĄDANIE — powód przy
    `useRekoncyliacja`.
 
-   NAZWY WSZYSTKICH DZIEWIĘCIU RODZAJÓW. Biuro znało cztery pierwsze, a serwer
-   od 0.2xx dokładał kolejne: kosze i zwroty. Rozjazd spoza słownika wychodził
+   NAZWY WSZYSTKICH DZIEWIĘCIU RODZAJÓW. Rozjazd spoza słownika wyszedłby
    na ekran surowym kluczem w rodzaju `zwrot_rozliczony_bez_korekty`.
    `Record<RodzajRozjazdu, …>` każe kompilatorowi upomnieć się o każdy nowy
    rodzaj z unii serwera, a test sprawdza, że unia jest ta sama.
 
-   ZWINIĘTA (0.509.0): sprawdzenie na żądanie, którego wynik zwykle brzmi
+   ZWINIĘTA: sprawdzenie na żądanie, którego wynik zwykle brzmi
    „bez rozjazdów", a nocny przebieg liczy to samo codziennie. */
 
 export const NAZWA_ROZJAZDU: Record<RodzajRozjazdu, string> = {

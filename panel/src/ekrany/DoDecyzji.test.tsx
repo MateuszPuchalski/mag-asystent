@@ -7,18 +7,17 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { DoDecyzji } from "./DoDecyzji";
 import type { PozycjaDecyzji } from "../api/decyzje";
 
-/* ── DO DECYZJI (0.435.0) ──────────────────────────────────────────────────
+/* ── DO DECYZJI ────────────────────────────────────────────────────────────
    Trzy gwarancje ekranu startowego biura:
 
    1. ZERO ZAPISU. To ekran, na który się WCHODZI — co rano i po każdej
       przerwie. Umowa „zero zapisu przy patrzeniu" obowiązuje go bardziej
       niż każdy inny.
-   2. WIERSZ PROWADZI DO ŹRÓDŁA. Ekran przeniesiony ma adres panelu, a ten,
-      który jeszcze mieszka w biurze, otwiera się mostem — z tokenem, żeby
-      człowiek nie logował się drugi raz.
+   2. WIERSZ PROWADZI DO ŹRÓDŁA — adres panelu albo, dla ekranu biura,
+      most z tokenem, żeby człowiek nie logował się drugi raz.
    3. KOLEJNOŚĆ JEST SERWERA. Panel jej nie przestawia — dwie reguły
       sortowania rozjechałyby się przy pierwszej poprawce jednej z nich.
-      Od 0.545.0 sprawy tego samego pytania stoją w jednej grupie. Grupa
+      Sprawy tego samego pytania stoją w jednej grupie. Grupa
       staje tam, gdzie serwer postawił jej pierwszą sprawę — to podział
       listy, nie drugie sortowanie. */
 
@@ -112,7 +111,7 @@ describe("DO DECYZJI", () => {
     expect(pytania).toEqual(POZYCJE.map((p) => p.pytanie));
   });
 
-  /* Wariant B (0.545.0): pytanie raz, sprawy pod nim. Druga sprawa pytania
+  /* Pytanie raz, sprawy pod nim. Druga sprawa pytania
      dołącza do grupy pierwszej, choć serwer postawił ją niżej — kolejność
      grup i spraw w grupie to dalej kolejność serwera. */
   it("sprawy jednego pytania stoją pod nim raz, w kolejności serwera", async () => {
@@ -159,9 +158,8 @@ describe("DO DECYZJI", () => {
   });
 
   it("każdy wiersz prowadzi do ekranu panelu — zapis w błędzie wprost do karty kolejki (0.441.0)", async () => {
-    /* Do 0.441.0 zapis w błędzie prowadził mostem do `/biuro`, na STAN
-       SYSTEMU. Stan przeszedł do panelu, a wiersz trafia wprost do karty,
-       na której rozstrzyga się jego sprawa. */
+    /* Zapis w błędzie trafia wprost do karty stanu, na której rozstrzyga się
+       jego sprawa. */
     pokaz();
     const dostawa = await screen.findByRole("link", { name: /Reklamować u dostawcy/ });
     expect(dostawa).toHaveAttribute("href", "/obsluga/dostawy/802");
@@ -177,14 +175,14 @@ describe("DO DECYZJI", () => {
     expect(screen.queryByText("Reklamować u dostawcy czy zamknąć wyjątki?")).toBeNull();
     expect(screen.getByText("Uznać czy odrzucić?")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /Magazyn 2/ })).toBeInTheDocument();
-    /* Suma stoi w nagłówku sekcji (0.524.0), więc „Wszystko" nie powtarza jej
+    /* Suma stoi w nagłówku sekcji, więc „Wszystko" nie powtarza jej
        w pigułce — jeden fakt, jedno miejsce. */
     expect(screen.getByRole("heading", { name: "Do decyzji biura · 3" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Wszystko" })).toBeInTheDocument();
   });
 });
 
-/* ── Jedna lista „Do zrobienia" (23 września 2026) ───────────────────────────
+/* ── Jedna lista „Do zrobienia" ──────────────────────────────────────────────
    Wzmianki i moje sprawy stoją na tym samym ekranie co decyzje, w tej
    kolejności — i ich dojście niczego nie zapisuje. */
 describe("DO ZROBIENIA — trzy sekcje na jednym ekranie", () => {
@@ -201,8 +199,8 @@ describe("DO ZROBIENIA — trzy sekcje na jednym ekranie", () => {
     expect(wyslane).toEqual([]);
   });
 
-  /* Wariant B (0.545.0): pusta sekcja nie jest kartą z nagłówkiem, tylko
-     linijką nad decyzjami — 170 px na „nic" oddane liście decyzji. */
+  /* Pusta sekcja nie jest kartą z nagłówkiem, tylko linijką nad
+     decyzjami. */
   it("puste sekcje schodzą do jednej linijki, decyzje zostają sekcją", async () => {
     pokaz();
     await screen.findByText("Uznać czy odrzucić?");
@@ -235,10 +233,10 @@ describe("DO ZROBIENIA — trzy sekcje na jednym ekranie", () => {
     expect(wyslane).toEqual([]);
   });
 
-  /* ── Odmowa z panelu Allegro (0.541.0) ──────────────────────────────────
-     Biuro odmawia w panelu Allegro (fakt właściciela z 27 września 2026).
-     Wiersz „Śledzić dosyłkę?” ma jedyny przycisk tej listy — decyzja
-     właściciela z tego samego dnia. Otwarcie dalej niczego nie zapisuje. */
+  /* ── Odmowa z panelu Allegro ────────────────────────────────────────────
+     Biuro odmawia w panelu Allegro. Wiersz „Śledzić dosyłkę?” ma jedyny
+     przycisk tej listy — decyzja właściciela. Otwarcie dalej niczego nie
+     zapisuje. */
   const DOSYLKA: PozycjaDecyzji = { klucz: "dosylka:77", obszar: "obsluga", zrodlo: "dosylki",
     pytanie: "Śledzić dosyłkę?", co: "Kowalski_Jan: odmowa „Wysłaliśmy nowy towar” przy zamówieniu 3f2a9c1e",
     od: "2026-09-27T09:00:00Z", pilne: false, cel: { panel: "/obsluga/zwroty/77" },
@@ -278,9 +276,9 @@ describe("DO ZROBIENIA — trzy sekcje na jednym ekranie", () => {
   });
 
   it("bez tytułu nad sekcjami; trzy nagłówki mają jeden kształt licznika (0.524.0)", async () => {
-    /* Tytuł „Do zrobienia" powtarzał podświetloną zakładkę. Liczniki miały
-       trzy zapisy; teraz każdy stoi po kropce w nagłówku sekcji. Sekcje
-       pełne — puste schodzą do linijki (0.545.0). */
+    /* Bez tytułu „Do zrobienia", bo powtarzałby podświetloną zakładkę.
+       Każdy licznik stoi po kropce w nagłówku sekcji. Sekcje pełne — puste
+       schodzą do linijki. */
     moje = [{ kolejka: "reklamacja", id: 9, opis: "Nowak: pompa cieknie", at: "2026-09-26T10:00:00Z", terminDo: null }];
     wzmianki = [{ commentId: 3, conversationId: 12, autor: "Ola", klient: "Nowak", at: "2026-09-27T08:00:00Z",
       fragment: "@Ty zerknij", odhaczona: false, odhaczonaAt: null }];

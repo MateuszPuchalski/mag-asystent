@@ -5,7 +5,7 @@ import {
   type StatusSynchronizacji,
 } from "./allegro-inbox-sync-state.js";
 
-/* ── Stan synchronizatora reklamacji (0.222.0) ───────────────────────────────
+/* ── Stan synchronizatora reklamacji ─────────────────────────────────────────
    Osobny wiersz od zwrotów i od skrzynki, bo to osobna rodzina końcówek:
    własny limit Allegro i własny rytm. Wspólny zostaje SŁOWNIK statusów
    i próg alarmu — agent ma czytać „rate_limited" tak samo na każdym ekranie,

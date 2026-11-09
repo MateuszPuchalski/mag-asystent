@@ -1,7 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { act, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import React from "react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { MemoryRouter } from "react-router-dom";
 import { KartaKontekstu } from "./KartaKontekstu";
@@ -207,7 +206,7 @@ describe("KartaKontekstu", () => {
     expect(screen.queryByText("Nowy klient")).toBeNull();
   });
 
-  /* Linijka „Nowy klient" zeszła z kolumny obok. Przy 1366 px karta bywa
+  /* Linijki „Nowy klient" nie ma w kolumnie obok. Przy 1366 px karta bywa
      poza kadrem i zwinięta, więc fakt musi stać także w jednej linii. */
   it("„Nowy klient” stoi w karcie zwiniętej i w pasku nad osią", async () => {
     const { unmount } = pokaz(dane(), historia());

@@ -19,18 +19,13 @@ import { coSwieci, historiaWierszaKlienta, klientWKolumnie, ofertaWKarcie, paczk
 /**
  * Trzecia kolumna ekranu skrzynki (§10.1).
  *
- * Układ z trzema kolumnami stoi w projekcie od początku, a makieta
- * `docs/projekt-widokow/Main.dc.html` narysowała go poprawnie. Kontekst
- * leżał kiedyś w środkowej kolumnie, nad osią: cztery bloki jeden pod drugim
- * spychały pytanie klienta poniżej krawędzi okna, a to ono jest powodem,
- * dla którego agent tu przyszedł.
+ * Kontekst w środkowej kolumnie, nad osią, spychałby pytanie klienta poniżej
+ * krawędzi okna, a to ono jest powodem, dla którego agent tu przyszedł.
  *
  * ── DLACZEGO OFERTA I TOWAR TO JEDEN TEMAT ─────────────────────────────────
  * Właściciel przysłał zrzut z pracy: „powinniśmy wykorzystać puste miejsce
- * z boku". Osobna „Oferta" to jedenaście linijek w kolumnie wysokiej na
- * osiemset pikseli, a obok, niewidoczne, leżały zdjęcie towaru, stan, półka
- * i PARAMETRY KARTOTEKI. Klient pytał o wymiar gwintu korka, a parametr
- * „Gwint" stał w schowanej zakładce. Niewidoczne znaczyło nieistniejące.
+ * z boku". Zdjęcie towaru, stan, półka i PARAMETRY KARTOTEKI stoją obok
+ * oferty, bo parametr w schowanej zakładce (np. „Gwint") znaczy nieistniejący.
  * Co klient kupuje i co mamy na półce to jeden temat oglądany z dwóch stron,
  * a odpowiedź prawie zawsze potrzebuje obu naraz.
  *
@@ -40,9 +35,8 @@ import { coSwieci, historiaWierszaKlienta, klientWKolumnie, ofertaWKarcie, paczk
  * wstawia zdanie do szkicu, a nie ma prawa robić tego po cichu.
  *
  * ── CIEMNY KOKPIT ───────────────────────────────────────────────────────────
- * Nagranie właściciela pokazało zakładki i trzy kłopoty naraz. Nazwa towaru
- * stała cztery razy, zwrot do decyzji — jedyna rzecz z terminem — w połowie
- * przewijania, a zakładka z zerem kazała kliknąć, żeby usłyszeć „nic tu nie ma".
+ * Zwrot do decyzji — jedyna rzecz z terminem — nie może stać w połowie
+ * przewijania, a zakładka z zerem nie może kazać klikać po „nic tu nie ma".
  *
  * Świeci to, co ma zegar albo czeka na ruch agenta: zwrot w toku,
  * paczka poza zwykłą drogą i pozycja do wskazania. Stoi w jednej ramie
@@ -54,7 +48,7 @@ import { coSwieci, historiaWierszaKlienta, klientWKolumnie, ofertaWKarcie, paczk
  * Karta zakupu nad osią mówi zakup i klienta: towar, numer, sumę, pasek
  * drogi klienta (kroki zakupu i inne sprawy ze stanem) i historię w liczbach.
  * Kolumna mówi Subiekt, paczkę i robotę.
- * Ten sam fakt w dwóch domach kazał sprawdzać, czy oba mówią to samo.
+ * Ten sam fakt w dwóch domach kazałby sprawdzać, czy oba mówią to samo.
  * Fakt z karty wraca tu tylko jako odpowiedź, którą agent musi mieć bez
  * przewijania osi: wiersz „Zamówił" w paśmie i data doręczenia w bloku
  * paczki. Karta bywa poza kadrem, a obie rzeczy rozstrzygają odpowiedź.
@@ -176,7 +170,7 @@ function Kolumna({ dane, onWstawDoSzkicu, onOtworzRozmowe }: {
 
       {/* KOLEJNOŚĆ: oferta i towar, zamówienie, zamknięte zwroty, klient.
           Od tego, co klient kupował, do tego, kim jest. */}
-      {/* BRAK OFERTY MÓWI SIĘ RAZ (decyzja właściciela z 28 września 2026).
+      {/* BRAK OFERTY MÓWI SIĘ RAZ (decyzja właściciela).
           Baner nad rozmową mówi o braku razem z czynnościami, a przy
           zamówieniu z kilku pozycji prośbę niesie „Wymaga Ciebie". Wiersz
           zostaje streszczeniem bez treści do rozwinięcia: przycisk, który
@@ -218,8 +212,8 @@ function Kolumna({ dane, onWstawDoSzkicu, onOtworzRozmowe }: {
       </Wiersz>
 
       {/* ZAMKNIĘTE ZWROTY ZOSTAJĄ, bo ich werdykt, kwotę i numer korekty mówi
-          tylko ten wiersz: przystanek paska drogi zwrotu nie ma stanu. Zamknięte
-          reklamacje zeszły stąd: pasek mówi, że są zamknięte, a ich
+          tylko ten wiersz: przystanek paska drogi zwrotu nie ma stanu. Zamkniętych
+          reklamacji tu nie ma: pasek mówi, że są zamknięte, a ich
           przebieg stoi na własnym ekranie, jedno kliknięcie dalej. */}
       {zwrotyZamkniete.length > 0 &&
         <Wiersz tytul="Zamknięte zwroty" streszczenie={streszczenieZamknietych(zwrotyZamkniete.length)}
@@ -343,7 +337,8 @@ export function streszczenieZamknietych(zwrotow: number): string {
  * Streszczenie wiersza „Klient": tylko to, czego karta zakupu nie ma.
  *
  * Liczniki („2 zakupy · 1 zwrot") mówi karta jako „Wcześniej u nas". Tu
- * zostaje sprawa klienta z następnym krokiem i data ostatniego kontaktu. Historia przychodzi już bez tego zakupu.
+ * zostaje sprawa klienta z następnym krokiem i data ostatniego kontaktu.
+ * Historia przychodzi już bez tego zakupu.
  */
 export function streszczenieWierszaKlienta(h: HistoriaKlienta): React.ReactNode {
   const czesci: React.ReactNode[] = [];

@@ -1,4 +1,4 @@
-/* ── Ile sztuk liczymy przy zwrocie (0.212.0) ────────────────────────────────
+/* ── Ile sztuk liczymy przy zwrocie ──────────────────────────────────────────
    `ilosc` niesie DEKLARACJĘ klienta z Allegro i nadpisuje ją synchronizator
    przy każdym takcie. `ilosc_zwrocona` niesie to, co biuro naprawdę znalazło
    w kartonie, i nie rusza jej nic poza biurem.

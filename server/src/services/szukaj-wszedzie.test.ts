@@ -4,11 +4,10 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 
-/* ── Ctrl+K: jedno szukanie ponad kolejkami (23 września 2026) ───────────────
+/* ── Ctrl+K: jedno szukanie ponad kolejkami ──────────────────────────────────
    Pilnujemy trzech rzeczy. Numer zamówienia prowadzi do WSZYSTKICH spraw tego
    zakupu, także rozmowy. Login kupującego trafia też w rozmowę po loginie
-   rozmówcy, bez wielkości liter — od 24 września 2026, gdy właściciel
-   potwierdził, że to ten sam login. Szukanie niczego nie zapisuje. */
+   rozmówcy, bez wielkości liter — właściciel potwierdził, że to ten sam login. Szukanie niczego nie zapisuje. */
 
 process.env.DB_PATH = path.join(fs.mkdtempSync(path.join(os.tmpdir(), "wertis-szukaj-")), "t.db");
 
@@ -100,7 +99,7 @@ test("szukanie niczego nie zapisuje", () => {
   assert.equal(po.n, przed.n);
 });
 
-/* ── Login po kawałku (24 września 2026) ─────────────────────────────────────
+/* ── Login po kawałku ────────────────────────────────────────────────────────
    Zrzut właściciela: „chrzanowski" nie znajdowało „Chrzanowski1234". Agent
    pamięta nazwisko z loginu, nie cyfry dopisane przez Allegro. */
 test("kawałek loginu znajduje rozmowę, zakup i zwrot; pełny login stoi pierwszy", () => {
@@ -113,7 +112,7 @@ test("kawałek loginu znajduje rozmowę, zakup i zwrot; pełny login stoi pierws
   assert.deepEqual(S.szukajWszedzie("%%%", null, db()), []);
 });
 
-/* ── Klient w wynikach (24 września 2026) ────────────────────────────────────
+/* ── Klient w wynikach ───────────────────────────────────────────────────────
    Login pasujący do frazy daje JEDEN wiersz „Klient" prowadzący do profilu,
    na górze listy, bez względu na wielkość liter w różnych tabelach. */
 test("login daje jeden wiersz klienta na górze, prowadzący do profilu", () => {
@@ -124,7 +123,7 @@ test("login daje jeden wiersz klienta na górze, prowadzący do profilu", () => 
   assert.match(klienci[0].cel ?? "", /^\/obsluga\/klient\/chips20$/i);
 });
 
-/* ── Kupujący zamówienia jako klient (0.535.0) ──────────────────────────────
+/* ── Kupujący zamówienia jako klient ────────────────────────────────────────
    Brak w dostawie przychodzi z numerem zamówienia, a sprawę klienta zakłada
    się na profilu. Numer zamówienia daje więc wiersz „Klient” jego kupującego,
    na górze — profil i sprawa są o jeden klik. */

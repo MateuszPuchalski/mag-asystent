@@ -5,10 +5,8 @@ import { MemoryRouter } from "react-router-dom";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { PlakietkaSpoznien } from "./Spoznione";
 
-/* ── Plakietka spóźnień w nagłówku (0.446.0) ──────────────────────────────
-   Gwarancje przeniesione z testu „spóźniona sprawa ma własną plakietkę
-   i drogę do treści" (0.364.0) w dawnym `routes/biuro.test.ts`: okno stałe,
-   droga do karty, zero znaczy brak plakietki. */
+/* ── Plakietka spóźnień w nagłówku ────────────────────────────────────────
+   Gwarancje: okno stałe, droga do karty, zero znaczy brak plakietki. */
 
 let adresy: string[] = [];
 function pokaz(spoznionychRazem: number) {

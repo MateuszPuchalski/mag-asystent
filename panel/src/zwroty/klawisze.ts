@@ -3,16 +3,15 @@ import { useEffect, type MutableRefObject } from "react";
 /* ── Klawisze kubełka sięgają do stanu, który mieszka niżej ──────────────────
    Nasłuch klawiatury stoi na EKRANIE (`ekrany/Zwroty.tsx`) i tak ma zostać:
    czytnik kodów wpisuje znaki jak klawiatura, więc dwa niezależne nasłuchy nie
-   umiałyby się dogadać, który klawisz jest czyj (`skaner.ts`, 0.163.0).
+   umiałyby się dogadać, który klawisz jest czyj (`skaner.ts`).
 
    Dwie decyzje z tabeli §25a.2 potrzebują jednak stanu, którego ekran nie ma
    i mieć nie powinien:
 
    • ODMOWA otwiera pole powodu — `Decyzje.tsx` trzyma to w `useState`;
    • KWOTA powstaje z ZAZNACZENIA pozycji, a ono mieszka w `Pozycje.tsx`
-     i ma tam zostać. Wyprowadzenie zaznaczenia z `zwrot.pozycje` naprawiło
-     w 0.216.0 dwie osobne drogi do złej kwoty; podniesienie go na ekran
-     odtworzyłoby dokładnie tamten błąd.
+     i ma tam zostać: wyprowadzenie zaznaczenia z `zwrot.pozycje` zamyka
+     dwie drogi do złej kwoty, a podniesienie go na ekran by je otworzyło.
 
    Stąd REJESTR: komponent zostawia w nim funkcję, a nasłuch ją woła. To nie
    jest kanał zdarzeń w drugą stronę — ekran nadal decyduje, KIEDY wolno
@@ -50,12 +49,12 @@ export interface AkcjeKlawiszy {
    */
   oddajPieniadze?: () => void;
   /**
-   * DO OCENY i DO ZWROTU, klawisz `-` (0.479.0): otwiera „wróciło mniej"
+   * DO OCENY i DO ZWROTU, klawisz `-`: otwiera „wróciło mniej"
    * przy pierwszej pozycji z więcej niż jedną sztuką, jeszcze nieprzeliczonej.
    */
   ilosc?: () => void;
   /**
-   * DO ZWROTU, klawisz `D` (0.479.0): otwiera potrącenie przy pierwszej
+   * DO ZWROTU, klawisz `D`: otwiera potrącenie przy pierwszej
    * pozycji bez potrącenia. Tylko OTWIERA — kwotę i powód wpisuje człowiek.
    */
   potracenie?: () => void;

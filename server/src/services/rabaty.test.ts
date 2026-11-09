@@ -5,7 +5,7 @@ import { DatabaseSync } from "node:sqlite";
 import { migrate, type Db } from "../db/db.js";
 import { stanRabatu, pozycjaDoWniosku, zlozWniosekORabat, RabatConflict } from "./rabaty.js";
 
-/* ── Rabat transakcyjny przy pozycji zwrotu (0.164.0) ────────────────────────
+/* ── Rabat transakcyjny przy pozycji zwrotu ──────────────────────────────────
    Firma klikała po zwrot prowizji ręcznie przy KAŻDYM zwrocie w panelu
    Allegro, bo skądinąd nie widziała, przy którym wniosek już jest. Te testy
    pilnują dwóch rzeczy, na których stoi cała reszta:
@@ -239,7 +239,7 @@ test("odmowa Allegro NIE zostawia u nas wniosku, którego tam nie ma", async () 
   assert.equal(stanRabatu(d, pozycja).stan, "brak", "pozycja zostaje do spróbowania jeszcze raz");
 });
 
-/* ── Wniosek złożony w panelu Allegro (0.176.0) ──────────────────────────────
+/* ── Wniosek złożony w panelu Allegro ────────────────────────────────────────
    Zgłoszenie właściciela: „rabat transakcyjny został zlecony przez panel
    allegro, do tego zwrotu w appce nie widać". Nasze lustro poznaje taki
    wniosek dopiero, gdy przewinie się przez `GET /order/refund-claims`; do

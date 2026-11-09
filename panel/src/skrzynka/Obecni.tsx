@@ -1,23 +1,15 @@
-import React from "react";
 import { Eye, PenLine } from "lucide-react";
 import type { Obecnosc } from "../api/zdarzenia";
 
 /**
- * Kto jeszcze siedzi przy tej rozmowie (§6.3, makieta `Main.dc.html`).
+ * Kto jeszcze siedzi przy tej rozmowie (§6.3). To tutaj pisze się odpowiedź,
+ * którą drugi agent właśnie może dublować.
  *
- * Dane leciały tu od 0.144.0 i nikt ich nie rysował: `useSzynaZdarzen` zwracał
- * `obecnosc`, a `Skrzynka.tsx` brała hook wyłącznie dla efektu ubocznego
- * i wynik wyrzucała. Kolejka pokazywała samego trzymającego (jedna osoba,
- * ikona oka), więc w otwartej rozmowie agent nie widział NIC — a to tutaj
- * pisze się odpowiedź, którą drugi agent właśnie dubluje.
- *
- * OBECNOŚĆ JEST STANEM CHWILOWYM, NIE STATUSEM ROZMOWY — tak mówi makieta
- * i dlatego ten pasek jest cienki, szary i znika sam. Plakietka w wadze
+ * OBECNOŚĆ JEST STANEM CHWILOWYM, NIE STATUSEM ROZMOWY — dlatego ten pasek jest cienki, szary i znika sam. Plakietka w wadze
  * statusu kłamałaby o tym, jak długo to trwa: uchwyt gaśnie po 45 s, a „pisze"
  * po 12 s.
  *
- * PISZE, nie „pisze komentarz". Makieta rozróżnia pole, do którego ktoś pisze;
- * sygnał z serwera niesie samo `typing` i nie wie, czy to szkic, czy notatka.
+ * PISZE, nie „pisze komentarz". Sygnał z serwera niesie samo `typing` i nie wie, czy to szkic, czy notatka.
  * Ekran mówi więc tyle, ile wie — dopisanie trybu wymaga zmiany w trasie
  * `presence`, nie zgadywania po stronie panelu.
  */

@@ -3,9 +3,8 @@ import assert from "node:assert/strict";
 import { USUNIETE, oczyscSurowy, zostalyWrazliwe } from "./allegro-oczyszczanie.js";
 
 /* ── Strażnik polityki danych ────────────────────────────────────────────────
-   Do 0.151.0 lądowisko zwrotów trzymało IBAN kupującego i telefon nadawcy,
-   choć polityka danych mówiła „nie pobieramy". Te testy są tym, co zamienia
-   zdanie w dokumencie na własność kodu.                                     */
+   Polityka danych mówi, że IBAN kupującego i telefon nadawcy nie trafiają do
+   bazy. Te testy są tym, co zamienia zdanie w dokumencie na własność kodu.  */
 
 /* Kształty z `docs/allegro/swagger.yaml`: CustomerReturnRefundBankAccount,
    CustomerReturnParcelSender, CheckoutForm.buyer, CheckoutFormDeliveryReference. */
@@ -73,8 +72,8 @@ test("wartość znika, ale KLUCZ zostaje — lądowisko ma dalej nieść kształ
   assert.equal(czysty.parcels[0].sender, USUNIETE);
   /* Numer listu zostaje, choć `ksztalt.ts` odsiewa go z raportu sondy. Obie
      oceny są prawdziwe o różnych miejscach — raport wchodzi do repo, lądowisko
-     jest prywatną kopią w bazie biura. Od 0.163.0 to lądowisko jest JEDYNYM
-     miejscem, gdzie skan etykiety znajduje zwrot po numerze listu. */
+     jest prywatną kopią w bazie biura, w której skan etykiety znajduje zwrot
+     po numerze listu. */
   assert.equal(czysty.parcels[0].waybill, "PX1", "list przewozowy zostaje w prywatnej kopii");
 });
 

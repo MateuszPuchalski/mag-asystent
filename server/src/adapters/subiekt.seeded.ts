@@ -358,7 +358,7 @@ export class SeededSubiektAdapter {
   }
 
   /**
-   * Ceny kartoteki — WSZYSTKIE poziomy, w kolejności Subiekta (0.396.0).
+   * Ceny kartoteki — WSZYSTKIE poziomy, w kolejności Subiekta.
    *
    * Kolejność idzie po numerze poziomu, a nie po kwocie: agent uczy się, że
    * „pierwsza od góry to detaliczna", a sortowanie po cenie przestawiałoby
@@ -385,9 +385,8 @@ export class SeededSubiektAdapter {
 
   listDeliveryDocuments(days: number): RawDocument[] {
     const cutoff = new Date(Date.now() - days * 86400_000).toISOString().slice(0, 10);
-    // Jedna lista, dwa magazyny skutku. Do 0.22.0 kontener na MGP miał własną
-    // zakładkę i własną ścieżkę pracy; teraz rozkłada się identycznie — zapisem
-    // adresu (D1) — a magazyn skutku mówi już tylko tyle, że po odłożeniu
+    // Jedna lista, dwa magazyny skutku. Kontener na MGP rozkłada się
+    // identycznie — zapisem adresu (D1) — a magazyn skutku mówi tylko, że po odłożeniu
     // zostaje jeszcze przesunięcie stanu na halę.
     // Typy dostaw biorą się z `DOK_TYPY_DOSTAW`, tak samo jak w adapterze MSSQL.
     // Para ('FZ','PZ') była tu ZASZYTA i czyniła demo niewiernym: zawężenie

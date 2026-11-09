@@ -11,13 +11,13 @@ export const NAZWA: Record<StatusRozmowy, string> = {
   open: "Otwarta",
   waiting_for_customer: "Czeka na klienta",
   waiting_for_us: "Czeka na nas",
-  /* „Czeka na halę", nie „Czeka na nas" (0.225.0). Ta etykieta kłamała: stan
+  /* „Czeka na halę", nie „Czeka na nas". Ta etykieta kłamała: stan
      stawia ZLECENIE POMIARU, a zdejmuje wynik z magazynu — to czekanie na
      halę, nie na odpowiedź biura. Pod starą nazwą stał obok „Otwartej"
      w rozwijanym menu i wyglądał jak coś, co agent ma wybrać ręką. */
   waiting_for_internal: "Czeka na halę",
   snoozed: "Odłożona",
-  /* JEDEN WERDYKT (23 września 2026, decyzja właściciela). „Rozwiązana"
+  /* JEDEN WERDYKT (decyzja właściciela). „Rozwiązana"
      i „Zamknięta" różniły się tylko tym, komu wraca obudzona rozmowa —
      dziś wraca do prowadzącego w obu przypadkach, więc nazwa jest jedna. */
   resolved: "Zakończona",
@@ -108,7 +108,7 @@ export function opisProblemuZakupu(p: NonNullable<Rozmowa["problemZakupu"]>): {
   return { powod: null, dymek: `${DYMEK_PROBLEMU} Powód od Allegro spoza słownika: ${p.powod}.` };
 }
 
-/* KATEGORIE klasyfikatora (specyfikacja z 20 września 2026). Ta sama zasada,
+/* KATEGORIE klasyfikatora. Ta sama zasada,
    co przy `NAZWA`: `Record<Kategoria, string>` NIE SKOMPILUJE SIĘ, gdy
    dojdzie szesnasta kategoria bez nazwy dla człowieka. Nazwy są krótkie, bo
    stoją na plakietce wiersza kolejki, a wiersz ma pokazywać pytanie klienta.

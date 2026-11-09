@@ -18,11 +18,11 @@ export interface ZadanieWysylki {
   body: string;
   expectedVersion: number;
   expectedLastMessageId: number | null;
-  /** Jawna zgoda z blizny 0.110.0 — „wyślij mimo to", nigdy ciche nadpisanie. */
+  /** Jawna zgoda — „wyślij mimo to", nigdy ciche nadpisanie. */
   mimoNowejWiadomosci?: boolean;
   /** Druga jawna zgoda: „odpowiadam, choć przy rozmowie siedzi kto inny". */
   mimoObecnosci?: boolean;
-  /** „Wyślij i zakończ" (23 września 2026): po udanej wysyłce rozmowa jest zakończona. */
+  /** „Wyślij i zakończ": po udanej wysyłce rozmowa jest zakończona. */
   zakoncz?: boolean;
   /** Ile ms minęło od otwarcia rozmowy w panelu — pomiar tarcia (`services/tarcie.ts`), przycięty w trasie. */
   msOdOtwarcia?: number | null;
@@ -47,10 +47,8 @@ class PomijamOznaczenie extends Error {}
 /**
  * Klucz idempotencji dla ROZMOWY — cienka nakładka na wspólny rdzeń.
  *
- * Rdzeń mieszka od 0.224.0 w `services/idempotencja.ts`, bo potrzebuje go też
- * odpowiedź w reklamacji. Ta nakładka zostaje, żeby format klucza (`snd-…`)
- * i wołający nie zmienili się ani o znak — a testy tego pliku są dowodem, że
- * wyjęcie było czyste.
+ * Rdzeń mieszka w `services/idempotencja.ts`, bo potrzebuje go też odpowiedź
+ * w reklamacji. Nakładka trzyma format klucza (`snd-…`).
  */
 export const kluczIdempotencji = (
   conversationId: number, lastMessageId: number | null, body: string, zalaczniki: string[] = [],
@@ -74,7 +72,7 @@ function kontekst(database: DatabaseSync, conversationId: number): Kontekst {
      ostatniej wiadomości klienta", i to nie jest drobiazg: własna odpowiedź
      przesuwałaby ten punkt, więc druga wysyłka w tej samej rozmowie zawsze
      wyglądałaby na pisaną do nieaktualnego pytania. */
-  /* ── PO CZASIE, NIE PO NUMERZE (23 września 2026) ──────────────────────────
+  /* ── PO CZASIE, NIE PO NUMERZE ─────────────────────────────────────────────
      Zgłoszenie właściciela ze zrzutem: „Wysyłka zatrzymana — klient dopisał
      wiadomość" padało często, choć wszystkie wiadomości klienta stały na
      ekranie. Synchronizacja wpisywała paczkę wiadomości w kolejności Allegro,
@@ -113,7 +111,7 @@ function kontekst(database: DatabaseSync, conversationId: number): Kontekst {
 export const LIMIT_ZNAKOW = 2000;
 
 /**
- * Co agent zrobił ze szkicem Copilota, zanim go wysłał (22 września 2026).
+ * Co agent zrobił ze szkicem Copilota, zanim go wysłał.
  *
  * Liczy się WYŁĄCZNIE szkic ułożony na TĘ SAMĄ wiadomość klienta, na którą
  * idzie odpowiedź — szkic sprzed dopisku opisuje inne pytanie. Porównanie
@@ -122,8 +120,8 @@ export const LIMIT_ZNAKOW = 2000;
  *
  * To pomiar, nie bramka: los nie blokuje wysyłki i nie zmienia jej wyniku.
  *
- * TWIERDZENIA DO SPRAWDZENIA ZAMRAŻANE PRZY WYSYŁCE (0.532.0). Pytanie
- * właściciela: czy tarcie „Wyślij bez zmian" (0.500.0) działa. Tarcie stoi
+ * TWIERDZENIA DO SPRAWDZENIA ZAMRAŻANE PRZY WYSYŁCE. Pytanie
+ * właściciela: czy tarcie „Wyślij bez zmian" działa. Tarcie stoi
  * tylko przy szkicu z twierdzeniami spoza faktów, a `szkic_copilota` ma
  * jeden wiersz na rozmowę i następny szkic go nadpisuje. Po fakcie nie
  * dałoby się więc powiedzieć, czy wysłany szkic miał co sprawdzać. Liczba
@@ -171,11 +169,9 @@ export async function wyslijOdpowiedz(z: ZadanieWysylki) {
      kontem. Człowiek zostaje przy sesji, jak dotąd. */
   const ref = z.automat ? z.autor.id : undefined;
 
-  /* ── Kto ma prawo odpowiedzieć (0.159.0) ──────────────────────────────────
-     Do 0.158.0 wysyłka wymagała WCZEŚNIEJSZEGO przejęcia rozmowy: agent, który
-     wszedł w pytanie i napisał odpowiedź, dostawał na końcu „najpierw ją
-     przejmij" i tracił ruch. Decyzja właściciela: samo wejście trzyma rozmowę
-     na czas siedzenia, a ODPOWIEDŹ przydziela ją na stałe.
+  /* ── Kto ma prawo odpowiedzieć ────────────────────────────────────────────
+     Decyzja właściciela: samo wejście trzyma rozmowę na czas siedzenia,
+     a ODPOWIEDŹ przydziela ją na stałe.
 
      Rozmowa nieprzypisana idzie więc do wysyłki bez osobnego kliknięcia —
      chyba że siedzi przy niej kto inny. Wtedy blokuje UCHWYT z pamięci
@@ -185,11 +181,8 @@ export async function wyslijOdpowiedz(z: ZadanieWysylki) {
     /* Trwały właściciel bije wszystko. Inaczej dwóch agentów odpowiada
        jednocześnie, a klient dostaje dwie różne wersje tej samej prawdy.
 
-       ŁADUNEK NIESIE IMIĘ I CZAS (0.395.0), bo to on karmi teraz jedyny
-       dialog przekazania w panelu. Do 0.394.0 ten dialog otwierał przegrany
-       wyścig o przycisk „PRZEJMIJ ROZMOWĘ"; przycisk zszedł na zgłoszenie
-       właściciela, więc bez tych dwóch pól agent zobaczyłby gołe zdanie
-       i nie miałby skąd wziąć nazwiska, u którego prosić o przekazanie.
+       ŁADUNEK NIESIE IMIĘ I CZAS, bo to on karmi jedyny dialog przekazania
+       w panelu: agent musi wiedzieć, u kogo prosić o przekazanie.
 
        Czas bierzemy z HISTORII PRZYPISAŃ, nie z `updated_at` rozmowy — ten
        drugi rusza się przy każdym zapisie szkicu (ta sama pułapka co
@@ -201,8 +194,7 @@ export async function wyslijOdpowiedz(z: ZadanieWysylki) {
       FROM app_user u WHERE u.user_id=?`)
       .get(z.conversationId, k.assignedUserId) as
       { name: string | null; assigned_at: string | null } | undefined;
-    /* ZDANIE NIE MÓWI JUŻ „najpierw ją przejmij": tej drogi nie ma od
-       0.395.0. Mówi to, co naprawdę da się zrobić — poprosić właściciela. */
+    /* Zdanie mówi to, co naprawdę da się zrobić — poprosić właściciela. */
     throw new ConversationConflict(
       `Rozmowę prowadzi ${wlasciciel?.name ?? "kto inny"} — poproś o przekazanie`, {
         assignedUserId: k.assignedUserId, assignedUserName: wlasciciel?.name ?? null,
@@ -224,7 +216,7 @@ export async function wyslijOdpowiedz(z: ZadanieWysylki) {
     });
   }
 
-  /* Kontrola świeżości — blizna 0.110.0. Dopisek klienta nie zakłada drugiej
+  /* Kontrola świeżości. Dopisek klienta nie zakłada drugiej
      sprawy i NIE kasuje szkicu; zmienia tylko to, na którą wersję pytania
      odpowiadamy. Dlatego wysyłka wymaga ponownego zatwierdzenia. */
   if (k.lastMessageId !== z.expectedLastMessageId && !z.mimoNowejWiadomosci) {
@@ -338,10 +330,10 @@ export async function wyslijOdpowiedz(z: ZadanieWysylki) {
        następnej odpowiedzi. */
     database.prepare("DELETE FROM wysylka_zalacznik WHERE conversation_id=?").run(z.conversationId);
 
-    /* ODPOWIEDŹ PRZESTAWIA ROZMOWĘ NA CZEKANIE (§7, 0.158.0). Piłka jest po
+    /* ODPOWIEDŹ PRZESTAWIA ROZMOWĘ NA CZEKANIE (§7). Piłka jest po
        stronie klienta i kolejka ma to pokazywać sama — status wymagający
        osobnego kliknięcia po każdej wysyłce zostałby pomijany. */
-    /* „WYŚLIJ I ZAKOŃCZ" (23 września 2026). Większość spraw kończy się
+    /* „WYŚLIJ I ZAKOŃCZ". Większość spraw kończy się
        w chwili ostatniej odpowiedzi, więc werdykt jedzie w TEJ SAMEJ
        transakcji co wiadomość: wysyłka nieudana nie zostawia rozmowy
        zakończonej bez odpowiedzi, a udana nie wymaga drugiego kliknięcia. */
@@ -350,7 +342,7 @@ export async function wyslijOdpowiedz(z: ZadanieWysylki) {
       database.prepare("UPDATE conversation SET otwarta_recznie_at=NULL WHERE id=?").run(z.conversationId);
     }
 
-    /* ODPOWIEDŹ PRZYDZIELA NA STAŁE (0.159.0). Kto odpisał klientowi, ten
+    /* ODPOWIEDŹ PRZYDZIELA NA STAŁE. Kto odpisał klientowi, ten
        prowadzi sprawę — bez tego rozmowa wracałaby do puli zaraz po tym, jak
        ktoś wziął za nią odpowiedzialność, a klient dopytujący trafiałby za
        każdym razem na kogo innego.
@@ -380,11 +372,9 @@ export async function wyslijOdpowiedz(z: ZadanieWysylki) {
       externalMessageId: wynik.externalMessageId };
   })();
 
-  /* ── Wątek przeczytany PO wysyłce (0.195.0) ────────────────────────────────
-     Do 0.194.1 odpowiedź wysłana z panelu zostawiała wątek NIEPRZECZYTANY
-     w Centrum Wiadomości Allegro. Im lepiej działał panel, tym bardziej kłamał
-     licznik po tamtej stronie: czerwona plakietka przy sprawach załatwionych,
-     a po niej nie sposób poznać, co jeszcze czeka.
+  /* ── Wątek przeczytany PO wysyłce ──────────────────────────────────────────
+     Bez tego licznik w Centrum Wiadomości Allegro świeci czerwoną plakietką
+     przy sprawach załatwionych w panelu.
 
      TU, a nie przy otwarciu rozmowy: „zero zapisu przy patrzeniu" obowiązuje
      także zapisy do cudzego systemu. Przeczytana znaczy „odpisaliśmy", nie

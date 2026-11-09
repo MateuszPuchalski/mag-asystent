@@ -3,10 +3,9 @@ import { logEvent } from "./events.js";
 import { ZwrotConflict } from "./zwroty.js";
 
 /* ── Ręczne zamknięcie zwrotu, bez korekty ───────────────────────────────────
-   Zwrot zamykała dotąd wyłącznie korekta (ręka, automat albo Sfera) albo
-   wypłata z Allegro. Zostawały sprawy, których nic z tego nie domknie:
-   pieniądze oddane poza aplikacją, zwrot bez towaru, historia sprzed panelu.
-   Stały w kolejce bez końca, a kolejka, której nie da się opróżnić, uczy ją
+   Korekta (ręka, automat albo Sfera) i wypłata z Allegro nie domkną spraw
+   takich jak pieniądze oddane poza aplikacją, zwrot bez towaru czy historia
+   sprzed panelu. Kolejka, której nie da się opróżnić, uczy ją
    ignorować.
 
    TYLKO U NAS. Zamknięcie nie wysyła nic do Allegro (ani zwrotu pieniędzy, ani

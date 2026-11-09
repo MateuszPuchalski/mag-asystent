@@ -5,17 +5,16 @@ import os from "node:os";
 import path from "node:path";
 
 /* ── Kosze zwrotowe — serwis ─────────────────────────────────────────────────
-   Dwa niezmienniki z cichym trybem awarii:
+   Trzy niezmienniki z cichym trybem awarii:
 
    1. ADRES PRZED SPRZEDAWALNOŚCIĄ. Zapis lokalizacji z odkładania musi stanąć
       w kolejce PRZED zadaniem MM tego samego towaru.
    2. POWRÓT WRACA TAM, SKĄD TOWAR PRZYJECHAŁ. Kosz złożony w aplikacji
-      (0.192.0) sam wysłał towar na regał, więc od 0.266.0 sam go stamtąd
-      zdejmuje jednym MM ZWROTY→MAG. Kosz z dokumentu MM robi od 0.277.0
-      dokładnie to samo, tylko kierunek bierze z TAMTEGO dokumentu
-      (`kosz.mm_mag_z`), a nie z konfiguracji. Nieznany kierunek to brak
-      dokumentu — zgadnięty magazyn przesuwałby towar naprawdę.
-
+      sam wysłał towar na regał, więc sam go stamtąd zdejmuje jednym MM
+      ZWROTY→MAG. Kosz z dokumentu MM robi dokładnie to samo, tylko kierunek
+      bierze z TAMTEGO dokumentu (`kosz.mm_mag_z`), a nie z konfiguracji.
+      Nieznany kierunek to brak dokumentu — zgadnięty magazyn przesuwałby
+      towar naprawdę.
    3. POWRÓT CZEKA NA ADRESY. MM na magazyn sprzedażowy czyni towar
       sprzedawalnym, a guard workera pilnuje kolejności po kolumnie `tw_id` —
       dokument wielopozycyjny przechodzi obok niego. Dlatego zadanie powstaje
@@ -36,8 +35,8 @@ beforeEach(() => {
   const d = db();
   for (const t of ["kosz_pozycja", "kosz", "sgt_towar", "sgt_stan", "sgt_magazyn",
     "sfera_queue",
-    /* Oś zwrotu doszła w 0.269.0: rozkładanie dopisuje na nią ślad, więc
-       zdarzenia z poprzedniego testu policzyłyby się w następnym. */
+    /* Rozkładanie dopisuje ślad na oś zwrotu, więc zdarzenia z poprzedniego
+       testu policzyłyby się w następnym. */
     "zwrot_zdarzenie", "zwrot_klienta_pozycja", "zwrot_klienta", "channel_account",
   ]) {
     d.prepare(`DELETE FROM ${t}`).run();
@@ -124,10 +123,9 @@ test("odłożenie: zapis adresu tylko przy zmianie, zawsze PRZED zadaniem MM", a
     .all() as Array<{ id: number; tw_id: number }>;
   assert.deepEqual(setLoc.map((s) => s.tw_id), [900_037]);
 
-  /* Do 0.79.0 stała tu odmowa „pozycja jest już odłożona". Zniknęła razem
-     z dopuszczeniem POPRAWKI: zły regał zeskanowany pomyłkowo prostuje się
-     skanem właściwego, bo COFNIJ po zapisie do Subiekta jest zamknięte,
-     a magazynier nie może zostać z towarem na złej półce i bez wyjścia. */
+  /* Odłożona pozycja przyjmuje POPRAWKĘ: zły regał zeskanowany pomyłkowo
+     prostuje się skanem właściwego, bo COFNIJ po zapisie do Subiekta jest
+     zamknięte, a magazynier nie może zostać z towarem na złej półce. */
   K.odlozPozycje(zAdresem.id, "D04-04-04", "Magazynier");
   const poprawiona = K.szczegolKosza(kosz.id).pozycje.find((x) => x.id === zAdresem.id);
   assert.equal(poprawiona?.lokFaktyczna, "D04-04-04", "nowy adres nadpisuje stary");
@@ -199,9 +197,8 @@ function koszAplikacji(
 }
 
 test("kosz z aplikacji cofa bufor JEDNYM MM ZWROTY→MAG", async () => {
-  /* Blizna: do 0.264.0 łańcuch kończył się na zapisie adresów. Towar leżał
-     na półce, a stan wisiał na regale zwrotów — sprzedawalny nie był, dopóki
-     biuro nie wystawiło drugiego dokumentu ręką. */
+  /* Łańcuch nie kończy się na zapisie adresów: bez powrotu stan wisiałby na
+     regale zwrotów, a towar z półki nie byłby sprzedawalny. */
   const kosz = koszAplikacji();
   for (const p of kosz.pozycje) K.odlozPozycje(p.id, "A01-02-03", "Magazynier");
   /* Adresy muszą wejść do Subiekta PRZED dokumentem — tu udajemy workera. */
@@ -255,7 +252,7 @@ test("powrót czeka na zapis adresów i wychodzi dopiero po nim", async () => {
   assert.equal(K.szczegolKosza(kosz.id).powrot?.status, "pending");
 });
 
-/* ── Sklejanie powtórzonych kartotek (0.359.0) ───────────────────────────────
+/* ── Sklejanie powtórzonych kartotek ─────────────────────────────────────────
    Ten sam towar z dwóch zwrotów to dwa wiersze `kosz_pozycja` — tak musi być,
    bo każdy wiersz niesie ślad na oś swojego zwrotu. Na ekranie były jednak
    dwie linijki, dwa skany i dwa podejścia do tej samej półki. Cena błędu przy
@@ -307,7 +304,7 @@ test("odłożenie sklejonej linijki zapisuje WSZYSTKIE jej wiersze, jednym adres
 test("sklejenie NIE zabiera śladu osobnym zwrotom", async () => {
   /* To jest cena, której sklejanie mieć nie może. Wiersz `kosz_pozycja`
      istnieje właśnie po to, żeby na oś SWOJEGO zwrotu dopisać „towar wrócił na
-     półkę X" (0.269.0). Jedna linijka na ekranie ma zostawić dwa ślady, bo
+     półkę X". Jedna linijka na ekranie ma zostawić dwa ślady, bo
      czeka na nie dwóch klientów. */
   const d = db();
   const teraz = new Date().toISOString();
@@ -387,10 +384,8 @@ test("sklejone są tylko wiersze NIEODRÓŻNIALNE na ekranie", async () => {
 });
 
 test("różna odpowiedź biura rozdziela pominięcia, choć towar ten sam", async () => {
-  /* 0.358.0 dało kolektorowi zdanie biura przy pominięciu, bo pominięcie bez
-     widocznej odpowiedzi uczy jednego: nie zgłaszać. Sklejenie dwóch wierszy
-     z RÓŻNYMI odpowiedziami schowałoby jedną z nich — czyli cofnęłoby tamto
-     wydanie po cichu, przez klucz w innym pliku. */
+  /* Pominięcie bez widocznej odpowiedzi biura uczy jednego: nie zgłaszać.
+     Sklejenie dwóch wierszy z RÓŻNYMI odpowiedziami schowałoby jedną z nich. */
   const kosz = koszAplikacji("Z-45");
   const sklejona = K.szczegolKosza(kosz.id).pozycje.find((p) => p.twId === 900_036)!;
   K.pominPozycjeKosza(sklejona.id, "brak_w_koszu", "Magazynier");
@@ -414,7 +409,7 @@ test("różna odpowiedź biura rozdziela pominięcia, choć towar ten sam", asyn
 
 test("pominięta pozycja nie wraca z bufora — nikt jej nie przeniósł", async () => {
   const kosz = koszAplikacji("Z-9");
-  /* Dwa wiersze na 900036 (dwa zwroty) są od 0.359.0 JEDNĄ linijką, więc
+  /* Dwa wiersze na 900036 (dwa zwroty) są JEDNĄ linijką, więc
      odłożenie bierze obie sztuki naraz. Pominięta zostaje druga kartoteka. */
   assert.equal(kosz.pozycje.length, 2, "trzy wiersze, dwie linijki");
   K.odlozPozycje(kosz.pozycje[0].id, "A01-02-03", "Magazynier");
@@ -432,9 +427,8 @@ test("pominięta pozycja nie wraca z bufora — nikt jej nie przeniósł", async
 });
 
 test("rozłożenie i pominięcie zostawiają ślad na osi ZWROTU", async () => {
-  /* Kosz wie, z której pozycji zwrotu wziął towar, od 0.192.0 — ale nikt nie
-     czytał tego w drugą stronę. Biuro patrzące na zwrot nie widziało ani
-     tego, że towar wrócił na półkę, ani tego, że go w koszu nie było. */
+  /* Kosz wie, z której pozycji zwrotu wziął towar. Biuro patrzące na zwrot
+     ma widzieć, że towar wrócił na półkę albo że go w koszu nie było. */
   const d = db();
   /* Id konta BIERZEMY Z ZAPISU, nie zakładamy „1": `channel_account` ma
      AUTOINCREMENT, a `beforeEach` kasuje wiersze bez zerowania licznika. Każdy
@@ -485,10 +479,7 @@ test("kosz bez zwrotu rozkłada się bez śladu — nie ma gdzie go dopisać", a
 });
 
 test("kosz z dokumentu wraca NA MAGAZYN, z którego dokument go wysłał", async () => {
-  /* Usterka zgłoszona 11 września 2026: „przesunięcia nie robią się
-     automatycznie, gdy zamyka się rozłożony koszyk na magazyn główny". Kosz
-     z kartki kończył się zapisaniem adresów, a drugi dokument wystawiało biuro
-     ręką — dokładnie ta sama blizna, którą kosze z panelu zamknęły w 0.266.0.
+  /* Kosz z kartki też kończy się przesunięciem, nie samym zapisem adresów.
 
      Magazyn docelowy bierze się z DOKUMENTU (`mm_mag_z`), nie z konfiguracji:
      filtr importu pilnuje wyłącznie odbiorcy przesunięcia, o nadawcy nie mówi
@@ -524,7 +515,7 @@ test("kosz z dokumentu wraca NA MAGAZYN, z którego dokument go wysłał", async
 
 test("kosz z dokumentu bez znanego magazynu źródłowego powrotu nie dostaje", async () => {
   /* Lustro `sgt_mm_zwrot` sięga tyle dni wstecz, ile mówi MM_ZWROTY_DNI_WSTECZ,
-     a kosz otwarty przed 0.277.0 snapshotu nie ma. Zgadnięty magazyn przesuwa
+     a stary kosz snapshotu nie ma. Zgadnięty magazyn przesuwa
      towar NAPRAWDĘ i nie cofa się jednym kliknięciem, więc dokumentu nie ma
      wcale — kosz zgłosi się w rekoncyliacji i zamknie go biuro ręką. */
   const kosz = koszDoRozkladania("KZ-78");
@@ -565,9 +556,9 @@ test("kosz rozłożony przed 0.266.0 powrotu nie dostaje", async () => {
 });
 
 test("koszyk wirtualny nie trafia na kolektor — halę rozkłada kosz z jego MM", async () => {
-  /* 0.350.0, decyzja właściciela: koszyk złożony w panelu zbiera towar, rodzi
-     MM i się kończy. Na produkcji Z-7 wisiał na kolektorze obok przyjęcia 1352
-     z tego samego MM — dwie jednostki pracy na jeden towar. */
+  /* Decyzja właściciela: koszyk złożony w panelu zbiera towar, rodzi
+     MM i się kończy. Inaczej wisiałby na kolektorze obok przyjęcia z tego
+     samego MM — dwie jednostki pracy na jeden towar. */
   const wirtualny = koszAplikacji("Z-7");
   const zDokumentu = koszDoRozkladania("KZ-01");
   const naKolektorze = K.koszeDlaKolektora().map((k) => k.id);
@@ -580,9 +571,8 @@ test("koszyk wirtualny nie trafia na kolektor — halę rozkłada kosz z jego MM
 });
 
 test("koszyk odpadu nie jest pracą hali i nie cofa bufora", async () => {
-  /* 0.211.0 dołożyło rodzaj koszy i nie ruszyło listy dla kolektora, więc
-     kosz odpadu wyglądał tam jak każdy inny. Magazynier odłożyłby złom na
-     regał i wpisał mu adres pickingowy do kartoteki. */
+  /* Kosz odpadu nie może wyglądać na kolektorze jak każdy inny. Magazynier
+     odłożyłby złom na regał i wpisał mu adres pickingowy do kartoteki. */
   const odpad = koszAplikacji("Z-10", "odpad");
   assert.equal(
     K.koszeDlaKolektora().some((k) => k.id === odpad.id),
@@ -603,11 +593,11 @@ test("zakończenie odmawia, dopóki cokolwiek leży w koszu", async () => {
   assert.throws(() => K.zakonczKosz(kosz.id, "Magazynier"), /Nieodłożone pozycje/);
 });
 
-/* ── Kosz rozłożony PRZED korektą (audyt zwrotów, 15 września 2026) ──────────
+/* ── Kosz rozłożony PRZED korektą ────────────────────────────────────────────
    Hala rozkłada kosz, zanim biuro wpisze korekty — zamknięcie jest czynnością
-   fizyczną. ZAKOŃCZ zamawiało wtedy powrót z regału, na który nic nie weszło,
-   a MM na regał nie wychodziło nigdy: automat patrzył tylko na kosze
-   zamknięte. Cofnięcie zakończenia nie widziało zaś powrotu wcale.          */
+   fizyczną. ZAKOŃCZ nie może wtedy zamówić powrotu z regału, na który nic nie
+   weszło, a MM na regał musi wyjść także dla kosza rozłożonego. Cofnięcie
+   zakończenia musi widzieć powrót.                                          */
 
 /** Odkłada wszystko na własne półki i udaje workera, który zapisał adresy. */
 function rozloz(koszId: number) {
@@ -677,10 +667,10 @@ test("po wejściu powrotu do Subiekta cofnięcie zakończenia odmawia", async ()
   assert.equal(K.szczegolKosza(kosz.id).status, "rozlozony", "stan kosza zostaje nietknięty");
 });
 
-/* ── Pełne rozkładanie kosza (0.77.0) ────────────────────────────────────────
+/* ── Pełne rozkładanie kosza ─────────────────────────────────────────────────
    Kosz zwrotowy dostał to, co linia dostawy: jednostkę, stany magazynów
    i podpowiedź strefy. Do tego POMIŃ — bo pozycja, której w koszu nie ma,
-   blokowała wcześniej zakończenie i cały obieg.                             */
+   nie może blokować zakończenia i całego obiegu.                            */
 
 test("pozycja niesie jednostkę i stany niezerowe, malejąco", async () => {
   const kosz = koszDoRozkladania();
@@ -692,7 +682,7 @@ test("pozycja niesie jednostkę i stany niezerowe, malejąco", async () => {
     [["MAG", 12], ["ZWR", 3]],
     "magazyn ze stanem zero nie jest odpowiedzią na żadne pytanie przy półce"
   );
-  /* ROLA jedzie razem ze stanem (0.118.0): kolektor wyróżnia po niej regał
+  /* ROLA jedzie razem ze stanem: kolektor wyróżnia po niej regał
      zwrotów, bo to jego licznik schodzi do zera w miarę rozkładania. Kod
      magazynu jest napisem z konfiguracji klienta, więc rozpoznawanie po nim
      byłoby magicznym łańcuchem psującym się przy zmianie w Subiekcie. */
@@ -741,7 +731,7 @@ test("odłożenie cofa pominięcie — znaleziony towar nie wymaga odklikiwania"
   assert.throws(() => K.pominPozycjeKosza(kosz.pozycje[0].id, "uszkodzony", "X"), /odłożona/);
 });
 
-/* ── Cofanie pomyłek i „wrócę do tego" (0.79.0) ──────────────────────────────
+/* ── Cofanie pomyłek i „wrócę do tego" ───────────────────────────────────────
    Granica przechodzi przez SUBIEKTA: dopóki zapis czeka w kolejce, aplikacja
    cofa wszystko bez śladu; po zapisie nie cofa nic i mówi to wprost.        */
 
@@ -838,8 +828,7 @@ test("cofnięcie pominięcia przywraca pozycję do pracy", async () => {
 test("odłożona pozycja zjeżdża na koniec listy, kolejna zostaje na górze", async () => {
   /* Lista kosza odpowiada na jedno pytanie: „co jeszcze zostało". Zwinięty
      pasek zrobionej pozycji dalej zajmuje ekran, więc przy koszu na dwadzieścia
-     pozycji do roboty trzeba było PRZEWIJAĆ przez robotę już wykonaną. Ta sama
-     lekcja, którą rozkładanie dostaw odrobiło w 0.35.0. */
+     pozycji do roboty trzeba by PRZEWIJAĆ przez robotę już wykonaną. */
   const kosz = koszDoRozkladania();
   const [pierwsza, druga] = kosz.pozycje;
 
@@ -876,8 +865,8 @@ test("odłożona pozycja zjeżdża na koniec listy, kolejna zostaje na górze", 
 
 test("pozycja niesie WSZYSTKIE półki towaru, pickingową pierwszą", async () => {
   /* Zwrot wraca pojedynczo i najtaniej dołożyć go tam, gdzie ten towar już
-     leży. Kolektor znał dotąd sam adres pickingowy, więc po resztę trzeba było
-     wyjść z kosza do karty towaru — czyli zgubić wskazaną pozycję. */
+     leży. Sam adres pickingowy kazałby wyjść z kosza do karty towaru —
+     czyli zgubić wskazaną pozycję. */
   db().prepare("UPDATE sgt_towar SET lokalizacja=? WHERE tw_id=?")
     .run("A01-02-03 B04-01-02", 900_036);
   const kosz = koszDoRozkladania();
@@ -898,7 +887,7 @@ test("pozycja niesie WSZYSTKIE półki towaru, pickingową pierwszą", async () 
 });
 
 test("karton nie miesza się z obiegiem zwrotów", async () => {
-  /* Karton (0.122.0) mieszka w tej samej tabeli, bo rozkłada się go tak samo.
+  /* Karton mieszka w tej samej tabeli, bo rozkłada się go tak samo.
      Wszystko PRZED rozkładaniem jest jednak inne i granica musi być twarda:
      zawartość kartonu zbiera hala, a kosz przyjeżdża dokumentem z Subiekta. */
   const KA = await import("./karton.js");
@@ -912,17 +901,13 @@ test("karton nie miesza się z obiegiem zwrotów", async () => {
   );
 });
 
-/* ── Kosz złożony w aplikacji: czego panel biura potrzebuje (0.333.0) ────────
-   Zgłoszenie właściciela: „nie utworzyło MM przy zamknięciu zwrotu, nie widzę
-   MM w Subiekcie". Dokument nie zginął — czeka na numery korekt, bo towar
-   wraca na magazyn główny dopiero korektą (bramka z 0.200.0). Ekran o tym
-   milczał, więc czekanie wyglądało jak awaria.
+/* ── Kosz złożony w aplikacji: czego panel biura potrzebuje ──────────────────
+   Dokument czeka na numery korekt, bo towar wraca na magazyn główny dopiero
+   korektą. Ekran ma to powiedzieć, inaczej czekanie wygląda jak awaria.
 
-   Przy okazji wyszło, że panel czytał DWA POLA, których serwer nigdy nie
-   oddawał: `zwrotow` na liście i `zwroty` w podglądzie. Pierwsze rysowało
-   „undefined zwr.", drugie wywracało cały podgląd. Nie wyszło wcześniej, bo
-   kosze Z DOKUMENTU mają `mmNumer` i trafiają w drugą gałąź tego zdania —
-   a własne kosze biuro zaczęło składać dopiero teraz.                       */
+   Panel czyta DWA POLA: `zwrotow` na liście i `zwroty` w podglądzie. Kosze
+   Z DOKUMENTU mają `mmNumer` i trafiają w drugą gałąź tego zdania, więc tylko
+   własne kosze biura je sprawdzają.                                         */
 
 /** Kosz złożony w aplikacji, z pozycją wniesioną przez zwrot. */
 function koszZeZwrotu(kod: string, korekta: string | null) {
@@ -998,11 +983,10 @@ test("kosz Z DOKUMENTU nie czeka na żadną korektę", () => {
 });
 
 test("ZWIĄZANY koszyk wraca trasą z konfiguracji, choćby dokument nie znał nadawcy", async () => {
-  /* 0.377.0. Związanie koszyka z jego dokumentem (0.376.0) przestawiło go do
-     gałęzi „kosz z dokumentu", a ta bierze cel WYŁĄCZNIE z `mm_mag_z`. Kolumna
-     read-modelu jest nullowalna, więc koszyk tracił trasę, którą przed
-     związaniem miał pewną — powrót nie wychodził wcale, a towar zostawał na
-     regale zwrotów.
+  /* Związanie koszyka z jego dokumentem przestawia go do gałęzi „kosz
+     z dokumentu", a ta bierze cel z `mm_mag_z`. Kolumna read-modelu jest
+     nullowalna, więc bez wyjątku koszyk traciłby trasę i powrót nie
+     wychodziłby wcale.
 
      To MY zleciliśmy tamto MM i wiemy, że poszło MAG→ZWROTY, więc nadawca
      dokumentu niczego tu nie dodaje. */
@@ -1026,10 +1010,10 @@ test("ZWIĄZANY koszyk wraca trasą z konfiguracji, choćby dokument nie znał n
   assert.equal(p.magTo, 1, "na magazyn główny — tak, jak koszyk stamtąd wyjechał");
 });
 
-/* ── Kosze z kłopotem MM (0.501.0) ─────────────────────────────────────────
-   Zgłoszenie właściciela: „zaznacz koszyki, w których był problem z MM —
-   muszę sprawdzić stany z Subiektem". Wiersz kolejki pamięta tylko ostatnie
-   podejście, więc MM odrzucona i przepuszczona PONÓW-em wyglądała jak czysta. */
+/* ── Kosze z kłopotem MM ───────────────────────────────────────────────────
+   Biuro sprawdza po nich stany z Subiektem. Wiersz kolejki pamięta tylko
+   ostatnie podejście, więc MM odrzucona i przepuszczona PONÓW-em
+   wyglądałaby jak czysta. */
 
 function koszZMm(kod: string, pola: { status?: string; rozlozono?: string; queueStatus: string;
   blad?: string | null; wPozycji?: boolean }) {
@@ -1091,9 +1075,8 @@ test("kosz z kłopotem MM zostaje na liście po oknie dwóch tygodni", () => {
   assert.ok(!lista.some((k) => k.id === bez.koszId), "reszta historii zostaje w audycie");
 });
 
-/* ── Ponowienie MM kosza (0.503.0) ────────────────────────────────────────
-   Zgłoszenie właściciela przy kubełku „Problem z MM": „dodaj, abym mógł
-   wywołać ponownie". Jeden ruch na kosz, a nie PONÓW na każde zadanie. */
+/* ── Ponowienie MM kosza ──────────────────────────────────────────────────
+   Jeden ruch na kosz, a nie PONÓW na każde zadanie. */
 
 test("ponowienie wraca do kolejki WSZYSTKIE MM kosza w błędzie, z wpisem w dzienniku", () => {
   db().prepare("DELETE FROM events").run();
@@ -1136,9 +1119,9 @@ test("kosz bez MM w błędzie odmawia zamiast udawać ponowienie", () => {
   assert.throws(() => K.ponowMmKosza(db(), koszId, "Ala"), (e: Error & { kod?: number }) => e.kod === 409);
 });
 
-/* ── Kosz bez MM powrotnego na liście koszy (0.505.0) ───────────────────────
-   Zgłoszenie właściciela: „jak mogę sprawdzić, do których koszyków po
-   rozłożeniu nie została zrobiona MM powrotna?" — a potem „zrób to". */
+/* ── Kosz bez MM powrotnego na liście koszy ─────────────────────────────────
+   Biuro ma widzieć, do których koszyków po rozłożeniu nie powstała MM
+   powrotna. */
 
 function rozlozonyZDokumentu(kod: string, rozlozono: string, powrotQueue: number | null = null) {
   const d = db();
@@ -1180,9 +1163,8 @@ test("przyczyna braku powrotu: adres w błędzie odróżnia się od nieznanego k
   assert.equal(K.listaKoszy().find((x) => x.id === k)?.bezPowrotu, "nieznany");
 });
 
-/* ── Który towar blokuje MM (0.530.0) ───────────────────────────────────────
-   Zgłoszenie właściciela przy koszu 1205: „brak towaru w MM, gdy chcę
-   przerzucić z powrotem na główny — i nie pokazuje, o jaki towar chodzi". */
+/* ── Który towar blokuje MM ─────────────────────────────────────────────────
+   Sfera mówi „brak towaru" bez nazwy towaru, więc wskazujemy go sami. */
 
 test("karta kosza nazywa kartotekę, której brakuje na magazynie źródłowym MM", () => {
   db().prepare("DELETE FROM events").run();
@@ -1214,8 +1196,7 @@ test("karta kosza nazywa kartotekę, której brakuje na magazynie źródłowym M
 });
 
 test("kartotekę, która blokuje MM, zdejmuje się z dokumentu — reszta idzie dalej (0.530.0)", () => {
-  /* Zgłoszenie właściciela przy koszu 1205: „daj możliwość usunięcia tego
-     towaru z tej MM". */
+  /* Zdjęcie jednej kartoteki z MM, którą blokuje. */
   db().prepare("DELETE FROM events").run();
   const k = koszDoRozkladania("1206");
   const q = Number(db().prepare(`INSERT INTO sfera_queue(type,payload,status,attempts,error_msg,created_by)

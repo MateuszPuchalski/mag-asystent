@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import type { Rozmowa } from "../api/typy";
 
-/* ── SYGNAŁY POZA EKRANEM (23 września 2026) ─────────────────────────────────
+/* ── SYGNAŁY POZA EKRANEM ────────────────────────────────────────────────────
    Decyzja właściciela po przeglądzie UX. Agent pracuje też w Subiekcie
    i w panelu Allegro, a skrzynka nie dawała znać, że klient napisał — nic nie
    zmieniało tytułu karty i nie było powiadomień.

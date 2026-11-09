@@ -1,13 +1,12 @@
 import type { Db } from "../db/db.js";
 
-/* ── Mostek oferta → kartoteka (0.152.0, przebudowany w 0.154.0) ─────────────
+/* ── Mostek oferta → kartoteka ───────────────────────────────────────────────
    Bez tego mostka pozycja zwrotu nie ma zdjęcia: `zdjecie_cache`
    i `zdjecie_wlasne` są kluczowane po `tw_id`.
 
-   Łańcuch ma pięć ogniw i do 0.153.1 KAŻDE zerwane wyglądało na ekranie tak
-   samo — „Bez kartoteki". Operator nie miał jak odróżnić „sprzedawca nie
-   wypełnił SKU" od „zamówienia jeszcze nie pobrano" od „kod ma błąd". Dlatego
-   `Dopasowanie` niesie teraz POWÓD, a nie tylko wynik.
+   Łańcuch ma pięć ogniw, a operator ma odróżnić „sprzedawca nie wypełnił
+   SKU" od „zamówienia jeszcze nie pobrano" od „kod ma błąd". Dlatego
+   `Dopasowanie` niesie POWÓD, a nie tylko wynik.
 
    DOPASOWANIE JEST PROPOZYCJĄ, NIE FAKTEM. Projekt panelu §4.3 żąda, żeby
    kartoteka wskazana przez agenta nie udawała faktu z Allegro; wybór automatu
@@ -36,7 +35,7 @@ export type PowodBraku =
   | "oferta_bez_sku"
   | "sku_nie_trafia"
   | "symbol_zdublowany"
-  /* Skrzynka (0.179.0): snapshotu oferty jeszcze nie ma, więc SKU nie ma
+  /* Skrzynka: snapshotu oferty jeszcze nie ma, więc SKU nie ma
      skąd wziąć. To stan PRZEJŚCIOWY — takt `allegro-oferty` dociągnie go
      w kilka minut — i ekran ma powiedzieć to, zamiast milczeć jak przy
      ofercie bez SKU, która nie naprawi się sama. */
@@ -135,9 +134,9 @@ export function dopasujPozycjeZamowienia(
 /**
  * Kartoteka wskazana przez SKU.
  *
- * Trim po OBU stronach porównania. Do 0.153.1 trimowaliśmy tylko SKU;
- * `subiekt.mssql.ts` nie trimuje `tw_Symbol` przy imporcie (`mag_Symbol` tuż
- * obok — trimuje), więc symbol z białym znakiem na końcu nie trafiał nigdy.
+ * Trim po OBU stronach porównania: `subiekt.mssql.ts` nie trimuje
+ * `tw_Symbol` przy imporcie, więc symbol z białym znakiem na końcu
+ * inaczej nie trafiłby nigdy.
  *
  * Dwa trafienia to NIE powód do wybrania pierwszego. Symbol miał być
  * unikalny; skoro nie jest, rozstrzyga człowiek.
@@ -167,7 +166,7 @@ export function zPamieci(database: Db, channelAccountId: number, offerId: string
 const zwinSku = (s: string) => s.trim().toLowerCase();
 
 /**
- * Czy pamięć wskazania obowiązuje przy DZISIEJSZEJ sygnaturze oferty (0.219.0).
+ * Czy pamięć wskazania obowiązuje przy DZISIEJSZEJ sygnaturze oferty.
  *
  * Decyzja właściciela: sprzedawca przepina sygnaturę oferty, gdy towar od
  * jednego dostawcy się wyczerpie. Para oferta–kartoteka zapamiętana przy
@@ -177,7 +176,7 @@ const zwinSku = (s: string) => s.trim().toLowerCase();
  *
  * `undefined` = sygnatury dziś nie znamy (snapshotu jeszcze nie ma, zwrot bez
  * zamówienia) — wtedy pamięć obowiązuje, bo nie ma czym jej podważyć. Wiersz
- * bez zapisanej sygnatury (sprzed 0.219.0) obowiązuje jak dotąd.
+ * bez zapisanej sygnatury też obowiązuje.
  */
 export function pamiecAktualna(
   pamiec: { sku: string | null; sku_wtedy: string | null }, skuTeraz: string | null | undefined,
@@ -207,8 +206,8 @@ export function zaproponujKartoteke(
 ): Dopasowanie {
   const pamiec = zPamieci(database, channelAccountId, offerId);
   /* Pozycję zamówienia liczymy PRZED rozstrzygnięciem pamięci: to jej SKU
-     mówi, czy pamięć jeszcze obowiązuje (0.219.0). Bez zamówienia albo bez
-     pozycji sygnatury nie znamy i pamięć obowiązuje jak dotąd. */
+     mówi, czy pamięć jeszcze obowiązuje. Bez zamówienia albo bez
+     pozycji sygnatury nie znamy i pamięć obowiązuje. */
   const t = orderId ? dopasujPozycjeZamowienia(database, channelAccountId, orderId, offerId, nazwa) : null;
   const skuTeraz = t?.pozycja ? (t.pozycja.sku ?? "") : undefined;
   if (pamiec && pamiecAktualna(pamiec, skuTeraz)) {
@@ -274,7 +273,7 @@ export function kartotekaOferty(
   sku: string | null | undefined,
 ): Dopasowanie {
   const pamiec = zPamieci(database, channelAccountId, offerId);
-  /* Pamięć obowiązuje, dopóki sygnatura oferty jest ta sama (0.219.0);
+  /* Pamięć obowiązuje, dopóki sygnatura oferty jest ta sama;
      `undefined` (bez snapshotu) jej nie podważa. */
   if (pamiec && pamiecAktualna(pamiec, sku === null ? undefined : sku)) {
     return {
@@ -304,9 +303,9 @@ export function kartotekaOferty(
       powod: "symbol_zdublowany", poKolumnie: null,
     };
   }
-  /* JEDNO trafienie po sygnaturze to POWIĄZANIE, nie propozycja (0.219.0,
-     decyzja właściciela) — jak przy zwrotach od 0.169.0. Zdanie źródła mówi,
-     że stoi za nim sygnatura, nie człowiek. */
+  /* JEDNO trafienie po sygnaturze to POWIĄZANIE, nie propozycja (decyzja
+     właściciela), jak przy zwrotach. Zdanie źródła mówi, że stoi za nim
+     sygnatura, nie człowiek. */
   return {
     pewnosc: "sku", twId: k.twId, symbol: k.symbol,
     zrodlo: `SKU oferty „${szukane}"${dopisek}`, powod: null, poKolumnie: null,

@@ -14,19 +14,17 @@ import { KontekstKosza } from "../kosze/Kontekst";
 import { Koszyk, NowyKoszyk } from "../zwroty/Koszyk";
 import { PrzelacznikZwrotow } from "../zwroty/Przelacznik";
 
-/** Kubełki „Tylko wgląd” — stoją pod „Więcej”, nie na wierzchu (0.526.0). */
+/** Kubełki „Tylko wgląd” — stoją pod „Więcej”, nie na wierzchu. */
 const WIECEJ_KOSZY: ReadonlyArray<KubelekKoszy> = ["rozlozone", "anulowane"];
 
-/* ── KOSZE W ZAKŁADCE ZWROTY (0.438.0) ─────────────────────────────────────
-   Przeniesione z MAGAZYNU ZWROTÓW w `biuro.html`, decyzją właściciela do
-   zakładki Zwroty — powód przy `zwroty/Przelacznik.tsx`. Gramatyka ta sama co
-   w Zwrotach i Dostawach: kolejka, sprawa, kontekst.
+/* ── KOSZE W ZAKŁADCE ZWROTY ───────────────────────────────────────────────
+   Decyzją właściciela w zakładce Zwroty — powód przy `zwroty/Przelacznik.tsx`.
+   Gramatyka ta sama co w Zwrotach i Dostawach: kolejka, sprawa, kontekst.
 
    PASEK OTWARTEGO KOSZYKA STOI TU TAK SAMO jak na liście zwrotów. To ten sam
    komponent, bo koszyk zamyka się w jednym miejscu, jedną trasą — dwie drogi
    zamknięcia tego samego pudła to dwa miejsca, w których może się ono
-   rozjechać. W biurze stał przy koszu przycisk ZAMKNIJ bez obsługi; teraz
-   zamyka go ten pasek.
+   rozjechać.
 
    ADRES NIESIE KOSZ (`/obsluga/zwroty/kosze/:id`): odświeżenie nie gubi
    sprawy, a karta zwrotu i Do zrobienia prowadzą wprost do niego. */
@@ -35,7 +33,7 @@ export function Kosze() {
   const { id } = useParams();
   const nawiguj = useNavigate();
   const wybrany = id ? Number(id) : null;
-  /* Kubełek z adresu (0.502.0): wiersz „Pominięta pozycja" w Do zrobienia
+  /* Kubełek z adresu: wiersz „Pominięta pozycja" w Do zrobienia
      prowadzi tu z `?kubelek=pominiete`. Adres czyta się RAZ, przy wejściu —
      dalej kubełek jest stanem ekranu, jak na każdej kolejce. */
   const [parametry] = useSearchParams();
@@ -72,10 +70,10 @@ export function Kosze() {
 
   const lista = kosze.data?.kosze ?? [];
   /* Kłopot z MM niesie wiersz LISTY, nie szczegół — liczy go ta sama funkcja
-     co kubełek, więc karta i kubełek nie mogą się rozjechać (0.503.0). */
+     co kubełek, więc karta i kubełek nie mogą się rozjechać. */
   const problemMm = lista.find((k) => k.id === wybrany)?.problemMm ?? null;
   const bezPowrotu = lista.find((k) => k.id === wybrany)?.bezPowrotu ?? null;
-  /* Bez danych licznik nie zna liczby i jej nie pokazuje (0.546.0) — powód
+  /* Bez danych licznik nie zna liczby i jej nie pokazuje — powód
      przy tych samych licznikach w `ekrany/Dostawy.tsx`. */
   const znane = kosze.data !== undefined;
   const liczniki: Record<KubelekKoszy, number | undefined> = {
@@ -90,7 +88,7 @@ export function Kosze() {
   const szuka = q.length >= 2;
 
   const lewa = kosze.isLoading ? <Pusto waga="lista">Wczytuję kosze…</Pusto>
-    /* Błąd bez danych zamiast „ten kubełek jest pusty" (0.546.0). */
+    /* Błąd bez danych zamiast „ten kubełek jest pusty". */
     : kosze.error && !kosze.data ? <Blad>{(kosze.error as Error).message}</Blad>
     : szuka ? (szukaj.isLoading ? <Pusto waga="lista">Szukam w koszach…</Pusto>
         : <WynikiSzukania lista={szukaj.data?.znalezione ?? []} onWybierz={idz} />)
@@ -100,7 +98,7 @@ export function Kosze() {
             pokazBladMm={kubelek === "mm"} />;
 
   return <div className="flex flex-col gap-4 lg:h-full lg:min-h-0">
-    {/* Jeden rząd nagłówka, jak na liście zwrotów (0.484.3). */}
+    {/* Jeden rząd nagłówka, jak na liście zwrotów. */}
     <div className="flex shrink-0 flex-wrap items-start gap-2">
       <PrzelacznikZwrotow teraz="kosze" />
       <NowyKoszyk />
@@ -108,13 +106,11 @@ export function Kosze() {
     <Koszyk />
     <div className={SIATKA_TRZECH_KOLUMN}>
       <Karta className="flex min-h-0 flex-col overflow-hidden">
-        {/* Tytuł „Kosze" zszedł (0.525.0), bo powtarzał wybraną zakładkę
-            przełącznika tuż nad nim — dwa razy ta sama nazwa to wiersz
-            zabrany kolejce i nic nowego dla oka. */}
+        {/* Bez tytułu „Kosze", bo powtarzałby wybraną zakładkę
+            przełącznika tuż nad nim. */}
         <nav className="flex shrink-0 flex-wrap gap-1 p-2">
-          {/* „Rozłożone" i „Anulowane" pod „Więcej" (0.526.0): oba to
-              „Tylko wgląd", a stały pigułką równą koszom w pracy. Ten sam
-              komponent co w Skrzynce i reklamacjach. */}
+          {/* „Rozłożone" i „Anulowane" pod „Więcej": oba to „Tylko wgląd".
+              Ten sam komponent co w Skrzynce i reklamacjach. */}
           <FiltrZWiecej<KubelekKoszy> wybrany={kubelek} onWybierz={setKubelek}
             wiecej={WIECEJ_KOSZY}
             pozycje={KUBELKI_KOSZY.map((k) => ({ klucz: k.id, etykieta: k.etykieta,

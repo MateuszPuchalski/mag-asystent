@@ -5,23 +5,21 @@ import { Liczba, PasekUdzialu, Slupki } from "../ui/wykres";
 import { dzienSkrot, liczbaPl, zdanieOSzczycie } from "./liczby";
 import { KartaWgladu, Tabela, Td } from "../ui/wglad";
 
-/* ── Zakres PRACA HALI (z `biuro.html`, w panelu od 0.440.0) ─────────────
-   Dawny zakres „Ślad audytowy" — nazwa mówiła, SKĄD są dane, a nie o CZYM.
+/* ── Zakres PRACA HALI ───────────────────────────────────────────────────
    Biuro pyta tu o pracę hali: ile, kiedy, czego szukano, co się psuje
-   w kolektorach i kto ile zrobił.
+   w kolektorach i kto ile zrobił. Nazwa mówi o CZYM są dane, nie SKĄD.
 
-   METRYKI PRZYSZŁY TU ZE STANU SYSTEMU. W biurze stały w NADZORZE z własnym
-   oknem 7/30/90 dni, osobnym od okna analizy — dwa przełączniki tego samego
-   pytania o dwie karty od siebie (dekalog pkt 5). Etykiety do przedruku
-   i kartoteki bez kodu mówią o pracy hali w oknie, nie o stanie serwera
-   TERAZ, więc mieszkają tu i słuchają jednego okna. */
+   METRYKI SŁUCHAJĄ OKNA ANALIZY. Osobne okno dla tego samego pytania to
+   dwa przełączniki o dwie karty od siebie (dekalog pkt 5). Etykiety do
+   przedruku i kartoteki bez kodu mówią o pracy hali w oknie, nie o stanie
+   serwera TERAZ. */
 
 export function ZakresHali({ a, m }: { a: AnalizaAudytu; m: Metryki | undefined }) {
   const r = a.rytm;
   return <>
     <KartaWgladu tytul="Praca hali w oknie">
       <div className="flex flex-wrap gap-8">
-        {/* Bez „w oknie N dni" (0.512.0) — okno podaje nagłówek Analizy. */}
+        {/* Bez „w oknie N dni" — okno podaje nagłówek Analizy. */}
         <Liczba ile={a.dni.reduce((s, d) => s + d.pozycje, 0)} etykieta="pozycji" />
         <Liczba ile={r.dostawZamknietych} etykieta="dostaw rozłożonych" />
         <Liczba ile={r.medianaMinutDostawy != null ? `${r.medianaMinutDostawy} min` : "—"} etykieta="mediana czasu dostawy" />
@@ -55,7 +53,7 @@ export function ZakresHali({ a, m }: { a: AnalizaAudytu; m: Metryki | undefined 
           ton={m.dotknieciaNaPozycje != null && m.dotknieciaNaPozycje >= 0.3 ? "text-ranga-zle" : ""} />
         <Liczba ile={m.p95OdpowiedziMs != null ? `${m.p95OdpowiedziMs} ms` : "—"} etykieta="p95 skanu na ekranie głównym · cel < 150 ms"
           ton={m.p95OdpowiedziMs != null && m.p95OdpowiedziMs > 300 ? "text-ranga-zle" : ""} />
-        {/* Metryki słuchają tego samego okna co nagłówek, więc bez jego powtórki (0.512.0). */}
+        {/* Metryki słuchają tego samego okna co nagłówek, więc bez jego powtórki. */}
         <Liczba ile={m.zdarzen} etykieta="zdarzeń" />
       </div>
       <div className="mt-5 grid gap-6 xl:grid-cols-2">
@@ -83,7 +81,7 @@ export function ZakresHali({ a, m }: { a: AnalizaAudytu; m: Metryki | undefined 
       </div>
     </KartaWgladu>}
 
-    {/* WYDAJNOŚĆ PER OSOBA — tylko administrator (0.431.0, decyzja
+    {/* WYDAJNOŚĆ PER OSOBA — tylko administrator (decyzja
         właściciela). Rozstrzyga SERWER: dla roli biuro raportu nie liczy
         i przysyła `null`, więc karta znika, zamiast stać pusta i wyglądać na
         brak pracy w oknie. Rola w przeglądarce nie decyduje tu o niczym —
@@ -115,7 +113,7 @@ export function ZakresHali({ a, m }: { a: AnalizaAudytu; m: Metryki | undefined 
         <Szukania lista={a.szukania.bezWynikow} pusto="Wszystko, czego szukano, znajdowało się." /></KartaWgladu>
     </div>
 
-    {/* Zostaje obok ergonomii (0.512.0), bo to INNE fakty, nie dubel.
+    {/* Obok ergonomii, bo to INNE fakty, nie dubel.
         „Odrzucone" tu to `klient_odrzucona`, a odrzucenia w ergonomii to
         `http_rejected` per trasa. Upadków i baterii ergonomia nie liczy wcale. */}
     <KartaWgladu tytul="Urządzenia" opis="Upadki, baterie i odrzucone operacje — per kolektor, nie per osoba.">

@@ -30,18 +30,15 @@ import { oznaczReklamacyjnaPoRozpoznaniu } from "./klasyfikacja-reklamacyjna.js"
 export { KATEGORIE, PEWNOSCI, AKCJE } from "./klasyfikacja-slownik.js";
 export type { Kategoria, Pewnosc, Akcja } from "./klasyfikacja-slownik.js";
 
-/* ── Klasyfikacja wiadomości klienta (specyfikacja z 20 września 2026) ───────
+/* ── Klasyfikacja wiadomości klienta ─────────────────────────────────────────
 
-   Druga wersja przyrostu z 0.191.0. Tamta brała JEDNĄ wiadomość, dawała
-   jedną z ośmiu etykiet i nadpisywała poprzednią. Ta daje decyzję
-   w kształcie specyfikacji: kategoria z piętnastu, kategorie dodatkowe,
-   następny krok, trzy flagi potrzeb i kody reguł, które coś zmieniły.
-
-   Cztery ostrożności z 0.191.0 zostają bez zmian:
+   Decyzja w kształcie specyfikacji: kategoria z piętnastu, kategorie
+   dodatkowe, następny krok, trzy flagi potrzeb i kody reguł, które coś
+   zmieniły. Pięć ostrożności:
 
    PIERWSZA: nic nie wychodzi niezamaskowane. Nadawca przyjmuje
    `TrescBezpieczna`, a przed siecią stoi asercja `zostalyDaneOsobowe()`.
-   Kontekst jest teraz WĄTKIEM (ta sama droga i ten sam sufit co szkic),
+   Kontekst jest WĄTKIEM (ta sama droga i ten sam sufit co szkic),
    bo „tak, ten model" bez pytania, na które odpowiada, jest nie do
    rozpoznania — dokładnie ten przypadek specyfikacja wymienia z nazwy.
 
@@ -54,10 +51,9 @@ export type { Kategoria, Pewnosc, Akcja } from "./klasyfikacja-slownik.js";
    CZWARTA: za tę samą treść nie płacimy dwa razy. Decyzja wisi przy
    WIADOMOŚCI; nowa wiadomość klienta dostaje nową decyzję, a stara zostaje.
 
-   NOWE: decyzje się nie nadpisują. Każda zmiana — ponowne rozpoznanie albo
+   PIĄTA: decyzje się nie nadpisują. Każda zmiana — ponowne rozpoznanie albo
    poprawka człowieka — to NOWA WERSJA, a poprzednia gaśnie (`aktywna=0`).
-   Specyfikacja żąda historii, a poprzednia tabela z `ON CONFLICT DO UPDATE`
-   gubiła przy każdym dopisku klienta to, co model sądził wcześniej.        */
+   Specyfikacja żąda historii tego, co model sądził wcześniej.              */
 
 /**
  * Odpowiedź nadawcy, SUROWA. Walidacja stoi w polityce, nie w adapterze:
@@ -115,10 +111,10 @@ export const CEL_KLASYFIKACJI = `(SELECT m.id FROM message m WHERE m.conversatio
  * ale kolejka pokazuje ją jako nieaktualną, dopóki nowsza nie powstanie.
  * Wymaga aliasu `c`.
  */
-/* Najnowsza PO CZASIE wiadomości, której dotyczy (23 września 2026) — ta sama
+/* Najnowsza PO CZASIE wiadomości, której dotyczy — ta sama
    reguła co `CEL_KLASYFIKACJI` wyżej. Po samym `message_id` decyzja przy
-   starszym dopisku z wyższym `id` wygrywała i kolejka pokazywała rozpoznanie
-   jako nieaktualne, choć dotyczyło najnowszej wiadomości. */
+   starszym dopisku z wyższym `id` wygrywałaby i kolejka pokazywała
+   rozpoznanie jako nieaktualne. */
 export const AKTYWNA_DECYZJA = `(SELECT k.id FROM decyzja_klasyfikacji k
   WHERE k.conversation_id=c.id AND k.aktywna=1 AND k.taksonomia_wersja='${TAKSONOMIA_WERSJA}'
   ORDER BY (SELECT km.sent_at FROM message km WHERE km.id=k.message_id) DESC,
@@ -199,7 +195,7 @@ function kontekstRozmowy(database: DatabaseSync, cel: Cel): Kontekst {
     .filter((w) => w.related_object_type === "OFFER" && w.related_object_id)
     .map((w) => String(w.related_object_id)))];
 
-  /* Login z WĄTKU Allegro (0.232.1); temat zostaje zapasem dla rozmów bez
+  /* Login z WĄTKU Allegro; temat zostaje zapasem dla rozmów bez
      wątku, bo temat bywa tytułem oferty z loginem w środku. */
   const login = String(cel.login ?? "").trim() || cel.subject;
   const slad = zamaskujWatekZeSladem(
@@ -500,9 +496,8 @@ function zapiszBlad(
 /**
  * Poprawka człowieka: kategoria, którą agent JAWNIE potwierdził albo wskazał.
  *
- * Zastępuje werdykt „trafna/nietrafna" z 0.191.0. Tamten mówił, że model się
- * pomylił, ale nie mówił, JAK powinno być — więc z ocen nie dało się policzyć
- * czułości żadnej kategorii, a specyfikacja stawia ją obok precyzji.
+ * Mówi, JAK powinno być, a nie tylko że model się pomylił — bez tego nie
+ * da się policzyć czułości kategorii, którą specyfikacja stawia obok precyzji.
  *
  * Poprawka to NOWA WERSJA decyzji: `kategoria_modelu` i surowa odpowiedź
  * przechodzą bez zmian, `kategoria_czlowieka` dostaje wskazanie, a kategoria
@@ -734,13 +729,13 @@ export interface PomiarCopilota {
   /** Klasyfikacja w kształcie specyfikacji — precyzja i czułość per klasa. */
   klasyfikacja: PomiarKlasyfikacji;
   /**
-   * Rozbicie księgi po ZADANIU (0.231.0). Bez tego koszt szkiców zlałby się
+   * Rozbicie księgi po ZADANIU. Bez tego koszt szkiców zlałby się
    * z miarą klasyfikacji i „zejdź na tańszy model" nie wiedziałoby, o którym
    * zadaniu mówi.
    */
   wgZadania: Array<{ zadanie: string; wywolan: number; bledow: number; kosztUsd: number;
     /**
-     * Czas czekania na model w ms (0.532.0): mediana i 90. percentyl.
+     * Czas czekania na model w ms: mediana i 90. percentyl.
      * `null`, gdy żadne wywołanie nie ma zmierzonego czasu.
      */
     medianaMs: number | null; p90Ms: number | null }>;
@@ -749,13 +744,12 @@ export interface PomiarCopilota {
    */
   szkice: {
     /**
-     * Ile szkiców powstało i ile agent ODRZUCIŁ. „Wstawionych" i „zastąpionych"
-     * odeszły 22 września 2026: to był zastępnik losu przy wysyłce, a wstawiony
-     * szkic bywał potem przepisany. Los niosą `wyslanych*` niżej.
+     * Ile szkiców powstało i ile agent ODRZUCIŁ. Los wstawionego szkicu niosą
+     * `wyslanych*` niżej, bo wstawiony szkic bywa potem przepisany.
      */
     ile: number; odrzuconych: number;
     /**
-     * Los szkicu PRZY WYSYŁCE (22 września 2026): ile odpowiedzi poszło ze
+     * Los szkicu PRZY WYSYŁCE: ile odpowiedzi poszło ze
      * szkicu bez zmian, a ile z poprawką. Specyfikacja stawia to obok
      * odrzuceń — te niesie `odrzuconych` wyżej.
      */
@@ -825,13 +819,12 @@ export function pomiarCopilota(database: DatabaseSync = defaultDb()): PomiarCopi
       return acc;
     }, [] as PomiarCopilota["wgZadania"]);
 
-  /* ── Czas czekania na Copilota (26 września 2026, 0.532.0) ──────────────
-     Księga zapisywała `ms` od początku, a nikt go nie czytał. Agent czeka
-     na szkic przy otwartej rozmowie, więc to jest koszt w sekundach obok
-     kosztu w złotych. Mediana mówi o typowym czekaniu, p90 o tym, które
-     agent zapamięta. Nieudane też, gdy mają czas: przekroczony limit to
-     najdłuższe czekanie ze wszystkich, a pominięcie go upiększałoby liczbę.
-     Błąd bez czasu (`zapiszBlad`) nie ma czego wnieść i odpada sam. */
+  /* ── Czas czekania na Copilota ──────────────────────────────────────────
+     Agent czeka na szkic przy otwartej rozmowie, więc to jest koszt
+     w sekundach obok kosztu w złotych. Mediana mówi o typowym czekaniu, p90
+     o tym, które agent zapamięta. Nieudane też, gdy mają czas: przekroczony
+     limit to najdłuższe czekanie ze wszystkich, a pominięcie go upiększałoby
+     liczbę. Błąd bez czasu (`zapiszBlad`) nie ma czego wnieść i odpada sam. */
   const czasy = new Map<string, number[]>();
   for (const c of database.prepare("SELECT zadanie, ms FROM copilot_wywolanie WHERE ms IS NOT NULL")
     .all() as Array<{ zadanie: string; ms: number }>) {

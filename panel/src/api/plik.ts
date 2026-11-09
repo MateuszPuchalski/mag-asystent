@@ -1,5 +1,5 @@
-/* ── Plik z dysku do ciała JSON (0.274.0) ────────────────────────────────────
-   Wydzielone, bo robi to kilka miejsc: załączniki skrzynki (od 0.195.0),
+/* ── Plik z dysku do ciała JSON ──────────────────────────────────────────────
+   Wydzielone, bo robi to kilka miejsc: załączniki skrzynki,
    reklamacja i zdjęcia do dopytania Copilota. Druga kopia rozjechałaby się
    przy pierwszej poprawce jednej z nich, a objawem byłby plik wysłany
    z jednego miejsca i odrzucony z drugiego.

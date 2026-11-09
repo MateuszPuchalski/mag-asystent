@@ -15,11 +15,10 @@ const schema = fs.readFileSync(new URL("../db/schema.sql", import.meta.url), "ut
    w `migrate()`, więc baza z samego `schema.sql` ma inny kształt niż ta,
    na której chodzi serwer. Audyt przejęcia rozmowy pisze właśnie do `events`. */
 const mkDb = () => { const d = new DatabaseSync(":memory:"); d.exec(schema); migrate(d); return d; };
-/* Kształt WPROST ZE SPECYFIKACJI Allegro (docs/allegro-ksztalt.md). Do 0.151.0
-   stał tu kształt wymyślony razem z kodem — `lastMessageDate`, `author.role`,
-   `relatedObject` — i to on jest powodem, dla którego skrzynka nigdy nie
-   zapisała ani jednego wątku. Testy nie mają prawa opisywać wygodniejszego
-   Allegro niż prawdziwe. */
+/* Kształt WPROST ZE SPECYFIKACJI Allegro (docs/allegro-ksztalt.md). Kształt
+   wymyślony razem z kodem przechodziłby testy, a na prawdziwej odpowiedzi
+   nie zapisałby ani jednego wątku. Testy nie mają prawa opisywać
+   wygodniejszego Allegro niż prawdziwe. */
 /* Daty fixture'ów stoją ZA granicą produkcyjną (1 września 2026). Sierpniowe
    znaczyłyby dziś „przed progiem" i testy mierzyłyby granicę tam, gdzie
    sprawdzają co innego. */
@@ -103,9 +102,9 @@ test("awaria sieci przy pobieraniu wiadomości kończy przebieg bez zapisu", asy
   assert.equal((database.prepare("SELECT cursor_id id FROM allegro_inbox_sync_state").get() as {id:null}).id, null);
 });
 
-/* ── Model kanoniczny (0.144.0) ────────────────────────────────────────────
-   Do 0.143.1 nikt nie zapisywał do `conversation`, więc przejmowanie rozmowy
-   i szkic były kodem nieosiągalnym. Te testy pilnują ogniwa, które to zmienia. */
+/* ── Model kanoniczny ──────────────────────────────────────────────────────
+   Bez zapisu do `conversation` przejmowanie rozmowy i szkic byłyby kodem
+   nieosiągalnym. Te testy pilnują tego ogniwa. */
 
 test("synchronizacja zakłada rozmowę i wiadomość w modelu kanonicznym", async () => {
   const database = mkDb(); const api = fake([[thread(1)]]);
@@ -132,9 +131,7 @@ test("synchronizacja zakłada rozmowę i wiadomość w modelu kanonicznym", asyn
 
 /* KIERUNEK LICZY SIĘ Z `author.isInterlocutor`, nie z roli. Allegro nie
    przysyła żadnego `role` — rozmówca to ten, który NIE jest nami, więc
-   `isInterlocutor: true` znaczy „od klienta". Do 0.151.0 stało tu
-   `role.toUpperCase() === "SELLER"`, które na prawdziwej odpowiedzi rzucało
-   `TypeError` na nieistniejącym polu. */
+   `isInterlocutor: true` znaczy „od klienta". */
 test("kierunek bierze się z isInterlocutor, a oferta z relatesTo", async () => {
   const database = mkDb();
   const query = async (url: string): Promise<unknown> => url.includes("/messages")
@@ -143,9 +140,8 @@ test("kierunek bierze się z isInterlocutor, a oferta z relatesTo", async () => 
           text: "Zmierzycie?", relatesTo: { offer: { id: "oferta-9" } } }),
         message("m-2", { author: { login: "wertis", isInterlocutor: false },
           text: "Sprawdzimy.", relatesTo: undefined }),
-        /* Gałęzie `offer` i `order` są NIEZALEŻNE (0.166.0): sama druga,
-           obie naraz. Do 0.164.0 `order` ginął przy mapowaniu w każdym z tych
-           przypadków — a sonda liczy go częściej niż ofertę. */
+        /* Gałęzie `offer` i `order` są NIEZALEŻNE: sama druga,
+           obie naraz. Sonda liczy `order` częściej niż ofertę. */
         message("m-3", { text: "Kiedy wysyłka?", relatesTo: { order: { id: "zam-3" } } }),
         message("m-4", { text: "Ta sztuka z tego zamówienia?",
           relatesTo: { offer: { id: "oferta-9" }, order: { id: "zam-4" } } }),
@@ -167,9 +163,8 @@ test("kierunek bierze się z isInterlocutor, a oferta z relatesTo", async () => 
   ]);
 });
 
-/* Oś czasu rozmowy stoi na `createdAt` KAŻDEJ wiadomości. Do 0.151.0 wszystkie
-   wiadomości wątku dostawały jedną datę — datę wątku — bo kod twierdził, że
-   Allegro nie podaje daty pojedynczej wiadomości. Podaje. */
+/* Oś czasu rozmowy stoi na `createdAt` KAŻDEJ wiadomości, nie na
+   dacie wątku. */
 test("wiadomość niesie własną datę i temat, nie datę wątku", async () => {
   const database = mkDb();
   const query = async (url: string): Promise<unknown> => url.includes("/messages")
@@ -190,9 +185,9 @@ test("wiadomość niesie własną datę i temat, nie datę wątku", async () => 
   assert.equal(temat, "Rozrusznik 148", "temat rozmowy to temat, nie login rozmówcy");
 });
 
-/* Allegro oddaje wiadomości OD NAJNOWSZEJ (23 września 2026). Wpis w tej
-   kolejności dawał starszemu dopiskowi wyższe `id`, a kontrola świeżości
-   wysyłki odmawiała wtedy 409 przy każdej odpowiedzi w takiej rozmowie. */
+/* Allegro oddaje wiadomości OD NAJNOWSZEJ. Wpis w tej kolejności dawałby
+   starszemu dopiskowi wyższe `id`, a kontrola świeżości wysyłki odmawiałaby
+   409 przy każdej odpowiedzi w takiej rozmowie. */
 test("paczka od najnowszej wchodzi od najstarszej: id rosną razem z czasem", async () => {
   const database = mkDb();
   const query = async (url: string): Promise<unknown> => url.includes("/messages")
@@ -241,11 +236,8 @@ test("przejęcie rozmowy działa na rozmowie z synchronizacji", async () => {
    Schemat `Thread` wymaga WYŁĄCZNIE `id` i `read`; `lastMessageDateTime`
    i `interlocutor` są opcjonalne i jawnie `nullable`. Wątek świeżo założony
    nie ma jak mieć ostatniej wiadomości, więc to jest zwykła poprawna
-   odpowiedź, a nie awaria.
-
-   0.151.0 zaczęło od odwrotnego założenia — że taki wątek jest zepsuty
-   i należy go pominąć. Specyfikacja to obaliła i dlatego ten test stoi tutaj:
-   pominięcie poprawnego wątku znaczyłoby rozmowę, której panel nie pokazuje. */
+   odpowiedź, a nie awaria. Pominięcie poprawnego wątku znaczyłoby rozmowę,
+   której panel nie pokazuje. */
 test("wątek bez daty i bez rozmówcy wchodzi do skrzynki z pustymi polami", async () => {
   const database = mkDb();
   const { lastMessageDateTime: _d, interlocutor: _i, ...swiezy } = thread(3);
@@ -271,15 +263,12 @@ test("wątek bez daty i bez rozmówcy wchodzi do skrzynki z pustymi polami", asy
 });
 
 /* ── §9: błąd pojedynczego wątku ma być IZOLOWANY ───────────────────────────
-   Z produkcji (1 września 2026): `Provided value cannot be bound to SQLite
-   parameter 3` w kółko, przez wiele przebiegów. Cała partia szła JEDNĄ
-   transakcją, więc jeden odrzucony wątek wywracał przebieg w całości:
-   skrzynka przestawała się odświeżać, choć pozostałe wątki były zdrowe.
-   §9 projektu panelu żąda czegoś innego — synchronizator „izoluje błąd
-   pojedynczego wątku", a §8.3 zabrania przesuwać kursor „po niepełnym
-   zapisie".
+   Jedna transakcja na partię znaczyłaby, że jeden odrzucony wątek wywraca
+   przebieg w całości. §9 projektu panelu żąda, żeby synchronizator
+   „izolował błąd pojedynczego wątku", a §8.3 zabrania przesuwać kursor
+   „po niepełnym zapisie".
 
-   Zepsuty wątek to dziś taki, który łamie SCHEMAT: `read` jest wymagane
+   Zepsuty wątek to taki, który łamie SCHEMAT: `read` jest wymagane
    i logiczne, więc „może" nie jest wartością, którą wolno zgadnąć na zero. */
 test("jeden zepsuty wątek nie zatrzymuje przebiegu ani nie truje kursora", async () => {
   const database = mkDb();
@@ -302,7 +291,7 @@ test("jeden zepsuty wątek nie zatrzymuje przebiegu ani nie truje kursora", asyn
   assert.notEqual(stan.cursor_id, "t-3");
 });
 
-/* ── Granica czasu (0.152.0) ─────────────────────────────────────────────────
+/* ── Granica czasu ───────────────────────────────────────────────────────────
    Decyzja właściciela: skrzynka pokazuje rozmowy od 1 września 2026, północy
    czasu lokalnego. Wcześniejszych nie pobieramy wcale — nie chodzi o ukrycie
    ich na ekranie, tylko o to, żeby synchronizacja przestała przemielać całą
@@ -327,9 +316,8 @@ test("wątek sprzed granicy nie wchodzi i NIE zostaje kursorem", async () => {
     .all() as Array<{ id: string }>).map((w) => w.id);
   assert.deepEqual(zapisane, ["t-1"], "wątek sprzed granicy wjechał mimo progu");
 
-  /* Ta sama zasada, co przy wątku pominiętym w 0.149.2: kursor na wątku,
-     którego nie zapisaliśmy, kazałby następnemu przebiegowi uznać go za punkt
-     odniesienia i przestać widzieć wszystko, co za nim. */
+  /* Kursor na wątku, którego nie zapisaliśmy, kazałby następnemu przebiegowi
+     uznać go za punkt odniesienia i przestać widzieć wszystko, co za nim. */
   const stan = database.prepare("SELECT cursor_id FROM allegro_inbox_sync_state WHERE id=1")
     .get() as { cursor_id: string | null };
   assert.equal(stan.cursor_id, "t-1");
@@ -381,12 +369,10 @@ test("bez granicy nic się nie zmienia", async () => {
     .get() as { n: number }).n, 1);
 });
 
-/* ── Encje HTML (0.152.0) ────────────────────────────────────────────────────
-   BLIZNA KUPIONA DRUGI RAZ. `odkodujEncje` leży w `tekst.ts` od 0.127.0
-   z kompletem testów, a jej komentarz mówi wprost: „nowa obsługa ma ją wziąć
-   gotową, nie odkryć drugi raz na produkcji". Nowa obsługa odkryła ją drugi
-   raz na produkcji — panel escape'uje przy renderowaniu, więc `kt&oacute;ry`
-   z bazy wyświetlał się dosłownie w każdej polskiej wiadomości. */
+/* ── Encje HTML ──────────────────────────────────────────────────────────────
+   Panel escape'uje przy renderowaniu, więc encja zapisana w bazie
+   (`kt&oacute;ry`) wyświetlałaby się dosłownie w każdej polskiej
+   wiadomości. Dekoduje `odkodujEncje` z `tekst.ts`. */
 test("encje HTML schodzą z treści i tematu przy wjeździe", async () => {
   const database = mkDb();
   await synchronizujAllegroInbox({
@@ -422,7 +408,7 @@ test("lądowisko zostaje SUROWE — encje i tak tam siedzą", async () => {
   assert.ok(l.surowe_json.includes("kt&oacute;ry"));
 });
 
-/* ── Powód porażki SŁOWEM (0.152.0) ──────────────────────────────────────────
+/* ── Powód porażki SŁOWEM ────────────────────────────────────────────────────
    Skrzynka stała 62 przebiegi na błędzie BEZ kodu HTTP („Konto Allegro
    niepołączone — /biuro → …"). Serwer znał to zdanie i pisał je do dziennika;
    panel pokazywał `failed` i nic więcej, bo baza trzymała wyłącznie kod.
@@ -458,7 +444,7 @@ test("udany przebieg czyści zdanie o błędzie razem z licznikiem", async () =>
   assert.equal(s.error_count, 0);
 });
 
-/* ── Załączniki (0.155.0) ────────────────────────────────────────────────────
+/* ── Załączniki ──────────────────────────────────────────────────────────────
    Sonda z żywego konta: `attachments` niepuste w 7 z 39 wiadomości. Klient
    przysyłający zdjęcie pękniętej części był dla agenta niewidzialny, bo
    mapowanie kończyło się na treści.
@@ -503,10 +489,9 @@ test("powtórna synchronizacja nie dubluje załączników", async () => {
     .get() as { n: number }).n, 1);
 });
 
-/* ── Załączniki przy KAŻDYM przebiegu (przyrost „zdjęcia w rozmowach") ──────
-   Do 0.242.0 wchodziły wyłącznie z nową wiadomością: `NEW` („Allegro jeszcze
-   sprawdza") zostawało zamrożone, a wiadomości sprzed 0.155.0 nie miały
-   zdjęć wcale. Allegro nie przestawia daty wątku, gdy kończy sprawdzać plik,
+/* ── Załączniki przy KAŻDYM przebiegu ─────────────────────────────────────────
+   `NEW` („Allegro jeszcze sprawdza") nie może zostać zamrożone. Allegro nie
+   przestawia daty wątku, gdy kończy sprawdzać plik,
    więc `NEW` dociąga się osobno, po samym statusie.                        */
 test("NEW → SAFE aktualizuje wiersz załącznika, choć wiadomość już istnieje", async () => {
   const database = mkDb();
@@ -565,7 +550,7 @@ test("wiadomość bez załączników nie zakłada pustych wierszy", async () => 
     .get() as { n: number }).n, 0);
 });
 
-/* ── Status rozmowy budzi się z synchronizacji (0.158.0) ─────────────────────
+/* ── Status rozmowy budzi się z synchronizacji ───────────────────────────────
    Przejście samo w sobie ma test w `conversations.test.ts`; ten sprawdza, że
    synchronizator NAPRAWDĘ je woła. Bez tego funkcja byłaby poprawna i martwa —
    dokładnie tak, jak `odkodujEncje` przez trzynaście wydań. */
@@ -590,13 +575,13 @@ test("nowa wiadomość klienta otwiera rozmowę uznaną za rozwiązaną", async 
       new Map([["t-1", ["m-1", "m-2"]]])).query,
   });
 
-  /* Od 0.225.0 obudzona rozmowa mówi WPROST, kto ma ruch: klient właśnie
-     dopisał pytanie, więc czeka na nas. Kolumna wraca do `open` jak dotąd. */
+  /* Obudzona rozmowa mówi WPROST, kto ma ruch: klient właśnie
+     dopisał pytanie, więc czeka na nas. Kolumna wraca do `open`. */
   assert.equal(statusRozmowy(database, rozmowa), "waiting_for_us",
     "rozmowa została rozwiązana mimo nowego pytania klienta");
 });
 
-/* ── Sufit stron i zapis po stronie (0.164.1) ────────────────────────────────
+/* ── Sufit stron i zapis po stronie ──────────────────────────────────────────
    BLIZNA Z PRODUKCJI: 315 986 żądań do Allegro w ciągu jednej doby, przy 0%
    błędów po ich stronie. Skrzynka była jedyną z czterech pętli bez
    ogranicznika, a zapis czekał do ostatniej strony — więc przebieg przerwany
@@ -651,9 +636,9 @@ test("po zejściu do dna SUFIT ucina przebieg, a kursor i tak idzie do przodu", 
 });
 
 test("strona, która przeszła, ZOSTAJE w bazie mimo awarii następnej", async () => {
-  /* Do 0.164.0 wszystko czekało w pamięci do ostatniej strony. Awaria na
-     stronie trzechsetnej kasowała dorobek dwustu dziewięćdziesięciu dziewięciu
-     i następny przebieg pytał Allegro o te same wiadomości raz jeszcze. */
+  /* Zapis po każdej stronie: awaria na stronie trzechsetnej nie może
+     skasować dorobku poprzednich, bo następny przebieg pytałby Allegro
+     o te same wiadomości raz jeszcze. */
   const database = mkDb();
   const pierwsza = strona(0);
   await assert.rejects(synchronizujAllegroInbox({
@@ -683,15 +668,13 @@ test("strona, która przeszła, ZOSTAJE w bazie mimo awarii następnej", async (
   assert.equal(stan.d, null, "do dna nie zeszliśmy, więc sufit dalej nie obowiązuje");
 });
 
-/* ── Czego synchronizator nie mówił panelowi (0.257.0) ───────────────────────
-   Skrzynka nie woła `zapiszWiadomosc`, więc omijała wszystko, co tamta funkcja
-   robi poza samym `INSERT`-em. Dwa wydania okazały się przez to puste:
-   0.228.0 dołożyło pasek „Klient dopisał nową wiadomość", który na prawdziwej
-   wiadomości z Allegro nie zapalił się ani razu, a 0.227.0 dołożyło kolumnę
-   `auto_odpowiedz`, która tą drogą zostawała zerem do najbliższego restartu.
+/* ── Czego synchronizator nie mówi panelowi sam ──────────────────────────────
+   Skrzynka nie woła `zapiszWiadomosc`, więc musi sama zrobić to, co tamta
+   funkcja robi poza `INSERT`-em: zapalić pasek „Klient dopisał nową
+   wiadomość" i ustawić `auto_odpowiedz`.
 
-   Oba testy patrzą na TĘ ścieżkę, nie na `zapiszWiadomosc` — usterka polegała
-   właśnie na tym, że strażnik pilnował funkcji, której produkcja nie woła. */
+   Oba testy patrzą na TĘ ścieżkę, nie na `zapiszWiadomosc` — strażnik ma
+   pilnować funkcji, którą produkcja woła. */
 
 test("zdarzenie o nowej wiadomości niesie KIERUNEK, inaczej pasek nie zapala się nigdy", async () => {
   const database = mkDb();
@@ -730,10 +713,8 @@ test("wiadomość WYCHODZĄCA ogłasza się jako nie-klient", async () => {
 });
 
 test("nasza autoodpowiedź dostaje flagę PRZY ZAPISIE, bez czekania na restart", async () => {
-  /* Do 0.256.0 kolumny w tej wstawce nie było, więc zostawało `DEFAULT 0`,
-     a flagę dosypywała dopiero migracja przy starcie procesu. Między
-     restartami „Dziękujemy za kontakt" liczyło się jako ruch biura
-     i przestawiało rozmowę na „czeka na klienta". */
+  /* Flaga w samej wstawce: bez niej „Dziękujemy za kontakt" liczyłoby się
+     jako ruch biura i przestawiało rozmowę na „czeka na klienta". */
   const database = mkDb();
   await synchronizujAllegroInbox({
     database, apiUrl: "https://api.test",
@@ -764,7 +745,7 @@ test("klient CYTUJĄCY nasz autoresponder nie jest autoodpowiedzią", async () =
 });
 
 
-/* ── Struktura wątku z beta.v1 (22 września 2026) ────────────────────────────
+/* ── Struktura wątku z beta.v1 ───────────────────────────────────────────────
    Lista chodzi po public.v1; typ i podtyp ma tylko beta, więc czytamy je
    osobnym żądaniem przy wątku, w którym coś się zmieniło. Cztery rzeczy:
    wartości zostają, jak przyszły; loginy uczestników nie wchodzą; awaria bety
@@ -833,7 +814,7 @@ test("odpowiedź bez `type` to nie ten kształt — struktury nie ma", () => {
     { typ: "COMMON", podtyp: null, status: null, zamowienia: [] });
 });
 
-/* ── Niepewna wysyłka rozstrzyga się sama (22 września 2026) ─────────────────
+/* ── Niepewna wysyłka rozstrzyga się sama ────────────────────────────────────
    Specyfikacja: timeout po możliwym wysłaniu to UNKNOWN, a przed ponowieniem
    trzeba go uzgodnić z wiadomościami wychodzącymi. Synchronizacja przynosi
    naszą odpowiedź — i to ona zamyka wiersz `send_uncertain`. */
@@ -1005,8 +986,8 @@ test("wątek bez daty i data, której nie da się odczytać, nie kończą przebi
 });
 
 /* ── Lista wątków w beta.v1: Problemy z zakupem ──────────────────────────────
-   Od 28 października 2026 Allegro zakłada nowe sprawy kupujących jako
-   Problemy z zakupem w Centrum Wiadomości i pokazuje je wyłącznie w `beta.v1`.
+   Allegro zakłada nowe sprawy kupujących jako Problemy z zakupem w Centrum
+   Wiadomości i pokazuje je wyłącznie w `beta.v1`.
    Kształty niżej idą WPROST ze schematów `ThreadsListVBeta1`, `ThreadVBeta1`
    i `MessageVBeta1` w docs/allegro/swagger.yaml. Wiadomość bety nie ma pola
    `thread`, a autora opisuje rolą, nie `isInterlocutor`. */

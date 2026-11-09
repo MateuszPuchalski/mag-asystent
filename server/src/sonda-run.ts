@@ -17,7 +17,7 @@ import {
   zapytajAllegro,
 } from "./adapters/allegro.http.js";
 
-/* ── Sonda kształtu Allegro (0.137.2) ────────────────────────────────────────
+/* ── Sonda kształtu Allegro ────────────────────────────────────────
    Etap 1 przebudowy obsługi klienta: zanim zaprojektujemy model danych od
    nowa, chcemy zobaczyć, co żywe konto NAPRAWDĘ oddaje. Dotychczasowy model
    stał na JSON-ie wymyślonym w testach adaptera i dokładnie tam pękł —

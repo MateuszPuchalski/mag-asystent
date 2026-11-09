@@ -1,6 +1,6 @@
 import type { PozycjaZwrotu, Zwrot } from "../api/typy";
 
-/* ── SZYBKA ŚCIEŻKA ZWROTU (0.481.0) ──────────────────────────────────────
+/* ── SZYBKA ŚCIEŻKA ZWROTU ────────────────────────────────────────────────
    Zgłoszenie właściciela: „większość zwrotów jest w porządku i może od razu
    jechać na półkę". Typowy zwrot to i tak ten sam ciąg: przyjmij, każda
    pozycja na stan, pełna kwota, pieniądze w Allegro. Tu stoi REGUŁA, kiedy
@@ -16,12 +16,11 @@ export const pewnaPropozycja = (p: PozycjaZwrotu): boolean =>
   && (p.propozycja.pewnosc === "sku" || p.propozycja.pewnosc === "pamiec");
 
 /**
- * Czy oddajemy koszt dostawy — wraca CAŁE zamówienie (0.476.0).
+ * Czy oddajemy koszt dostawy — wraca CAŁE zamówienie.
  *
  * Podpowiedź dla HACZYKA na ekranie ręcznym (`Pozycje.tsx`), nie decyzja.
- * Od 0.484.5 szybka ścieżka z niej nie korzysta: decyzją właściciela „Wszystko
- * OK" oddaje sumę pozycji bez dostawy. Reguła stoi tu dalej, bo ekran ręczny
- * ją czyta, a jej test mieszka obok.
+ * Szybka ścieżka z niej nie korzysta: decyzją właściciela „Wszystko OK"
+ * oddaje sumę pozycji bez dostawy.
  */
 export function calaDostawa(zwrot: Zwrot): boolean {
   const poz = zwrot.zamowienie?.pozycje ?? [];
@@ -47,7 +46,7 @@ export function szybkaSciezka(zwrot: Zwrot, pudla: PudloSzybkie[]): SzybkaSciezk
     && zwrot.werdykt !== "odrzucony";
   /* Paczka nieodebrana nie ma zwrotu w Allegro — nie ma czego oddawać ani
      gdzie. Pieniądze przy niej to inna rozmowa z klientem. */
-  /* KLIENT NIE ODESŁAŁ (0.505.0) — miejsce przycisku zajmuje gotowa odmowa
+  /* KLIENT NIE ODESŁAŁ — miejsce przycisku zajmuje gotowa odmowa
      (`NieOdeslany`). Dwa przyciski na jedną decyzję, z czego jeden oddaje
      pieniądze za towar, którego nie ma, to pomyłka czekająca na klawisz. */
   if (!wZasiegu || zwrot.zrodlo === "nieodebrana" || zwrot.sygnaly.includes("nie_odeslany")) {
@@ -55,7 +54,7 @@ export function szybkaSciezka(zwrot: Zwrot, pudla: PudloSzybkie[]): SzybkaSciezk
   }
 
   const stop = (przeszkoda: string): SzybkaSciezka => ({ pokaz: true, przeszkoda });
-  /* PACZKA MUSI WRÓCIĆ (0.505.0). Zgłoszenie właściciela przy 5ZRQ/2026:
+  /* PACZKA MUSI WRÓCIĆ. Zgłoszenie właściciela przy 5ZRQ/2026:
      przycisk proponował „na półkę i oddaj" za filtr, który nigdy nie
      przyjechał. `brak_dowodu` liczy serwer z trackingu. Gdy karton leży
      przy biurku, a tracking się spóźnia, droga ręczna zostaje otwarta. */
@@ -74,7 +73,7 @@ export function szybkaSciezka(zwrot: Zwrot, pudla: PudloSzybkie[]): SzybkaSciezk
     || (p.iloscZwrocona !== null && p.iloscZwrocona < p.ilosc))) {
     return stop("Jest potrącenie albo brak sztuk — dokończ ręcznie.");
   }
-  /* OCENIONA, A NIE W PUDLE (0.484.2). Ocena „na stan" zapisuje się
+  /* OCENIONA, A NIE W PUDLE. Ocena „na stan" zapisuje się
      także wtedy, gdy serwer pozycji do pudła nie dołożył: komplet bez składu,
      składnik poza magazynem, brak magazynu docelowego. Ciąg ocenia wyłącznie
      pozycje bez oceny, więc taką by pominął — i oddał pieniądze za towar,
@@ -88,7 +87,7 @@ export function szybkaSciezka(zwrot: Zwrot, pudla: PudloSzybkie[]): SzybkaSciezk
   const bezKartoteki = zwrot.pozycje.find((p) => p.twId === null && !pewnaPropozycja(p));
   if (bezKartoteki) return stop(`„${bezKartoteki.nazwa}” nie ma pewnej kartoteki — wskaż ją.`);
 
-  /* PUDŁA NIE ZGADUJEMY — decyzja właściciela z 0.379.0. Przy jednym albo
+  /* PUDŁA NIE ZGADUJEMY — decyzja właściciela. Przy jednym albo
      zerze serwer rozstrzyga sam; przy kilku bierzemy tylko to, w którym leży
      już towar tego zwrotu. */
   if (zwrot.pozycje.some((p) => p.ocena === null)) {
@@ -96,7 +95,7 @@ export function szybkaSciezka(zwrot: Zwrot, pudla: PudloSzybkie[]): SzybkaSciezk
     const zTymZwrotem = naZwroty.filter((k) => k.pozycje.some((p) => p.zwrotId === zwrot.id));
     if (naZwroty.length > 1 && zTymZwrotem.length !== 1) {
       /* W DO DECYZJI przycisków pudeł jeszcze nie ma — stoją przy ocenie,
-         więc zdanie zaczyna od przyjęcia (0.484.7). */
+         więc zdanie zaczyna od przyjęcia. */
       return stop(zwrot.kubelek === "decyzja"
         ? "Kilka otwartych pudeł — przyjmij zwrot (P) i oceń pierwszą pozycję w wybranym pudle, resztę zrobi przycisk."
         : "Kilka otwartych pudeł — oceń pierwszą pozycję w wybranym pudle, resztę zrobi przycisk.");

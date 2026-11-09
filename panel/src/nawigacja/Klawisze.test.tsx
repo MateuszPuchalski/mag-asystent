@@ -8,7 +8,7 @@ import { SKROTY, SzukajIKlawisze } from "./Klawisze";
 import { KLAWISZE_KUBELKA } from "../ekrany/Zwroty";
 import zrodloSzkicu from "../skrzynka/SzkicCopilota.tsx?raw";
 
-/* ── Ctrl+K i lista skrótów pod `?` (23 września 2026) ───────────────────────
+/* ── Ctrl+K i lista skrótów pod `?` ─────────────────────────────────────────
    Pilnujemy: Ctrl+K otwiera szukanie z każdego miejsca, także z pola; Enter
    na wyniku prowadzi na ekran sprawy; `?` w polu tekstowym jest znakiem,
    nie skrótem; sekcja bieżącego ekranu stoi na liście skrótów pierwsza po
@@ -116,9 +116,9 @@ describe("lista pod ? zna każdy klawisz zwrotów", () => {
 
 describe("opis skrótu idzie za napisem przycisku", () => {
   it("E w skrzynce opisuje „Wstaw do odpowiedzi”, nie dawne „popraw” (0.515.0)", () => {
-    /* Przycisk pod E od 0.500.0 nazywa skutek, a lista pod `?` dalej
-       obiecywała poprawianie. Czytamy napis ze źródła karty, żeby kolejna
-       zmiana napisu bez zmiany opisu wywróciła ten test. */
+    /* Przycisk pod E nazywa skutek, więc lista pod `?` też. Czytamy napis
+       ze źródła karty, żeby kolejna zmiana napisu bez zmiany opisu wywróciła
+       ten test. */
     expect(zrodloSzkicu).toContain('"Wstaw do odpowiedzi"');
     const skrzynka = SKROTY.find((s) => s.tytul === "Skrzynka")!;
     const opis = skrzynka.klawisze.find(([k]) => k === "E")?.[1];

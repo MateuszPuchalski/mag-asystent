@@ -9,9 +9,8 @@ import { NAZWA_ROZJAZDU, csvRozjazdow } from "../stan/Rekoncyliacja";
 import { zdanieResyncu } from "../stan/Serwer";
 import reconcileZrodlo from "../../../server/src/services/reconcile.ts?raw";
 
-/* ── STAN SYSTEMU w panelu (0.441.0) ────────────────────────────────────
-   Gwarancje przeniesione z testów NADZORU w `server/src/routes/biuro.test.ts`
-   (numery tamtych testów w nawiasach) i trzy nowe:
+/* ── STAN SYSTEMU w panelu ──────────────────────────────────────────────
+   Gwarancje (w nawiasach numery testów serwera, z których przyszły):
 
    1. ZERO ZAPISU PRZY PATRZENIU — i rekoncyliacja nie biegnie przy otwarciu.
    2. PONÓW bez pytania, ANULUJ za potwierdzeniem, oba bez ciała (974).
@@ -19,9 +18,9 @@ import reconcileZrodlo from "../../../server/src/services/reconcile.ts?raw";
    4. PAROWANIE ALLEGRO: jedna pętla, rytm serwera, `brak` kończy, PRZERWIJ
       nie wysyła nic (953, 999).
    5. Arkusz lokalizacji stoi wyłącznie u administratora.
-   6. NOWE: nazwy WSZYSTKICH rodzajów rozjazdu z unii serwera.
-   7. NOWE: `?karta=` przewija do karty.
-   8. (0.509.0) Rzadkie karty zwinięte do nagłówka; `?karta=` i błąd testu
+   6. Nazwy WSZYSTKICH rodzajów rozjazdu z unii serwera.
+   7. `?karta=` przewija do karty.
+   8. Rzadkie karty zwinięte do nagłówka; `?karta=` i błąd testu
       na żywo otwierają je same. Każdy fakt stoi w jednym miejscu. */
 
 let wyslane: string[] = [];
@@ -86,7 +85,7 @@ function pokaz(adres = "/obsluga/stan") {
 
 /* Zwinięta karta: nagłówek z przyciskiem, który niesie `aria-expanded`. */
 const rozwin = (tytul: string) => screen.getByRole("button", { name: tytul });
-/* Kafelek tablicy (0.538.0): nazwa obszaru, spacja i jego stan jednym zdaniem. */
+/* Kafelek tablicy: nazwa obszaru, spacja i jego stan jednym zdaniem. */
 const kafelek = (nazwa: string) => screen.getByRole("button", { name: new RegExp(`^${nazwa} `) });
 
 const kartaKolejki = () => screen.getByRole("heading", { name: "Zapisy do Subiekta" }).closest(".card") as HTMLElement;
@@ -122,7 +121,7 @@ describe("Stan systemu w panelu", () => {
       `POST /api/ean-conflicts/5901234567890/rozstrzygnij ${JSON.stringify({ rodzaj: "dopuszczone", notatka: "dwa rozmiary" })}`]));
   });
 
-  /* Test na żywym Allegro (0.495.0): otwarcie karty CZYTA ostatni przebieg,
+  /* Test na żywym Allegro: otwarcie karty CZYTA ostatni przebieg,
      nowy biegnie wyłącznie na kliknięcie — POST bez ciała. */
   it("test na żywo: wynik ostatniego przebiegu, a nowy tylko na kliknięcie", async () => {
     pokaz();
@@ -139,8 +138,8 @@ describe("Stan systemu w panelu", () => {
   });
 
   it("zdrowe i rzadkie obszary stoją kafelkiem, a klik otwiera kartę bez zapisu", async () => {
-    /* Tablica z 0.538.0: rzadkie karty nie stoją nawet zwinięte — ich
-       nagłówkiem jest kafelek. Otwarcie karty to dalej samo patrzenie. */
+    /* Rzadkie karty nie stoją nawet zwinięte — ich nagłówkiem jest kafelek.
+       Otwarcie karty to dalej samo patrzenie. */
     sondaBlad = false;
     pokaz();
     await screen.findByText("MM kosza K-010");
@@ -232,7 +231,7 @@ describe("Stan systemu w panelu", () => {
     /* Kopie robi serwer bez udziału człowieka, więc to jedyne miejsce w panelu,
        gdzie widać, że je robi. Data lokalna: 00:30Z to 2:30 w Warszawie. */
     pokaz();
-    /* Zdrowy serwer stoi kafelkiem (0.538.0) — karta jest jedno kliknięcie dalej. */
+    /* Zdrowy serwer stoi kafelkiem — karta jest jedno kliknięcie dalej. */
     await screen.findByText("MM kosza K-010");
     await userEvent.click(kafelek("Serwer"));
     expect(await screen.findByText("nocna 2026-09-24 · przed aktualizacją —")).toBeInTheDocument();
@@ -241,7 +240,7 @@ describe("Stan systemu w panelu", () => {
   it("każdy fakt stanu raz: bez pliku konfiguracji, bez połączenia i workera w tabeli integracji", async () => {
     /* Plik konfiguracji mówi karta konfiguracji za zębatką; połączenie —
        karta konta Allegro; worker — karta serwera. Wersja zostaje, bo karta
-       aktualizacji jest wyłącznie adminowa (0.509.0). */
+       aktualizacji jest wyłącznie adminowa. */
     pokaz();
     await screen.findByText("MM kosza K-010");
     await userEvent.click(kafelek("Stan integracji"));

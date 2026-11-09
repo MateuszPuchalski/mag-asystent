@@ -6,7 +6,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { MemoryRouter } from "react-router-dom";
 import { PrzyciskTowaru, SzufladaTowaru } from "./Szuflada";
 
-/* ── Szuflada towaru — trzeci mostek (0.502.0) ─────────────────────────────
+/* ── Szuflada towaru ───────────────────────────────────────────────────────
    Pilnujemy: bez dostawcy przycisk jest tekstem (testy komponentów i ekrany
    poza ramą), otwarcie czyta i niczego nie zapisuje, wiersze prowadzą do
    spraw i zamykają szufladę, a Escape ją zamyka.                          */
@@ -50,12 +50,12 @@ describe("szuflada towaru", () => {
     expect(await within(s).findByText("brak na stanie")).toBeInTheDocument();
     expect(within(s).getByText(/zamówione 20 szt\. u Rosa-Pol/)).toBeInTheDocument();
     expect(await within(s).findByText(/sprzedane 10 · zwrócone 3 \(30%\)/)).toBeInTheDocument();
-    /* Źródło sprzedaży stoi na ekranie, bo wcześniej liczba szła z jednej oferty Allegro. */
+    /* Źródło sprzedaży stoi na ekranie, żeby było wiadomo, skąd liczba. */
     expect(within(s).getByText(/Sprzedaż z paragonów i faktur w Subiekcie/)).toBeInTheDocument();
     expect(within(s).getByRole("link", { name: /Z-7/ })).toHaveAttribute("href", "/obsluga/zwroty/7");
     expect(within(s).getByRole("link", { name: /reklamacja 12\/2026/ })).toHaveAttribute("href", "/obsluga/reklamacje/9");
-    /* Pusta lista się nie rysuje (0.514.0): rozmów o tym towarze nie ma,
-       więc nie ma też ich nagłówka ani „brak" pod nim. */
+    /* Pusta lista się nie rysuje: rozmów o tym towarze nie ma, więc nie ma
+       też ich nagłówka ani „brak" pod nim. */
     expect(within(s).queryByRole("region", { name: /Otwarte rozmowy/ })).toBeNull();
     expect(within(s).queryByText("brak")).toBeNull();
     expect(within(s).queryByText("Brak otwartych spraw.")).toBeNull();

@@ -1,10 +1,10 @@
 import { describe, expect, it } from "vitest";
 import { paryZArkusza, wierszeZXlsx } from "./xlsx";
 
-/* ── Czytnik arkusza (0.441.0) ────────────────────────────────────────────
-   W biurze ten kod nie miał testu, a trzy jego pułapki kosztowały realne
-   zgłoszenia: prefiks `x:` z Subiekta (plik „pusty" przy 125 wierszach),
+/* ── Czytnik arkusza ───────────────────────────────────────────────────────
+   Trzy pułapki: prefiks `x:` z Subiekta (plik „pusty" przy 125 wierszach),
    pomijane puste komórki (kolumny przesunięte w lewo) i teksty współdzielone
+   (całe kolumny jako liczby). Pliki budujemy tu z bajtów, bez biblioteki —
    (całe kolumny jako liczby). Pliki budujemy tu z bajtów, bez biblioteki —
    stąd własny, mały zapis ZIP-a z wpisami bez kompresji i deflate. */
 
@@ -85,17 +85,5 @@ describe("czytnik .xlsx", () => {
 
   it("coś, co nie jest ZIP-em, nie udaje pustego arkusza", async () => {
     await expect(wierszeZXlsx(enc.encode("symbol;lokalizacja").buffer as ArrayBuffer)).rejects.toThrow(/brak stopki ZIP/);
-  });
-});
-
-describe("tabelaZWierszy", () => {
-  it("kolumny stoją po pozycji, a komórka pominięta przez Excela zostaje pustym tekstem", async () => {
-    const { tabelaZWierszy } = await import("./xlsx");
-    expect(tabelaZWierszy([{ A: "Indeks", C: "EAN", D: "OEM" }, { A: "W80-2005", D: "6.904-143.0" }, { AA: "x" }]))
-      .toEqual([
-        ["Indeks", "", "EAN", "OEM", ...new Array(23).fill("")],
-        ["W80-2005", "", "", "6.904-143.0", ...new Array(23).fill("")],
-        [...new Array(26).fill(""), "x"],
-      ]);
   });
 });

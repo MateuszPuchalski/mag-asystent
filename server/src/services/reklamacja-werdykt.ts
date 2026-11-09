@@ -12,9 +12,8 @@ import {
   LIMIT_ZNAKOW, odpowiedzWSprawie, type StatusWysylki, type WynikOdpowiedzi, type WyslijWiadomosc,
 } from "./reklamacje-wysylka.js";
 
-/* ── Werdykt reklamacji (przyrost trzeci) ────────────────────────────────────
-   0.222.0 dało kolejkę i zegar (tylko czyta), 0.224.0 odpowiedź w czacie.
-   Ten plik domyka trzeci przyrost: uznanie albo odrzucenie wysłane do Allegro
+/* ── Werdykt reklamacji ──────────────────────────────────────────────────────
+   Uznanie albo odrzucenie wysłane do Allegro
    przez `POST /sale/issues/{issueId}/status` — pierwszy zapis tej aplikacji
    NIEODWRACALNY wobec kupującego.
 
@@ -236,7 +235,7 @@ export async function wydajWerdykt(
       "UPDATE reklamacja_klienta SET werdykt_status=?, werdykt_blad=? WHERE id=?",
     ).run(status, blad, id);
     logEvent("reklamacja_werdykt", kto.name, null, { id, werdykt, status, kod }, undefined, database);
-    /* TRAFNOŚĆ RADY LICZY SIĘ Z FAKTU (0.276.0): porównujemy rekomendację
+    /* TRAFNOŚĆ RADY LICZY SIĘ Z FAKTU: porównujemy rekomendację
        Copilota z werdyktem, który agent naprawdę wysłał. Bez ankiety, bo
        rekomendacja jest typowana tym samym słownikiem.
 

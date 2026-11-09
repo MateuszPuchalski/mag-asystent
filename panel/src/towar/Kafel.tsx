@@ -5,13 +5,10 @@ import { useZdjecie, useZdjecieOferty } from "./useZdjecie";
 import type { StanZdjeciaOferty } from "../api/typy";
 
 /**
- * Kafel zdjęcia, który POWIĘKSZA SIĘ SAM (0.203.0).
+ * Kafel zdjęcia, który POWIĘKSZA SIĘ SAM.
  *
- * Do 0.202.0 każde miejsce ze zdjęciem trzymało własny stan powiększenia
- * i własny warunek na `Powiekszenie` — trzy kopie tych samych sześciu linijek
- * w `zwroty/Pozycje.tsx`, `skrzynka/TowarRozmowy.tsx` i nigdzie indziej.
- * Zdjęcie weszło w tym wydaniu do wyników wyszukiwarki i do zadań
- * terenowych; kolejna kopia rozjechałaby się z pierwszą.
+ * Jedna kopia stanu powiększenia i warunku na `Powiekszenie` dla każdego
+ * miejsca ze zdjęciem; kolejna kopia rozjechałaby się z pierwszą.
  *
  * Stan siedzi W KAFLU, nie w liście nad nim. Otwarty jest zawsze jeden, bo
  * otwiera go kliknięcie — a lista, która musiałaby pamiętać, KTÓRY wiersz
@@ -38,7 +35,7 @@ export function Kafel({ twId, rozmiar = 48, nazwa, symbol = null }: {
 }
 
 /**
- * To samo dla zdjęcia listingowego oferty (0.213.0).
+ * To samo dla zdjęcia listingowego oferty.
  *
  * Osobny komponent, nie prop `rodzaj` w `Kafel`: każdy z nich woła INNY hak,
  * a haka nie wolno wołać warunkowo. Wspólne jest to, co ma być wspólne —

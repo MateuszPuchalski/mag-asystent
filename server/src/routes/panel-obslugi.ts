@@ -18,7 +18,7 @@ function katalog() {
 /**
  * Wersja ZBUDOWANEGO panelu — `null`, gdy panelu nie ma albo nie ma pieczątki.
  *
- * ── NAJCICHSZA POMYŁKA WDROŻENIA (audyt, 15 września 2026) ────────────────
+ * ── NAJCICHSZA POMYŁKA WDROŻENIA (audyt) ────────────────
  * `npm run build` w `server/` nie przebudowuje panelu — robi to dopiero
  * polecenie z KORZENIA repo. Kto pomyli katalog, dostaje API z nowego kodu
  * i ekran obsługi ze starego builda. `/api/health` melduje wtedy nową wersję
@@ -95,12 +95,12 @@ export function plikZasobu(dir: string, czlony: string[]): string | null {
 const MIME: Record<string, string> = {
   ".js": "text/javascript; charset=utf-8", ".css": "text/css; charset=utf-8",
   ".svg": "image/svg+xml", ".png": "image/png", ".ico": "image/x-icon",
-  /* `.webp` doszło z ikoną karty przeglądarki (0.419.0): Vite hashuje ją do
+  /* `.webp` doszło z ikoną karty przeglądarki: Vite hashuje ją do
      `assets/` razem z resztą, więc bez tego wpisu wyszłaby jako strumień
      bajtów i przeglądarka nie narysowałaby jej w pasku. */
   ".webp": "image/webp",
-  /* Barlow jedzie z panelem od 0.431.0 — wcześniej panel brał go z trasy
-     starego biura. Bez typu przeglądarka odrzuca font podany jako strumień. */
+  /* Barlow jedzie z panelem. Bez typu przeglądarka odrzuca font podany jako
+     strumień. */
   ".ttf": "font/ttf",
   /* Dekodery skanów pdf.js. Biblioteka czyta je jako bajty, ale typ zgodny
      z treścią nie kosztuje nic i nie myli narzędzi przeglądarki. */

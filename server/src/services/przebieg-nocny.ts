@@ -10,7 +10,7 @@ import {
 } from "./kopie-bazy.js";
 import { reconcile, zapiszRaportRekoncyliacji } from "./reconcile.js";
 
-/* ── Przebieg nocny: kopia bazy i rekoncyliacja (0.487.0) ────────────────────
+/* ── Przebieg nocny: kopia bazy i rekoncyliacja ──────────────────────────────
    Obie czynności były wpisami w Harmonogramie zadań, które człowiek miał
    założyć po instalacji. Instalator kończył prośbą, a bramka etapu 4
    wdrożenia (`docs/wdrozenie.md`) stała na obu. Serwer chodzi przez całą

@@ -1,6 +1,6 @@
 import React from "react";
 
-/* ── TREŚĆ WIADOMOŚCI REKLAMACYJNEJ (0.415.0) ────────────────────────────────
+/* ── TREŚĆ WIADOMOŚCI REKLAMACYJNEJ ──────────────────────────────────────────
    Trzy rzeczy, które robi się z tekstem przychodzącym z Allegro, w jednym
    pliku — bo wszystkie trzy dotyczą TEGO SAMEGO napisu i rozjechałyby się,
    gdyby stały przy trzech różnych komponentach.
@@ -31,11 +31,9 @@ export function scisle(t: string): string {
 const PROG_DUBLA = 25;
 
 /**
- * Czy wiadomość ZAWIERA opis zgłoszenia (0.415.0).
+ * Czy wiadomość ZAWIERA opis zgłoszenia.
  *
- * BLIZNA 0.412.0, ZNALEZIONA NA ZRZUCIE WŁAŚCICIELA. Tamto wydanie usuwało
- * ramkę „Zgłoszenie", gdy była DOSŁOWNIE równa pierwszej wiadomości klienta —
- * i nie usuwało jej nigdy, bo Allegro wkłada zdanie kupującego w swój
+ * Równość tekstów nie wystarcza, bo Allegro wkłada zdanie kupującego w swój
  * formularz: „Problem: … / Opis: <zdanie> / Oczekiwane rozwiązanie: …".
  * Teksty nie są wtedy równe, a dublem są.
  *
@@ -47,7 +45,7 @@ export function zawieraOpis(wiadomosc: string, opis: string): boolean {
   return scisle(wiadomosc).includes(o);
 }
 
-/* ── FORMULARZ ALLEGRO (0.415.0) ─────────────────────────────────────────────
+/* ── FORMULARZ ALLEGRO ───────────────────────────────────────────────────────
    Pierwsza wiadomość kupującego w reklamacji nie jest jego wiadomością: to
    formularz Allegro z etykietami, w którym jedno pole niesie jego własne
    słowa. Trzy z pięciu etykiet powtarzają to, co ekran mówi już po polsku:
@@ -95,11 +93,10 @@ export function rozbierzFormularz(tekst: string): Formularz | null {
   return { opis, calosc: tekst };
 }
 
-/* ── ADRESY W TREŚCI (0.415.0) ───────────────────────────────────────────────
-   Automat Allegro odsyła klienta do formularza zwrotu LINKIEM w wiadomości,
-   a my rysowaliśmy go jako czysty tekst — agent zaznaczał go myszą i kopiował
-   do paska adresu. Przy każdej sprawie, w której poprosiliśmy o odesłanie
-   towaru, czyli przy każdym uznaniu z wymianą.
+/* ── ADRESY W TREŚCI ─────────────────────────────────────────────────────────
+   Automat Allegro odsyła klienta do formularza zwrotu LINKIEM w wiadomości.
+   Jako czysty tekst agent musiałby go zaznaczać myszą i kopiować do paska
+   adresu przy każdym uznaniu z wymianą.
 
    BEZ `dangerouslySetInnerHTML`: tekst dzielimy na kawałki i sklejamy
    elementami Reacta. Treść przychodzi od kupującego i od Allegro, więc
@@ -129,10 +126,10 @@ export function Tresc({ tekst, className = "" }: { tekst: string; className?: st
   </p>;
 }
 
-/* ── DŁUGA TREŚĆ ZWINIĘTA DO CZTERECH LINII (0.511.0) ──────────────────────
-   Wzorzec `NaszaTresc` ze skrzynki (0.506.0), skopiowany, bo tamten nie jest
+/* ── DŁUGA TREŚĆ ZWINIĘTA DO CZTERECH LINII ────────────────────────────────
+   Wzorzec `NaszaTresc` ze skrzynki, skopiowany, bo tamten nie jest
    eksportowany. Powód ten sam: własną odpowiedź agent już zna, a długa
-   zajmowała całą oś i spychała pytanie klienta pod krawędź okna.
+   zajęłaby całą oś i zepchnęła pytanie klienta pod krawędź okna.
 
    Progi te same co w skrzynce, 320 znaków albo pięć linii, żeby zwijało się
    jednakowo na każdej kolejce. Puste wiersze ponad jeden ściskamy WYŁĄCZNIE

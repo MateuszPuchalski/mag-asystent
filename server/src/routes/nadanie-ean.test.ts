@@ -64,8 +64,8 @@ test("nadanie kodu kartotece bez kodu kolejkuje zapis", async () => {
 });
 
 test("podmiana istniejącego kodu przechodzi BEZ potwierdzenia", async () => {
-  /* Do 0.48.x ta próba kończyła się 409 „Podmiana wymaga potwierdzenia".
-     Wymóg zdjęty na polecenie właściciela — to jest test na jego brak. */
+  /* Podmiana nie wymaga potwierdzenia (decyzja właściciela) — to jest test
+     na brak 409. */
   const r = await nadaj(1, { ean: "5900000000013" }, token());
   assert.equal(r.statusCode, 200);
   assert.ok(r.json().queueId > 0);

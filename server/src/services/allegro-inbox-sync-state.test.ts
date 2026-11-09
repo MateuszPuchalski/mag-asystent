@@ -56,8 +56,8 @@ test("cisza dłuższa niż dwa interwały to opóźnienie, nawet bez ani jednego
 });
 
 test("status bierze kod z klasy błędu, nie ze zdania komunikatu", async () => {
-  /* Regres z 0.147.0: kod wyłuskiwany wyrażeniem `\((\d{3})\)` łapał „(401)",
-     ale nie „Allegro odpowiedziało 503: …" — czyli milczał akurat przy
+  /* Kod z KLASY błędu: wyrażenie `\((\d{3})\)` łapałoby „(401)", ale nie
+     „Allegro odpowiedziało 503: …" — czyli milczałoby akurat przy
      odmowach, które status ma nazywać. */
   const { BladOdpowiedziAllegro } = await import("../adapters/allegro.js");
   const database = mkDb();
@@ -102,9 +102,9 @@ test("udany przebieg ZERUJE licznik błędów", async () => {
   assert.equal(s.errorCount, 2);
   assert.equal(s.lastErrorCode, 429);
 
-  /* Do 0.147.0 klauzula `DO UPDATE` pomijała `error_count`, więc licznik rósł
-     do końca życia bazy: panel pokazywał „błędów: 2" jeszcze po tygodniu
-     poprawnej pracy, a §21 nie miał z czego policzyć przebiegów Z RZĘDU. */
+  /* `error_count` zeruje się na sukcesie, inaczej panel pokazywałby
+     „błędów: 2" po tygodniu poprawnej pracy, a §21 nie miałby z czego
+     policzyć przebiegów Z RZĘDU. */
   await synchronizujAllegroInbox({ database, apiUrl: "https://api.test", query: pusto });
   s = stanSynchronizacji(database);
   assert.equal(s.errorCount, 0, "sukces nie wyzerował licznika");

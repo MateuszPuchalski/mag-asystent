@@ -1,11 +1,9 @@
 import React, { useState } from "react";
 import { ArrowDownWideNarrow, Check } from "lucide-react";
 
-/* ── Porządek kolejek obsługi (0.401.0) ──────────────────────────────────────
-   Zgłoszenie właściciela: „dodaj sortowanie po dacie etc". Reklamacje
-   i zwroty miały kolejność ZASZYTĄ — najpierw termin, potem data
-   otwarcia malejąco — i ani jednego przełącznika. Agent szukający „co przyszło
-   wczoraj" przewijał listę.
+/* ── Porządek kolejek obsługi ────────────────────────────────────────────────
+   Agent szukający „co przyszło wczoraj" nie ma przewijać listy ułożonej po
+   terminie, więc kolejki obsługi mają przełącznik porządku.
 
    OSIE SĄ DEKLAROWANE PRZEZ EKRAN, nie wspólne dla wszystkich. Skrzynka NIE MA
    terminu ani kwoty, więc pokazanie jej tych dwóch pigułek byłoby obietnicą
@@ -13,7 +11,7 @@ import { ArrowDownWideNarrow, Check } from "lucide-react";
    Przełącznik, który nic nie robi, uczy, że przełączniki nic nie robią.
 
    WYBÓR JEST PAMIĘTANY, osobno dla każdej kolejki — decyzja właściciela i ten
-   sam nawyk, co przy porządku w skrzynce od 0.259.0. Osobno, bo „po kwocie"
+   sam nawyk, co przy porządku w skrzynce. Osobno, bo „po kwocie"
    ma sens w reklamacjach i nie ma go w skrzynce; wspólny klucz przenosiłby
    wybór tam, gdzie tej osi nie ma.
 
@@ -100,20 +98,14 @@ export function posortuj<T>(lista: T[], porzadek: OsPorzadku, klucze: KluczePorz
 }
 
 /**
- * Wybór osi — JEDEN PRZYCISK Z MENU (0.402.0).
+ * Wybór osi — JEDEN PRZYCISK Z MENU.
  *
- * 0.401.0 postawiło tu pasmo pigułek, po jednej na oś. Zgłoszenie właściciela
- * ze zrzutem — „panel wygląda chaotycznie" — i policzenie tego na ekranie
- * reklamacji pokazało, ile to kosztowało: pasmo zajmowało cały wiersz
- * w kolumnie szerokiej na 280 px, zawijało się razem z sitem „Moje", a agent
- * i tak musiał przeczytać CZTERY napisy, żeby poznać jeden — ten wybrany.
+ * Pasmo pigułek zajęłoby cały wiersz w wąskiej kolumnie, a agent i tak
+ * musiałby przeczytać CZTERY napisy, żeby poznać jeden — ten wybrany.
  *
  * NAPIS NA PRZYCISKU MÓWI BIEŻĄCĄ OŚ, więc jedno spojrzenie zamiast czterech.
  * Wybór z menu kosztuje kliknięcie więcej niż pigułka i to jest cena zapłacona
  * świadomie: oś przestawia się rzadko, a patrzy się na nią za każdym razem.
- *
- * Pigułek nie zabrakło żadnej — menu niesie te same osie, w tej samej
- * kolejności, z tymi samymi podpowiedziami.
  */
 export function PasekPorzadku({ porzadek, dozwolone, onZmien }: {
   porzadek: OsPorzadku;

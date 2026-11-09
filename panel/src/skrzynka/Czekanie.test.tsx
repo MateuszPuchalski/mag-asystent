@@ -1,9 +1,8 @@
-import React from "react";
 import { describe, expect, it } from "vitest";
 import { render, screen } from "@testing-library/react";
 import { Czekanie, czekaKrotko, stopienCzekania } from "./Czekanie";
 
-/* ── Czekanie kreskami (23 września 2026) ────────────────────────────────────
+/* ── Czekanie kreskami ───────────────────────────────────────────────────────
    Progi to pytanie „za co się wziąć": godzina, cztery, osiem. Test pilnuje
    progów i tego, że liczba zostaje przy kreskach — kreski bez liczby kazałyby
    zgadywać, gdzie przebiega granica. */
@@ -27,7 +26,7 @@ describe("czekanie", () => {
     render(<Czekanie ms={14 * G} />);
     const znak = screen.getByTitle("czeka 14 g");
     expect(znak).toHaveTextContent("czeka 14 g");
-    /* Kresek nie ma od 0.506.0 — barwa liczby niesie ten sam próg. */
+    /* Kresek nie ma — barwa liczby niesie ten sam próg. */
     expect(znak.querySelectorAll("[aria-hidden='true']")).toHaveLength(0);
     expect(znak.className).toMatch(/text-ranga-zle/);
   });

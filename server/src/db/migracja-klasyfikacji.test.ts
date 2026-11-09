@@ -4,8 +4,8 @@ import fs from "node:fs";
 import { DatabaseSync } from "node:sqlite";
 import { migrate } from "./db.js";
 
-/* ── Etykiety z 0.191.0 przechodzą do decyzji jako HISTORIA ──────────────────
-   Baza sprzed tego wydania ma `klasyfikacja_rozmowy`. Migracja ma przenieść
+/* ── Stare etykiety przechodzą do decyzji jako HISTORIA ──────────────────────
+   Stara baza ma `klasyfikacja_rozmowy`. Migracja ma przenieść
    jej wiersze jako NIEAKTYWNE wersje 1 i skasować tabelę — dwa razy
    uruchomiona nie może niczego podwoić (API i worker wołają ją razem).     */
 

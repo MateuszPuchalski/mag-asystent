@@ -4,7 +4,7 @@ import { DatabaseSync } from "node:sqlite";
 import fs from "node:fs";
 import { migrate } from "./db.js";
 
-/* ── Wsteczne wypełnienie „kto prowadzi" (0.278.0) ───────────────────────────
+/* ── Wsteczne wypełnienie „kto prowadzi" ───────────────────────────
    Do tego wydania znacznik był SAMYM IMIENIEM. Migracja dokłada tożsamość
    i próbuje ją odczytać z imienia — ale tylko wtedy, gdy imię wskazuje jedno
    konto. Dwa konta o tym samym imieniu to dokładnie ten przypadek, dla którego

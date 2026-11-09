@@ -7,7 +7,7 @@ import path from "node:path";
 process.env.DB_PATH = path.join(fs.mkdtempSync(path.join(os.tmpdir(), "wertis-dosylka-")), "t.db");
 process.env.SGT_MODE = "seeded";
 
-/* ── Dosyłka ze śledzeniem (0.536.0, drugi przyrost S6) ─────────────────────
+/* ── Dosyłka ze śledzeniem (drugi przyrost S6) ──────────────────────────────
    Pilnujemy projektu punkt po punkcie:
    - odmowa z kodem dosyłki zakłada, wznawia albo przestawia sprawę TĄ SAMĄ
      drogą co „Ustaw krok”, nie potwierdza „nowego” i jest idempotentna;
@@ -749,7 +749,7 @@ test("odczyty niczego nie zapisują: sprawa z dosyłkami, „Moje”, stan zwrot
   assert.equal(zmiany(), przed);
 });
 
-/* ── Poprawki po przeglądzie (0.536.1) ─────────────────────────────────── */
+/* ── Poprawki po przeglądzie ───────────────────────────────────────────── */
 
 test("wznowienie zakończonej sprawy odkłada jej skończone dosyłki do historii: karta, „Moje” i ticker ich nie widzą", async () => {
   /* Dosyłka dotarła, numeru drugiej nikt nie wpisał, sprawę zakończono.

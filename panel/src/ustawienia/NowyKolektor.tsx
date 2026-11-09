@@ -5,11 +5,11 @@ import { useKolektor } from "../api/ustawienia";
 import { Blad, Przycisk } from "../ui";
 import { KartaWgladu } from "../ui/wglad";
 
-/* ── Nowy kolektor (0.496.0) ───────────────────────────────────────────
-   Pierwsza instalacja aplikacji na kolektorze szła przez MDM albo kabel.
-   Serwer rozdaje APK bez logowania (`/api/aktualizacja/apk`), więc wystarczy
-   zeskanować ten kod aparatem kolektora: przeglądarka pobierze plik,
-   a Android zapyta o zgodę na instalację.
+/* ── Nowy kolektor ─────────────────────────────────────────────────────
+   Serwer rozdaje APK bez logowania (`/api/aktualizacja/apk`), więc pierwsza
+   instalacja nie potrzebuje MDM ani kabla: wystarczy zeskanować ten kod
+   aparatem kolektora. Przeglądarka pobierze plik, a Android zapyta o zgodę
+   na instalację.
 
    Adres bierze się z SERWERA, nie z paska przeglądarki: panel otwarty na
    samym serwerze to `localhost`, a z kolektora `localhost` jest kolektorem.
@@ -19,7 +19,7 @@ import { KartaWgladu } from "../ui/wglad";
    `SplashScreen.kt`). Aplikacja ma adres produkcyjny wbudowany; wpisuje się
    go tylko po przeprowadzce serwera, i do tego jest duży napis niżej.
 
-   KOD ZA PRZYCISKIEM (0.521.0). Kwadrat 192 px był największą rzeczą na
+   KOD ZA PRZYCISKIEM. Kwadrat 192 px byłby największą rzeczą na
    ekranie ustawień, a potrzebny jest raz na nowe urządzenie. Stoi jedno
    kliknięcie dalej; adres serwera zostaje na wierzchu, bo po niego sięga się
    częściej — przy każdej przeprowadzce i każdym „Nie widzę serwera". */

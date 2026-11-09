@@ -10,7 +10,7 @@ process.env.DB_PATH = path.join(fs.mkdtempSync(path.join(os.tmpdir(), "wertis-he
 process.env.LOG_LEVEL = "silent";
 process.env.SGT_MODE = "seeded";
 
-/* `/api/health` nie miała testu do 0.149.0, choć to po niej instalator poznaje,
+/* Po `/api/health` instalator poznaje,
    że system żyje: `Test-WertisHealth` odpytuje ją kilkadziesiąt razy i po
    ostatnim wyjątku melduje „API nie odpowiedziało".
 
@@ -125,9 +125,7 @@ test("blok obsługi klienta niesie liczby z §21, bez treści i bez klientów", 
   const h = (await app.inject({ method: "GET", url: "/api/health" })).json();
   assert.equal(typeof h.obsluga.rozmowyOczekujace, "number");
   assert.equal(typeof h.obsluga.zadaniaTerenowe, "number");
-  /* Do 0.172.0 stała tu stała „wysyłka wyłączona" — zdanie nieprawdziwe od
-     0.148.0, czyli od wydania, w którym wysyłka zaczęła działać. Teraz pole
-     opisuje STAN kolejki, a pusta baza znaczy „nic jeszcze nie poszło". */
+  /* Pole opisuje STAN kolejki, a pusta baza znaczy „nic jeszcze nie poszło". */
   assert.equal(h.obsluga.kolejkaWysylek, "pusta — nic jeszcze nie poszło");
   assert.equal(h.obsluga.wysylkiDoSprawdzenia, 0);
 
@@ -340,7 +338,7 @@ test("awaria przycisku resync to 502 ze zdaniem ze zdrowia, nie goły 500", asyn
 });
 
 test("zdrowie mówi o synchronizacji SPRAW POSPRZEDAŻOWYCH, nie tylko skrzynki", async () => {
-  /* ── Zgłoszenie właściciela (0.409.0) ────────────────────────────────────
+  /* ── Zgłoszenie właściciela ────────────────────────────────────
      „Reklamacje w aplikacji mają nieaktualny stan." Przysłał wynik tej trasy,
      żeby to pokazać — a odpowiedzi w nim nie było: `/api/health` niósł
      `allegroInbox` i milczał o sprawach posprzedażowych, choć

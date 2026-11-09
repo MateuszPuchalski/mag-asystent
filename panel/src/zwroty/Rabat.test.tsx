@@ -4,10 +4,9 @@ import userEvent from "@testing-library/user-event";
 import { Rabat } from "./Rabat";
 import type { StanRabatu } from "../api/typy";
 
-/* ── Rabat transakcyjny przy pozycji (0.164.0) ───────────────────────────────
+/* ── Rabat transakcyjny przy pozycji ─────────────────────────────────────────
    Ekran ma odpowiedzieć na jedno pytanie: czy przy TEJ pozycji trzeba jeszcze
-   coś kliknąć. Do tego wydania odpowiedź brzmiała „nie wiadomo, sprawdź
-   w panelu Allegro" — i dlatego sprawdzało się przy każdym zwrocie.        */
+   coś kliknąć — bez sprawdzania w panelu Allegro przy każdym zwrocie.      */
 
 const stan = (n: Partial<StanRabatu> = {}): StanRabatu => ({
   stan: "brak", lineItemId: "li-1", ilosc: 1, wniosekId: null,
@@ -23,7 +22,7 @@ describe("Rabat transakcyjny", () => {
     pasek(stan(), { onZglos });
     expect(screen.getByText(/brak wniosku/)).toBeInTheDocument();
     await userEvent.click(screen.getByRole("button", { name: /ZGŁOŚ RABAT/ }));
-    /* PIERWSZE KLIKNIĘCIE NIE SKŁADA WNIOSKU (audyt, 15 września 2026). */
+    /* PIERWSZE KLIKNIĘCIE NIE SKŁADA WNIOSKU (audyt). */
     expect(onZglos).not.toHaveBeenCalled();
     expect(screen.getByText(/panel go nie wycofa/)).toBeInTheDocument();
     await userEvent.click(screen.getByRole("button", { name: /ZŁÓŻ WNIOSEK/ }));

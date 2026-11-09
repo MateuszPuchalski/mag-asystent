@@ -3,21 +3,14 @@ import { sprawSlowo } from "./Moje";
 import type { ProgKolejki } from "../api/typy";
 
 /* ── Próg daty nad kolejką spraw ─────────────────────────────────────────────
-   POWSTAŁO Z DWÓCH ZDAŃ WŁAŚCICIELA: „w kolejce pojawiają mi się stare
-   reklamacje" i „pokaż tylko reklamacje od 1 lipca 2026".
-
-   Przyczyna była nasza w całości. Pełny przelot listy dołożony w 0.273.0
-   zapisuje CAŁE archiwum konta, a zapytanie kolejki nie miało ani filtra
-   statusu, ani okna czasowego, ani limitu — do przeglądarki jechała zawartość
-   całej tabeli. Porządek dołożył drugą połowę: `decyzja_do ASC` stawia termin
-   sprzed pół roku NAD dzisiejszym, więc archiwum lądowało nie gdziekolwiek,
-   tylko na samej górze.
+   Stare reklamacje nie mają zaśmiecać kolejki. Pełny przelot listy zapisuje
+   CAŁE archiwum konta, a `decyzja_do ASC` stawia termin sprzed pół roku
+   NAD dzisiejszym, więc archiwum lądowałoby na samej górze.
 
    PRÓG DATY JEST NARZĘDZIEM TĘPYM i ten pasek jest za to zapłatą. Próg nie
    pyta, czy sprawa jest skończona — pyta, kiedy wpłynęła. Dlatego mówi wprost,
    ile schował, i dlatego osobno liczy sprawy, które nadal mają żywy obowiązek.
-   Zniknięcie z kolejki musi mieć widoczne uzasadnienie: ta sama reguła, którą
-   zwroty kupiły w 0.339.0.
+   Zniknięcie z kolejki musi mieć widoczne uzasadnienie.
 
    DATĘ PROGU RYSUJEMY W STREFIE PRZEGLĄDARKI, jak każdy inny znacznik czasu
    w panelu. Wartość wdrożeniowa to północ czasu lokalnego zapisana w UTC

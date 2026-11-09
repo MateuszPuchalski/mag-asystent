@@ -5,10 +5,10 @@ import { BrakSesji, zglosBrakPolaczenia, zglosBrakSesji } from "./klient";
    piętnaście sekund. To jest ta część wyceny z `docs/obsluga-klienta.md` §7,
    za którą płacimy TanStackiem: ekrany dzielą stan zamiast każdy swój.
 
-   Budowa mieszka tu, a nie w `main.tsx` (0.502.0), żeby test mógł złożyć
+   Budowa mieszka tu, a nie w `main.tsx`, żeby test mógł złożyć
    ten sam klient i sprawdzić odświeżenie wspólnych kluczy niżej. */
 
-/* ── ODŚWIEŻENIE PO KAŻDEJ ZMIANIE, NA KAŻDYM EKRANIE (0.502.0) ────────────
+/* ── ODŚWIEŻENIE PO KAŻDEJ ZMIANIE, NA KAŻDYM EKRANIE ──────────────────────
    Mutacja w zwrotach albo reklamacjach odświeżała tylko swoją
    kolejkę. „Do zrobienia" i otwarta rozmowa dowiadywały się o niej dopiero
    po 10–30 sekundach, więc wiersz „do decyzji" wisiał nad sprawą już
@@ -21,9 +21,9 @@ export const WSPOLNE_KLUCZE = [["do-decyzji"], ["rozmowa"]] as const;
 export function nowyKlientZapytan(): QueryClient {
   const klient: QueryClient = new QueryClient({
     /* Wygasła sesja w dowolnym zapytaniu albo mutacji wraca do logowania
-       (0.431.0) — szczegół przy `zglosBrakSesji` w `api/klient.ts`. */
+       — szczegół przy `zglosBrakSesji` w `api/klient.ts`. */
     /* Brak połączenia w dowolnym zapytaniu albo mutacji zapala pasek pod
-       nagłówkiem (0.546.0) — szczegół przy `BrakPolaczenia` w `api/klient.ts`. */
+       nagłówkiem — szczegół przy `BrakPolaczenia` w `api/klient.ts`. */
     queryCache: new QueryCache({ onError: (e) => { zglosBrakSesji(e); zglosBrakPolaczenia(e); } }),
     mutationCache: new MutationCache({
       onError: (e) => { zglosBrakSesji(e); zglosBrakPolaczenia(e); },

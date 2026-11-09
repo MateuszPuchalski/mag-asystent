@@ -3,9 +3,8 @@ import type { Pominieta, WierszKosza, ZnalezionaWKoszu } from "../api/kosze";
 import { Pusto, WierszKolejki, czas, dniSlowo, ile } from "../ui";
 import { CyklKosza, StanMmKosza } from "./Cykl";
 
-/* ── Kolejka koszy (0.438.0) ───────────────────────────────────────────────
-   Z MAGAZYNU ZWROTÓW w `biuro.html`, w ramie kolejek panelu. Kubełki
-   odpowiadają na pytania biura przy koszach, po kolei:
+/* ── Kolejka koszy ─────────────────────────────────────────────────────────
+   Kubełki odpowiadają na pytania biura przy koszach, po kolei:
 
      W pracy     — co jest w drodze: koszyk zbiera towar albo kosz stoi na hali;
      Pominięte   — czego hala nie znalazła; każdy wiersz czeka na decyzję;
@@ -21,22 +20,20 @@ export type KubelekKoszy = "praca" | "pominiete" | "mm" | "rozlozone" | "anulowa
 export const KUBELKI_KOSZY: Array<{ id: KubelekKoszy; etykieta: string; pytanie: string }> = [
   { id: "praca", etykieta: "W pracy", pytanie: "Co jest w drodze na regał?" },
   { id: "pominiete", etykieta: "Pominięte", pytanie: "Szukać dalej, reklamować czy poprawić dokument?" },
-  /* Problem z MM (0.501.0), zgłoszenie właściciela: „muszę sprawdzić stany
-     z Subiektem". Kubełek PRZEKROJOWY — kosz stoi tu obok swojego kubełka
-     statusu, bo kłopot z dokumentem nie zmienia tego, gdzie kosz jest. */
+  /* Problem z MM: biuro sprawdza stany z Subiektem. Kubełek PRZEKROJOWY —
+     kosz stoi tu obok swojego kubełka statusu, bo kłopot z dokumentem nie zmienia tego, gdzie kosz jest. */
   { id: "mm", etykieta: "Problem z MM", pytanie: "Czy stany w Subiekcie zgadzają się z koszem?" },
   { id: "rozlozone", etykieta: "Rozłożone", pytanie: "Tylko wgląd." },
   { id: "anulowane", etykieta: "Anulowane", pytanie: "Tylko wgląd." },
 ];
 
 /**
- * Kosze jednego kubełka w kolejności, którą ten kubełek zadaje (0.486.4).
+ * Kosze jednego kubełka w kolejności, którą ten kubełek zadaje.
  *
- * ROZŁOŻONE PO CHWILI ROZŁOŻENIA, najświeższe na górze. Zgłoszenie
- * właściciela: „rozłożone koszyki układaj kolejnością rozłożenia". Kubełek
- * jest historią i odpowiada na „co hala właśnie skończyła" — a lista stała
- * w porządku serwera, czyli po założeniu kosza. Kosz założony wcześniej bywa
- * rozłożony później, więc tamten porządek mieszał dzień pracy hali.
+ * ROZŁOŻONE PO CHWILI ROZŁOŻENIA, najświeższe na górze. Kubełek jest
+ * historią i odpowiada na „co hala właśnie skończyła". Kosz założony
+ * wcześniej bywa rozłożony później, więc porządek po założeniu mieszałby
+ * dzień pracy hali.
  *
  * Kosz rozłożony bez zapisanej chwili (sprzed wprowadzenia pola) idzie na
  * koniec, zamiast udawać najstarszy albo najnowszy. Pozostałe kubełki
@@ -47,7 +44,7 @@ export function koszeKubelka(kosze: WierszKosza[], kubelek: KubelekKoszy): Wiers
      nierozwiązany błąd i wczorajsza odmowa są pilniejsze od tej sprzed
      miesiąca, którą remanent mógł już wyrównać. */
   if (kubelek === "mm") {
-    /* Kosz BEZ MM POWROTNEGO też tu stoi (0.505.0): jego stan wisi na
+    /* Kosz BEZ MM POWROTNEGO też tu stoi: jego stan wisi na
        regale zwrotów, więc sprawdza się go z Subiektem tak samo. Dla niego
        chwilą kłopotu jest rozłożenie — od niej powrót powinien był wyjść. */
     const kiedy = (k: WierszKosza) => k.problemMm?.ostatnioAt ?? k.rozlozonoAt ?? "";
@@ -72,7 +69,7 @@ export function kubelekKosza(k: WierszKosza): KubelekKoszy {
   return "praca";
 }
 
-/** Zdanie o postępie — to, co w biurze stało pod numerem kosza. */
+/** Zdanie o postępie kosza. */
 function postep(k: WierszKosza): string {
   const karton = k.rodzaj === "karton";
   if (k.status === "anulowany") {
@@ -83,7 +80,7 @@ function postep(k: WierszKosza): string {
     return karton ? "Hala zbiera zawartość — pudło jeszcze otwarte."
       : "Przyjmuje zwroty — rozkładanie jeszcze nie ruszyło.";
   }
-  /* Chwila rozłożenia w zdaniu (0.486.4): kubełek ROZŁOŻONE układa się po
+  /* Chwila rozłożenia w zdaniu: kubełek ROZŁOŻONE układa się po
      niej, więc porządek ma być widać, a nie trzeba go zgadywać. */
   return `Rozłożono ${k.odlozonych}/${k.pozycji} poz.${
     k.status === "rozlozony" && k.rozlozonoAt ? ` · ${czas(k.rozlozonoAt)}` : ""}${
@@ -118,7 +115,7 @@ export function KolejkaKoszy({ kosze, wybrany, onWybierz, pokazBladMm = false }:
           {karton && <span className="rounded bg-slate-200 px-1.5 py-0.5 text-xs font-bold text-slate-700">karton</span>}
           <CyklKosza status={k.status} mmBlad={k.mmStan === "blad" && !k.mmNumer && !karton} />
           <StanMmKosza mmStan={k.mmStan} mmNumer={k.mmNumer} brakujeKorekt={k.brakujeKorekt} karton={karton} />
-          {/* ZNACZNIK KŁOPOTU Z MM (0.501.0) w każdym kubełku. Czerwony, gdy
+          {/* ZNACZNIK KŁOPOTU Z MM w każdym kubełku. Czerwony, gdy
               zadanie stoi w błędzie teraz; bursztynowy, gdy przeszło po
               odmowie — wtedy dokument jest, ale stany trzeba sprawdzić. */}
           {k.problemMm &&
@@ -127,9 +124,9 @@ export function KolejkaKoszy({ kosze, wybrany, onWybierz, pokazBladMm = false }:
               className={`rounded px-1.5 py-0.5 text-xs font-bold ${k.problemMm.nierozwiazany
                 ? "bg-red-100 text-ranga-zle" : "bg-amber-100 text-ranga-uwaga"}`}>
               {k.problemMm.nierozwiazany ? "MM w błędzie"
-                /* Ponawiane (0.530.0): po odmowie czeka na próbę — jeszcze nie weszło. */
+                /* Ponawiane: po odmowie czeka na próbę — jeszcze nie weszło. */
                 : k.problemMm.ponawiane ? "MM ponawiane" : "MM po błędzie"}</span>}
-          {/* BEZ MM POWROTNEGO (0.505.0). Czerwony, bo towar leży na półce,
+          {/* BEZ MM POWROTNEGO. Czerwony, bo towar leży na półce,
               a stan na regale zwrotów — sprzedać się go nie da. */}
           {k.bezPowrotu &&
             <span title="Rozłożony ponad dobę temu, a MM powrotne nie powstało — stan wisi na regale zwrotów"

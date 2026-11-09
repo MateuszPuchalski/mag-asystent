@@ -10,7 +10,7 @@ import {
   SUFIT_ZDJEC, SUFIT_ZDJEC_AGENTA,
 } from "./copilot-zdjecia.js";
 
-/* ── Zdjęcia dla Copilota (0.283.0) ──────────────────────────────────────────
+/* ── Zdjęcia dla Copilota ────────────────────────────────────────────────────
    Cztery rzeczy warte testu, bo każda jest granicą, nie wyglądem:
 
    1. TYP ROZSTRZYGA SYGNATURA, nie nazwa pliku. `faktura.jpg`, która jest

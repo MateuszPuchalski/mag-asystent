@@ -2,7 +2,7 @@ import { createHash } from "node:crypto";
 import { db } from "../db/db.js";
 import { logEvent } from "./events.js";
 
-/* ── Logo dostawcy (0.56.0) ──────────────────────────────────────────────────
+/* ── Logo dostawcy ───────────────────────────────────────────────────────────
    Biuro wgrywa logo raz, magazynier widzi je po lewej stronie wiersza na
    liście dostaw. Cała funkcja stoi na jednej decyzji: SERWER NIE DOTYKA
    OBRAZU.
@@ -22,9 +22,9 @@ import { logEvent } from "./events.js";
 /** Logo po konwersji waży kilka kB; 128 kB to już sygnał, że coś poszło inną
  *  drogą niż `<canvas>` w panelu.
  *
- *  Limit podniesiony z 64 kB w 0.87.0 razem z dłuższym bokiem obrazu (128 →
- *  256 px). Panel zmniejsza obraz sam, dopóki się nie zmieści, więc ta liczba
- *  nie jest już granicą, o którą człowiek może się potknąć — jest granicą dla
+ *  Limit idzie w parze z dłuższym bokiem obrazu (256 px). Panel zmniejsza obraz
+ *  sam, dopóki się nie zmieści, więc ta liczba nie jest granicą, o którą
+ *  człowiek może się potknąć — jest granicą dla
  *  wpisu, który przyszedł z pominięciem panelu. */
 const MAX_BAJTOW = 128 * 1024;
 

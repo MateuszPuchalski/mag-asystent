@@ -5,10 +5,9 @@ import React from "react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import type { Zadanie } from "../api/typy";
 
-/* ── Droga powrotna z hali (0.352.0) ─────────────────────────────────────────
-   Do 0.351.0 zadanie terenowe miało z magazynu jedno wyjście: wynik. Ekran
-   biura nie znał więc stanu „hala odpowiedziała, ale nie wynikiem" i nie miał
-   czym na niego odpowiedzieć.
+/* ── Droga powrotna z hali ───────────────────────────────────────────────────
+   Hala może odesłać zadanie z powodem zamiast wyniku, a biuro musi mieć
+   czym na to odpowiedzieć.
 
    Ten plik pilnuje TRZECH rzeczy, bo każda z nich zamieniłaby odesłanie
    z powrotem w ciszę:
@@ -64,8 +63,8 @@ const pokaz = () => render(
 
 describe("Zadania terenowe — nagłówek ekranu", () => {
   it("bez tytułu powtarzającego zakładkę; w rzędzie zostają sito i akcja główna", () => {
-    /* Tytuł i podpis zeszły (0.524.0): nazwę ekranu niesie podświetlona
-       zakładka, jak na każdym innym ekranie panelu. */
+    /* Bez tytułu i podpisu: nazwę ekranu niesie podświetlona zakładka, jak
+       na każdym innym ekranie panelu. */
     LISTA = [];
     pokaz();
     expect(screen.queryByRole("heading", { level: 1 })).toBeNull();
@@ -142,9 +141,9 @@ describe("Zadania terenowe — droga powrotna z hali", () => {
   });
 
   it("zdjęcie od hali stoi na karcie i ma opis w treści zastępczej", () => {
-    /* Przy pytaniu „co jest na tabliczce" obraz JEST odpowiedzią. Do 0.351.0
-       hala mogła odpowiedzieć wyłącznie tekstem, a agent przepisywał opis ze
-       słów magazyniera i wysyłał go kupującemu jako własne ustalenie. */
+    /* Przy pytaniu „co jest na tabliczce" obraz JEST odpowiedzią. Bez niego
+       agent przepisywałby opis ze słów magazyniera i wysyłał go kupującemu
+       jako własne ustalenie. */
     LISTA = [zadanie({ zalaczniki: [
       { id: 9, opis: "Tabliczka od spodu", at: "2026-09-15T09:00:00.000Z", przez: "M. Kowal" },
     ] })];

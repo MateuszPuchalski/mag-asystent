@@ -7,12 +7,7 @@ import path from "node:path";
 process.env.DB_PATH = path.join(fs.mkdtempSync(path.join(os.tmpdir(), "wertis-wzmianki-")), "t.db");
 process.env.SGT_MODE = "seeded";
 
-/* ── Skrzynka wzmianek (0.160.0) ─────────────────────────────────────────────
-   Wzmianka była do tego wydania zapisem bez odczytu — dokładnie tą samą blizną,
-   którą komentarze dostały w 0.157.0. `conversation_mention` zapełniała się
-   przy każdym komentarzu z „@", a jedyną drogą do niej było OTWARCIE tej
-   właśnie rozmowy. Kto nie zgadł, w której, nie dowiadywał się nigdy.
-
+/* ── Skrzynka wzmianek ───────────────────────────────────────────────────────
    Testy pilnują trzech rzeczy, bo każda osobno wystarczy, żeby skrzynka
    kłamała: adresata (cudzej wzmianki nie widać), odhaczenia (osobnego dla
    każdej wzmiankowanej osoby) i reguły „zero zapisu przy patrzeniu".        */

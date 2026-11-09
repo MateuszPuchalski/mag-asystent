@@ -1,4 +1,4 @@
-import React, { useContext, useState, type MutableRefObject } from "react";
+import { useContext, useState, type MutableRefObject } from "react";
 import { QueryClientContext } from "@tanstack/react-query";
 import type { KoszZwrotow, Zwrot } from "../api/typy";
 import { Przycisk, Pole, Blad, Skopiuj, dzien } from "../ui";
@@ -6,23 +6,18 @@ import { useAkcjaKlawisza, type AkcjeKlawiszy } from "./klawisze";
 import { kluczeZwrotow } from "../api/zwroty";
 import { szybkaSciezka } from "./regulaSzybkiej";
 
-/* ── Pasek decyzji zwrotu (0.156.0) ──────────────────────────────────────────
-   Do tego wydania klawisze z §25a.2 stały tu jako PODPISY: `kubelekZwrotu`
-   routował po `werdykt`, ocenie pozycji i `kwota_grosze`, a żadnej z tych
-   kolumn nic nie zapisywało. Kolejka bramek była maszyną bez paliwa.
-
-   Trzy kubełki dostały działanie w 0.156.0, czwarty — korekta — w 0.162.0.
+/* ── Pasek decyzji zwrotu ────────────────────────────────────────────────────
    Korekty NIE wystawia panel: robi to człowiek w Subiekcie, a tutaj przepisuje
    jej numer. Stąd pole tekstowe zamiast przycisku „zleć" i stąd cofnięcie
    (§25a.5): literówka w przepisanym numerze jest zdarzeniem normalnym.
 
-   Od 0.167.0 zostają tu decyzje o CAŁYM zwrocie: werdykt, korekta, cofnięcie.
-   Ocena towaru i wycena dotyczą pojedynczych pozycji, więc przeniosły się na
-   wiersz produktu (`Pozycje.tsx`) — operator ocenia towar, patrząc na towar,
+   Tu stoją decyzje o CAŁYM zwrocie: werdykt, korekta, cofnięcie. Ocena
+   towaru i wycena dotyczą pojedynczych pozycji, więc stoją na wierszu
+   produktu (`Pozycje.tsx`) — operator ocenia towar, patrząc na towar,
    a nie na jego nazwę wypisaną drugi raz obok.                              */
 
 /**
- * Pierwsze zdanie komunikatu (0.479.0). Błąd automatu ZW bywa ścianą:
+ * Pierwsze zdanie komunikatu. Błąd automatu ZW bywa ścianą:
  * zrzut kilkudziesięciu pól. Pierwsze zdanie mówi, co się stało — reszta jest
  * materiałem dla serwisu i rozwija się na żądanie.
  */
@@ -43,12 +38,6 @@ type Props = {
   blad: string;
   /** Rejestr akcji dla klawiszy kubełka (`zwroty/klawisze.ts`). */
   akcje?: MutableRefObject<AkcjeKlawiszy>;
-  /**
-   * Czy klawisz `Z` odda pieniądze (0.484.7). NIEUŻYWANE od 0.516.0: zdanie
-   * „albo klawiszem Z" zeszło, bo klawisz stoi na przycisku w „Pieniądzach"
-   * tuż niżej. Ekran dalej je podaje; prop zejdzie przy jego następnej zmianie.
-   */
-  moznaZwrocic?: boolean;
 };
 
 export function Decyzje({ zwrot, onWerdykt, onKorekta, onCofnijKorekte, onCofnijKwote,
@@ -76,7 +65,7 @@ export function Decyzje({ zwrot, onWerdykt, onKorekta, onCofnijKorekte, onCofnij
   const ramka = "border-b border-slate-200 bg-slate-50 p-4";
 
   if (zwrot.kubelek === "decyzja") {
-    /* JEDEN GŁÓWNY PRZYCISK NA WIDOK (0.516.0, §26d). Nad paskiem stoi
+    /* JEDEN GŁÓWNY PRZYCISK NA WIDOK (§26d). Nad paskiem stoi
        „Wszystko OK" (`SzybkiZwrot`), też główny — dwa zielone przyciski
        jeden pod drugim każą wybierać, który jest „ten". Gdy szybka ścieżka
        jest gotowa, „Przyjmij" schodzi do drugiego rzędu; klawisz P zostaje.
@@ -100,8 +89,7 @@ export function Decyzje({ zwrot, onWerdykt, onKorekta, onCofnijKorekte, onCofnij
             {/* Odmowa jest NIEODWRACALNA (§25a.5), więc dostaje potwierdzenie
                 i wymaga powodu.
 
-                ETYKIETA MÓWI PRAWDĘ OD 0.210.0. Stało tu „zobaczy go klient" —
-                i to była jedyna nieprawda na tym ekranie. Allegro nie zna
+                Klient powodu NIE zobaczy. Allegro nie zna
                 pojęcia „odrzuć zwrot": końcówka `rejection` odmawia WYPŁATY,
                 nie zwrotu. Nasz werdykt jest decyzją biura i nigdzie nie
                 wychodzi, więc klient nie dowie się niczego, dopóki ktoś mu
@@ -137,15 +125,15 @@ export function Decyzje({ zwrot, onWerdykt, onKorekta, onCofnijKorekte, onCofnij
   /* DO OCENY i DO ZWROTU nie mają paska: ich pytanie zadaje wiersz produktu,
      bo dotyczy pojedynczej pozycji, a nie całego zwrotu.
 
-     WYJĄTEK: świeżo przyjęty zwrot, w którym nikt jeszcze nic nie ocenił
-     (0.204.0). Przyjęcie idzie jednym kliknięciem, bez pytania o nic, więc
+     WYJĄTEK: świeżo przyjęty zwrot, w którym nikt jeszcze nic nie ocenił.
+     Przyjęcie idzie jednym kliknięciem, bez pytania o nic, więc
      pomyłka jest zdarzeniem normalnym — a wykrywa się ją natychmiast, patrząc
      na kubełek, do którego zwrot właśnie wpadł. To jedno zdanie, nie ramka
      z decyzją: pytanie ekranu dalej zadaje wiersz produktu.
 
      Po pierwszej ocenie klawisz znika, bo serwer i tak by odmówił — schodzi
      się po jednym szczeblu, a ocena jest szczebel niżej. */
-  /* ── PIENIĄDZE CZEKAJĄ (0.476.0) ────────────────────────────────────
+  /* ── PIENIĄDZE CZEKAJĄ ──────────────────────────────────────────────
      Zwrot z ustaloną kwotą wraca do DO ZWROTU, póki pieniądze nie wyjdą —
      także po korekcie, którą automat ZW wystawia minutę po kwocie. Pasek mówi,
      DLACZEGO zwrot tu stoi i ILE czasu zostało. Bez tego zdania zwrot
@@ -153,22 +141,20 @@ export function Decyzje({ zwrot, onWerdykt, onKorekta, onCofnijKorekte, onCofnij
 
      Data jest datą automatu Allegro, a nie naszą: tego dnia pieniądze wyjdą
      same, w całości — potrącenie przepada. To jest powód, dla którego ten
-     zwrot w ogóle wraca do pracy (przegląd zwrotów, 23 września 2026). */
+     zwrot w ogóle wraca do pracy (przegląd zwrotów). */
   if (zwrot.kubelek === "zwrot" && zwrot.kwotaGrosze !== null) {
     const pobranie = zwrot.zamowienie?.platnoscTyp === "CASH_ON_DELIVERY";
     const automat = zwrot.terminAt
       ? new Date(Date.parse(zwrot.terminAt) + 86_400_000).toISOString() : null;
-    /* KWOTA STOI RAZ, W „PIENIĄDZACH" (0.516.0, §26d). Ta sama liczba
-       stała tu, w sekcji pieniędzy i w stopce pozycji — trzy razy na jednym
-       ekranie. Zeszło też „oddaj je w Allegro albo klawiszem Z": przycisk
-       z klawiszem stoi linijkę niżej, a przy pobraniu drogę mówi serwer. */
+    /* KWOTA STOI RAZ, W „PIENIĄDZACH" (§26d). Przycisk z klawiszem stoi
+       linijkę niżej, a przy pobraniu drogę mówi serwer. */
     return <div className={ramka}>
       <p className="text-xs text-slate-600">
         Pieniądze jeszcze nie wyszły.
         {zwrot.korektaNumer && <> Korekta {zwrot.korektaNumer}.</>}
         {!pobranie && automat && <> Allegro odda całość samo {dzien(automat)}, bez potrącenia.</>}
       </p>
-      {/* DROGA DO POPRAWKI STOI TUTAJ (0.484.7). Sygnał „kwota?" i odmowa
+      {/* DROGA DO POPRAWKI STOI TUTAJ. Sygnał „kwota?" i odmowa
           wypłaty mówiły „popraw kwotę", a w tym stanie nie było ani
           przycisku kwoty, ani cofnięcia korekty. Z korektą najpierw schodzi
           ona (`cofnijKwote` odmawia, dopóki stoi), bez niej — sama kwota. */}
@@ -200,25 +186,23 @@ export function Decyzje({ zwrot, onWerdykt, onKorekta, onCofnijKorekte, onCofnij
     const zwWDrodze = zw !== null
       && (zw.status === "pending" || zw.status === "processing" || zw.status === "waiting_for_doc");
     return <div className={ramka}>
-      {/* KWOTA Z DROGĄ WYJŚCIA (0.202.0). To jedyny ekran, na którym kwota jest
+      {/* KWOTA Z DROGĄ WYJŚCIA. To jedyny ekran, na którym kwota jest
           już ustalona, a jeszcze nic na jej podstawie nie wyszło z firmy —
           więc tu, i tylko tu, da się ją poprawić. Pomyłka w zaznaczeniu
-          pozycji zostawała dotąd na zawsze: pasek wyceny znika razem
+          pozycji zostałaby na zawsze: pasek wyceny znika razem
           z kubełkiem DO ZWROTU. */}
-      {/* Sama kwota zeszła stąd (0.516.0) — stoi w „Pieniądzach" niżej.
-          Zostaje droga wyjścia, bo to ona jest powodem tego bloku. */}
+      {/* Kwota stoi w „Pieniądzach" niżej. Tu droga wyjścia, bo to ona jest
+          powodem tego bloku. */}
       {zwrot.kwotaGrosze !== null && <button type="button" disabled={trwa} onClick={onCofnijKwote}
         className="mb-2 block text-xs text-slate-500 underline underline-offset-2 disabled:opacity-50">
         popraw kwotę</button>}
-      {/* KTO WYSTAWIA ZW (0.349.0). „Wystawiasz w Subiekcie" było prawdą, dopóki
+      {/* KTO WYSTAWIA ZW. „Wystawiasz w Subiekcie" było prawdą, dopóki
           robiło to wyłącznie biuro. Przy zleconym automacie zdanie mówi, że numer
           przyjdzie sam — inaczej biuro wystawiłoby drugi dokument obok. Pole
           numeru zostaje: wpisany numer anuluje czekające zlecenie. */}
-      {/* JEDNA LINIJKA ZAMIAST AKAPITU (0.479.0) — przegląd zwrotów
-          z 23 września: pudełko powtarzało dwa, trzy zdania przy każdym
-          zwrocie. Zostaje to, co każe coś zrobić albo czegoś nie robić;
-          reszta idzie do podpowiedzi. Błąd automatu niesie od 0.456.0 cały
-          zrzut pól, więc na ekranie stoi jego PIERWSZE zdanie, a całość
+      {/* JEDNA LINIJKA ZAMIAST AKAPITU. Zostaje to, co każe coś zrobić albo
+          czegoś nie robić; reszta idzie do podpowiedzi. Błąd automatu niesie
+          cały zrzut pól, więc na ekranie stoi jego PIERWSZE zdanie, a całość
           rozwija się na żądanie. */}
       {zwWDrodze
         ? <p className="mb-2 text-xs text-slate-600"
@@ -251,24 +235,21 @@ export function Decyzje({ zwrot, onWerdykt, onKorekta, onCofnijKorekte, onCofnij
           <kbd className="rounded border border-black/20 px-1 text-xs">Enter</kbd> Zapisz korektę
         </Przycisk>
       </div>
-      {/* Zdanie o pieniądzach ZESZŁO (0.479.0). Od 0.476.0 zwrot
-          z korektą, a bez wypłaty, wraca do DO ZWROTU z własnym paskiem
-          pieniędzy — przypominanie o tym tutaj przy każdym zwrocie mówiło
-          to samo drugi raz, zanim było potrzebne. */}
+      {/* Bez zdania o pieniądzach: zwrot z korektą, a bez wypłaty, wraca do
+          DO ZWROTU z własnym paskiem pieniędzy. */}
       {blad && <Blad>{blad}</Blad>}
     </div>;
   }
 
-  /* STAN KOŃCOWY BEZ KOREKTY I POWODU NIE MA RAMKI (0.516.0, §26d).
-     Stało tu „nie ma tu decyzji do podjęcia" — oś etapów wyżej mówi już
-     „Zamknięty" albo „Odrzucony", a pusta ramka tylko zabierała wzrok. */
+  /* STAN KOŃCOWY BEZ KOREKTY I POWODU NIE MA RAMKI (§26d). Oś etapów wyżej
+     mówi „Zamknięty" albo „Odrzucony", a pusta ramka zabierałaby wzrok. */
   if (!zwrot.korektaNumer && !(zwrot.kubelek === "odrzucony" && zwrot.werdyktPowod)) {
     return blad ? <div className={ramka}><Blad>{blad}</Blad></div> : null;
   }
 
   /* Skąd wziął się numer, jest częścią informacji — ta sama zasada co
      przy dokumencie sprzedaży (§4.3). Fakt z danych nie ma udawać
-     czyjejś decyzji, a decyzja nie ma udawać faktu. Od 0.516.0 mówi to
+     czyjejś decyzji, a decyzja nie ma udawać faktu. Mówi to
      podpowiedź przy numerze, nie osobna linijka: czyta się ją raz. */
   const skadKorekta = zwrot.korektaZrodlo === "subiekt"
     ? "Znaleziona w Subiekcie — dokument koryguje tę sprzedaż."
@@ -291,15 +272,15 @@ export function Decyzje({ zwrot, onWerdykt, onKorekta, onCofnijKorekte, onCofnij
           </div>
         </>
       : zwrot.kubelek === "odrzucony" && zwrot.werdyktPowod
-        /* POWÓD ODMOWY WIDOCZNY (0.210.0). Zapisywał się do bazy i nikt go nie
+        /* POWÓD ODMOWY WIDOCZNY. Zapisywał się do bazy i nikt go nie
            czytał — ani panel, ani nic innego. Operator, który ma napisać
            klientowi, musiał pamiętać własne zdanie sprzed tygodnia albo szukać
            go w dzienniku. Z klawiszem kopiowania, bo to zdanie się przekleja. */
         ? <div className="text-sm">
             <div className="flex flex-wrap items-center gap-2">
               <span className="text-slate-500">Odmówiono</span>
-              {/* Wskazówka „napisz mu w skrzynce" zeszła do podpowiedzi
-                  (0.516.0): operator zna ją po pierwszym razie. */}
+              {/* Wskazówka „napisz mu w skrzynce" stoi w podpowiedzi:
+                  operator zna ją po pierwszym razie. */}
               <b className="mr-auto"
                 title="Powód został u nas. Jeśli klient go jeszcze nie zna, napisz mu w skrzynce.">
                 {zwrot.werdyktPowod}</b>

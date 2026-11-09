@@ -1,11 +1,11 @@
-import React, { useState } from "react";
+import { useState } from "react";
 import { PackagePlus } from "lucide-react";
 import type { DoDopisania } from "../api/typy";
 import { zlote } from "../api/zwroty";
 import { Blad, ile, odmien } from "../ui";
 import { ZdjecieOferty } from "../towar/Zdjecie";
 
-/* ── Produkt, którego klient nie zgłosił (0.184.0) ───────────────────────────
+/* ── Produkt, którego klient nie zgłosił ─────────────────────────────────────
    Klient zgłasza jedną rzecz, a odsyła dwie. Formularz zwrotu wypełnia się na
    ekranie, a paczkę pakuje przy stole — i wtedy dokłada się to, co też nie
    pasowało. Regulamin Allegro tej zgodności nie wymaga: liczy się terminowe
@@ -66,7 +66,7 @@ export function Dopisz({ kandydaci, trwa, blad, onDopisz }: {
           className="flex w-full items-center gap-2 rounded border
             border-slate-200 bg-white px-2 py-1 text-left text-sm hover:bg-sky-50
             disabled:opacity-50">
-          {/* Zdjęcie kandydata (0.217.0). Operator dopisuje to, co NAPRAWDĘ
+          {/* Zdjęcie kandydata. Operator dopisuje to, co NAPRAWDĘ
               przyszło w kartonie — a rozstrzyga to, patrząc na przedmiot,
               nie na nazwę z Allegro. Kafel jest bez powiększenia: cały wiersz
               jest przyciskiem, więc przycisk w przycisku zabierałby kliknięcie
@@ -80,7 +80,7 @@ export function Dopisz({ kandydaci, trwa, blad, onDopisz }: {
           <span className="min-w-0 flex-1">
             <span className="block font-semibold">{k.nazwa}</span>
             <span className="mt-0.5 block text-xs text-slate-600">
-              {/* RESZTA LINII (0.484.7): „brakuje 1 z 2" mówi, że część tej
+              {/* RESZTA LINII: „brakuje 1 z 2" mówi, że część tej
                   linii już wraca — bez tego dopisanie jednej nakrętki wyglądałoby
                   jak drugi zakup tego samego. */}
               {k.zamowiono != null && k.zamowiono > k.ilosc

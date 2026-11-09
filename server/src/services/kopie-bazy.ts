@@ -4,19 +4,15 @@ import { DatabaseSync } from "node:sqlite";
 import { config } from "../config.js";
 import { dataLokalna, godzinaLokalna } from "../czas.js";
 
-/* ── Kopie bazy aplikacji robi sam serwer (0.487.0) ──────────────────────────
-   Do tego wydania kopia była czynnością człowieka w DWÓCH miejscach, a obie
-   stały tylko w dokumentacji:
+/* ── Kopie bazy aplikacji robi sam serwer ────────────────────────────────────
+   Dwie kopie nie mogą zależeć od pamięci człowieka:
 
-   1. „Przed KAŻDĄ aktualizacją zrób kopię wertis.db" (DEPLOY.md §2), bo
-      migracje przy starcie kasują tabele — trzy razy dotąd: 0.140.0, 0.388.0
-      i 0.434.0. `-Aktualizuj` instalatora tej kopii NIE robił.
-   2. Nocna kopia w Harmonogramie zadań (DEPLOY.md §7). Instalator kończył
-      prośbą, żeby ją ustawić. Bramka etapu 4 wdrożenia stoi na niej.
+   1. Przed KAŻDĄ aktualizacją (DEPLOY.md §2), bo migracje przy starcie
+      potrafią kasować tabele, a `-Aktualizuj` instalatora kopii nie robi.
+   2. Nocna (DEPLOY.md §7). Bramka etapu 4 wdrożenia stoi na niej.
 
-   Krok, na którym stoi bramka, nie może zależeć od pamięci. Serwer ma bazę
-   otwartą przez cały czas, więc wie lepiej niż ktokolwiek, kiedy jej kopia
-   jest potrzebna.
+   Serwer ma bazę otwartą przez cały czas, więc wie lepiej niż ktokolwiek,
+   kiedy jej kopia jest potrzebna.
 
    `VACUUM INTO`, nie kopia pliku. Baza chodzi w WAL, a dwa procesy piszą do
    niej naraz: zwykła kopia `wertis.db` bez `-wal` gubi ostatnie zapisy, a z
@@ -143,7 +139,7 @@ function bazaPusta(database: DatabaseSync): boolean {
  * padła, nie przestawia znacznika — następny start robi kopię jeszcze raz.
  *
  * NIE zatrzymuje startu, gdy kopia się nie uda. Odmowa startu w usłudze NSSM
- * to pętla restartów i magazyn bez kolektorów (blizna 0.174.2). Nieudana
+ * to pętla restartów i magazyn bez kolektorów. Nieudana
  * kopia melduje się zdaniem w `/api/health`, a migracja idzie dalej.
  */
 export function kopiaPrzedMigracja(
@@ -271,8 +267,7 @@ export function problemyKopii(
     );
   }
 
-  /* Bez żadnej kopii alarm liczy się od pierwszego zapisu stanu, czyli od
-     startu tego wydania. Świeża instalacja nie jest czerwona pierwszego dnia. */
+  /* Bez żadnej kopii alarm liczy się od pierwszego zapisu stanu. Świeża instalacja nie jest czerwona pierwszego dnia. */
   const odKiedy = stan.noc?.at ?? stan.od;
   if (odKiedy) {
     const godzin = (Date.parse(teraz) - Date.parse(odKiedy)) / 3_600_000;

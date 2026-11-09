@@ -10,12 +10,10 @@ import {
   type TonDosylki,
 } from "./dosylka-opis.js";
 
-/* ── Zwrot pieniędzy i odmowa w Allegro (0.190.0) ────────────────────────────
+/* ── Zwrot pieniędzy i odmowa w Allegro ──────────────────────────────────────
 
-   DO 0.190.0 PANEL KOŃCZYŁ PRACĘ W POŁOWIE. Operator rozstrzygał zwrot,
-   zaznaczał pozycje, dostawał policzoną kwotę — i szedł oddać pieniądze do
-   panelu Allegro, czyli dokładnie tam, gdzie §25 obiecuje nie zaglądać.
-   Panel zapisywał sam FAKT, że to się stało, i wierzył człowiekowi na słowo.
+   Operator oddaje pieniądze z panelu, bo §25 obiecuje nie zaglądać do panelu
+   Allegro.
 
    DWIE KOŃCÓWKI, DWA RÓŻNE KSZTAŁTY. Zwrot pieniędzy to
    `POST /payments/refunds` w wersji `public.v1` i uprawnieniu
@@ -200,9 +198,8 @@ export type StanZwrotuPieniedzy = {
      * Czy ALLEGRO potwierdziło, że pieniądze wyszły.
      *
      * `status` to odpowiedź na nasze polecenie sprzed chwili; to pole mówi,
-     * co Allegro sądzi o zwrocie TERAZ. Do 0.209.0 ekran pokazywał wyłącznie
-     * to pierwsze i przez to nie umiał odróżnić przelewu udanego od
-     * przyjętego-i-odrzuconego.
+     * co Allegro sądzi o zwrocie TERAZ. Bez niego nie da się odróżnić przelewu
+     * udanego od przyjętego-i-odrzuconego.
      */
     potwierdzone: boolean;
   } | null;
@@ -214,7 +211,7 @@ export type StanZwrotuPieniedzy = {
    */
   platnosci: ZwrotPlatnosci[];
   /**
-   * Dosyłka tego zwrotu (0.536.1), gdy NASZA odmowa albo kod z Allegro to
+   * Dosyłka tego zwrotu, gdy NASZA odmowa albo kod z Allegro to
    * kod dosyłki. Poza `odmowa`, bo odmowa złożona w panelu Allegro przychodzi
    * tylko kodem synchronizacji — a ekran ma pokazać dosyłkę i przy niej.
    */
@@ -222,7 +219,7 @@ export type StanZwrotuPieniedzy = {
   /** Kod dosyłki, zamówienie i login znane, a dosyłki nikt nie śledzi — ekran proponuje „Śledź dosyłkę”. */
   sledzicDosylke: boolean;
   /**
-   * Ślad po przelewie oddanym POZA Allegro (0.269.0) — przy pobraniu jedyny,
+   * Ślad po przelewie oddanym POZA Allegro — przy pobraniu jedyny,
    * jaki może istnieć. To notatka biura o ruchu pieniędzy, nie sam ruch:
    * dlatego wolno ją cofnąć, inaczej niż zwrot przez Allegro.
    */
@@ -233,7 +230,7 @@ export type StanZwrotuPieniedzy = {
 };
 
 /**
- * Czy wolno zapisać ślad po przelewie oddanym poza Allegro (0.269.0).
+ * Czy wolno zapisać ślad po przelewie oddanym poza Allegro.
  *
  * Osobna bramka od `moznaZwrocic`, bo to DRUGA DROGA, nie wariant pierwszej.
  * Przy pobraniu Allegro nie trzymało tych pieniędzy i pierwsza droga jest
@@ -260,7 +257,7 @@ function bramkaPrzelewu(w: Wiersz): { moznaZapisacPrzelew: boolean; powodPrzelew
 }
 
 /**
- * Dosyłka pod odmową wypłaty (0.536.1) według JEDNEJ reguły
+ * Dosyłka pod odmową wypłaty według JEDNEJ reguły
  * (`DOSYLKA_ZWROTU_SQL`) — tej samej, którą „Śledź dosyłkę” sprawdza, czy
  * jest co zakładać. Surowy SQL i zdanie z `dosylka-opis.ts`, nie import
  * `dosylka.ts`: tamten plik importuje sprawę klienta, a ten czyta
@@ -294,17 +291,15 @@ export function stanZwrotuPieniedzy(
 ): StanZwrotuPieniedzy {
   const w = wczytaj(database, zwrotId);
   /* Nasza odmowa albo kod zsynchronizowany z Allegro. Biuro odmawia w panelu
-     Allegro (fakt właściciela z 27 września 2026, nagłówek `dosylka.ts`),
+     Allegro (fakt właściciela, nagłówek `dosylka.ts`),
      ale nasz ekran też umie odmówić, więc liczą się obie drogi. */
   const kodDosylki = jestKodemDosylki(w.odmowa_kod) || jestKodemDosylki(w.rejection_code);
   const dosylka = kodDosylki ? dosylkaZwrotu(database, w, teraz) : null;
   const podstawa = {
     kwotaGrosze: w.kwota_grosze == null ? null : Number(w.kwota_grosze),
     waluta: w.waluta ?? "PLN",
-    /* Kolumny CZYTANE, nie zerowane. Do 0.209.0 stały tu trzy `null`-e mimo
-       wypełnionych kolumn — ekran nie mówił ani kiedy przelew poszedł, ani co
-       Allegro na niego odpowiedziało. Zapisane i nieodczytane pole jest
-       gorsze od nieistniejącego: wygląda jak wiedza, której nie ma. */
+    /* Zapisane i nieodczytane pole jest gorsze od nieistniejącego: wygląda
+       jak wiedza, której nie ma. */
     oddane: w.zwrot_pieniedzy_id || w.zwrot_pieniedzy_command_id
       ? {
         id: w.zwrot_pieniedzy_id,
@@ -329,7 +324,7 @@ export function stanZwrotuPieniedzy(
     ({ ...podstawa, moznaZwrocic: false, moznaOdmowic: false, powod });
 
   if (w.zwrot_pieniedzy_id) return nie("Pieniądze już oddano przez panel.");
-  /* ODMOWA Z PANELU ALLEGRO TO TEN SAM FAKT CO NASZA (0.536.1). `rejection_code`
+  /* ODMOWA Z PANELU ALLEGRO TO TEN SAM FAKT CO NASZA. `rejection_code`
      to `CustomerReturn.rejection.code` — w schemacie „Refund rejection code”,
      ten sam słownik co nasze `POST …/rejection`. Drugiej odmowy Allegro nie
      przyjmie, a wypłata po odmowie przeczyłaby jej; kolejka zwrotów
@@ -337,19 +332,16 @@ export function stanZwrotuPieniedzy(
      o przelewie poza Allegro (`bramkaPrzelewu`) ten kod nie zamyka: to zapis
      tego, co już się stało, a zamknięta ukryłaby przelew, nie zatrzymała go. */
   if (w.odmowa_kod || w.rejection_code) return nie("Odmowa zwrotu pieniędzy jest już zgłoszona w Allegro.");
-  /* KOREKTA ZAMYKA ZWROT, ALE NIE DROGĘ DO PIENIĘDZY (audyt, 15 września 2026).
-     Do tego wydania zamknięty zwrot odmawiał przelewu, a biuro wystawia korektę
-     zwykle PRZED oddaniem pieniędzy. Na nagraniu z pracy przycisk znikał, więc
-     przelew szedł w Sales Center. Drogę zamyka dopiero Allegro, gdy potwierdzi,
-     że pieniądze wyszły — bramka przelewu nie patrzy na zamknięcie od 0.269.0
-     z tego samego powodu. */
+  /* KOREKTA ZAMYKA ZWROT, ALE NIE DROGĘ DO PIENIĘDZY: biuro wystawia korektę
+     zwykle PRZED oddaniem pieniędzy. Drogę zamyka dopiero Allegro, gdy
+     potwierdzi, że pieniądze wyszły — bramka przelewu tak samo. */
   if (w.rozliczony_allegro_at || STATUSY_ODDANE.has(String(w.status_allegro ?? ""))) {
     return nie("Allegro już oddało pieniądze za ten zwrot.");
   }
 
   /* Odmówić wolno ZANIM zapadnie werdykt o kwocie — to jest osobna droga,
      nie wariant zwrotu. Oddać pieniądze wolno dopiero po przyjęciu. */
-  /* Paczce nieodebranej odmówić się nie da (0.493.0): odmowa idzie do
+  /* Paczce nieodebranej odmówić się nie da: odmowa idzie do
      zwrotu klienta w Allegro, a tu klient niczego nie zgłosił. Żądanie
      skończyłoby się 404 z identyfikatorem, którego Allegro nie zna. */
   const moznaOdmowic = !String(w.external_id).startsWith("nieodebrana:");
@@ -367,7 +359,7 @@ export function stanZwrotuPieniedzy(
   }
   if (!w.platnosc_id) {
     return { ...podstawa, moznaZwrocic: false, moznaOdmowic,
-      /* „Dociągnij" TYLKO, gdy zamówienia nie ma (0.484.7). Dociąganie pobiera
+      /* „Dociągnij" TYLKO, gdy zamówienia nie ma. Dociąganie pobiera
          zamówienia BRAKUJĄCE; wiersz bez płatności stoi i przycisk nic by nie
          zmienił. Wtedy działa już tylko panel Allegro. */
       powod: w.zamowienie_wiersz == null
@@ -393,7 +385,7 @@ export function stanZwrotuPieniedzy(
     return { ...podstawa, moznaZwrocic: false, moznaOdmowic,
       powod: `Nie wiem, której pozycji zamówienia dotyczy: ${bezPozycji.join(", ")}. `
         /* Zamówienie tu STOI (jest płatność), więc „dociągnij" nic by nie
-           zmieniło (0.484.7) — zostaje droga, która działa. */
+           zmieniło — zostaje droga, która działa. */
         + "Oddaj pieniądze w panelu Allegro." };
   }
   /* Kwota jest migawką z chwili zaznaczenia (`kwotaRozjechana` w `zwroty.ts`).
@@ -433,7 +425,7 @@ export type NadawcaOdmowy = (
 const LIMIT_KOMENTARZA = 250;
 
 /**
- * Powody potrąceń jednym zdaniem dla klienta, `null` bez potrąceń (0.476.0).
+ * Powody potrąceń jednym zdaniem dla klienta, `null` bez potrąceń.
  *
  * Nazwa pozycji przy powodzie, bo zwrot bywa wielopozycyjny, a klient ma
  * wiedzieć, której rzeczy dotyczy mniejsza kwota. Za długie urywamy znakiem
@@ -496,11 +488,9 @@ export async function zwrocPieniadze(
   if (dostawa > 0) {
     ciało.delivery = { value: { amount: naZlote(dostawa), currency: waluta } };
   }
-  /* POWÓD POTRĄCENIA IDZIE DO KLIENTA (0.476.0). Formularz potrącenia mówi
-     „to jego treść zobaczy klient", a do tego wydania nie docierała nigdzie:
-     żądanie niosło sam kod `REFUND`. Schemat `InitializeRefund` ma na to
-     opcjonalne `sellerComment` (`maxLength: 250`) — przegląd zwrotów
-     z 23 września. Bez potrącenia pola nie wysyłamy wcale, jak `delivery`. */
+  /* POWÓD POTRĄCENIA IDZIE DO KLIENTA. Formularz potrącenia mówi
+     „to jego treść zobaczy klient". Schemat `InitializeRefund` ma na to
+     opcjonalne `sellerComment` (`maxLength: 250`). Bez potrącenia pola nie wysyłamy wcale, jak `delivery`. */
   const komentarz = komentarzPotracen(database, zwrotId);
   if (komentarz) ciało.sellerComment = komentarz;
 
@@ -540,7 +530,7 @@ export async function zwrocPieniadze(
  *
  * NAZWA MÓWI O PIENIĄDZACH, nie o zwrocie. Kupujący dalej ma otwarty zwrot;
  * my odmawiamy wypłaty i podajemy kod. Nasz werdykt `odrzucony` jest czym
- * innym — to decyzja biura, która do tej pory nigdzie nie wychodziła.
+ * innym — to decyzja biura, która nigdzie nie wychodzi.
  */
 export async function odmowZwrotuPieniedzy(
   database: Db, zwrotId: number, kod: string, powod: string | null, wersja: number,
@@ -599,12 +589,11 @@ export async function odmowZwrotuPieniedzy(
   return { kod, wersja: wersja + 1 };
 }
 
-/* ── Przelew oddany poza Allegro (0.269.0) ───────────────────────────────────
+/* ── Przelew oddany poza Allegro ─────────────────────────────────────────────
    Przy pobraniu klient nigdy nie zapłacił Allegro, więc Allegro nie ma czego
-   oddawać: pieniądze wracają przelewem z banku firmy. Panel mówił o tym
-   zdaniem od 0.190.0 i na tym kończył — zwrot zamykał się bez ŚLADU po
-   wypłacie, a jedynym dowodem był wyciąg bankowy poza aplikacją. Przy sporze
-   z klientem odpowiedź „oddaliśmy" nie miała się o co oprzeć.
+   oddawać: pieniądze wracają przelewem z banku firmy. Bez śladu w aplikacji
+   jedynym dowodem byłby wyciąg bankowy, a przy sporze z klientem odpowiedź
+   „oddaliśmy" nie miałaby się o co oprzeć.
 
    TO NOTATKA O RUCHU PIENIĘDZY, NIE SAM RUCH. Aplikacja niczego tu nie
    wysyła; zapisuje, co zrobił człowiek w banku. Dlatego wolno ją cofnąć —

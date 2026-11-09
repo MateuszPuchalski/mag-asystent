@@ -97,10 +97,10 @@ export interface AudytLokalizacji {
 }
 
 /**
- * Zadanie nadania kodu kreskowego (0.37.0) wraz z wpisem do audytu.
+ * Zadanie nadania kodu kreskowego wraz z wpisem do audytu.
  *
- * DRUGIE pole, które aplikacja zapisuje do bazy firmy — do 0.37.0 była nim
- * wyłącznie lokalizacja. Rozszerzenie granicy zapisu jest świadome i kosztuje
+ * DRUGIE pole, które aplikacja zapisuje do bazy firmy, obok lokalizacji.
+ * Rozszerzenie granicy zapisu jest świadome i kosztuje
  * nowe uprawnienie kolumnowe (`GRANT UPDATE ON dbo.tw__Towar
  * (tw_PodstKodKresk)`); bez niego zadanie ląduje w błędzie, a kod i tak działa
  * na kolektorze przez `ean_alias`.
@@ -146,7 +146,7 @@ export interface AudytZdjecia {
 }
 
 /**
- * Zadanie dopisania zdjęcia do kartoteki (0.88.0) wraz z wpisem do audytu.
+ * Zadanie dopisania zdjęcia do kartoteki wraz z wpisem do audytu.
  *
  * TRZECIA rzecz, którą aplikacja zapisuje do bazy firmy, i pierwsza dopisywana
  * WIERSZEM. Kosztuje nowe uprawnienie (`GRANT INSERT` na tabelę zdjęć); bez
@@ -273,7 +273,7 @@ export function enqueueMM(
 }
 
 /**
- * Zadanie ZW do paragonu (0.349.0) — wykonuje worker Sfery.
+ * Zadanie ZW do paragonu — wykonuje worker Sfery.
  *
  * Bez `twId` i bez `sourceDocId`, ŚWIADOMIE. ZW oddaje towar na magazyn
  * główny, więc przez guard „adres przed sprzedawalnością" przechodzi furtką

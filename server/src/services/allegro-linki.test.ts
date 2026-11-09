@@ -42,7 +42,7 @@ test("wzorzec z konfiguracji rządzi w całości, razem z hostem", () => {
   );
 });
 
-/* ── Zakres dat w adresie Centrum Sprzedaży (0.207.0) ───────────────────────
+/* ── Zakres dat w adresie Centrum Sprzedaży ─────────────────────────────────
    Lista zwrotów filtruje po zakresie, więc numer w `search` sam nie wystarcza:
    zwrot spoza okna nie pokaże się mimo trafionego numeru.                   */
 
@@ -70,11 +70,10 @@ test("wzorzec bez znacznika daty działa dalej — sandboks go nie ma", () => {
     "https://allegro.pl/moje-allegro/sprzedaz/zwroty/abc");
 });
 
-/* ── Adres sprawy reklamacyjnej (0.226.1) ───────────────────────────────────
-   Wzorzec z 0.222.0 był zgadnięty z analogii do zwrotu i mylił się w OBU
-   członach: sprawa ma własną stronę `/claims/{uuid}`, nie wiersz na liście
+/* ── Adres sprawy reklamacyjnej ─────────────────────────────────────────────
+   Sprawa ma własną stronę `/claims/{uuid}`, nie wiersz na liście
    z wyszukiwaniem, a adresuje się identyfikatorem zasobu, nie numerem
-   czytelnym. Kliknięcie właściciela dawało 404.
+   czytelnym.
 
    Testy porównują PEŁNY łańcuch, nie wzorzec — dowodzą, że budujemy dokładnie
    ten adres, który u właściciela się otworzył.                              */

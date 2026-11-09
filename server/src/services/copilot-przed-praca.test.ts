@@ -9,7 +9,7 @@ process.env.SGT_MODE = "seeded";
 process.env.LOG_LEVEL = "silent";
 process.env.STREFA_CZASU = "Europe/Warsaw";
 
-/* ── Szkice przed pracą (26 września 2026) ───────────────────────────────────
+/* ── Szkice przed pracą ──────────────────────────────────────────────────────
    Przebieg WYDAJE PIENIĄDZE BEZ KLIKNIĘCIA, więc testy pilnują jego hamulców:
    przełącznika, okna, własnego limitu z księgi — i tego, że nie zjada sufitu
    pierwszej godziny biura. Oba nadawcy są atrapami, zegar jest udawany. */
@@ -176,7 +176,7 @@ test("własny limit poranka liczy się z księgi, razem z błędami; wczorajszy 
 });
 
 test("poranek nie zjada sufitu godzinowego pierwszej godziny biura", async () => {
-  /* Wybór z 26 września 2026: poranek pisze do księgi pod własnymi zadaniami,
+  /* Poranek pisze do księgi pod własnymi zadaniami,
      więc sufit dnia (`klasyfikacja`, `szkic`) widzi zero, choć poranek płacił. */
   rozmowa("2026-09-27T10:00:00Z");
   rozmowa("2026-09-27T11:00:00Z");

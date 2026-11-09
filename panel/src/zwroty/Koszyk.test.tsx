@@ -1,4 +1,3 @@
-import React from "react";
 import { describe, expect, it, vi, beforeEach } from "vitest";
 import { fireEvent, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
@@ -6,7 +5,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Koszyk, NowyKoszyk } from "./Koszyk";
 import type { KoszZwrotow } from "../api/typy";
 
-/* ── Pasek koszyka zwrotów (0.192.0) ────────────────────────────────────────
+/* ── Pasek koszyka zwrotów ──────────────────────────────────────────────────
    Obieg właściciela: pusta MM przy zasiadaniu do zwrotów, dokładanie pozycja
    po pozycji, domknięcie gdy kosz się zapełni.
 
@@ -49,7 +48,7 @@ const KOSZ = (n: Partial<KoszZwrotow> = {}): KoszZwrotow => ({
   rodzaj: "zwroty",
   id: 3, kod: "Z-7", pozycji: 2, sztuk: 5, otwartyOd: "2026-09-03T08:00:00Z",
   pozycje: [{ id: 91, symbol: "SEK-01", nazwa: "Sekator", ilosc: 2, zeZwrotu: true },
-    /* Wiersz dołożony ręką (0.365.0) — ma własną drogę wyjścia. */
+    /* Wiersz dołożony ręką — ma własną drogę wyjścia. */
     { id: 92, symbol: "LOP-02", nazwa: "Łopata", ilosc: 3, zeZwrotu: false }],
   ...n,
 });
@@ -67,8 +66,7 @@ describe("Koszyk zwrotów", () => {
   });
 
   it("bez koszyka pasek proponuje ZAŁOŻENIE pudła i nic poza tym", () => {
-    /* Punkt 2 dekalogu, zastosowany po zmianie z 0.378.0, a nie złamany.
-       Reguła mówi: pokazuj to, co potrzebne TERAZ. Licznik zerowy nie jest
+    /* Punkt 2 dekalogu. Reguła mówi: pokazuj to, co potrzebne TERAZ. Licznik zerowy nie jest
        potrzebny nigdy, ale wejście do pracy — owszem: zgłoszenie właściciela
        brzmiało „potrzebuję tworzenia koszy zwrotowych jako oddzielna opcja".
 
@@ -89,16 +87,15 @@ describe("Koszyk zwrotów", () => {
     expect(screen.getByText("pusty")).toBeInTheDocument();
     /* ZAMKNĄĆ GO NIE MA JAK: dokument bez linii nie jest dokumentem, więc
        serwer i tak odmówi. Zamiast przycisku, który zawsze odmawia, stoi
-       droga wyjścia — i od 0.380.0 schodzi nią także pudło NAPEŁNIONE.
+       droga wyjścia — i schodzi nią także pudło NAPEŁNIONE.
        Pusty nie pyta o nic: nie niesie niczyjej pracy. */
     expect(screen.queryByRole("button", { name: /Zamknij koszyk/ })).toBeNull();
     expect(screen.getByRole("button", { name: /Usuń pusty koszyk/ })).toBeInTheDocument();
   });
 
   it("przycisk zakładania stoi TAKŻE przy otwartym pudle", () => {
-    /* ODWRÓCENIE decyzji z 3 września („jeden koszyk na operatora"), zgłoszone
-       przez właściciela w 0.379.0: przy biurku stoi czasem kilka kartonów,
-       a zamykanie pierwszego po to, żeby zacząć drugi, wystawia dokument na
+    /* Kilka koszyków na operatora, decyzją właściciela: przy biurku stoi
+       czasem kilka kartonów, a zamykanie pierwszego po to, żeby zacząć drugi, wystawia dokument na
        pudło, które jeszcze nie odjechało.
 
        Zdanie obok przycisku zmienia się razem ze stanem: mówi, że przy kilku
@@ -106,7 +103,7 @@ describe("Koszyk zwrotów", () => {
     odpowiedz.kosze = [KOSZ()];
     pokaz();
     expect(screen.getByRole("button", { name: /Nowy koszyk zwrotów/ })).toBeInTheDocument();
-    /* Od 0.453.0 zdanie stoi w podpowiedzi przycisku, nie obok niego. */
+    /* Zdanie stoi w podpowiedzi przycisku, nie obok niego. */
     expect(screen.getByTitle(/ocena pyta, do którego/)).toBeInTheDocument();
   });
 
@@ -116,7 +113,7 @@ describe("Koszyk zwrotów", () => {
     expect(screen.getByText(/Z-7/)).toBeInTheDocument();
     expect(screen.getByText(/2 poz · 5 szt/)).toBeInTheDocument();
     /* SYMBOLE, nie nazwy: przy koszu liczy się to, co stoi na opakowaniu
-       i na dokumencie MM. Od 0.453.0 każdy jest znacznikiem, a nazwa czeka
+       i na dokumencie MM. Każdy jest znacznikiem, a nazwa czeka
        w podpowiedzi. */
     const zawartosc = screen.getByRole("list", { name: "Zawartość koszyka" });
     expect(within(zawartosc).getByText("SEK-01")).toBeInTheDocument();
@@ -124,19 +121,16 @@ describe("Koszyk zwrotów", () => {
   });
 
   it("dokładanie towaru stoi TAKŻE przy pudle, nie tylko przy zwrocie", () => {
-    /* ODWRÓCENIE GRANICY z 0.365.0 („tylko z poziomu obsługi zwrotów"),
-       zgłoszone przez właściciela w 0.378.0: „dodawanie produktów do nich jako
-       oddzielna opcja".
-
-       Tamto miejsce ZOSTAJE i to nie jest dublowanie wejścia. Przy otwartym
+    /* Zgłoszenie właściciela: „dodawanie produktów do nich jako oddzielna
+       opcja". Wejście przy zwrocie też jest i to nie jest dublowanie. Przy otwartym
        zwrocie operator stoi nad kartonem konkretnej paczki — ekran idzie za
        czynnością fizyczną. Tutaj chodzi o drugą czynność: zbieranie towaru do
        pudła, które stoi przy biurku niezależnie od tego, co jest na ekranie.
 
-       Ocena „na stan" dalej dokłada sama i nikt jej nie zastępuje przyciskiem. */
+       Ocena „na stan" dokłada sama i nikt jej nie zastępuje przyciskiem. */
     odpowiedz.kosze = [KOSZ()];
     pokaz();
-    /* Od 0.453.0 pole stoi otwarte na stałe — przy pudle to jedyna czynność,
+    /* Pole stoi otwarte na stałe — przy pudle to jedyna czynność,
        a przycisk „otwórz pole" byłby kliknięciem przed każdą serią skanów. */
     expect(screen.getByRole("textbox", { name: "Towar do koszyka" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /Zamknij koszyk Z-7/ })).toBeInTheDocument();
@@ -147,7 +141,7 @@ describe("Koszyk zwrotów", () => {
        przy korekcie: ekran nazywa skutek, zamiast go zaskakiwać. */
     odpowiedz.kosze = [KOSZ()];
     pokaz();
-    /* Od 0.453.0 mówi to droga koszyka: przystanek MM niesie zdanie
+    /* Mówi to droga koszyka: przystanek MM niesie zdanie
        w podpowiedzi, a regał — że na hali rozkłada się kosz z numerem MM. */
     const droga = screen.getByRole("list", { name: "Droga koszyka" });
     expect(within(droga).getByTitle(/MM z magazynu głównego na regał zwrotów/)).toBeInTheDocument();
@@ -168,7 +162,7 @@ describe("Koszyk zwrotów", () => {
     pokaz();
     expect(screen.getByText(/Z-6/)).toBeInTheDocument();
     expect(screen.getByText(/ZW-7/)).toBeInTheDocument();
-    /* „Dlaczego" stoi pod ikoną informacji od 0.453.0 — treść bez zmian. */
+    /* „Dlaczego" stoi pod ikoną informacji. */
     expect(screen.getByRole("note", { name: "Dlaczego czeka" }))
       .toHaveAttribute("title", expect.stringMatching(/po korekcie/));
     expect(screen.getByText("Korekty · brak 1").closest("[aria-current]"))
@@ -248,9 +242,8 @@ describe("Koszyk zwrotów", () => {
 
   it("kosz z ODRZUCONĄ MM mówi, co odrzuciła Sfera, i daje krzyżyk przy pomyłce", async () => {
     /* Koszyk Z-8: skanem wszedł do niego KOSZT PRZESYŁKI — kartoteka bez stanu,
-       więc Sfera odrzuciła dokument zdaniem „Brak towaru w magazynie". Do
-       0.370.0 taki kosz nie pokazywał się w panelu w ogóle i nie było jak go
-       poprawić; zgłoszenie właściciela: „pozwól mi edytować koszyki zwrotowe,
+       więc Sfera odrzuciła dokument zdaniem „Brak towaru w magazynie".
+       Zgłoszenie właściciela: „pozwól mi edytować koszyki zwrotowe,
        z których nie zostały jeszcze utworzone MM". */
     odpowiedz.czekajace = [{
       id: 8, kod: "Z-8", rodzaj: "zwroty", zamknietoAt: "2026-09-15T09:00:00Z",
@@ -258,8 +251,8 @@ describe("Koszyk zwrotów", () => {
       pozycje: [
         { pozycjaId: 77, symbol: "KOSZT-PRZESYLKI", nazwa: "Koszt przesyłki", ilosc: 1,
           zeZwrotu: false },
-        /* Wiersz przyniesiony OCENĄ (0.379.0). Do tego wydania nie miał tu
-           krzyżyka i to przez niego Z-8 nie dawał się odetkać z tego ekranu. */
+        /* Wiersz przyniesiony OCENĄ też ma krzyżyk, żeby kosz dało się
+           odetkać z tego ekranu. */
         { pozycjaId: 78, symbol: "SEK-01", nazwa: "Sekator", ilosc: 1, zeZwrotu: true },
       ],
     }];
@@ -295,7 +288,7 @@ describe("Koszyk zwrotów", () => {
   });
 
   it("usunięcie NAPEŁNIONEGO pudła pyta i mówi, co zniknie", async () => {
-    /* Zgłoszenie właściciela (0.380.0): „zrób, żeby można było usunąć cały
+    /* Zgłoszenie właściciela: „zrób, żeby można było usunąć cały
        koszyk zwrotowy". Pytamy tylko przy zawartości — pudło puste nie niesie
        niczyjej pracy, więc pytanie byłoby bez treści.
 
@@ -329,7 +322,7 @@ describe("Koszyk zwrotów", () => {
   });
 
   it("odmowa Sfery WSKAZUJE wiersz, którego na magazynie brakuje", async () => {
-    /* Produkcja, 17 września: „dostaję brak towaru w magazynie, ale nie mówi
+    /* Zgłoszenie właściciela: „dostaję brak towaru w magazynie, ale nie mówi
        jakiego, abym mógł go usunąć z koszyka". Sfera nie nazywa wiersza —
        nazywamy go za nią, stanem z read-modelu. */
     odpowiedz.czekajace = [{

@@ -4,11 +4,10 @@ import { useZdjecie, useZdjecieOferty } from "./useZdjecie";
 import type { StanZdjeciaOferty } from "../api/typy";
 
 /* Kafel zdjęcia o STAŁYM rozmiarze — także wtedy, gdy zdjęcia nie ma i gdy
-   jeszcze się ładuje. To jest lekcja z `biuro.html`: kafel, który rośnie po
-   doładowaniu, przesuwa wiersze pod kursorem i operator klika nie w ten
-   zwrot, w który celował.
+   jeszcze się ładuje. Kafel, który rośnie po doładowaniu, przesuwa wiersze
+   pod kursorem i operator klika nie w ten zwrot, w który celował.
 
-   ── DWA BRAKI, DWA ZNAKI (0.203.0) ────────────────────────────────────────
+   ── DWA BRAKI, DWA ZNAKI ──────────────────────────────────────────────────
    Kafel odpowiada na dwa różne pytania i myli je, dopóki wygląda tak samo.
    „Bez kartoteki" znaczy: nie wiadomo, o który towar chodzi — i to jest
    praca dla agenta. „Bez zdjęcia" znaczy: towar znany, obrazu w Subiekcie
@@ -16,19 +15,18 @@ import type { StanZdjeciaOferty } from "../api/typy";
    ten sam znak, którym `TowarRozmowy.tsx` opisuje brak kartoteki w zdaniu
    obok; drugi nosi `ImageOff`.
 
-   Słowo „bez zdjęcia" zostaje na kaflach od 44 px w górę — czyli wszędzie,
-   gdzie stało do 0.202.0, bo w dwóch wierszach dziewięciopunktowego pisma
-   jeszcze się mieści. Próg jest dla kafli MNIEJSZYCH, jak 36 px w koszach
-   i 32 px na osi rozmowy: tam słowo by się rozjechało. */
+   Słowo „bez zdjęcia" zostaje na kaflach od 44 px w górę, bo w dwóch
+   wierszach dziewięciopunktowego pisma jeszcze się mieści. Próg jest dla
+   kafli MNIEJSZYCH, jak 36 px w koszach i 32 px na osi rozmowy: tam słowo by
+   się rozjechało. */
 
 /**
- * Sama PŁYTKA — pudełko o stałym rozmiarze z trzema stanami (0.213.0).
+ * Sama PŁYTKA — pudełko o stałym rozmiarze z trzema stanami.
  *
- * Wydzielona, bo od tego wydania obrazy mają dwa źródła: kartotekę Subiekta
- * i ofertę Allegro. Wygląd, rozmiary i próg słowa „bez zdjęcia" mają zostać
- * WSPÓLNE — dwa kafle różniące się o dwa piksele czytałyby się jak dwa różne
- * rodzaje rzeczy. Różnią się wyłącznie zdania o braku, bo brak znaczy tam
- * co innego.
+ * Wspólna dla kartoteki Subiekta i oferty Allegro. Wygląd, rozmiary i próg
+ * słowa „bez zdjęcia" mają zostać WSPÓLNE — dwa kafle różniące się o dwa
+ * piksele czytałyby się jak dwa różne rodzaje rzeczy. Różnią się wyłącznie
+ * zdania o braku, bo brak znaczy tam co innego.
  */
 function Plytka({ url, rozmiar, nazwa, tytul, brakTytul, brakSlowo, brakIkona, pusteTytul, pusteIkona, puste, onKlik }: {
   url: string | null | undefined;
@@ -94,7 +92,7 @@ export function Zdjecie({ twId, rozmiar = 48, nazwa, onKlik }: {
 }
 
 /**
- * Zdjęcie listingowe oferty Allegro (0.213.0).
+ * Zdjęcie listingowe oferty Allegro.
  *
  * Trzy stany mówią co innego i to jest cały powód, dla którego nie da się tu
  * użyć `Zdjecie` z innym adresem:
@@ -109,12 +107,11 @@ export function Zdjecie({ twId, rozmiar = 48, nazwa, onKlik }: {
 export function ZdjecieOferty({ externalId, stan = "jest", rozmiar = 48, nazwa, onKlik }: {
   externalId: string | null;
   /**
-   * Co WIADOMO o zdjęciu, zanim pójdziemy po plik (0.214.0).
+   * Co WIADOMO o zdjęciu, zanim pójdziemy po plik.
    *
-   * Bez tego kafel miał jeden napis „bez zdjęcia" na trzy różne prawdy
-   * i mylił najgorszą z możliwych: „jeszcze nie pytaliśmy Allegro" wyglądało
-   * jak „Allegro nie ma obrazu". Właściciel przysłał zrzut zwrotu z dwoma
-   * pustymi kaflami przy ofercie, która na Allegro zdjęcie miała.
+   * Bez tego kafel miałby jeden napis „bez zdjęcia" na trzy różne prawdy
+   * i mylił najgorszą z możliwych: „jeszcze nie pytaliśmy Allegro" wyglądałoby
+   * jak „Allegro nie ma obrazu".
    */
   stan?: StanZdjeciaOferty;
   rozmiar?: number;

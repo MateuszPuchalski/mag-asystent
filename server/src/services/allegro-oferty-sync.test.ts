@@ -159,7 +159,7 @@ test("oferta, której Allegro nie oddało, wraca do kolejki i nie psuje reszty",
 });
 
 
-/* ── Zdjęcie listingowe (0.213.0) ────────────────────────────────────────────
+/* ── Zdjęcie listingowe ──────────────────────────────────────────────────────
    `primaryImage.url` jedzie w TEJ SAMEJ odpowiedzi, po którą i tak idziemy
    po tytuł. Testy pilnują, że adres wchodzi do snapshotu, że pusty schodzi
    na NULL i że numery ofert biorą się także z pozycji ZAMÓWIENIA — bez tego
@@ -196,7 +196,7 @@ test("adres zdjęcia wchodzi do snapshotu, a pusty zapisuje się jako „pytali�
     .map((w) => ({ external_id: w.external_id, primary_image_url: w.primary_image_url }));
   assert.deepEqual(wiersze, [
     { external_id: "111", primary_image_url: "https://a.allegroimg.com/original/aa/bb" },
-    /* `""`, nie `NULL` (0.214.0). Cache po pusty adres do sieci nie idzie, a ta
+    /* `""`, nie `NULL`. Cache po pusty adres do sieci nie idzie, a ta
        wartość niesie fakt, którego `NULL` nie niósł: PYTALIŚMY już Allegro
        o tę ofertę. `NULL` znaczy dalej „nikt nie pytał" i wraca do kolejki. */
     { external_id: "222", primary_image_url: "" },
@@ -227,17 +227,15 @@ test("ten sam numer w wiadomości i w zamówieniu pobiera się RAZ", () => {
 });
 
 
-/* ── Niekompletny snapshot to nie snapshot świeży (0.214.0) ──────────────────
-   Zgłoszenie właściciela: przy zwrocie stały dwa kafle „BEZ ZDJĘCIA", a oferta
-   na Allegro zdjęcie miała. Przyczyna: wiersz `offer_snapshot` był świeższy
-   niż doba, więc warunek świeżości go przepuszczał — mimo że powstał PRZED
-   kolumną z adresem i adresu nie miał. Zdjęcie czekało na zestarzenie się
-   snapshotu, czyli do doby.                                                 */
+/* ── Niekompletny snapshot to nie snapshot świeży ────────────────────────────
+   Wiersz `offer_snapshot` świeższy niż doba, ale bez kolumny z adresem
+   zdjęcia, musi iść do pobrania. Inaczej zwrot pokazywałby „BEZ ZDJĘCIA"
+   przy ofercie, która na Allegro zdjęcie ma.                                */
 
 test("snapshot bez adresu zdjęcia wraca do pobrania, choć jest świeży", () => {
   const d = stanowisko();
   wiadomosc(d, 1, "111");
-  /* Wiersz sprzed 0.213.0: świeży co do minuty, ale kolumny obrazu nie zna. */
+  /* Wiersz świeży co do minuty, ale kolumny obrazu nie zna. */
   d.prepare(`INSERT INTO offer_snapshot
     (channel_account_id,external_id,nazwa,primary_image_url,synced_at)
     VALUES (1,'111','Nóż',NULL,?)`).run(new Date().toISOString());

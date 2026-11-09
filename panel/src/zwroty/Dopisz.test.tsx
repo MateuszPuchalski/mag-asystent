@@ -1,11 +1,10 @@
-import React from "react";
 import { describe, expect, it, vi } from "vitest";
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { Dopisz } from "./Dopisz";
 import type { DoDopisania } from "../api/typy";
 
-/* ── Produkt, którego klient nie zgłosił (0.184.0) ───────────────────────────
+/* ── Produkt, którego klient nie zgłosił ─────────────────────────────────────
    Te testy pilnują trzech punktów dekalogu ergonomii, które obowiązują panel
    biura: 5 (mniej decyzji), 6 (ograniczenie zamiast komunikatu) i 2 (tylko to,
    co potrzebne teraz).                                                       */

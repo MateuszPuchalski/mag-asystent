@@ -4,7 +4,7 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 
-/* Aktualizacja automatyczna (0.494.0). Każda bramka z nagłówka
+/* Aktualizacja automatyczna. Każda bramka z nagłówka
    `aktualizacja-auto.ts` ma tu własny przypadek, bo każda chroni przed innym
    nieszczęściem: wymagające działania wydanie wgrane bez człowieka, zepsuta
    wersja wgrywana co pięć minut, przerwa w środku rozkładania. */

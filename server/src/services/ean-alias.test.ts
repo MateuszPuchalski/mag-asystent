@@ -4,7 +4,7 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 
-/* ── Nadawanie kodów kreskowych (0.37.0) ─────────────────────────────────────
+/* ── Nadawanie kodów kreskowych ──────────────────────────────────────────────
    Funkcja rozszerza granicę zapisu do bazy firmy z jednego pola na dwa, więc
    test pilnuje przede wszystkim tego, czego NIE wolno:
 
@@ -97,7 +97,6 @@ test("alias niesie stary kod i numer zadania", () => {
 test("ponowne nadanie tego samego kodu podmienia wpis, nie dubluje", () => {
   A.zapiszAlias(KOD, GAZNIK, null, 1, "jan");
   A.zapiszAlias(KOD, LOZYSKO, null, 2, "ewa");
-  assert.equal(A.aliasyTowaru(GAZNIK).length, 0);
   assert.equal(A.aliasKodu(KOD)!.twId, LOZYSKO);
 });
 
@@ -105,12 +104,6 @@ test("zdjęty alias przestaje wskazywać kartotekę", () => {
   A.zapiszAlias(KOD, GAZNIK, null, 1, "jan");
   A.zdejmijAlias(KOD);
   assert.equal(A.aliasKodu(KOD), undefined);
-});
-
-test("kartoteka pokazuje kody nadane u nas", () => {
-  A.zapiszAlias(KOD, GAZNIK, null, 1, "jan");
-  A.zapiszAlias("5901234123464", GAZNIK, null, 2, "jan");
-  assert.deepEqual(A.aliasyTowaru(GAZNIK).map((a) => a.ean), [KOD, "5901234123464"]);
 });
 
 test("jeden kod nie może wskazywać dwóch kartotek — pilnuje tego baza", () => {

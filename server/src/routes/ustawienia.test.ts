@@ -10,7 +10,7 @@ process.env.DB_PATH = path.join(fs.mkdtempSync(path.join(os.tmpdir(), "wertis-us
 process.env.LOG_LEVEL = "silent";
 process.env.SGT_MODE = "seeded";
 
-/* ── Ustawienia obsługi (0.169.0) ────────────────────────────────────────────
+/* ── Ustawienia obsługi ────────────────────────────────────────────
    Ekran ustawień pokazuje pokrycie sygnatur, czyli mówi o kartotekach
    i zamówieniach. To są dane biura, więc bramka roli stoi także na odczycie —
    ta sama zasada co przy skrzynce i zwrotach.                              */

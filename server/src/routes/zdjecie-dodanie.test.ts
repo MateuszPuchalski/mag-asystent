@@ -5,7 +5,7 @@ import os from "node:os";
 import path from "node:path";
 import type { FastifyInstance } from "fastify";
 
-/* ── Dodanie zdjęcia kartoteki z kolektora (0.88.0) ───────────────────────────
+/* ── Dodanie zdjęcia kartoteki z kolektora ───────────────────────────
    Testy pilnują trzech rzeczy, których złamanie NIE wywala serwera:
 
      1. ZAPIS DZIAŁA BEZ SUBIEKTA. Zdjęcie ma być widoczne na karcie natychmiast,

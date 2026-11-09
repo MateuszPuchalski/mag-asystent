@@ -5,11 +5,9 @@ import { DatabaseSync } from "node:sqlite";
 import { migrate, type Db } from "../db/db.js";
 import { powiazZaleglosci } from "./wiazania.js";
 
-/* ── Parasol nad wiązaniem (0.220.0) ─────────────────────────────────────────
+/* ── Parasol nad wiązaniem ───────────────────────────────────────────────────
    Ten plik pilnuje jednej rzeczy: żeby praca, która nie potrzebuje Allegro,
-   nie ginęła razem z żądaniem, które się nie udało. Blizna była widoczna
-   z ekranu jako „Bez kartoteki" przy KAŻDEJ pozycji, z gotową propozycją
-   tuż obok.                                                                */
+   nie ginęła razem z żądaniem, które się nie udało.                        */
 
 const schema = fs.readFileSync(new URL("../db/schema.sql", import.meta.url), "utf8");
 
@@ -61,9 +59,8 @@ test("wywrócony krok NIE zabiera pozostałych", () => {
 });
 
 test("takt woła wiązanie w `finally`, a nie po `await`", () => {
-  /* Strażnik blizny, nie ozdoba. Do 0.220.0 wiązanie stało jako ciąg dalszy
-     po `await synchronizujAllegroZwroty()` i przy każdym błędzie Allegro nie
-     wykonywało się ANI RAZU. Test czyta źródło, bo `main()` nie da się
+  /* Wiązanie po `await synchronizujAllegroZwroty()` nie wykonałoby się przy
+     żadnym błędzie Allegro. Test czyta źródło, bo `main()` nie da się
      wywołać w teście — uruchamia tickery strzelające do Allegro. */
   const zrodlo = fs.readFileSync(new URL("../index.ts", import.meta.url), "utf8");
   const wywolania = zrodlo.match(/powiazZaleglosci\(/g) ?? [];
@@ -76,7 +73,7 @@ test("takt woła wiązanie w `finally`, a nie po `await`", () => {
   }
 });
 
-/* ── Wiązanie po imporcie z Subiekta (audyt zwrotów, 15 września 2026) ───────
+/* ── Wiązanie po imporcie z Subiekta (audyt zwrotów) ─────────────────────────
    Korekta wchodzi do bazy importem co minutę, a wiązało ją dopiero Allegro co
    pięć minut. Operator nie czekał i przepisywał numer ręką — na nagraniu
    z pracy przepisał przy tym numer cudzej korekty.                          */

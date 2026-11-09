@@ -16,7 +16,7 @@ import { zostalyWrazliwe } from "./allegro-oczyszczanie.js";
 const schema = fs.readFileSync(new URL("../db/schema.sql", import.meta.url), "utf8");
 
 /* Konto kanału, które `stanowisko()` zakłada jako pierwsze i jedyne.
-   `brakujaceZamowienia` bierze je PARAMETREM od 0.249.1: pamięć negatywu
+   `brakujaceZamowienia` bierze je PARAMETREM: pamięć negatywu
    musi odsiewać tym samym kluczem, którym zapisuje. */
 const KONTO = 1;
 
@@ -74,7 +74,7 @@ test("to samo zamówienie przy dwóch zwrotach pobiera się raz", () => {
   assert.deepEqual(brakujaceZamowienia(d, KONTO, 10), ["ord-1"]);
 });
 
-/* Numer zamówienia prowadzi tu także z WIADOMOŚCI (0.166.0, gałąź
+/* Numer zamówienia prowadzi tu także z WIADOMOŚCI (gałąź
    `relatesTo.order`). Bez tego rozmowa pokazywałaby goły numer na zawsze —
    ticker nie miałby powodu, żeby po treść sięgnąć. */
 function wiadomosc(d: Db, ext: string, orderId: string | null, sentAt = "2026-08-30T09:00:00Z") {
@@ -161,12 +161,8 @@ test("zamówienie niesie koszt dostawy, sumę, SKU i wszystkie pozycje", async (
 });
 
 test("adres DOSTAWY wchodzi do modelu pracy, a kupujący i lądowisko nie", async () => {
-  /* STRAŻNIK PRZEPISANY TRZECI RAZ, i za każdym razem zmieniał się ZAKRES
-     zdjęcia, nigdy sam mechanizm. Do 0.366.0 lista zakazanych niosła też
-     „Kowalski", bo żadnego kawałka adresu nie braliśmy. 0.367.0 zdjęło z niej
-     SAMĄ NAZWĘ odbiorcy. 0.422.0 zdejmuje RESZTĘ ADRESU DOSTAWY decyzją
-     właściciela: agent dostaje od klienta numer telefonu i nie miał czym go
-     zamienić na zamówienie.
+  /* Adres DOSTAWY przechodzi decyzją właściciela: agent dostaje od klienta
+     numer telefonu i musi zamienić go na zamówienie.
 
      TRZY GRANICE, KTÓRE ZOSTAJĄ, i to jest cała treść tego testu:
 
@@ -304,9 +300,8 @@ test("drugi przebieg nie ma czego pobierać", async () => {
 
 
 test("zamówienie bez ani jednego SKU wraca do pobrania — po dobie", () => {
-  /* Do 0.153.1 warunkiem było wyłącznie „nie ma takiego wiersza", więc jedna
-     zła synchronizacja zamieniała się w trwały stan: po naprawieniu mapowania
-     zamówienie i tak nie było odpytywane NIGDY. */
+  /* Sam warunek „nie ma takiego wiersza" zamieniałby jedną złą
+     synchronizację w trwały stan: zamówienie nie byłoby odpytywane NIGDY. */
   const d = stanowisko();
   zwrot(d, "z1", "ord-1");
   d.prepare(`INSERT INTO zamowienie_klienta(channel_account_id,external_id,synced_at)
@@ -348,7 +343,7 @@ test("SKU z samych spacji liczy się jak brak", () => {
   assert.deepEqual(brakujaceZamowienia(d, KONTO, 10, new Date("2026-09-01T10:00:00Z")), ["ord-1"]);
 });
 
-/* ── Pamięć negatywu (0.249.1) ───────────────────────────────────────────────
+/* ── Pamięć negatywu ─────────────────────────────────────────────────────────
    Portal deweloperski Allegro pokazał 432 wywołania `GET /order/checkout-forms/{id}`
    zakończone 404 w krótkim czasie. Numer, którego Allegro nie zna, nie
    dostawał wiersza w `zamowienie_klienta` NIGDY, więc `k.id IS NULL` było
@@ -493,7 +488,7 @@ test("zapamiętany brak zostawia ślad w events", async () => {
   assert.equal((JSON.parse(zd[0].payload) as { ile: number }).ile, 2);
 });
 
-/* ── Zamówienia kupującego prosto z Allegro (0.450.0) ────────────────────
+/* ── Zamówienia kupującego prosto z Allegro ──────────────────────────────
    Paczka nieodebrana nie ma zwrotu, wiadomości ani reklamacji, więc
    `brakujaceZamowienia` nigdy nie prowadzi do jej zamówienia. Lista paczek
    klienta czytała tylko naszą bazę i przy takiej paczce wychodziła pusta —
@@ -525,7 +520,7 @@ test("login idzie do Allegro filtrem buyer.login, a pobrane zamówienia lądują
   assert.equal(paczki[0].pozycji, 2);
   assert.equal(paczki[0].odbiorcaNazwa, "Jan Kowalski");
   /* Wiersz prowadzi do zamówienia w panelu Allegro — tam biuro kończy pracę,
-     odkąd rejestracja paczki odeszła (0.451.0). */
+     odkąd rejestracja paczki odeszła. */
   assert.ok(paczki.every((p) => p.link?.includes(p.orderId)),
     "każde trafienie niesie odnośnik do swojego zamówienia");
 });
@@ -547,7 +542,7 @@ test("nazwisko ze spacją nie jedzie do Allegro — tam szuka się wyłącznie p
   assert.equal(wygladaNaLogin("+48 600 100 200"), false);
   assert.equal(wygladaNaLogin("a"), false, "jeden znak to nie uchwyt");
   assert.equal(wygladaNaLogin("Łąka-ogród_2"), true);
-  /* Login bez pseudonimu (0.452.0) — Sales Center pokazuje go wprost. Wzór
+  /* Login bez pseudonimu — Sales Center pokazuje go wprost. Wzór
      jest wąski: sam przedrostek i cyfry, nie „dowolny dwukropek". */
   assert.equal(wygladaNaLogin("client:124843816"), true);
   assert.equal(wygladaNaLogin(" Client:124843816 "), true);
@@ -573,9 +568,9 @@ test("limit Allegro wraca jako błąd, a baza zostaje nietknięta", async () => 
 });
 
 test("login bez pseudonimu pyta małą literą, a przy pustej odpowiedzi wielką (0.452.0)", async () => {
-  /* Zgłoszenie właściciela: Sales Center znajdował „Client:124843816",
-     a panel mówił „nie mam paczek". Nie wiemy, czy filtr rozróżnia wielkość
-     liter — więc drugi wariant idzie wyłącznie po pustej odpowiedzi. */
+  /* Sales Center znajduje „Client:124843816". Nie wiemy, czy filtr rozróżnia
+     wielkość liter — więc drugi wariant idzie wyłącznie po pustej
+     odpowiedzi. */
   const d = stanowisko();
   const pytania: string[] = [];
   const ile = await pobierzZamowieniaKupujacego("Client:124843816", {

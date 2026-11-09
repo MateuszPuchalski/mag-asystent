@@ -40,12 +40,8 @@ export class BladLimituAllegro extends BladLimitu {}
  * Odmowa Allegro z zachowanym kodem HTTP.
  *
  * Kod jest w komunikacie, bo to on trafia na ekran biura — ale STATUS musi
- * dać się odczytać bez czytania zdania. Do 0.149.0 status synchronizacji
- * wyłuskiwał go wyrażeniem `\((\d{3})\)`, więc rozpoznawał wyłącznie te
- * komunikaty, które akurat miały kod w nawiasie: 401 i 403 tak, „Allegro
- * odpowiedziało 503: …" już nie. Efekt był cichy — panel pokazywał ogólne
- * „nie udało się" zamiast zdania, po którym wiadomo, czy czekać, czy wołać
- * administratora.
+ * dać się odczytać bez czytania zdania: po nim wiadomo, czy czekać, czy
+ * wołać administratora.
  */
 export class BladOdpowiedziAllegro extends Error {
   constructor(komunikat: string, public readonly status: number) {

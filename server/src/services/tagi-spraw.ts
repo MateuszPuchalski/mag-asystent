@@ -2,7 +2,7 @@ import type { DatabaseSync } from "node:sqlite";
 import { db as defaultDb } from "../db/db.js";
 import { logEvent } from "./events.js";
 
-/* ── Tagi spraw posprzedażowych (0.279.0) ────────────────────────────────────
+/* ── Tagi spraw posprzedażowych ──────────────────────────────────────────────
    Właściciel poprosił o tagi w jednym celu: „abym łatwiej mógł znaleźć
    reklamacje, którymi się zajmuję". Tag jest więc SITEM, a nie ozdobą, i cała
    reszta decyzji z tego wynika.
@@ -36,9 +36,8 @@ export interface TagSprawy {
   nazwa: string;
 }
 
-/* ── DWIE OSIE, JEDEN SŁOWNIK (0.315.0) ──────────────────────────────────────
-   Tagi weszły w 0.279.0 wyłącznie dla `reklamacja_klienta` — jednego wiersza
-   na reklamację. Zwrot mieszka we własnej tabeli, więc dostaje
+/* ── DWIE OSIE, JEDEN SŁOWNIK ────────────────────────────────────────────────
+   Tagi reklamacji wiszą na `reklamacja_klienta`. Zwrot mieszka we własnej tabeli, więc dostaje
    własną tabelę wiązań, a nie własny słownik: „gwarancja" znaczy to samo przy
    reklamacji i przy zwrocie, a dwa słowniki znaczyłyby dwa ekrany ustawień
    i dwa sufity aktywnych nazw.
@@ -64,10 +63,6 @@ export const TAGI_REKLAMACJI: OsTagow = {
   /* Wiersze dawnych dyskusji zostały w tabeli, ale tagów już nie dostają. */
   warunek: "typ = 'CLAIM'",
 };
-/* OSI TAGÓW ZWROTU JUŻ NIE MA (0.370.0) — patrz komentarz przy tabeli
-   `zwrot_tag_sprawy` w `schema.sql`. Zeszła oś, nie mechanizm: `OsTagow`
-   przyjmuje kolejną tabelę tak samo jak przyjęła tamtą. */
-
 
 export class BladTagu extends Error {
   constructor(message: string, readonly kod = 400) { super(message); }

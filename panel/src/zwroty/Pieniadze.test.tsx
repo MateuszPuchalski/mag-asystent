@@ -6,7 +6,7 @@ import { Pieniadze } from "./Pieniadze";
 import type { AkcjeKlawiszy } from "./klawisze";
 import type { StanZwrotuPieniedzy, ZwrotPlatnosciAllegro } from "../api/typy";
 
-/* ── Pieniądze przy zwrocie (§25a, 0.190.0) ──────────────────────────────────
+/* ── Pieniądze przy zwrocie (§25a) ───────────────────────────────────────────
    Ten ekran jako pierwszy w panelu rusza cudze pieniądze, więc testy pilnują
    nie wyglądu, tylko czterech rzeczy: że przeszkoda MÓWI, czego brakuje; że
    przycisk nie stoi tam, gdzie serwer i tak odmówi; że odmowa bez powodu nie
@@ -53,7 +53,7 @@ describe("Pieniądze przy zwrocie", () => {
     expect(screen.queryByRole("button", { name: /Oddaj pieniądze/ })).toBeNull();
   });
 
-  /* Przed werdyktem przeszkoda jest JEDNA i znana (0.453.0): oś etapów nad
+  /* Przed werdyktem przeszkoda jest JEDNA i znana: oś etapów nad
      sekcją już ją pokazuje, więc zdanie schodzi do znacznika z kłódką. Treść
      nie ginie — stoi w podpowiedzi, słowo w słowo z serwera. */
   it("przed werdyktem zamiast zdania stoi kłódka „po werdykcie”", () => {
@@ -82,7 +82,7 @@ describe("Pieniądze przy zwrocie", () => {
       oddane: { id: "ref-9", status: "SUCCEEDED", kiedy: null, potwierdzone: true } }) });
     expect(screen.getByText("ref-9")).toBeInTheDocument();
     expect(screen.getByText(/Oddano/)).toBeInTheDocument();
-    /* Kwota stoi tylko tutaj (0.516.0) — po oddaniu nie może zniknąć,
+    /* Kwota stoi tylko tutaj — po oddaniu nie może zniknąć,
        bo zamknięty zwrot nie mówiłby wtedy nigdzie, ile wyszło. */
     expect(screen.getByText("64,98 PLN")).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /Oddaj pieniądze/ })).toBeNull();
@@ -90,18 +90,16 @@ describe("Pieniądze przy zwrocie", () => {
   });
 
   it("przyjęte polecenie NIE UDAJE oddanych pieniędzy", () => {
-    /* 0.209.0: do tego wydania stało tu „Oddano" od chwili, w której Allegro
-       przyjęło polecenie. Przelew odrzucony godzinę później wyglądał na
-       ekranie dokładnie tak samo jak udany. */
+    /* „Oddano" od chwili, w której Allegro przyjęło polecenie, nie
+       odróżniłoby przelewu odrzuconego godzinę później od udanego. */
     ekran({ stan: stan({ moznaZwrocic: false,
       oddane: { id: "ref-9", status: "SUCCEEDED", kiedy: null, potwierdzone: false } }) });
     expect(screen.getByText(/jeszcze nie potwierdziło/)).toBeInTheDocument();
     expect(screen.queryByText(/Oddano/)).toBeNull();
   });
 
-  /* ŻADEN KOD NIE JEST WYBRANY Z GÓRY (audyt, 15 września 2026). Stał tu
-     `REFUND_REJECTED` i wyglądało to bezpiecznie, bo jako jedyny żąda powodu.
-     Skutek był odwrotny: uzasadnienie „wysłaliśmy nowy towar" wychodziło do
+  /* ŻADEN KOD NIE JEST WYBRANY Z GÓRY. `REFUND_REJECTED` wygląda
+     bezpiecznie, bo jako jedyny żąda powodu. Skutek byłby odwrotny: uzasadnienie „wysłaliśmy nowy towar" wychodziło do
      klienta pod oświadczeniem, że odmawiamy zwrotu pieniędzy. */
   it("odmowa nie ma kodu wybranego z góry i bez wskazania nie wychodzi", async () => {
     const onOdmow = vi.fn();
@@ -147,7 +145,7 @@ describe("Pieniądze przy zwrocie", () => {
     expect(screen.getByRole("button", { name: /Oddaję…/ })).toBeDisabled();
   });
 
-  /* ── Klawisz `Z` (audyt, 15 września 2026) ───────────────────────────
+  /* ── Klawisz `Z` (audyt) ───────────────────────────
      Tabela §25a.2 obiecuje klawisz na kubełek, a ostatni krok — jedyny, który
      rusza pieniędzmi — nie miał żadnego. Testy idą przez REJESTR, bo taką
      drogą chodzi prawdziwy nasłuch z `ekrany/Zwroty.tsx`.                    */
@@ -185,7 +183,7 @@ describe("Pieniądze przy zwrocie", () => {
     expect(screen.getByRole("button", { name: /Z Oddaj pieniądze/ })).toBeInTheDocument();
   });
 
-  /* ── Przelew oddany poza Allegro (0.269.0) ─────────────────────────────────
+  /* ── Przelew oddany poza Allegro ───────────────────────────────────────────
      Przy pobraniu to JEDYNY ślad po wypłacie, jaki może powstać. */
   it("przy pobraniu daje pole na numer przelewu i zapisuje ślad", async () => {
     const onPrzelew = vi.fn();
@@ -232,7 +230,7 @@ describe("Pieniądze przy zwrocie", () => {
     expect(screen.queryByLabelText("Numer przelewu")).toBeNull();
   });
 
-  /* ── Odmowa z kodem dosyłki (0.536.0) ────────────────────────────────────
+  /* ── Odmowa z kodem dosyłki ──────────────────────────────────────────────
      Zła paczka wraca, biuro odmawia wypłaty kodem „Wysłaliśmy nowy towar”
      i wysyła właściwy towar. Testy pilnują czterech rzeczy: kod mówi słowami,
      a nie nazwą pola Allegro; formularz odmowy nie dostaje nowego wyboru, tylko
@@ -285,8 +283,7 @@ describe("Pieniądze przy zwrocie", () => {
   });
 
   /* ── Odmowa złożona w panelu Allegro ───────────────────────────────────────
-     Biuro odmawia w panelu Allegro (fakt właściciela z 27 września 2026),
-     z nawyku. Kod z panelu Allegro przychodzi synchronizacją, bez naszej
+     Biuro odmawia w panelu Allegro, z nawyku. Kod z panelu Allegro przychodzi synchronizacją, bez naszej
      `odmowa`, a dosyłkę serwer liczy i wtedy. Linijka stoi więc niezależnie
      od `odmowa`, z faktem odmowy obok, żeby nie wisiała bez powodu. */
   it("odmowa z panelu Allegro dostaje linijkę dosyłki z faktem odmowy obok", () => {

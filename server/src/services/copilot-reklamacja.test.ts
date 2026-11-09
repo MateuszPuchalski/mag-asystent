@@ -5,10 +5,10 @@ import fs from "node:fs";
 import { migrate } from "../db/db.js";
 import {
   kartaSprawy, ocenRekomendacje, odsiejBezPokrycia, ponumerujRozmowe, pustaKarta,
-  rozpoznajSprawe, sugerujeWerdykt, trafnoscRad, type OdpowiedzRozpoznania,
+  rozpoznajSprawe, sugerujeWerdykt, type OdpowiedzRozpoznania,
 } from "./copilot-reklamacja.js";
 
-/* ── Copilot reklamacyjny (0.275.0) ──────────────────────────────────────────
+/* ── Copilot reklamacyjny ────────────────────────────────────────────────────
    Trzy bramki, z których dwie są deterministyczne i dlatego w ogóle warte
    zaufania:
 
@@ -104,9 +104,7 @@ test("karta bez ani jednego pokrycia jest pusta i nie ma po co iść na ekran", 
 });
 
 test("RADA jest dozwolona (0.276.0) i zapisuje się razem z kartą", async () => {
-  /* Do 0.275.0 ten moduł odrzucał każdą kartę z rozstrzygnięciem — moja
-     decyzja. Właściciel odwrócił ją tego samego dnia: „copilot powinien też
-     radzić w reklamacji". */
+  /* Copilot radzi w reklamacji (decyzja właściciela). */
   const { d, id } = stanowisko();
   await rozpoznajSprawe({
     reklamacjaId: id, kto: KTO, database: d,
@@ -123,8 +121,8 @@ test("RADA jest dozwolona (0.276.0) i zapisuje się razem z kartą", async () =>
 });
 
 test("werdykt w polu FAKTOGRAFICZNYM dalej odrzuca kartę", async () => {
-  /* Cała różnica między 0.275.0 a 0.276.0: rada jest dozwolona, ale ma stać
-     w swoim polu. W `usterka` wyglądałaby jak cytat z kupującego. */
+  /* Rada jest dozwolona, ale ma stać w swoim polu. W `usterka` wyglądałaby
+     jak cytat z kupującego. */
   const { d, id } = stanowisko();
   await assert.rejects(() => rozpoznajSprawe({
     reklamacjaId: id, kto: KTO, database: d,
@@ -268,22 +266,6 @@ test("ocena BEZ karty jest cicha — werdykt nie zależy od Copilota", async () 
   assert.equal(ocenRekomendacje(d, 9999, "ACCEPTED_REFUND"), null);
 });
 
-test("licznik trafności oddziela rady OCENIONE od wszystkich", async () => {
-  /* Sprawy bez werdyktu nie są ani sukcesem, ani porażką modelu — są
-     niedokończone i nie mają prawa psuć ani poprawiać wyniku. */
-  const { d, id } = stanowisko();
-  await rozpoznajSprawe({
-    reklamacjaId: id, kto: KTO, database: d,
-    nadaj: async () => karta({ rada: {
-      co: "ACCEPTED_REFUND", pewnosc: "niska",
-      uzasadnienie: { tresc: "x", zrodlo: "W1" }, czegoNieWiem: ["y"],
-    } }),
-  });
-  assert.deepEqual(trafnoscRad(d), { rad: 1, ocenionych: 0, trafnych: 0 });
-  ocenRekomendacje(d, id, "ACCEPTED_REFUND");
-  assert.deepEqual(trafnoscRad(d), { rad: 1, ocenionych: 1, trafnych: 1 });
-});
-
 test("do modelu idzie BLOK FAKTÓW przed rozmową, zamaskowany tak samo (0.282.0)", async () => {
   /* Karta z żywego panelu prosiła agenta o „datę zakupu / numer zamówienia" —
      o dane, które Allegro przysłało razem ze sprawą. Prosiła, bo model ich
@@ -399,7 +381,7 @@ test("cytat ze zdjęcia, którego NIE MA, dalej wypada", async () => {
 });
 
 test("sprawa bez zdjęć działa jak dotąd — to większość spraw", async () => {
-  /* Ważniejsze od reszty testów tego wydania: zdjęcie jest dodatkiem,
+  /* Ważniejsze od reszty testów: zdjęcie jest dodatkiem,
      rozpoznanie podstawową pracą. */
   const { d, id } = stanowisko();
   let dostal: unknown = "nie wołano";

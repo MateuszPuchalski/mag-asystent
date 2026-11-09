@@ -4,7 +4,7 @@ import fs from "node:fs";
 import { DatabaseSync } from "node:sqlite";
 import { migrate } from "./db.js";
 
-/* ── Znacznik autoodpowiedzi wstecz (0.227.0) ────────────────────────────────
+/* ── Znacznik autoodpowiedzi wstecz ────────────────────────────────
    Kolumna `message.auto_odpowiedz` doszła po tym, jak w bazie leżały już
    tysiące wiadomości. Bez backfillu stare rozmowy zostałyby z zerem, czyli
    z tą samą usterką, którą to wydanie naprawia: odbicie „Dziękujemy za

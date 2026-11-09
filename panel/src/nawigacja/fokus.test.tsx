@@ -4,7 +4,7 @@ import { act, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { klawiszZajety, useOkno, useSkrotyDzialaja } from "./fokus";
 
-/* ── Podpowiedź klawisza tylko wtedy, gdy klawisz działa (0.500.0) ────────
+/* ── Podpowiedź klawisza tylko wtedy, gdy klawisz działa ───────────────────
    Znaczek jednoliterowego skrótu znika, gdy fokus wchodzi w pole pisania,
    i wraca, gdy z niego wychodzi — dokładnie tam, gdzie skrót milknie.     */
 
@@ -31,7 +31,7 @@ describe("znaczki skrótów", () => {
   });
 });
 
-/* ── Okna dialogowe: fokus wchodzi, zostaje i wraca (0.546.0) ─────────────
+/* ── Okna dialogowe: fokus wchodzi, zostaje i wraca ───────────────────────
    Strona niżej ma nasłuch skrótów na `window`, jak kolejki panelu. Pyta
    o `klawiszZajety`, więc pod oknem modalnym ma milczeć. */
 

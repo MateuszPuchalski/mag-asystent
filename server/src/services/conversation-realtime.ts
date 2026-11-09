@@ -5,11 +5,11 @@ export type ConversationEventType =
   | "message.created"
   | "assignment.changed"
   | "warehouse.result"
-  /* Odesłanie zadania z hali (0.352.0). OSOBNY typ, nie `warehouse.result`
+  /* Odesłanie zadania z hali. OSOBNY typ, nie `warehouse.result`
      z pustym wynikiem: panel ma pokazać brak odpowiedzi jako brak, a nie jako
      wynik, którego nikt nie zmierzył. */
   | "warehouse.returned"
-  /* Decyzja klasyfikatora (22 września 2026). Takt rozpoznaje w TLE, więc bez
+  /* Decyzja klasyfikatora. Takt rozpoznaje w TLE, więc bez
      zdarzenia plakietka czekałaby na następny ruch w kolejce. */
   | "classification.updated";
 
@@ -38,7 +38,7 @@ export function onConversationEvent(listener: (event: ConversationRealtimeEvent)
   return () => emitter.off("event", listener);
 }
 
-/* ── Obecność i UCHWYT rozmowy (0.158.0) ─────────────────────────────────────
+/* ── Obecność i UCHWYT rozmowy ───────────────────────────────────────────────
    Decyzja właściciela: samo wejście agenta w pytanie ma przydzielić mu je
    NA CZAS SIEDZENIA, a odpowiedź — na stałe. To jest dokładnie ten kształt,
    który przewidział §6.3 projektu: „Obecność i »pisze« nie są tabelą. To stan
@@ -174,10 +174,6 @@ export function setTyping(conversationId: number, userId: number, name: string, 
     userId, name, typing: active,
     expiresAt: active ? new Date(teraz + TYPING_TTL_MS).toISOString() : null,
   });
-}
-
-export function typingPresence(conversationId: number, teraz = Date.now()) {
-  return przyRozmowie(conversationId, teraz).filter((o) => o.typing);
 }
 
 /** Wyłącznie dla testów: stan w pamięci nie ma jak wygasnąć między nimi. */

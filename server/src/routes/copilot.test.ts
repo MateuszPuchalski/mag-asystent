@@ -230,9 +230,8 @@ test("ocena szkicu bez szkicu odmawia zdaniem", async () => {
   assert.match(r.json<{ error: string }>().error, /nie ma jeszcze szkicu/);
 });
 
-/* Strażnik adresów panelu (blizna 0.181.1): każdy adres wołany z
-   `panel/src/api/copilot.ts` ma trasę. Do 0.230.0 ten plik nie miał strażnika —
-   strażnik skrzynki czyta tylko `rozmowy.ts`, a wiedzy tylko `wiedza.ts`. */
+/* Strażnik adresów panelu: każdy adres wołany z `panel/src/api/copilot.ts`
+   ma trasę. Strażnik skrzynki czyta tylko `rozmowy.ts`. */
 test("każdy adres wołany z panel/src/api/copilot.ts ma trasę na serwerze", async () => {
   const b = login("biuro", "Ala");
   const zrodlo = fs.readFileSync(new URL("../../../panel/src/api/copilot.ts", import.meta.url), "utf8");

@@ -10,27 +10,20 @@ import { Wyjatek } from "./Wyjatek";
 import { PrzyciskTowaru } from "../towar/Szuflada";
 import { otwarteWyjatki } from "./Kolejka";
 
-/* ── Dokument dostawy — środkowa kolumna (0.435.0) ─────────────────────────
-   Przeniesiony z `biuro.html` z trzema decyzjami, które tam kosztowały:
-
-   - POZYCJE WYMAGAJĄCE BIURA STOJĄ OSOBNO I NA GÓRZE (0.97.0). Tabela na
+/* ── Dokument dostawy — środkowa kolumna ───────────────────────────────────
+   - POZYCJE WYMAGAJĄCE BIURA STOJĄ OSOBNO I NA GÓRZE. Tabela na
      trzydzieści cztery wiersze zawiera zwykle dwa, przy których ktoś czeka
      na decyzję — biuro wchodzi w dokument WŁAŚNIE po nie.
-   - TRZY KOLUMNY ZAMIAST PIĘCIU (0.427.0, dekalog pkt 2). Stan idzie pod
+   - TRZY KOLUMNY ZAMIAST PIĘCIU (dekalog pkt 2). Stan idzie pod
      ilość, bo odpowiadają na jedno pytanie: ile i czy skończone. Osoba idzie
      pod adres, bo odpowiadają na drugie: gdzie i kto tam położył.
    - PROTOKÓŁ STOI W NAGŁÓWKU DOKUMENTU, nie w osobnej karcie reklamacji.
-     W biurze karta REKLAMACJE listowała wyjątki wszystkich faktur osobno od
-     faktur — dwie listy o tym samym. Reklamuje się fakturę, więc druk
-     mieszka przy fakturze.
+     Reklamuje się fakturę, więc druk mieszka przy fakturze.
 
-   ── ZDJĘCIE PRZY KAŻDEJ POZYCJI (0.449.0) ──────────────────────────────
-   Przeprowadzka zgubiła kolumnę zdjęć: `biuro.html` miało ją w tabeli
-   pozycji od 0.36.0, a panel pokazywał zdjęcie tylko przy wyjątku. Zgłosił
-   to właściciel na nietkniętej fakturze — czternaście symboli bez jednego
-   obrazu, a biuro rozpoznaje towar po wyglądzie szybciej niż po numerze.
+   ── ZDJĘCIE PRZY KAŻDEJ POZYCJI ────────────────────────────────────────
+   Biuro rozpoznaje towar po wyglądzie szybciej niż po numerze.
    Kolumna stoi wtedy, gdy instalacja MA zdjęcia (pola `zdjecia` albo
-   `zdjeciaWlasne` w `/api/health`), jak w biurze: bez źródła byłaby rzędem
+   `zdjeciaWlasne` w `/api/health`): bez źródła byłaby rzędem
    kafli „bez zdjęcia" na każdej fakturze. Pobieranie idzie wspólną kolejką
    `towar/useZdjecie.ts` — trzy naraz, brak zapamiętany. */
 
@@ -52,8 +45,8 @@ const STAN_POZYCJI: Record<string, { slowo: string; klasa: string }> = {
 /**
  * Stan faktury, która fizycznie jest rozłożona, a ma otwarty wyjątek.
  *
- * Zielone „rozłożona" przy czterech otwartych wyjątkach mówiło „gotowe",
- * choć faktura stała w DO DECYZJI i czekała na biuro (audyt 26.09.2026).
+ * Zielone „rozłożona" przy otwartym wyjątku mówiłoby „gotowe", choć faktura
+ * stoi w DO DECYZJI i czeka na biuro.
  * Słowo „rozłożona" zostaje, bo hala naprawdę skończyła; kolor i dopisek
  * mówią, że skończyło się tylko jej zadanie.
  */
@@ -63,14 +56,12 @@ const CZEKA_NA_BIURO = { slowo: "rozłożona · czeka na biuro", klasa: "bg-ambe
 const otwarteNajpierw = (lista: WyjatekHali[]) =>
   [...lista].sort((a, b) => Number(a.resolvedAt != null) - Number(b.resolvedAt != null));
 
-/* POZYCJĘ Z WYJĄTKIEM ROZPOZNAJE ZGŁOSZENIE, NIE STATUS (0.538.1). Podział
-   szedł po `status === "problem"`, a dwie drogi serwera zostawiają otwarty
-   wyjątek przy pozycji `done`. Pierwsza to nadmiar zgłaszany przy ZAKOŃCZ
-   (`zachowajStatusLinii`). Druga to odłożenie reszty sztuk po zgłoszeniu,
-   bo odłożenie przelicza status z samej ilości. Taka pozycja szła do tabeli,
-   która wyjątków nie rysuje. Zgłoszenie właściciela z nagraniem: nagłówek
-   FZ 65/MAG/09/2026 mówił „1 otwarty wyjątek", a w 42 pozycjach nie było go
-   nigdzie. Rozwiązany też wychodzi na górę, bo idzie do protokołu, a tabela
+/* POZYCJĘ Z WYJĄTKIEM ROZPOZNAJE ZGŁOSZENIE, NIE STATUS. Dwie drogi
+   serwera zostawiają otwarty wyjątek przy pozycji `done`. Pierwsza to
+   nadmiar zgłaszany przy ZAKOŃCZ (`zachowajStatusLinii`). Druga to
+   odłożenie reszty sztuk po zgłoszeniu, bo odłożenie przelicza status
+   z samej ilości. Tabela wyjątków nie rysuje, więc taka pozycja zginęłaby
+   z ekranu. Rozwiązany też wychodzi na górę, bo idzie do protokołu, a tabela
    i tak by go zgubiła. */
 const zWyjatkiem = (l: PozycjaDostawy) => l.status === "problem" || l.problemy.length > 0;
 const czekaNaBiuro = (l: PozycjaDostawy) => l.problemy.some((p) => p.resolvedAt == null);
@@ -84,10 +75,10 @@ function licznikWyjatkow(lista: WyjatekHali[]): string {
 }
 
 function StanPozycji({ s }: { s: string }) {
-  /* „DO ZROBIENIA" ZESZŁO Z WIERSZA (audyt 26.09.2026). Nietknięta faktura
-     na czterdzieści pozycji miała czterdzieści identycznych szarych
-     plakietek, a „0/7" obok mówi to samo. Pastylka zostaje tam, gdzie
-     odróżnia wiersz od sąsiadów: rozłożona, częściowo, wyjątek, pominięta. */
+  /* BEZ „DO ZROBIENIA" W WIERSZU. Nietknięta faktura miałaby czterdzieści
+     identycznych szarych plakietek, a „0/7" obok mówi to samo. Pastylka
+     zostaje tam, gdzie odróżnia wiersz od sąsiadów: rozłożona, częściowo,
+     wyjątek, pominięta. */
   const st = STAN_POZYCJI[s];
   if (!st) return null;
   /* `nowrap`: pastylka to JEDNO słowo znaczeniowe. Na zrzucie właściciela
@@ -110,9 +101,8 @@ function Gdzie({ l }: { l: PozycjaDostawy }) {
 }
 
 /* Zdjęcie przy pozycji z wyjątkiem słucha TEJ SAMEJ reguły co kolumna zdjęć
-   w tabeli (audyt 26.09.2026): stoi, gdy instalacja ma zdjęcia. Bez źródła
-   był to kafel „bez zdjęcia" przy każdym wyjątku i 404 w konsoli za każdy —
-   dokładnie to, czego kolumna w tabeli unika od 0.449.0. */
+   w tabeli: stoi, gdy instalacja ma zdjęcia. Bez źródła byłby to kafel „bez
+   zdjęcia" przy każdym wyjątku i 404 w konsoli za każdy. */
 function PozycjaZWyjatkiem({ l, rozwiaz, zdjecia }: { l: PozycjaDostawy; rozwiaz: RozwiazProps; zdjecia: boolean }) {
   return <div className="flex gap-3 border-b border-slate-200 py-3 last:border-b-0">
     {zdjecia && <Zdjecie twId={l.twId} rozmiar={44} nazwa={l.name} />}

@@ -11,20 +11,11 @@ import { db as defaultDb, type Db } from "../db/db.js";
  * Kształt pochodzi ze specyfikacji Allegro i jest opisany w sekcji „Wysyłka"
  * w `docs/allegro-ksztalt.md`. `POST /messaging/threads/{id}/messages`
  * przyjmuje `{ text, attachments? }` i oddaje obiekt wiadomości z polem `id`.
- * Od 0.195.0 wysyłamy też załączniki — pole `attachments` w `NewMessageInThread`
- * to lista `{ id }`, a identyfikatory pochodzą z dwukrokowego wgrania niżej.
+ * Pole `attachments` w `NewMessageInThread` to lista `{ id }`,
+ * a identyfikatory pochodzą z dwukrokowego wgrania niżej.
  *
- * DO 0.150.0 TA FUNKCJA NIOSŁA `[WERYFIKUJ]`: ciało powstało z pamięci, bo
- * `developer.allegro.pl` był niedostępny ze środowiska, w którym pisano kod,
- * a właściciel polecił mimo to zbudować wysyłkę wbrew §8.2 projektu panelu.
- * Specyfikacja potwierdziła to zgadnięcie co do znaku — i warto zapisać, że
- * potwierdziła, bo dokładnie w tym samym wydaniu okazało się, że mapowanie
- * ODCZYTU, które żadnego znacznika nie nosiło, było błędne w każdym polu.
- * Znacznik nie jest miarą ryzyka; jest miarą tego, komu się przyznano.
- *
- * Ścieżka stoi w repo od 0.142.1 (`urlWiadomosci` — ten sam adres co przy
- * odczycie), a `zapytajAllegro` ma negocjację wersji zasobu po 406,
- * obowiązkowy User-Agent oraz obsługę 401, 403, 404 i 429 z `Retry-After`.
+ * `zapytajAllegro` ma negocjację wersji zasobu po 406, obowiązkowy
+ * User-Agent oraz obsługę 401, 403, 404 i 429 z `Retry-After`.
  *
  * (Specyfikacja zna też `POST /messaging/messages` z `recipient` i `order` —
  * to końcówka do ZAKŁADANIA wątku. My odpisujemy w istniejącym.)
@@ -86,11 +77,10 @@ export const wyslijDoAllegro: WyslijDoAllegro = async (threadId, tresc, zalaczni
   return { externalMessageId: numerWiadomosci(odp) };
 };
 
-/* ── Wątek przeczytany (0.195.0) ─────────────────────────────────────────────
-   Odpowiedź wysłana z panelu ZOSTAWIAŁA wątek nieprzeczytany w Centrum
-   Wiadomości Allegro. Skutek był taki, że im lepiej działał panel, tym
-   bardziej kłamał licznik u właściciela: czerwona plakietka przy sprawach
-   dawno załatwionych, a po niej nie da się poznać, co jeszcze czeka.
+/* ── Wątek przeczytany ───────────────────────────────────────────────────────
+   Odpowiedź wysłana z panelu ma oznaczyć wątek jako przeczytany w Centrum
+   Wiadomości Allegro, inaczej licznik u właściciela pokazuje sprawy dawno
+   załatwione.
 
    Stoi PO wysyłce i nie ma prawa jej wywrócić: wiadomość już poszła do
    klienta, a nieoznaczony wątek to niedogodność, nie utrata pracy. Dlatego
@@ -110,7 +100,7 @@ export const oznaczPrzeczytanyWAllegro: OznaczPrzeczytany = async (threadId) => 
   });
 };
 
-/* ── Załącznik: deklaracja, potem binaria (0.195.0) ──────────────────────────
+/* ── Załącznik: deklaracja, potem binaria ────────────────────────────────────
    Allegro dzieli wgranie na DWA żądania i nie da się tego skrócić:
    `POST /messaging/message-attachments` z `{ filename, size }` oddaje `{ id }`,
    a dopiero `PUT /messaging/message-attachments/{id}` niesie bajty. Rozmiar

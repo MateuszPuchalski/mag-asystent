@@ -88,7 +88,7 @@ test("kartoteka bez wiersza stanu liczy się jako zero, nie wypada z wyników", 
   assert.deepEqual(symbole("Kosa"), ["MA-1", "BRAK-1"]);
 });
 
-/* ── Wyrozumiałość (0.34.0) ──────────────────────────────────────────────────
+/* ── Wyrozumiałość ──────────────────────────────────────────────────
    Zgłoszenie brzmiało: „wpisuję gaznik i nie znajduje gaźnika". Przyczyna
    sięgała głębiej — SQLite nie zna polskich liter ani w `lower()`, ani
    w `COLLATE NOCASE`, więc zepsuta była też zwykła wielkość liter.           */

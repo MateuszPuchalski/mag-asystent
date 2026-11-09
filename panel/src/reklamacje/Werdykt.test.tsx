@@ -11,7 +11,7 @@ import { Werdykt, naGrosze } from "./Werdykt";
    kwota tylko przy częściowym, przycisk MARTWY bez wiadomości i bez zgody,
    ładunek w groszach, zgoda nazywająca werdykt i tracąca ważność razem z nim,
    towar wybierany jawnie, bez domyślnego, i ponowienie wyłącznie po
-   `send_failed`. Stany po werdykcie idą za makietą „Stany”.               */
+   `send_failed`.                                                          */
 
 const rek = (n: Partial<Reklamacja> = {}): Reklamacja => ({
   id: 1, externalId: "i-1", numer: "123/2026", orderId: "ord-1", offerId: "of-1",
@@ -52,9 +52,9 @@ describe("Zwinięta karta: dwa duże przyciski", () => {
     expect(screen.getByRole("form", { name: "Werdykt" })).toBeInTheDocument();
   });
 
-  /* Gałęzie werdyktu niosą pełne barwy rangi, zieleń i czerwień, bo makieta
-     właściciela tak rozróżnia uznanie od odmowy. Bursztynu nie noszą, bo
-     należy do wysyłki odpowiedzi. */
+  /* Gałęzie werdyktu niosą pełne barwy rangi, zieleń i czerwień, bo tak
+     rozróżnia się uznanie od odmowy. Bursztynu nie noszą, bo należy do
+     wysyłki odpowiedzi. */
   it("pełne barwy gałęzi z makiety, bez bursztynu wysyłki i bez prawej krawędzi", () => {
     pokaz();
     expect(przycisk("Uznaj reklamację…").className).toContain("bg-ranga-ok");
@@ -246,9 +246,8 @@ describe("Zgoda nazywa werdykt i traci ważność razem z nim", () => {
 });
 
 /* ── TOWAR: JAWNY WYBÓR, BEZ DOMYŚLNEGO ──────────────────────────────────────
-   Makieta rysuje jedno pole wyboru „Towar do odesłania”. Zostaje dzisiejsza
-   semantyka: dwa wybory, żaden zaznaczony na starcie. Pole wyboru ma dwa
-   stany, więc „nie odhaczone” czytałoby się jak „zostaje u klienta”, choć
+   Dwa wybory, żaden zaznaczony na starcie, a nie pole wyboru. Pole wyboru
+   ma dwa stany, więc „nie odhaczone” czytałoby się jak „zostaje u klienta”, choć
    agent o towarze nie pomyślał, a obie odpowiedzi kosztują.                */
 describe("Towar wybiera się przy uznaniu", () => {
   it("dwa wybory, żaden zaznaczony — i nie ma ich przy odmowie", async () => {

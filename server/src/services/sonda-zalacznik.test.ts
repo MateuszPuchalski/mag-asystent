@@ -28,8 +28,7 @@ test("host końcowy pokazuje się WYŁĄCZNIE przy przekierowaniu — to odpowie
 });
 
 test("werdykt: API 200 bez Accept potwierdza specyfikację, sam zapas zostaje, wszystko 403 mówi o uprawnieniu", () => {
-  /* Tabela właściciela z 10 września — 200 stało w wierszu „bez Accept",
-     a stary werdykt mówił „żadna droga nie oddała pliku". */
+  /* 200 w wierszu „bez Accept" to sukces, nie „żadna droga nie oddała pliku". */
   assert.match(werdyktSondy([
     w({ status: 406 }), w({ akcept: "application/vnd.allegro.beta.v1+json", status: 406 }),
     w({ droga: "url", akcept: null, status: 403 }), w({ akcept: null, status: 200 }),

@@ -1,7 +1,7 @@
 import React from "react";
 import { Undo2, X } from "lucide-react";
 
-/* ── „COFNIJ" ZAMIAST PYTANIA „CZY NA PEWNO" (0.500.0) ──────────────────────
+/* ── „COFNIJ" ZAMIAST PYTANIA „CZY NA PEWNO" ────────────────────────────────
    Czynność jednym kliknięciem, której skutek znika z oczu — rozmowa
    zakończona schodzi z listy, a ekran przeskakuje do następnej — dostaje
    pasek z „Cofnij" na kilka sekund. Nie okno potwierdzenia: badanie
@@ -32,7 +32,7 @@ export function Cofniecie({ wpis, onZamknij }: { wpis: DoCofniecia | null; onZam
        przerysowaniu rodzica, a zegar ma ruszyć raz na wpis. */
   }, [wpis?.klucz]);
   if (!wpis) return null;
-  /* BEZ WŁASNEGO `fixed` (0.533.0). Pasek stał w lewym dolnym rogu, a pasek
+  /* BEZ WŁASNEGO `fixed`. Pasek stał w lewym dolnym rogu, a pasek
      odłożonej wysyłki na środku dołu — przy 1440 px nachodziły na siebie
      o 16 px, przy 1366 px o ponad 50. Odłożenie rozmowy zaraz po wysyłce
      stawia oba naraz, więc stoją teraz w jednym stosie, który układa ekran. */

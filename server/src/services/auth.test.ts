@@ -276,11 +276,9 @@ test("biuro zarządza kontami i ukrywa magazyny", () => {
 /* ── Drugi stopień: czego biuru nie wolno ────────────────────────────────── */
 
 test("biuro NIE dotyka kont biura ani adminów", () => {
-  /* Najważniejsza asercja tej roli. Do 0.24.0 „zarządzanie kontami" było jedną
-     operacją, więc biuro zakładało konto biura z własnym hasłem — czyli rola
-     strzegąca tożsamości rozdawała ją sama sobie. Rozdzielenie na dwa stopnie
-     ma sens wyłącznie wtedy, gdy TEN test jest czerwony po scaleniu ich z
-     powrotem. */
+  /* Najważniejsza asercja tej roli: biuro nie może założyć konta biura
+     z własnym hasłem. Rozdzielenie na dwa stopnie ma sens wyłącznie wtedy,
+     gdy TEN test jest czerwony po scaleniu ich z powrotem. */
   const b = konto("Biuro Zakupy", "biuro", "biuro");
   const w = A.autoryzuj(b, "zarzadzanie_biurem");
   assert.equal(w.ok, false);
@@ -346,7 +344,7 @@ test("nazwisko z polskimi znakami wraca w całości", async () => {
   /* Kolektor MUSI kodować tę wartość procentowo: OkHttp odmawia wysłania
      nagłówka z jakimkolwiek znakiem spoza ` `–`~` i robi to wyjątkiem
      z wątku dyspozytora, czyli wywrotką aplikacji. Nazwisko „Błażej"
-     zabijało kolektor przy pierwszym żądaniu po zalogowaniu (0.60.3).
+     zabijało kolektor przy pierwszym żądaniu po zalogowaniu.
 
      Dekodujemy tutaj, bo ta wartość idzie do `events.user_id` — do dziennika
      audytu. Okrojone „Blazej" byłoby stratą danych, nie kosmetyką. */

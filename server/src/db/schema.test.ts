@@ -8,12 +8,8 @@ import fs from "node:fs";
  * błędem składni — jest cichą podmianą schematu. Wygrywa ta wcześniejsza
  * w pliku, późniejsza zostaje pominięta bez słowa.
  *
- * To nie jest hipoteza. W 0.142.0 gałąź odbita od starego `main` dopisała
- * własną `zadanie_terenowe` z kolumnami `opis` i `completed_at`, a git scalił
- * to BEZ JEDNEGO ZNACZNIKA KONFLIKTU — obie definicje wylądowały w pliku,
- * atrapa wcześniej. Na świeżej bazie powstałaby tabela bez `rodzaj`, `tytul`
- * i `instrukcja`, więc trasy zadań i ekran kolektora przestałyby działać.
- * Zielone CI tego nie widziało, bo żaden test nie czytał samego schematu.
+ * Git potrafi scalić dwie definicje jednej tabeli BEZ ZNACZNIKA KONFLIKTU,
+ * a zielone CI tego nie widzi, bo bazy z testów nie czytają samego schematu.
  *
  * Ten strażnik czyta plik i nie dotyka bazy — kosztuje milisekundy, a pilnuje
  * klasy błędu, którą automatyczne scalanie wpuściłoby wprost na produkcję.

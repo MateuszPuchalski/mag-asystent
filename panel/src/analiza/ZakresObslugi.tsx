@@ -5,11 +5,10 @@ import { KartaWgladu, Przekroje, Tabela, Td } from "../ui/wglad";
 import { NAZWA_KATEGORII } from "../skrzynka/statusy";
 import type { Kategoria } from "../api/typy";
 
-/* ── Zakres OBSŁUGA KLIENTA (23 września 2026) ───────────────────────────────
-   Luka, którą ekran zapisywał wprost: makieta F0 pokazała ten zakres, a nie
-   było dla niego źródła danych. Źródłem jest dziś `services/czas-odpowiedzi.ts`
-   — czas od pierwszej wiadomości klienta do naszej odpowiedzi, liczony
-   z wiadomości, które i tak stoją w bazie.
+/* ── Zakres OBSŁUGA KLIENTA ──────────────────────────────────────────────────
+   Źródłem jest `services/czas-odpowiedzi.ts` — czas od pierwszej
+   wiadomości klienta do naszej odpowiedzi, liczony z wiadomości, które i tak
+   stoją w bazie.
 
    MEDIANA I DZIEWIĘĆDZIESIĄTY PERCENTYL, NIE ŚREDNIA. Jedna rozmowa odpisana
    po weekendzie ciągnie średnią tak, że tydzień pracy wygląda jak tydzień
@@ -47,7 +46,7 @@ function TabelaCzasu({ wiersze, naglowek, nazwa }: {
   </Tabela>;
 }
 
-/* ── BEZ PONOWNEGO PYTANIA (24 września 2026) ────────────────────────────────
+/* ── BEZ PONOWNEGO PYTANIA ───────────────────────────────────────────────────
    Druga liczba obok czasu, i ważniejsza od niego: czas nagradza szybką złą
    odpowiedź, a ta liczba nie. Reguła stoi w `services/czas-odpowiedzi.ts`.
 
@@ -75,16 +74,14 @@ function TabelaPowrotow({ wiersze, naglowek, nazwa }: {
   </Tabela>;
 }
 
-/* ── PRZEKROJE W KARCIE LICZBY, PUSTE JEDNĄ LINIĄ (0.542.0) ──────────────
-   Decyzja właściciela z 27 września 2026, wariant C Analizy. Zakres miał
-   czternaście kart jedna pod drugą, w tym cztery tabele „według kategorii"
-   i „według osoby" stojące osobno pod liczbami, które rozbijały. Teraz każdy
-   przekrój stoi przełącznikiem w karcie swojej liczby (`Przekroje`), a karta
-   bez odpowiedzi w oknie zwija się do jednego zdania (`pusta`).
+/* ── PRZEKROJE W KARCIE LICZBY, PUSTE JEDNĄ LINIĄ ────────────────────────
+   Decyzja właściciela. Każdy przekrój („według kategorii", „według osoby")
+   stoi przełącznikiem w karcie swojej liczby (`Przekroje`), a nie osobną
+   tabelą pod nią. Karta bez odpowiedzi w oknie zwija się do jednego zdania
+   (`pusta`).
 
-   ROZBICIE NA LUDZI DALEJ PRZYCHODZI TYLKO ADMINOWI (0.431.0): dla biura
-   serwer go nie liczy, więc przełącznik ma jedną pozycję i staje się
-   podpisem. */
+   ROZBICIE NA LUDZI PRZYCHODZI TYLKO ADMINOWI: dla biura serwer go nie
+   liczy, więc przełącznik ma jedną pozycję i staje się podpisem. */
 
 function KartaPowrotow({ p }: { p: Powroty }) {
   const pusto = p.n === 0 && p.wrocilo === 0 && p.czeka === 0;
@@ -93,7 +90,7 @@ function KartaPowrotow({ p }: { p: Powroty }) {
     opis={`Po naszej odpowiedzi klient nie pisał już w tej rozmowie przez ${p.oknoDni} dni. `
       + "Podziękowanie się nie liczy. Mierzy skutek, nie szybkość."}>
     <div className="flex flex-wrap gap-8">
-      {/* Bez „okno N dni" (0.512.0) — okno zakresu stoi w nagłówku Analizy.
+      {/* Bez „okno N dni" — okno zakresu stoi w nagłówku Analizy.
           „Młodsze niż N dni" niżej zostaje: to INNE okno, czas na powrót klienta. */}
       <Liczba ile={procent(p.bezPowrotu, p.n)} etykieta={`z ${p.n} odpowiedzi z wynikiem`} />
       <Liczba ile={p.wrocilo} etykieta={p.wrociloBezRozpoznania
@@ -119,7 +116,7 @@ export function ZakresObslugi({ a }: { a: CzasOdpowiedzi }) {
       pusta={pusto ? "Brak odpowiedzi w tym oknie i nikt teraz nie czeka." : null}
       opis="Od pierwszej wiadomości klienta do naszej odpowiedzi. Autoodpowiedź się nie liczy.">
       <div className="flex flex-wrap gap-8">
-        {/* Okno podaje nagłówek Analizy — tu bez powtórki (0.512.0). */}
+        {/* Okno podaje nagłówek Analizy — tu bez powtórki. */}
         <Liczba ile={a.ogolem.n} etykieta="odpowiedzi" />
         <Liczba ile={czasPo(a.ogolem.medianaMin)} etykieta="mediana" />
         <Liczba ile={czasPo(a.ogolem.p90Min)} etykieta="9 na 10 odpowiedzi szybciej niż" />

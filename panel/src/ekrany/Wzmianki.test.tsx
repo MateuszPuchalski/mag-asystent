@@ -6,7 +6,7 @@ import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import type { WpisWzmianki } from "../api/typy";
 
-/* ── Skrzynka wzmianek (0.160.0) ─────────────────────────────────────────────
+/* ── Skrzynka wzmianek ───────────────────────────────────────────────────────
    Wzmianka to prośba kolegi o zajęcie się czymś. Ekran pilnuje dwóch rzeczy:
    że nieodhaczone widać bez szukania, i że NIC ich nie kasuje samo — ani
    otwarcie listy, ani przejście do rozmowy. */
@@ -51,7 +51,7 @@ describe("Skrzynka wzmianek", () => {
     expect(screen.getByText("A. Lewandowska")).toBeInTheDocument();
     expect(screen.getByText(/zielony_ogrod/)).toBeInTheDocument();
     expect(screen.getByText(/zerkniesz na ten szarpak/)).toBeInTheDocument();
-    /* Licznik nieodhaczonych stoi w nagłówku po kropce (0.524.0), jak
+    /* Licznik nieodhaczonych stoi w nagłówku po kropce, jak
        w pozostałych sekcjach „Do zrobienia". */
     expect(screen.getByRole("heading", { name: "Wspomniano o mnie · 1" })).toBeInTheDocument();
   });
@@ -82,7 +82,7 @@ describe("Skrzynka wzmianek", () => {
     pokaz();
     expect(screen.getByText(/Wszystko odhaczone/)).toBeInTheDocument();
 
-    /* Przełącznik jest cichym odnośnikiem w nagłówku (0.524.0), nie polem
+    /* Przełącznik jest cichym odnośnikiem w nagłówku, nie polem
        wyboru — dalej jedno kliknięcie od historii. */
     await userEvent.click(screen.getByRole("button", { name: "Pokaż odhaczone (1)" }));
     expect(screen.getByText(/zerkniesz na ten szarpak/)).toBeInTheDocument();

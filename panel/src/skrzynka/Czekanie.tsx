@@ -1,6 +1,5 @@
-import React from "react";
 
-/* ── CZEKANIE JAKO KRESKI, NIE ZDANIE (23 września 2026) ─────────────────────
+/* ── CZEKANIE JAKO KRESKI, NIE ZDANIE ────────────────────────────────────────
    Zgłoszenie właściciela: „za dużo tekstu". Wiersz kolejki mówił „czeka 14 g
    42 min" — trzy wyrazy i minuty, których nikt nie czyta przy czternastu
    godzinach. Cztery kreski rosną z czasem i ciemnieją ku czerwieni, więc
@@ -33,7 +32,7 @@ export function stopienCzekania(ms: number): { kreski: number; pismo: string; kr
   return { kreski: 4, pismo: "text-ranga-zle", kreska: "bg-ranga-zle" };
 }
 
-/* ── LICZBA BEZ KRESEK (0.506.0) ────────────────────────────────────────────
+/* ── LICZBA BEZ KRESEK ──────────────────────────────────────────────────────
    Zgłoszenie agenta: „przytłacza". Cztery kreski przy KAŻDYM wierszu mówiły
    to samo co barwa liczby obok — dwa znaki jednego faktu w liście, która
    i tak niesie kafel kategorii, kropkę i podgląd. Zostaje liczba w barwie

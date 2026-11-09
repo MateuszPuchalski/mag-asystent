@@ -51,8 +51,7 @@ test("zdanie dla człowieka nie niesie surowej odpowiedzi dostawcy", async () =>
   klientRzucajacy(odpowiedzDostawcy(529, "overloaded_error", "Overloaded"));
 
   const e = await nadawcaAnthropic(TRESC).then(() => null, (b) => b) as Error;
-  /* Blizna z 0.191.0: na ekran szło `529 {"type":"error",…}`. Agent czytający
-     zrzut JSON-a uczy się, że w tym miejscu nic dla niego nie ma. */
+  /* Agent czytający na ekranie zrzut JSON-a uczy się, że w tym miejscu nic dla niego nie ma. */
   assert.doesNotMatch(e.message, /[{}]/, "żadnego JSON-a w zdaniu na ekran");
   assert.doesNotMatch(e.message, /req_011Ce/, "identyfikator żądania należy do księgi");
   assert.match(e.message, /spróbuj za chwilę/i, "zdanie ma powiedzieć, CO ZROBIĆ");
@@ -93,10 +92,8 @@ test("brak sieci mówi o SIECI, choć SDK opakowuje go w APIError", async () => 
   klientRzucajacy(new Anthropic.APIConnectionError({ message: "getaddrinfo ENOTFOUND" }));
 
   const e = await nadawcaAnthropic(TRESC).then(() => null, (b) => b) as Error;
-  /* Blizna z 0.191.0: `APIConnectionError` DZIEDZICZY po `APIError`, więc
-     gałąź o braku internetu stojąca niżej była martwa, a zerwana sieć
-     meldowała się jako „Anthropic odpowiedziało ?" — czyli twierdziła, że
-     dostawca odpowiedział, choć nie został nawet zapytany. Ten test pilnuje
+  /* `APIConnectionError` DZIEDZICZY po `APIError`, więc gałąź o braku
+     internetu stojąca niżej byłaby martwa. Ten test pilnuje
      KOLEJNOŚCI `instanceof`, która jest tu logiką, nie stylem. */
   assert.ok(e instanceof BladLacznosciCopilota,
     `zerwana sieć dostała klasę ${e?.constructor.name}`);
@@ -107,10 +104,9 @@ test("brak sieci mówi o SIECI, choć SDK opakowuje go w APIError", async () => 
     "przyczyna techniczna należy do księgi, nie do zdania na ekranie");
 });
 
-/* ── Odpowiedź, której nie da się odczytać (blizna 0.253.1) ──────────────────
-   Zgłoszenie właściciela: „Copilot wywrócił się przed wysyłką — to usterka po
-   naszej stronie". Zdanie prawdziwe i bezużyteczne — nie mówiło ani co się
-   stało, ani co zrobić.
+/* ── Odpowiedź, której nie da się odczytać ───────────────────────────────────
+   Zdanie „Copilot wywrócił się przed wysyłką" ma mówić, co się stało i co
+   zrobić.
 
    Mechanizm: `lib/parser.js` rzuca GOŁYM `AnthropicError`, gdy tekst modelu
    nie daje się sparsować. `APIError` dziedziczy po `AnthropicError`, więc
@@ -146,7 +142,7 @@ test("błąd SDK ze statusem dalej idzie swoją gałęzią, mimo wspólnego przo
     `529 przykryte przez gałąź parsowania: ${(e as Error)?.constructor.name}`);
 });
 
-/* ── Model klasyfikacji i parametr wysiłku (22 września 2026) ───────────────
+/* ── Model klasyfikacji i parametr wysiłku ───────────────
    Klasyfikacja idzie WŁASNYM modelem. Haiku 4.5 i Sonnet 4.5 odrzucają
    `effort` błędem 400 wg dokumentacji Anthropic — żądanie do nich idzie bez
    niego, reszta modeli dostaje wysiłek jak dotąd. */
@@ -228,7 +224,7 @@ test("schemat i instrukcja szkicu nie znają danych doboru ani pasowania", async
   }
 });
 
-/* ── Pętla narzędzi dopytania (0.507.0) ─────────────────────────────────────
+/* ── Pętla narzędzi dopytania ─────────────────────────────────────
    Atrapa klienta oddaje CIĄG odpowiedzi, jak dostawca w kolejnych rundach.
    Sprawdzamy to, czego nie sprawdzi test serwisu z atrapą nadawcy: że wyniki
    narzędzi wracają do modelu w jednej wiadomości, że zdanie wstępu przed

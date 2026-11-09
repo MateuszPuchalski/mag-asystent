@@ -128,12 +128,10 @@ function seed() {
 
   const mgpProducts: Array<{ tw_id: number; mgp: number; dostawca: string }> = [];
   const noLocProducts: number[] = [];
-  /* Kolumna `ordered` z eksportu NIE idzie już do sgt_towar. Do 0.7.0 leżała
-     tam jako gotowa liczba, ale importer produkcyjny nie miał jej skąd wziąć
-     (w Subiekcie „zamówione" pochodzi z dokumentów ZD, nie z kartoteki)
-     i wpisywał zero — czyli demo pokazywało coś, czego produkcja nie umiała.
-     Ta sama liczba zasila teraz syntetyczne zamówienia, więc obie ścieżki
-     chodzą tym samym torem. */
+  /* Kolumna `ordered` z eksportu NIE idzie do sgt_towar: w Subiekcie
+     „zamówione" pochodzi z dokumentów ZD, nie z kartoteki. Ta sama liczba
+     zasila syntetyczne zamówienia, więc demo i produkcja chodzą tym samym
+     torem. */
   const zamowione: Array<{ tw_id: number; ilosc: number; dostawca: string }> = [];
 
   const insertAll = transaction(d, (data: Row[]) => {
@@ -247,7 +245,7 @@ function seed() {
 
   // ── stan na magazynie Zwroty ─────────────────────────────────────────────
   // Zwroty przyjmuje i rozlicza biuro w Subiekcie — aplikacja nie ma tam nic do
-  // roboty (rozkładanie koszykami wypadło w 0.17.0). Stan zasiewamy mimo to,
+  // roboty. Stan zasiewamy mimo to,
   // bo karta towaru odpowiada na pytanie „gdzie jeszcze leży" i magazyn Zwroty
   // jest jedną z możliwych odpowiedzi.
   const zwrotItems: Array<{ tw_id: number; qty: number }> = [];

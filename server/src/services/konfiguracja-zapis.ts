@@ -6,10 +6,9 @@ import type { DatabaseSync } from "node:sqlite";
 import type { EnvFileResult } from "../env-file.js";
 import { kluczZRejestru, type Edycja } from "../konfiguracja-rejestr.js";
 
-/* ── Zmiana ustawienia z panelu (0.491.0) ────────────────────────────────────
-   Do tego wydania każda zmiana `wertis.env` była pulpitem zdalnym, edytorem
-   tekstu i restartem usług. Panel robi dziś to samo, w tej kolejności, i ani
-   jednego kroku więcej:
+/* ── Zmiana ustawienia z panelu ──────────────────────────────────────────────
+   Panel robi to, co człowiek przy pulpicie zdalnym z edytorem i restartem,
+   w tej kolejności i ani jednego kroku więcej:
 
    1. SPRAWDZA WARTOŚĆ według rodzaju z rejestru (liczba, data, wybór, tekst).
    2. SKŁADA NOWY PLIK, zmieniając jedną linię. Komentarze, klucze

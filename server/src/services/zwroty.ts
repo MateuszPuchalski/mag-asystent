@@ -17,7 +17,7 @@ import { stanZdjeciaOferty, type StanZdjeciaOferty } from "./zdjecia-ofert.js";
 import { ROZMOWA_ZAMOWIENIA } from "./droga-klienta.js";
 import { glosAllegroPoZamknieciu } from "./glos-allegro.js";
 
-/* ── Kubełki zwrotów (0.150.0) ───────────────────────────────────────────────
+/* ── Kubełki zwrotów ─────────────────────────────────────────────────────────
    Panel zwrotów jest KOLEJKĄ BRAMEK, nie rejestrem. Rejestr każe najpierw
    znaleźć zwrot, potem wybrać akcję z menu — dwa kliknięcia przed
    jakąkolwiek decyzją. Kubełek niesie dokładnie jedno pytanie, więc operator
@@ -29,8 +29,7 @@ import { glosAllegroPoZamknieciu } from "./glos-allegro.js";
    ma, albo chował tę, która jest.
 
    Kolejność w kubełku bierze się z ZEGARA USTAWOWEGO, nie z daty wpływu.
-   To blizna 0.121.0: ustawowy termin jest osobnym bytem i steruje
-   kolejnością pracy. Zwrot z dwoma dniami zapasu stoi nad wczorajszym.    */
+   Zwrot z dwoma dniami zapasu stoi nad wczorajszym.                       */
 
 export type Kubelek = "decyzja" | "ocena" | "zwrot" | "korekta" | "zamkniety" | "odrzucony";
 
@@ -39,27 +38,24 @@ export type Sygnal = "termin" | "brak_dowodu" | "odrzucony_w_allegro"
   | "rozjazd_ilosci" | "przelew_czeka" | "drugi_zwrot" | "nie_odeslany";
 
 /**
- * Ile dni klient ma na ODESŁANIE towaru po zgłoszeniu odstąpienia (0.505.0).
+ * Ile dni klient ma na ODESŁANIE towaru po zgłoszeniu odstąpienia.
  * Czternaście, jak termin ustawowy na odesłanie rzeczy. Po nim zwrot bez
  * nadanej paczki dostaje sygnał `nie_odeslany` i gotową odmowę.
  */
 export const TERMIN_ODESLANIA_DNI = 14;
 
 /**
- * Jak długo zwrot bez nadanej paczki stoi w DO DECYZJI mimo reguły wieku
- * (0.505.0). Reguła z 0.452.0 zamyka po `ZWROT_WYGASA_DNI` zwrot bez decyzji,
- * bo „ósmego dnia Allegro oddaje samo" — ale oddaje za paczkę, która wróciła.
- * Za nienadaną nie oddaje nic, więc zamknięcie mówiłoby nieprawdę i zdejmowało
- * odmowę z pracy. Sufit jest, żeby stara historia nie wróciła do kolejki
- * setkami — to ta sama blizna, po której reguła wieku powstała.
+ * Jak długo zwrot bez nadanej paczki stoi w DO DECYZJI mimo reguły wieku.
+ * Allegro oddaje samo tylko za paczkę, która wróciła, więc nienadanej nie
+ * zamykamy po `ZWROT_WYGASA_DNI`. Sufit trzyma starą historię poza kolejką.
  */
 export const NIEODESLANY_WYGASA_DNI = 90;
 
 /**
- * Zwrot tego samego zamówienia z DRUGIEGO źródła (0.493.0).
+ * Zwrot tego samego zamówienia z DRUGIEGO źródła.
  *
- * Decyzja właściciela: klient, którego paczka wróciła nieodebrana, bywa, że
- * zgłasza potem odstąpienie w Allegro. Synchronizacja zakłada wtedy drugi
+ * Klient, którego paczka wróciła nieodebrana, bywa, że zgłasza potem
+ * odstąpienie w Allegro. Synchronizacja zakłada wtedy drugi
  * zwrot tego samego zamówienia, obok przyjętej przez biuro paczki. Dwa zwroty
  * to dwie kwoty do oddania za jeden towar — worker nie wystawi drugiego ZW,
  * ale pieniądze pilnuje już tylko człowiek.
@@ -78,16 +74,16 @@ export interface DrugiZwrot {
 export interface PozycjaZwrotu {
   id: number;
   /**
-   * Ile sztuk naprawdę wróciło. `null` = nikt jeszcze nie liczył (0.212.0).
+   * Ile sztuk naprawdę wróciło. `null` = nikt jeszcze nie liczył.
    *
    * `ilosc` obok niesie DEKLARACJĘ klienta i nadpisuje ją synchronizator.
    */
   iloscZwrocona: number | null;
-  /** `allegro` = ze zgłoszenia klienta, `biuro` = dopisana u nas (0.184.0). */
+  /** `allegro` = ze zgłoszenia klienta, `biuro` = dopisana u nas. */
   zrodlo: string;
   offerId: string | null;
   /**
-   * Numer oferty wzięty z POZYCJI ZAMÓWIENIA (0.213.0), nie z pozycji zwrotu.
+   * Numer oferty wzięty z POZYCJI ZAMÓWIENIA, nie z pozycji zwrotu.
    *
    * `offerId` wyżej należy do przestrzeni, której nie znamy; ten jest
    * `lineItems[].offer.id` ze specyfikacji. `null` znaczy „nie ma zamówienia
@@ -95,7 +91,7 @@ export interface PozycjaZwrotu {
    */
   ofertaZamowienia: string | null;
   /**
-   * Co wiadomo o zdjęciu tej oferty (0.214.0).
+   * Co wiadomo o zdjęciu tej oferty.
    *
    * `nieznane` znaczy „jeszcze nie pytaliśmy Allegro" ALBO „nie ma numeru
    * oferty" — w obu wypadkach ekran nie ma prawa powiedzieć „bez zdjęcia",
@@ -121,18 +117,14 @@ export interface PozycjaZwrotu {
   sku: string | null;
   /** EAN z kartoteki Subiekta. Allegro EAN-u nie podaje przy zwrocie wcale. */
   ean: string | null;
-  /** Ile MNIEJ oddajemy za tę pozycję i DLACZEGO (0.170.0). */
+  /** Ile MNIEJ oddajemy za tę pozycję i DLACZEGO. */
   potracenieGrosze: number | null;
   potraceniePowod: string | null;
   /** Propozycja automatu — pokazywana obok, nigdy zamiast potwierdzonej. */
   propozycja: Dopasowanie | null;
-  /** Rabat transakcyjny: czy wniosek o zwrot prowizji już jest (0.164.0). */
+  /** Rabat transakcyjny: czy wniosek o zwrot prowizji już jest. */
   rabat: StanRabatu;
 }
-
-/* `Zamowienie` i `PozycjaZamowienia` mieszkają od 0.166.0 w `zamowienia.ts`,
-   bo to samo zamówienie pokazuje też rozmowa. Re-eksport trzyma stare importy. */
-export type { PozycjaZamowienia, Zamowienie } from "./zamowienia.js";
 
 export interface WierszZwrotu {
   id: number;
@@ -143,21 +135,18 @@ export interface WierszZwrotu {
   orderId: string | null;
   utworzono: string;
   paczkaAt: string | null;
-  /** Kiedy paczka DOTARŁA do nas — z trackingu przewoźnika (0.187.0). */
+  /** Kiedy paczka DOTARŁA do nas — z trackingu przewoźnika. */
   dostarczonoAt: string | null;
   /** Ostatni kod przewoźnika: `NOTICE_LEFT`, `ISSUE`, `RETURNED`… */
   przesylkaStatus: string | null;
   /**
-   * Ostatni status zwrotu po stronie Allegro (0.339.0).
-   *
-   * Do 0.338.0 czytały go wyłącznie sygnały, z surowego wiersza. Od kiedy
-   * rozstrzyga o KUBEŁKU, musi być widoczny tam, gdzie widać kubełek —
-   * inaczej zwrot znika z kolejki bez zdania, które to tłumaczy.
+   * Ostatni status zwrotu po stronie Allegro. Rozstrzyga o KUBEŁKU, więc
+   * stoi obok niego — inaczej zwrot znika z kolejki bez wyjaśnienia.
    */
   statusAllegro: string | null;
   kubelek: Kubelek;
   /**
-   * Kwota ustalona, a pieniądze jeszcze nie wyszły (0.476.0). Trzyma zwrot
+   * Kwota ustalona, a pieniądze jeszcze nie wyszły. Trzyma zwrot
    * w DO ZWROTU także po korekcie — powód przy `pieniadzeCzekaja`.
    */
   pieniadzeCzekaja: boolean;
@@ -168,8 +157,7 @@ export interface WierszZwrotu {
   sumaPozycjiGrosze: number;
   /**
    * Kwota PEŁNA: pozycje plus koszt dostawy. `null`, dopóki zamówienia nie
-   * pobrano — do 0.151.0 ekran nie umiał jej policzyć wcale i mówił o tym
-   * wprost, bo koszt dostawy stoi przy zamówieniu, nie przy zwrocie.
+   * pobrano, bo koszt dostawy stoi przy zamówieniu, nie przy zwrocie.
    */
   kwotaPelnaGrosze: number | null;
   waluta: string;
@@ -177,13 +165,7 @@ export interface WierszZwrotu {
   linkZwrotu: string | null;
   zamowienie: Zamowienie | null;
   werdykt: string | null;
-  /**
-   * Powód odmowy wpisany przez biuro (0.210.0).
-   *
-   * Do tego wydania zapisywał się do `werdykt_powod` i NIKT go nie czytał —
-   * ani panel, ani nic innego. Ekran obiecywał przy nim „zobaczy go klient",
-   * a nie widział go nawet operator, który go wpisał.
-   */
+  /** Powód odmowy wpisany przez biuro. */
   werdyktPowod: string | null;
   kwotaGrosze: number | null;
   kwotaWariant: string | null;
@@ -196,23 +178,18 @@ export interface WierszZwrotu {
   zamknietyRecznie: { kiedy: string; przez: string | null; powod: string | null } | null;
   /**
    * `subiekt` = automat znalazł dokument, `reczne` = człowiek przepisał,
-   * `sfera` = ZW wystawił worker Sfery (0.349.0).
+   * `sfera` = ZW wystawił worker Sfery.
    */
   korektaZrodlo: string | null;
   /**
-   * Zadanie automatycznego ZW (0.349.0) — `null`, gdy nie zlecono żadnego.
+   * Zadanie automatycznego ZW — `null`, gdy nie zlecono żadnego.
    * Panel mówi po nim, czy numer przyjdzie sam, czy biuro ma wystawić ZW ręką.
    */
   zw: { status: string; numer: string | null; blad: string | null } | null;
   rejectionCode: string | null;
   /** `allegro` albo `nieodebrana` — paczka, której klient nie odebrał. */
   zrodlo: string;
-  /* PROWADZĄCEGO I TAGÓW W TYM DTO JUŻ NIE MA (0.370.0) — patrz komentarz
-     przy trasach zwrotów. Kolumny `prowadzi*` zostają w tabeli: przebudowa
-     dla trzech nieużywanych kolumn niesie więcej ryzyka, niż kupuje, a wiersz
-     bez nich niczego nie traci. */
-  /** Notatka biura — od 0.313.0 dopisywana przy KAŻDYM zwrocie, nie tylko
-      przy paczce nieodebranej. */
+  /** Notatka biura — przy KAŻDYM zwrocie, nie tylko przy paczce nieodebranej. */
   notatka: string | null;
   notatkaAt: string | null;
   notatkaPrzez: string | null;
@@ -221,33 +198,22 @@ export interface WierszZwrotu {
   /** Login kupującego prosto ze zwrotu — nie wymaga pobranego zamówienia. */
   kupujacyLogin: string | null;
   /**
-   * Nazwa odbiorcy Z NAKLEJKI (0.367.0).
+   * Nazwa odbiorcy Z NAKLEJKI.
    *
    * Paczki nadaje klient albo kurier, więc numeru listu z wracającego kartonu
    * nasz system NIGDY nie widział — pierwszy skan takiej paczki musi chybić.
    * Uchwytem zostaje to, co jeszcze jest na naklejce: nazwa odbiorcy.
-   *
-   * W CSV jej NIE MA, tak samo jak numeru listu: plik na dysku jest zapisem
-   * trwalszym niż baza, a decyzja właściciela dotyczyła szukania na ekranie,
-   * nie wynoszenia danych osobowych do arkusza.
    */
   odbiorcaNazwa: string | null;
   /** `INPOST`, `DPD`, `UNKNOWN`… — surowo, bo Allegro nie zamyka listy. */
   przewoznik: string | null;
   /**
-   * Numer listu przewozowego paczki zwrotnej (0.344.0).
-   *
-   * Decyzja właściciela zdjęła politykę 0.163.0: „zapisuj numery paczek".
-   * Numer z naklejki jest tym, co operator trzyma w ręku przy kartonie —
-   * ma więc stać tam, gdzie się na niego patrzy. Do 0.343.0 żył wyłącznie
-   * w kopii odpowiedzi Allegro i panel nie mógł go pokazać ani przefiltrować.
-   *
-   * W CSV go NIE MA i to zostaje: plik na dysku jest zapisem trwalszym niż
-   * baza, a tamta część polityki nie była przedmiotem decyzji.
+   * Numer listu przewozowego paczki zwrotnej — to, co operator trzyma
+   * w ręku przy kartonie, więc stoi tam, gdzie się na niego patrzy.
    */
   waybill: string | null;
   /**
-   * Kiedy Allegro PIERWSZY RAZ powiedziało, że pieniądze wróciły (0.345.0).
+   * Kiedy Allegro PIERWSZY RAZ powiedziało, że pieniądze wróciły.
    *
    * `status_allegro` to wskaźnik TERAZ, nie historia: zwrot rozliczony idzie
    * dalej tą samą osią czasu. Ten zatrzask trzyma fakt, a nie chwilowy stan.
@@ -255,7 +221,7 @@ export interface WierszZwrotu {
   rozliczonyAllegroAt: string | null;
   /** Rozmowy o TYM zakupie; puste znaczy „Allegro nic nie powiązało". */
   rozmowy: RozmowaZwrotu[];
-  /** Zwrot tego zamówienia z drugiego źródła; `null` = nie ma (0.493.0). */
+  /** Zwrot tego zamówienia z drugiego źródła; `null` = nie ma. */
   drugiZwrot: DrugiZwrot | null;
   /** Dokument sprzedaży z Subiekta — snapshot numeru, nie odczyt na żywo. */
   faktura: FakturaZwrotu;
@@ -264,24 +230,20 @@ export interface WierszZwrotu {
 }
 
 /**
- * Rozmowa z klientem o tym samym zakupie (0.169.0).
+ * Rozmowa z klientem o tym samym zakupie.
  *
- * Mostkiem jest `message.related_order_id`, mapowany od 0.166.0 z gałęzi
- * `relatesTo.order`. Nie ma tu ani jednego nowego żądania do Allegro: numer
- * zamówienia zwrot ma od zawsze, a wiadomości leżą już w naszej bazie.
+ * Mostkiem jest `message.related_order_id` z gałęzi `relatesTo.order`, więc
+ * nie ma tu żadnego żądania do Allegro: wiadomości leżą już w naszej bazie.
  *
- * NUMER ZAMÓWIENIA, NIE LOGIN, i to jest wybór zakresu, nie zakaz. Karta
- * zwrotu pokazuje rozmowy o TYM zakupie; wszystkie rozmowy kupującego niesie
- * historia klienta (`klient-historia.ts`), która od 24 września 2026 chodzi
- * też po loginie. Blizna 0.56.6 brała `client:44300444` za maskę — to był
- * login kupującego bez konta (`docs/allegro-ksztalt.md`).
+ * NUMER ZAMÓWIENIA, NIE LOGIN, i to jest wybór zakresu, nie zakaz. Wszystkie
+ * rozmowy kupującego niesie historia klienta (`klient-historia.ts`).
  */
 export interface RozmowaZwrotu {
   id: number;
   temat: string | null;
   status: string;
   ostatniaAt: string | null;
-  /** Ostatnia prawdziwa wiadomość w wątku, do 280 znaków — bez naszej autoodpowiedzi (0.486.1). */
+  /** Ostatnia prawdziwa wiadomość w wątku, do 280 znaków — bez naszej autoodpowiedzi. */
   ostatniaTresc: string | null;
   /** Czy to ostatnie słowo napisał klient, czyli wątek czeka na nas. */
   odKlienta: boolean;
@@ -293,15 +255,14 @@ const PROG_TERMINU_DNI = 3;
 type Wiersz = Record<string, unknown>;
 
 /**
- * Od kiedy biegnie zegar obsługi zwrotu (0.339.0).
+ * Od kiedy biegnie zegar obsługi zwrotu.
  *
  * OD PACZKI U NAS, nie od zgłoszenia klienta. Regulamin Allegro daje siedem
  * dni od OTRZYMANIA zwrotu, a nie od jego zadeklarowania — i tym zegarem
  * właściciel kazał ustawiać kolejność pracy, bo to po nim Allegro rozlicza
- * sprzedawcę. Do 0.338.0 liczyliśmy czternaście dni od `createdAt`, czyli
- * termin ustawowy na oddanie pieniędzy.
+ * sprzedawcę.
  *
- * TA SAMA REGUŁA CO PRZY SYGNALE „BRAK DOWODU" (0.187.0), i to jest celowe:
+ * TA SAMA REGUŁA CO PRZY SYGNALE „BRAK DOWODU", i to jest celowe:
  * dwie definicje „paczka wróciła" rozjechałyby się przy pierwszej poprawce
  * jednej z nich, a wtedy wiersz świeciłby terminem, mówiąc jednocześnie, że
  * paczki nie ma. Doręczenie z trackingu; a gdy trackingu NIE MA wcale,
@@ -334,13 +295,11 @@ export function dniDoTerminu(terminAt: string | null, teraz = Date.now()): numbe
 }
 
 /**
- * Czy zwrot czeka jeszcze na wyjście pieniędzy (0.476.0).
+ * Czy zwrot czeka jeszcze na wyjście pieniędzy.
  *
- * Przegląd zwrotów z 23 września: automatyczny ZW zamyka zwrot minutę po
- * zapisie kwoty, a zamknięty zwrot schodzi z kolejki. Pieniądze biuro oddaje
- * ręką w Allegro — więc jeśli nikt nie pamiętał, ósmego dnia Allegro oddawało
- * całość samo, a potrącenie za uszkodzenie przepadało. Nic w kolejce o tym
- * nie mówiło.
+ * Automatyczny ZW zamyka zwrot minutę po zapisie kwoty, a pieniądze biuro
+ * oddaje ręką w Allegro. Bez tego ósmego dnia Allegro oddaje całość samo,
+ * a potrącenie za uszkodzenie przepada.
  *
  * ROZLICZONE jest to, po czym jest ślad: nasze polecenie zwrotu, odmowa,
  * zapisany przelew albo potwierdzenie z Allegro. Kwota zero nie ma czego
@@ -349,8 +308,7 @@ export function dniDoTerminu(terminAt: string | null, teraz = Date.now()): numbe
  * OKNO, NIE WIECZNOŚĆ. Zamówienie opłacone w Allegro czeka do dnia po naszym
  * terminie — potem Allegro oddaje samo, wg właściciela „ósmego dnia".
  * Pobranie Allegro nie oddaje wcale, więc czeka tyle, ile stary zwrot bez
- * decyzji (`ZWROT_WYGASA_DNI`). Bez okna wróciłaby do pracy cała historia
- * sprzed tej reguły.
+ * decyzji (`ZWROT_WYGASA_DNI`). Bez okna wróciłaby do pracy cała historia.
  */
 export function pieniadzeCzekaja(z: {
   werdykt: string | null; rejectionCode: string | null; kwotaGrosze: number | null;
@@ -359,18 +317,16 @@ export function pieniadzeCzekaja(z: {
   zlecono?: boolean;
   odmowaKod?: string | null; przelewAt?: string | null;
   platnoscTyp?: string | null; terminAt?: string | null; utworzono?: string | null;
-  /** `allegro` albo `nieodebrana` (0.493.0). */
+  /** `allegro` albo `nieodebrana`. */
   zrodlo?: string | null;
 }, teraz = Date.now(), wygasaDni = config.allegro.zwrotWygasaDni): boolean {
   if (z.werdykt !== "przyjety" || z.rejectionCode) return false;
   if (z.kwotaGrosze === null || z.kwotaGrosze <= 0) return false;
   if (z.rozliczonyAllegroAt || STATUSY_ODDANE.has(String(z.statusAllegro ?? ""))) return false;
   if (z.zlecono || z.odmowaKod || z.przelewAt) return false;
-  /* PACZKA NIEODEBRANA CZEKA BEZ TERMINU (0.493.0). „Ósmego dnia Allegro
+  /* PACZKA NIEODEBRANA CZEKA BEZ TERMINU. „Ósmego dnia Allegro
      oddaje samo" dotyczy zwrotu klienta, a tej paczki Allegro nie zna.
-     Z terminem zamknięty korektą, niezapłacony zwrot wychodził z kolejki
-     dzień po terminie — pieniądze nie szły nigdy i nikt by tego nie
-     zobaczył. Czeka więc, aż zobaczymy wypłatę, zlecenie albo przelew. */
+     Czeka więc, aż zobaczymy wypłatę, zlecenie albo przelew. */
   if (z.zrodlo === "nieodebrana") return true;
   if (z.platnoscTyp === "CASH_ON_DELIVERY") {
     return Boolean(z.utworzono) && teraz - Date.parse(String(z.utworzono)) <= wygasaDni * 86_400_000;
@@ -393,40 +349,33 @@ export function kubelekZwrotu(z: {
   rejectionCode: string | null; werdykt: string | null; zamknietyAt: string | null;
   kwotaGrosze: number | null; korektaNumer: string | null;
   pozycje: Array<{ ocena: string | null }>;
-  /** Ostatni status zwrotu po stronie Allegro (0.339.0). */
+  /** Ostatni status zwrotu po stronie Allegro. */
   statusAllegro?: string | null;
-  /** Kiedy Allegro PIERWSZY RAZ powiedziało, że pieniądze wróciły (0.345.0). */
+  /** Kiedy Allegro PIERWSZY RAZ powiedziało, że pieniądze wróciły. */
   rozliczonyAllegroAt?: string | null;
-  /** Data zgłoszenia i źródło — do reguły wieku (0.452.0). */
+  /** Data zgłoszenia i źródło — do reguły wieku. */
   utworzono?: string | null;
   zrodlo?: string | null;
-  /** Wynik `pieniadzeCzekaja` — liczony raz, przez wołającego (0.476.0). */
+  /** Wynik `pieniadzeCzekaja` — liczony raz, przez wołającego. */
   pieniadzeCzekaja?: boolean;
   /**
-   * Czy klient w ogóle nadał paczkę (0.505.0) — numer listu albo doręczenie.
+   * Czy klient w ogóle nadał paczkę — numer listu albo doręczenie.
    * Brak pola znaczy „nadana": wołający, którzy go nie znają, dostają
    * dawne zachowanie reguły wieku.
    */
   nadana?: boolean;
 }, teraz = Date.now(), wygasaDni = config.allegro.zwrotWygasaDni): Kubelek {
-  /* ZAMKNIĘCIE NIE ZDEJMUJE NIEZAPŁACONEGO ZWROTU (0.476.0). Korekta
+  /* ZAMKNIĘCIE NIE ZDEJMUJE NIEZAPŁACONEGO ZWROTU. Korekta
      zamyka zwrot w bazie — ręką albo automatem ZW minutę po kwocie — ale
      pieniądze wychodzą zwykle później. Taki zwrot wraca do DO ZWROTU i stoi
      tam, dopóki Allegro nie pokaże, że pieniądze wyszły, albo nie minie
      dzień, w którym oddaje samo. Powód przy `pieniadzeCzekaja`. */
   if (z.zamknietyAt) return z.pieniadzeCzekaja ? "zwrot" : "zamkniety";
   if (z.werdykt === "odrzucony" || z.rejectionCode) return "odrzucony";
-  /* ALLEGRO ROZLICZYŁO — SPRAWA ZAMKNIĘTA (0.339.0). Zgłoszenie właściciela:
-     „pokazuje za dużo zwrotów do procesowania, pokazuje zwroty, za które
-     pieniądze zostały już zwrócone".
-
-     Ze SCHEMATU `CustomerReturn.status`: `FINISHED` to „the payment has been
-     refunded, return process is finished", `FINISHED_APT` to to samo ręką
-     Allegro Protect. Do 0.338.0 kubełek liczył się z pięciu naszych faktów
-     i tego statusu nie czytał wcale — zwrot rozliczony w panelu Allegro albo
-     przez Allegro Protect stał u nas w DO DECYZJI i pytał „przyjąć czy
-     odrzucić?", choć pieniądze dawno były u klienta. Pytanie bez treści,
-     na zawsze, przy każdym takim zwrocie.
+  /* ALLEGRO ROZLICZYŁO — SPRAWA ZAMKNIĘTA. Ze SCHEMATU
+     `CustomerReturn.status`: `FINISHED` to „the payment has been refunded,
+     return process is finished", `FINISHED_APT` to to samo ręką Allegro
+     Protect. Pytanie „przyjąć czy odrzucić?" nie ma już wtedy treści.
 
      DECYZJA WŁAŚCICIELA: całkiem z kolejki. Zdejmuje to z pracy także zwroty
      bez naszej korekty i bez oceny towaru — dlatego wychodzą one w raporcie
@@ -436,22 +385,18 @@ export function kubelekZwrotu(z: {
      żaden nie chowa pracy — ale „odrzucony" niesie POWÓD, a „zamknięty" mówi
      tylko, że sprawy nie ma. Przy wyborze między dwoma prawdami wygrywa ta,
      która więcej tłumaczy. */
-  /* ZATRZASK, NIE WSKAŹNIK (0.345.0). `status_allegro` mówi, co jest TERAZ,
+  /* ZATRZASK, NIE WSKAŹNIK. `status_allegro` mówi, co jest TERAZ,
      a nie co było: zwrot rozliczony idzie dalej tą samą osią czasu — choćby
      na `COMMISSION_REFUND_CLAIMED`, który dotyczy NASZEJ prowizji, a nie
-     pieniędzy klienta. Wskaźnik przestawał wtedy pokazywać rozliczenie
-     i kubełek wypychał taki zwrot z powrotem do kolejki pracy.
-
-     Zgłoszenie właściciela: „nadal pokazuje paczki, do których został już
-     stwierdzony zwrot" — a wypychał je NASZ WŁASNY automat rabatów (0.320.0),
-     składający wniosek zaraz po zaciągnięciu odstąpienia.
+     pieniędzy klienta. Sam wskaźnik wypchnąłby taki zwrot z powrotem do
+     pracy, a status ten ustawia nasz własny automat rabatów.
 
      Wskaźnik czytamy DALEJ, obok zatrzasku: pierwsze spojrzenie na świeżo
      zsynchronizowany zwrot bywa wcześniejsze niż zapis zatrzasku, a dwa
      źródła tej samej prawdy nie kłócą się — oba mówią „pieniądze wróciły". */
-  /* PACZKI NIEODEBRANEJ WYPŁATA NIE ZAMYKA (0.493.0). Zwrot z Allegro po
-     wypłacie wychodzi z pracy decyzją z 0.339.0, a braki łapie rekoncyliacja.
-     Nieodebraną biuro przyjmuje po to, żeby zrobić ZW i odłożyć towar —
+  /* PACZKI NIEODEBRANEJ WYPŁATA NIE ZAMYKA. Zwrot z Allegro po
+     wypłacie wychodzi z pracy, a braki łapie rekoncyliacja. Nieodebraną
+     biuro przyjmuje po to, żeby zrobić ZW i odłożyć towar —
      a pieniądze bywają oddane wcześniej, ręką w Allegro. Zamknięcie po
      wypłacie zdejmowałoby taką paczkę z kolejki w pierwszym takcie po
      przyjęciu, zanim ktokolwiek ją oceni. Wypłata dalej zdejmuje czekanie
@@ -460,11 +405,7 @@ export function kubelekZwrotu(z: {
       && (z.zrodlo ?? "allegro") !== "nieodebrana") {
     return "zamkniety";
   }
-  /* ── STARY ZWROT BEZ DECYZJI JEST ROZLICZONY (0.452.0) ─────────────────
-     Wywiad z właścicielem: „Do decyzji" liczyło 743 sprawy, „głównie stare".
-     Zatrzask z 0.426.0 łapie tylko wypłatę z obciążeniem `REFUND_CHARGE`,
-     a reszta starych zwrotów stała w kolejce na zawsze.
-
+  /* ── STARY ZWROT BEZ DECYZJI JEST ROZLICZONY ───────────────────────────
      Fakt, na którym stoi reguła, podał właściciel: sprzedawca ma siedem dni,
      a ósmego dnia Allegro oddaje pieniądze samo. Po `wygasaDni` od zgłoszenia
      pytanie „przyjąć czy odrzucić?" nie ma już treści — pieniądze są
@@ -478,7 +419,7 @@ export function kubelekZwrotu(z: {
      LICZONE, NIE ZAPISANE. Kubełek wynika z faktów przy każdym odczycie,
      więc zmiana progu w `ZWROT_WYGASA_DNI` działa od razu i w obie strony.
      Zapis w bazie byłby decyzją bez człowieka, której nie dałoby się cofnąć. */
-  /* NIENADANA CZEKA DŁUŻEJ (0.505.0) — powód przy `NIEODESLANY_WYGASA_DNI`. */
+  /* NIENADANA CZEKA DŁUŻEJ — powód przy `NIEODESLANY_WYGASA_DNI`. */
   const prog = z.nadana === false ? Math.max(wygasaDni, NIEODESLANY_WYGASA_DNI) : wygasaDni;
   if (!z.werdykt && z.utworzono && (z.zrodlo ?? "allegro") !== "nieodebrana"
       && teraz - Date.parse(z.utworzono) > prog * 86_400_000) {
@@ -506,10 +447,7 @@ const PROG_POTWIERDZENIA_DNI = 3;
 /**
  * Sygnały — jedyne rzeczy, które każą przeczytać wiersz.
  *
- * Wszystko inne wiersz mówi bez czytania. Sygnału „rozjazd" (klient zgłosił
- * inną liczbę sztuk, niż wróciła) tu nadal nie ma: liczbę zwróconą zna
- * dopiero ocena hali. Reguła bez danych zapalałaby się na ślepo albo nigdy —
- * obie wersje uczą operatora ignorować kolor.
+ * Wszystko inne wiersz mówi bez czytania.
  *
  * DWA SYGNAŁY O PIENIĄDZACH SĄ OSOBNE, BO MÓWIĄ COŚ INNEGO. Jeden mówi
  * „wysłaliśmy i nie wiemy", drugi „nie wysyłaliśmy, a poszło". Zwinięte
@@ -524,11 +462,11 @@ export function sygnalyZwrotu(z: {
   pieniadzeAt: string | null;
   /* Ostatni status zwrotu po stronie Allegro — nasze jedyne potwierdzenie. */
   statusAllegro: string | null;
-  /** Czy zapisana kwota rozjechała się z pozycjami (0.210.0). */
+  /** Czy zapisana kwota rozjechała się z pozycjami. */
   kwotaRozjazd?: boolean;
-  /** Czy któraś pozycja wróciła w innej liczbie, niż klient zgłosił (0.212.0). */
+  /** Czy któraś pozycja wróciła w innej liczbie, niż klient zgłosił. */
   rozjazdIlosci?: boolean;
-  /** Forma płatności zamówienia; pobranie oddaje się przelewem (0.269.0). */
+  /** Forma płatności zamówienia; pobranie oddaje się przelewem. */
   platnoscTyp?: string | null;
   /** Kiedy biuro zapisało, że przelew poszedł; `null` = nie ma śladu. */
   przelewAt?: string | null;
@@ -536,32 +474,28 @@ export function sygnalyZwrotu(z: {
   kwotaUstalona?: boolean;
   /** Czy zwrot został przyjęty; odmowa nie prosi o pieniądze. */
   przyjety?: boolean;
-  /** Czy to zamówienie ma zwrot z drugiego źródła (0.493.0). */
+  /** Czy to zamówienie ma zwrot z drugiego źródła. */
   drugiZwrot?: boolean;
-  /** Data zgłoszenia — od niej liczy się termin odesłania (0.505.0). */
+  /** Data zgłoszenia — od niej liczy się termin odesłania. */
   utworzono?: string | null;
 }, teraz = Date.now()): Sygnal[] {
   const s: Sygnal[] = [];
   /* Stany końcowe nie mają terminu do pilnowania — czerwień na nich uczyłaby
      przewijać czerwone wiersze. */
   const wPracy = z.kubelek !== "zamkniety" && z.kubelek !== "odrzucony";
-  /* `null` = paczka jeszcze nie wróciła, więc zegar nie ruszył (0.339.0).
+  /* `null` = paczka jeszcze nie wróciła, więc zegar nie ruszył.
      Sygnał terminu na paczce w drodze kazałby gonić pracę, której nie da się
      wykonać — od tego jest `brak_dowodu` linijkę niżej. */
   if (wPracy && z.dni !== null && z.dni <= PROG_TERMINU_DNI) s.push("termin");
-  /* Dowodem jest DORĘCZENIE, nie nadanie (0.187.0). Do 0.186.0 sygnał gasł,
-     gdy klient nadał paczkę — a paczka w drodze nie jest paczką u nas. Zwrot
-     doręczony i ten jadący od tygodnia wyglądały w kolejce identycznie.
-
-     Gdy trackingu nie ma (przewoźnik nie odpowiada, brak numeru), zostaje
-     dawne kryterium: lepszy sygnał z daty nadania niż jego brak. */
+  /* Dowodem jest DORĘCZENIE, nie nadanie — paczka w drodze nie jest paczką
+     u nas. Gdy trackingu nie ma, zostaje data nadania: lepszy sygnał niż brak. */
   const wrocila = z.dostarczonoAt != null
     || (z.przesylkaStatus == null && Boolean(z.paczkaAt));
-  /* KLIENT NIE ODESŁAŁ (0.505.0). Zgłosił odstąpienie, a przez czternaście
+  /* KLIENT NIE ODESŁAŁ. Zgłosił odstąpienie, a przez czternaście
      dni nie nadał paczki — nie ma ani numeru listu, ani doręczenia. Pieniądze
      się nie należą, więc sygnał zastępuje „nie nadana": to już nie czekanie,
      tylko decyzja do podjęcia. Tylko w DO DECYZJI — po werdykcie ktoś ją
-     już podjął. Zgłoszenie właściciela przy zwrocie 5ZRQ/2026. */
+     już podjął. */
   const nieOdeslany = z.kubelek === "decyzja" && !z.paczkaAt && !z.dostarczonoAt
     && !z.rejectionCode && Boolean(z.utworzono)
     && teraz - Date.parse(String(z.utworzono)) > TERMIN_ODESLANIA_DNI * 86_400_000;
@@ -572,12 +506,9 @@ export function sygnalyZwrotu(z: {
   if (z.rejectionCode) s.push("odrzucony_w_allegro");
 
   const oddane = STATUSY_ODDANE.has(String(z.statusAllegro ?? ""));
-  /* PRZELEW BEZ POTWIERDZENIA. Do tego wydania status płatności zapisywał się
-     RAZ, z odpowiedzi na `POST /payments/refunds`, i nikt go już nie czytał:
-     przelew, który Allegro odrzuciło godzinę później, wyglądał u nas
-     dokładnie jak udany. Potwierdzeniem jest status zwrotu, bo `GET` po
-     identyfikatorze zwrotu płatności w specyfikacji NIE ISTNIEJE — sprawdzone
-     w `docs/allegro/swagger.yaml`, jest tam samo `POST /payments/refunds`.
+  /* PRZELEW BEZ POTWIERDZENIA. Odpowiedź na `POST /payments/refunds` nie
+     mówi, czy przelew wyszedł. Potwierdzeniem jest status zwrotu, bo `GET`
+     po identyfikatorze zwrotu płatności w specyfikacji NIE ISTNIEJE.
 
      Ten jeden sygnał obowiązuje TAKŻE na zwrocie zamkniętym. Wszystkie
      pozostałe gasną na stanach końcowych, bo mówią o pracy do zrobienia —
@@ -595,12 +526,12 @@ export function sygnalyZwrotu(z: {
      już ma.
 
      Tylko na zwrocie w pracy. Na zamkniętych zapaliłby się na całej
-     historii sprzed tego panelu — a tam nie ma już czego zapłacić drugi raz. */
+     historii — a tam nie ma już czego zapłacić drugi raz. */
   if (wPracy && oddane && !z.pieniadzeAt) s.push("pieniadze_poza_panelem");
-  /* POBRANIE CZEKA NA PRZELEW (0.269.0). Allegro tych pieniędzy nie trzymało,
+  /* POBRANIE CZEKA NA PRZELEW. Allegro tych pieniędzy nie trzymało,
      więc przycisk ODDAJ PIENIĄDZE jest zamknięty z definicji — a zwrot zamyka
      się korektą i schodzi z kolejki. Bez tego sygnału jedynym śladem po
-     niewykonanej wypłacie był brak wyciągu bankowego, czyli nic.
+     niewykonanej wypłacie jest brak wyciągu bankowego, czyli nic.
 
      Świeci TAKŻE na zwrocie zamkniętym, z tego samego powodu co
      niepotwierdzony przelew: pieniądze wychodzą zwykle po korekcie, więc
@@ -610,7 +541,7 @@ export function sygnalyZwrotu(z: {
       && !z.przelewAt && !oddane) {
     s.push("przelew_czeka");
   }
-  /* DRUGI ZWROT TEGO ZAMÓWIENIA (0.493.0). Tylko w pracy: gdy oba są
+  /* DRUGI ZWROT TEGO ZAMÓWIENIA. Tylko w pracy: gdy oba są
      zamknięte, pieniądze są już rozstrzygnięte, a świecący sygnał na
      historii uczyłby go nie czytać. Świeci na OBU wierszach, bo każdy
      z nich może być tym, który ktoś zaraz wypłaci. */
@@ -618,13 +549,10 @@ export function sygnalyZwrotu(z: {
   /* KWOTA ROZJECHANA Z POZYCJAMI. Świeci także na zwrocie ZAMKNIĘTYM, z tego
      samego powodu co niepotwierdzony przelew: mówi o pieniądzach, które mogły
      wyjść w złej wysokości, a zwrot zamyka się zaraz po korekcie. Gaśnie
-     dopiero wtedy, gdy ktoś kwotę poprawi — drabina cofania z 0.202.0 daje
-     na to drogę nawet po zamknięciu. */
+     dopiero wtedy, gdy ktoś kwotę poprawi — drabina cofania daje na to
+     drogę nawet po zamknięciu. */
   if (z.kwotaRozjazd) s.push("kwota_nieaktualna");
-  /* ROZJAZD ILOŚCI (0.212.0). Do 0.211.0 tego sygnału nie było, bo nie było
-     DANYCH: liczbę zwróconą znała tylko paczka, nie baza, a reguła bez danych
-     zapala się na ślepo albo nigdy. Teraz liczy ją biuro przy rozpakowaniu,
-     więc sygnał ma z czego świecić.
+  /* ROZJAZD ILOŚCI. Liczbę zwróconą liczy biuro przy rozpakowaniu.
 
      Świeci także na zwrocie zamkniętym: mówi, że wypłata poszła za inną liczbę
      sztuk, niż klient zgłosił — a to jest zdanie, którego szuka się po fakcie,
@@ -638,23 +566,19 @@ export function sygnalyZwrotu(z: {
  *
  * To NIE jest jeszcze „kwota pełna". Koszt dostawy nie przyjeżdża ze
  * zwrotem — Allegro trzyma go przy zamówieniu (`/order/checkout-forms`)
- * i przy inicjowaniu zwrotu płatności (`delivery.value`). Do czasu, aż
- * panel zacznie dociągać zamówienie, wariant „bez wysyłki" byłby
- * nieodróżnialny od pełnego, czyli byłby kłamstwem na przycisku.
+ * i przy inicjowaniu zwrotu płatności (`delivery.value`).
  */
 export function sumaPozycji(pozycje: Array<{ cenaGrosze: number; ilosc: number }>): number {
   return pozycje.reduce((s, p) => s + Math.round(p.cenaGrosze * p.ilosc), 0);
 }
 
 /**
- * Czy zapisana kwota nadal zgadza się z pozycjami (0.210.0).
+ * Czy zapisana kwota nadal zgadza się z pozycjami.
  *
  * KWOTA JEST MIGAWKĄ, A POZYCJE ŻYJĄ DALEJ. Synchronizator przy każdym takcie
  * nadpisuje `ilosc` i `cena_grosze` pozycji z Allegro, a zapisanej
- * `kwota_grosze` nie dotyka nic — do tego wydania nikt jej po zapisie nie
- * porównywał. Zwrot, którego klient poprawił po wycenie, wypłacał kwotę
- * sprzed poprawki. Cicho, bo obie liczby leżały w bazie zgodne ze sobą
- * w chwili zapisu.
+ * `kwota_grosze` nie dotyka nic. Bez porównania zwrot poprawiony przez
+ * klienta po wycenie wypłaciłby kwotę sprzed poprawki.
  *
  * Liczymy TĄ SAMĄ arytmetyką co `zapiszKwote`: zaznaczone pozycje minus
  * potrącenia, plus zapisany koszt dostawy. Inna dałaby fałszywy alarm przy
@@ -761,9 +685,7 @@ function zloz(
     terminAt,
     dniDoTerminu: dni,
     sumaPozycjiGrosze: suma,
-    /* Kwota pełna = pozycje + dostawa. Bez zamówienia zostaje `null`, a nie
-       suma pozycji udająca całość — do 0.151.0 ekran musiał o tym pisać
-       zdanie, bo koszt dostawy stoi przy zamówieniu, nie przy zwrocie. */
+    /* Bez zamówienia zostaje `null`, a nie suma pozycji udająca całość. */
     kwotaPelnaGrosze: zamowienie ? suma + (zamowienie.dostawaGrosze ?? 0) : null,
     waluta: pozycje[0]?.waluta ?? zamowienie?.waluta ?? "PLN",
     /* Paczka nieodebrana nie ma zwrotu w Allegro, więc nie ma czego otwierać —
@@ -792,16 +714,10 @@ function zloz(
     notatkaAt: (z.notatka_at as string) ?? null,
     notatkaPrzez: (z.notatka_przez as string) ?? null,
     maPoprzedniaNotatke: ((z.notatka_poprzednia as string) ?? null) !== null,
-    /* ZWROT ALBO JEGO ZAMÓWIENIE (0.177.0). Login siedzi w OBU odpowiedziach
+    /* ZWROT ALBO JEGO ZAMÓWIENIE. Login siedzi w OBU odpowiedziach
        Allegro — `CustomerReturn.buyer.login` i `checkout-forms.buyer.login` —
-       i oba synchronizatory go mapują. Ekran czytał wyłącznie pierwszy, więc
-       zwrot bez `buyer` (albo zaciągnięty przed 0.164.0, gdy mapowania tam
-       jeszcze nie było) nie pokazywał kupującego wcale, choć jego zamówienie
-       leżało obok z wypełnioną kolumną. To ten sam człowiek: zamówienie jest
-       tym, którego zwrot dotyczy.
-
-       Zysk nie kończy się na ekranie — po tym polu idzie też kolumna
-       „Kupujacy" w eksporcie CSV. */
+       i oba synchronizatory go mapują. Zwrot bez `buyer` bierze login z
+       zamówienia, którego dotyczy — to ten sam człowiek. */
     kupujacyLogin: (z.kupujacy_login as string) ?? zamowienie?.kupujacyLogin ?? null,
     /* Ten sam fallback i z tego samego powodu co przy loginie: kolumna zwrotu
        jest pierwsza, bo przy paczce nieodebranej wpisał ją człowiek patrzący
@@ -827,17 +743,6 @@ function zloz(
   };
 }
 
-/* EKSPORTU CSV JUŻ NIE MA (0.370.0). Właściciel wskazał go wprost jako
-   niepotrzebny przy prośbie „uprość panel zwrotów do wymaganego minimum".
-
-   Nie jest to sama oszczędność miejsca na ekranie: plik wynosił loginy
-   kupujących na dysk, czyli poza politykę danych zwrotów, i właśnie
-   dlatego zostawiał ślad `zwroty_eksport`. Rzecz, której nikt nie używa,
-   a która wynosi dane osobowe, jest samym kosztem.
-
-   Gdyby wróciła: numeru listu i nazwy odbiorcy w pliku nie było i nie ma
-   mieć — plik na dysku jest zapisem trwalszym niż baza. */
-
 /**
  * Cała kolejka, jednym zapytaniem plus jednym na pozycje.
  *
@@ -853,19 +758,16 @@ export type FiltrZwrotow =
 
 export function listaZwrotow(
   database: Db = defaultDb(), teraz = Date.now(),
-  /* Zwroty JEDNEGO zamówienia (0.221.0) — dla bloku zwrotu przy rozmowie.
+  /* Zwroty JEDNEGO zamówienia — dla bloku zwrotu przy rozmowie.
      Ten sam skład wiersza, co w kolejce zwrotów: druga funkcja składająca
      zwrot rozjechałaby się z pierwszą przy pierwszym nowym polu.
 
-     JEDEN ZWROT (audyt zwrotów, 15 września 2026) — dla szczegółu. Do tego
-     wydania trasa szczegółu budowała CAŁĄ historię zwrotów, żeby wyjąć z niej
-     jeden wiersz, razem z propozycją kartoteki i stanem rabatu dla każdej
-     pozycji każdego zwrotu. Szczegół odświeża się po każdym zapisie, więc
-     płacił to każdy klawisz. Filtr zawęża też odczyty słownikowe niżej. */
+     JEDEN ZWROT — dla szczegółu, który odświeża się po każdym zapisie.
+     Filtr zawęża też odczyty słownikowe niżej. */
   filtr: FiltrZwrotow | null = null,
 ): WierszZwrotu[] {
   const znaki = (n: number) => Array.from({ length: n }, () => "?").join(",");
-  /* Stan zadania ZW (0.349.0) złączeniem, nie osobnym zapytaniem na zwrot:
+  /* Stan zadania ZW złączeniem, nie osobnym zapytaniem na zwrot:
      zadanie jest co najwyżej jedno i wskazuje je kolumna zwrotu. Aliasy z
      przedrostkiem `zw_`, żeby nie zasłoniły kolumn zwrotu o tych samych nazwach. */
   const ZWROTY_Z_ZW = `SELECT z.*, q.status AS zw_status, q.sgt_doc_number AS zw_numer,
@@ -879,7 +781,7 @@ export function listaZwrotow(
       : database.prepare(`${ZWROTY_Z_ZW} WHERE z.channel_account_id=? AND z.order_id=?
           ORDER BY z.created_at ASC`).all(filtr.channelAccountId, filtr.orderId)) as Wiersz[];
   const idyZwrotow = zwroty.map((z) => Number(z.id));
-  /* ZWROTY TYCH SAMYCH ZAMÓWIEŃ, do sygnału `drugi_zwrot` (0.493.0). Pełna
+  /* ZWROTY TYCH SAMYCH ZAMÓWIEŃ, do sygnału `drugi_zwrot`. Pełna
      kolejka ma je już w pamięci. Szczegół jednego zwrotu pyta o jedno
      zamówienie — jego drugi zwrot zwykle nie przeszedł filtra. */
   type ZwrotZamowienia = { id: number; zrodlo: string; numer: string };
@@ -912,7 +814,7 @@ export function listaZwrotow(
           WHERE zwrot_id IN (${znaki(idyZwrotow.length)}) ORDER BY id ASC`).all(...idyZwrotow)
       : []) as Wiersz[];
   const idyPozycji = pozycje.map((p) => Number(p.id));
-  /* Które pozycje leżą już w koszyku zwrotów (0.192.0). Osobne zapytanie,
+  /* Które pozycje leżą już w koszyku zwrotów. Osobne zapytanie,
      nie złączenie: `listaZwrotow` czyta całe tabele naraz i dokładanie
      `LEFT JOIN` do jednej z nich rozjechałoby ten wzorzec bez zysku. */
   const wKoszyku = new Set(((filtr === null
@@ -940,7 +842,7 @@ export function listaZwrotow(
         .all(...idyZamowien)
       : []) as Wiersz[];
 
-  /* Stan zdjęcia oferty (0.214.0). JEDNO zapytanie na całą kolejkę, jak przy
+  /* Stan zdjęcia oferty. JEDNO zapytanie na całą kolejkę, jak przy
      zamówieniach wyżej — snapshotów jest tyle, co ofert, a `LEFT JOIN` na
      wiersz pozycji ciągnąłby je po jednym. Ekran ma tu powiedzieć trzy różne
      rzeczy, więc niesie stan, a nie samo „jest/nie ma". */
@@ -990,7 +892,7 @@ export function listaZwrotow(
   const rozmowy = filtr !== null && !numery.length ? [] : database.prepare(`
     SELECT rz.numer AS zam, c.id, c.subject, c.status,
            (SELECT MAX(x.sent_at) FROM message x WHERE x.conversation_id = c.id) AS ostatnia,
-           /* OSTATNIE SŁOWO W WĄTKU (0.486.1) — do nagłówka zwrotu. Zgłoszenie
+           /* OSTATNIE SŁOWO W WĄTKU — do nagłówka zwrotu. Zgłoszenie
               właściciela: „potrzebuję więcej informacji o kliencie w nagłówku,
               szczególnie jeśli jest konwersacja o tym zwrocie". Temat i data
               nie mówią, czy klient czeka na nas. Pomijamy naszą automatyczną
@@ -1005,9 +907,7 @@ export function listaZwrotow(
                AND NOT ${glosAllegroPoZamknieciu("x")}
              ORDER BY x.sent_at DESC LIMIT 1) AS kierunek
       FROM ${ROZMOWA_ZAMOWIENIA} rz JOIN conversation c ON c.id = rz.conversation_id
-      /* Konto rozmowy musi być kontem zwrotu (0.502.0) — do tego wydania
-         zapytanie go nie sprawdzało. Numery Allegro to UUID, więc zderzenie
-         kont jest czysto teoretyczne; reszta mostka filtruje i ta część też. */
+      /* Konto rozmowy musi być kontem zwrotu, jak w reszcie mostka. */
       JOIN zwrot_klienta zk ON zk.order_id = rz.numer AND zk.channel_account_id = c.channel_account_id
      WHERE 1=1
        ${filtr === null ? "" : `AND rz.numer IN (${znaki(numery.length)})`}
@@ -1033,7 +933,7 @@ export function listaZwrotow(
       const surowe = wgZwrotu.get(Number(z.id)) ?? [];
       const zam = zamWgKlucza.get(`${z.channel_account_id}|${z.order_id}`) ?? null;
       const pozZamowienia = zam ? pozWgZam.get(Number(zam.id)) ?? [] : [];
-      /* SZTUKI, nie sam fakt (0.176.0). Ta sama oferta bywa w zwrocie w kilku
+      /* SZTUKI, nie sam fakt. Ta sama oferta bywa w zwrocie w kilku
          wierszach (`klucz` z przyrostkiem), więc sztuki się SUMUJĄ — inaczej
          „wraca 1" przy dwóch wierszach po jednej sztuce byłoby nieprawdą. */
       const wracajace = new Map<string, number>();
@@ -1055,7 +955,7 @@ export function listaZwrotow(
         }
       }
 
-      /* ── NUMER OFERTY DO ZDJĘCIA (0.213.0) ──────────────────────────────
+      /* ── NUMER OFERTY DO ZDJĘCIA ────────────────────────────────────────
          `PozycjaZwrotu.offerId` do zdjęcia się NIE NADAJE i mówi o tym cały
          akapit niżej: nie wiadomo, czy to numer oferty, czy identyfikator
          pozycji zamówienia (`[WERYFIKUJ]` w `docs/allegro-ksztalt.md`).
@@ -1088,7 +988,7 @@ export function listaZwrotow(
           powod: (p.powod as string) ?? null,
           powodKomentarz: (p.powod_komentarz as string) ?? null,
           ocena: (p.ocena as string) ?? null,
-          /* Czy ta pozycja jest na dokumencie MM (0.192.0). Ocena „na stan"
+          /* Czy ta pozycja jest na dokumencie MM. Ocena „na stan"
              dokłada ją do koszyka, ale pozycja BEZ KARTOTEKI wejść nie może —
              MM przesuwa stany kartotek. Ekran ma to powiedzieć wprost, bo
              cicha strata kończy się kartonem na hali z towarem spoza
@@ -1107,7 +1007,7 @@ export function listaZwrotow(
             : stanZdjeciaOferty(zdjeciaOfert.get(`${z.channel_account_id}|${oferta}`)),
           ean: twId === null ? null : eanWgTw.get(twId) ?? null,
           zrodlo: String(p.zrodlo ?? "allegro"),
-          /* Ile NAPRAWDĘ wróciło; `null` = nikt jeszcze nie liczył (0.212.0). */
+          /* Ile NAPRAWDĘ wróciło; `null` = nikt jeszcze nie liczył. */
           iloscZwrocona: p.ilosc_zwrocona == null ? null : Number(p.ilosc_zwrocona),
           potracenieGrosze: p.potracenie_grosze == null ? null : Number(p.potracenie_grosze),
           potraceniePowod: (p.potracenie_powod as string) ?? null,
@@ -1132,9 +1032,7 @@ export function listaZwrotow(
 
          Sprawdzamy OBIE kolumny z tego samego powodu co złączenie
          w `dopasowanie-sku.ts`: nie wiadomo, czy `offerId` ze zwrotu to
-         numer oferty, czy identyfikator pozycji zamówienia. Do 0.153.1
-         porównanie szło po jednej i przy rozjeździe ŻADNA pozycja nie
-         dostawała plakietki WRACA — co samo w sobie było objawem. */
+         numer oferty, czy identyfikator pozycji zamówienia. */
       const zamowienie = zam ? naZamowienie(zam, pozZamowienia, (p) =>
         wracajace.get((p.offer_id as string) ?? "")
           ?? wracajace.get((p.external_id as string) ?? "")
@@ -1158,7 +1056,7 @@ export function listaZwrotow(
         drugiZwrotDla(z));
     })
     /* Najkrótszy termin na górze — to jest cała reguła kolejności i jedyna,
-       jakiej ten ekran potrzebuje. ZWROTY BEZ TERMINU IDĄ NA KONIEC (0.339.0):
+       jakiej ten ekran potrzebuje. ZWROTY BEZ TERMINU IDĄ NA KONIEC:
        ich paczka jeszcze nie wróciła, więc nie ma czego obsłużyć, a puste
        miejsce po terminie nie ma prawa udawać najpilniejszego. */
     .sort((a, b) => (a.dniDoTerminu ?? Infinity) - (b.dniDoTerminu ?? Infinity));
@@ -1168,8 +1066,7 @@ export function listaZwrotow(
  * Ile pozycji czeka na kartotekę i z jakiego powodu.
  *
  * Bez tej liczby nie da się powiedzieć, czy problem jest w kodzie, czy
- * w danych po stronie Allegro — a przez trzy wydania nie dało się tego
- * rozstrzygnąć właśnie dlatego, że każde zerwane ogniwo wyglądało tak samo.
+ * w danych po stronie Allegro.
  */
 export function bilansKartotek(zwroty: WierszZwrotu[]) {
   const powody: Record<string, number> = {};
@@ -1183,7 +1080,7 @@ export function bilansKartotek(zwroty: WierszZwrotu[]) {
       wszystkie++;
       if (p.twId !== null) continue;
       bez++;
-      /* DWA RODZAJE CZEKANIA (0.220.0), bo znaczą co innego i co innego
+      /* DWA RODZAJE CZEKANIA, bo znaczą co innego i co innego
          każą zrobić. Pewność `sku` wiąże automat sam — pozycja z taką
          propozycją NIE POWINNA tu stać, a gdy stoi, znaczy to, że automat
          nie chodzi (`services/wiazania.ts`). Pozostałe stopnie czekają
@@ -1211,20 +1108,15 @@ export function licznikiKubelkow(zwroty: WierszZwrotu[]): Record<Kubelek, number
 /**
  * Potwierdzenie kartoteki dla pozycji zwrotu.
  *
- * PIERWSZY ZAPIS tego ekranu. Do 0.151.0 zwroty wyłącznie czytały, a licznik
- * tras zapisu w `routes/zwroty.test.ts` stał na zerze i był umową — tak jak
- * licznik `method:` w `biuro.test.ts` dla panelu magazynu.
- *
  * Zapisuje ŹRÓDŁO razem z wyborem. `sku` znaczy „agent zatwierdził propozycję
- * automatu", `reczne` — „wskazał sam". Projekt panelu §4.3 żąda, żeby wybór
- * człowieka nie udawał faktu z Allegro; tu obowiązuje to w obie strony, bo
- * bez źródła nie da się później odróżnić, komu wierzyć.
+ * automatu", `reczne` — „wskazał sam". Bez źródła nie da się później
+ * odróżnić, komu wierzyć.
  *
  * `twId === null` ZDEJMUJE powiązanie — to jest droga wyjścia z błędnego
  * potwierdzenia, a nie brak funkcji.
  *
  * `zapamietaj: false` wiąże pozycję BEZ dopisania do `oferta_kartoteka`.
- * Używa tego automat sygnatur (0.169.0): pamięć niesie zdanie „wskazał to
+ * Używa tego automat sygnatur: pamięć niesie zdanie „wskazał to
  * człowiek" i jest w `zaproponujKartoteke` mocniejsza od automatu. Wpisanie
  * tam wyniku automatu podszywałoby go pod decyzję biura, a przy okazji
  * nadpisywało cudze imię w `wskazano_przez`.
@@ -1291,7 +1183,7 @@ export function potwierdzKartoteke(
 
      Pamięć trzyma się OFERTY, nie pozycji: pozycja żyje jednym zwrotem. */
   if (pozycja.offer_id && zapamietaj) {
-    /* Sygnatura pozycji zamówienia W TEJ CHWILI (0.219.0) — po obu kolumnach
+    /* Sygnatura pozycji zamówienia W TEJ CHWILI — po obu kolumnach
        złączenia, jak `dopasujPozycjeZamowienia`. Gdy sprzedawca przepnie
        sygnaturę, to wskazanie ma jej ustąpić — patrz `pamiecAktualna`. */
     const linia = pozycja.order_id ? database.prepare(`SELECT p.sku FROM zamowienie_klienta k
@@ -1320,17 +1212,12 @@ export function potwierdzKartoteke(
   return { twId: towar.tw_id, twSymbol: towar.symbol, twZrodlo: zrodlo };
 }
 
-/* ── Decyzje biura (0.156.0) ─────────────────────────────────────────────────
-   Do tego wydania kolejka bramek była DEKORACJĄ: `kubelekZwrotu` routuje po
-   `werdykt`, ocenie pozycji, `kwota_grosze` i `korekta_numer`, a żadnej z tych
-   kolumn nic nie zapisywało. Każdy zwrot stał w DO DECYZJI na zawsze.
+/* ── Decyzje biura ───────────────────────────────────────────────────────────
+   Zapisy, po których `kubelekZwrotu` przesuwa zwrot: `werdykt`, ocena pozycji,
+   `kwota_grosze` i `korekta_numer`.
 
-   Trzy zapisy domykają trzy pierwsze kubełki. Korekta i zamknięcie zostają
-   poza wydaniem: tamto wychodzi do Subiekta i ma własny kontrakt.
-
-   KONTROLA WSPÓŁBIEŻNOŚCI jak przy rozmowie. Kolumna `wersja` stoi w schemacie
-   od 0.150.0 z komentarzem „dwóch agentów nie zamyka jednego zwrotu dwiema
-   różnymi kwotami" — dopiero teraz ma czego pilnować.                       */
+   KONTROLA WSPÓŁBIEŻNOŚCI jak przy rozmowie: kolumna `wersja` pilnuje, żeby
+   dwóch agentów nie zamknęło jednego zwrotu dwiema różnymi kwotami.       */
 
 export class ZwrotConflict extends Error {
   constructor(message: string, public readonly szczegoly: Record<string, unknown>) {
@@ -1385,11 +1272,8 @@ export function rozstrzygnijZwrot(
       WHERE id=?`).run(decyzja, teraz.toISOString(), kto.name, kto.id,
         uzasadnienie === "" ? null : uzasadnienie, zwrotId);
     podnies(database, zwrotId);
-    /* NA OŚ, nie tylko do dziennika (0.313.0). Do 0.284.0 oś zwrotu znała
-       wyłącznie cofnięcia, bo tylko one ją zapisywały — karta pokazywałaby
-       „Cofnięto przyjęcie" nad pustką po samym przyjęciu. `events` ma tę
-       decyzję od zawsze, ale jest audytem SYSTEMU: nie ma retencji, nie ma
-       ekranu i nie odpowiada na pytanie biura „co się z tą sprawą działo". */
+    /* NA OŚ, nie tylko do dziennika. `events` jest audytem SYSTEMU: nie ma
+       retencji ani ekranu i nie odpowiada biuru „co się z tą sprawą działo". */
     zdarzenie(database, zwrotId, "werdykt",
       decyzja === "przyjety" ? "Zwrot przyjęty" : `Odmowa: ${uzasadnienie}`,
       { decyzja, powod: uzasadnienie || null }, kto, teraz.toISOString());
@@ -1400,11 +1284,9 @@ export function rozstrzygnijZwrot(
 }
 
 /**
- * Cofa PRZYJĘCIE zwrotu — wraca do kubełka DECYZJA (0.204.0).
+ * Cofa PRZYJĘCIE zwrotu — wraca do kubełka DECYZJA.
  *
- * Trzeci i ostatni szczebel drabiny z §25a.5. Zgłoszenie właściciela: „gdy
- * kliknę przyjęcie zwrotu, na DO OCENY nie mogę tego cofnąć". Przyjęcie idzie
- * JEDNYM kliknięciem, bez pytania o nic — i tak ma zostać, bo tak wygląda
+ * Trzeci i ostatni szczebel drabiny cofania. Przyjęcie idzie JEDNYM kliknięciem, bez pytania o nic — i tak ma zostać, bo tak wygląda
  * typowy zwrot. Kliknięcie bez pytania musi jednak mieć drogę powrotną,
  * inaczej cena pomyłki jest wyższa niż cena pytania, którego celowo nie ma.
  *
@@ -1436,7 +1318,7 @@ export function cofnijWerdykt(
     if (pieniadze.zwrot_pieniedzy_id) {
       throw new Error("Pieniądze zostały już oddane — przyjęcia nie cofam.");
     }
-    /* KWOTA BEZ OCEN ISTNIEJE (0.484.7). `zapiszKwote` wymaga samego
+    /* KWOTA BEZ OCEN ISTNIEJE. `zapiszKwote` wymaga samego
        przyjęcia, więc komentarz wyżej zakładał za dużo: cofnięcie werdyktu
        zostawiało kwotę i zlecone ZW na zwrocie bez decyzji. */
     const kwota = database.prepare("SELECT kwota_grosze FROM zwrot_klienta WHERE id=?")
@@ -1448,7 +1330,7 @@ export function cofnijWerdykt(
       `SELECT id, nazwa FROM zwrot_klienta_pozycja
         WHERE zwrot_id=? AND ocena IS NOT NULL`).all(zwrotId) as Array<{ id: number; nazwa: string }>;
     /* Pozycja na wystawionym MM oceny nie odda (`ocenPozycje`), więc „najpierw
-       cofnij oceny" byłoby drogą donikąd (0.484.7). Mówimy to wprost. */
+       cofnij oceny" byłoby drogą donikąd. Mówimy to wprost. */
     for (const p of ocenione) {
       const kosz = zamknietyKoszPozycji(database, Number(p.id));
       if (kosz) {
@@ -1472,7 +1354,7 @@ export function cofnijWerdykt(
   })();
 }
 
-/** Trzy oceny pozycji zwrotu; `null` cofa ocenę (0.375.0). */
+/** Trzy oceny pozycji zwrotu; `null` cofa ocenę. */
 export type OcenaPozycji = "stan" | "utylizacja" | "outlet" | null;
 
 /** Jak ocena brzmi na osi zwrotu — czyta ją człowiek, nie kod. */
@@ -1483,38 +1365,28 @@ const OPIS_OCENY: Record<Exclude<OcenaPozycji, null>, string> = {
 /**
  * Ocena towaru: na stan, do utylizacji albo na outlet. `null` cofa ocenę.
  *
- * OCENA „NA STAN" DOKŁADA POZYCJĘ DO KOSZYKA ZWROTÓW (0.192.0) — bez
+ * OCENA „NA STAN" DOKŁADA POZYCJĘ DO KOSZYKA ZWROTÓW — bez
  * osobnego ruchu. Właściciel opisał obieg biura tak: „gdy agent zasiada do
  * zwrotów, to otwiera pustą MM i dodaje kolejno przedmioty ze zwrotów; gdy
  * koszyk się zapełni, zamyka MM i tak w kółko". Naciśnięcie, które operator
  * i tak wykonuje, JEST tym dołożeniem; osobny przycisk kazałby mu powiedzieć
  * dwa razy to samo.
  *
- * OCENY SĄ TRZY OD 0.375.0, a trzecia ma warunek. „Przecena" stała tu od
- * 0.156.0 i zeszła w 0.209.0, bo nie prowadziła DONIKĄD: nie dokładała do
- * koszyka, nie ruszała stanu, nie zakładała zadania — zapisywała się i na tym
- * się kończyła. Trzeci przycisk, który wygląda jak decyzja, a nie jest żadną,
- * kosztuje operatora namysł przy każdej pozycji.
+ * OCENY SĄ TRZY, a trzecia ma warunek. Przycisk, który wygląda jak decyzja,
+ * a nie prowadzi donikąd, kosztuje operatora namysł przy każdej pozycji.
  *
- * „Outlet" stoi w tym samym miejscu i też nie tworzy dokumentu — magazyn
- * outletowy nie jest skonfigurowany, bo właściciel obsługuje go RĘKĄ (decyzja
- * z 16 września 2026). Wolno jej tu stać, bo kończy się LISTĄ ROBOCZĄ:
- * `pozycjeNaOutlet` wymienia, co czeka na przeniesienie, a `przeniesionoNaOutlet`
- * to odklikuje. Bez tej listy byłaby „przeceną" drugi raz.
+ * „Outlet" nie tworzy dokumentu — magazyn outletowy właściciel obsługuje
+ * RĘKĄ. Wolno mu tu stać, bo kończy się LISTĄ ROBOCZĄ: `pozycjeNaOutlet`
+ * wymienia, co czeka na przeniesienie, a `przeniesionoNaOutlet` to odklikuje.
  *
  * Czego ta ocena BRONI: towar używany bez własnej oceny dostawał „na stan",
  * jechał na halę i wracał MM-em powrotnym na półkę pickingową obok
  * fabrycznych. Kompletujący brał ten, który stał bliżej.
  *
- * KAŻDA OCENA MA SWÓJ KOSZYK (0.211.0). „Stan" idzie na regał zwrotów,
- * „utylizacja" na magazyn odpadu — decyzja właściciela. Do 0.210.0 utylizacja
- * zapisywała się i na tym koniec: bez dokumentu, bez ruchu stanu, bez listy.
- * Towar leżał, a w Subiekcie nie było po nim żadnego śladu. Był to dokładnie
- * ten ślepy zaułek, za który w 0.209.0 zdjęto „przecenę" — tylko utylizacji
- * nikt wtedy nie policzył.
+ * KAŻDA OCENA MA SWÓJ KOSZYK. „Stan" idzie na regał zwrotów,
+ * „utylizacja" na magazyn odpadu — decyzja właściciela.
  *
- * Odpad bez `MAG_ID_ODP` w `wertis.env` zachowuje się jak przed 0.211.0:
- * ocena się zapisuje, koszyka nie ma. Zgadnięty numer magazynu wystawiłby
+ * Odpad bez `MAG_ID_ODP` w `wertis.env`: ocena się zapisuje, koszyka nie ma. Zgadnięty numer magazynu wystawiłby
  * dokument przesuwający złom w cudze miejsce.
  *
  * `koszyk` w wyniku mówi, czy dołożenie się udało. Pozycja bez kartoteki nie
@@ -1537,9 +1409,8 @@ export function ocenPozycje(
        nie przyjęliśmy, zostawiałoby w bazie decyzję o czymś, co nie wraca. */
     if (z.werdykt !== "przyjety") throw new Error("Najpierw przyjmij zwrot");
     /* ODMOWA PRZED ZAPISEM, nie po nim: pozycja z zamkniętego koszyka jest już
-       na dokumencie MM, który pojechał na halę. Do 0.202.0 zmiana oceny
-       przechodziła tu po cichu i zostawiała towar na cudzym papierze — bez
-       oceny, która go tam posłała, więc i bez tropu przy szukaniu. */
+       na dokumencie MM, który pojechał na halę. Zmiana oceny zostawiłaby
+       towar na cudzym papierze bez tropu przy szukaniu. */
     const zamkniety = zamknietyKoszPozycji(database, pozycjaId);
     if (zamkniety) {
       throw new Error(`Pozycja jest na zamkniętym koszyku ${zamkniety.kod} — ` +
@@ -1574,7 +1445,7 @@ export function ocenPozycje(
     /* OUTLET NIE MA KOSZYKA i to jest jego definicja, nie brak. Magazyn
        outletowy nie jest skonfigurowany, więc dokument MM nie miałby dokąd
        jechać — a zgadnięty numer przesunąłby używkę w cudze miejsce. */
-    /* WSKAZANY KOSZYK JEDZIE DALEJ (0.379.0). Przy kilku otwartych pudłach
+    /* WSKAZANY KOSZYK JEDZIE DALEJ. Przy kilku otwartych pudłach
        `dolozDoKosza` odmawia zgadywania i oddaje wybór ekranowi — decyzja
        właściciela. Przy jednym pudle nikt o nic nie pyta. */
     const koszyk = ocena === null || ocena === "outlet" ? null
@@ -1591,15 +1462,12 @@ export function ocenPozycje(
   })();
 }
 
-/* ── Lista robocza outletu (0.375.0) ────────────────────────────────────────
-   Warunek, pod którym trzecia ocena w ogóle weszła. „Przecena" zeszła
-   w 0.209.0, bo kończyła się znacznikiem w bazie — a znacznik, którego nikt
-   nie czyta, jest ślepym zaułkiem. Tu znacznik ma czytelnika: człowieka, który
-   niesie używkę na regał i wystawia jej MM w Subiekcie.
+/* ── Lista robocza outletu ──────────────────────────────────────────────────
+   Znacznik, którego nikt nie czyta, jest ślepym zaułkiem. Tu ma czytelnika:
+   człowieka, który niesie używkę na regał i wystawia jej MM w Subiekcie.
 
    Lista mówi, CO czeka. Odkliknięcie mówi, że już nie czeka. Nic poza tym —
-   żadnego dokumentu z naszej strony, bo magazyn outletowy obsługuje dziś ręka
-   (decyzja właściciela, 16 września 2026).                                    */
+   żadnego dokumentu z naszej strony, bo magazyn outletowy obsługuje ręka. */
 
 export interface PozycjaNaOutlet {
   pozycjaId: number;
@@ -1759,10 +1627,9 @@ function przeniesionoSkladnik(
 }
 
 /**
- * Skład kompletu wskazany ręką biura, z dołożeniem do koszyka (0.336.0).
+ * Skład kompletu wskazany ręką biura, z dołożeniem do koszyka.
  *
- * Zgłoszenie właściciela: „rozwiąż «nie weszła do koszyka» — nie wiem, gdzie
- * to wskazać". Zapis samego składu nie kończy sprawy: pozycja ma już ocenę
+ * Zapis samego składu nie kończy sprawy: pozycja ma już ocenę
  * „na stan", tylko odbiła się od braku rozbicia. Kazanie operatorowi cofnąć
  * ocenę i postawić ją drugi raz byłoby pytaniem o to, co już powiedział.
  *
@@ -1789,12 +1656,8 @@ export function wskazSklad(
 }
 
 /**
- * Rejestracja paczki, która wróciła NIEODEBRANA (0.172.0).
- *
- * ── FORMULARZ ODSZEDŁ W 0.451.0, WIERSZ WRÓCIŁ W 0.493.0 ────────────────
- * W 0.451.0 rejestracja zniknęła z panelu i z serwera, decyzją właściciela.
- * Funkcja została, bo jest JEDYNĄ definicją kształtu takiego wiersza. Wraca
- * do niej `przyjmijNieodebrana`, nową decyzją — uzasadnienie stoi tam.
+ * Rejestracja paczki, która wróciła NIEODEBRANA — jedyna definicja kształtu
+ * takiego wiersza. Woła ją `przyjmijNieodebrana`.
  *
  * Allegro takiego bytu nie zna: `CustomerReturn` powstaje z DEKLARACJI klienta,
  * a nieodebrana przesyłka wraca sama i zwrotem nigdy nie zostanie. Pieniądze
@@ -1809,52 +1672,18 @@ export function wskazSklad(
  * bez nich zwrot nie miałby czego wycenić, a operator nie wie, co w paczce
  * jest, dopóki jej nie otworzy.
  *
- * ── LOGIN KUPUJĄCEGO (0.365.0) ─────────────────────────────────────────────
- * Zgłoszenie właściciela: „nieodebrane paczki powinienem móc wyszukiwać po
- * loginie klienta". Szukanie w panelu zna login od 0.337.0 i pole mówi to
- * wprost — ale TEJ paczce login brał się wyłącznie z zamówienia, a numeru
- * zamówienia przy nieodebranej najczęściej nie ma. Karton wraca sam, bez
- * zgłoszenia i bez kopii z Allegro, więc jedyne, co operator ma pod ręką, to
- * naklejka i wiadomość od klienta. Szukanie po loginie milczało wtedy tak
- * samo, jak gdyby paczki nie było — a to najgorszy rodzaj odpowiedzi.
- *
- * Login WPISANY bije ten z zamówienia, bo pochodzi od człowieka patrzącego na
- * sprawę. Gdy go nie ma, bierzemy z zamówienia — i zapisujemy do KOLUMNY,
- * zamiast liczyć na złączenie przy każdym odczycie: zwrot ma zostać
- * odnajdywalny także wtedy, gdy zamówienie wypadnie z okna synchronizacji.
+ * Login i nazwę odbiorcy zapisujemy do KOLUMN, zamiast liczyć na złączenie
+ * przy każdym odczycie: zwrot ma zostać odnajdywalny także wtedy, gdy
+ * zamówienie wypadnie z okna synchronizacji.
  */
-
-/*
- * ── NAZWA ODBIORCY I PRZEWOŹNIK Z NAKLEJKI (0.367.0) ───────────────────────
- * Właściciel: paczki nakleja klient albo kurier i tych numerów w Allegro nie
- * ma. To przewraca założenie z 0.172.0, że nietrafiony skan wracającej paczki
- * to zwykły wyścig synchronizacji — numeru z naklejki nasz system nie widział
- * NIGDY i nie zobaczy, więc pierwszy skan musi chybić z definicji.
- *
- * Zostają dwa uchwyty, które na naklejce widać: nazwa odbiorcy i przewoźnik.
- * Oba zapisujemy do kolumn zwrotu i oba wchodzą do szukania — dopiero razem
- * z loginem dają odpowiedź na „czyja to paczka i która".
- */
-
-/** Ile znaków loginu zapisujemy. Allegro trzyma się dużo krótszych. */
-const LIMIT_LOGINU = 100;
-
-/** Ile znaków nazwy odbiorcy. Naklejka i tak nie mieści więcej. */
-const LIMIT_NAZWY = 120;
-
 export function zarejestrujNieodebrana(
-  database: Db, dane: {
-    waybill?: string | null; orderId?: string | null; notatka?: string | null;
-    login?: string | null; odbiorcaNazwa?: string | null; przewoznik?: string | null;
-  },
+  database: Db, dane: { waybill?: string | null; orderId?: string | null },
   kto: { id: number; name: string }, teraz = new Date(),
 ): { zwrotId: number; pozycji: number } {
   const waybill = (dane.waybill ?? "").trim();
   const orderId = (dane.orderId ?? "").trim() || null;
-  /* Uchwytem jest numer listu ALBO zamówienie (0.493.0). Do 0.451.0 list
-     był jedynym, bo formularz zakładał zwrot bez zamówienia. Przycisk przy
-     wyniku szukania zna zamówienie zawsze, a listu nie, gdy biuro szukało
-     klienta bez skanu naklejki. */
+  /* Uchwytem jest numer listu ALBO zamówienie: przycisk przy wyniku szukania
+     zna zamówienie zawsze, a listu nie, gdy biuro szukało bez skanu naklejki. */
   if (!waybill && !orderId) {
     throw new Error("Numer listu przewozowego jest tu jedynym uchwytem — podaj go.");
   }
@@ -1880,32 +1709,22 @@ export function zarejestrujNieodebrana(
       .get(konto.id, orderId) as
       { kupujacy_login: string | null; odbiorca_nazwa: string | null } | undefined
     : undefined;
-  const login = (dane.login ?? "").trim().slice(0, LIMIT_LOGINU)
-    || (zam?.kupujacy_login ?? null);
-  /* Ta sama zasada co przy loginie: wpisane bije to z zamówienia, bo pochodzi
-     od człowieka patrzącego na naklejkę. Adres dostawy bywa inny niż kupujący
-     i to WŁAŚNIE ta nazwa stoi na kartonie. */
-  const odbiorca = (dane.odbiorcaNazwa ?? "").trim().slice(0, LIMIT_NAZWY)
-    || (zam?.odbiorca_nazwa ?? null);
-  /* Przewoźnika przy nieodebranej Allegro nie zna wcale — do 0.366.0 kolumna
-     zostawała pusta. Operator widzi go na naklejce, a wybór z listy nie
-     wymaga pisania. Trzymamy SUROWO, jak przy zwrocie z Allegro. */
-  const przewoznik = (dane.przewoznik ?? "").trim().toUpperCase() || null;
+  const login = zam?.kupujacy_login ?? null;
+  /* Adres dostawy bywa inny niż kupujący i to WŁAŚNIE ta nazwa stoi na kartonie. */
+  const odbiorca = zam?.odbiorca_nazwa ?? null;
 
   return transaction(database, () => {
     database.prepare(`INSERT INTO zwrot_klienta
       (channel_account_id,external_id,order_id,created_at,paczka_at,dostarczono_at,
-       zrodlo,waybill,notatka,kupujacy_login,odbiorca_nazwa,przewoznik,synced_at)
-      VALUES (?,?,?,?,?,?,'nieodebrana',?,?,?,?,?,?)`).run(
+       zrodlo,waybill,kupujacy_login,odbiorca_nazwa,synced_at)
+      VALUES (?,?,?,?,?,?,'nieodebrana',?,?,?,?)`).run(
       konto.id, external, orderId, at,
       /* Paczka JEST u nas — inaczej nie byłoby czego rejestrować. To jedyny
          zwrot, przy którym datę powrotu znamy na pewno, więc `dostarczono_at`
          wpisuje się od razu zamiast czekać na tracking, którego tu nie ma:
          przy paczce nieodebranej nie znamy przewoźnika, a Allegro nie zna
-         samego zwrotu. Bez tego panel pytał „czy dotarła" o karton leżący
-         na biurku operatora. */
-      at, at, waybill || null, (dane.notatka ?? "").trim() || null,
-      login, odbiorca, przewoznik, at);
+         samego zwrotu. */
+      at, at, waybill || null, login, odbiorca, at);
     const zwrotId = Number((database.prepare(
       "SELECT id FROM zwrot_klienta WHERE channel_account_id=? AND external_id=?")
       .get(konto.id, external) as { id: number }).id);
@@ -1917,11 +1736,8 @@ export function zarejestrujNieodebrana(
         JOIN zamowienie_klienta k ON k.id = p.zamowienie_id
        WHERE k.channel_account_id=? AND k.external_id=?`)
         .all(konto.id, orderId) as Array<Record<string, unknown>>;
-      /* Przyrostek liczy się per POWTÓRZENIE, nie per wiersz — poprawka
-         0.174.2. Do niej stało tu `i + 1` z pętli, więc druga pozycja
-         zamówienia dostawała `|#2` nawet wtedy, gdy niczego nie powtarzała.
-         Taki napis w kluczu zderzał się potem w migracji z prawdziwym
-         duplikatem sąsiada i kładł start aplikacji. */
+      /* Przyrostek liczy się per POWTÓRZENIE, nie per wiersz: numer wiersza
+         w kluczu zderzałby się w migracji z prawdziwym duplikatem sąsiada. */
       const wystapienia = new Map<string, number>();
       poz.forEach((p) => {
         const baza = `${p.offer_id ?? ""}|${p.nazwa}`;
@@ -1939,27 +1755,20 @@ export function zarejestrujNieodebrana(
 
     /* W dzienniku SAME FAKTY, nie dane osobowe. Zdarzenie odpowiada na pytanie
        „skąd ten wiersz", a do tego wystarczy, że uchwyt był; login i nazwa
-       odbiorcy leżą w kolumnach zwrotu i stamtąd się je czyta. Przewoźnik
-       daną osobową nie jest, więc idzie wprost. */
+       odbiorcy leżą w kolumnach zwrotu i stamtąd się je czyta. */
     logEvent("zwrot_nieodebrana", kto.name, null,
       { zwrotId, orderId, pozycji, zLoginem: login !== null,
-        zOdbiorca: odbiorca !== null, przewoznik }, kto.id, database);
+        zOdbiorca: odbiorca !== null, przewoznik: null }, kto.id, database);
     return { zwrotId, pozycji };
   })();
 }
 
 /**
- * Paczka nieodebrana przyjęta JEDNYM KLIKIEM z wyniku szukania (0.493.0).
+ * Paczka nieodebrana przyjęta JEDNYM KLIKIEM z wyniku szukania.
  *
- * Decyzja właściciela, po pytaniu „jak procesujemy paczki, które wracają
- * nieodebrane". Od 0.451.0 biuro tylko szukało zamówienia, a resztę robiło
- * poza panelem: ZW w Subiekcie, towar na półkę, przelew w Allegro. Taka paczka
- * nie miała ani oceny, ani koszyka, ani automatu ZW, ani śladu oddanych
- * pieniędzy — czyli żadnej z rzeczy, dla których zwroty w ogóle są w panelu.
- *
- * To NIE jest powrót formularza z 0.451.0. Tamten miał sześć pól i zasłaniał
- * login. Ten przycisk stoi przy zamówieniu, które operator już wskazał, więc
- * pyta o nic: pozycje, login i odbiorcę bierze z zamówienia.
+ * Paczka dostaje ocenę, koszyk, automat ZW i ślad oddanych pieniędzy, jak
+ * każdy zwrot. Przycisk stoi przy zamówieniu, które operator już wskazał,
+ * więc pyta o nic: pozycje, login i odbiorcę bierze z zamówienia.
  *
  * TRZY BRAMKI, każda przed zapisem, każda z własnym zdaniem:
  * - zamówienia nie ma w bazie — bez niego zwrot nie miałby pozycji, czyli
@@ -2005,7 +1814,7 @@ export function przyjmijNieodebrana(
   return zarejestrujNieodebrana(database, { orderId, waybill: dane.waybill ?? null }, kto, teraz);
 }
 
-/* ── Dopisanie produktu do zwrotu (0.184.0) ──────────────────────────────────
+/* ── Dopisanie produktu do zwrotu ────────────────────────────────────────────
    Klient zgłasza jedną rzecz, a odsyła dwie. To nie jest wypadek przy pracy,
    tylko normalny bieg: formularz zwrotu wypełnia się na ekranie, a paczkę
    pakuje się przy stole i wtedy dokłada się to, co też nie pasowało.
@@ -2026,10 +1835,10 @@ export function przyjmijNieodebrana(
 export interface DoDopisania {
   zamPozycjaId: number;
   offerId: string | null;
-  /** Stan zdjęcia oferty (0.217.0) — kandydat też jest odniesieniem do towaru. */
+  /** Stan zdjęcia oferty — kandydat też jest odniesieniem do towaru. */
   ofertaZdjecie: StanZdjeciaOferty;
   nazwa: string;
-  /** Ile sztuk BRAKUJE w zwrocie — tyle wejdzie przy dopisaniu (0.484.7). */
+  /** Ile sztuk BRAKUJE w zwrocie — tyle wejdzie przy dopisaniu. */
   ilosc: number;
   /** Ile kupiono w tej linii zamówienia; różne od `ilosc`, gdy część już wraca. */
   zamowiono: number;
@@ -2044,14 +1853,9 @@ export interface DoDopisania {
  * pozycji już zgłoszonych kazałoby operatorowi porównywać dwie listy oczami —
  * a to jest dokładnie ta praca, którą ekran ma zdjąć (dekalog, punkt 5).
  *
- * ── RÓŻNICA W SZTUKACH, NIE W LINIACH (0.484.7) ─────────────────────────────
- * Zgłoszenie właściciela: klient zgłosił jedną nakrętkę z dwóch, a w kartonie
- * przyszły obie. Linia zamówienia stała już w zwrocie, więc lista jej nie
- * dawała, a „wróciło mniej" słusznie nie przyjmuje liczby większej niż
- * zgłoszona. Odmowa tamtego pola odsyłała tutaj — do drogi, której nie było.
- *
- * Teraz linia wypada z listy dopiero wtedy, gdy w zwrocie są WSZYSTKIE jej
- * sztuki; przy części zostaje z resztą. Sztuki liczymy tą samą regułą co
+ * ── RÓŻNICA W SZTUKACH, NIE W LINIACH ───────────────────────────────────────
+ * Klient zgłasza jedną nakrętkę z dwóch, a w kartonie przychodzą obie. Linia
+ * wypada więc z listy dopiero wtedy, gdy w zwrocie są WSZYSTKIE jej sztuki. Sztuki liczymy tą samą regułą co
  * plakietkę „↩ 1 z 2" w dowodach (`listaZwrotow`): pozycja zwrotu trafia
  * w linię po `offer_id` albo po `external_id`, bo nie wiadomo, którym z nich
  * Allegro ją podpisuje. Pula sztuk jest WSPÓLNA dla oferty i schodzi linia po
@@ -2156,8 +1960,7 @@ export function dopiszPozycje(
 
     /* Klucz musi być liczony PONOWNIE względem tego, co stoi w zwrocie, a nie
        przepisany z zamówienia: pozycja o tej samej parze mogła już wejść ze
-       zgłoszenia klienta. Duplikat klucza wywróciłby zapis na indeksie
-       UNIQUE — blizna 0.174.2. */
+       zgłoszenia klienta. Duplikat klucza wywróciłby zapis na indeksie UNIQUE. */
     const baza = `${kandydat.offerId ?? ""}|${kandydat.nazwa}`;
     const zajete = new Set((database.prepare(
       "SELECT klucz FROM zwrot_klienta_pozycja WHERE zwrot_id=?").all(zwrotId) as
@@ -2212,12 +2015,11 @@ export function usunDopisanaPozycje(
 }
 
 /**
- * Potrącenie za utratę wartości pojedynczej pozycji (0.170.0).
+ * Potrącenie za utratę wartości pojedynczej pozycji.
  *
- * Do tego wydania kwota była BINARNA per pozycja: cała cena albo nic. Towar
- * wracający używany nie miał jak zjechać w dół, a to codzienność biura.
+ * Towar wracający używany musi mieć jak zjechać w dół, a to codzienność biura.
  *
- * §25a.3 zostaje nienaruszone: panel nadal NIE przysyła kwoty do oddania —
+ * Panel NIE przysyła kwoty do oddania —
  * przysyła zaznaczenie, a sumę składa `zapiszKwote`. Potrącenie jest osobnym,
  * WALIDOWANYM zapisem przy pozycji, a nie liczbą doklejaną do sumy. Widełki
  * `0…cena × ilość` pilnuje serwer: potrącenie większe niż wartość pozycji
@@ -2228,13 +2030,10 @@ export function usunDopisanaPozycje(
  * co przy ocenie i korekcie (§25a.5).
  */
 /**
- * Ile sztuk NAPRAWDĘ wróciło w kartonie (0.212.0).
+ * Ile sztuk NAPRAWDĘ wróciło w kartonie.
  *
- * Klient zgłasza w Allegro dwie sztuki, w paczce przyjeżdża jedna — do tego
- * wydania nie było tego gdzie zapisać. Pozycji z Allegro nie da się poprawić
- * (zdjąć wolno tylko pozycję dopisaną przez biuro), a kwota liczyła się
- * z DEKLARACJI klienta. Zostawało odznaczyć całą pozycję albo zapłacić za
- * dwie; „wróciła jedna z dwóch" nie mieściło się w bazie.
+ * Klient zgłasza w Allegro dwie sztuki, w paczce przyjeżdża jedna. Pozycji
+ * z Allegro nie da się poprawić, a kwota ma iść za to, co wróciło.
  *
  * LICZY BIURO — decyzja właściciela: to ono otwiera i procesuje zwroty.
  *
@@ -2242,7 +2041,7 @@ export function usunDopisanaPozycje(
  * znaczy „nie wróciło nic", puste — „nikt jeszcze nie liczył".
  *
  * Więcej niż zgłoszono ODPADA. W kartonie bywa więcej, niż klient zgłosił, ale
- * to jest INNA pozycja i ma własną drogę (`dopiszPozycje` od 0.184.0).
+ * to jest INNA pozycja i ma własną drogę (`dopiszPozycje`).
  * Podniesienie liczby tutaj wypłaciłoby za sztuki, o których zwrocie klient
  * nigdy nie napisał.
  */
@@ -2269,7 +2068,7 @@ export function zapiszIloscZwrocona(
     }
   }
 
-  /* POTRĄCENIE NIE MOŻE PRZEROSNĄĆ TEGO, CO WRÓCIŁO (0.484.7). Widełki
+  /* POTRĄCENIE NIE MOŻE PRZEROSNĄĆ TEGO, CO WRÓCIŁO. Widełki
      potrącenia liczyły się z deklaracji; mniejsza liczba sztuk po nim dawała
      linię ujemną. `zapiszKwote` ją sumował, a zwrot pieniędzy pomijał — i
      przycisk wypłaty odmawiał zdaniem „popraw kwotę", którego nie dało się
@@ -2308,7 +2107,7 @@ export function zapiszPotracenie(
     if (!Number.isInteger(grosze) || grosze < 0) {
       throw new Error("Potrącenie to pełne grosze, nie mniej niż zero.");
     }
-    /* Widełki z tego, co WRÓCIŁO, nie z deklaracji (0.484.7) — ta sama
+    /* Widełki z tego, co WRÓCIŁO, nie z deklaracji — ta sama
        liczba, z której `zapiszKwote` liczy wartość linii. Inaczej linia
        wychodziła ujemna, a wypłata odmawiała bez drogi wyjścia. */
     const wartosc = Math.round(Number(p.cena_grosze) * iloscLiczona(p));
@@ -2380,18 +2179,15 @@ export function zapiszKwote(
        `zapiszPotracenie`, więc suma nie ma prawa zejść poniżej zera. */
     const suma = wszystkie
       .filter((p) => wybrane.has(Number(p.id)))
-      /* PO TYM, CO WRÓCIŁO (0.212.0). Do tego wydania kwota liczyła się
-         z deklaracji klienta, więc zwrot dwóch sztuk, z których przyjechała
-         jedna, wypłacał za dwie. */
+      /* PO TYM, CO WRÓCIŁO, nie po deklaracji klienta. */
       .reduce((s, p) => s + Math.round(Number(p.cena_grosze) * iloscLiczona(p))
         - Number(p.potracenie_grosze ?? 0), 0);
 
     /* Koszt dostawy bierze się z ZAMÓWIENIA, nie ze zwrotu: Allegro nie
-       przysyła go przy zwrocie. Dociągamy zamówienia od 0.152.0 i dopiero to
-       zdjęło blokadę opisaną przy `sumaPozycji`. Brak zamówienia znaczy zero,
-       bo nie ma czego oddać — a nie „oddaj nieznaną kwotę".
+       przysyła go przy zwrocie. Brak zamówienia znaczy zero, bo nie ma czego
+       oddać — a nie „oddaj nieznaną kwotę".
 
-       KTÓRĄ dostawę oddajemy — decyzja właściciela z 3 września 2026. Tę,
+       KTÓRĄ dostawę oddajemy — decyzja właściciela. Tę,
        którą klient WYBRAŁ i za którą zapłacił, czyli `dostawa_grosze`
        z zamówienia. Pytanie było realne, bo ustawa pozwala oddać MNIEJ:
        gdy klient wybrał opcję droższą niż najtańsza zwykła, sprzedawca nie
@@ -2431,7 +2227,7 @@ export function zapiszKwote(
     return { kwotaGrosze: suma + dostawa, dostawaGrosze: dostawa, wariant, wersja: wersja + 1 };
   })();
 
-  /* ZW ZLECA SIĘ SAM PO KWOCIE (0.349.0, decyzja właściciela). PO transakcji,
+  /* ZW ZLECA SIĘ SAM PO KWOCIE (decyzja właściciela). PO transakcji,
      bo `zakolejkujZw` otwiera własną, a `BEGIN IMMEDIATE` się nie zagnieżdża.
      Pod parasolem: kwota jest zapisana i obiecana klientowi, a nieudane
      zlecenie ZW nie ma prawa jej wywrócić — biuro wystawi ZW ręką. Wersji
@@ -2445,7 +2241,7 @@ export function zapiszKwote(
 }
 
 /**
- * Cofa ustaloną kwotę — zwrot wraca do DO ZWROTU (0.202.0).
+ * Cofa ustaloną kwotę — zwrot wraca do DO ZWROTU.
  *
  * §25a.5 obiecuje cofnięcie wszędzie poza oddaniem pieniędzy i odmową. Kwota
  * była z tej obietnicy wyjęta: nadpisać dawało się ją tylko w kubełku DO
@@ -2489,7 +2285,7 @@ export function cofnijKwote(
     if (z.korekta_numer) {
       throw new Error(`Najpierw cofnij korektę ${z.korekta_numer} — kwota jest pod nią.`);
     }
-    /* ZW zlecony z TEJ kwoty (0.349.0) czeka w kolejce albo już powstał.
+    /* ZW zlecony z TEJ kwoty czeka w kolejce albo już powstał.
        Czekający anulujemy — poprawiona kwota zleci nowy. Wystawiony
        zatrzymuje cofnięcie, bo dokument stoi w Subiekcie na starą kwotę. */
     odsunZwPrzedRecznym(database, zwrotId, "kwota", teraz);
@@ -2511,7 +2307,7 @@ export function cofnijKwote(
   })();
 }
 
-/* ── Korekta i zamknięcie (0.162.0) ──────────────────────────────────────────
+/* ── Korekta i zamknięcie ────────────────────────────────────────────────────
    Piąty kubełek był ślepym zaułkiem: `kubelekZwrotu` routuje po
    `korekta_numer`, a tej kolumny nic nie zapisywało. Zwrot z ustaloną kwotą
    stał w DO KOREKTY na zawsze, a ekran pisał przy nim „czeka na własne
@@ -2553,13 +2349,13 @@ export function zapiszKorekte(
       .get(zwrotId) as { werdykt: string | null; kwota_grosze: number | null };
     if (stan.werdykt !== "przyjety") throw new Error("Najpierw przyjmij zwrot");
     if (stan.kwota_grosze === null) throw new Error("Najpierw ustal kwotę do oddania");
-    /* Człowiek wyprzedza automat (0.349.0). Bez anulowania czekającego ZW
+    /* Człowiek wyprzedza automat. Bez anulowania czekającego ZW
        powstałby drugi dokument obok tego, którego numer właśnie wpisano. */
     odsunZwPrzedRecznym(database, zwrotId, "korekta", teraz);
 
     const kiedy = teraz.toISOString();
-    /* `reczne` odróżnia to od numeru znalezionego w Subiekcie przez automat
-       (0.201.0). Wybór człowieka nie ma udawać faktu z danych, ale i odwrotnie:
+    /* `reczne` odróżnia to od numeru znalezionego w Subiekcie przez automat.
+       Wybór człowieka nie ma udawać faktu z danych, ale i odwrotnie:
        fakt z danych nie ma udawać czyjejś decyzji. */
     database.prepare(`UPDATE zwrot_klienta
       SET korekta_numer=?, korekta_zrodlo='reczne', zamkniety_at=? WHERE id=?`)
@@ -2571,7 +2367,7 @@ export function zapiszKorekte(
   })();
 
   /* Ten numer bywa OSTATNIM brakującym w koszyku, który stoi zamknięty
-     i czeka na komplet korekt (0.200.0). MM wychodzi wtedy natychmiast,
+     i czeka na komplet korekt. MM wychodzi wtedy natychmiast,
      a nie po najbliższym takcie — biuro wpisuje numer i odchodzi.
 
      PO transakcji, nie w niej: `transaction` woła `BEGIN IMMEDIATE`, którego
@@ -2614,7 +2410,7 @@ export function cofnijKorekte(
       `UPDATE zwrot_klienta
         SET korekta_numer=NULL, korekta_zrodlo=NULL, zamkniety_at=NULL,
             korekta_queue_id=NULL WHERE id=?`).run(zwrotId);
-    /* `korekta_queue_id` ODPINAMY (0.349.0). Wykonane zadanie ZW zostałoby
+    /* `korekta_queue_id` ODPINAMY. Wykonane zadanie ZW zostałoby
        inaczej przy zwrocie i `wpiszNumeryZw` wpisałby cofnięty numer z powrotem
        w ciągu minuty. Sam dokument zostaje w Subiekcie — usuwa go biuro. */
     podnies(database, zwrotId);
@@ -2626,7 +2422,7 @@ export function cofnijKorekte(
   })();
 }
 
-/* ── Otwarcie zwrotu skanem etykiety zwrotnej (0.163.0) ──────────────────────
+/* ── Otwarcie zwrotu skanem etykiety zwrotnej ────────────────────────────────
    Paczka wraca do biura wcześniej niż wiedza o tym, który to zwrot. Do tego
    wydania operator szukał go oczami; teraz odpowiada za to czytnik.
 
@@ -2678,7 +2474,7 @@ export function znajdzZwrotPoKodzie(kod: string, database: Db = defaultDb()): Wy
     ["numer", poKolumnie("reference_number")],
     ["external", poKolumnie("external_id")],
     /* Paczka nieodebrana ma numer listu W MODELU, bo nie ma kopii odpowiedzi
-       Allegro, w której dałoby się go szukać (0.172.0). Stoi przed szukaniem
+       Allegro, w której dałoby się go szukać. Stoi przed szukaniem
        po lądowisku, żeby raz zarejestrowana paczka znalazła się od razu. */
     ["waybill", poKolumnie("waybill")],
     ["waybill", (database.prepare(`
@@ -2709,10 +2505,9 @@ function opisz(database: Db, idy: number[]) {
   }));
 }
 
-/* ── Notatka biura i oś zwrotu (0.313.0) ─────────────────────────────────────
+/* ── Notatka biura i oś zwrotu ───────────────────────────────────────────────
    Dwie strony jednej sprawy: co biuro ZAPISAŁO od siebie i co się ze zwrotem
-   DZIAŁO. Do 0.284.0 pierwszego nie dało się zrobić przy zwrocie z Allegro,
-   a drugie zapisywało pięć serwisów i nie czytał nikt.                      */
+   DZIAŁO.                                                                   */
 
 export interface WpisOsiZwrotu {
   id: number;
@@ -2797,22 +2592,10 @@ function wersjaSieZgadza(w: Record<string, unknown>, wersja: number | undefined)
   }
 }
 
-/* ZNACZNIKA „BIORĘ TO" PRZY ZWROCIE JUŻ NIE MA (0.370.0).
-
-   Wraca to do PIERWSZEJ decyzji z 0.315.0, a nie ustala nową: tamto wydanie
-   ustaliło najpierw, że przy zwrocie prowadzącego nie ma, bo zwroty prowadzi
-   całe biuro i sito „Moje"/„Niczyje" nie odpowiadałoby na żadne prawdziwe
-   pytanie — a tego samego dnia przywróciło znacznik z powrotem. Właściciel
-   wskazał go teraz wprost jako niepotrzebny przy prośbie o wymagane minimum.
-
-   REKLAMACJA ZOSTAJE ZE ZNACZNIKIEM (0.278.0) i to nie jest
-   niekonsekwencja: tam sprawę bierze konkretna osoba i prowadzi rozmowę
-   z klientem, więc pytanie „czyje to" jest prawdziwe. Zwrot przechodzi przez
-   biuro jako kolejka decyzji, nie jako czyjaś sprawa.
-
-   Kolumny `prowadzi`, `prowadzi_user_id` i `prowadzi_at` zostają w tabeli:
-   przebudowa dla trzech nieużywanych kolumn niesie więcej ryzyka, niż
-   kupuje. Czyta ich odtąd nikt. */
+/* ZWROT NIE MA ZNACZNIKA „BIORĘ TO", a reklamacja ma. Reklamację prowadzi
+   konkretna osoba w rozmowie z klientem; zwrot przechodzi przez biuro jako
+   kolejka decyzji. Kolumny `prowadzi*` zostają w tabeli nieczytane, bo
+   przebudowa tabeli niesie więcej ryzyka, niż kupuje. */
 
 /**
  * Zapis notatki. Poprzednia treść zostaje na wierszu — stąd cofnięcie.

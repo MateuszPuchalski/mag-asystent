@@ -6,10 +6,10 @@ import {
 import { Blad, dataLokalna, odmien, Pole, Przycisk } from "../ui";
 import { KartaWgladu, Tabela, Td } from "../ui/wglad";
 
-/* ── Konfiguracja serwera (0.488.0) ─────────────────────────────────────
+/* ── Konfiguracja serwera ───────────────────────────────────────────────
    Odpowiedź na „na czym ten serwer chodzi" bez pulpitu zdalnego na maszynie
-   z Subiektem. Od 0.491.0 decyzje właściciela zmienia się tu przyciskiem
-   „Zmień"; resztę — klucze instalatora i pokrętła — dalej w pliku.
+   z Subiektem. Decyzje właściciela zmienia się tu przyciskiem „Zmień";
+   resztę — klucze instalatora i pokrętła — w pliku.
 
    ZMIANA TO JEDEN KLUCZ NA RAZ. Serwer sprawdza, czy wstanie z nowym
    plikiem, zapisuje go i restartuje się sam. Formularz całości kusiłby do
@@ -42,10 +42,9 @@ function wartosc(w: WierszKonfiguracji): React.ReactNode {
   return w.wartosc === "" ? <i className="text-slate-600">puste</i> : <code className="break-all">{w.wartosc}</code>;
 }
 
-/* ── Wartość słowem (0.543.0) ──────────────────────────────────────────
+/* ── Wartość słowem ────────────────────────────────────────────────────
    Decyzja właściciela pokazuje to, na czym serwer pracuje, językiem biura:
-   „7 dni", „wyłączony", data. Wcześniej przy domyślnej stała kreska, a
-   liczbę znał tylko `config.ts`. Słowa dla wartości przychodzą z rejestru,
+   „7 dni", „wyłączony", data. Słowa dla wartości przychodzą z rejestru,
    bo rodzaj gramatyczny idzie za nazwą: szkic „wyłączony", rozpoznanie
    „wyłączone". Brak słowa to surowa wartość, nie zgadywanie. */
 export function wartoscSlowem(w: WierszKonfiguracji): string {
@@ -102,11 +101,11 @@ function Edytor({ w, onGotowe, onZamknij }: {
   </form>;
 }
 
-/* ── Gdzie mieszkają klucze właściciela (0.529.0) ──────────────────────
+/* ── Gdzie mieszkają klucze właściciela ────────────────────────────────
    Ustawienia są pogrupowane według tego, na co wpływają, a nie gdzie je
    zapisuje serwer. Termin zwrotu stoi przy zwrotach, a nie w konfiguracji
-   serwera pod nazwą `ZWROT_TERMIN_DNI` — szukało się go tam, gdzie się
-   o nim myśli, i nie znajdowało.
+   serwera pod nazwą `ZWROT_TERMIN_DNI` — szuka się go tam, gdzie się
+   o nim myśli.
 
    Grupa rejestru bez miejsca tutaj ląduje w karcie zaawansowanej, razem
    z kluczami instalatora. Nowy klucz właściciela nie zniknie więc po cichu:
@@ -138,12 +137,11 @@ function TabelaKluczy({ wiersze, onWynik }: { wiersze: WierszKonfiguracji[]; onW
   </Tabela>;
 }
 
-/* ── Decyzje właściciela wierszami (0.543.0) ──────────────────────────
-   Decyzja właściciela z 27 września 2026, wariant B z makiet: wiersz jak
-   w ustawieniach telefonu. Nazwa i jedno zdanie z lewej, wartość, która
-   obowiązuje, z prawej. Tabela z kluczem z pliku na czele i kreską zamiast
-   liczby odpowiadała na pytanie instalatora, nie biura. Klucz zostaje w
-   dymku nazwy, bo szuka się go przy awarii i w `wertis.env`.
+/* ── Decyzje właściciela wierszami ────────────────────────────────────
+   Wiersz jak w ustawieniach telefonu: nazwa i jedno zdanie z lewej,
+   wartość, która obowiązuje, z prawej. Tabela z kluczem z pliku na czele
+   odpowiadałaby na pytanie instalatora, nie biura. Klucz zostaje w dymku
+   nazwy, bo szuka się go przy awarii i w `wertis.env`.
 
    CAŁY WIERSZ JEST PRZYCISKIEM. Cel kliknięcia to wiersz, nie mały „Zmień"
    w środku kolumny (dekalog pkt 1 i 6). Wiersz, którego panel nie zmieni,

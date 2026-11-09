@@ -2,7 +2,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { naGrosze, rozwinCeny, type CenaRow } from "./subiekt.mssql.js";
 
-/* ── Cennik kartoteki z Subiekta na read-model (0.405.0) ─────────────────────
+/* ── Cennik kartoteki z Subiekta na read-model ─────────────────────
    Właściciel uruchomił `tools/sonda-cen.sql` na produkcji 19 września 2026
    i wynik rozstrzygnął dwie rzeczy, których nie dało się wziąć z kodu:
 

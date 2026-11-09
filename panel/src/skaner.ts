@@ -1,7 +1,7 @@
 import { useEffect, useRef } from "react";
 import { oknoModalne } from "./nawigacja/fokus";
 
-/* ── Czytnik kodów jako klawiatura (0.163.0) ─────────────────────────────────
+/* ── Czytnik kodów jako klawiatura ───────────────────────────────────────────
    Czytnik USB wpisuje znaki jak klawiatura i kończy Enterem. Panel musi
    odróżnić taką serię od człowieka stukającego w skróty — a na ekranie zwrotów
    cyfry 1–6 przełączają kubełki i litery `j`/`k` chodzą po kolejce.
@@ -30,7 +30,7 @@ export const MIN_DLUGOSC = 6;
 export const ZWLOKA_MS = 40;
 
 /**
- * Odstęp, poniżej którego seria W POLU TEKSTOWYM jest czytnikiem (0.468.0).
+ * Odstęp, poniżej którego seria W POLU TEKSTOWYM jest czytnikiem.
  *
  * Sześć razy ostrzej niż `PRZERWA_MS`, bo tu pomyłka kosztuje więcej: poza
  * polem zbyt gorliwy nasłuch przełączy najwyżej kubełek, a w polu ZJADŁBY
@@ -42,7 +42,7 @@ export const PRZERWA_W_POLU_MS = 50;
 
 export interface OpcjeSkanera {
   /**
-   * Słuchaj także w polach tekstowych (0.468.0). Seria czytnika w zwykłym
+   * Słuchaj także w polach tekstowych. Seria czytnika w zwykłym
    * polu nie zostaje w nim — pole wraca do treści sprzed serii, a kod idzie
    * do `onSkan`. Pole, które skan obsługuje samo, nosi `data-skan-wlasny`.
    */
@@ -85,11 +85,11 @@ export function useSkaner(
   naZnak.current = onZnak;
   wPolach.current = Boolean(opcje?.wPolach);
 
-  /* ── SKAN W POLU (0.468.0) ───────────────────────────────────────────────
-     Zgłoszenie właściciela: „zakładka zwrotów powinna CAŁY CZAS nasłuchiwać
-     skanu etykiety". Nasłuch niżej milczy, gdy kursor stoi w polu — więc
-     etykieta zeskanowana przy kursorze w notatce albo w kwocie wpisywała się
-     tam jak tekst, a Enter czytnika zapisywał tę kwotę.
+  /* ── SKAN W POLU ─────────────────────────────────────────────────────────
+     Zakładka zwrotów nasłuchuje skanu etykiety CAŁY CZAS. Nasłuch niżej
+     milczy, gdy kursor stoi w polu — więc bez tego etykieta zeskanowana przy
+     kursorze w notatce albo w kwocie wpisałaby się tam jak tekst, a Enter
+     czytnika zapisałby tę kwotę.
 
      Osobny nasłuch w FAZIE PRZECHWYTYWANIA, na oknie. Tylko ta faza jest
      przed obsługą pola w Reakcie, więc Enter czytnika nie dociera do pola
@@ -151,8 +151,8 @@ export function useSkaner(
     let bufor = "";
     let ostatni = 0;
     let odlozony: { e: KeyboardEvent; zegar: ReturnType<typeof setTimeout> } | null = null;
-    /* SKRÓT POD OKNEM MODALNYM MILCZY (0.546.0). Pod historią klienta `Z`
-       oddawało pieniądze za zwrot zasłonięty nakładką. Skan idzie dalej, bo
+    /* SKRÓT POD OKNEM MODALNYM MILCZY: inaczej `Z` pod historią klienta
+       oddałoby pieniądze za zwrot zasłonięty nakładką. Skan idzie dalej, bo
        zwroty mają słuchać etykiety cały czas. Pytamy w chwili oddania znaku,
        nie wciśnięcia: odłożony pierwszy znak czeka jeszcze `ZWLOKA_MS`. */
     const doSkrotu = (e: KeyboardEvent) => { if (!oknoModalne()) naZnak.current?.(e); };
@@ -213,16 +213,15 @@ export function useSkaner(
   }, []);
 }
 
-/* ── Czytnik W POLU TEKSTOWYM (0.329.0) ─────────────────────────────────────
-   Zgłoszenie właściciela: „skan powinien najpierw wyczyścić pole szukania,
-   a nie dopisywać się na końcu tego, co już w nim stoi".
+/* ── Czytnik W POLU TEKSTOWYM ───────────────────────────────────────────────
+   Skan najpierw czyści pole szukania, a nie dopisuje się na końcu tego, co
+   już w nim stoi.
 
    Hook wyżej celowo MILCZY, gdy kursor stoi w polu — pole obsługuje Enter samo
    i dwie drogi naraz wpisywałyby kod podwójnie. Skutek uboczny tej decyzji jest
    jednak taki, że znaki czytnika lecą do pola jak pisanie: przy niepustym polu
-   doklejają się do poprzedniej treści. Operator, który zeskanował jedną
-   etykietę, a potem drugą, szuka po sklejonych dwóch numerach i nie znajduje
-   nic. Wygląda to na zepsuty czytnik, a jest zwykłym dopisaniem.
+   doklejają się do poprzedniej treści, a sklejone dwa numery nie znajdują
+   niczego.
 
    ROZSTRZYGA SERIA, NIE POJEDYNCZY ZNAK. Ten sam podpis czytnika co wyżej:
    znaki lecą gęściej niż `PRZERWA_MS`, a kod jest dłuższy niż `MIN_DLUGOSC`.

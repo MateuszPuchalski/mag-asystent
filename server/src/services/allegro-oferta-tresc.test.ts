@@ -4,7 +4,7 @@ import fs from "node:fs";
 import { DatabaseSync } from "node:sqlite";
 import { naTekst, zbierzTresc, trzebaTresci, dociagnijTresc } from "./allegro-oferta-tresc.js";
 
-/* ── Treść oferty dla Copilota (0.253.0) ─────────────────────────────────────
+/* ── Treść oferty dla Copilota ───────────────────────────────────────────────
    Testy pilnują TRZECH rzeczy, z których każda kosztowałaby osobno.
 
    Kształt: opis Allegro jedzie HTML-em w sekcjach, a lista zgodności ma dwie
@@ -104,7 +104,7 @@ test("po tygodniu treść odświeża się sama", async () => {
 
 test("oferta BEZ opisu też zapamiętuje, że pytaliśmy", async () => {
   /* Inaczej każda oferta bez opisu kosztowałaby żądanie przy każdym szkicu —
-     ta sama blizna, którą zdjęcie listingowe kupiło w 0.214.0. */
+     to samo rozróżnienie co przy zdjęciu listingowym. */
   const d = baza();
   let strzalow = 0;
   const query = async () => { strzalow += 1; return {}; };

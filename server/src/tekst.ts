@@ -247,7 +247,7 @@ const ENCJE: Readonly<Record<string, string>> = {
   /* Zwykła spacja, nie U+00A0: niełamliwa w bazie psułaby porównania
      i zawijanie, a nikt jej tu świadomie nie użył. */
   nbsp: " ",
-  /* ── Polskie znaki (0.152.0) ─────────────────────────────────────────────
+  /* ── Polskie znaki ─────────────────────────────────────────────
      Zostają wypisane osobno, choć mieszczą się w bloku niżej: to one były
      powodem powstania tej tablicy (blizna 0.127.0) i pierwsze, czego się tu
      szuka. */
@@ -323,12 +323,6 @@ const ENCJE: Readonly<Record<string, string>> = {
  * `&lt;` i STOP, bo wynik podstawienia nie jest skanowany ponownie. To
  * celowe: podwójne kodowanie oznacza, że ktoś po drodze zakodował encję
  * jako tekst, i jeden poziom na przebieg jest jedynym bezpiecznym ruchem.
- *
- * OD 0.140.0 BEZ WOŁAJĄCEGO: jedynym był adapter rozmów Allegro, który odszedł
- * z obsługą klienta. Funkcja zostaje z testami, bo „&oacute; w treści pytania"
- * to blizna zapłacona wydaniem 0.127.0 i wpisana na listę w
- * `docs/obsluga-klienta.md` — nowa obsługa ma ją wziąć gotową, nie odkryć
- * drugi raz na produkcji.
  */
 export function odkodujEncje(s: string): string {
   return s.replace(/&(#\d+|#x[0-9a-fA-F]+|[a-zA-Z]+);/g, (calosc, cialo: string) => {

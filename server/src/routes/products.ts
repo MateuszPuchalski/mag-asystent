@@ -59,7 +59,7 @@ function computeNewLocs(current: string[], body: LocBody): string[] | null {
       return current.filter((l) => l !== v);
     case "replace_one":
       return current.map((l) => (l === body.replaced ? v : l));
-    /* PODNIESIENIE na pierwsze miejsce (0.38.0). Pickingową jest PIERWSZA
+    /* PODNIESIENIE na pierwsze miejsce. Pickingową jest PIERWSZA
        lokalizacja z pola (`locs.ts`), więc „uczyń podstawową" to przestawienie
        kolejności, a nie dopisanie ani skasowanie czegokolwiek — reszta adresów
        zostaje nietknięta i w swojej kolejności.
@@ -264,7 +264,7 @@ export async function productRoutes(app: FastifyInstance) {
   );
 
   /**
-   * Nadanie kodu kreskowego kartotece (0.37.0) → zadanie `set_ean`.
+   * Nadanie kodu kreskowego kartotece → zadanie `set_ean`.
    *
    * POWSTAŁO Z SYTUACJI PRZY REGALE: karton ma kod, kartoteka go nie ma, a
    * jedyną drogą było „zapamiętaj i powiedz biuru" — czyli nazajutrz ten sam
@@ -343,7 +343,7 @@ export async function productRoutes(app: FastifyInstance) {
   );
 
   /**
-   * Zdjęcie kartoteki (0.30.0).
+   * Zdjęcie kartoteki.
    *
    * OSOBNA TRASA, nigdy pole karty — karta jest odpytywana co 2 s
    * (ProductScreen.kt), a 150 KB w base64 w tym cyklu to ponad 4 MB na minutę
@@ -376,7 +376,7 @@ export async function productRoutes(app: FastifyInstance) {
       .send(fs.createReadStream(plik));
   });
 
-  /* ── Dodanie zdjęcia z kolektora (0.88.0) ──────────────────────────────────
+  /* ── Dodanie zdjęcia z kolektora ──────────────────────────────────
      DWA KROKI, BO WYCINANIE TŁA BYWA NIEUDANE. Pierwszy robi podgląd, drugi
      zapisuje. Zdjęcie regału z pięcioma kartonami wygląda dla modelu tak samo
      jak zdjęcie noża i bez kroku „obejrzyj" wchodziłoby do kartoteki w Subiekcie,

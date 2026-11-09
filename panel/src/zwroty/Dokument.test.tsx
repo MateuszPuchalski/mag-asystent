@@ -1,11 +1,10 @@
-import React from "react";
 import { describe, expect, it, vi } from "vitest";
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { Dokument } from "./Dokument";
 import type { FakturaZwrotu, KandydatFaktury } from "../api/typy";
 
-/* ── Dokument sprzedaży przy zwrocie (0.174.0) ───────────────────────────────
+/* ── Dokument sprzedaży przy zwrocie ─────────────────────────────────────────
    Ekran ma odpowiadać na pytanie „pod jakim numerem stoi ta sprzedaż
    w Subiekcie" — i mówić, SKĄD tę odpowiedź wziął. Numer bez pochodzenia
    wygląda tak samo, gdy dopasował go automat i gdy zgadł go człowiek. */

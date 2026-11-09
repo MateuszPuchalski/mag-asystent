@@ -46,17 +46,11 @@ describe("api()", () => {
     await expect(api("/api/obsluga/rozmowy")).rejects.toThrow("Skrzynkę obsługuje biuro");
   });
 
-  /* ── Strażnik blizny z `biuro.html` ─────────────────────────────────────
-     Panel magazynu nauczył się tego w bólach: `content-type` wysyłany zawsze
-     wywracał KAŻDE żądanie bez ciała, bo domyślny parser Fastify odrzuca pustą
-     treść zadeklarowaną jako JSON (FST_ERR_CTP_EMPTY_JSON_BODY, 400). Martwe
-     były wtedy cztery czynności naraz. Kolektor zna tę regułę osobno —
-     `ApiService.kt` wysyła `EMPTY_BODY` bez nagłówka typu.
-
-     Panel obsługi kupił tę bliznę drugi raz w 0.146.0, bo strażnik tamtej
-     reguły czyta ŹRÓDŁO `biuro.html` wyrażeniem regularnym i nie miał jak
-     objąć drugiego frontu. Ten strażnik sprawdza ZACHOWANIE, bo tego klienta
-     da się zaimportować — i przez to jest mocniejszy od tamtego. */
+  /* ── Żądanie bez ciała nie deklaruje typu treści ─────────────────────────
+     Domyślny parser Fastify odrzuca pustą treść zadeklarowaną jako JSON
+     (FST_ERR_CTP_EMPTY_JSON_BODY, 400). Kolektor zna tę regułę osobno —
+     `ApiService.kt` wysyła `EMPTY_BODY` bez nagłówka typu. Ten strażnik
+     sprawdza ZACHOWANIE, bo tego klienta da się zaimportować. */
   const naglowki = (f: ReturnType<typeof odp>) => f.mock.calls[0][1].headers as Record<string, string>;
 
   it("żądanie BEZ ciała nie deklaruje typu treści", async () => {

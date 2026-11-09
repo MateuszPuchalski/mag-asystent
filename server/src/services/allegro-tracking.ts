@@ -3,21 +3,17 @@ import { BladLimituAllegro, BladOdpowiedziAllegro } from "../adapters/allegro.js
 import { config } from "../config.js";
 import type { Db } from "../db/db.js";
 
-/* ── Kiedy paczka zwrotna do nas dotarła (0.187.0) ───────────────────────────
-   Do 0.186.0 panel twierdził, że „Allegro nie podaje daty doręczenia do nas".
-   To była NIEPRAWDA wzięta ze zbyt wąskiego czytania: obiekt `CustomerReturn`
-   i jego `parcels[]` istotnie mają tylko datę NADANIA — ale API ma osobną
-   końcówkę, która podaje czas każdej zmiany statusu przesyłki:
+/* ── Kiedy paczka zwrotna do nas dotarła ─────────────────────────────────────
+   `CustomerReturn.parcels[]` ma tylko datę NADANIA. Datę doręczenia podaje
+   osobna końcówka z czasem każdej zmiany statusu przesyłki:
 
        GET /order/carriers/{carrierId}/tracking?waybill=…
 
    Każdy wpis niesie `occurredAt` („actual shipment status change time"),
-   a wśród kodów jest `DELIVERED`. Właściciel zobaczył tę datę we własnym
-   panelu sprzedawcy i słusznie zapytał, czemu u nas jej nie ma.
+   a wśród kodów jest `DELIVERED`.
 
-   ── Tu numer dalej ŻYJE PRZEZ JEDNO ŻĄDANIE (0.344.0) ─────────────────────
-   Decyzja właściciela zdjęła politykę 0.163.0 i model pracy trzyma teraz numer
-   PIERWSZEJ paczki zwrotu. Ten plik i tak go stamtąd nie bierze: pytanie brzmi
+   ── Numer z LĄDOWISKA ─────────────────────────────────────────────────────
+   Model pracy trzyma numer tylko PIERWSZEJ paczki zwrotu. Pytanie brzmi
    „co z KAŻDĄ paczką tego zwrotu", a na to odpowiada wyłącznie lądowisko.
    Zapisujemy z odpytania WYŁĄCZNIE wynik — moment doręczenia i kod statusu.
 
@@ -41,7 +37,7 @@ export interface StanPrzesylki {
   /** Kod OSTATNIEGO statusu: `IN_TRANSIT`, `NOTICE_LEFT`, `ISSUE`, `RETURNED`… */
   status: string | null;
   /**
-   * `occurredAt` ostatniego statusu (0.536.1). Dosyłka rozpoznaje po nim
+   * `occurredAt` ostatniego statusu. Dosyłka rozpoznaje po nim
    * paczkę bez daty rejestracji: ruch u przewoźnika po zgłoszeniu zwrotu
    * odróżnia nową paczkę od oryginału (`wybierzNumer` w `dosylka.ts`).
    */
@@ -93,7 +89,7 @@ export interface PaczkaDoTrackingu {
 /**
  * Pyta przewoźników o paczki i oddaje stan każdej po numerze — bez zapisu.
  *
- * JEDNA droga do końcówki trackingu dla zwrotów i dla dosyłki (0.536.0).
+ * JEDNA droga do końcówki trackingu dla zwrotów i dla dosyłki.
  * Partie po PRZEWOŹNIKU, bo `carrierId` siedzi w ścieżce adresu, i po
  * dwadzieścia numerów, bo tyle dopuszcza `maxItems`.
  *
@@ -165,7 +161,7 @@ export async function odpytajTracking(
  * DEGRADUJE, nie przerywa. Tracking jest wygodą biura, a synchronizacja
  * zwrotów — pracą: gdy przewoźnik nie odpowie, zwroty i tak wchodzą, a data
  * doręczenia dojdzie przy następnym takcie. Błąd jednego przewoźnika nie
- * zabiera pozostałych (ta sama lekcja co przy wątkach skrzynki w 0.149.2).
+ * zabiera pozostałych.
  *
  * Oddaje liczbę zwrotów, którym dopisał datę doręczenia.
  */
