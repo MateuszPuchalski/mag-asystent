@@ -1,6 +1,6 @@
 import type { Kategoria, KandydatZamowienia, OsRozmowy, StanPrzesylki } from "../api/typy";
 
-/* ── SOCZEWKI: PRAWA KOLUMNA WEDŁUG RODZAJU PYTANIA (0.499.0) ───────────────
+/* ── SOCZEWKI: PRAWA KOLUMNA WEDŁUG RODZAJU PYTANIA ─────────────────────────
    Zgłoszenie właściciela z listą prawdziwych pytań klientów: „faktury nie
    dostaliśmy", „podwójne zamówienie, prosimy anulować jedno", „w paczce są
    inne rzeczy". Każde z nich ma JEDNĄ odpowiedź, której agent szukał po
@@ -28,12 +28,12 @@ const SOCZEWKA_KATEGORII: Partial<Record<Kategoria, RodzajSoczewki>> = {
      Jedna soczewka na oba, bo odpowiedź zaczyna się od tej samej listy. */
   MISSING_PRODUCT: "inny_towar",
   INVOICE: "faktura",
-  /* Zwrot (0.506.0): zrzut z „przytłacza" — klient pisał o odesłaniu części,
+  /* Zwrot: zrzut z „przytłacza" — klient pisał o odesłaniu części,
      a kolumna mówiła o cenach i EAN. Soczewka mówi to, czego agent szuka:
      czy zwrot jest już w Allegro. Gdy jest, jego karta stoi w „Wymaga
      Ciebie" — wtedy soczewka milczy, żeby nie mówić tego samego dwa razy. */
   RETURN: "zwrot",
-  /* ── PACZKA (0.531.0) ────────────────────────────────────────────────────
+  /* ── PACZKA ──────────────────────────────────────────────────────────────
      „Gdzie moja paczka" to najczęstsze pytanie skrzynki, a odpowiedź leżała
      w zwiniętym wierszu „Zamówienie", pod rozwinięciem i kliknięciem.
      Uszkodzona w transporcie też tu trafia: zgłoszenie szkody u przewoźnika

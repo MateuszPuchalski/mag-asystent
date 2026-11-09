@@ -1,4 +1,3 @@
-import React from "react";
 import type { ZamowienieRozmowy as Dane } from "../api/typy";
 import { useWskazOferte } from "../api/rozmowy";
 import { zlote } from "../api/zwroty";
@@ -19,7 +18,7 @@ import { ODNOSNIK } from "./odnosniki";
  * teraz" ze zwrotów tu NIE ma: to zapis, a ekran rozmowy nie ma żadnego
  * zapisu przy patrzeniu — liczniki tras skrzynki tego pilnują.
  *
- * ── DWA ZDJĘCIA PRZY POZYCJI (0.215.0) ─────────────────────────────────────
+ * ── DWA ZDJĘCIA PRZY POZYCJI ───────────────────────────────────────────────
  * Właściciel przysłał zrzut rozmowy z samym zamówieniem: „tutaj powinny być
  * zdjęcia i przy ofercie, i przy towarze". Pozycja niesie OBA źródła naraz —
  * zdjęcie z oferty Allegro (to widział klient, kupując) i zdjęcie kartoteki

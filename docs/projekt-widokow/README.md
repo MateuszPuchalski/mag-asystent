@@ -39,11 +39,6 @@ komentarz.
 **Brak danych mówi o sobie wprost.** Puste pole oferty zostaje puste i jest
 oznaczone. Ekran nie uzupełnia go z kartoteki, bo to mieszałoby źródła.
 
-## Poprawki po decyzjach właściciela
-
-**Makieta doboru zeszła.** Dobór części i baza wiedzy wyszły z WERTIS
-w 0.565.0, więc ekran, który je rysował, nie ma już czego pokazywać.
-
 ## Skąd wzięte
 
 Ekran stanów pokrywa cztery blizny z `docs/obsluga-klienta.md`. Dopisek

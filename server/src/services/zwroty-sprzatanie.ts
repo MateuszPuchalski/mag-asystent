@@ -2,11 +2,10 @@ import { logEvent } from "./events.js";
 import { transaction, type Db } from "../db/db.js";
 import { STATUSY_ODDANE } from "./zwrot-pieniedzy.js";
 
-/* ── Kasowanie zwrotów rozliczonych POZA aplikacją (0.340.0) ────────────────
+/* ── Kasowanie zwrotów rozliczonych POZA aplikacją ──────────────────────────
    Zgłoszenie właściciela: „wywal zwroty rozliczone poza aplikacją".
 
-   Po 0.339.0 taki zwrot schodzi z kolejki pracy do ZAMKNIĘTYCH. Właściciel
-   chce iść dalej: jeżeli całą sprawę załatwiono w panelu Allegro, a u nas nie
+   Taki zwrot schodzi z kolejki pracy do ZAMKNIĘTYCH. Właściciel chce iść dalej: jeżeli całą sprawę załatwiono w panelu Allegro, a u nas nie
    ma po niej ani jednego śladu, to ten wiersz nie opisuje niczego, co
    kiedykolwiek robiliśmy — i ma zniknąć z bazy.
 
@@ -20,8 +19,7 @@ import { STATUSY_ODDANE } from "./zwrot-pieniedzy.js";
      * ani jednej pozycji w koszyku — towar poszedł wtedy na dokument MM.
 
    KAŻDY Z TYCH ŚLADÓW ZATRZYMUJE KASOWANIE i to nie jest ostrożność na wyrost.
-   Wiersz z przelewem bywa JEDYNYM dowodem, że klient dostał pieniądze (blizna
-   0.269.0). A `kosz_pozycja.zwrot_pozycja_id` NIE MA klucza obcego — dodano ją
+   Wiersz z przelewem bywa JEDYNYM dowodem, że klient dostał pieniądze. A `kosz_pozycja.zwrot_pozycja_id` NIE MA klucza obcego — dodano ją
    `addColumn` — więc skasowanie zwrotu nie wywróciłoby zapisu, tylko zostawiło
    w pudle wiersz wskazujący na nieistniejącą pozycję. Po cichu.
 
@@ -38,7 +36,7 @@ const STATUSY = [...STATUSY_ODDANE];
 const PYTAJNIKI = STATUSY.map(() => "?").join(",");
 
 /**
- * Warunek „Allegro oddało pieniądze" — zatrzask ALBO wskaźnik (0.345.0).
+ * Warunek „Allegro oddało pieniądze" — zatrzask ALBO wskaźnik.
  *
  * `status_allegro` mówi, co jest TERAZ: zwrot rozliczony idzie dalej osią
  * czasu Allegro, choćby na `COMMISSION_REFUND_CLAIMED`, który dotyczy naszej
@@ -47,7 +45,7 @@ const PYTAJNIKI = STATUSY.map(() => "?").join(",");
  * dalej.
  */
 /*
- * PACZKA NIEODEBRANA NIGDY NIE JEST „POZA APLIKACJĄ" (0.493.0). Zakłada ją
+ * PACZKA NIEODEBRANA NIGDY NIE JEST „POZA APLIKACJĄ". Zakłada ją
  * biuro, więc skasowana nie wróci z synchronizacji. A pieniądze za nią bywają
  * oddane ręką w Allegro, zanim ktoś ją oceni — świeżo przyjęta paczka
  * spełniała więc warunek kasowania co do joty.

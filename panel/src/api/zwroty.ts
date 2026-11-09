@@ -12,11 +12,11 @@ export const kluczeZwrotow = {
   kolejka: ["zwroty"] as const,
   zwrot: (id: number) => ["zwrot", id] as const,
   /* Przedrostek WSZYSTKICH szczegółów — dla zapisów, które nie znają numeru
-     zwrotu, a zmieniają to, co szczegół niesie (0.336.0). Otwarty jest i tak
+     zwrotu, a zmieniają to, co szczegół niesie. Otwarty jest i tak
      jeden, więc nic zbędnego się tym nie odświeża. */
   szczegoly: ["zwrot"] as const,
   kosz: ["zwroty", "kosz"] as const,
-  /* Lista robocza outletu (0.375.0) — osobny klucz, bo odświeża ją co innego
+  /* Lista robocza outletu — osobny klucz, bo odświeża ją co innego
      niż koszyk: ocena „na outlet" i meldunek o przeniesieniu. */
   outlet: ["zwroty", "outlet"] as const,
 };
@@ -24,14 +24,11 @@ export const kluczeZwrotow = {
 /**
  * Odświeżenie po zapisie zwrotu — kolejka DOKŁADNIE i otwarty szczegół.
  *
- * DOKŁADNIE, bo `["zwroty"]` jest przedrostkiem także koszyka i rozjazdów. Do
- * audytu z 15 września 2026 każdy klawisz decyzji przeładowywał więc trzy
- * listy, w tym rozjazdy liczone z całej bazy, choć żaden z tych zapisów ich nie
- * rusza. Rozjazdy mają własny rytm co minutę, a koszyk odświeża ten, kto go zmienia.
+ * DOKŁADNIE, bo `["zwroty"]` jest przedrostkiem także koszyka i rozjazdów,
+ * a rozjazdy liczy się z całej bazy, choć żaden z tych zapisów ich nie rusza. Rozjazdy mają własny rytm co minutę, a koszyk odświeża ten, kto go zmienia.
  *
- * SZCZEGÓŁ ZAWSZE, bo to on niesie blok pieniędzy. Po zapisaniu przyjęcia albo
- * kwoty ekran dalej pisał „Najpierw zaznacz, co oddajemy", a przycisk ODDAJ
- * PIENIĄDZE nie pojawiał się, dopóki ktoś nie otworzył zwrotu od nowa.
+ * SZCZEGÓŁ ZAWSZE, bo to on niesie blok pieniędzy: po zapisaniu przyjęcia
+ * albo kwoty ma się pojawić przycisk ODDAJ PIENIĄDZE.
  *
  * ZWRACAMY OBIETNICĘ KOLEJKI i tylko jej. Mutacja zostaje w toku, aż kolejka
  * wróci, więc następny klawisz dostaje świeży kubełek i wersję — bez tego `P`
@@ -60,14 +57,14 @@ export function useZwrot(id: number | null) {
       /* Klucz to identyfikator pozycji. Serwer liczy to TYLKO w szczególe —
          w kolejce byłoby kilkaset zapytań o dokumenty i mapowania ofert. */
       sklady: Record<number, SkladPozycji>;
-      /* Wiersze paragonu — materiał do RĘCZNEGO składu (0.336.0). Jeden raz na
+      /* Wiersze paragonu — materiał do RĘCZNEGO składu. Jeden raz na
          zwrot, bo dokument jest jeden. */
       wierszeDokumentu: WierszDokumentu[];
       /* Spoiwo kolejek (S1 i S3): reklamacje tego zakupu oraz jego
          droga. Tylko w szczególe — powód ten sam, co przy składach wyżej. */
       sprawy: SprawaZakupu[];
       droga: PrzystanekDrogi[];
-      /* Kosze z towarem tego zwrotu (0.438.0) — wiązanie kosz ↔ zwrot
+      /* Kosze z towarem tego zwrotu — wiązanie kosz ↔ zwrot
          od strony zwrotu. Tylko w szczególe, z tego samego powodu co wyżej. */
       kosze: Array<{ id: number; kod: string; status: string }>;
     }>(
@@ -95,10 +92,9 @@ export function usePotwierdzKartoteke() {
         `/api/obsluga/zwroty/pozycje/${v.pozycjaId}/kartoteka`,
         { method: "POST", body: JSON.stringify({ twId: v.twId, zrodlo: v.zrodlo }) },
       ),
-    /* SZCZEGÓŁ TEŻ (0.336.0). To on niesie `sklady`, czyli zdanie „nie weszła
-       do koszyka — POWÓD". Bez tego zatwierdzenie kartoteki zostawiało na
-       ekranie powód sprzed zatwierdzenia: pozycja miała już kartotekę, a panel
-       dalej pisał, że jej nie ma. Zgłoszenie właściciela z 0.336.0. */
+    /* SZCZEGÓŁ TEŻ. To on niesie `sklady`, czyli zdanie „nie weszła
+       do koszyka — POWÓD". Bez tego zatwierdzenie kartoteki zostawiłoby na
+       ekranie powód sprzed zatwierdzenia. */
     onSettled: () => {
       qc.invalidateQueries({ queryKey: kluczeZwrotow.kolejka, exact: true });
       qc.invalidateQueries({ queryKey: kluczeZwrotow.szczegoly });
@@ -116,15 +112,15 @@ export function usePotwierdzKartoteke() {
  * w kodzie.
  */
 /**
- * Ręczna synchronizacja zwrotów (0.232.0).
+ * Ręczna synchronizacja zwrotów.
  *
  * Takt zwrotów chodzi rzadziej niż skrzynka — zwrot ma termin w dniach —
- * więc po nadaniu paczki biuro czekało kilkanaście minut na wiersz, o którym
+ * więc po nadaniu paczki biuro czekałoby kilkanaście minut na wiersz, o którym
  * już wie. Ten sam wzorzec co „Synchronizuj teraz" w reklamacjach.
  *
  * Żądanie BEZ ciała nie deklaruje typu treści; pilnuje tego `api()` i jego
  * test. Pusty JSON to `FST_ERR_CTP_EMPTY_JSON_BODY` i gołe „Bad Request"
- * na ekranie — ta blizna kosztowała dwa razy.
+ * na ekranie.
  */
 export function useSynchronizujZwroty() {
   const qc = useQueryClient();
@@ -137,7 +133,7 @@ export function useSynchronizujZwroty() {
 
 export interface WynikDociagniecia {
   pobrano: number;
-  /* Ile zaległości dopiął przy okazji przebieg wiązania (0.220.0). Kartoteki
+  /* Ile zaległości dopiął przy okazji przebieg wiązania. Kartoteki
      są tu najważniejsze: to one odpowiadają na pytanie „czemu ta pozycja nie
      ma kartoteki", z którym operator ten przycisk naciska. */
   kartoteki: number;
@@ -154,7 +150,7 @@ export function useDociagnijZamowienia() {
   });
 }
 
-/* ── Decyzje biura (0.156.0) ─────────────────────────────────────────────────
+/* ── Decyzje biura ───────────────────────────────────────────────────────────
    Trzy mutacje domykają trzy pierwsze kubełki. Każda niesie WERSJĘ zwrotu,
    bo dwóch agentów nie ma prawa zamknąć jednego zwrotu dwiema kwotami —
    ten sam wzorzec, co przy przejmowaniu rozmowy. Konflikt wraca kodem 409
@@ -171,7 +167,7 @@ export function useWerdykt() {
 }
 
 /**
- * Ptaszek przy składniku kompletu (0.335.0).
+ * Ptaszek przy składniku kompletu.
  *
  * `wKoszyku` to stan DOCELOWY, nie czynność — jedna trasa na oba kierunki,
  * więc panel nie musi wiedzieć, co dziś stoi w koszyku, zanim kliknie.
@@ -222,7 +218,7 @@ export function useSkladnikNaOutlet() {
 }
 
 /**
- * Ręczne wskazanie składu kompletu (0.336.0).
+ * Ręczne wskazanie składu kompletu.
  *
  * Odświeża szczegół (powód i skład), kolejkę (`wKoszyku` pozycji) i pasek
  * koszyka: zapis wkłada pozycję do pudła, gdy ocena „na stan" już stoi.
@@ -247,8 +243,7 @@ export function useWskazSklad() {
 export function useOcena() {
   const qc = useQueryClient();
   return useMutation({
-    /* `null` COFA ocenę (0.202.0) — serwer i trasa umiały to od 0.192.0, tylko
-       panel nie miał klawisza. */
+    /* `null` COFA ocenę. */
     mutationFn: (v: { pozycjaId: number; ocena: Ocena | null; wersja: number;
       koszId?: number }) =>
       api<{ wersja: number; koszyk: number | null }>(
@@ -257,7 +252,7 @@ export function useOcena() {
           { ocena: v.ocena, wersja: v.wersja, koszId: v.koszId }) }),
     /* Ocena „na stan" dokłada pozycję do koszyka zwrotów, więc odświeża też
        jego pasek — inaczej licznik na ekranie stałby w miejscu, a operator
-       nie wiedziałby, ile już zebrał (0.192.0). */
+       nie wiedziałby, ile już zebrał. */
     onSettled: () => {
       void qc.invalidateQueries({ queryKey: kluczeZwrotow.kosz });
       /* I lista outletu: ocena „na outlet" dopisuje do niej pozycję, a zmiana
@@ -265,19 +260,16 @@ export function useOcena() {
       void qc.invalidateQueries({ queryKey: kluczeZwrotow.outlet });
       /* I szczegół — po ocenie zmienia się `wKoszyku` każdego składnika. */
       void qc.invalidateQueries({ queryKey: kluczeZwrotow.szczegoly });
-      /* OBIETNICA KOLEJKI WRACA (0.476.0) — reguła `odswiez` wyżej. Do tego
-         wydania ocena kończyła się przed odświeżeniem kolejki, więc szybkie
-         `s s s` wysyłało drugą ocenę ze starą wersją i odbijało się od
-         blokady optymistycznej. Przegląd zwrotów z 23 września. */
+      /* OBIETNICA KOLEJKI WRACA — reguła `odswiez` wyżej. Inaczej szybkie
+         `s s s` wysłałoby drugą ocenę ze starą wersją. */
       return qc.invalidateQueries({ queryKey: kluczeZwrotow.kolejka, exact: true });
     },
   });
 }
 
-/* ── Koszyk zakładany WPROST (0.378.0) ──────────────────────────────────────
+/* ── Koszyk zakładany WPROST ────────────────────────────────────────────────
    Zgłoszenie właściciela: „potrzebuję tworzenia koszy zwrotowych i dodawania
-   produktów do nich jako oddzielna opcja". Do tego wydania koszyk powstawał
-   wyłącznie jako skutek uboczny pierwszego dołożenia.
+   produktów do nich jako oddzielna opcja".
 
    Obie mutacje odświeżają WYŁĄCZNIE koszyk: zwrotów nie ruszają, bo pudło
    zakładane wprost nie ma za sobą żadnego zwrotu.                            */
@@ -293,7 +285,7 @@ export function useNowyKoszyk() {
 }
 
 /**
- * Usuwa CAŁY koszyk — także napełniony (0.380.0).
+ * Usuwa CAŁY koszyk — także napełniony.
  *
  * Odświeża TAKŻE zwroty: usunięcie pudła cofa oceny wszystkich wierszy, które
  * przyszły ze zwrotów, więc karty wracają do kubełka DO OCENY.
@@ -313,14 +305,13 @@ export function useUsunKoszyk() {
   });
 }
 
-/* ── Regał outletowy obsługiwany ręką (0.375.0) ─────────────────────────────
+/* ── Regał outletowy obsługiwany ręką ───────────────────────────────────────
    Decyzja właściciela: „na razie będziemy obsługiwać outlet ręcznie". Panel
    nie wystawia tu żadnego dokumentu — mówi, co czeka na przeniesienie,
    i przyjmuje meldunek, że już nie czeka.
 
-   Lista jest WARUNKIEM istnienia trzeciej oceny. Znacznik bez czytelnika to
-   „przecena" zdjęta w 0.209.0; ten ma czytelnika, który niesie towar na
-   regał.                                                                     */
+   Lista jest WARUNKIEM istnienia trzeciej oceny: znacznik ma czytelnika,
+   który niesie towar na regał.                                              */
 
 export function useOutlet() {
   return useQuery({
@@ -347,11 +338,8 @@ export function usePrzeniesionoNaOutlet() {
 }
 
 /**
- * Koszyk zamknięty BEZ DOKUMENTU (0.200.0, poszerzony w 0.371.0).
- *
- * Do 0.370.0 były tu wyłącznie kosze, którym brakuje korekt. Kosz, któremu
- * Sfera odrzuciła MM, nie pokazywał się nigdzie — a to właśnie on wymaga
- * ręki: sam się nie odblokuje.
+ * Koszyk zamknięty BEZ DOKUMENTU: brak korekt albo MM odrzucone przez
+ * Sferę. Ten drugi wymaga ręki, bo sam się nie odblokuje.
  */
 export interface KoszykCzekajacy {
   id: number;
@@ -363,7 +351,7 @@ export interface KoszykCzekajacy {
   /** Odmowa Sfery; niepusta znaczy też, że zadanie wciąż wisi przy koszu. */
   blad?: string | null;
   /**
-   * CAŁA zawartość pudła (0.379.0), nie tylko wiersze ze skanu.
+   * CAŁA zawartość pudła, nie tylko wiersze ze skanu.
    *
    * Koszyk Z-8 pokazał cenę tamtego zawężenia: odbił się od Sfery na kartotece
    * przyniesionej OCENĄ, więc nie miał ani jednego krzyżyka i nie było jak go
@@ -372,18 +360,18 @@ export interface KoszykCzekajacy {
    */
   pozycje?: Array<{
     pozycjaId: number; symbol: string; nazwa: string; ilosc: number; zeZwrotu: boolean;
-    /** Ile tego towaru leży na magazynie, z którego MM ma go zabrać (0.381.0). */
+    /** Ile tego towaru leży na magazynie, z którego MM ma go zabrać. */
     stanMag?: number;
     /** Czy to TEN wiersz wywrócił dokument: na magazynie jest go za mało. */
     brakNaMag?: boolean;
-    /** Ile z `stanMag` jest zarezerwowane (0.486.5). */
+    /** Ile z `stanMag` jest zarezerwowane. */
     rezerwacja?: number;
     /** Towar jest, ale wolnego (stan − rezerwacje) za mało — naprawa: rezerwacja w Subiekcie. */
     brakWolnego?: boolean;
   }>;
 }
 
-/** Co leży w otwartym koszyku zwrotów tego operatora (0.192.0). */
+/** Co leży w otwartym koszyku zwrotów tego operatora. */
 export function useKosz() {
   return useQuery({
     queryKey: kluczeZwrotow.kosz,
@@ -403,7 +391,7 @@ export interface TowarDoKosza {
 }
 
 /**
- * Towar do koszyka: skan albo kartoteka (0.365.0).
+ * Towar do koszyka: skan albo kartoteka.
  *
  * JEDNO PYTANIE, jedna trasa — „który to towar". Kod z czytnika wraca jako
  * `dokladne` z jednym wynikiem, fraza jako lista. Pusty nie pyta serwera.
@@ -418,7 +406,7 @@ export function useTowaryDoKosza(q: string) {
 }
 
 /**
- * To samo pytanie bez hooka — dla skanu z nasłuchu ekranu (0.468.0).
+ * To samo pytanie bez hooka — dla skanu z nasłuchu ekranu.
  *
  * Skan EAN-u na zakładce zwrotów pyta kartotekę RAZ i od odpowiedzi zależy,
  * dokąd kod pójdzie dalej. Zapytanie kluczowane frazą trzymałoby w pamięci
@@ -430,7 +418,7 @@ export function szukajTowaruDoKosza(q: string) {
 }
 
 /**
- * Dołożenie towaru do koszyka ręką (0.365.0).
+ * Dołożenie towaru do koszyka ręką.
  *
  * Decyzja właściciela: „dodaj możliwość dodawania produktów do koszyka
  * zwrotowego poprzez zeskanowanie produktu lub wybranie go z kartoteki",
@@ -451,8 +439,7 @@ export function useDolozTowar() {
 /**
  * Zdjęcie wiersza z koszyka bez dokumentu — cena pomyłki przy skanie i ocenie.
  *
- * ODŚWIEŻA TAKŻE ZWROTY (0.379.0). Od tego wydania schodzi stąd również wiersz
- * przyniesiony OCENĄ, a wtedy serwer cofa tę ocenę: zwrot wraca do kubełka
+ * ODŚWIEŻA TAKŻE ZWROTY. Schodzi stąd również wiersz przyniesiony OCENĄ, a wtedy serwer cofa tę ocenę: zwrot wraca do kubełka
  * DO OCENY. Bez unieważnienia kolejki karta zwrotu pokazywałaby ocenę, której
  * już nie ma.
  */
@@ -472,7 +459,7 @@ export function useZdejmijTowar() {
 }
 
 /**
- * Domknięcie koszyka: MM wychodzi PO KOMPLECIE KOREKT (0.200.0).
+ * Domknięcie koszyka: MM wychodzi PO KOMPLECIE KOREKT.
  *
  * Odświeża TAKŻE kolejkę zwrotów, bo domknięcie zmienia stan pozycji
  * (`wKoszyku`) w każdym zwrocie, z którego coś do kosza wpadło.
@@ -487,7 +474,7 @@ export function useZamknijKosz() {
     onSettled: () => {
       qc.invalidateQueries({ queryKey: kluczeZwrotow.kolejka, exact: true });
       qc.invalidateQueries({ queryKey: kluczeZwrotow.kosz });
-      /* Zamknięty koszyk staje się koszem na liście koszy (0.502.0) — bez tego
+      /* Zamknięty koszyk staje się koszem na liście koszy — bez tego
          przełącznik na kosze pokazywał listę sprzed zamknięcia. */
       qc.invalidateQueries({ queryKey: ["kosze"] });
     },
@@ -495,10 +482,10 @@ export function useZamknijKosz() {
 }
 
 /**
- * Wypuszczenie MM koszyka MIMO brakujących korekt (0.368.0).
+ * Wypuszczenie MM koszyka MIMO brakujących korekt.
  *
  * Decyzja właściciela: „dodaj opcję sforsowania zamknięcia koszyka, nawet
- * jeśli nie ma wszystkich ZW". Bramka z 0.200.0 zostaje domyślna — to wyjście
+ * jeśli nie ma wszystkich ZW". Bramka zostaje domyślna — to wyjście
  * awaryjne obok niej.
  *
  * OSOBNY ADRES, nie flaga przy `zamknij`: flaga w ciele robi z wyjątku wariant
@@ -530,23 +517,23 @@ export interface PaczkaKlienta {
   zawartosc: string;
   /** Zwrot dla tego zamówienia już istnieje — ostrzeżenie, nie blokada. */
   maZwrot: boolean;
-  /** Nazwa odbiorcy z naklejki (0.367.0) — po niej rozpoznaje się karton. */
+  /** Nazwa odbiorcy z naklejki — po niej rozpoznaje się karton. */
   odbiorcaNazwa: string | null;
   /** Login kupującego — paczkę znalezioną po nazwisku trzeba zapisać z nim. */
   kupujacyLogin: string | null;
-  /* ── Reszta adresu (0.422.0) ─────────────────────────────────────────────
+  /* ── Reszta adresu ───────────────────────────────────────────────────────
      Do ROZRÓŻNIANIA trafień, nie do szukania. Telefon bywa `null` także przy
      pełnym adresie: `phoneNumber` nie stoi w `required` schematu Allegro. */
   odbiorcaTelefon: string | null;
   odbiorcaUlica: string | null;
   odbiorcaMiasto: string | null;
   odbiorcaKod: string | null;
-  /** Zamówienie w panelu Allegro (0.451.0); `null` bez wzorca adresu. */
+  /** Zamówienie w panelu Allegro; `null` bez wzorca adresu. */
   link: string | null;
 }
 
 /**
- * Co ten klient u nas kupił (0.365.0, uchwyt poszerzony w 0.367.0).
+ * Co ten klient u nas kupił.
  *
  * Zgłoszenie właściciela: „kupujący może mieć wiele paczek kupionych
  * w historii sklepu, więc muszę mieć możliwość wybrania paczki". Pusty uchwyt
@@ -558,7 +545,7 @@ export interface PaczkaKlienta {
  * czym jest to, co przepisuje. Zasady dopasowania rozstrzyga serwer: login
  * w całości, nazwisko po fragmencie.
  *
- * POST, CHOĆ TO ODCZYT — ta sama decyzja co przy `/skan` z 0.163.0. Uchwyt
+ * POST, CHOĆ TO ODCZYT — ta sama decyzja co przy `/skan`. Uchwyt
  * w adresie wylądowałby w logu żądań serwera, a bywa nim teraz nazwisko.
  *
  * Odczyt, więc `useQuery`: otwarcie i przeglądanie niczego nie mutuje.
@@ -582,13 +569,13 @@ export function usePaczkiKlienta(szukane: string) {
  */
 export function wygladaNaLogin(uchwyt: string): boolean {
   const u = uchwyt.trim();
-  /* Drugi wzór to login bez pseudonimu, `client:124843816` (0.452.0) —
+  /* Drugi wzór to login bez pseudonimu, `client:124843816` —
      Sales Center pokazuje go wprost jako login kupującego. */
   return /^[\p{L}\p{N}._-]{2,64}$/u.test(u) || /^client:\d{3,20}$/i.test(u);
 }
 
 /**
- * Zamówienia kupującego prosto z Allegro, po loginie (0.450.0).
+ * Zamówienia kupującego prosto z Allegro, po loginie.
  *
  * Nasza baza zna tylko zamówienia, do których prowadzi zwrot, wiadomość albo
  * reklamacja. Paczka nieodebrana nie ma żadnego z nich, więc lista paczek
@@ -610,7 +597,7 @@ export function useZamowieniaZAllegro() {
 }
 
 /**
- * Paczka nieodebrana przyjęta z wyniku szukania (0.493.0).
+ * Paczka nieodebrana przyjęta z wyniku szukania.
  *
  * Wysyła zamówienie i — gdy panel go ma — numer z naklejki, który chybił
  * w skanie. Nic więcej: pozycje, login i odbiorcę serwer bierze z zamówienia.
@@ -631,7 +618,7 @@ export function usePrzyjmijNieodebrana() {
 }
 
 /**
- * Potrącenie za utratę wartości pojedynczej pozycji (0.170.0).
+ * Potrącenie za utratę wartości pojedynczej pozycji.
  *
  * To JEDYNA liczba o pieniądzach, jaką panel wolno mu wysłać — i dlatego
  * serwer trzyma ją w widełkach `0…wartość pozycji` i żąda powodu. Kwotę do
@@ -687,7 +674,7 @@ export function useKorekta() {
 }
 
 /**
- * Ile sztuk naprawdę wróciło w kartonie (0.212.0). `null` czyści zapis.
+ * Ile sztuk naprawdę wróciło w kartonie. `null` czyści zapis.
  *
  * Odświeża też pasek koszyka: liczba sztuk na dokumencie MM bierze się z tej
  * samej wartości, więc licznik przy koszu musi ruszyć razem z nią.
@@ -701,7 +688,7 @@ export function useIloscZwrocona() {
         { method: "POST", body: JSON.stringify({ ilosc: v.ilosc, wersja: v.wersja }) }),
     onSettled: () => {
       void qc.invalidateQueries({ queryKey: kluczeZwrotow.kosz });
-      /* Obietnica kolejki, jak przy ocenie (0.476.0): `Enter` zaraz po
+      /* Obietnica kolejki, jak przy ocenie: `Enter` zaraz po
          zapisie liczby ma trafić w świeży kubełek i wersję. */
       return qc.invalidateQueries({ queryKey: kluczeZwrotow.kolejka, exact: true });
     },
@@ -709,7 +696,7 @@ export function useIloscZwrocona() {
 }
 
 /**
- * Cofnięcie PRZYJĘCIA zwrotu — wraca do kubełka DECYZJA (0.204.0).
+ * Cofnięcie PRZYJĘCIA zwrotu — wraca do kubełka DECYZJA.
  */
 export function useCofnijWerdykt() {
   const qc = useQueryClient();
@@ -722,7 +709,7 @@ export function useCofnijWerdykt() {
 }
 
 /**
- * Cofnięcie ustalonej kwoty — zwrot wraca do DO ZWROTU (0.202.0).
+ * Cofnięcie ustalonej kwoty — zwrot wraca do DO ZWROTU.
  *
  * Odświeża kolejkę tak samo jak zapis kwoty: kubełek zwrotu się zmienia, więc
  * licznik przy nagłówku musi ruszyć razem z nim.
@@ -765,7 +752,7 @@ export function useZglosRabat() {
   });
 }
 
-/* ── Skan etykiety zwrotnej (0.163.0) ────────────────────────────────────────
+/* ── Skan etykiety zwrotnej ──────────────────────────────────────────────────
    Kod jedzie CIAŁEM ŻĄDANIA, nie adresem, i to jest ta sama ostrożność co przy
    szynie zdarzeń: numer listu przewozowego w adresie wylądowałby w logu żądań
    serwera. */
@@ -806,7 +793,7 @@ export function useDociagnijPoSkanie() {
 }
 
 /**
- * Wskazanie dokumentu sprzedaży z Subiekta (0.174.0).
+ * Wskazanie dokumentu sprzedaży z Subiekta.
  *
  * `dokId: null` ZDEJMUJE powiązanie — droga wyjścia z pomyłki, a nie brak
  * funkcji (§25a.5). Panel wysyła sam identyfikator z listy kandydatów: numeru
@@ -827,7 +814,7 @@ export function useFaktura() {
 }
 
 /**
- * Dopisanie produktu, którego klient nie zgłosił (0.184.0).
+ * Dopisanie produktu, którego klient nie zgłosił.
  *
  * Panel wysyła identyfikator POZYCJI ZAMÓWIENIA, nigdy nazwy ani ceny. Klient
  * może odesłać wyłącznie to, co kupił, a kwotę do oddania dalej składa serwer
@@ -860,7 +847,7 @@ export function useZdejmijPozycje() {
   });
 }
 
-/* ── Zwrot pieniędzy i odmowa (0.190.0) ──────────────────────────────────────
+/* ── Zwrot pieniędzy i odmowa ────────────────────────────────────────────────
    Pierwsze wyjście tego panelu po CUDZE PIENIĄDZE. Stąd trzy różnice
    względem sąsiednich mutacji.
 
@@ -890,7 +877,7 @@ export function useZwrocPieniadze() {
 }
 
 /**
- * Zapis przelewu oddanego poza Allegro i jego cofnięcie (0.269.0).
+ * Zapis przelewu oddanego poza Allegro i jego cofnięcie.
  *
  * Przy pobraniu Allegro nie trzymało tych pieniędzy, więc `useZwrocPieniadze`
  * jest tam zamknięte z definicji, a zwrot zamykał się bez śladu po wypłacie.
@@ -1018,7 +1005,7 @@ export function useSprawdzWszystkiePlatnosci() {
 }
 
 /**
- * Odmowa wypłaty. Przy kodach dosyłki (0.536.0) ta sama trasa zakłada też
+ * Odmowa wypłaty. Przy kodach dosyłki ta sama trasa zakłada też
  * śledzenie dosyłki i krok sprawy klienta — odpowiedź niesie wtedy `dosylka`.
  * Przy pozostałych kodach tego pola nie ma wcale.
  *
@@ -1041,7 +1028,7 @@ export function useOdmowPlatnosci() {
 }
 
 /**
- * „Śledź dosyłkę” przy zwrocie (0.536.0) — ponowienie po odmowie, przy
+ * „Śledź dosyłkę” przy zwrocie — ponowienie po odmowie, przy
  * której zapis u nas się nie udał, albo po odmowie złożonej w panelu
  * Allegro, której kod przyszedł synchronizacją (`rejection_code`).
  *
@@ -1059,7 +1046,7 @@ export function useSledzDosylkeZwrotu() {
   return useMutation({
     mutationFn: (v: { id: number }) =>
       api<DosylkaZalozona>(`/api/obsluga/zwroty/${v.id}/dosylka`, { method: "POST" }),
-    /* „Do decyzji” też (0.541.0): przycisk stoi tam w wierszu odmowy z panelu
+    /* „Do decyzji” też: przycisk stoi tam w wierszu odmowy z panelu
        Allegro. Listę odświeża i tak każda udana mutacja (`klient-zapytan.ts`),
        ale `onSettled` na nią CZEKA — przycisk gaśnie dopiero, gdy wiersz już
        zszedł, więc drugiego kliknięcia w ten sam wiersz nie ma. */
@@ -1072,7 +1059,7 @@ export function useSledzDosylkeZwrotu() {
   });
 }
 
-/* ── Notatka biura i rozjazdy (0.313.0) ──────────────────────────────────── */
+/* ── Notatka biura i rozjazdy ────────────────────────────────────────────── */
 
 /** Stan notatki po zapisie — nagłówek zwrotu odświeża się z tego, nie z listy. */
 export interface StanNotatkiZwrotu {
@@ -1132,7 +1119,3 @@ export function useRozjazdyZwrotow() {
   });
 }
 
-/* `useProwadziZwrot` ZNIKNĄŁ w 0.431.0. Wołał `POST /api/obsluga/zwroty/:id/prowadzi`,
-   którą serwer skasował w 0.370.0 razem z prowadzącym przy zwrocie — powód
-   stoi w `server/src/routes/zwroty.ts`. Hooka nikt już nie używał, a jego
-   adres bez trasy znalazł strażnik `routes/panel-adresy.test.ts`. */

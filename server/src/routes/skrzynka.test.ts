@@ -10,7 +10,7 @@ process.env.DB_PATH = path.join(fs.mkdtempSync(path.join(os.tmpdir(), "wertis-sk
 process.env.LOG_LEVEL = "silent";
 process.env.SGT_MODE = "seeded";
 
-/* Trasy skrzynki nie miały testu do 0.145.1. Pilnują tu dwóch rzeczy, których
+/* Testy tras skrzynki pilnują dwóch rzeczy, których
    test serwisu nie złapie, bo obie żyją na granicy HTTP:
 
    1. BRAMKA ROLI TAKŻE NA ODCZYCIE. Polityka danych skrzynki mówi wprost, że
@@ -76,10 +76,10 @@ const liczbaZdarzen = () =>
 const TRASY = () => [
   { method: "GET" as const, url: "/api/obsluga/rozmowy" },
   { method: "GET" as const, url: `/api/obsluga/rozmowy/${rozmowa}` },
-  /* Zdjęcie oferty (0.213.0) stoi za tą samą bramką, co reszta skrzynki:
+  /* Zdjęcie oferty stoi za tą samą bramką, co reszta skrzynki:
      obraz z oferty klienta nie jest daną dla hali. */
   { method: "GET" as const, url: "/api/obsluga/oferta/111/zdjecie" },
-  /* Podgląd załącznika (0.218.0) — ta sama bramka: zdjęcie od klienta nie jest
+  /* Podgląd załącznika — ta sama bramka: zdjęcie od klienta nie jest
      daną dla hali, tak samo jak zdjęcie z jego oferty. */
   { method: "GET" as const, url: "/api/obsluga/zalaczniki/1/podglad" },
   { method: "POST" as const, url: "/api/obsluga/zadania/pomiar",
@@ -95,27 +95,27 @@ const TRASY = () => [
     payload: { doUserId: null, powod: "urlop", expectedVersion: 1 } },
   { method: "POST" as const, url: `/api/conversations/${rozmowa}/oferta`,
     payload: { ofertaId: "14892374512" } },
-  /* Wskazanie ZAMÓWIENIA (0.397.0) — ta sama bramka, co reszta skrzynki:
+  /* Wskazanie ZAMÓWIENIA — ta sama bramka, co reszta skrzynki:
      powiązanie otwiera pozycje i kwoty cudzego zakupu, więc hala nie ma tu
      czego szukać. */
   { method: "POST" as const, url: `/api/conversations/${rozmowa}/zamowienie`,
     payload: { externalId: "ord-1" } },
-  /* Paczka zamówienia rozmowy (23 września 2026) — ta sama bramka: stan
+  /* Paczka zamówienia rozmowy — ta sama bramka: stan
      przesyłki należy do cudzego zakupu. */
   { method: "POST" as const, url: `/api/conversations/${rozmowa}/przesylka` },
   { method: "POST" as const, url: `/api/conversations/${rozmowa}/kartoteka`,
     payload: { ofertaId: "14892374512", twId: null } },
   { method: "POST" as const, url: `/api/conversations/${rozmowa}/send`,
     payload: { body: "Odpowiedź", expectedVersion: 1, expectedLastMessageId: null } },
-  /* Zakończ / Otwórz ponownie (23 września 2026) — ta sama bramka. */
+  /* Zakończ / Otwórz ponownie — ta sama bramka. */
   { method: "POST" as const, url: `/api/conversations/${rozmowa}/zakoncz`, payload: {} },
   { method: "POST" as const, url: `/api/conversations/${rozmowa}/otworz` },
-  /* Odłóż do terminu (0.533.0) — ta sama bramka co Zakończ. */
+  /* Odłóż do terminu — ta sama bramka co Zakończ. */
   { method: "POST" as const, url: `/api/conversations/${rozmowa}/odloz`,
     payload: { doKiedy: new Date(Date.now() + 86_400_000).toISOString() } },
-  /* Cofnięta wysyłka (0.500.0) — sam wpis do pomiaru tarcia, ta sama bramka. */
+  /* Cofnięta wysyłka — sam wpis do pomiaru tarcia, ta sama bramka. */
   { method: "POST" as const, url: `/api/conversations/${rozmowa}/wysylka-cofnieta` },
-  /* Pominięcie (0.532.0) — licznik bez człowieka, ale pisze go tylko biuro:
+  /* Pominięcie — licznik bez człowieka, ale pisze go tylko biuro:
      hala rozmów nie widzi, więc nie ma czego pomijać. */
   { method: "POST" as const, url: "/api/obsluga/pominiecie", payload: { kategoria: "RETURN" } },
   { method: "POST" as const, url: `/api/obsluga/rozmowy/${rozmowa}/priorytet`,
@@ -134,10 +134,10 @@ const TRASY = () => [
   /* Historia klienta niesie CUDZE ZAKUPY — bramka roli jest tu ostrzejszym
      wymogiem niż przy reszcie skrzynki, nie luźniejszym. */
   { method: "GET" as const, url: `/api/obsluga/rozmowy/${rozmowa}/klient` },
-  /* Dokumenty sprzedaży zamówienia (0.499.0) — numery faktur i paragonów
+  /* Dokumenty sprzedaży zamówienia — numery faktur i paragonów
      kupującego, więc ta sama bramka co historia klienta. */
   { method: "GET" as const, url: `/api/obsluga/rozmowy/${rozmowa}/dokumenty-sprzedazy` },
-  /* Przekrój towaru (0.502.0) — zwroty i sprawy cudzych zakupów, ta sama bramka. */
+  /* Przekrój towaru — zwroty i sprawy cudzych zakupów, ta sama bramka. */
   { method: "GET" as const, url: "/api/obsluga/towar/1/przekroj" },
 ];
 
@@ -216,7 +216,7 @@ test("szkic pisany do starej osi odpada z 409, a zapisany zostaje", async () => 
     headers: b.naglowki, payload: { body: "Pierwsza wersja", expectedLastMessageId: pytanie, expectedVersion: null } });
   assert.equal(r.statusCode, 200, r.body);
 
-  /* Klient dopisuje w trakcie redagowania — blizna 0.110.0. */
+  /* Klient dopisuje w trakcie redagowania. */
   const konto = (db().prepare("SELECT channel_account_id k FROM conversation WHERE id=?")
     .get(rozmowa) as { k: number }).k;
   db().prepare(`INSERT INTO message(conversation_id,channel_account_id,external_message_id,
@@ -242,7 +242,7 @@ test("mutacje przez trasę zostawiają ślad w dzienniku", async () => {
   const typy = (db().prepare(
     "SELECT type FROM events WHERE type LIKE 'rozmowa_%' ORDER BY id").all() as Array<{type:string}>)
     .map((w) => w.type);
-  /* `rozmowa_status` doszło w 0.158.0: przejęcie otwiera rozmowę, więc zostawia
+  /* `rozmowa_status`: przejęcie otwiera rozmowę, więc zostawia
      DWA ślady — o przejęciu i o zmianie stanu. Kolejność jest znacząca, bo
      audyt czyta się z góry na dół: status zmieniony przed przejęciem
      opowiadałby, że rozmowa otworzyła się sama. */
@@ -330,7 +330,7 @@ test("ręczna synchronizacja bez sparowanego konta mówi wprost, czego brakuje",
    `services/wysylka.test.ts` z podstawionym adapterem — testy tras nie
    strzelają do Allegro. */
 test("nie wyśle ten, kto nie prowadzi rozmowy", async () => {
-  /* Od 0.159.0 rozmowa NIEPRZYPISANA idzie do wysyłki bez osobnego przejęcia:
+  /* Rozmowa NIEPRZYPISANA idzie do wysyłki bez osobnego przejęcia:
      przydziela ją sama odpowiedź. Blokadą zostaje trwały właściciel — gdy
      rozmowę prowadzi kto inny, odpowiedź nie wychodzi. */
   const ala = login("biuro", "A. Lewandowska");
@@ -345,13 +345,12 @@ test("nie wyśle ten, kto nie prowadzi rozmowy", async () => {
     headers: marek.naglowki,
     payload: { body: "Pasuje.", expectedVersion: wersja(), expectedLastMessageId: pytanie } });
   assert.equal(r.statusCode, 409);
-  /* ZDANIE MÓWI, CO DA SIĘ ZROBIĆ (0.395.0). Do 0.394.0 stało tu „najpierw ją
-     przejmij" i odsyłało do przycisku „PRZEJMIJ ROZMOWĘ"; przycisk zszedł
-     z ekranu na zgłoszenie właściciela, więc rada odsyłałaby w próżnię. */
+  /* ZDANIE MÓWI, CO DA SIĘ ZROBIĆ. Przycisku „PRZEJMIJ ROZMOWĘ" na ekranie
+     nie ma, więc rada „przejmij" odsyłałaby w próżnię. */
   assert.match(r.json().error, /poproś o przekazanie/);
   assert.doesNotMatch(r.json().error, /przejmij/);
 
-  /* IMIĘ I CZAS W ŁADUNKU, bo od 0.395.0 to ten konflikt — a nie przegrany
+  /* IMIĘ I CZAS W ŁADUNKU, bo to ten konflikt — a nie przegrany
      wyścig o przycisk — karmi jedyny dialog przekazania w panelu. Bez nich
      agent widzi, że nie wyszło, i nie wie, u kogo prosić. */
   const sz = r.json();
@@ -680,7 +679,7 @@ test("wejście w rozmowę trzyma ją, ale nie zapisuje ani jednego wiersza", asy
   assert.equal(r.json().trzyma, null);
 });
 
-/* ── Strażnik adresów panelu (0.181.1) ──────────────────────────────────────
+/* ── Strażnik adresów panelu ──────────────────────────────────────
    `TRASY()` wyżej pilnuje tras, które ISTNIEJĄ. Nie pilnuje tego, że panel
    woła te same adresy — i dokładnie tędy przeszło 404 komentarza: od 0.157.0
    do 0.181.0 hook wołał `/api/obsluga/rozmowy/:id/komentarz`, a serwer miał
@@ -737,7 +736,7 @@ test("trasy doboru zniknęły, a rozmowa nie niesie stanu doboru", async () => {
   assert.equal("dobor" in os.json<{ rozmowa: Record<string, unknown> }>().rozmowa, false);
 });
 
-/* ── Flagi jawnej zgody jadą CIAŁEM, więc trasa musi je wymienić (0.224.1) ───
+/* ── Flagi jawnej zgody jadą CIAŁEM, więc trasa musi je wymienić ───
    Blizna znaleziona przy rozpoznaniu do 0.224.0. `mimoObecnosci` istniał
    w serwisie od 0.159.0 razem z testem, panel wysyłał go od 0.190.0 — a trasa
    ani nie deklarowała pola w typie `Body`, ani nie podawała go niżej. Pole
@@ -803,7 +802,7 @@ test("moje sprawy: tożsamość z sesji, nie z zapytania — cudzej listy nie ma
 });
 
 test("sprawa klienta na „Moje” i w historii rozmowy: tylko prowadzącego, bez zapisu przy patrzeniu", async () => {
-  /* Bliźniak testu wyżej dla sprawy klienta (0.535.0). Scalenie stoi
+  /* Bliźniak testu wyżej dla sprawy klienta. Scalenie stoi
      w serwisie, ale tożsamość bierze TRASA — i tu się jej pilnuje. */
   const ala = login("biuro", "A. Lewandowska");
   const bob = login("biuro", "B. Nowak");
@@ -917,7 +916,7 @@ test("znacznik reklamacyjny jest PRZEŁĄCZNIKIEM i zostawia ślad w obie strony
 });
 
 test("ciało bez `reklamacyjna` odpada 400, zamiast po cichu zdejmować znacznik", async () => {
-  /* Pole nieopisane w typie `Body` znika po cichu — blizna 0.224.1. Puste ciało
+  /* Pole nieopisane w typie `Body` znika po cichu. Puste ciało
      nie ma prawa znaczyć „fałsz", bo to zdejmowałoby znacznik przez literówkę. */
   const b = login("biuro", "Anna");
   const r = await app.inject({ method: "POST", url: `/api/obsluga/rozmowy/${rozmowa}/reklamacyjna`,
@@ -926,7 +925,7 @@ test("ciało bez `reklamacyjna` odpada 400, zamiast po cichu zdejmować znacznik
 });
 
 test("odłóż: ciało bez `doKiedy` odpada 400; z terminem kolejka widzi odłożenie, null je zdejmuje", async () => {
-  /* Ta sama blizna 0.224.1 co wyżej: puste ciało nie może znaczyć „zdejmij",
+  /* Tak samo jak wyżej: puste ciało nie może znaczyć „zdejmij",
      bo budziłoby rozmowę przez literówkę. */
   const b = login("biuro", "Anna");
   let r = await app.inject({ method: "POST", url: `/api/conversations/${rozmowa}/odloz`,
@@ -951,7 +950,7 @@ test("odłóż: ciało bez `doKiedy` odpada 400; z terminem kolejka widzi odło�
   assert.equal(w.status, "waiting_for_us");
 });
 
-/* ── Pomiary pod decyzje (26 września 2026, 0.532.0) ─────────────────────── */
+/* ── Pomiary pod decyzje ─────────────────────── */
 
 test("cofnięta wysyłka niesie czas od odłożenia; liczba spoza 0–60 s odpada, wpis zostaje", async () => {
   const b = login("biuro", "Anna");

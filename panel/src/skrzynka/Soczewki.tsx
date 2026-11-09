@@ -1,4 +1,3 @@
-import React from "react";
 import { FileText, PackageSearch, ReceiptText } from "lucide-react";
 import type { OsRozmowy } from "../api/typy";
 import { zlote } from "../api/zwroty";
@@ -13,9 +12,9 @@ import {
 } from "./soczewki-reguly";
 
 /**
- * Soczewka na górze kolumny kontekstu (0.499.0) — reguły i ryzyko
+ * Soczewka na górze kolumny kontekstu — reguły i ryzyko
  * w `soczewki-reguly.ts`. Tutaj tylko rysowanie, każda soczewka to jedno pytanie
- * klienta i jedna odpowiedź, której agent dotąd szukał po całej kolumnie.
+ * klienta i jedna odpowiedź, której agent szukałby po całej kolumnie.
  */
 export function Soczewka({ dane, onWstawDoSzkicu }: {
   dane: OsRozmowy;
@@ -42,10 +41,9 @@ export function Soczewka({ dane, onWstawDoSzkicu }: {
 
 /* SKĄD KATEGORIA — zawsze, bo soczewka stoi na domyśle klasyfikatora.
    Agent, który widzi „wg Copilota", wie, że może się mylić, i wie, gdzie
-   to poprawić: od 0.506.0 etykieta kategorii stoi pod „⋯” nad rozmową.
-   Zwinięte (0.513.0): źródło zostaje słowem w linii nagłówka, a „gdzie
-   poprawić" zeszło do dymka. Zdanie o „⋯” stało nad KAŻDĄ soczewką, choć
-   potrzebne jest tylko temu, kto chce poprawić kategorię. */
+   to poprawić: etykieta kategorii stoi pod „⋯” nad rozmową. Źródło stoi
+   słowem w linii nagłówka, a „gdzie poprawić" w dymku — potrzebne jest
+   tylko temu, kto chce poprawić kategorię. */
 function Naglowek({ s }: { s: DaneSoczewki }) {
   return <div className="mb-2 flex flex-wrap items-baseline gap-x-2">
     <NaglowekSekcji jako="h3" ton="text-slate-700">Pytanie klienta · {NAZWA_KATEGORII[s.kategoria]}</NaglowekSekcji>
@@ -78,7 +76,7 @@ function Anulowanie({ dane }: { dane: OsRozmowy }) {
       : `Bez powtórzonego zakupu tych samych pozycji w ${OKNO_PODWOJNEGO_GODZ} godzinach.`}</p>
     <ul className="divide-y divide-slate-200" aria-label="Zakupy tego klienta">
       {zakupy.map((z) => <li key={z.externalId} className="py-2">
-        {/* STATUS PIERWSZY (0.500.0): to on rozstrzyga, który zakup anulować,
+        {/* STATUS PIERWSZY: to on rozstrzyga, który zakup anulować,
             a początek wiersza jest jedynym miejscem, które oko czyta na pewno. */}
         <div className="flex flex-wrap items-baseline gap-x-2 text-xs">
           <span className={z.status === "READY_FOR_PROCESSING" ? "font-semibold text-ranga-ok"

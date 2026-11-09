@@ -24,7 +24,7 @@ import { DatabaseSync } from "node:sqlite";
 const katalog = fs.mkdtempSync(path.join(os.tmpdir(), "wertis-migr-"));
 const plik = path.join(katalog, "stara.db");
 
-// Schemat sprzed 0.20.0 — dokładnie tyle, ile potrzeba, żeby migracja miała co robić.
+// Schemat sprzed kont — dokładnie tyle, ile potrzeba, żeby migracja miała co robić.
 const stara = new DatabaseSync(plik);
 stara.exec(`
   CREATE TABLE app_user (

@@ -4,7 +4,7 @@ import fs from "node:fs";
 import { DatabaseSync } from "node:sqlite";
 import { migrate } from "./db.js";
 
-/* ── Nakładka spraw odeszła (0.388.0) ────────────────────────────────────────
+/* ── Nakładka spraw odeszła ────────────────────────────────────────
    Plik nazywał się `migracja-sprawy.test.ts` i pilnował rzeczy odwrotnej:
    żeby `sprawa_klienta` PRZEŻYŁA kasatę nakładek. Zostaje na tym samym
    miejscu z odwróconą treścią, bo pytanie jest to samo — co `migrate()` robi
@@ -51,7 +51,7 @@ test("kasata przeżywa drugi start — `migrate()` chodzi przy każdym uruchomie
 });
 
 test("baza klienta ze SPRAWAMI traci je przy aktualizacji, razem z wiązaniami", () => {
-  /* Ten test odtwarza bazę SPRZED 0.388.0: tabele stoją i mają dane. Po
+  /* Ten test odtwarza starą bazę: tabele stoją i mają dane. Po
      `migrate()` obu nie ma. Bez tego kasata przechodziłaby na zielono na
      świeżym schemacie, nie dotykając ani jednej prawdziwej instalacji. */
   const d = new DatabaseSync(":memory:");
@@ -81,7 +81,7 @@ test("baza klienta ze SPRAWAMI traci je przy aktualizacji, razem z wiązaniami",
 });
 
 test("ślad sklejania zostaje w dzienniku audytu, choć klamry już nie ma", () => {
-  /* Zdarzenia wiszą przy ŹRÓDLE (blizna 0.130.0), a `conversation_event` nie
+  /* Zdarzenia wiszą przy ŹRÓDLE, a `conversation_event` nie
      ma retencji. „Kto i kiedy sklejał te rozmowy" ma zostać pytaniem, na które
      da się odpowiedzieć po latach — panel przestał je rysować, baza pamięta. */
   const d = new DatabaseSync(":memory:");

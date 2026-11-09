@@ -12,7 +12,7 @@ import {
 import { wpiszNumerDosylki, zalozDosylkeZProfilu } from "../services/dosylka.js";
 import { ROLE_BIUROWE } from "../services/users.js";
 
-/* ── Trasy PONAD kolejkami (23 września 2026) ────────────────────────────────
+/* ── Trasy PONAD kolejkami ────────────────────────────────
    Szukanie Ctrl+K i historia klienta ze zwrotu albo sprawy nie należą do
    żadnej jednej kolejki — dlatego nie stoją w pliku żadnej z nich. Obie są
    ODCZYTEM: GET, zero zapisu i zero żądań do Allegro. */
@@ -30,7 +30,7 @@ const BIURO = ROLE_BIUROWE;
  * rozmówcy w wątku, dowiązanej numerem zamówienia, a historia takiej
  * rozmowy loginu nie ma (`loginSprawyRozmowy`).
  *
- * NUMER DOSYŁKI TU NIE JEDZIE (0.536.1). Linia sprawy przy źródle drukuje
+ * NUMER DOSYŁKI TU NIE JEDZIE. Linia sprawy przy źródle drukuje
  * samo zdanie dosyłki, a numer prowadzi do adresu odbiorcy. Potrzebuje go
  * wyłącznie karta sprawy na profilu, gdzie agent go kopiuje albo poprawia.
  */
@@ -77,7 +77,7 @@ export async function spoiwoRoutes(app: FastifyInstance) {
     catch (e) { return reply.code(404).send({ error: (e as Error).message }); }
   });
 
-  /* PROFIL KLIENTA (24 września 2026) — odczyt; 404 ze zdaniem, gdy login nie
+  /* PROFIL KLIENTA — odczyt; 404 ze zdaniem, gdy login nie
      występuje nigdzie, żeby ekran nie rysował pustego profilu jak prawdziwego. */
   app.get<{ Params: { login: string } }>("/api/obsluga/klient/:login", async (req, reply) => {
     const nie = odmowa(reply); if (nie) return nie;
@@ -111,7 +111,7 @@ export async function spoiwoRoutes(app: FastifyInstance) {
       return { ok };
     });
 
-  /* ── SPRAWA KLIENTA (0.535.0, S6) ─────────────────────────────────────────
+  /* ── SPRAWA KLIENTA (S6) ─────────────────────────────────────────
      Cztery zapisy, każdy z wymaganą `wersją` (od 0.536.0 jeszcze dwa przy
      dosyłce, niżej). KAŻDY KLUCZ CIAŁA JEST
      WYMAGANY i sprawdza się go `in`, nie `?? null`: brak klucza to 400 bez
@@ -186,7 +186,7 @@ export async function spoiwoRoutes(app: FastifyInstance) {
         { wersja: Number(b.wersja), odcisk: String(b.odcisk) }, autor()));
     });
 
-  /* ── DOSYŁKA (0.536.0, drugi przyrost S6) ─────────────────────────────────
+  /* ── DOSYŁKA (drugi przyrost S6) ─────────────────────────────────
      Dwa zapisy z profilu, z tymi samymi strażnikami co cztery wyżej: każdy
      klucz wymagany, wersja i odcisk ekranu, 409 ze świeżą sprawą. Zamówienia
      i konta propozycja NIE niesie — wynikają ze zwrotu po stronie serwera.

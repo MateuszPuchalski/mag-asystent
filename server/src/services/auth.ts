@@ -19,16 +19,11 @@ import {
    i zalogowanie — nic po cichu.
 
    SESJA NIE WYGASA SAMA. Trwa do jawnej decyzji człowieka: wylogowania
-   z Ustawień. Bezczynność nie robi nic.
+   z Ustawień. Bezczynność nie robi nic: urządzenia nie opuszczają hali,
+   a blokada kosztowałaby skan przy każdym powrocie do kolektora.
 
-   Do sierpnia 2026 sesja blokowała się po 10 minutach bez ruchu, a kolektor
-   pokazywał wtedy ekran „Sesja zablokowana". Blokada nigdy nie gubiła pracy,
-   ale kosztowała skan przy każdym powrocie do odłożonego kolektora — i to był
-   jej całkowity efekt, bo urządzenia nie opuszczają hali.
-
-   Nagłówek `X-User` przestaje być tożsamością. Dało się go wpisać ręcznie,
-   więc każdy mógł podać się za kogokolwiek — zostaje najwyżej jako podpowiedź
-   dla instalacji, które nie przeszły jeszcze na konta.                       */
+   Nagłówek `X-User` nie jest tożsamością, bo dało się go wpisać ręcznie.
+   Zostaje najwyżej jako podpowiedź dla instalacji bez kont.                 */
 
 export interface Sesja {
   token: string;
@@ -47,9 +42,8 @@ const minut = (od: string, doKiedy = Date.now()): number =>
   (doKiedy - new Date(od).getTime()) / 60000;
 
 /* ── Dławienie prób ─────────────────────────────────────────────────────────
-   Plakietka była przedmiotem: żeby jej użyć, trzeba było ją mieć. Hasło się
-   zgaduje, a serwer stoi w tej samej sieci co kolektory, więc bez licznika
-   jedno urządzenie z pętlą przechodzi cały słownik przez noc.
+   Hasło się zgaduje, a serwer stoi w tej samej sieci co kolektory, więc bez
+   licznika jedno urządzenie z pętlą przechodzi cały słownik przez noc.
 
    Licznik żyje w PAMIĘCI PROCESU, nie w bazie: restart usługi zwalnia blokadę
    i to jest w porządku, bo atak przez restart wymaga dostępu do serwera, czyli
@@ -101,7 +95,7 @@ export function zaloguj(login: string, haslo: string, deviceId: string | null): 
 
 /**
  * Ponowne podanie WŁASNEGO hasła przed operacją, której sama sesja nie
- * wystarcza (0.492.0: aktualizacja serwera z panelu).
+ * wystarcza (np. aktualizacja serwera z panelu).
  *
  * Sesje nie wygasają (architektura §6), więc token zostawiony w przeglądarce
  * biura wystarczyłby, żeby ktoś obcy wgrał wersję na maszynę z bazą firmy.
@@ -195,20 +189,13 @@ export function dotknij(token: string): void {
   db().prepare("UPDATE device_session SET last_seen = ? WHERE token = ?").run(nowIso(), token);
 }
 
-/* Przejęcie pracy cudzym badge'em (`przejmij`) wyszło razem z plakietkami
-   w 0.20.0. Miało sens, dopóki zmiana osoby kosztowała jeden skan: wtedy warto
-   było pytać „przejąć pracę?", zamiast przełączać po cichu. Przy haśle nie ma
-   czego przejmować — kto siada do kolektora, ten się loguje, a poprzednik
-   wylogowuje. Zdarzenia `session_handover` zostają w audycie jako historia. */
-
 export function wyloguj(token: string): void {
   db().prepare("UPDATE device_session SET revoked_at = ? WHERE token = ?").run(nowIso(), token);
 }
 
-/* ── Sesje konta — wgląd i cięcie (0.111.0) ──────────────────────────────────
-   `last_seen` było zbierane od zawsze i nigdzie nie pokazywane, a jedyną
-   drogą unieważnienia sesji zgubionego kolektora był curl na `:id/active`.
-   Karta KONTA I SESJE w panelu czyta stąd; „wyloguj wszędzie" tnie wszystkie
+/* ── Sesje konta — wgląd i cięcie ────────────────────────────────────────────
+   Karta KONTA I SESJE w panelu czyta stąd, żeby sesję zgubionego kolektora
+   dało się unieważnić bez curla. „Wyloguj wszędzie" tnie wszystkie
    naraz — sesje się nie kasują (revoked_at, jak przy zwykłym wylogowaniu),
    żeby ślad „co było zalogowane" przetrwał decyzję.                          */
 
@@ -243,9 +230,8 @@ export function wylogujWszedzie(userId: number): number {
 }
 
 /* ── Operacje uprzywilejowane ───────────────────────────────────────────────
-   Rozstrzyga sama ROLA zalogowanego konta. Do sierpnia 2026 dochodził PIN,
-   bo plakietkę dawało się pożyczyć („weź moją, mam ręce w oleju") — hasła się
-   nie pożycza tak samo łatwo, więc drugi sekret wyszedł razem z badge'em.
+   Rozstrzyga sama ROLA zalogowanego konta. Hasła nie pożycza się tak łatwo
+   jak plakietki, więc drugi sekret nie jest potrzebny.
 
    Cena jest jawna: porzucony zalogowany kolektor pozwala obcej osobie na
    wszystko, co może jego właściciel. Dlatego wylogowanie po zmianie jest
@@ -254,16 +240,12 @@ export function wylogujWszedzie(userId: number): number {
 /**
  * Operacje zastrzeżone dla ról.
  *
- * Plan §7 wymieniał cztery: korektę zatwierdzonego ruchu, domknięcie dostawy
- * z nierozwiązanymi wyjątkami, zdjęcie cudzej blokady pozycji i zmianę ustawień
- * serwera. Zostały dwie: korekta lokalizacji okazała się ścieżką codzienną, nie
- * wyjątkiem, a blokady pozycji wyszły w 0.47.0 razem z rolą brygadzisty, więc
- * nie ma już czego odbierać. Wartości enuma bez trasy byłyby martwym kodem
- * udającym zabezpieczenie, więc dochodzą razem ze swoimi trasami.
+ * Wartości enuma bez trasy byłyby martwym kodem udającym zabezpieczenie,
+ * więc dochodzą razem ze swoimi trasami.
  */
 export type OperacjaUprzywilejowana =
   /**
-   * Zamknięcie dostawy jako rozłożonej POZA WERTIS (0.40.0).
+   * Zamknięcie dostawy jako rozłożonej POZA WERTIS.
    *
    * Jedyna operacja w aplikacji, która zdejmuje pracę z listy bez ani jednego
    * skanu — a więc jedyna, którą da się „rozłożyć" całą dostawę, nie ruszając
@@ -271,7 +253,7 @@ export type OperacjaUprzywilejowana =
    */
   | "domkniecie_dostawy"
   /**
-   * Oddanie pieniędzy kupującemu albo odmowa ich oddania (0.190.0).
+   * Oddanie pieniędzy kupującemu albo odmowa ich oddania.
    *
    * JEDYNA operacja tej aplikacji, która rusza cudze pieniądze na zewnątrz.
    * Bramka roli sama w sobie niewiele tu dodaje — trasy zwrotów i tak stoją
@@ -283,7 +265,7 @@ export type OperacjaUprzywilejowana =
   /** Zakładanie kont magazynierów, migracja historii. */
   | "zarzadzanie_kontami"
   /**
-   * Zmiana ustawienia serwera z panelu (0.491.0).
+   * Zmiana ustawienia serwera z panelu.
    *
    * Zapisuje `wertis.env` i restartuje usługi, więc jedno kliknięcie zmienia
    * zachowanie całej firmy — od progów kolejek po to, czy Copilot wydaje
@@ -291,12 +273,12 @@ export type OperacjaUprzywilejowana =
    */
   | "konfiguracja_serwera"
   /**
-   * Aktualizacja serwera z panelu (0.492.0). Wymienia kod na maszynie
+   * Aktualizacja serwera z panelu. Wymienia kod na maszynie
    * z bazą firmy, więc obok roli wymaga ponownego hasła (`potwierdzHaslo`).
    */
   | "aktualizacja_serwera"
   /**
-   * Odebranie rozmowy agentowi, który ją prowadzi (0.147.0).
+   * Odebranie rozmowy agentowi, który ją prowadzi.
    *
    * Przejęcie wolnej rozmowy robi każdy z biura i to nie jest ta operacja.
    * Ta zdejmuje sprawę komuś Z RĄK — a więc, jak domknięcie dostawy, siedzi
@@ -308,11 +290,9 @@ export type OperacjaUprzywilejowana =
    * To, czego biuru NIE wolno: konta o roli `biuro` albo `admin`, wyłączanie
    * kont i odbieranie haseł.
    *
-   * Osobna operacja, bo „zarządzanie kontami" było jedną nazwą na dwie różne
-   * rzeczy. Kto zakłada konto biura z własnym hasłem, ten obchodzi każdą regułę
-   * wyżej — a do 0.24.0 biuro potrafiło to zrobić samo sobie. To była realna
-   * dziura, nie hipoteza: rola strzegąca tożsamości sama sobie tożsamość
-   * rozdawała.
+   * Osobna operacja, bo kto zakłada konto biura z własnym hasłem, ten
+   * obchodzi każdą regułę wyżej — rola strzegąca tożsamości nie może sama
+   * sobie tożsamości rozdawać.
    */
   | "zarzadzanie_biurem"
   /**
@@ -325,7 +305,7 @@ export type OperacjaUprzywilejowana =
    */
   | "widocznosc_magazynow"
   /**
-   * Podmiana adresów CAŁEJ listy kartotek z arkusza (0.138.0).
+   * Podmiana adresów CAŁEJ listy kartotek z arkusza.
    *
    * Jedyna operacja, która zapisuje do bazy firmy SETKI kartotek jednym
    * kliknięciem — reszta dróg do `tw_Lokalizacja` przestawia jeden towar
@@ -350,8 +330,8 @@ export type OperacjaUprzywilejowana =
   | "reklamacja_werdykt"
   /**
    * Operacje ratunkowe serwera: pełny resync z Subiekta i zapomnienie braków
-   * zdjęć (0.431.0). Do tej wersji stały za SAMĄ sesją — resync na produkcji
-   * to pełny import z Subiekta, a mógł go wywołać magazynier z kolektora.
+   * zdjęć. Resync to pełny import z Subiekta, więc sama sesja magazyniera
+   * nie wystarcza.
    */
   | "ratunek_serwera";
 
@@ -366,12 +346,10 @@ export type OperacjaUprzywilejowana =
  * Admin NIE dostaje audytu JAKO UPRAWNIENIA PONAD biuro — dostaje dokładnie
  * tyle, co biuro, żeby konto z instalatora nadawało się do pracy.
  *
- * WYJĄTKIEM jest raport wydajności per osoba (0.431.0, decyzja właściciela).
- * Do tej wersji stał tu zapis, że raport o pracy ludzi zostaje przy biurze.
- * Audyt 0.427.0 odwrócił kolejność: monitoring pracowniczy to decyzja kadrowa,
- * nie robota biura przy dostawie. Bramka stoi w `routes/analiza.ts`
- * (`mozeWidziecLudzi`), nie tutaj — to odczyt, a `autoryzuj` zapisuje
- * zdarzenie przy każdym wywołaniu.
+ * WYJĄTKIEM jest raport wydajności per osoba (decyzja właściciela):
+ * monitoring pracowniczy to decyzja kadrowa, nie robota biura przy dostawie.
+ * Bramka stoi w `routes/analiza.ts` (`mozeWidziecLudzi`), nie tutaj — to
+ * odczyt, a `autoryzuj` zapisuje zdarzenie przy każdym wywołaniu.
  */
 const WYMAGANA_ROLA: Record<OperacjaUprzywilejowana, readonly Rola[]> = {
   /* ORZEKA, że dostawy nie trzeba rozkładać — a takie orzeczenie należy do tej

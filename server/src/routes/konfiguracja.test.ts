@@ -5,7 +5,7 @@ import os from "node:os";
 import path from "node:path";
 import type { FastifyInstance } from "fastify";
 
-/* ── Konfiguracja w panelu (0.488.0) ─────────────────────────────────────────
+/* ── Konfiguracja w panelu ─────────────────────────────────────────
    Cztery gwarancje, każda z powodem w `routes/konfiguracja.ts`:
    1. tylko admin — biuro dostaje 403, bez sesji 401;
    2. hasło z pliku nie pojawia się w odpowiedzi ani razu;
@@ -70,7 +70,7 @@ test("wartości ze źródłem, sekret bez wartości", async () => {
     ["plik", null, true]);
   assert.deepEqual([w("PORT").zrodlo, w("PORT").wartosc], ["przykryte", "3001"]);
   assert.deepEqual([w("ZWROT_WYGASA_DNI").zrodlo, w("ZWROT_WYGASA_DNI").wartosc], ["domyslna", null]);
-  /* Domyślna nie jest już kreską (0.543.0): panel dostaje liczbę, na której
+  /* Domyślna nie jest już kreską: panel dostaje liczbę, na której
      serwer pracuje, prosto z `config`. Sekret dalej nie wychodzi. */
   const { config } = await import("../config.js");
   const obowiazuje = (klucz: string) => (w(klucz) as unknown as { obowiazuje: string | null }).obowiazuje;
@@ -92,7 +92,7 @@ test("patrzenie niczego nie zapisuje — także wpisu privileged", async () => {
   assert.equal(ile(), przed);
 });
 
-/* ── Zapis z panelu (0.491.0) ───────────────────────────────────────────
+/* ── Zapis z panelu ───────────────────────────────────────────
    Klucz przykryty zmienną usługi sprawdza `konfiguracja-zapis.test.ts`:
    tutaj PORT jest przykryty, ale nie jest edytowalny, więc nie ma na czym. */
 

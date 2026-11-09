@@ -1,10 +1,9 @@
-import React from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { render } from "@testing-library/react";
 import type { Kopilot, Rozmowa } from "../api/typy";
 import { licznikTytulu, powodyPowiadomienia, useSygnaly } from "./Sygnaly";
 
-/* ── Sygnały poza ekranem (23 września 2026) ─────────────────────────────────
+/* ── Sygnały poza ekranem ────────────────────────────────────────────────────
    Pilnujemy trzech rzeczy: licznik liczy nieprzeczytane słowa KLIENTA,
    powiadomienie dotyczy wyłącznie dwóch powodów, a pierwszy odczyt niczego
    nie wystrzeliwuje — inaczej poranne otwarcie zasypałoby ekran nocą. */

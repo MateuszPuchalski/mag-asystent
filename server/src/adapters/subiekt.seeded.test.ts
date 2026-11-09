@@ -25,18 +25,12 @@ test("kod PZ tłumaczy się na etykietę PZ", () => {
 });
 
 test("kod bez nazwy dostaje własny symbol, a nie cudzy", () => {
-  /* Do 0.22.1 ta asercja brzmiała odwrotnie: kod spoza pary FZ/PZ WYPADAŁ
-     z listy etykiet. Zachowanie było spójne samo ze sobą, ale nie z importerem,
-     który ten sam kod zapisywał do read-modelu jako „PZ" — bo miał gałąź
-     `else`, nie filtr. Dopisanie trzeciego typu do `DOK_TYPY_DOSTAW` dawało
-     więc dokumenty pod CUDZĄ nazwą, bez jednego słowa błędu po drodze.
+  /* Kod spoza pary FZ/PZ ZOSTAJE na liście etykiet, spójnie z importerem.
+     Inaczej trzeci typ w `DOK_TYPY_DOSTAW` dawałby dokumenty pod CUDZĄ nazwą.
 
-     `TYP-20` jest brzydkie i o to chodzi: widać, że czegoś nie nazwano.
-
-     Przykładem był kod 14, dopóki 0.201.0 nie nazwało go `ZW` — zwrot
-     detaliczny wszedł do mapy razem z automatem numerów korekt. Test pilnuje
-     ZACHOWANIA przy kodzie bez nazwy, więc przykład się zmienia, a asercja
-     nie. */
+     `TYP-20` jest brzydkie i o to chodzi: widać, że czegoś nie nazwano. Test
+     pilnuje ZACHOWANIA przy kodzie bez nazwy, więc przykład się zmienia,
+     a asercja nie. */
   const orig = config.mssql.dokTypyDostaw;
   config.mssql.dokTypyDostaw = [config.mssql.dokTypFZ, 20, 22];
   try {

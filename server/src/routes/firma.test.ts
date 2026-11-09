@@ -6,7 +6,7 @@ import path from "node:path";
 import type { FastifyInstance } from "fastify";
 import type { Rola } from "../services/users.js";
 
-/* ── Trasy danych firmy (0.444.0) ──────────────────────────────────────────
+/* ── Trasy danych firmy ──────────────────────────────────────────
    Rachunek zapisu jest w `services/firma.test.ts`; tutaj bramka ról i ślad
    przez całą trasę. Dane firmy stoją na każdym protokole, który wychodzi do
    dostawcy — hala ich nie czyta i nie zmienia.                              */

@@ -5,7 +5,7 @@ import os from "node:os";
 import path from "node:path";
 import { DatabaseSync } from "node:sqlite";
 
-/* ── Kasacja obsługi klienta (0.140.0) ───────────────────────────────────────
+/* ── Kasacja obsługi klienta ───────────────────────────────────────
    Migracja, która USUWA dane, jest jedyną, przy której błąd kosztuje pracę
    magazynu, a nie komunikat. Trzy rzeczy do sprawdzenia:
 
@@ -131,7 +131,7 @@ test("kosz i jego pozycje przeżywają przebudowę z całą treścią", () => {
     db().prepare("PRAGMA table_info(kosz_pozycja)").all() as Array<{ name: string }>
   ).map((c) => c.name);
   assert.ok(!kolumny.includes("zwrot_id"), "zwrot_id znika razem z tabelą zwrotów");
-  /* Kolumny z 0.79.0 dochodzą ze schematu, choć stara baza ich nie miała. */
+  /* Nowsze kolumny dochodzą ze schematu, choć stara baza ich nie miała. */
   for (const k of ["powod", "pominieto_at", "pozniej_at", "loc_queue_id"]) {
     assert.ok(kolumny.includes(k), `${k} dochodzi z nowego kształtu`);
   }

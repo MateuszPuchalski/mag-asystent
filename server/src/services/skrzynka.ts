@@ -37,10 +37,7 @@ import { stanProblemowZakupu, type StanProblemowZakupu } from "./allegro-inbox-s
    `allegro-inbox-sync`. Nie odpytuje Allegro sama: rytm i limity API pilnuje
    jedno miejsce, a ekran otwiera się także wtedy, gdy Allegro nie odpowiada —
    pokazuje wtedy ostatni znany stan i moment ostatniej udanej synchronizacji.
-
-   Do 0.143.1 czytała surowe lądowisko `allegro_inbox_*`. Przejście na model
-   kanoniczny jest tym, co czyni przejmowanie rozmowy, właściciela i szkic
-   z 0.143.0 osiągalnymi: tamte trasy przyjmują liczbowe `conversation.id`. */
+   Trasy przejmowania rozmowy i szkicu przyjmują liczbowe `conversation.id`. */
 
 export interface RozmowaSkrzynki {
   id: number; klient: string; ostatniaWiadomosc: string; ostatniaWiadomoscAt: string;
@@ -50,10 +47,10 @@ export interface RozmowaSkrzynki {
   nieprzeczytana: boolean; wlascicielId: number | null; wlasciciel: string | null; wersja: number;
   /** Status WYLICZONY (§7) — odłożenie po terminie wraca tu już jako `open`. */
   status: StatusRozmowy;
-  /** Ręczna flaga „pilne" (§10.2, 0.181.0). */
+  /** Ręczna flaga „pilne" (§10.2). */
   priorytet: "normalny" | "pilny";
   /**
-   * Ręczny znacznik „to sprawa reklamacyjna" (0.390.0).
+   * Ręczny znacznik „to sprawa reklamacyjna".
    *
    * NASZ, nie Allegro: sprawy posprzedażowej sprzedawca nie może założyć
    * (`/sale/issues` ma wyłącznie GET). Mówi, że rozmowę prowadzimy jak
@@ -88,13 +85,11 @@ export interface RozmowaSkrzynki {
   zadanieWToku: boolean;
   odlozoneDo: string | null;
   /* Odłożenie, którego termin minął. Liczy to SERWER, bo reguła „minął termin"
-     ma jedno źródło; panel dwa razy tej samej reguły nie wyprowadza (blizna
-     z kubełków zwrotów). Wiersz taki wraca jako `open` i wygląda jak każdy
+     ma jedno źródło; panel dwa razy tej samej reguły nie wyprowadza. Wiersz taki wraca jako `open` i wygląda jak każdy
      inny otwarty — a to właśnie ten, o którym ktoś zapomniał. */
   poTerminie: boolean;
-  /* Ostatnia wiadomość klienta to podziękowanie po naszej odpowiedzi
-     (22 września 2026). Od 23 września rozmowa jest wtedy ZAKOŃCZONA, a
-     znacznik mówi dlaczego — inaczej wiersz z wiadomością klienta na
+  /* Ostatnia wiadomość klienta to podziękowanie po naszej odpowiedzi.
+     Rozmowa jest wtedy ZAKOŃCZONA, a znacznik mówi dlaczego — inaczej wiersz z wiadomością klienta na
      podglądzie wyglądałby jak pytanie, które ktoś przeoczył. Liczy SERWER,
      regułą `klientPodziekowal`, tą samą co przy jednej rozmowie. */
   podziekowal: boolean;
@@ -106,7 +101,7 @@ export interface RozmowaSkrzynki {
 
      `nieaktualna` liczy SERWER, tak samo jak `poTerminie`: reguła „klient
      dopisał po rozpoznaniu" ma jedno źródło, a panel drugi raz jej nie
-     wyprowadza (blizna z kubełków zwrotów). Wyszarzona plakietka mówi
+     wyprowadza. Wyszarzona plakietka mówi
      agentowi, że etykieta dotyczy starszej wiadomości — milczenie o tym
      byłoby gorsze niż brak etykiety. */
   kopilot: {
@@ -138,7 +133,7 @@ export interface RozmowaSkrzynki {
 /** Załącznik wiadomości. `SAFE` znaczy „wolno pobrać"; reszta tylko informuje. */
 export interface ZalacznikOsi {
   id: number; nazwa: string; typ: string | null; status: string; doPobrania: boolean;
-  /* Czy pokazać obraz WPROST na osi (0.218.0). Decyduje SERWER, bo to on zna
+  /* Czy pokazać obraz WPROST na osi. Decyduje SERWER, bo to on zna
      listę typów, które trasa podglądu odda — panel zgadujący po `typ`
      rysowałby zepsuty obrazek przy każdym rozjeździe tych dwóch list. */
   podglad: boolean;
@@ -152,16 +147,16 @@ export interface Wzmianka { userId: number; name: string }
 
 export interface WpisOsi {
   id: string;
-  /* `odeslanie_zadania` (0.352.0) to ODPOWIEDŹ HALI BEZ WYNIKU. Osobny rodzaj,
+  /* `odeslanie_zadania` to ODPOWIEDŹ HALI BEZ WYNIKU. Osobny rodzaj,
      nie `wynik_zadania` z treścią „nie da się": agent czytający oś ma widzieć,
      że pomiaru NIE MA, a nie że pomiar brzmi jak wymówka. */
   rodzaj: "wiadomosc" | "zlecenie" | "wynik_zadania" | "odeslanie_zadania" | "komentarz" | "status"
-    /* Kamień milowy zwrotu tego zamówienia (0.502.0) — `zwrot-na-osi.ts`. */
+    /* Kamień milowy zwrotu tego zamówienia — `zwrot-na-osi.ts`. */
     | "zwrot";
   autor: string; odKlienta: boolean; tresc: string; at: string;
   ofertaId: string | null; zadanieId?: number; messageId?: number;
   /**
-   * Szczegóły ZLECENIA dla hali (0.226.0) — tylko przy `rodzaj: "zlecenie"`.
+   * Szczegóły ZLECENIA dla hali — tylko przy `rodzaj: "zlecenie"`.
    *
    * Osobne pole, nie doklejka do `tresc`: panel rysuje z tego blok ze
    * statusem, priorytetem i kartoteką, a sklejanie tego w jeden łańcuch
@@ -174,7 +169,7 @@ export interface WpisOsi {
     twId: number | null; symbol: string | null; nazwaTowaru: string | null;
   };
   /**
-   * Zdarzenie w postaci KLUCZY (0.243.0) — przy `status` i `zwrot`.
+   * Zdarzenie w postaci KLUCZY — przy `status` i `zwrot`.
    * `tresc` zostaje zdaniem dla podpowiedzi, a to pole niesie
    * to samo rozłożone na części, żeby pasek zdarzeń mógł pokazać krótką
    * etykietę po polsku. Słownik polszczyzny stoi w panelu — angielskie klucze
@@ -188,11 +183,11 @@ export interface WpisOsi {
      niesie źródło). Ofert nie pobieramy; nazwę znamy tylko dla oferty, która
      kiedykolwiek przeszła przez pobrane zamówienie. `null` = nie znamy. */
   nazwaOferty?: string | null;
-  /* Zamówienie, którego dotyczy wiadomość — gałąź `relatesTo.order` (0.166.0). */
+  /* Zamówienie, którego dotyczy wiadomość — gałąź `relatesTo.order`. */
   zamowienieId?: string | null;
   zalaczniki?: ZalacznikOsi[];
   wzmianki?: Wzmianka[];
-  /* Nasze automatyczne potwierdzenie „Dziękujemy za kontakt" (0.218.0). Panel
+  /* Nasze automatyczne potwierdzenie „Dziękujemy za kontakt". Panel
      zwija taki wpis do jednej linijki. Flaga stoi wyłącznie przy wiadomościach
      WYCHODZĄCYCH — uzasadnienie w `czyAutoresponder`. */
   automatyczna?: boolean;
@@ -200,7 +195,7 @@ export interface WpisOsi {
      (`glos-allegro.ts`). Stoi po stronie przychodzącej, ale klientem nie
      jest: świeżość szkicu Copilota liczy się od słów KUPUJĄCEGO. */
   odAllegro?: true;
-  /* Blok firmowy odcięty od treści (0.219.1): nazwa spółki, adres, NIP, KRS,
+  /* Blok firmowy odcięty od treści: nazwa spółki, adres, NIP, KRS,
      REGON, telefon. `tresc` jest wtedy BEZ niego, a panel chowa go pod
      przyciskiem. Też tylko przy wychodzących — patrz `podzielStopke`. */
   stopka?: string;
@@ -219,18 +214,16 @@ export interface ZamowienieRozmowy {
   przesylka: StanPrzesylkiZamowienia | null;
 }
 
-/* Oferta, pod którą padło pytanie (0.178.0). `pobrana` jest `null`, dopóki
+/* Oferta, pod którą padło pytanie. `pobrana` jest `null`, dopóki
    ticker nie dociągnie snapshotu — numer i odnośnik są od razu, jak przy
    zamówieniu. Cena jest ze snapshotu, więc opisuje CHWILĘ pytania (§15.2),
    a nie dzisiejszy cennik. */
 export interface OfertaRozmowy {
   externalId: string; link: string | null;
   /**
-   * Skąd numer oferty (0.215.0): wskazanie agenta bije numer z wiadomości,
-   * a gdy nie ma żadnego z nich — JEDYNA pozycja zamówienia. Do 0.213.0
-   * ręczne wskazanie zapisywało się w zdarzeniu, a blok oferty go nie czytał;
-   * rozmowa z samym zamówieniem stała bez oferty i bez kartoteki, choć
-   * zamówienie nazywa towar dokładniej niż oferta.
+   * Skąd numer oferty: wskazanie agenta bije numer z wiadomości,
+   * a gdy nie ma żadnego z nich — JEDYNA pozycja zamówienia, bo zamówienie
+   * nazywa towar dokładniej niż oferta.
    */
   zrodlo: "wiadomosc" | "reczne" | "zamowienie";
   /**
@@ -242,46 +235,39 @@ export interface OfertaRozmowy {
   pobrana: {
     nazwa: string; sku: string | null; cenaGrosze: number | null;
     waluta: string | null; status: string | null; syncedAt: string;
-    /* Co wiadomo o zdjęciu listingowym (0.214.0; do 0.213.0 `maZdjecie: boolean`).
-       Adres NIE jedzie do panelu i to jest cała różnica: gdyby jechał, front
+    /* Co wiadomo o zdjęciu listingowym. Adres NIE jedzie do panelu i to jest cała różnica: gdyby jechał, front
        miałby w ręku `https://a.allegroimg.com/…` i prędzej czy później ktoś
        wstawiłby go w `src`, czyli wyprowadził przeglądarkę biura poza własną
        sieć. Jedzie sam STAN — a stany są trzy, bo „czekam na Allegro" i „tej
        oferty Allegro nie ma z czym pokazać" to dwa różne zdania na ekranie. */
     zdjecie: StanZdjeciaOferty;
   } | null;
-  /* Kartoteka Subiekta wywiedziona z SKU oferty (0.179.0). Od 0.219.0 jedno
-     trafienie po sygnaturze jest POWIĄZANIEM (decyzja właściciela), a zdanie
-     źródła mówi, że stoi za nim sygnatura, nie człowiek — §4.3 nie pozwala,
-     żeby wynik automatu udawał daną z Allegro. Ciężkich danych towaru tu NIE MA: stan, półki i zamienniki
-     panel bierze z `GET /api/products/:twId`, bo `osRozmowy` odświeża się
+  /* Kartoteka Subiekta wywiedziona z SKU oferty. Jedno trafienie po
+     sygnaturze jest POWIĄZANIEM (decyzja właściciela), a zdanie źródła mówi,
+     że stoi za nim sygnatura, nie człowiek. Ciężkich danych towaru tu NIE MA:
+     stan, półki i zamienniki panel bierze z `GET /api/products/:twId`, bo `osRozmowy` odświeża się
      przy każdym zdarzeniu szyny, a karta towaru ciągnie kolejkę MM. */
   kartoteka: Dopasowanie;
 }
 
 const SKRZYNKA = "skrzynka";
 
-/* PODGLĄD W KOLEJCE TO OSTATNIA WIADOMOŚĆ KLIENTA (0.166.0). Do 0.165.0
-   podzapytanie brało ostatnią wiadomość JAKĄKOLWIEK, więc po autoodpowiedzi
-   konta Allegro („Dziękujemy za kontakt…" wjeżdża synchronizacją jako zwykłe
-   `outgoing`) w kolejce stało nasze zdanie zamiast pytania. W `message` nie
+/* PODGLĄD W KOLEJCE TO OSTATNIA WIADOMOŚĆ KLIENTA. Autoodpowiedź konta
+   Allegro („Dziękujemy za kontakt…") wjeżdża synchronizacją jako zwykłe
+   `outgoing` i nie może zasłonić pytania. W `message` nie
    ma flagi automatu — autoresponder i odpowiedź agenta wyglądają identycznie
    — więc jedynym pewnym filtrem jest kierunek. Rozmowa bez ani jednej
    wiadomości przychodzącej (wątek, który zaczęliśmy my) schodzi na ostatnią
    dowolną, a `ostatniKierunek` mówi panelowi, żeby podpisał ją „Biuro".
 
    Data idzie Z TEJ SAMEJ wiadomości, nie z `conversation.updated_at`: tamto
-   jest datą WĄTKU z Allegro i po autoodpowiedzi mówiło o godzinie naszego
+   jest datą WĄTKU z Allegro i po autoodpowiedzi mówi o godzinie naszego
    zdania, nie pytania. `COALESCE` zostaje dla wątku świeżo założonego, bez
    wiadomości — Allegro takie oddaje. Kolejność LISTY dalej niesie
    `updated_at`, czyli tę samą, którą właściciel widzi w panelu sprzedawcy. */
 const LISTA = `
   SELECT c.id, c.unread,
-         -- KLIENT TO LOGIN, NIE TEMAT (0.228.0). 0.219.2 naprawiło to na OSI
-         -- rozmowy i zatrzymało się w pół drogi: nagłówek rozmowy i wiersz
-         -- kolejki dalej brały c.subject. Na koncie właściciela temat bywa
-         -- równy loginowi, więc wyglądało poprawnie — aż do wątku o temacie
-         -- „Zaworek zwrotny", który podpisywał klienta nazwą części.
+         -- KLIENT TO LOGIN, NIE TEMAT: temat bywa nazwą części.
          -- Złączenie po identyfikatorze wątku, jak w klient-historia.ts.
          COALESCE(
            (SELECT t.interlocutor_login FROM allegro_inbox_thread t
@@ -293,25 +279,19 @@ const LISTA = `
          o.body AS ostatniaWiadomosc,
          COALESCE(o.sent_at, c.updated_at) AS ostatniaWiadomoscAt,
          o.direction AS ostatniKierunek,
-         -- KTO PISAŁ NAPRAWDĘ OSTATNI (0.225.0). Kolumna ostatniKierunek wyżej
-         -- NIE nadaje się do wyliczenia stanu: złączenie o celowo preferuje
-         -- ostatnią wiadomość KLIENTA, bo podgląd w kolejce ma pokazywać jego
-         -- słowa, nie nasze. Użycie go tutaj dawało „czeka na nas" także tuż
-         -- po naszej odpowiedzi.
-         -- AUTOODPOWIEDŹ NIE JEST NASZYM RUCHEM (0.227.0): „Dziękujemy za
-         -- kontakt" wychodzi samo, w sekundę po pytaniu, i nie odpowiada na
-         -- nic. Liczona jako nasza wiadomość zdejmowała rozmowę z listy tych,
-         -- które czekają na odpowiedź.
-         -- PO CZASIE, NIE PO id (23 września 2026): synchronizacja wpisywała
-         -- paczkę od najnowszej, więc id nie rośnie z czasem. Ta sama reguła
-         -- co kontrola świeżości wysyłki i klasyfikator.
+         -- KTO PISAŁ NAPRAWDĘ OSTATNI. Kolumna ostatniKierunek wyżej
+         -- celowo preferuje wiadomość KLIENTA, więc stanu z niej nie liczymy.
+         -- AUTOODPOWIEDŹ NIE JEST NASZYM RUCHEM: wychodzi sama i nie
+         -- odpowiada na nic.
+         -- PO CZASIE, NIE PO id: synchronizacja wpisuje paczkę od najnowszej,
+         -- więc id nie rośnie z czasem.
          -- Głos Allegro po zamknięciu wątku nie jest ruchem (glos-allegro.ts).
          (SELECT m.direction FROM message m
            WHERE m.conversation_id=c.id AND m.auto_odpowiedz=0
              AND NOT ${glosAllegroPoZamknieciu("m")}
            ORDER BY m.sent_at DESC, m.id DESC LIMIT 1) AS ostatniRuch,
          -- Chwila tego ruchu i stan wątku u Allegro: z nich zakończenie
-         -- liczy się samo (23 września 2026, reguła w wyliczStatus).
+         -- liczy się samo (reguła w wyliczStatus).
          (SELECT m.sent_at FROM message m
            WHERE m.conversation_id=c.id AND m.auto_odpowiedz=0
              AND NOT ${glosAllegroPoZamknieciu("m")}
@@ -334,10 +314,8 @@ const LISTA = `
          (SELECT MAX(k.sent_at) FROM message k
            WHERE k.conversation_id=c.id AND k.direction='incoming'
              AND NOT ${glosAllegroPoZamknieciu("k")}) AS pytanieAt,
-         -- Licznik dopisków liczy się OD NASZEJ PRAWDZIWEJ ODPOWIEDZI
-         -- (0.227.0). Autoodpowiedź stojąca po pytaniu zerowała go, więc
-         -- wiersz kolejki mówił „zero dopisków" o rozmowie, w której klient
-         -- napisał i nikt mu nie odpowiedział.
+         -- Licznik dopisków liczy się OD NASZEJ PRAWDZIWEJ ODPOWIEDZI,
+         -- bo autoodpowiedź po pytaniu nie jest odpowiedzią.
          (SELECT COUNT(*) FROM message k
            WHERE k.conversation_id=c.id AND k.direction='incoming'
              AND NOT ${glosAllegroPoZamknieciu("k")}
@@ -482,16 +460,7 @@ export function stanObslugiHealth(teraz = Date.now()) {
   };
 }
 
-/* ── Kolejka wysyłek melduje PRAWDĘ (0.173.0) ────────────────────────────────
-   Do 0.172.0 stała tu stała `"wysyłka wyłączona"`. Zdanie było prawdziwe,
-   gdy powstawało — mechanizmu nie było. Wysyłka weszła w 0.148.0 i od tamtej
-   pory ekran twierdził coś przeciwnego do tego, co robi kod: agent odpisywał
-   klientom, a `/api/health` mówił, że wysyłka jest wyłączona.
-
-   To jest gorszy rodzaj błędu niż brak wskaźnika. Brak każe szukać; napis
-   „wyłączona" każe NIE szukać i prowadzi wprost do wniosku „trzeba to
-   włączyć", choć włączać nie ma czego.
-
+/* ── Kolejka wysyłek melduje PRAWDĘ ──────────────────────────────────────────
    `doSprawdzenia` liczy stany, które czekają na człowieka: nieudana wysyłka
    znaczy, że odpowiedź NIE poszła do klienta, a niepewna — że nie wiadomo,
    czy poszła. Oba wołają o ruch, a §21 żąda, żeby awaria integracji była
@@ -528,16 +497,15 @@ export function listaRozmow(): RozmowaSkrzynki[] {
   /* Uchwyty bierzemy RAZ na całą listę, nie po jednym na wiersz: kolejka
      odświeża się przy każdym zdarzeniu, a mapa i tak stoi w pamięci. */
   const trzymane = uchwyty();
-  /* PILNE na górze, potem najdłużej czekające pytanie (0.181.0).
+  /* PILNE na górze, potem najdłużej czekające pytanie.
      Właściciel wybrał obie drogi naraz: ręczna flaga przebija automatyczną
      kolejność. Terminu odpowiedzi nie ma (§26 zostaje bez rozstrzygnięcia),
      więc automatyczną kolejność niesie CZAS OCZEKIWANIA — najstarsze pytanie
      klienta stoi wyżej. Rozmowa bez pytania klienta idzie na koniec: nie ma
      tam nikogo, kto czeka.
 
-     Data wątku zostaje ostatnim rozstrzygnięciem, a `id` tie-breakerem: dwie
-     rozmowy z tą samą datą stały dotąd w kolejności, jaką dał planer zapytań,
-     czyli w żadnej. */
+     Data wątku zostaje ostatnim rozstrzygnięciem, a `id` tie-breakerem: bez
+     niego dwie rozmowy z tą samą datą stoją w kolejności planera zapytań. */
   return (db().prepare(`${LISTA}
     ORDER BY CASE c.priorytet WHEN 'pilny' THEN 0 ELSE 1 END,
              pytanieAt IS NULL, pytanieAt ASC,
@@ -567,7 +535,7 @@ function snapshotOferty(konto: number, ofertaId: string): OfertaRozmowy["pobrana
   };
 }
 
-/* Stan paczki przy zamówieniu rozmowy (23 września 2026). Czysty odczyt tego,
+/* Stan paczki przy zamówieniu rozmowy. Czysty odczyt tego,
    co zapisało ostatnie sprawdzenie — pytanie Allegro wisi na kliknięciu
    „sprawdź" i na układaniu szkicu, nigdy na otwarciu rozmowy. */
 function przesylkaRozmowy(konto: number, externalId: string): StanPrzesylkiZamowienia | null {
@@ -581,7 +549,7 @@ export function osRozmowy(id: number): {
   ofertaWskazana: OfertaWskazana | null;
   zamowienie: ZamowienieRozmowy | null; oferta: OfertaRozmowy | null;
   /**
-   * Zakupy tego kupującego — kandydaci do powiązania (0.397.0).
+   * Zakupy tego kupującego — kandydaci do powiązania.
    *
    * Lista jedzie ZAWSZE, także gdy zamówienie już jest: klient bywa u nas
    * z kilkoma paczkami i pytanie „nie o tę chodzi" pada częściej niż raz.
@@ -590,11 +558,11 @@ export function osRozmowy(id: number): {
    */
   kandydaciZamowien: KandydatZamowienia[];
   /**
-   * Zwroty TEGO zamówienia (0.221.0). Właściciel: „klienci często pytają
+   * Zwroty TEGO zamówienia. Właściciel: „klienci często pytają
    * pod zamówieniem o zwrot, którego dokonali" — agent szedł po stan zwrotu
    * do ekranu Zwroty i szukał go ręcznie. Mostkiem jest numer zamówienia,
-   * ten sam, którym zwrot znajduje swoje rozmowy od 0.169.0; po loginie
-   * dobierać nie wolno (blizna 0.56.6). Bez zamówienia lista jest pusta.
+   * ten sam, którym zwrot znajduje swoje rozmowy. Bez zamówienia lista jest
+   * pusta.
    */
   zwroty: WierszZwrotu[];
   /**
@@ -624,23 +592,18 @@ export function osRozmowy(id: number): {
   if (!wiersz) throw new Error("Nie znaleziono rozmowy");
   const rozmowa = naRozmowe(wiersz, Date.now(), uchwyty());
 
-  /* Nazwa towaru przy ofercie: NAJPIERW snapshot oferty (0.178.0), a gdy go
+  /* Nazwa towaru przy ofercie: NAJPIERW snapshot oferty, a gdy go
      jeszcze nie ma — ostatnia pozycja zamówienia o tym numerze oferty.
      Kolejność nie jest obojętna: snapshot to tytuł SAMEJ oferty, a pozycja
-     zamówienia opisuje ten towar tak, jak nazywał się w chwili zakupu.
-     Do 0.177.1 stała tu wyłącznie druga droga, więc pytanie SPRZED zakupu —
-     czyli każde zadane pod ofertą — zostawało z gołym numerem. */
+     zamówienia opisuje ten towar tak, jak nazywał się w chwili zakupu,
+     a pytanie SPRZED zakupu żadnej pozycji nie ma. */
   const wiadomosci = db().prepare(`
     SELECT m.id, m.direction, m.body, m.sent_at, m.auto_odpowiedz AS auto,
            m.related_object_type AS typ,
            m.related_object_id AS oferta, m.related_order_id AS zamowienie,
            m.channel_account_id AS konto, m.autor_rola AS rola,
-           /* ── PODPIS TO LOGIN, NIE TEMAT (0.219.2) ────────────────────────
-              Do 0.219.1 stała tu kolumna c.subject i przez to podpis
-              wiadomości niósł TEMAT WĄTKU. Na koncie właściciela temat bywa
-              równy loginowi, więc wyglądało to poprawnie — i dokładnie dlatego
-              było groźne: przy wątku o temacie „Zaworek zwrotny" wiadomość
-              klienta podpisywała się nazwą części.
+           /* ── PODPIS TO LOGIN, NIE TEMAT ──────────────────────────────────
+              Temat wątku bywa nazwą części.
 
               Login stoi w allegro_inbox_thread, złączony po identyfikatorze
               wątku, tak samo jak w klient-historia.ts (§4.3: jedno źródło na
@@ -693,11 +656,9 @@ export function osRozmowy(id: number): {
          `mimeType` jest w schemacie Allegro OPCJONALNE i bywa kłamliwe:
          telefony przysyłają `image/jpg`, `application/octet-stream` albo pusty
          ciąg przy `IMG_….jpg`. O UKŁADZIE decyduje więc typ ALBO nazwa pliku
-         (jak w reklamacjach od 0.223.0), a o WYDANIU — sygnatura bajtów na
-         trasie podglądu; plik nazwany `usterka.jpg` bez sygnatury obrazu
-         dostaje 415, panel to zapamiętuje i zostaje przy nazwie z pobraniem.
-         0.244.0 patrzyło na nazwę tylko przy PUSTYM polu, więc `image/jpg`
-         zostawiało zdjęcie samą nazwą i trasa z bajtami nie była pytana. */
+         (jak w reklamacjach), a o WYDANIU — sygnatura bajtów na trasie
+         podglądu; plik nazwany `usterka.jpg` bez sygnatury obrazu dostaje 415,
+         panel to zapamiętuje i zostaje przy nazwie z pobraniem. */
       podglad: obraz,
       /* PDF tą samą bramką: `SAFE`, adres i typ ALBO nazwa. Pierwszeństwo ma
          obraz, bo `podglad` zostaje bez zmian, a kafel ma jeden układ. */
@@ -708,10 +669,8 @@ export function osRozmowy(id: number): {
     zalaczniki.set(Number(z.message_id), lista);
   }
 
-  /* Kolejność niesie `message.id`, nie `sent_at`. Do 0.151.0 stało tu
-     uzasadnienie „Allegro podaje datę wątku, nie wiadomości" — nieprawdziwe,
-     `createdAt` jest per wiadomość. Kolejność po identyfikatorze zostaje, bo
-     jest stabilna także przy dwóch wiadomościach z tej samej sekundy. */
+  /* Kolejność niesie `message.id`, nie `sent_at`, bo jest stabilna także
+     przy dwóch wiadomościach z tej samej sekundy. */
   const os: WpisOsi[] = wiadomosci.map((m) => {
     /* Stopkę odcinamy TYLKO od naszych wiadomości: cytat naszej odpowiedzi
        w liście klienta niesie ją w środku, a cięcie „do końca" zabrałoby to,
@@ -733,7 +692,7 @@ export function osRozmowy(id: number): {
     nazwaOferty: m.nazwaOferty == null ? null : String(m.nazwaOferty),
     zamowienieId: m.zamowienie == null ? null : String(m.zamowienie),
     ...(zalaczniki.has(Number(m.id)) ? { zalaczniki: zalaczniki.get(Number(m.id)) } : {}),
-    /* Znacznik z KOLUMNY, nie liczony drugi raz (0.227.0): tę samą wartość
+    /* Znacznik z KOLUMNY, nie liczony drugi raz: tę samą wartość
        czyta kolejka przy wyliczaniu, kto ma ruch, a jedno źródło znaczy, że
        oba miejsca nie mogą się rozejść. */
     ...(Number(m.auto ?? 0) ? { automatyczna: true } : {}),
@@ -746,7 +705,7 @@ export function osRozmowy(id: number): {
      go niesie (wątek dotyczy jednego zakupu), a gdy klient go nie podał —
      z najnowszej naszej. Treść jest, gdy ticker już dociągnął; odczyt niczego
      nie pobiera („zero zapisu przy patrzeniu"). */
-  /* ── WSKAZANIE RĘCZNE JAKO ZAPASOWA DROGA (0.397.0) ─────────────────────────
+  /* ── WSKAZANIE RĘCZNE JAKO ZAPASOWA DROGA ───────────────────────────────────
      Zgłoszenie właściciela: klient napisał pod OFERTĄ o braku w paczce, a
      rozmowa nie miała zamówienia wcale. Ładunek wątku niesie JEDEN obiekt
      powiązany — pytanie spod oferty numeru zakupu nie ma i mieć nie będzie.
@@ -787,12 +746,9 @@ export function osRozmowy(id: number): {
     };
   })() : null;
 
-  /* ── ZLECENIE I WYNIK TO DWA WPISY (0.226.0) ────────────────────────────
-     Do 0.224.0 oś pokazywała sam WYNIK z hali. Zlecenie — czyli moment,
-     w którym agent poprosił magazyn o pomiar — nie zostawiało po sobie nic
-     poza kreskami zmian statusu rozmowy, z których nie da się odczytać, o co
-     kto prosił. Zgłoszenie właściciela: „zlecenie zmierzenia też powinno
-     zostać pokazane jako blok w wiadomości".
+  /* ── ZLECENIE I WYNIK TO DWA WPISY ──────────────────────────────────────
+     Zgłoszenie właściciela: „zlecenie zmierzenia też powinno zostać pokazane
+     jako blok w wiadomości".
 
      Rozdzielenie na dwa wpisy, a nie jeden blok „zlecenie z wynikiem", bo to
      dwa różne momenty i oś jest chronologiczna: między prośbą a odpowiedzią
@@ -843,7 +799,7 @@ export function osRozmowy(id: number): {
     });
   }
 
-  /* ODESŁANIE Z HALI (0.352.0) — ten sam kształt co wynik, bo dla osi to ten
+  /* ODESŁANIE Z HALI — ten sam kształt co wynik, bo dla osi to ten
      sam moment: hala odpowiedziała. Różnica jest w treści odpowiedzi, więc
      w rodzaju wpisu, a nie w tym, czy wpis w ogóle jest. Przed tą wersją hala
      nie miała jak odpowiedzieć „nie da się", więc oś kończyła się zleceniem
@@ -879,10 +835,8 @@ export function osRozmowy(id: number): {
       at: String(z.odeslano_at), ofertaId: null, zadanieId: Number(z.id),
     });
   }
-  /* KOMENTARZE WEWNĘTRZNE (0.157.0). Do tego wydania `conversation_comment`
-     miała w całym serwerze jeden INSERT i zero odczytów — notatka agenta
-     wpadała do tabeli i nie wracała do nikogo. §10.3 wymienia ją wśród rzeczy,
-     które ma nieść oś, a §6.4 każe odróżnić ją wizualnie od treści klienta;
+  /* KOMENTARZE WEWNĘTRZNE. §10.3 wymienia je wśród rzeczy, które ma nieść
+     oś, a §6.4 każe odróżnić ją wizualnie od treści klienta;
      tu dajemy do tego `rodzaj`, a wygląd robi panel. */
   const komentarze = db().prepare(`
     SELECT k.id, k.body, k.created_at, u.name AS autor
@@ -912,7 +866,7 @@ export function osRozmowy(id: number): {
     });
   }
 
-  /* ZMIANY STATUSU (0.158.0). §10.3 wymienia je wprost wśród rzeczy, które
+  /* ZMIANY STATUSU. §10.3 wymienia je wprost wśród rzeczy, które
      ma nieść oś. Nie są ozdobą: „dlaczego ta rozmowa wróciła na wierzch"
      odpowiada wyłącznie wpis mówiący, że klient dopisał do sprawy uznanej za
      rozwiązaną. Autor bywa KLIENTEM, nie agentem — patrz `obudzPrzychodzaca`.
@@ -929,7 +883,7 @@ export function osRozmowy(id: number): {
       id: `status-${z.id}`, rodzaj: "status", autor: String(p.autor ?? "system"),
       odKlienta: false, tresc: `${p.przed ?? "?"} → ${p.po ?? "?"}`,
       at: String(z.created_at), ofertaId: null,
-      /* KLUCZ, NIE ZDANIE (0.243.0). `tresc` zostaje dla podpowiedzi, ale pasek
+      /* KLUCZ, NIE ZDANIE. `tresc` zostaje dla podpowiedzi, ale pasek
          zdarzeń potrzebuje krótkiej etykiety PO POLSKU, a słownik polszczyzny
          stoi w panelu (`skrzynka/statusy.ts`) — tak jak wszędzie indziej:
          angielskie klucze w bazie i w API, polszczyzna na ekranie. Panel nie
@@ -938,7 +892,7 @@ export function osRozmowy(id: number): {
     });
   }
 
-  /* ZNACZNIK REKLAMACYJNY NA OSI (0.390.0). Nadanie i zdjęcie są tak samo
+  /* ZNACZNIK REKLAMACYJNY NA OSI. Nadanie i zdjęcie są tak samo
      ważne: „czemu ta rozmowa wypadła z sita reklamacyjnego" ma mieć
      odpowiedź, a `events` nie ma retencji. */
   for (const z of db().prepare(`
@@ -956,7 +910,7 @@ export function osRozmowy(id: number): {
     });
   }
 
-  /* ZWROT NA OSI (0.502.0) — decyzja, korekta i pieniądze zwrotu tego
+  /* ZWROT NA OSI — decyzja, korekta i pieniądze zwrotu tego
      zamówienia jako zdarzenia, jak status. Powód i zakres
      w `services/zwrot-na-osi.ts`. */
   for (const z of zdarzeniaZwrotowRozmowy(db(), id)) {
@@ -968,9 +922,8 @@ export function osRozmowy(id: number): {
     });
   }
 
-  /* OŚ JEST CHRONOLOGICZNA (0.157.0). Do tego wydania wyniki zadań doklejały
-     się za wszystkimi wiadomościami bez względu na czas — przy dwóch źródłach
-     znośne, przy trzech oś przestawała opowiadać przebieg sprawy.
+  /* OŚ JEST CHRONOLOGICZNA, bo trzy źródła wpisów muszą opowiadać jeden
+     przebieg sprawy.
 
      Sortowanie jest STABILNE, więc wiadomości z tą samą datą zostają
      w kolejności identyfikatorów. To ważne: Allegro potrafi oddać dwie
@@ -1024,21 +977,16 @@ export function zlecPomiar(
   const oferta = String(m.typ ?? "") === "OFFER" ? String(m.oferta) : null;
   const dodatkowa = (instrukcja ?? "").trim();
 
-  /* ── HALA DOSTAJE ZDANIE, NIE DOSSIER (0.408.0) ─────────────────────────
+  /* ── HALA DOSTAJE ZDANIE, NIE DOSSIER ───────────────────────────────────
      Zgłoszenie właściciela: „zadania zlecane dla magazynu mają za dużo
      informacji; powinno być tylko, jakiego produktu dotyczy zadanie — lub bez
      produktu — i co ma zrobić".
 
-     Do 0.407.0 `instrukcja` szła na kolektor jako CZTERY sklejone linie: całe
-     pytanie kupującego, numer oferty Allegro, zdanie o tym, kto wskazał
-     kartotekę, i dopiero pod nimi wskazówka biura. Magazynier w rękawicy
-     czytał więc reklamację klienta, żeby znaleźć jedno zdanie mówiące, co ma
-     zmierzyć. Dekalog ergonomii, punkt 2: pierwszeństwo ma to, co rozstrzyga
-     bieżącą czynność.
+     Dekalog ergonomii, punkt 2: pierwszeństwo ma to, co rozstrzyga bieżącą
+     czynność.
 
-     WSKAZÓWKA JEST ODTĄD OBOWIĄZKOWA. Była opcjonalna dokładnie dlatego, że
-     kontekst służył za treść zastępczą — a zadanie bez zdania „co zrobić" to
-     zadanie, którego nie da się wykonać. Tłumaczenie pytania klienta na
+     WSKAZÓWKA JEST OBOWIĄZKOWA: zadanie bez zdania „co zrobić" to zadanie,
+     którego nie da się wykonać. Tłumaczenie pytania klienta na
      polecenie dla hali jest pracą agenta, nie magazyniera.                 */
   if (!dodatkowa) {
     throw new Error("Napisz, co ma zrobić hala — bez tego zadanie jest nie do wykonania");
@@ -1072,11 +1020,11 @@ export function zlecPomiar(
     twId, zrodlo: SKRZYNKA, zrodloRef: String(rozmowaId),
   }, autor);
 
-  /* Powiązanie idzie kluczami obcymi modelu kanonicznego (0.144.0), a nie samym
+  /* Powiązanie idzie kluczami obcymi modelu kanonicznego, a nie samym
      `zrodlo_ref` — dzięki temu wynik wraca na oś TEJ rozmowy i tej wiadomości. */
   db().prepare("UPDATE zadanie_terenowe SET conversation_id=?, message_id=? WHERE id=?")
     .run(rozmowaId, messageId, utworzone.id);
-  /* ZLECONY POMIAR PRZESTAWIA STATUS (0.159.0). Bez tego `waiting_for_internal`
+  /* ZLECONY POMIAR PRZESTAWIA STATUS. Bez tego `waiting_for_internal`
      z §7 stał w liście dopuszczonych wartości i nie miał ani jednego nadawcy:
      agent musiałby wybrać go ręcznie z listy, choć fakt już się wydarzył.
      Wyjście z tego stanu jest równie automatyczne — zdejmuje go wynik z hali

@@ -4,14 +4,13 @@ import { iloscLiczona } from "./ilosc-zwrotu.js";
 import { kartotekaPoSku } from "./dopasowanie-sku.js";
 import { pomijanaPozycja } from "../pomijane.js";
 
-/* ── Komplet rozbity na paragonie (0.328.0) ─────────────────────────────────
-   Zgłoszenie właściciela: „niektóre oferty są sprzedawane jako komplety, ale
-   zbierane osobno na magazynie, więc produkty idące do koszyka zwrotów powinny
-   być brane z paragonu jako źródła prawdy, bo na paragonie są rozbite pozycje".
+/* ── Komplet rozbity na paragonie ───────────────────────────────────────────
+   Niektóre oferty sprzedaje się jako komplety, ale zbiera osobno na
+   magazynie. Towar do koszyka zwrotów bierze się wtedy z paragonu, bo tam
+   pozycje są rozbite.
 
    TABELA `oferta_kartoteka` MA KLUCZ `(konto, oferta)`, czyli jedna oferta
-   wskazuje DOKŁADNIE JEDNĄ kartotekę. Komplet nie ma jak wskazać trzech i to
-   nie jest przeoczenie — tak było projektowane, gdy komplety nie istniały.
+   wskazuje DOKŁADNIE JEDNĄ kartotekę. Komplet nie ma jak wskazać trzech.
    Dokładanie drugiego mapowania znaczyłoby drugie miejsce do utrzymania
    i drugie do rozjechania. Paragon już to rozbicie ma, bo Subiekt wystawia
    komplet osobnymi wierszami — i to jest DOKUMENT, a nie nasze mapowanie.
@@ -47,7 +46,7 @@ export interface SkladPozycji {
   skladniki: Skladnik[];
   /**
    * Skąd wzięły się kartoteki:
-   * `oferta` — mapowanie oferty, czyli droga sprzed tego wydania;
+   * `oferta` — mapowanie oferty;
    * `paragon` — rozbicie z dokumentu sprzedaży;
    * `biuro` — człowiek wskazał wiersze dokumentu.
    */
@@ -104,11 +103,10 @@ export function wierszeDokumentuSprzedazy(database: Db, dokId: number): PozycjaD
 /**
  * Wiersze dokumentu sprzedaży, zsumowane po kartotece — BEZ pozycji usługowych.
  *
- * PRZESYŁKA NIE JEST SKŁADNIKIEM KOMPLETU (0.350.2). Paragon z Allegro niesie
+ * PRZESYŁKA NIE JEST SKŁADNIKIEM KOMPLETU. Paragon z Allegro niesie
  * wiersz „PRZESYŁKA", a odejmowanie niżej oddaje kompletowi wszystko, czego
- * nie zabrała inna oferta — więc zabierało i przesyłkę. Na produkcji zwrot
- * 970W/2026 dostał ją w składzie: koszyk pokazał ją do odznaczenia, a
- * automatyczny ZW odmówił, bo pozycja zwrotu wskazywała kartotekę przesyłki.
+ * nie zabrała inna oferta. Bez filtra automatyczny ZW odmówiłby, bo pozycja
+ * zwrotu wskazywałaby kartotekę przesyłki.
  * Filtr ten sam, którym rozkładanie dostaw pomija usługi (`pomijane.ts`).
  */
 function pozycjeDokumentu(database: Db, dokId: number): Map<number, number> {
@@ -175,8 +173,7 @@ export function skladPozycji(
     if (juz) return juz;
   }
 
-  /* Bez wskazanego dokumentu zostaje droga sprzed tego wydania: kartoteka
-     z mapowania oferty. To NIE jest gorszy wynik dla zwykłego towaru —
+  /* Bez wskazanego dokumentu zostaje kartoteka z mapowania oferty. To NIE jest gorszy wynik dla zwykłego towaru —
      mapowanie wskazuje wtedy tę samą kartotekę, którą wystawił Subiekt. */
   if (p.faktura_dok_id == null) {
     if (p.tw_id == null) return PUSTY("Pozycja nie ma kartoteki, a zwrot nie ma wskazanego dokumentu sprzedaży");
@@ -208,15 +205,12 @@ export function skladPozycji(
 }
 
 /**
- * Kartoteka oferty ZAMÓWIENIA: z mapowania, a gdy go nie ma — po SKU (0.343.0).
+ * Kartoteka oferty ZAMÓWIENIA: z mapowania, a gdy go nie ma — po SKU.
  *
- * TO JEST POWÓD, DLA KTÓREGO AUTOMAT MILCZAŁ. Odejmowanie niżej wymaga, żeby
- * każda POZOSTAŁA oferta zamówienia miała kartotekę, a `oferta_kartoteka`
- * wypełnia się dopiero wtedy, gdy ktoś zatwierdzi kartotekę PRZY ZWROCIE tamtej
- * oferty. W zamówieniu na pięć różnych rzeczy nie ma jej prawie nigdy — więc
- * rozbicie kompletu odmawiało nie dlatego, że dane są złe, tylko dlatego, że
- * pytaliśmy nie o to źródło. Zgłoszenia właściciela z 0.336.0 („Ofert bez
- * kartoteki na tym dokumencie: 3" i „: 5") to była reguła, nie wyjątek.
+ * Odejmowanie niżej wymaga, żeby każda POZOSTAŁA oferta zamówienia miała
+ * kartotekę, a `oferta_kartoteka` wypełnia się dopiero przy zwrocie tamtej
+ * oferty. W zamówieniu na pięć różnych rzeczy nie ma jej prawie nigdy, więc
+ * bez SKU rozbicie kompletu odmawiałoby niemal zawsze.
  *
  * ODCZYT W LOCIE, NIE ZAPIS. Dopasowanie po SKU nie trafia do
  * `oferta_kartoteka`: tamta tabela jest PAMIĘCIĄ CZŁOWIEKA (§4.3 panelu —
@@ -370,17 +364,13 @@ export function zapamietajSklad(
     { offerId, kartotek: skladniki.length, zrodlo }, kto.id, database);
 }
 
-/* ── Skład wskazany ręką biura (0.336.0) ─────────────────────────────────────
-   Zgłoszenie właściciela: „rozwiąż «nie weszła do koszyka» — nie wiem, gdzie
-   to wskazać". Automat sam odsyłał do ręcznej drogi („wskaż skład ręcznie"),
-   której nigdy nie zbudowano: kolumna `zrodlo='biuro'` stała w schemacie od
-   0.328.0 i nie miał jej kto wypełnić.
-
+/* ── Skład wskazany ręką biura ───────────────────────────────────────────────
    Odejmowanie z paragonu wymaga, żeby KAŻDA POZOSTAŁA oferta zamówienia miała
    kartotekę. `oferta_kartoteka` wypełnia się dopiero przy zwrocie tej oferty,
    więc w zamówieniu na pięć różnych rzeczy automat prawie zawsze milczy — nie
    dlatego, że dane są złe, tylko dlatego, że nie ma ich skąd wziąć. Człowiek
-   patrzy wtedy na paragon i wie w pięć sekund, co wchodziło w skład.         */
+   patrzy wtedy na paragon i wie w pięć sekund, co wchodziło w skład
+   (`zrodlo='biuro'`).                                                       */
 
 /** Wiersz dokumentu sprzedaży — materiał, z którego biuro składa komplet. */
 export interface WierszDokumentu {

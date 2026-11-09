@@ -10,25 +10,21 @@ import { Wyjatek as WyjatekWiersz } from "../dostawy/Wyjatek";
 import type { Dokument, DokumentDostawy, Wyjatek } from "../api/dostawy";
 import { _wyczyscPamiecZdjec } from "../towar/useZdjecie";
 
-/* ── Ekran dostaw (0.435.0) ────────────────────────────────────────────────
-   Pierwszy widok przeniesiony z `biuro.html`. Tamtejsze strażnice pilnowały
-   go po ŹRÓDLE (liczniki `method:` w `routes/biuro.test.ts`); tu pilnujemy
-   po ZACHOWANIU — co ekran naprawdę wysyła. Gwarancje, które przeszły razem
-   z widokiem:
+/* ── Ekran dostaw ──────────────────────────────────────────────────────────
+   Pilnujemy po ZACHOWANIU — co ekran naprawdę wysyła:
 
    1. ZERO ZAPISU PRZY PATRZENIU. Otwarcie ekranu i wejście w dokument to
       same odczyty — podgląd dokumentu nie otwiera dostawy i nie zabiera
       nikomu blokad.
    2. DO DECYZJI PRZEBIJA STAN. Faktura „zamknięta" z otwartym wyjątkiem
       dalej czeka na biuro.
-   3. WYJĄTEK SPOZA OKNA NIE GINIE. W biurze stał w karcie REKLAMACJE;
-      tu dostaje wiersz, bo lista dostaw go nie zna.
+   3. WYJĄTEK SPOZA OKNA NIE GINIE: dostaje wiersz, bo lista dostaw go nie
+      zna.
    4. ROZWIĄŻ działa i niesie notatkę do protokołu.
 
-   Od 0.435.0 ten plik przejmuje też gwarancje strażników `biuro.html`,
-   które odeszły z widokiem (`routes/biuro.test.ts`): sygnał wyjątku
-   w wierszu, kto odłożył pozycję, archiwum szukane przez SERWER z uczciwą
-   stopką i powiększenie dowodu zamykane kliknięciem albo Escape. */
+   Do tego: sygnał wyjątku w wierszu, kto odłożył pozycję, archiwum szukane
+   przez SERWER z uczciwą stopką i powiększenie dowodu zamykane kliknięciem
+   albo Escape. */
 
 const dok = (dokId: number, o: Partial<DokumentDostawy> = {}): DokumentDostawy => ({
   dokId, typ: "FZ", nrPelny: `FZ ${dokId}/MAG/09/2026`, nrDostawcy: null, dataWyst: "2026-09-20",
@@ -125,7 +121,7 @@ function odpowiedz(url: string, init?: RequestInit): unknown {
   if (url === "/api/biuro/dokument/802") return DOKUMENT;
   if (url === "/api/biuro/dokument/806") return { ...DOKUMENT_ZE_ZDJECIEM(), dokId: 806 };
   if (url === "/api/biuro/dokument/803") return DOKUMENT_803;
-  /* Nietknięta: pozycje „do zrobienia" i wyjątek sprzed 0.21.0 bez towaru. */
+  /* Nietknięta: pozycje „do zrobienia" i stary wyjątek bez towaru. */
   if (url === "/api/biuro/dokument/805") return { ...DOKUMENT, dokId: 805, nrPelny: "FZ 805/MAG/09/2026",
     status: null, lines: DOKUMENT.lines.map((l) => ({ ...l, status: "todo", qtyDone: 0, problemy: [] })),
     problemyBezLinii: [wyj(31, { lineId: null, typ: "no_space", typLabel: "Brak miejsca", sym: null,
@@ -177,11 +173,10 @@ function pokaz(adres = "/obsluga/dostawy") {
   </QueryClientProvider>);
 }
 
-/* ── Logo w liście i zdjęcia pozycji (0.449.0) ───────────────────────────
-   Zgłoszenie właściciela ze zrzutem nietkniętej faktury: ani jednego zdjęcia
-   towaru, a logo dostawcy dopiero po wejściu w dokument. Pilnujemy trzech
-   rzeczy: logo stoi w wierszu listy (i nie pytamy o logo, którego nie ma),
-   zdjęcia pozycji idą wtedy, gdy instalacja je ma, a bez źródła — wcale. */
+/* ── Logo w liście i zdjęcia pozycji ─────────────────────────────────────
+   Pilnujemy trzech rzeczy: logo stoi w wierszu listy (i nie pytamy o logo,
+   którego nie ma), zdjęcia pozycji idą wtedy, gdy instalacja je ma, a bez
+   źródła — wcale. */
 describe("Obrazy na ekranie dostaw", () => {
   it("wiersz listy niesie logo dostawcy, a o brakujące logo nie pyta", async () => {
     pokaz();
@@ -209,9 +204,9 @@ describe("Obrazy na ekranie dostaw", () => {
     await screen.findByRole("heading", { name: "FZ 802/MAG/09/2026" });
     await screen.findByText("RP-2201");
     expect(screen.queryByRole("columnheader", { name: "Zdjęcie" })).toBeNull();
-    /* Od audytu 26.09.2026 pozycja z wyjątkiem słucha tej samej reguły co
-       tabela. Do tej pory pytała o zdjęcie zawsze — i w instalacji bez zdjęć
-       rysowała kafel „bez zdjęcia" przy każdym wyjątku, z 404 za każdy. */
+    /* Pozycja z wyjątkiem słucha tej samej reguły co tabela. Inaczej
+       w instalacji bez zdjęć rysowałaby kafel „bez zdjęcia" przy każdym
+       wyjątku, z 404 za każdy. */
     expect(pytaniaOObrazy.filter((u) => u.endsWith("/zdjecie"))).toEqual([]);
   });
 });
@@ -286,14 +281,14 @@ describe("Ekran dostaw", () => {
     pokaz();
     const wiersz = await screen.findByRole("button", { name: /FZ 803\/MAG/ });
     expect(within(wiersz).getByText("1 otwarty wyjątek")).toBeInTheDocument();
-    /* Pasek 4/4 NIE jest zielony, dopóki wyjątek czeka na biuro (audyt 26.09.2026). */
+    /* Pasek 4/4 NIE jest zielony, dopóki wyjątek czeka na biuro. */
     expect(wiersz.querySelector(".bg-emerald-600")).toBeNull();
     expect(wiersz.querySelector(".bg-wertis-amber")).not.toBeNull();
   });
 
   it("pozycja mówi, kto ją odłożył i gdzie", async () => {
-    /* `done_by` leżało w bazie od 0.17.0 bez czytelnika — biuro dzwoniło na
-       halę po rzecz, którą miało na ekranie. */
+    /* `done_by` stoi na ekranie, żeby biuro nie dzwoniło na halę po rzecz,
+       którą ma w bazie. */
     pokaz("/obsluga/dostawy/802");
     expect(await screen.findByRole("columnheader", { name: /kto odłożył/i })).toBeInTheDocument();
     /* W wierszu tabeli, nie gdziekolwiek: to samo nazwisko stoi też przy
@@ -317,11 +312,11 @@ describe("Ekran dostaw", () => {
     pokaz();
     await screen.findByRole("button", { name: /FZ 802\/MAG/ });
     expect(archiwumPytania).toEqual([]);
-    /* Od 0.526.0 „Archiwum" stoi pod „Więcej" — wybór z listy, nie pigułka. */
+    /* „Archiwum" stoi pod „Więcej" — wybór z listy, nie pigułka. */
     await userEvent.selectOptions(screen.getByLabelText("Więcej kubełków"),
       screen.getByRole("option", { name: /Archiwum/ }));
     const granica = await screen.findByText(/pokazano 1 z 350 — zawęź wyszukiwaniem/);
-    /* Granica okna stoi w paśmie pytania, NAD listą (0.525.0) — ucięte
+    /* Granica okna stoi w paśmie pytania, NAD listą — ucięte
        archiwum widać, zanim zacznie się czytać wiersze. */
     expect(granica.parentElement).toHaveTextContent(/Tylko wgląd — dostawy spoza okna importu/);
     await userEvent.type(screen.getByLabelText("Szukaj dostawy"), "FZ 5");
@@ -343,7 +338,7 @@ describe("Ekran dostaw", () => {
   });
 });
 
-/* ── Wejście z Analizy (0.502.0) ──────────────────────────────────────────
+/* ── Wejście z Analizy ────────────────────────────────────────────────────
    Wiersz dostawcy w Analizie prowadzi tu z kubełkiem archiwum i nazwą
    dostawcy. Adres czyta się raz, przy wejściu, i od razu pyta archiwum. */
 describe("adres z kubełkiem i frazą", () => {
@@ -372,9 +367,9 @@ describe("adres z kubełkiem i frazą", () => {
   });
 });
 
-/* ── Audyt 26 września 2026 ────────────────────────────────────────────────
-   Cztery rzeczy, w których ekran mówił co innego niż fakty, i jedna, w której
-   wysyłał dane do niewłaściwej faktury. Każdy test odtwarza zgłoszony krok. */
+/* ── Ekran mówi to, co wie ─────────────────────────────────────────────────
+   Cztery rzeczy, w których ekran mógłby mówić co innego niż fakty, i jedna,
+   w której wysłałby dane do niewłaściwej faktury. */
 describe("audyt ekranu dostaw", () => {
   it("notatka i formularz zamknięcia NIE przechodzą na następnie wybraną fakturę", async () => {
     /* 803 najpierw — trafia do pamięci podręcznej, więc powrót do niej nie
@@ -408,8 +403,7 @@ describe("audyt ekranu dostaw", () => {
   });
 
   it("wyjątek przy pozycji rozłożonej do końca stoi na górze, nie ginie w tabeli", async () => {
-    /* Zgłoszenie właściciela z nagraniem (27.09.2026): nagłówek FZ 65 mówił
-       „1 otwarty wyjątek", a w 42 wierszach tabeli nie było go nigdzie. */
+    /* Nagłówek mówi „1 otwarty wyjątek", więc wyjątek ma stać w tabeli. */
     pokaz("/obsluga/dostawy/809");
     await screen.findByRole("heading", { name: "FZ 809/MAG/09/2026" });
     expect(screen.getByText(/odłożone 3\/3 poz\. · 1 otwarty wyjątek/)).toBeInTheDocument();
@@ -456,8 +450,8 @@ describe("audyt ekranu dostaw", () => {
   });
 });
 
-/* ── Audyt 26 września 2026, grupy trzecia i czwarta ──────────────────────
-   Drobniejsze rozjazdy między tym, co ekran mówi, a tym, co wie. */
+/* ── Drobniejsze rozjazdy ──────────────────────────────────────────────────
+   Między tym, co ekran mówi, a tym, co wie. */
 describe("audyt ekranu dostaw — drobne", () => {
   it("wiek dostawy w dniach kalendarza, nie w godzinach od północy UTC", () => {
     const teraz = new Date(2026, 8, 26, 13, 51);

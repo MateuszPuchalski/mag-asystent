@@ -4,10 +4,9 @@ import { DatabaseSync } from "node:sqlite";
 import fs from "node:fs";
 import { migrate } from "./db.js";
 
-/* ── Dosyłka z 0.536.0 dostaje cztery kolumny (0.536.1) ─────────────────────
-   0.536.0 założył `klient_dosylka` bez `numer_at`, `archiwalna`, `doreczen`
-   i `problemow`. Baza, która przeszła tamto wydanie, ma tabelę w starym
-   kształcie, a `schema.sql` jej nie poprawi. Stanowisko stawia DOKŁADNIE ten
+/* ── Stara dosyłka dostaje cztery kolumny ─────────────────────────
+   Stara `klient_dosylka` nie ma `numer_at`, `archiwalna`, `doreczen`
+   i `problemow`, a `schema.sql` jej nie poprawi. Stanowisko stawia DOKŁADNIE ten
    stary kształt, bo test na świeżym schemacie przeszedłby bez migracji.
 
    Liczniki biorą wartość z obecnego stanu wiersza, inaczej zapisany odcisk
@@ -16,7 +15,7 @@ import { migrate } from "./db.js";
 
 const schema = fs.readFileSync(new URL("./schema.sql", import.meta.url), "utf8");
 
-/** Tabela w kształcie z 0.536.0 — bez kluczy obcych, bo test patrzy na kolumny. */
+/** Tabela w starym kształcie — bez kluczy obcych, bo test patrzy na kolumny. */
 const KSZTALT_0536 = `CREATE TABLE klient_dosylka (
   sprawa_id INTEGER NOT NULL, konto INTEGER NOT NULL, zamowienie TEXT NOT NULL,
   zwrot_id INTEGER, waybill TEXT, przewoznik TEXT, zrodlo TEXT, status TEXT,
@@ -58,7 +57,7 @@ test("drugi przebieg migracji nie przelicza liczników, które prowadzi już tic
 });
 
 test("zapisany odcisk z 0.536.0 schodzi do nowej sumy, żeby następny kłopot obudził sprawę", () => {
-  /* 0.536.0 liczył `q` jako wiersze z kłopotem TERAZ. Agent potwierdził dwa
+  /* Stary odcisk liczył `q` jako wiersze z kłopotem TERAZ. Agent potwierdził dwa
      kłopoty, potem jedna paczka ruszyła dalej: zapisane `q: 2`, a nowa suma
      przejść wynosi 1. Bez przycięcia następny kłopot dałby 2 — nie więcej
      niż 2 — i sprawa by nie wstała. Pozostałe klucze odcisku zostają. */

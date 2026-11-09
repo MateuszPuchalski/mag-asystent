@@ -2,7 +2,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "./klient";
 import type { DosylkaZalozona } from "./typy";
 
-/* ── DO DECYZJI (0.435.0) ──────────────────────────────────────────────────
+/* ── DO DECYZJI ────────────────────────────────────────────────────────────
    Kształt z `server/src/services/do-decyzji.ts` — tam stoi całe uzasadnienie:
    lista liczona w locie, bez własnej tabeli i bez własnego „załatwione". */
 
@@ -12,7 +12,7 @@ export type ZrodloDecyzji =
   | "dostawy" | "odpowiedzi" | "kosze" | "zapisy" | "kody" | "allegro"
   | "reklamacje" | "zwroty" | "skrzynka" | "sonda" | "zadania" | "dosylki" | "braki" | "sellasist";
 
-/** Adres w panelu — od 0.441.0 każdy wiersz prowadzi do ekranu panelu. */
+/** Adres w panelu — każdy wiersz prowadzi do ekranu panelu. */
 export type CelDecyzji = { panel: string };
 
 export interface PozycjaDecyzji {

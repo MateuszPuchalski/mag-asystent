@@ -1,5 +1,4 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import React from "react";
 import { render, screen } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import userEvent from "@testing-library/user-event";
@@ -55,7 +54,7 @@ describe("zakładka klienta", () => {
   });
 
   it("wątek bez loginu i tak pokazuje sprawę kupującego z zamówienia rozmowy", () => {
-    /* S6, 0.535.0: sprawa budzi się z rozmowy dowiązanej numerem zamówienia
+    /* S6: sprawa budzi się z rozmowy dowiązanej numerem zamówienia
        i do niej odsyła — więc ta rozmowa pokazuje sprawę, choć historii nie
        zna. Login linijki to login SPRAWY, bo historia go nie ma. */
     pokaz(dane({ login: null, sprawa: {
@@ -69,7 +68,7 @@ describe("zakładka klienta", () => {
   });
 
   it("login nie stoi trzeci raz — profil klienta zostaje o klik", () => {
-    /* Zeszło (0.513.0): w skrzynce login stoi w nagłówku rozmowy i przy
+    /* Zeszło: w skrzynce login stoi w nagłówku rozmowy i przy
        wiadomościach, a kopiuje się go stamtąd. Odnośnik do profilu zostaje. */
     pokaz(dane());
     expect(screen.queryByText("zielony_ogrod")).toBeNull();
@@ -102,7 +101,7 @@ describe("zakładka klienta", () => {
   });
 
   it("historia przy źródle niesie sprawę klienta i prowadzi do profilu", () => {
-    /* S6, 0.535.0: wiązanie w obie strony. Profil prowadzi do rozmowy, więc
+    /* S6: wiązanie w obie strony. Profil prowadzi do rozmowy, więc
        rozmowa mówi, że klienta ktoś prowadzi i na co czeka — inaczej drugi
        agent odpisałby klientowi, nie wiedząc o kroku kolegi. */
     const sprawa: SprawaKlienta = {
@@ -205,7 +204,7 @@ describe("zakładka klienta", () => {
   });
 });
 
-/* ── Dosyłka w linijce sprawy (0.536.0) ─────────────────────────────────────
+/* ── Dosyłka w linijce sprawy ───────────────────────────────────────────────
    Linijka stoi przy każdej kolejce i niesie JEDNO zdanie o dosyłce —
    najpilniejsze, nie najświeższe: kłopot, brak numeru, w drodze, doręczona.
    Reszta stoi na profilu. Zakończona sprawa przychodzi z pustą listą

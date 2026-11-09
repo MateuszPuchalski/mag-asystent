@@ -1,10 +1,9 @@
-import React from "react";
 import { describe, expect, it, vi } from "vitest";
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { Odlozone, nastepnaRozmowa, type Odlozona } from "./Odlozone";
 
-/* ── Dziesięć sekund na cofnięcie (23 września 2026) ─────────────────────────
+/* ── Dziesięć sekund na cofnięcie ────────────────────────────────────────────
    Komponent jest czysty; pilnujemy, że każdy stan daje właściwe wyjście:
    odliczanie ma „Cofnij", odmowa ma „Wróć do rozmowy", wysłane — samo
    zamknięcie. Pomylenie tych przycisków to wysyłka, której nie da się cofnąć. */

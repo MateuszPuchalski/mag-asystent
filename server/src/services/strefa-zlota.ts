@@ -10,7 +10,7 @@ import { db } from "../db/db.js";
    Reguły są PER ZAKRES REGAŁÓW, nie globalne: ten sam numer poziomu oznacza
    inną wysokość w różnych alejkach, bo regały mają różną geometrię.
 
-   OD 0.50.0 REGUŁY MIESZKAJĄ W TABELI `strefa_regula` i są edytowalne
+   REGUŁY MIESZKAJĄ W TABELI `strefa_regula` i są edytowalne
    z panelu biura — regały zmieniają geometrię częściej niż wychodzi wydanie.
    Tablica niżej została ZIARNEM: `migrate()` wsiewa ją raz, do pustej tabeli.
    Zapis właściciela, słowo w słowo:

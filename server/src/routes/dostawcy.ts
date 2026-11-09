@@ -8,7 +8,7 @@ import {
 } from "../services/logo-dostawcy.js";
 import { ROLE_BIUROWE } from "../services/users.js";
 
-/* ── Logo dostawcy — trasy (0.56.0) ──────────────────────────────────────────
+/* ── Logo dostawcy — trasy ──────────────────────────────────────────
    Trzy trasy biura (wgranie, kasowanie, lista) i jedna czytana przez kolektor.
 
    Podział pliku idzie za CZYTELNIKIEM, nie za tematem: `/api/dostawcy/:id/logo`

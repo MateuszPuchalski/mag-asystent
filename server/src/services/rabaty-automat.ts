@@ -3,16 +3,15 @@ import { BladLimituAllegro } from "../adapters/allegro.js";
 import { logEvent } from "./events.js";
 import { stanRabatu, zlozWniosekORabat, type NadawcaWniosku } from "./rabaty.js";
 
-/* ── Wniosek o rabat składany SAM (0.320.0) ──────────────────────────────────
+/* ── Wniosek o rabat składany SAM ────────────────────────────────────────────
    Zgłoszenie właściciela: „musimy zrobić automatyczny wniosek o rabat
    transakcyjny do zwracanych przedmiotów". Ręczny przycisk stoi przy pozycji
-   od 0.164.0 i działa — ale trzeba o nim pamiętać przy KAŻDYM zwrocie, a na
+   — ale trzeba o nim pamiętać przy KAŻDYM zwrocie, a na
    liście stoi ich w tej firmie kilkaset. Prowizja, po którą nikt nie kliknął,
    zostaje u Allegro.
 
    KIEDY: zaraz po tym, jak dowiadujemy się o odstąpieniu — czyli po
-   zaciągnięciu zwrotu, jeszcze przed werdyktem biura. Decyzja właściciela
-   z 13 września, zapisana wprost: „wystawiaj wniosek jak tylko otrzymamy
+   zaciągnięciu zwrotu, jeszcze przed werdyktem biura. Decyzja właściciela: „wystawiaj wniosek jak tylko otrzymamy
    informację o odstąpieniu od umowy, do towarów które są zwracane".
 
    Wniosek NIE JEST decyzją o towarze. Dotyczy prowizji od transakcji, którą
@@ -24,7 +23,7 @@ import { stanRabatu, zlozWniosekORabat, type NadawcaWniosku } from "./rabaty.js"
    wdrożenia migracja stempluje jako `rabat_poza_automatem`: bez tego pierwszy
    przebieg wysłałby do Allegro serię żądań o wnioski dla zwrotów sprzed
    miesięcy, z których część wróciłaby odmową. Ten sam wzorzec i ten sam powód
-   co przy powrocie kosza z bufora (`powrot_poza_aplikacja`, 0.266.0).        */
+   co przy powrocie kosza z bufora (`powrot_poza_aplikacja`).                 */
 
 /** Kto podpisuje wniosek złożony bez człowieka. */
 export const AUTOMAT_RABATU = "automat (odstąpienie)";
@@ -100,7 +99,7 @@ function kandydaci(database: Db, teraz: Date): number[] {
  * dostała pierwszy w panelu Allegro.
  *
  * KAŻDA POZYCJA IDZIE WŁASNĄ PRÓBĄ — jedna wywrócona nie ma prawa zabrać
- * pozostałych (ta sama lekcja co przy wiązaniu zaległości w 0.220.0).
+ * pozostałych.
  * Wyjątkiem jest limit Allegro: on dotyczy WSZYSTKICH następnych żądań, więc
  * przerywa przebieg zamiast mnożyć odmowy.
  */

@@ -3,15 +3,13 @@ import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type { WpisOsi } from "../api/typy";
 
-/* ── Załączniki na osi (0.155.0, naprawione w 0.219.1) ───────────────────────
-   Sonda z żywego konta: 7 z 39 wiadomości ma załącznik, a agent go nie
-   widział. W sklepie z częściami do maszyn ogrodniczych zdjęcie pękniętego
+/* ── Załączniki na osi ───────────────────────────────────────────────────────
+   Sonda z żywego konta: 7 z 39 wiadomości ma załącznik. W sklepie z częściami do maszyn ogrodniczych zdjęcie pękniętego
    elementu bywa całą treścią pytania.
 
    TESTY MOCKUJĄ OBIE DROGI DO SERWERA, bo obie są tu istotą rzeczy: sesja
    jedzie nagłówkiem `x-session`, więc ani `<img src>`, ani `<a href>` jej nie
-   uniosą. Do 0.219.1 nazwa pliku była zwykłym odnośnikiem i pobranie NIGDY nie
-   działało — na ekranie właściciela wyszedł surowy JSON „Brak sesji".         */
+   uniosą — zwykły odnośnik pokazałby surowy JSON „Brak sesji".               */
 
 const zdjecie = vi.fn();
 const pobierz = vi.fn();
@@ -81,7 +79,7 @@ describe("Załączniki na osi rozmowy", () => {
     expect(container.querySelectorAll("img").length).toBe(0);
   });
 
-  /* ── Zdjęcie widać, nie trzeba klikać (0.218.0) ────────────────────────────
+  /* ── Zdjęcie widać, nie trzeba klikać ──────────────────────────────────────
      Właściciel: „gdy klient wysyła zdjęcie, wyświetlaj w czacie, nie każ mi
      w nie klikać".                                                          */
   it("zdjęcie klienta rysuje się na osi z pobranego obrazu", () => {
@@ -116,8 +114,7 @@ describe("Załączniki na osi rozmowy", () => {
     expect(screen.getByRole("button", { name: /umowa\.docx/ })).toBeTruthy();
   });
   /* ── Porażka podglądu MÓWI (przyrost „zdjęcia w rozmowach") ────────────────
-     Do tego wydania nieudany podgląd rysował nic: agent widział samą nazwę
-     pliku i nie miał jak zgadnąć, że zdjęcie w ogóle było spodziewane.     */
+     Sama nazwa pliku nie mówi agentowi, że zdjęcie było spodziewane.        */
   it("w trakcie pobierania stoi ramka, żeby oś nie skakała", () => {
     zdjecie.mockReturnValue(wynikHaka(undefined));
     os(wiadomosc([{ id: 7, nazwa: "szarpak.jpeg", typ: "image/jpeg",

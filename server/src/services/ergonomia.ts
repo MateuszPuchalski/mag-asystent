@@ -3,9 +3,8 @@ import { GRANICA_OKNA, OKNO } from "./raporty.js";
 import { etykietaUrzadzenia } from "./szukanie-kolektora.js";
 
 /* ── Ergonomia w liczbach ────────────────────────────────────────────────────
-   Pytanie właściciela: „jak sprawić, żeby kolektor był przyjemny w pracy?".
-   Odpowiedź z opinii to lista życzeń. Ten raport zamienia ją na ranking
-   z NASZEJ hali, liczony z dziennika, który i tak się zbiera.
+   Ranking z NASZEJ hali, liczony z dziennika, który i tak się zbiera —
+   odpowiedź na „jak sprawić, żeby kolektor był przyjemny w pracy?".
 
    Pięć pytań, każde z gotowym „co zrobić":
    - gdzie jest WOLNO — udział odpowiedzi powyżej 300 ms per ekran, trasa
@@ -23,14 +22,12 @@ import { etykietaUrzadzenia } from "./szukanie-kolektora.js";
 
    DWA POMIARY CZASU I RAPORT MÓWI, KTÓRY JEST KTÓRY. `scan_timing` wysyła
    wyłącznie wspólna droga skanu (`ScanRouter`), a woła ją tylko ekran
-   główny. Do 0.482.0 była to jedyna liczba o czasie — i „p95 hali" w panelu
-   mówiło o jednej czynności. Od 0.482.0 kolektor mierzy KAŻDE żądanie
-   (`czasy_zadan`, kubełki per ekran i trasa), więc rozkładanie dostaw, koszy
-   i kartonów ma wreszcie własne liczby. Stary pomiar zostaje pod własną,
-   wąską nazwą, bo to jedyna historia sprzed tego wydania.
+   główny. Kolektor mierzy też KAŻDE żądanie (`czasy_zadan`, kubełki per
+   ekran i trasa), więc rozkładanie dostaw, koszy i kartonów ma własne
+   liczby. Stary pomiar zostaje pod własną, wąską nazwą.
 
    Każdy `json_extract` stoi za `json_valid` — jeden ucięty payload w oknie
-   kładł kiedyś całe raporty (patrz `zrodloZdarzenia` w `raporty.ts`). */
+   kładzie całe raporty (patrz `zrodloZdarzenia` w `raporty.ts`). */
 
 /** Dwa skany tego samego kodu z jednego kolektora w tym czasie to powtórka. */
 export const POWTORKA_MS = 2_000;

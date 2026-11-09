@@ -1,5 +1,4 @@
-import React from "react";
-import { ClipboardList, ExternalLink, MessageSquare, MessagesSquare, Scale, Undo2, UserRound }
+import { ClipboardList, ExternalLink, MessageSquare, Scale, Undo2, UserRound }
   from "lucide-react";
 import { Link } from "react-router-dom";
 import type { HistoriaKlienta, SprawaKlienta, WpisHistorii } from "../api/typy";
@@ -9,17 +8,14 @@ import { barwaTonu, czas, dzien, LoginKlienta, NaglowekSekcji, Pusto, termin } f
 import { historiaPozaZakupem, historiaWierszaKlienta } from "./kokpit";
 
 /**
- * Zakładka KLIENT — historia u nas (makieta „Klient", §10.1).
+ * Zakładka KLIENT — historia u nas (§10.1).
  *
- * ZAKŁADKA WRÓCIŁA Z MAKIETY decyzją właściciela. §10.1 skreślił ją w 0.198.0
- * zdaniem „nie ma bytu" — prawdziwym o TABELI, nie o danych. Kupujący ma
+ * Decyzja właściciela. Klient nie ma własnej TABELI, ale ma dane: kupujący ma
  * login, po którym wiążą się jego zamówienia, rozmowy i sprawy z kolejek.
  *
- * DLACZEGO TO JEST WARTE ZAKŁADKI. Odpowiedź „ten szarpak pasuje" waży inaczej,
- * gdy ten sam klient kupił go rok temu do tej samej kosiarki. §11.3 nazywa to
- * wprost: `sprzedaz_weryfikacja` jest rodzajem dowodu. Bez tego ekranu agent
- * musiałby szukać tego w panelu Allegro — czyli tam, gdzie §25 obiecuje nie
- * zaglądać.
+ * DLACZEGO TO JEST WARTE ZAKŁADKI. Odpowiedź waży inaczej, gdy agent widzi, co
+ * ten klient już u nas kupił. Bez tego ekranu szukałby tego w panelu Allegro,
+ * czyli tam, gdzie §25 obiecuje nie zaglądać.
  *
  * EKRAN NICZEGO NIE ZAPISUJE. Historia jest odczytem po loginie.
  */
@@ -46,7 +42,7 @@ export function Klient({ rozmowaId, onOtworzRozmowe, zamowienieId = null, pomin 
      Różnica jest cała: drugie zdanie byłoby kłamstwem o kliencie, który kupuje
      u nas od lat, tylko napisał z konta bez loginu w lądowisku wątku. */
   if (!poza?.login) {
-    /* Sprawa klienta i tak bywa tu znana (0.535.0): serwer bierze jej login
+    /* Sprawa klienta i tak bywa tu znana: serwer bierze jej login
        z zamówienia rozmowy, nie z treści. Sprawa budzi się z takiej rozmowy
        i do niej odsyła, więc rozmowa pokazuje ją z powrotem — wiązanie
        jednostronne to wiązanie, którego nie ma. Historii dalej nie ma. */
@@ -78,7 +74,7 @@ export function Klient({ rozmowaId, onOtworzRozmowe, zamowienieId = null, pomin 
 
 /**
  * Sama historia, bez pobierania — rysuje ją wiersz „Klient" w skrzynce i szuflada
- * historii przy zwrocie i reklamacji (23 września 2026). Jeden widok
+ * historii przy zwrocie i reklamacji. Jeden widok
  * na trzy wejścia: agent czyta klienta tak samo, skądkolwiek przyszedł.
  */
 export function WidokHistorii({ historia, onOtworzRozmowe, bezProfilu = false, bezLoginu = false,
@@ -103,12 +99,12 @@ export function WidokHistorii({ historia, onOtworzRozmowe, bezProfilu = false, b
 
   return <div className={wKolumnie ? undefined : "p-3"} aria-label="Historia klienta">
     {!wKolumnie && <NaglowekSekcji jako="p">Historia u nas</NaglowekSekcji>}
-    {/* Klik kopiuje (0.228.0): po loginie szuka się klienta w panelu Allegro
+    {/* Klik kopiuje: po loginie szuka się klienta w panelu Allegro
         i w Subiekcie, a przepisany z ekranu bywa przekręcony. */}
-    {/* Profil klienta (24 września 2026): cały klient na jednym ekranie —
+    {/* Profil klienta: cały klient na jednym ekranie —
         liczby, sygnały, otwarte sprawy, zamówienia z pozycjami, notatka.
         Na samym profilu login stoi w nagłówku, więc tu drugi raz go nie ma. */}
-    {/* Login zszedł ze skrzynki (0.513.0): stał tam trzeci raz, po nagłówku
+    {/* Login zszedł ze skrzynki: stał tam trzeci raz, po nagłówku
         rozmowy i wątku, a kopiuje się go z nagłówka. Szuflada przy sprawach
         go zachowuje — tam zasłania kartę, na której login stoi. */}
     {!bezProfilu && <>
@@ -134,7 +130,7 @@ export function WidokHistorii({ historia, onOtworzRozmowe, bezProfilu = false, b
 }
 
 /**
- * Sprawa klienta przy źródle (S6, 0.535.0) — jedna linijka, cała klikalna.
+ * Sprawa klienta przy źródle (S6) — jedna linijka, cała klikalna.
  *
  * WIĄZANIE W OBIE STRONY (`CLAUDE.md`). Profil prowadzi do rozmowy, zwrotu
  * i reklamacji; bez tej linijki agent przy rozmowie nie wiedziałby, że ktoś
@@ -143,7 +139,7 @@ export function WidokHistorii({ historia, onOtworzRozmowe, bezProfilu = false, b
  * i zakończenie; tutaj sprawy się nie zmienia.
  */
 function LiniaSprawy({ login, sprawa: s }: { login: string; sprawa: SprawaKlienta }) {
-  /* Dosyłka (0.536.0) doklejona do TEJ SAMEJ linijki. Bez niej stan drugiej
+  /* Dosyłka doklejona do TEJ SAMEJ linijki. Bez niej stan drugiej
      paczki stał tylko na profilu, o ekran dalej od rozmowy, zwrotu czy
      reklamacji. Jedno zdanie, najpilniejsze — reszta jest na profilu.
      Zakończona sprawa przychodzi z pustą listą (`prowadzenie-klienta.ts`),

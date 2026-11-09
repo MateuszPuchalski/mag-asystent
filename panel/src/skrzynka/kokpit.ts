@@ -1,7 +1,7 @@
 import type { HistoriaKlienta, Kategoria, Kubelek, OsRozmowy, StanPrzesylki, Zwrot } from "../api/typy";
 import { paczkaWSoczewce } from "./soczewki-reguly";
 
-/* ── CIEMNY KOKPIT: CO W KOLUMNIE KONTEKSTU ŚWIECI (0.498.0) ────────────────
+/* ── CIEMNY KOKPIT: CO W KOLUMNIE KONTEKSTU ŚWIECI ──────────────────────────
    Zgłoszenie właściciela z nagraniem prawej kolumny: „uporządkuj ten panel".
    Na nagraniu nazwa towaru stała cztery razy, SKU sześć, a jedyna rzecz,
    która czekała na człowieka — zwrot do decyzji — leżała w połowie przewijania,
@@ -81,12 +81,12 @@ export function ofertaWKarcie(dane: OsRozmowy): boolean {
 
 /* ── HISTORIA BEZ TEGO ZAKUPU ────────────────────────────────────────────────
    Serwer (`klient-historia.ts`) pomija w historii tylko bieżącą rozmowę.
-   Klient z jedynym zakupem dostawał więc „Wcześniej u nas: 1 zakup" o tym
+   Klient z jedynym zakupem dostałby więc „Wcześniej u nas: 1 zakup" o tym
    samym zakupie, o który właśnie pisze. Zakup, jego zwrot, reklamacja
    niosą numer zamówienia rozmowy i mają dom w karcie zakupu.
 
    Rozmowy zostają: inna rozmowa to wcześniejszy kontakt, a nie ten zakup.
-   Serwer daje im dziś pusty numer zamówienia, a człon `rodzaj === "rozmowa"`
+   Serwer daje im pusty numer zamówienia, a człon `rodzaj === "rozmowa"`
    trzyma regułę także wtedy, gdy zacznie go podawać. Gdy serwer zacznie
    pomijać zakup sam, funkcja nic nie zmieni, bo nie znajdzie czego wyciąć. */
 export function historiaPozaZakupem(h: HistoriaKlienta | undefined, zamowienieId: string | null):
@@ -136,7 +136,7 @@ export type Swiatlo = "zwrot" | "paczka" | "pozycja";
 export function coSwieci(dane: OsRozmowy): Swiatlo[] {
   const s: Swiatlo[] = [];
   if (dane.zwroty.some(zwrotWToku)) s.push("zwrot");
-  /* Paczkę poza zwykłą drogą pokazuje soczewka paczki, gdy stoi (0.531.0).
+  /* Paczkę poza zwykłą drogą pokazuje soczewka paczki, gdy stoi.
      Stoi NAD „Wymaga Ciebie", więc druga karta tej samej paczki niżej
      byłaby powtórzeniem, a nie drugim sygnałem. */
   if (paczkaOdchylenie(dane) && !paczkaWSoczewce(dane)) s.push("paczka");
@@ -145,21 +145,19 @@ export function coSwieci(dane: OsRozmowy): Swiatlo[] {
 }
 
 /* ── „OFERTA I TOWAR" OTWARTE DOMYŚLNIE — POZA JEDNYM PRZYPADKIEM ────────────
-   Decyzja z 0.198.0 zostaje: oferta i kartoteka stoją razem i bez klikania,
-   bo klient pytał kiedyś o gwint, a parametr leżał w niewidocznej zakładce.
-   Niewidoczne znaczyło wtedy „nieistniejące".
+   Oferta i kartoteka stoją razem i bez klikania, bo parametr w niewidocznej
+   zakładce (np. gwint) agent czyta jak „nieistniejący".
 
    Zwija się wyłącznie przy zwrocie w toku. Wtedy temat rozmowy to decyzja
-   z terminem, a karta towaru jest tłem, które spychało decyzję w połowę
+   z terminem, a karta towaru jest tłem, które spychałoby decyzję w połowę
    przewijania. Otwarta reklamacja towaru nie zwija: kolumna nie
-   niesie już jej wiersza, więc zwinięcie nie miałoby na ekranie powodu. */
+   niesie jej wiersza, więc zwinięcie nie miałoby na ekranie powodu. */
 export function towarOtwartyNaStart(swiatla: Swiatlo[], kategoria: Kategoria | null = null): boolean {
   if (swiatla.includes("zwrot")) return false;
-  /* ── TYLKO PRZY PYTANIU O TOWAR (0.506.0) ────────────────────────────────
-     Zgłoszenie agenta: „przytłacza". Na zrzucie klient pisał o odesłaniu
-     części, a karta oferty z cenami, EAN i opisem stała otwarta nad
-     wszystkim — pasmo nad kolumną mówiło już nazwę, SKU i stan. Powód
-     z 0.198.0 (gwint w niewidocznej zakładce) dotyczy pytań O TOWAR, więc
+  /* ── TYLKO PRZY PYTANIU O TOWAR ──────────────────────────────────────────
+     Zgłoszenie agenta: „przytłacza". Pasmo nad kolumną mówi nazwę, SKU
+     i stan. Powód wyżej (gwint w niewidocznej zakładce) dotyczy pytań
+     O TOWAR, więc
      przy nich karta zostaje otwarta. Bez rozpoznania też: nie wiemy, o co
      pyta klient, a ukrycie byłoby zgadywaniem. */
   return kategoria === null || KATEGORIE_O_TOWAR.has(kategoria);
@@ -171,9 +169,9 @@ const KATEGORIE_O_TOWAR: ReadonlySet<Kategoria> = new Set<Kategoria>([
   "MISSING_PRODUCT", "DAMAGED_PRODUCT", "OTHER",
 ]);
 
-/* ── PUSTY WIERSZ „KLIENT" ZNIKA (0.531.0) ─────────────────────────────────
-   Decyzja właściciela z 26 września 2026, wbrew wyłączeniu z §26e. Przy
-   większości rozmów wiersz mówił tylko „nic tu nie ma": cel 44 px, który
+/* ── PUSTY WIERSZ „KLIENT" ZNIKA ───────────────────────────────────────────
+   Decyzja właściciela, wbrew wyłączeniu z §26e. Przy większości rozmów
+   wiersz mówiłby tylko „nic tu nie ma": cel 44 px, który
    trzeba przeczytać, żeby się tego dowiedzieć. §26d mówi
    „flagi tylko aktywne", więc wiersz staje dopiero z treścią.
 

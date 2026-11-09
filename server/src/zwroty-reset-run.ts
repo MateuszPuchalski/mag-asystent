@@ -2,7 +2,7 @@ import { db } from "./db/db.js";
 import { policzZwroty, wyczyscZwroty, type PodsumowanieZwrotow } from "./services/zwroty-reset.js";
 import { synchronizujAllegroZwroty } from "./services/allegro-zwroty-sync.js";
 
-/* ── Czyszczenie zwrotów i pobranie ich od nowa (0.199.0) ───────────────────
+/* ── Czyszczenie zwrotów i pobranie ich od nowa ───────────────────
    Osobny proces, nie trasa w API: ma się wykonać i skończyć. Trasa dawałaby
    przycisk kasujący zwroty firmy jednym kliknięciem, a to jest operacja
    nieodwracalna, którą wykonuje się świadomie z konsoli.

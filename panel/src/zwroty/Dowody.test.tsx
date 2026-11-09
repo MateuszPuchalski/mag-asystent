@@ -6,13 +6,11 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Dowody } from "./Dowody";
 import type { WpisOsiZwrotu, Zwrot } from "../api/typy";
 
-/* ── Kolumna dowodów po uproszczeniu (0.518.0) ──────────────────────────────
-   Zgłoszenie agentów: „aplikacja przytłacza". Te testy pilnują, żeby to,
-   co zeszło, nie wróciło przy następnej zmianie:
+/* ── Kolumna dowodów po uproszczeniu ────────────────────────────────────────
+   Zgłoszenie agentów: „aplikacja przytłacza". Te testy pilnują:
 
-   1. JEDNA SEKCJA O ZAKUPIE. Sprawy, droga i wiadomości stały w trzech
-      sekcjach, a dwie z nich rysowały drugi nagłówek nad własną listą.
-   2. HALA BEZ NAGŁÓWKA. „Hala" stała nad jednym przyciskiem „Zleć hali".
+   1. JEDNA SEKCJA O ZAKUPIE, nie trzy z osobnymi nagłówkami.
+   2. HALA BEZ NAGŁÓWKA nad jednym przyciskiem „Zleć hali".
    3. PRZEBIEG ZWINIĘTY. Całość jest jednym kliknięciem dalej, nie na stałe. */
 
 const zwrot = (n: Partial<Zwrot> = {}): Zwrot => ({
@@ -75,10 +73,8 @@ describe("Dowody zwrotu — mniej nagłówków", () => {
   });
 });
 
-/* ── Odmowa z Allegro jednym brzmieniem (0.536.1) ──────────────────────────
-   Do tego wydania ta kolumna miała własną mapę kodów i pisała „wysłano nowy
-   towar”, a sekcja pieniędzy obok — „Wysłaliśmy nowy towar”. Jeden kod ma
-   jedno brzmienie: oba miejsca czytają `etykietaKodu` z `Pieniadze.tsx`. */
+/* ── Odmowa z Allegro jednym brzmieniem ────────────────────────────────────
+   Jeden kod ma jedno brzmienie: oba miejsca czytają `etykietaKodu` z `Pieniadze.tsx`. */
 describe("Dowody zwrotu — rozstrzygnięte w Allegro", () => {
   it("kod odmowy brzmi tak samo jak w sekcji pieniędzy", () => {
     pokaz({ zwrot: zwrot({ rejectionCode: "NEW_ITEM_SENT" }) });

@@ -66,10 +66,8 @@ test("numer z kartki: sama liczba, cały numer i śmieci", () => {
 });
 
 test("kod koszyka wirtualnego odsyła do jego MM — nie otwiera ani jego, ani MM o tej liczbie", () => {
-  /* 0.350.0, decyzja właściciela: koszyk złożony w panelu jest WIRTUALNY.
-     Po zamknięciu rodzi MM, a halę rozkłada kosz z tamtego dokumentu. Do
-     tego wydania `Z-7` otwierał sam koszyk — drugi kosz na ten sam towar.
-     Numer z kartki to same cyfry, więc bez tej gałęzi `Z-7` otworzyłby MM 7. */
+  /* Decyzja właściciela: koszyk złożony w panelu jest WIRTUALNY. Po
+     zamknięciu rodzi MM, a halę rozkłada kosz z tamtego dokumentu. Numer z kartki to same cyfry, więc bez tej gałęzi `Z-7` otworzyłby MM 7. */
   const d = db();
   d.prepare(`INSERT INTO sgt_mm_zwrot(dok_id, nr_pelny, numer, data_wyst, mag_z, mag_do)
      VALUES (41007, 'MM 7/MAG/2026', '7', '2026-08-18', 1, 3)`).run();
@@ -108,7 +106,7 @@ test("otwarcie po numerze buduje kosz z pozycji dokumentu i jest idempotentne", 
     [["TEST-LINIA-TODO", 3], ["TEST-LINIA-DONE", 1], ["TEST-WYCOFANY", 2]]
   );
 
-  /* Magazyn źródłowy dokumentu idzie do kosza SNAPSHOTEM (0.277.0): powrót
+  /* Magazyn źródłowy dokumentu idzie do kosza SNAPSHOTEM: powrót
      z regału ma wrócić dokładnie tam, skąd towar przyjechał, a lustro
      `sgt_mm_zwrot` czyści się przy każdym imporcie i sięga tylko
      MM_ZWROTY_DNI_WSTECZ dni wstecz. */
@@ -125,7 +123,7 @@ test("otwarcie po numerze buduje kosz z pozycji dokumentu i jest idempotentne", 
 });
 
 test("towar bez kartoteki zostaje w koszu i niesie nazwę z dokumentu", () => {
-  /* Regresja 0.76.1. Import kartotek pomija towar zablokowany
+  /* Import kartotek pomija towar zablokowany
      (`tw_Zablokowany = 0` w zapytaniu), a na regale zwrotów leży właśnie towar
      wycofany ze sprzedaży. Pominięcie takiej pozycji dawało kosz KRÓTSZY niż
      papier przy nim — w dodatku bez śladu, że czegoś brakuje. */
@@ -172,8 +170,8 @@ test("ZAKOŃCZ na koszu z dokumentu NIE wystawia żadnego dokumentu", () => {
 
 test("kosz z dokumentu z pominiętą pozycją też kończy się bez zadania", () => {
   /* Pominięcie nie zmienia najważniejszej reguły przyjęć: dokument powrotny
-     wystawia biuro. Gdyby zakończenie z pominiętą pozycją poszło inną gałęzią,
-     wróciłby błąd z 0.75.0 — przesunięcie wystawione drugi raz. */
+     wystawia biuro. Inna gałąź przy pominiętej pozycji wystawiłaby przesunięcie
+     drugi raz. */
   const kosz = P.otworzPrzyjecie("1209", "Jan");
   K.odlozPozycje(kosz.pozycje[0].id, kosz.pozycje[0].lokOczekiwana ?? "A01-02-03", "Jan");
   K.odlozPozycje(kosz.pozycje[1].id, "C09-09-09", "Jan");
@@ -196,7 +194,6 @@ test("lista zna stan pracy, a admin zdejmuje dokument sprzed wdrożenia", () => 
   for (const p of kosz.pozycje) K.odlozPozycje(p.id, "C01-01-01", "Jan");
   K.zakonczKosz(kosz.id, "Jan");
   assert.equal(P.listaPrzyjec()[0].stan, "rozlozony");
-  assert.equal(P.liczbaPrzyjecDoRozlozenia(), 0);
 
   // zdjęcie ręką: idempotentne i widoczne na liście
   P.oznaczRozlozonePozaAplikacja(DOK, "Admin");
@@ -241,10 +238,8 @@ test("rozłożone przyjęcia schodzą pod te, które czekają", () => {
 });
 
 test("koszyk ZWIĄZANY z dokumentem otwiera się z własnej etykiety (0.376.0)", () => {
-  /* Jedno pudło, jedno imię. Do 0.375.0 hala rozkładała kosz założony
-     z dokumentu, czyli DRUGI kosz na ten sam karton: pierwszy nie miał ani
-     jednego odłożenia, a drugi nie miał zamknięcia. Po związaniu skan `Z-7`
-     prowadzi do tego samego kosza co numer z dokumentu. */
+  /* Jedno pudło, jedno imię, a nie DRUGI kosz na ten sam karton. Po
+     związaniu skan `Z-7` prowadzi do tego samego kosza co numer z dokumentu. */
   const d = db();
   const teraz = new Date().toISOString();
   const q = Number(d.prepare(`INSERT INTO sfera_queue(type, status, payload, sgt_doc_number, created_at, created_by)

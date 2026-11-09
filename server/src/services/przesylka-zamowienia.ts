@@ -5,7 +5,7 @@ import { logEvent } from "./events.js";
 import { stanZHistorii } from "./allegro-tracking.js";
 import { DOSYLKI_SQL, dosylkaSledzona, zycieWiersza } from "./dosylka-opis.js";
 
-/* ── Gdzie jest paczka do klienta (0.393.0) ──────────────────────────────────
+/* ── Gdzie jest paczka do klienta ────────────────────────────────────────────
    Zgłoszenie właściciela: „dodaj status przesyłki". Przy reklamacji to jest
    pytanie pierwsze — „czy on to w ogóle dostał" — a panel nie umiał na nie
    odpowiedzieć wcale.
@@ -17,7 +17,7 @@ import { DOSYLKI_SQL, dosylkaSledzona, zycieWiersza } from "./dosylka-opis.js";
         `CheckoutFormDeliveryReference` niesie adres, metodę, koszt i okno
         dostawy, ale ani numeru, ani statusu.
      2. `GET /order/carriers/{carrierId}/tracking?waybill=…` — historia
-        statusów. Tę końcówkę zwroty odpytują od 0.187.0 i parser
+        statusów. Tę końcówkę odpytują też zwroty i parser
         (`stanZHistorii`) jest ten sam. Druga kopia rozjechałaby się przy
         pierwszej poprawce jednej z nich.
 
@@ -37,7 +37,7 @@ type Przesylka = { waybill?: string; carrierId?: string };
 type OdpowiedzPrzesylek = { shipments?: Przesylka[] };
 
 /**
- * Druga paczka zamówienia — dosyłka (0.536.0) — bez numeru. Numer zostaje
+ * Druga paczka zamówienia — dosyłka — bez numeru. Numer zostaje
  * w `klient_dosylka` i na karcie sprawy; tu idzie tylko to, co mówi o losie
  * towaru. `zrodlo` rozstrzyga, czy klient widzi numer w Allegro: wykryty
  * stoi przy zamówieniu, wpisany ręką — niekoniecznie.
@@ -182,7 +182,7 @@ export async function sprawdzPrzesylke(
   return { waybill, przewoznik, status, dostarczonoAt, sprawdzonoAt: teraz };
 }
 
-/* ── PRZESYŁKA W SZKICU COPILOTA (23 września 2026) ──────────────────────────
+/* ── PRZESYŁKA W SZKICU COPILOTA ─────────────────────────────────────────────
    Zgłoszenie właściciela: „informacje o statusie przesyłki powinny zostać
    dodane, jeśli klient zadaje pytanie pod zamówieniem". Klient pytający pod
    zamówieniem pyta najczęściej „gdzie paczka", a szkic nie wiedział o niej
@@ -218,7 +218,7 @@ function stanDosylki(d: DosylkaZamowienia): string {
 }
 
 /**
- * Druga paczka dla szkicu (0.536.0). Bez numeru, jak pierwsza. Zdanie
+ * Druga paczka dla szkicu. Bez numeru, jak pierwsza. Zdanie
  * o numerze w Allegro stoi tylko przy numerze wykrytym przy zamówieniu:
  * wpisany ręką mógł trafić na inne zamówienie, a szkic nie ma prawa
  * odsyłać klienta tam, gdzie numeru nie ma.
@@ -229,7 +229,7 @@ function zdanieDosylki(d: DosylkaZamowienia): string {
 }
 
 /* PACZKA WRACA DO NADAWCY, bo klient zwykle jej nie odebrał. Decyzja
-   właściciela z 20 października 2026: prosimy wtedy o złożenie zamówienia
+   właściciela: prosimy wtedy o złożenie zamówienia
    jeszcze raz, a ponownego nadania nie obiecujemy. Werdykt stoi w fakcie,
    nie we wzorcu kategorii, bo taką prośbę rozpoznanie bierze czasem za
    zaginięcie. Zwrot pieniędzy za pierwsze zamówienie rozlicza człowiek. */
@@ -257,11 +257,11 @@ export function zdaniePrzesylki(s: StanPrzesylkiZamowienia): string | null {
 }
 
 /**
- * Stan paczki kilkoma słowami, dla ekranu (profil klienta, 24 września 2026).
+ * Stan paczki kilkoma słowami, dla ekranu (profil klienta).
  * Ten sam słownik co zdanie dla szkicu — dwa słowniki rozjechałyby się przy
  * pierwszym nowym statusie przewoźnika. `null`: nie wiemy nic.
  *
- * Dosyłka (0.536.0) staje po kropce: „doręczona … · dosyłka: w drodze
+ * Dosyłka staje po kropce: „doręczona … · dosyłka: w drodze
  * do klienta”. Bez niej doręczony oryginał mówiłby, że sprawa skończona.
  */
 export function stanPrzesylkiKrotko(s: StanPrzesylkiZamowienia): string | null {

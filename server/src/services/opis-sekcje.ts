@@ -15,7 +15,7 @@
  * prozę: `Nr. oryg.: GND-33`, `STIHL: 017`, `HUSQVARNA: 40`, `Odpowiednik
  * oryginału o numerze: 597338`. Na karcie `W24-0807` dawała 19 śmieci zamiast
  * zera. Reguła ogólna ucina je wszystkie naraz i nie wymaga dopisywania każdej
- * nowej marki, którą ktoś kiedyś wklepie w opis (decyzja 0.61.0).
+ * nowej marki, którą ktoś kiedyś wklepie w opis.
  *
  * Etykieta to od E3 JEDNO DO CZTERECH SŁÓW Z LITER (z kropkami), nie dowolne
  * 25 znaków. Poprzedni kształt dopuszczał cyfry i połykał token stojący PRZED
@@ -40,8 +40,7 @@ export const KONIEC_SEKCJI =
  * Zawartość zestawu to osobny rodzaj informacji (co jest W ŚRODKU, nie co
  * ZASTĘPUJE), dlatego dostaje własną etykietę i własny odczyt
  * (`sekcjeZestawu`). Reguła ogólna `KONIEC_SEKCJI` zostaje nietknięta:
- * rozluźnienie jej na słowa bez dwukropka wpuściłoby z powrotem prozę, którą
- * 0.61.0 wyrzuciło.
+ * rozluźnienie jej na słowa bez dwukropka wpuściłoby z powrotem prozę.
  */
 export const ETYKIETA_ZESTAWU = /\b(?:w\s+zestawie(?:\s+z)?|zawiera|zawarto[sś][cć])\s*:?\s*/gi;
 

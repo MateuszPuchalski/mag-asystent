@@ -1,7 +1,7 @@
 import { db as defaultDb, type Db } from "../db/db.js";
 import { ZDARZENIA } from "./zdarzenia-rejestr.js";
 
-/* ── Czego nikt nie używa (23 września 2026) ─────────────────────────────────
+/* ── Czego nikt nie używa ────────────────────────────────────────────────────
    Panel rośnie o przycisk w każdym wydaniu, a nic z niego nie schodzi, bo
    nikt nie wie, co jest martwe. Zgadywanie kończy się sporem, a dziennik
    zdarzeń ma odpowiedź: każda zmiana w panelu i na kolektorze zapisuje wpis.
@@ -24,7 +24,7 @@ const AUTOMATY = new Set([
   "siec_przerwa", "rozmowa_przeczytana_blad", "rozmowa_wysylka_blad", "rozmowa_wysylka_niepewna",
   "rozmowa_wysylka_konflikt", "rozmowa_wysylka_uzgodniona", "reklamacja_wysylka_konflikt",
   "reklamacja_zalacznik_bez_location", "allegro_zamowienie_brak", "ean_conflict", "location_mismatch",
-  /* Dosyłka (0.536.1): wykrycie numeru, doręczenie, kłopot i zmianę stanu
+  /* Dosyłka: wykrycie numeru, doręczenie, kłopot i zmianę stanu
      zapisuje wyłącznie ticker. Numer wpisany ręką ma własny typ
      (`klient_dosylka_numer`) i zostaje w raporcie — to czynność człowieka. */
   "klient_dosylka_doreczona", "klient_dosylka_problem", "klient_dosylka_stan", "klient_dosylka_wykryta",

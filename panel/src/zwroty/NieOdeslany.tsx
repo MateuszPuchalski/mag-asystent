@@ -1,10 +1,9 @@
-import React from "react";
 import { PackageX } from "lucide-react";
 import type { Zwrot } from "../api/typy";
 import { Przycisk } from "../ui";
 
 /**
- * Uzasadnienie odmowy, gdy klient nie odesłał paczki (0.505.0). Jedno zdanie,
+ * Uzasadnienie odmowy, gdy klient nie odesłał paczki. Jedno zdanie,
  * bo idzie do Allegro jako powód `REFUND_REJECTED` i do werdyktu u nas —
  * a klient przeczyta je w swoim zwrocie.
  */
@@ -12,7 +11,7 @@ export const POWOD_NIE_ODESLAL =
   "Kupujący nie odesłał towaru w terminie 14 dni od zgłoszenia odstąpienia.";
 
 /**
- * Gotowa odmowa dla zwrotu, którego paczka nie wyszła od klienta (0.505.0).
+ * Gotowa odmowa dla zwrotu, którego paczka nie wyszła od klienta.
  *
  * Zgłoszenie właściciela przy 5ZRQ/2026, decyzja „zrób obie": odmowa jednym
  * ruchem, z kodem i powodem wypełnionymi. `O` otwiera pole powodu, bo odmowa

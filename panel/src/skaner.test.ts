@@ -115,7 +115,7 @@ describe("Czytnik kodów w panelu", () => {
   });
 });
 
-/* ── Skan w polu tekstowym (0.468.0) ─────────────────────────────────────────
+/* ── Skan w polu tekstowym ───────────────────────────────────────────────────
    Zakładka zwrotów słucha czytnika także wtedy, gdy kursor stoi w notatce
    albo w kwocie. Granica jest ostrzejsza niż poza polem, bo pomyłka tutaj
    kasuje człowiekowi wpisany tekst — i te testy pilnują obu stron granicy. */

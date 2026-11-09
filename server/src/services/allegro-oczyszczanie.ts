@@ -1,14 +1,8 @@
-/* ── Czyszczenie surowych odpowiedzi Allegro (0.152.0) ───────────────────────
+/* ── Czyszczenie surowych odpowiedzi Allegro ─────────────────────────────────
    Lądowiska `allegro_zwrot` i `allegro_zamowienie` trzymają odpowiedź
    w kształcie, w jakim przyszła — po to, żeby przy sporze o kształt było co
-   obejrzeć. Do 0.151.0 trzymały ją DOSŁOWNIE, razem z numerem konta
-   bankowego kupującego i telefonem nadawcy paczki. Rozdział „Polityka danych
-   zwrotów" mówił tymczasem „nie pobieramy" i to zdanie było nieprawdziwe.
-
-   To ta sama pomyłka co w 0.143.0, gdzie szkic polityki twierdził, że treści
-   rozmów nie trafiają do bazy. Wtedy poprawiliśmy zdanie, bo kopia treści
-   była ceną za działający ekran. Tu jest odwrotnie: konto bankowe nie kupuje
-   nam niczego, więc poprawiamy KOD.
+   obejrzeć. Numer konta bankowego kupującego i telefon nadawcy paczki nie
+   kupują nam niczego, a polityka danych mówi „nie pobieramy".
 
    WARTOŚĆ ZNIKA, KLUCZ ZOSTAJE. Kasowanie całej gałęzi zabrałoby lądowisku
    to, po co istnieje — wiedzę, że pole w ogóle przyszło. Podmiana na

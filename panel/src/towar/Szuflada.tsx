@@ -8,13 +8,11 @@ import { Kafel } from "./Kafel";
 import { dzien } from "../ui";
 import { useOkno } from "../nawigacja/fokus";
 
-/* ── SZUFLADA TOWARU — TRZECI MOSTEK (0.502.0) ──────────────────────────────
-   Towar stał na wielu ekranach — w skrzynce, zwrotach, koszach,
-   dostawach, zadaniach, stanie, dzienniku i w szukaniu — i nigdzie
-   nie był odnośnikiem. „Ten nóż wraca trzeci raz w tym miesiącu" składało
-   się z trzech kolejek w głowie agenta. Tu stoi w jednym miejscu: stan,
-   dostawy, otwarte sprawy i liczby z 90 dni.
-
+/* ── SZUFLADA TOWARU ─────────────────────────────────────────────────────────
+   Towar stoi na wielu ekranach — w skrzynce, zwrotach, koszach, dostawach,
+   zadaniach, stanie, dzienniku i w szukaniu. „Ten nóż wraca trzeci raz
+   w tym miesiącu" nie ma się składać z trzech kolejek w głowie agenta. Tu
+   stoi w jednym miejscu: stan, dostawy, otwarte sprawy i liczby z 90 dni.
    SZUFLADA, NIE EKRAN (§7 celu biura): to wgląd, nie praca. Nie ma w niej
    decyzji — każdy wiersz prowadzi do sprawy, w której ta decyzja zapada.
    Otwiera się nad bieżącym ekranem, więc agent nie traci miejsca w pracy.
@@ -50,7 +48,7 @@ const procent = (u: number | null) => (u === null ? "—" : `${Math.round(u * 10
 function Szuflada({ twId, onZamknij }: { twId: number; onZamknij: () => void }) {
   const karta = useKartaTowaru(twId);
   const przekroj = usePrzekrojTowaru(twId);
-  /* NIEMODALNA (0.546.0): szuflada stoi obok pracy, bez nakładki, więc
+  /* NIEMODALNA: szuflada stoi obok pracy, bez nakładki, więc
      skróty strony działają dalej, a tabulator może z niej wyjść. Fokus
      wchodzi do niej i wraca do przycisku towaru, jak z każdego okna. */
   const okno = useOkno<HTMLDivElement>({ modalne: false, onZamknij });
@@ -91,9 +89,9 @@ function Szuflada({ twId, onZamknij }: { twId: number; onZamknij: () => void }) 
             : " Żadna oferta nie jest powiązana z kartoteką, więc reklamacji nie liczymy."}</p>
       </section>}
 
-      {/* PUSTA LISTA NIE STOI (0.514.0). Trzy nagłówki z „brak" pod każdym
-          to sześć linijek, które mówią jedno. Zostaje jedno zdanie, gdy nic
-          nie jest otwarte, a lista pojawia się dopiero, gdy ma wiersz. */}
+      {/* PUSTA LISTA NIE STOI. Trzy nagłówki z „brak" pod każdym to sześć
+          linijek, które mówią jedno. Zostaje jedno zdanie, gdy nic nie jest
+          otwarte, a lista pojawia się dopiero, gdy ma wiersz. */}
       {p && (p.otwarteZwroty.length + p.otwarteSprawy.length + p.otwarteRozmowy.length === 0
         ? <p className="text-slate-600">Brak otwartych spraw.</p>
         : <>
@@ -115,7 +113,7 @@ function Szuflada({ twId, onZamknij }: { twId: number; onZamknij: () => void }) 
   </div>;
 }
 
-/** Lista otwartych spraw jednego rodzaju; pusta się nie rysuje (0.514.0). */
+/** Lista otwartych spraw jednego rodzaju; pusta się nie rysuje. */
 function Lista({ tytul, ikona, wiersze, onIdz }: {
   tytul: string; ikona: React.ReactNode; onIdz: () => void;
   wiersze: Array<{ klucz: string; do: string; napis: string; at: string }>;

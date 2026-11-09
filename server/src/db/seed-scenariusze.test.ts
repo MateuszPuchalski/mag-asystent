@@ -128,7 +128,7 @@ test("historia pobrań daje raportowi materiał na cztery listy", () => {
 test("konta scenariuszowe pokrywają wszystkie role i jedno jest wyłączone", async () => {
   const { ROLE } = await import("../services/users.js");
   const role = wartosci("SELECT DISTINCT role FROM app_user WHERE login IS NOT NULL");
-  // lista ról jest zamknięta od 0.24.0 — scenariusze mają pokrywać ją w całości,
+  // lista ról jest zamknięta — scenariusze mają pokrywać ją w całości,
   // bo różnice między rolami widać wyłącznie na odmowach
   for (const r of ROLE) assert.ok(role.includes(r), `brak konta o roli ${r}`);
   assert.equal(liczba("SELECT COUNT(*) AS n FROM app_user WHERE active = 0"), 1);

@@ -1,7 +1,7 @@
 import fs from "node:fs";
 import { bezMigracji, db } from "./db/db.js";
 
-/* ── Inwentarz obsługi klienta przed cięciem (0.137.2) ───────────────────────
+/* ── Inwentarz obsługi klienta przed cięciem ───────────────────────
    Etap 1 przebudowy. Rejestry pytań, dyskusji, opinii, zwrotów i reklamacji
    mają zniknąć razem z danymi — a decyzje o nowym modelu chcemy oprzeć na
    tym, jaka praca NAPRAWDĘ przychodziła, nie na wspomnieniu. Po `DROP TABLE`
@@ -19,7 +19,7 @@ import { bezMigracji, db } from "./db/db.js";
    Uruchomienie:  npm run inwentarz            (raport na ekran)
                   npm run inwentarz -- plik.md (raport do pliku)             */
 
-/* Migracji NIE robimy (0.177.1) — schemat zakłada wyłącznie serwer API. Ten
+/* Migracji NIE robimy — schemat zakłada wyłącznie serwer API. Ten
    skrypt bywa uruchamiany przy żywej usłudze, a migracja z dwóch procesów
    naraz to blizna z 2 września. */
 bezMigracji();

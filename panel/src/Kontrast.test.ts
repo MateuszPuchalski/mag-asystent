@@ -8,11 +8,9 @@ import kolory from "tailwindcss/colors";
 const ZRODLA = import.meta.glob(["./**/*.tsx", "!./**/*.test.tsx"],
   { query: "?raw", eager: true, import: "default" }) as Record<string, string>;
 
-/* ── Strażnik czytelności (0.255.0) ──────────────────────────────────────────
-   Audyt wizualny ośmiu ekranów `/obsluga` znalazł cztery miejsca poniżej progu
-   kontrastu WCAG AA. DWA Z NICH WESZŁY W 0.251.0 — przy wydaniu, które
-   nazywało się poprawą czytelności, czyli dokładnie wtedy, gdy uwagi było
-   najwięcej. Poprawka bez bramki wraca przy pierwszym pośpiechu.
+/* ── Strażnik czytelności ────────────────────────────────────────────────────
+   Pilnuje par barw poniżej progu kontrastu WCAG AA. Poprawka bez bramki
+   wraca przy pierwszym pośpiechu.
 
    CO PILNUJE — cztery pary barw, każda zmierzona, nie oszacowana:
 
@@ -22,8 +20,8 @@ const ZRODLA = import.meta.glob(["./**/*.tsx", "!./**/*.test.tsx"],
      `text-slate-500` na zaznaczeniu    #64748B na #E2E8F0     = 3.86:1
 
    Próg dla pisma poniżej 18 px to 4.5:1, dla 24 px/700 — 3:1. Żadna z tych
-   par nie przechodzi nigdzie, więc zakaz jest bezwarunkowy. Czwarta doszła
-   w 0.546.0 i pilnuje się jej inaczej — powód przy jej teście.
+   par nie przechodzi nigdzie, więc zakaz jest bezwarunkowy. Czwartej pilnuje
+   się inaczej — powód przy jej teście.
 
    Bursztyn jest zakazany jako PISMO, nie w ogóle: `bg-wertis-amber` pod
    `text-wertis-ink` daje 5.84:1 i zostaje barwą marki. Usterką było użycie
@@ -31,21 +29,20 @@ const ZRODLA = import.meta.glob(["./**/*.tsx", "!./**/*.test.tsx"],
 
    CZEGO NIE PILNUJE. Nie liczy kontrastu tam, gdzie tło stoi gdzie indziej.
    Liczy go tylko dla białego pisma na barwnym tle, bo ta para stoi w jednym
-   łańcuchu klas (0.546.0). Poza tym czyta tekst źródła, więc nie wie,
+   łańcuchu klas. Poza tym czyta tekst źródła, więc nie wie,
    na jakim tle element naprawdę wyląduje — tło bierze się z rodzica albo
    z `@apply` w `index.css`. Zna cztery konkretne złe pary i tyle: nie wykryje
    nowej złej barwy ani złego zestawienia, którego nie ma na liście. Zielony
    wynik NIE znaczy „panel przechodzi WCAG"; znaczy, że te cztery nie wróciły.
    Prawdziwy pomiar robi się w przeglądarce, po złożeniu alfy przez cały stos
-   tła — audyt pokazał dwa razy pod rząd, że bez tego wyniki są bzdurą.
+   tła — bez tego wyniki są bzdurą.
 
    ZWOLNIENIA SĄ JAWNE. Komentarz `kontrast: <powód>` w linii albo do sześciu
    linii nad nią zdejmuje zgłoszenie, a powód musi mieć co najmniej trzy
    wyrazy — ten sam mechanizm i ten sam próg co `ergonomia: <powód>`
    w `tools/ergonomia_check.py`, bo zwolnienie bez uzasadnienia to brak
    zwolnienia. Zwolnienia są prawdziwe: pasek nawigacji stoi na `#303030`
-   i tam `slate-400` daje 5.14:1, powyżej progu 4.5:1 (barwy z logo
-   od 23 września 2026; wcześniej, na `#2A2A2C`, było 5.59:1).                                                                 */
+   i tam `slate-400` daje 5.14:1, powyżej progu 4.5:1.                       */
 
 /** Powód zwolnienia — co najmniej trzy wyrazy po dwukropku. */
 const ZWOLNIENIE = /kontrast:\s*\S+(?:\s+\S+){2,}/;
@@ -90,9 +87,8 @@ function bezKomentarzy(tekst: string): string {
  *
  * `py-0.5` NIE JEST usterką, gdy obok stoi `min-h-6`: skala Tailwinda liczy
  * w ćwiartkach `rem`, więc `min-h-6` to 1.5 rem, czyli dokładnie 24 px progu.
- * Tak właśnie 0.255.0 uratowało przycisk „Synchronizuj" na Zwrotach — i to jest
+ * Tak właśnie jest przycisk „Synchronizuj" na Zwrotach — i to jest
  * poprawka, a nie obejście, więc bramka ma ją rozpoznać, zamiast żądać
- * zwolnienia w komentarzu. Wartość arbitralna (`min-h-[26px]`) tu nie wchodzi:
  * ta idzie przez `kontrast: <powód>`, bo wymaga przeczytania przez człowieka.
  */
 const MIN_H = /\bmin-h-(\d+)\b/;
@@ -132,8 +128,7 @@ describe("Czytelność: cztery pary barw, które nie przechodzą nigdzie", () =>
        panel przyzwyczaił się traktować ją jako bezpieczną. Na tle strony,
        które ma `bg-slate-100`, już nie przechodzi. Tam idzie `slate-600`. */
     /* `(?<!hover:)` jest tu istotne: `hover:bg-slate-100` to stan NAJECHANIA,
-       a nie tło, na którym tekst spoczywa — pierwsza wersja tego strażnika
-       zgłaszała dwa przyciski ikonowe właśnie dlatego. */
+       a nie tło, na którym tekst spoczywa. */
     const PARA = /(?<!hover:)bg-slate-100[^"`]*text-slate-500|text-slate-500[^"`]*(?<!hover:)bg-slate-100/;
     expect(znajdz(PARA)).toEqual([]);
   });
@@ -145,10 +140,8 @@ describe("Czytelność: cztery pary barw, które nie przechodzą nigdzie", () =>
   });
 
   it("białe pismo na barwnym tle ma 4.5:1 — liczone z palety, nie z listy", () => {
-    /* Tu strażnik LICZY (0.546.0), bo para stoi w jednym łańcuchu klas
-       i nic nie trzeba zgadywać o rodzicu. Przycisk „Zakończ” w skrzynce
-       miał biel na `emerald-600`, 3.77:1, razem z dwoma innymi zielonymi.
-       Zmierzone axe w Chromium przy otwartej rozmowie. Lista par przegapiłaby
+    /* Tu strażnik LICZY, bo para stoi w jednym łańcuchu klas
+       i nic nie trzeba zgadywać o rodzicu. Lista par przegapiłaby
        następną barwę; paleta Tailwinda jej nie przegapi. `hover:` pomijamy,
        bo to stan najechania, a nie tło, na którym pismo spoczywa. */
     const winne: string[] = [];
@@ -172,7 +165,7 @@ describe("Czytelność: cztery pary barw, które nie przechodzą nigdzie", () =>
   });
 
   it("zaznaczenie `bg-slate-200` niesie `wiersz-wybrany` — `slate-500` daje na nim 3.86:1", () => {
-    /* Czwarta para (0.546.0), zmierzona axe w Chromium na zwrocie z danymi.
+    /* Czwarta para, zmierzona axe w Chromium na zwrocie z danymi.
        Tło zaznaczenia stoi na rodzicu, podpisy kilkadziesiąt linii niżej,
        więc strażnik źródła pary nie zobaczy. Pilnuje więc klasy, pod którą
        `index.css` przyciemnia szarość. Kolejka bez niej wraca do 3.86:1. */
@@ -190,17 +183,13 @@ describe("Czytelność: cztery pary barw, które nie przechodzą nigdzie", () =>
 
 describe("Cele klikalne w kolejkach mają 24 px", () => {
   it("żaden przycisk kolejki nie stoi na `py-0.5`", () => {
-    /* Ta jedna klasa dała w 0.251.0 pigułki kubełków o wysokości 20 px przy
+    /* Ta jedna klasa daje pigułki o wysokości 20 px przy
        progu 24×24 z WCAG 2.2 AA (2.5.8). Zakres wąski celowo: bramka ma łapać
        TĘ regresję, a nie zgadywać wysokość dowolnego przycisku. Wysokość
        w pikselach mierzy się w przeglądarce, nie w jsdomie. */
-    /* ── OKNO Z TRZECH LINII NA SZEŚĆ ────────────────────────────────────────
-       Pierwsza wersja szukała `<button` w oknie TRZECH linii nad klasą i przez
-       to przepuściła kategorie Copilota: tam między znacznikiem a `className`
-       stoją `aria-pressed` i `onClick`, czyli `<button` jest cztery linie
-       wyżej. Pigułka miała 20 px i stała DWADZIEŚCIA LINII pod tą, którą
-       0.255.0 podniosło do 24 px — w tym samym pliku. Bramka pilnowała
-       sąsiada i nie widziała tego obok.
+    /* ── OKNO SZEŚCIU LINII ──────────────────────────────────────────────────
+       Między `<button` a `className` stoją czasem `aria-pressed`
+       i `onClick`, więc znacznik bywa kilka linii wyżej.
 
        Sześć, bo tyle samo co okno zwolnień niżej: jeśli uzasadnienie wolno
        postawić sześć linii nad klasą, to i znacznik wolno tam szukać. */

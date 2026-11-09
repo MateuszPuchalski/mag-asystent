@@ -3,7 +3,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "./klient";
 import { TECHNICZNE } from "../dziennik/nazwy";
 
-/* ── Wgląd biura: dziennik i analiza (0.440.0) ──────────────────────────
+/* ── Wgląd biura: dziennik i analiza ────────────────────────────────────
    Przeniesione z DZIENNIKA i ANALIZY w `biuro.html`. Trasy są TE SAME, którymi
    jeździło biuro — przeprowadzka zmienia front, nie umowę z serwerem. Typy
    stoją tutaj, a nie w `typy.ts`, z powodu podanego przy `api/dostawy.ts`:
@@ -40,7 +40,7 @@ export interface FiltrDziennika {
   device: string;
   userRef: string;
   limit: number;
-  /** Pokazać pomiary techniczne (`TECHNICZNE`)? Domyślnie schowane (0.540.0). */
+  /** Pokazać pomiary techniczne (`TECHNICZNE`)? Domyślnie schowane. */
   techniczne: boolean;
 }
 
@@ -143,7 +143,7 @@ export function useAnaliza(dni: number, wlaczona: boolean) {
   });
 }
 
-/* ── Czas odpowiedzi klientowi (`services/czas-odpowiedzi.ts`, 23.09.2026) ── */
+/* ── Czas odpowiedzi klientowi (`services/czas-odpowiedzi.ts`) ── */
 
 export interface WierszCzasu { klucz: string; n: number; medianaMin: number | null }
 
@@ -201,7 +201,7 @@ export function useCzasOdpowiedzi(dni: number, wlaczona: boolean) {
   });
 }
 
-/* ── Tarcie w skrzynce (`services/tarcie.ts`, 0.500.0) ────────────────── */
+/* ── Tarcie w skrzynce (`services/tarcie.ts`) ─────────────────────────── */
 
 export interface LiczbyTarcia {
   wyslanych: number;
@@ -214,7 +214,7 @@ export interface LiczbyTarcia {
   probekCzasu: number;
 }
 
-/* ── Pomiary pod decyzje (26 września 2026, 0.532.0) ──────────────────────
+/* ── Pomiary pod decyzje ───────────────────────────────────────────────────
    Cztery odpowiedzi na cztery pytania właściciela o politykę skrzynki. Żadna
    nie idzie na osobę, więc czyta je całe biuro. Powód każdej przy
    `services/tarcie.ts` na serwerze. */
@@ -277,7 +277,7 @@ export function useTarcie(dni: number, wlaczona: boolean) {
 }
 
 /**
- * Pominięcie rozmowy (0.532.0) — licznik doby i klasy, bez człowieka.
+ * Pominięcie rozmowy — licznik doby i klasy, bez człowieka.
  *
  * KIEDY WOŁAĆ: agent WYCHODZI z rozmowy, którą otworzył, a przez cały pobyt
  * nie wysłał odpowiedzi, nie zakończył, nie odłożył i nie dopisał notatki.
@@ -301,7 +301,7 @@ export function useZglosPominiecie(): (kategoria?: string | null) => void {
   }, []);
 }
 
-/* ── Użycie (`services/uzycie.ts`, 23 września 2026) ────────────────────── */
+/* ── Użycie (`services/uzycie.ts`) ────────────────────── */
 
 export interface WpisUzycia { typ: string; ile: number; ostatnio: string | null }
 
@@ -320,7 +320,7 @@ export function useUzycie(dni: number, wlaczona: boolean) {
   });
 }
 
-/* ── Raport tygodnia (`services/raport-tygodnia.ts`, 0.497.0) ───────────
+/* ── Raport tygodnia (`services/raport-tygodnia.ts`) ────────────────────
    Zamrożony przy zapisie przez takt serwera. Ekran tylko czyta: tygodnia
    niepoliczonego nie ma na liście, więc nie ma też o co zapytać 404. */
 

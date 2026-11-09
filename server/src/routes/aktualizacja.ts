@@ -6,7 +6,7 @@ import { config } from "../config.js";
 import { sesjaZadania } from "../context.js";
 import { ROLE_BIUROWE } from "../services/users.js";
 
-/* ── Aktualizacja kolektora z serwera (0.52.0) ───────────────────────────────
+/* ── Aktualizacja kolektora z serwera ───────────────────────────────
    OBIE TRASY SĄ POZA BRAMKĄ SESJI (`BEZ_SESJI` w `context.ts`) i to jest
    decyzja, nie przeoczenie. Pytanie pada przy otwarciu aplikacji, także wtedy,
    gdy nikt nie jest zalogowany — a kolektor, którego nie da się naprawić bez
@@ -67,7 +67,7 @@ export async function aktualizacjaRoutes(app: FastifyInstance) {
   });
 
   /**
-   * Dane dla karty „Nowy kolektor" w panelu (0.496.0): adresy serwera w sieci
+   * Dane dla karty „Nowy kolektor" w panelu: adresy serwera w sieci
    * i czy jest APK do pobrania. Za bramką biura, inaczej niż dwie trasy wyżej:
    * lista adresów nie jest potrzebna kolektorowi, tylko człowiekowi przy biurku.
    */

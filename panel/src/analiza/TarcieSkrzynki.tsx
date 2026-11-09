@@ -4,7 +4,7 @@ import { Liczba } from "../ui/wykres";
 import { KartaWgladu, Przekroje, Tabela, Td } from "../ui/wglad";
 import { PomiaryDecyzji } from "./PomiaryDecyzji";
 
-/* ── Tarcie w skrzynce (0.500.0) ────────────────────────────────────────────
+/* ── Tarcie w skrzynce ──────────────────────────────────────────────────────
    Trzy liczby, po których widać, czy zmiana układu skrzynki pomogła: ile
    pomyłek agent zawrócił, ile sekund mija od otwarcia rozmowy do wysyłki
    i jak często szkic Copilota idzie do klienta nietknięty. Powód każdej
@@ -21,8 +21,8 @@ const procent = (u: number | null) => (u === null ? "—" : `${Math.round(u * 10
 const sekundy = (s: number | null) =>
   (s === null ? "—" : s < 120 ? `${s} s` : `${Math.floor(s / 60)} min ${s % 60} s`);
 
-/* Bez „w oknie N dni" (0.512.0): karta słucha okna zakresu, które stoi
-   w nagłówku Analizy. Powtórka przy liczbie była drugim źródłem tego faktu. */
+/* Bez „w oknie N dni": karta słucha okna zakresu, które stoi
+   w nagłówku Analizy. Powtórka przy liczbie byłaby drugim źródłem faktu. */
 function Liczby({ l }: { l: LiczbyTarcia }) {
   return <div className="flex flex-wrap gap-8">
     <Liczba ile={l.cofnietychWysylek} etykieta={`cofniętych wysyłek z ${l.wyslanych}`} />
@@ -38,8 +38,8 @@ export function TarcieSkrzynki({ dni }: { dni: number }) {
   const t = useTarcie(dni, true);
   if (!t.data) return null;
   const r = t.data.razem;
-  /* Pusta, gdy w oknie nie było ani wysyłki, ani cofnięcia (0.542.0,
-     wariant C Analizy): cztery zera i kreska to zdanie, nie karta. */
+  /* Pusta, gdy w oknie nie było ani wysyłki, ani cofnięcia: cztery zera
+     i kreska to zdanie, nie karta. */
   const pusto = r.wyslanych === 0 && r.cofnietychWysylek === 0 && r.cofnietychZakonczen === 0;
   return <>
     <KartaWgladu tytul="Tarcie w skrzynce" pusta={pusto ? "Brak wysyłek w tym oknie." : null}
@@ -47,10 +47,9 @@ export function TarcieSkrzynki({ dni }: { dni: number }) {
         + "Czas mierzy szukanie po ekranie. Wysoki udział szkiców bez zmian bywa dobry albo zły: "
         + "rozstrzyga rozmowa, nie ta liczba."}>
       <Liczby l={r} />
-      {/* Rozbicie na ludzi przychodzi WYŁĄCZNIE administratorowi (0.431.0).
-          Stoi w karcie liczb, które rozbija (0.542.0), a nie osobną kartą:
-          to ten sam pomiar w innym przekroju. Czas liczy się od wydania,
-          które zaczęło go mierzyć; wcześniejsze wysyłki nie mają pomiaru. */}
+      {/* Rozbicie na ludzi przychodzi WYŁĄCZNIE administratorowi. Stoi
+          w karcie liczb, które rozbija, a nie osobną kartą: to ten sam
+          pomiar w innym przekroju. Starsze wysyłki nie mają pomiaru czasu. */}
       {t.data.osoby && <Przekroje pozycje={[{ klucz: "osoba", etykieta: "Według osoby", tresc:
         <Tabela naglowki={["kto", "wysłanych", "cofnięte wysyłki", "cofnięte zakończenia",
           "mediana do wysyłki", "szkic bez zmian"]} pusto="Brak wysyłek w tym oknie.">
@@ -65,8 +64,8 @@ export function TarcieSkrzynki({ dni }: { dni: number }) {
           </tr>)}
         </Tabela> }]} />}
     </KartaWgladu>
-    {/* Pod tarciem i jego rozbiciem na osoby, bo liczy z tego samego odczytu
-        (0.532.0): tam „ile", tu „co z tego wynika dla decyzji właściciela".
+    {/* Pod tarciem i jego rozbiciem na osoby, bo liczy z tego samego odczytu:
+        tam „ile", tu „co z tego wynika dla decyzji właściciela".
         Rozbicie zostaje przy liczbach, które rozbija. Drugi fetch po te same
         wiersze byłby kosztem za nic. */}
     <PomiaryDecyzji t={t.data} />

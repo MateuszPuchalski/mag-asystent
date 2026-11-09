@@ -5,7 +5,7 @@ import fs from "node:fs";
 import { migrate } from "../db/db.js";
 import { BladFirmy, MAKS_ZNAKOW, daneFirmy, zapiszDaneFirmy } from "./firma.js";
 
-/* ── Dane firmy (0.444.0) ──────────────────────────────────────────────────
+/* ── Dane firmy ────────────────────────────────────────────────────────────
    Trzy obietnice serwisu, każda z własnym testem: pusta baza nie jest błędem
    (panel na niej opiera propozycję przeniesienia z przeglądarki), zapis
    podmienia całość i zostawia ślad, a śmieci nie wchodzą.                   */

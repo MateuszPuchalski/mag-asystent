@@ -1,4 +1,4 @@
-import React, { useEffect, useId, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useId, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { ChevronDown, Eraser, Lock, MessageSquare, Send, Undo2 } from "lucide-react";
 import { Przycisk } from "../ui";
 import { obrazZeSchowka, PrzyciskZalacznika, ZalacznikiWysylki } from "./ZalacznikiWysylki";
@@ -37,38 +37,30 @@ export const ZWLOKA_KLAWISZA_MS = 1000;
  * bywa trudny" zostawałaby w szkicu po przełączeniu z powrotem i czekała na
  * kliknięcie WYŚLIJ.
  *
- * ── OSTATNIA WYPOWIEDŹ W WĄTKU, NIE PAS POD NIM (0.495.0) ─────────────────
+ * ── OSTATNIA WYPOWIEDŹ W WĄTKU, NIE PAS POD NIM ───────────────────────────
  * Zgłoszenie właściciela ze zrzutem: „za dużo odstępów w środkowej kolumnie,
- * miejsce pracy jest ściśnięte". Zmierzone na tamtym zrzucie: rozmowa 166 px,
- * czyli 19% kolumny; puste pole 212 px; pod nim karta szkicu z tą samą
- * odpowiedzią, zepchnięta pod krawędź do DRUGIEGO paska przewijania.
+ * miejsce pracy jest ściśnięte". Dwa pasy o sztywnym podziale odejmowałyby
+ * rozmowie każdy piksel edytora.
  *
- * Przyczyna leżała w kształcie, nie w odstępach. Kolumna miała dwa pasy
- * o sztywnym podziale: oś `flex-1`, edytor `shrink-0` z siatką 60vh. Każdy
- * piksel edytora był odjęty rozmowie, a szkic Copilota stał w nim DWA razy —
- * pustym polem i kartą z treścią. Żaden odstęp tego nie naprawiał.
- *
- * Decyzja właściciela z kanwy („A + B"), dwie zmiany naraz:
+ * Decyzja właściciela („A + B"), dwie zmiany naraz:
  * A — szkic Copilota stoi W POLU, jako zwykły tekst do poprawiania;
  * B — edytor jest ostatnią wypowiedzią osi, z jednym przewijaniem na całość.
  * Komponent zwraca podpis i dymek z działaniami w środku. Wołający wstawia
  * je na koniec listy wypowiedzi.
  *
- * ── WĄTEK PIERWSZY: PUSTY EDYTOR TO JEDNA LINIJKA (0.548.0) ───────────────
- * Wariant C z płótna „Skrzynka — warianty”, decyzja właściciela z 28 września.
- * Przy 1180 px wątek miał około 190 px, bo pusty edytor z zakładkami i polem
- * na pięć linii stał pod nim, zanim agent napisał choć słowo. Teraz pusty
- * edytor to jeden przyklejony rząd z polem i „Wyślij” w środku. Rozwija się
+ * ── WĄTEK PIERWSZY: PUSTY EDYTOR TO JEDNA LINIJKA ─────────────────────────
+ * Decyzja właściciela. Pusty edytor z zakładkami i polem na pięć linii
+ * zabierałby wątek, zanim agent napisze choć słowo. Pusty edytor to więc
+ * jeden przyklejony rząd z polem i „Wyślij” w środku. Rozwija się
  * sam, gdy jest co pokazać: pierwsza litera, szkic zespołu albo Copilota,
  * notatka, załącznik, cofnięcie wyczyszczenia. Pole jest przez cały czas TYM
  * SAMYM elementem w tym samym rodzicu, więc przy rozwinięciu nie traci
  * fokusu w pół słowa. Notatkę otwiera N z tła strony albo przycisk w rzędzie.
  *
- * ── JEDEN EDYTOR DWÓCH KOLEJEK (0.549.0) ─────────────────────────────────
- * Decyzja właściciela z 28 września: reklamacje odpowiadają tym
- * samym edytorem, w tym samym miejscu wątku. Osobny edytor sprawy rozjeżdżał
- * się z tym przy każdym wydaniu: nie miał zwiniętego rzędu, czyszczenia
- * z cofnięciem, Entera z tła ani Ctrl+Enter spoza pola. To, co w sprawie
+ * ── JEDEN EDYTOR DWÓCH KOLEJEK ───────────────────────────────────────────
+ * Decyzja właściciela: reklamacje odpowiadają tym samym edytorem, w tym
+ * samym miejscu wątku. Osobny edytor sprawy rozjeżdżałby się z tym przy
+ * każdej zmianie. To, co w sprawie
  * Allegro jest naprawdę inne, wchodzi ustawieniem, nie kopią:
  * - notatka z wzmiankami istnieje tylko w skrzynce, więc zakładki, przycisk
  *   „Notatka” i klawisz N żyją tylko przy `onDodajKomentarz`. W sprawach
@@ -98,7 +90,7 @@ export function Edytor({
   /** „Zapisz szkic” — tylko tam, gdzie szkic stoi na serwerze (skrzynka). */
   onZapisz?: () => void;
   onWyslij: () => void;
-  /** „Wyślij i zakończ" (23 września 2026) — większość spraw kończy się ostatnią odpowiedzią. */
+  /** „Wyślij i zakończ" — większość spraw kończy się ostatnią odpowiedzią. */
   onWyslijIZakoncz?: () => void;
   /* Notatka zespołu — cała grupa albo nic. Bez `onDodajKomentarz` nie ma
      zakładek: przełącznik z jedną pozycją niczego nie wybiera. */
@@ -111,7 +103,7 @@ export function Edytor({
   agenci?: Array<{ userId: number; name: string }>;
   wzmianki?: number[];
   onWzmianki?: (v: number[]) => void;
-  /* Załączniki (0.195.0) — TYLKO w trybie odpowiedzi. Komentarz wewnętrzny
+  /* Załączniki — TYLKO w trybie odpowiedzi. Komentarz wewnętrzny
      nigdzie nie wychodzi, więc dołączanie do niego pliku nie miałoby dokąd
      pójść, a przycisk obok notatki sugerowałby, że ma. Bez obsługi pliku
      spinacza nie ma: czego nie da się zrobić, tego nie ma na ekranie. */
@@ -120,7 +112,7 @@ export function Edytor({
   bladZalacznika: string;
   onDodajZalacznik?: (plik: File) => void;
   onUsunZalacznik?: (id: number) => void;
-  /* Szkic z Copilota (0.231.0) — TYLKO w trybie odpowiedzi: propozycja jest
+  /* Szkic z Copilota — TYLKO w trybie odpowiedzi: propozycja jest
      dla klienta, a w komentarzu nie ma czego układać. Opcjonalny, bo sprawy
      Allegro i testy komentarza nie mają Copilota wcale. */
   copilot?: PropsSzkicuCopilota;
@@ -151,7 +143,7 @@ export function Edytor({
      przeglądarki, a Ctrl+Enter z tła strony nie patrzy, czy pole istnieje. */
   const zaDlugo = szkic.length > limitZnakow;
   const mozeWyslac = !zamkniete && !cudza && !wysyla && !zaDlugo && szkic.trim() !== "";
-  /* Prośba o przekazanie pisze do notatki (0.533.0) — edytor ma wtedy
+  /* Prośba o przekazanie pisze do notatki — edytor ma wtedy
      stać na notatce, żeby agent widział, gdzie leży tekst. Porównanie
      z wartością z montowania, bo ekran montuje edytor od nowa przy każdej
      rozmowie, a stary licznik nie jest nową prośbą. */
@@ -160,7 +152,7 @@ export function Edytor({
     if (doNotatki !== undefined && doNotatki !== doNotatkiNaStart.current) setTryb("komentarz");
   }, [doNotatki]);
 
-  /* ── KLAWIATURA OD LISTY DO WYSYŁKI (0.533.0) ──────────────────────────
+  /* ── KLAWIATURA OD LISTY DO WYSYŁKI ────────────────────────────────────
      Ctrl+Enter wysyłał tylko z pola, a po przejściu do następnej rozmowy
      fokus stoi na tle strony (i tak ma być — pole z autofokusem zabiłoby
      j/k, `zwroty/klawisze.ts`). Każda rozmowa kosztowała więc ruch ręki do
@@ -190,7 +182,7 @@ export function Edytor({
   const skrotyDzialaja = useSkrotyDzialaja();
   const klawisz = useRef<(e: KeyboardEvent) => void>(() => {});
   klawisz.current = (e: KeyboardEvent) => {
-    /* N — NOTATKA (0.548.0). Pusty edytor chowa przełącznik zakładek, więc
+    /* N — NOTATKA. Pusty edytor chowa przełącznik zakładek, więc
        notatka potrzebuje drogi z klawiatury. N nie jest zajęte w skrzynce.
        W reklamacjach znaczy „niczyje”, a tam notatki w edytorze
        nie ma, więc warunek `zNotatka` oddaje klawisz ekranowi. */
@@ -230,11 +222,8 @@ export function Edytor({
     return () => window.removeEventListener("keydown", f);
   }, []);
 
-  /* ── SZKIC W POLU: ZWYKŁY TEKST DO POPRAWIANIA (0.499.0) ─────────────────
-     Do 0.499.0 szkic stał w pustym polu jako szara podpowiedź przyjmowana
-     Tabem (0.495.0). Nagranie właściciela pokazało, że nikt się tego kroku
-     nie domyśla: pierwsza litera zasłaniała szkic, a pod polem wyskakiwała
-     karta. Szkic wstawia teraz do pola ekran, jako zwykły tekst — powód
+  /* ── SZKIC W POLU: ZWYKŁY TEKST DO POPRAWIANIA ───────────────────────────
+     Szkic wstawia do pola ekran, jako zwykły tekst — powód
      i granice przy `szkicNaStart` w `SzkicCopilota.tsx`. Edytor wie tylko,
      że pole trzyma szkic, i mówi to nad nim. */
   const wPolu = !wKomentarzu && Boolean(copilot?.wPolu) && szkic !== "";
@@ -259,13 +248,13 @@ export function Edytor({
     l.style.right = `${Math.max(0, el.offsetWidth - el.clientWidth)}px`;
   };
   useLayoutEffect(zrownajLustro, [podswietlone, szkic]);
-  /* ── „WYCZYŚĆ WSZYSTKO" Z COFNIĘCIEM (0.499.0) ─────────────────────────
+  /* ── „WYCZYŚĆ WSZYSTKO" Z COFNIĘCIEM ───────────────────────────────────
      Druga połowa zgłoszenia: „z opcją wyczyszczenia wszystkiego". Kasowanie
      pięciuset znaków zaznaczaniem to ruch na kilka sekund i łatwy do
      pomylenia. Czyszczenie niczego nie zapisuje, więc do pomyłki potrzebne
      jest cofnięcie — trzymane, dopóki agent nie zacznie pisać od nowa. */
   const [wyczyszczone, setWyczyszczone] = useState<string | null>(null);
-  /* ── TARCIE PRZY WYSYŁCE NIETKNIĘTEGO SZKICU (0.500.0) ─────────────────
+  /* ── TARCIE PRZY WYSYŁCE NIETKNIĘTEGO SZKICU ───────────────────────────
      Szkic stoi w polu gotowy do wysłania, więc przyjęcie go bez czytania
      kosztuje jedno kliknięcie. Randomizowane badanie z 2025 (NEJM AI):
      lekarze po dwudziestu godzinach szkolenia z AI wypadali o 18 punktów
@@ -314,7 +303,7 @@ export function Edytor({
     title="Notatka wewnętrzna — zobaczy ją tylko zespół (N)"
     className="inline-flex min-h-10 shrink-0 items-center gap-1 rounded-lg px-2 text-xs font-semibold text-slate-700 hover:bg-slate-100">
     <MessageSquare size={15} />Notatka
-    {/* Znaczek klawisza tylko wtedy, gdy klawisz działa (0.500.0). */}
+    {/* Znaczek klawisza tylko wtedy, gdy klawisz działa. */}
     {skrotyDzialaja && <kbd aria-hidden="true" className="rounded border border-slate-300 px-1 font-sans text-podpis text-slate-600">N</kbd>}
   </button>;
 
@@ -339,7 +328,7 @@ export function Edytor({
   }
 
   /* ── DYMEK PO NASZEJ STRONIE, DZIAŁANIA W ŚRODKU ─────────────────────────
-     Makieta właściciela: edytor jest następną naszą wypowiedzią, więc stoi
+     Edytor jest następną naszą wypowiedzią, więc stoi
      dymkiem po prawej, jak nasze odpowiedzi, z tym samym „ogonkiem” w rogu.
      Pełna ramka i błękitna poświata mówią, że to miejsce pisania, a podpis
      nad dymkiem, kto zobaczy szkic. Pasek działań stoi w dymku, pod treścią,
@@ -354,7 +343,7 @@ export function Edytor({
     && (Boolean(copilot) || (szkic !== "" && !cudza) || (szkic === "" && wyczyszczone !== null));
   const ramka = wKomentarzu ? "border-amber-300 bg-amber-50 ring-amber-100"
     : wPolu ? "border-violet-300 bg-white ring-violet-50" : "border-blue-300 bg-white ring-blue-50";
-  /* Licznik stoi zawsze, bo makieta tak go pokazuje, i mówi pełną liczbą
+  /* Licznik stoi zawsze i mówi pełną liczbą
      po polsku. Barwę dostaje dopiero przy progu, bo dopiero tam zmienia
      decyzję. Próg rośnie z sufitem, ale najwyżej do 500 znaków przed nim. */
   const blisko = szkic.length >= limitZnakow - Math.min(500, limitZnakow / 5);
@@ -586,11 +575,9 @@ const LIMIT_ALLEGRO = 2000;
    pięciu cyfr, więc sufit skrzynki stoi jako „2000”. */
 const LICZBA = new Intl.NumberFormat("pl-PL");
 
-/* ── „▾" OBOK WYSYŁKI (0.506.0) ─────────────────────────────────────────────
-   Pasek niósł pięć rzeczy: licznik, spinacz, „Zapisz szkic", „Wyślij
-   i zakończ" z napisem skrótu i „Wyślij do klienta" z drugim. Najgłośniejsze
-   ma zostać jedno — wysyłka (0.247.0). Dwie rzadsze drogi stoją pod
-   strzałką, a „Wyślij i zakończ" dalej chodzi z klawiatury Ctrl+Shift+Enter.
+/* ── „▾" OBOK WYSYŁKI ───────────────────────────────────────────────────────
+   Najgłośniejsza w pasku jest jedna rzecz — wysyłka. Dwie rzadsze drogi
+   stoją pod strzałką, a „Wyślij i zakończ" chodzi z klawiatury Ctrl+Shift+Enter.
    Okienko otwiera się W GÓRĘ, bo dymek edytora stoi na dole osi rozmowy. */
 function InneWysylki({ onZapisz, zapisuje, cudza, onWyslijIZakoncz, mozeWyslac }: {
   onZapisz?: () => void; zapisuje: boolean; cudza: boolean;
@@ -604,7 +591,7 @@ function InneWysylki({ onZapisz, zapisuje, cudza, onWyslijIZakoncz, mozeWyslac }
       <ChevronDown size={17} /></button>
     {otwarte && <div role="group" aria-label="Inne sposoby wysłania"
       className="absolute bottom-full right-0 z-30 mb-2 flex w-64 flex-col gap-1 rounded-xl border border-slate-200 bg-white p-2 shadow-lg">
-      {/* Zakończenie jedzie z wysyłką w tej samej transakcji (23 września 2026):
+      {/* Zakończenie jedzie z wysyłką w tej samej transakcji:
           nieudana wysyłka niczego nie kończy. */}
       {onWyslijIZakoncz && <button type="button" disabled={!mozeWyslac}
         aria-keyshortcuts="Control+Shift+Enter" title="Ctrl+Shift+Enter"

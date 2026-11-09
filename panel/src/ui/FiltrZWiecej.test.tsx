@@ -4,7 +4,7 @@ import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { FiltrZWiecej } from "./FiltrZWiecej";
 
-/* Kubełki przeglądania pod „Więcej" (0.522.0). Klucz `null` jest tu celowo:
+/* Kubełki przeglądania pod „Więcej". Klucz `null` jest tu celowo:
    tak wygląda „Wszystkie" w reklamacjach, a `<select>` zna
    wyłącznie napisy — pomyłka w przekładzie zgubiłaby właśnie ten kubełek. */
 type K = "praca" | "wglad" | null;
@@ -63,7 +63,7 @@ describe("FiltrZWiecej", () => {
     expect(screen.getAllByRole("button")).toHaveLength(2);
   });
 
-  /* Tryb zwarty (0.548.0, wariant C skrzynki): lista na szerokość treści,
+  /* Tryb zwarty: lista na szerokość treści,
      w rzędzie pigułek. Domyślny zostaje dla kolejek, które go nie wybrały. */
   it("zwarta lista mierzy się treścią, domyślna bierze resztę rzędu", () => {
     const pozycje = [{ klucz: "a", etykieta: "A" }, { klucz: "b", etykieta: "B", ile: 2 }];

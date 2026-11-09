@@ -14,7 +14,7 @@ import { ocenPozycje, rozstrzygnijZwrot } from "./zwroty.js";
 import { zapamietajSklad } from "./komplety.js";
 import { koszeZwrotu } from "./kosze.js";
 
-/* ── Koszyk zwrotów składany w panelu (0.192.0) ─────────────────────────────
+/* ── Koszyk zwrotów składany w panelu ───────────────────────────────────────
    Obieg właściciela: pusta MM przy zasiadaniu do zwrotów, dokładanie pozycja
    po pozycji, domknięcie gdy kosz się zapełni, i tak w kółko.
 
@@ -46,7 +46,7 @@ function zwrotZTowarem(d: Db, twIdy: Array<number | null>, kto: { id: number; na
     if (tw === null) continue;
     d.prepare("INSERT OR IGNORE INTO sgt_towar(tw_id,symbol,nazwa) VALUES (?,?,?)")
       .run(tw, `SYM-${tw}`, `Towar ${tw}`);
-    /* WIERSZ STANU, bo od 0.372.2 kartoteka bez niego nie wchodzi do pudła.
+    /* WIERSZ STANU, bo kartoteka bez niego nie wchodzi do pudła.
        Towar, który wyszedł ze sprzedaży, jest magazynowi znany — fikstura bez
        tego wiersza opisywałaby usługę, a nie część. */
     d.prepare("INSERT OR IGNORE INTO sgt_stan(tw_id,mag_id,stan) VALUES (?,1,0)").run(tw);
@@ -78,8 +78,7 @@ test("ocena „na stan\" DOKŁADA do koszyka, a inne oceny nie", () => {
   assert.equal(ocenPozycje(d, poz[1], "utylizacja", 3, KTO).koszyk, null,
     "utylizacja ma zejść ze stanu, nie pojechać na regał zwrotów");
   /* Trzecia pozycja zostaje BEZ OCENY i to też jest wypowiedź: brak oceny nie
-     dokłada niczego do koszyka. Do 0.209.0 stała tu „przecena" — ocena, która
-     nie prowadziła donikąd i dlatego zeszła razem z przyciskiem. */
+     dokłada niczego do koszyka. */
   assert.equal(ocenPozycje(d, poz[2], null, 4, KTO).koszyk, null,
     "bez oceny nie ma czego dokładać do MM");
 
@@ -91,9 +90,8 @@ test("ocena „na stan\" DOKŁADA do koszyka, a inne oceny nie", () => {
 });
 
 test("zwrot wie, w którym koszu jedzie jego towar (0.438.0)", () => {
-  /* Druga połowa wiązania kosz ↔ zwrot. Kosz od dawna wymieniał swoje zwroty;
-     zwrot pisał tylko „w koszyku zwrotów", bez nazwy i bez drogi — a pytanie
-     „gdzie jest towar z tego zwrotu" pada właśnie przy zwrocie. */
+  /* Druga połowa wiązania kosz ↔ zwrot: pytanie „gdzie jest towar z tego
+     zwrotu" pada właśnie przy zwrocie. */
   const d = stanowisko();
   const KTO = biuro(d);
   const { id, poz } = zwrotZTowarem(d, [21], KTO);
@@ -218,11 +216,9 @@ test("BEZ MAG_ID_ODP utylizacja zachowuje się jak przed 0.211.0", () => {
 });
 
 test("kosza Z DOKUMENTEM nie da się opróżnić ani zamknąć drugi raz", () => {
-  /* BRAMKĄ JEST DOKUMENT, NIE ZAMKNIĘCIE (0.334.0). Do tego wydania blokowało
-     samo zamknięcie — a kosz bywa zamknięty tygodniami, czekając na komplet
-     korekt. Zgłoszenie właściciela: „dodałem zestaw, a powinienem rozbić go
-     przed dodaniem do MM", i nie dało się tego poprawić, choć papieru nie było.
-     Tu kosz ma już numer MM, więc odmowa zostaje. */
+  /* BRAMKĄ JEST DOKUMENT, NIE ZAMKNIĘCIE: kosz bywa zamknięty tygodniami,
+     czekając na komplet korekt. Tu kosz ma już numer MM, więc odmowa
+     zostaje. */
   const d = stanowisko();
   const KTO = biuro(d);
   const { poz } = zwrotZTowarem(d, [11], KTO);
@@ -236,12 +232,9 @@ test("kosza Z DOKUMENTEM nie da się opróżnić ani zamknąć drugi raz", () =>
     .get(kosz.id) as { n: number }).n, 1);
   assert.throws(() => zamknijKosz(d, kosz.id, KTO), /jest już zamkniety/);
 
-  /* Zmiana oceny po domknięciu ODMAWIA i nazywa kosz (0.202.0). Do tego
-     wydania przechodziła w ciszy „zostawiając kosz w spokoju" — brzmiało to
-     bezpiecznie, a znaczyło: towar zostaje na dokumencie, który pojechał na
-     halę, tyle że bez oceny, która go tam posłała. Zawartość kosza jest
-     nietknięta tak samo jak wcześniej; nowe jest to, że nietknięta zostaje
-     też ocena, a człowiek dostaje kod kosza. */
+  /* Zmiana oceny po domknięciu ODMAWIA i nazywa kosz. Cicha zmiana
+     zostawiłaby towar na dokumencie, który pojechał na halę, bez oceny,
+     która go tam posłała. Nietknięte zostają zawartość i ocena. */
   assert.throws(() => ocenPozycje(d, poz[0], "utylizacja", 3, KTO), new RegExp(kosz.kod));
   assert.throws(() => ocenPozycje(d, poz[0], null, 3, KTO), /zamkniętym koszyku/);
   assert.equal((d.prepare("SELECT COUNT(*) AS n FROM kosz_pozycja WHERE kosz_id=?")
@@ -329,9 +322,9 @@ test("brakujące korekty wymieniają zwroty Z IMIENIA", () => {
   assert.deepEqual(braki, [{ zwrotId: a.id, numer: "ZW-7" }]);
 });
 
-/* ── Wypuszczenie MM mimo brakujących korekt (0.368.0) ──────────────────────
+/* ── Wypuszczenie MM mimo brakujących korekt ────────────────────────────────
    Decyzja właściciela: „dodaj opcję sforsowania zamknięcia koszyka, nawet
-   jeśli nie ma wszystkich ZW". Bramka z 0.200.0 zostaje domyślna — to wyjście
+   jeśli nie ma wszystkich ZW". Bramka korekt zostaje domyślna — to wyjście
    awaryjne obok niej, nie jej zdjęcie. Koszt jest realny i te testy go
    utrwalają razem z drogą.                                                  */
 
@@ -422,11 +415,9 @@ test("komplet korekt nie zmienia drogi — wymuszenie wypuszcza tak samo", () =>
   assert.ok(w.queueId > 0);
 });
 
-/* ── Towar dołożony ręką: skan albo kartoteka (0.365.0) ─────────────────────
-   Zgłoszenie właściciela, a zaraz po nim jego granica: „tylko z poziomu
-   obsługi zwrotów, jak jeszcze nie jest zamknięty". Pudło bywa pełniejsze niż
-   zgłoszenie — paczka nieodebrana bez numeru zamówienia nie ma ani jednej
-   pozycji, a towar leży na biurku.                                          */
+/* ── Towar dołożony ręką: skan albo kartoteka ───────────────────────────────
+   Pudło bywa pełniejsze niż zgłoszenie — paczka nieodebrana bez numeru
+   zamówienia nie ma ani jednej pozycji, a towar leży na biurku.             */
 
 /** Kartoteka, którą można zeskanować. */
 function kartoteka(d: Db, twId: number, symbol = `SYM-${twId}`,
@@ -434,7 +425,7 @@ function kartoteka(d: Db, twId: number, symbol = `SYM-${twId}`,
   d.prepare("INSERT OR IGNORE INTO sgt_towar(tw_id,symbol,nazwa) VALUES (?,?,?)")
     .run(twId, symbol, `Towar ${twId}`);
   /* `prowadzona = false` opisuje USŁUGĘ: kartotekę bez ani jednego wiersza
-     w `tw_Stan`, czyli taką, jakiej dokument MM nie ruszy (0.372.2). */
+     w `tw_Stan`, czyli taką, jakiej dokument MM nie ruszy. */
   if (prowadzona) {
     d.prepare("INSERT OR IGNORE INTO sgt_stan(tw_id,mag_id,stan) VALUES (?,1,0)").run(twId);
   }
@@ -481,13 +472,8 @@ test("dołożony towar jedzie na MM i NIE trzyma go bramką korekt", () => {
 });
 
 test("z koszyka BEZ DOKUMENTU schodzi każdy wiersz, a ze zwrotu razem z oceną", () => {
-  /* ODWRÓCENIE REGUŁY z 0.365.0 („wiersz ze zwrotu schodzi cofnięciem oceny"),
-     zgłoszone przez właściciela: „pozwól edytować te koszyki".
-
-     Reguła była słuszna w zamyśle — jedna droga na jeden skutek — a zostawiła
-     koszyki bez wyjścia. Z-8 na produkcji odbił się od Sfery na kartotece
-     usługowej przyniesionej OCENĄ: nie miał ani jednego wiersza ze skanu,
-     więc nie miał ani jednego krzyżyka.
+  /* Wiersz ze zwrotu też schodzi krzyżykiem: koszyk odbity od Sfery na
+     kartotece przyniesionej OCENĄ nie miałby inaczej wyjścia.
 
      OCENA SCHODZI RAZEM Z WIERSZEM i to jest warunek spójności: to ona wsadziła
      towar do pudła, więc wyjęcie bez jej zdjęcia zostawiłoby kartę zwrotu
@@ -512,11 +498,8 @@ test("z koszyka BEZ DOKUMENTU schodzi każdy wiersz, a ze zwrotu razem z oceną"
 });
 
 test("koszyk zamknięty BEZ DOKUMENTU wciąż oddaje wiersz dołożony ręką", () => {
-  /* Zgłoszenie właściciela (0.371.0): „pozwól mi edytować koszyki zwrotowe,
-     z których nie zostały jeszcze utworzone MM". Granica z 0.365.0 („jak
-     jeszcze nie jest zamknięty") kosztowała koszyk Z-8: wszedł do niego skanem
-     KOSZT PRZESYŁKI, kartoteka bez stanu, więc Sfera odrzuciła MM zdaniem
-     „Brak towaru w magazynie" — a wiersza nie dało się zdjąć nigdzie. */
+  /* Koszyk bez wystawionej MM wolno edytować także po zamknięciu: wiersz
+     usługowy odrzucony przez Sferę musi dać się zdjąć. */
   const d = stanowisko();
   const KTO = biuro(d);
   kartoteka(d, 41);
@@ -564,10 +547,8 @@ test("odmowy mówią, co jest nie tak: sztuki i nieznana kartoteka", () => {
 });
 
 test("kosz z ODRZUCONĄ MM widać w panelu — z odmową Sfery i wierszem do zdjęcia", () => {
-  /* Koszyk Z-8 wypadł z panelu przez dwa warunki naraz: lista wymagała
-     BRAKUJĄCEJ KOREKTY (a miał komplet) i braku zadania (a miał zadanie
-     w błędzie). Kosz stał na hali, dokumentu nie było i nic o tym nie mówiło —
-     cisza gorsza od złej wiadomości (0.371.0). */
+  /* Kosz z kompletem korekt i zadaniem w błędzie też stoi na liście:
+     dokumentu nie ma, a cisza byłaby gorsza od złej wiadomości. */
   const d = stanowisko();
   const KTO = biuro(d);
   const { id: zwrotId, poz } = zwrotZTowarem(d, [71], KTO);
@@ -586,8 +567,8 @@ test("kosz z ODRZUCONĄ MM widać w panelu — z odmową Sfery i wierszem do zdj
   const lista = koszykiBezDokumentu(d);
   assert.equal(lista.length, 1);
   assert.equal(lista[0].blad, "Brak towaru w magazynie");
-  /* CAŁA zawartość od 0.379.0, nie tylko wiersze ze skanu: koszyk Z-8 odbił
-     się na kartotece przyniesionej OCENĄ i nie miał czym się odetkać. */
+  /* CAŁA zawartość, nie tylko wiersze ze skanu: koszyk odbity na kartotece
+     przyniesionej OCENĄ musi mieć czym się odetkać. */
   assert.deepEqual(lista[0].pozycje.map((p) => p.symbol).sort(),
     ["KOSZT-PRZESYLKI", "SYM-71"]);
   assert.deepEqual(lista[0].pozycje.map((p) => p.zeZwrotu).sort(), [false, true]);
@@ -627,10 +608,10 @@ test("kosz z zadaniem W TOKU nie pokazuje się — papier jest w drodze", () => 
   assert.equal(koszykiBezDokumentu(d).length, 0);
 });
 
-/* ── Kartoteka, której dokument MM nie ruszy (0.372.2) ──────────────────────
-   Blizna Z-8: koszt przesyłki wszedł do pudła skanem, kosz się zamknął, a MM
-   odbiła się od Sfery zdaniem „Brak towaru w magazynie". Odmowa ma paść przy
-   dokładaniu, bo tam stoi człowiek z przedmiotem w ręku.                    */
+/* ── Kartoteka, której dokument MM nie ruszy ────────────────────────────────
+   Koszt przesyłki w pudle odbija MM od Sfery zdaniem „Brak towaru
+   w magazynie". Odmowa ma paść przy dokładaniu, bo tam stoi człowiek
+   z przedmiotem w ręku.                                                     */
 
 test("usługi nie da się dołożyć do pudła — odmowa mówi, czego dotyczy", () => {
   const d = stanowisko();
@@ -761,8 +742,8 @@ test("kartoteki NIEZNANEJ read-modelowi nie sądzimy — to towar zablokowany", 
 });
 
 test("ptaszek składnika NIE jest obejściem bramki kartotek", () => {
-  /* Koszyk napełniony przed 0.374.0 dostawał wiersz usługowy z powrotem przez
-     odznaczenie i zaznaczenie go na nowo. Jedna reguła, jedno miejsce.
+  /* Bez bramki ptaszek przywracałby wiersz usługowy przez odznaczenie
+     i zaznaczenie go na nowo. Jedna reguła, jedno miejsce.
 
      Pozycja musi mieć DWA składniki, bo ostatniego wiersza kosz nie oddaje —
      zapamiętany komplet daje taki skład bez sięgania po paragon. */
@@ -790,10 +771,8 @@ test("ptaszek składnika NIE jest obejściem bramki kartotek", () => {
     /nie wejdzie do pudła/, "ta sama odmowa co przy dokładaniu");
 });
 
-/* ── Koszyk zakładany WPROST (0.378.0) ──────────────────────────────────────
-   Zgłoszenie właściciela: „potrzebuję tworzenia koszy zwrotowych i dodawania
-   produktów do nich jako oddzielna opcja". Pusty karton staje przy biurku,
-   ZANIM otworzy się pierwszą paczkę.                                         */
+/* ── Koszyk zakładany WPROST ────────────────────────────────────────────────
+   Pusty karton staje przy biurku, ZANIM otworzy się pierwszą paczkę.         */
 
 test("NOWY KOSZYK zakłada pudło bez ani jednej pozycji", () => {
   const d = stanowisko();
@@ -833,9 +812,8 @@ test("drugie naciśnięcie zakłada DRUGIE pudło, a ocena pyta, do którego", (
 });
 
 test("koszyk schodzi CAŁY — także napełniony, a oceny wracają", () => {
-  /* Zgłoszenie właściciela (0.380.0): „zrób, żeby można było usunąć cały
-     koszyk zwrotowy". Do 0.379.0 schodził wyłącznie pusty, więc pudło odrzucone
-     przez Sferę trzeba było opróżniać wiersz po wierszu.
+  /* Usuwa się cały koszyk, także napełniony: pudła odrzuconego przez Sferę
+     nie trzeba opróżniać wiersz po wierszu.
 
      OCENY WRACAJĄ tą samą regułą co przy zdejmowaniu jednego wiersza: to one
      wsadziły towar do pudła. */
@@ -941,9 +919,8 @@ test("pasek mówi, KTÓREGO towaru brakuje na magazynie (0.381.0)", () => {
 });
 
 test("zarezerwowany towar to osobny powód odmowy — liczy się WOLNE (0.486.5)", () => {
-  /* Kosz Z-29: Sfera odmówiła „Brak towaru w magazynie", a żaden wiersz nie
-     był czerwony. Subiekt nie zabierze zarezerwowanego towaru; liczyliśmy
-     sam stan. */
+  /* Subiekt nie zabierze zarezerwowanego towaru, więc sam stan nie
+     wystarcza, żeby wiersz był czerwony. */
   const d = stanowisko();
   const KTO = biuro(d);
   const z = zwrotZTowarem(d, [11], KTO);
@@ -965,12 +942,9 @@ test("zarezerwowany towar to osobny powód odmowy — liczy się WOLNE (0.486.5)
 });
 
 test("poprawka GASI stare zadanie w błędzie — PONÓW nie wskrzesi duplikatu", () => {
-  /* Koszyk Z-23 zebrał tak TRZY żywe zadania MM naraz (0.420.0). W czasie
-     awarii pustej sesji Sfery każde zadanie tego kosza schodziło w `error`,
-     każda poprawka zawartości odpinała je i zamawiała nowe, a biuro naciskało
-     PONÓW na starych wierszach — w kolejce wyglądały jak zwykła praca do
-     odzyskania. Każde wskrzeszone zadanie wystawia WŁASNY dokument MM na to
-     samo pudło, czyli ten sam towar przesunięty trzy razy. */
+  /* Odpięte zadanie w `error` wygląda w kolejce jak praca do odzyskania.
+     Każde wskrzeszone PONÓW-em wystawia WŁASNY dokument MM na to samo pudło,
+     czyli ten sam towar przesunięty kilka razy. */
   const d = stanowisko();
   const KTO = biuro(d);
   const { id: zwrotId, poz } = zwrotZTowarem(d, [81], KTO);

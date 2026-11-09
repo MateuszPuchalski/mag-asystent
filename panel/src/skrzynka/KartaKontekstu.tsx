@@ -62,9 +62,9 @@ export function KartaKontekstu({ dane, historia }: { dane: OsRozmowy; historia?:
      agent odpowiada klientowi. Kształt, którego nie znamy, czytamy jak brak. */
   const zgodna = Array.isArray(historia?.wpisy) ? historia : undefined;
   /* „WCZEŚNIEJ" ZNACZY PRZED TYM ZAKUPEM. Serwer oddaje historię razem z tym
-     zakupem, jego zwrotem i sprawami, więc karta mówiła „Wcześniej u nas:
-     1 zakup" o tym samym zakupie, a „Nowy klient" nie stawał przy pierwszym.
-     Kolumna obok nie mówi już tego faktu wcale, więc jedyny dom musi mówić
+     zakupem, jego zwrotem i sprawami, więc bez reguły karta mówiłaby
+     „Wcześniej u nas: 1 zakup" o tym samym zakupie. Kolumna obok nie mówi
+     tego faktu wcale, więc jedyny dom musi mówić
      prawdę. Reguła w `kokpit.ts`, wspólna z wierszem „Klient". */
   const h = historiaPozaZakupem(zgodna, dane.zamowienie?.externalId ?? null);
   const znaczniki: string[] = [];

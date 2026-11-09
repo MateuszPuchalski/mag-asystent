@@ -11,7 +11,7 @@ import {
   BladKluczaCopilota, BladLimituCopilota, BladOdpowiedziCopilota, BladPrzeciazeniaCopilota,
 } from "../adapters/copilot.js";
 
-/* ── Klasyfikacja wiadomości (specyfikacja z 20 września 2026) ───────────────
+/* ── Klasyfikacja wiadomości ─────────────────────────────────────────────────
    Testy pilnują pięciu rzeczy, po których poznaje się, że wolno to wypuścić:
    nic osobowego nie wychodzi ŚCIEŻKĄ, automat niczego nie rozstrzyga o sprawie,
    za tę samą treść nie płacimy dwa razy, limit dostawcy zatrzymuje partię bez
@@ -534,7 +534,7 @@ test("pomiar mówi, co działa na żywo — bez wpisu w pliku nic", () => {
 });
 
 
-/* ── Struktura Allegro w klasyfikacji (22 września 2026) ─────────────────── */
+/* ── Struktura Allegro w klasyfikacji ────────────────────────────────────── */
 
 function wStrukturze(d: DatabaseSync, typ: string, podtyp: string | null, tresc: string): number {
   const watek = `w-str-${Math.random()}`;

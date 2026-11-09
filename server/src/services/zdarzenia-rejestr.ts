@@ -1,4 +1,4 @@
-/* ── Rejestr typów zdarzeń (23 września 2026) ────────────────────────────────
+/* ── Rejestr typów zdarzeń ───────────────────────────────────────────────────
    Raport „czego nikt nie używa" (`uzycie.ts`) potrzebuje listy WSZYSTKIEGO,
    co panel i kolektor umieją zapisać. Sam dziennik jej nie zna: funkcja, której
    nikt nigdy nie nacisnął, nie zostawiła w nim ani jednego wiersza — a to jest

@@ -9,10 +9,8 @@ import {
   CISZA_ZAKONCZENIA_MS, odlozRozmowe, otworzRozmowe, statusIZakonczenie, wyliczStatus, zakonczRozmowe,
 } from "./conversations.js";
 
-/* Serwis rozmów nie miał testu obok do 0.145.1, choć trzyma trzy mutacje
-   i całą współbieżność panelu. Ten plik pilnuje dwóch rzeczy naraz: że wyścig
-   agentów rozstrzyga się jednym zapisem ORAZ że każda mutacja zostawia ślad
-   w dzienniku — bo bez śladu wróciłaby blizna 0.137.1.
+/* Ten plik pilnuje dwóch rzeczy naraz: że wyścig agentów rozstrzyga się
+   jednym zapisem ORAZ że każda mutacja zostawia ślad w dzienniku.
 
    Baza to schemat PLUS `migrate()`: `events.user_ref` dochodzi dostawką,
    więc sam `schema.sql` opisuje kształt, którego na produkcji nie ma. */
@@ -162,7 +160,7 @@ test("komentarz zapisuje wzmianki bez duplikatów i odrzuca pustą treść", () 
   assert.throws(() => dodajKomentarz(rozmowa, ala, "   ", [], d), /nie może być pusty/);
 });
 
-/* ── Statusy rozmowy §7 (0.158.0) ────────────────────────────────────────────
+/* ── Statusy rozmowy §7 ──────────────────────────────────────────────────────
    `conversation` nie miała kolumny statusu, więc kolejka nie odróżniała sprawy
    załatwionej od nietkniętej, a rozmowa raz otwarta rosła w nieskończoność.
 
@@ -172,10 +170,8 @@ test("komentarz zapisuje wzmianki bez duplikatów i odrzuca pustą treść", () 
    załatwioną i nikt do niej nie zagląda. */
 
 test("rozmowa z pytaniem klienta czeka NA NAS, i to bez klikania (0.225.0)", () => {
-  /* Do 0.224.0 stało tu `new`, a po przejęciu `open`. Oba były prawdziwe
-     o KOLUMNIE i nic nie mówiły o tym, kto ma następny ruch — a to jedyne,
-     po co agent na ten stan patrzy. Kolumna dalej trzyma `new` i przejęcie
-     dalej robi z niej `open`; zmieniło się to, co widać na ekranie. */
+  /* Kolumna trzyma `new`, a przejęcie robi z niej `open`, ale ekran pokazuje,
+     kto ma następny ruch — a to jedyne, po co agent na ten stan patrzy. */
   const { d, ala, rozmowa } = stanowisko();
   assert.equal(statusRozmowy(d, rozmowa), "waiting_for_us");
 
@@ -204,16 +200,11 @@ test("PRZYCHODZĄCA wiadomość budzi rozmowę rozwiązaną i odłożoną", () =
   }
 });
 
-/* ── Zamknięta wraca do puli (0.257.0) ───────────────────────────────────────
-   Do 0.256.0 stał tu jeden test mówiący, że NIE budzą się ani `closed`, ani
-   `spam`, z uzasadnieniem „automat, który cofa werdykt, kazałby zamykać tę
-   samą rozmowę w kółko". Właściciel to odwołał, bo argument mylił dwa koszty:
-   ponowne zamknięcie to jedno kliknięcie, a przepadłe pytanie klienta to
-   sprawa, o której nikt się nie dowie.
-
-   Test nie znika — dzieli się na dwa. `spam` zostaje przy dawnym założeniu
-   i dostaje własnego strażnika niżej; `closed` budzi się, ale ODDAJE ROZMOWĘ
-   DO PULI, i to jest jedyna rzecz, którą oba werdykty się teraz różnią. */
+/* ── Zamknięta wraca do puli ─────────────────────────────────────────────────
+   Ponowne zamknięcie to jedno kliknięcie, a przepadłe pytanie klienta to
+   sprawa, o której nikt się nie dowie. Dlatego `closed` budzi się, ale
+   ODDAJE ROZMOWĘ DO PULI. `spam` się nie budzi i ma własnego strażnika
+   niżej. */
 
 test("`closed` budzi się i oddaje rozmowę do puli", () => {
   const { d, ala, rozmowa } = stanowisko();
@@ -346,7 +337,7 @@ test("nieznany status odpada — lista z §7 jest zamknięta", () => {
   assert.throws(() => ustawStatus(d, rozmowa, "zalatwione" as never, ala, null), /status/i);
 });
 
-/* ── Podziękowanie klienta (22 września 2026) ────────────────────────────────
+/* ── Podziękowanie klienta ───────────────────────────────────────────────────
    Decyzja właściciela: rozmowa zakończona „dziękuję" nie czeka na nas. Rozstrzyga
    WYŁĄCZNIE decyzja klasyfikatora — tekstu nikt tu nie sprawdza — więc każdy
    warunek reguły dostaje osobny test: zdjęcie któregokolwiek zostawia rozmowę
@@ -393,7 +384,7 @@ test("status rozmowy słucha podziękowania, a nowa wiadomość klienta je uniew
     taksonomia_wersja,polityka_wersja,at,przez)
     VALUES (?,?,1,1,'MODEL','SUCCESS','OTHER','NO_ACTION',0,0,0,'wysoka','v2','p1',?,'automat')`)
     .run(rozmowa, dzieki, "2026-09-01T09:01:00.000Z");
-  /* Od 23 września 2026 podziękowanie ZAKAŃCZA rozmowę (decyzja właściciela),
+  /* Podziękowanie ZAKAŃCZA rozmowę (decyzja właściciela),
      a nie zostawia jej „czekającej na klienta". */
   assert.equal(statusRozmowy(d, rozmowa), "resolved");
 
@@ -404,7 +395,7 @@ test("status rozmowy słucha podziękowania, a nowa wiadomość klienta je uniew
   assert.equal(statusRozmowy(d, rozmowa), "waiting_for_us");
 });
 
-/* ── Zakończenie rozmowy (23 września 2026) ─────────────────────────────────
+/* ── Zakończenie rozmowy ─────────────────────────────────────────────────────
    Decyzja właściciela: jeden werdykt „Zakończona", z ręki agenta albo sam
    — podziękowanie, dwa dni ciszy po naszej odpowiedzi, wątek zamknięty
    w Allegro. Pytanie bez odpowiedzi nie kończy się NIGDY samo. */
@@ -474,10 +465,9 @@ test("Otwórz ponownie cofa werdykt agenta; nowa wiadomość klienta budzi zako�
 });
 
 
-/* ── ODŁÓŻ DO TERMINU (0.533.0) ─────────────────────────────────────────────
-   Decyzja właściciela z 26 września 2026 — powód przy `odlozRozmowe`. Test
-   pilnuje trzech obietnic: termin jest zawsze, rozmowa wraca SAMA, a klient
-   budzi ją wcześniej. */
+/* ── ODŁÓŻ DO TERMINU ───────────────────────────────────────────────────────
+   Powód przy `odlozRozmowe`. Test pilnuje trzech obietnic: termin jest
+   zawsze, rozmowa wraca SAMA, a klient budzi ją wcześniej. */
 test("odłożona rozmowa schodzi z ruchu do terminu i wraca sama, z wpisem w dzienniku", () => {
   const { d, ala, rozmowa } = stanowisko();
   const teraz = new Date("2026-09-26T10:00:00.000Z");

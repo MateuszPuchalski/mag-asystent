@@ -8,11 +8,10 @@ import {
   przygotujZdjecia, przygotujZdjeciaRozmowy, pobierzZdjecieRozmowy, type Pobieracz, type WynikZdjec,
 } from "./copilot-zdjecia.js";
 
-/* ── Test na żywym Allegro (24 września 2026) ────────────────────────────────
-   Zgłoszenie właściciela po rozmowie o metodzie Feynmana: „build it”. Zasada
-   stamtąd: natury nie da się oszukać. Nasze bramki sprawdzają kod wobec kodu,
-   nie wobec Allegro. Copilot „widział zdjęcia” od 0.330.0, a pierwsze zdjęcie
-   doszło do modelu w 0.484.6 — testy podstawiały pobieracz, więc przechodziły.
+/* ── Test na żywym Allegro ───────────────────────────────────────────────────
+   Natury nie da się oszukać. Nasze bramki sprawdzają kod wobec kodu, nie
+   wobec Allegro: testy z podstawionym pobieraczem przechodzą, choć zdjęcie
+   do modelu nie dochodzi.
 
    RAZ DZIENNIE te same drogi co produkcja, BEZ ATRAP. Każdy krok woła tę samą
    funkcję, którą woła Copilot albo synchronizacja, z jej domyślnym
@@ -30,9 +29,6 @@ import {
 
 export type KrokSondy = "watki" | "sprawa" | "zdjecie_rozmowy" | "zdjecie_reklamacji" | "zdjecia_copilota";
 export type WynikKroku = "ok" | "blad" | "pominiety";
-
-export const KROKI_SONDY: readonly KrokSondy[] =
-  ["watki", "sprawa", "zdjecie_rozmowy", "zdjecie_reklamacji", "zdjecia_copilota"];
 
 export interface WynikSondy { krok: KrokSondy; wynik: WynikKroku; szczegol: string | null; ms: number }
 

@@ -10,7 +10,7 @@ import {
 } from "../services/karton.js";
 import { BladKosza, kartonyDlaKolektora } from "../services/kosze.js";
 
-/* ── KARTON — trasy zbierania zawartości (0.122.0) ───────────────────────────
+/* ── KARTON — trasy zbierania zawartości ───────────────────────────
    Jedna publiczność: HALA. Bramka jak przy `/api/kosze/…` — każda zalogowana
    rola, bo karton składa i rozkłada magazynier, a globalna bramka z context.ts
    i tak wymaga sesji.

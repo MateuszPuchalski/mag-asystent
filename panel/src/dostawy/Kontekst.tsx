@@ -4,12 +4,12 @@ import type { Dokument, Wyjatek } from "../api/dostawy";
 import { useLogoDostawcy, useZdjecieDowodu } from "../towar/useZdjecie";
 import { Blad, NaglowekSekcji, Pole, Przycisk, czas, ile } from "../ui";
 
-/* ── Kontekst dostawy — prawa kolumna (0.435.0) ────────────────────────────
+/* ── Kontekst dostawy — prawa kolumna ──────────────────────────────────────
    Kolejność sekcji idzie za pytaniem, które biuro zadaje przy wyjątku:
    najpierw DOWÓD (co hala widziała), potem DOSTAWCA (czy to się u niego
-   powtarza), potem ROZMOWA Z HALĄ. W biurze dowody leżały w tabeli pozycji
-   jako miniatury 48 px, a pytanie przy nich brzmi „czy to TA część" — 48 px
-   nie wystarczało i trzeba było otwierać Subiekt obok (0.205.0). */
+   powtarza), potem ROZMOWA Z HALĄ. Dowód jest duży, bo pytanie przy nim
+   brzmi „czy to TA część", a miniatura 48 px kazałaby otwierać Subiekt
+   obok. */
 
 function Dowod({ p, onPowieksz }: { p: Wyjatek; onPowieksz: (url: string) => void }) {
   const { url, blad, ponow } = useZdjecieDowodu(p.id);
@@ -18,11 +18,10 @@ function Dowod({ p, onPowieksz }: { p: Wyjatek; onPowieksz: (url: string) => voi
       ? <button type="button" onClick={() => onPowieksz(url)} title="Powiększ"
           className="block w-full overflow-hidden rounded-lg bg-slate-100">
           <img src={url} alt={`Zdjęcie z hali: ${p.sym ?? p.symObcy ?? ""}`} className="h-28 w-full object-cover" /></button>
-      /* PLIK ZGUBIONY TO NIE „BEZ ZDJĘCIA" (audyt 26.09.2026). Ta kolumna
-         rysuje wyłącznie zgłoszenia z `hasPhoto`, więc 404 znaczy tu jedno:
-         hala zdjęcie zrobiła, a serwer pliku nie ma. Kafel mówił dotąd „bez
-         zdjęcia", jak przy zgłoszeniu, do którego nikt zdjęcia nie robił —
-         i utrata dowodu do reklamacji była niewidoczna. */
+      /* PLIK ZGUBIONY TO NIE „BEZ ZDJĘCIA". Ta kolumna rysuje wyłącznie
+         zgłoszenia z `hasPhoto`, więc 404 znaczy tu jedno: hala zdjęcie
+         zrobiła, a serwer pliku nie ma. „Bez zdjęcia" ukryłoby utratę dowodu
+         do reklamacji. */
       : <div className={`grid h-28 place-items-center rounded-lg ${url === null && !blad
           ? "border border-red-200 bg-red-50 text-ranga-zle" : "bg-slate-100 text-slate-600"}`}>
           {url === undefined && !blad ? <span className="text-xs">wczytuję…</span>
@@ -31,9 +30,9 @@ function Dowod({ p, onPowieksz }: { p: Wyjatek; onPowieksz: (url: string) => voi
                   : <span title="Hala dołączyła zdjęcie, ale serwer nie ma jego pliku — dowód do reklamacji przepadł">
                       zdjęcie zgłoszone, pliku brak</span>}</span>}
         </div>}
-    {/* Dwie linijki zamiast wielokropka (audyt 26.09.2026): przy dwóch
-        dowodach w rzędzie ucinało się akurat to, co je odróżnia — typ
-        i godzina. Pełny podpis zostaje też w `title`. */}
+    {/* Dwie linijki zamiast wielokropka: przy dwóch dowodach w rzędzie
+        ucinałoby się akurat to, co je odróżnia — typ i godzina. Pełny podpis
+        zostaje też w `title`. */}
     <figcaption className="mt-1 line-clamp-2 text-xs text-slate-600"
       title={`${p.sym ?? p.symObcy ?? "towar"} · ${p.typLabel} · ${czas(p.createdAt)}`}>
       {p.sym ?? p.symObcy ?? "towar"} · {p.typLabel} · {czas(p.createdAt)}</figcaption>
@@ -72,7 +71,7 @@ function Dostawca({ d }: { d: Dokument }) {
 
 /**
  * Notatki z halą jako ROZMOWA — pytanie biura i odpowiedź z hali w dwóch
- * dymkach, jak od 0.97.0 w biurze. Nieodpowiedziana jest wyróżniona, bo to
+ * dymkach. Nieodpowiedziana jest wyróżniona, bo to
  * ona trzyma dostawę otwartą.
  */
 function Notatki({ d, notatka, przeczytane }: {
@@ -107,9 +106,9 @@ function Notatki({ d, notatka, przeczytane }: {
         placeholder="Pytanie do hali" aria-label="Notatka do hali" />
       <Przycisk type="submit" disabled={notatka.trwa || !tresc.trim()}>Wyślij</Przycisk>
     </form>
-    {/* Reguła zeszła z podpowiedzi pola (audyt 26.09.2026): w kolumnie
-        kontekstu ucinała się w połowie („trzeba będzie odpo…") i znikała
-        przy pierwszej literze — akurat wtedy, gdy jest ważna. */}
+    {/* Reguła stoi pod polem, nie w podpowiedzi: w kolumnie kontekstu
+        podpowiedź ucina się w połowie i znika przy pierwszej literze —
+        akurat wtedy, gdy jest ważna. */}
     <p className="mt-1 text-xs text-slate-600">Hala musi odpowiedzieć, zanim dostawa się domknie.</p>
     <Blad>{notatka.blad}</Blad>
   </section>;

@@ -1,16 +1,13 @@
 import React from "react";
 import { useZdrowie } from "../api/rozmowy";
 
-/* ── Etykieta instancji w nagłówku (0.446.0, z `biuro.html` 0.69.0) ────────
+/* ── Etykieta instancji w nagłówku ─────────────────────────────────────────
    Dev i produkcja potrafią chodzić na tej samej maszynie (DEPLOY.md, „dev
-   obok produkcji"), a oba panele wyglądają identycznie. Biuro miało na to
-   pierwszą linię dymka przy ikonie SYSTEM: „⚠ DEV — to nie jest produkcja".
-   Strona zniknęła, a panel tej linii nie przejął — pomyłka instancji była
-   znowu możliwa do przeoczenia. Kolektor ma swoją pastylkę DEV od dawna.
+   obok produkcji"), a oba panele wyglądają identycznie. Kolektor ma swoją
+   pastylkę DEV z tego samego powodu.
 
    STOI W NAGŁÓWKU, nie w stanie systemu: pytanie „czy patrzę na właściwy
-   serwer" pada przed każdym innym, z każdej zakładki. Dolny rząd, obok
-   pigułki synchronizacji — górny nie ma na nią miejsca przy 1180 px. Na produkcji nie ma
+   serwer" pada przed każdym innym, z każdej zakładki. Na produkcji nie ma
    jej wcale — wieczny znaczek uczyłby go nie widzieć. Czerwień, bo zapis
    zrobiony na złej instancji jest błędem, którego nikt potem nie znajdzie.
 

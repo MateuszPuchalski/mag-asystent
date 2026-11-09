@@ -21,7 +21,7 @@ import {
   dowodyReklamacji, uDostawcyReklamacji, type DowodReklamacji, type ReklamacjaUDostawcy,
 } from "./reklamacja-dowody.js";
 
-/* ── Reklamacje klienckie — model pracy biura (0.222.0) ──────────────────────
+/* ── Reklamacje klienckie — model pracy biura ────────────────────────────────
    TEN PLIK PROWADZI WYŁĄCZNIE REKLAMACJE (`typ = 'CLAIM'`) i musi to mówić
    KAŻDYM zapytaniem. Tabela `reklamacja_klienta` trzyma też wiersze dawnych
    dyskusji (`DISPUTE`), których nikt już nie pobiera ani nie pokazuje, ale
@@ -31,10 +31,7 @@ import {
    pliku i wymaga warunku na `typ` przy każdym `FROM reklamacja_klienta`.
 
    ZEGAR CZYTAMY, NIE LICZYMY. `decisionDueDate` z Allegro jest terminem na
-   uznanie albo odrzucenie reklamacji. Implementacja skasowana w 0.140.0
-   liczyła ustawowe czternaście dni SAMA, bo komentarz obok mówił, że Allegro
-   żadnego zegara nie oddaje — i było to nieprawdą już wtedy. Liczba wzięta
-   z naszego kodu rozjeżdżałaby się z tą, którą widzi kupujący, a rozstrzyga
+   uznanie albo odrzucenie reklamacji. Liczba wzięta z naszego kodu rozjeżdżałaby się z tą, którą widzi kupujący, a rozstrzyga
    jego.
 
    KUBEŁEK NIE JEST KOLUMNĄ. Wynika ze statusu Allegro i ze stanu rozmowy,
@@ -52,7 +49,7 @@ export class BladReklamacji extends Error {
 /**
  * Konflikt 409 — panel dostaje ładunek i pokazuje, co się zmieniło.
  *
- * Zdanie jest PARAMETREM od 0.224.0, bo powodów jest kilka i każdy każe co
+ * Zdanie jest PARAMETREM, bo powodów jest kilka i każdy każe co
  * innego zrobić: cudza zmiana rekordu (odśwież), dopisek klienta albo doradcy
  * (przeczytaj i zdecyduj), zamknięta rozmowa (nie da się już nic wysłać).
  * Jedno zdanie na wszystkie trzy kazałoby agentowi zgadywać, na co patrzy.
@@ -73,7 +70,7 @@ export class ReklamacjaConflict extends Error {
  * `bez_ruchu` doszedł jako czwarty na zgłoszenie właściciela „w kolejce
  * pojawiają mi się stare reklamacje". Kubełek, a NIE ukrycie: sprawa martwa
  * ma zejść z pracy, ale zniknięcie z kolejki musi mieć widoczne uzasadnienie
- * i własny licznik — ta sama reguła co przy zwrotach rozliczonych (0.339.0).
+ * i własny licznik — ta sama reguła co przy zwrotach rozliczonych.
  */
 export type Kubelek = "decyzja" | "odpowiedz" | "zamknieta" | "bez_ruchu";
 
@@ -111,21 +108,6 @@ export const STATUSY_ALLEGRO = [
   "DISPUTE_CLOSED", "DISPUTE_ONGOING", "DISPUTE_UNRESOLVED",
   "CLAIM_SUBMITTED", "CLAIM_ACCEPTED", "CLAIM_REJECTED",
 ] as const;
-
-/**
- * Statusy końcowe — po nich biuro nie ma już decyzji do podjęcia.
- *
- * `DISPUTE_CLOSED` dołożony jako OSŁONA, nie jako naprawa, i różnica jest
- * istotna. Enum `PostPurchaseIssueStatus` jest JEDEN dla obu rodzajów spraw,
- * a `type` ma dwie wartości (`DISPUTE`, `CLAIM`), więc reklamacja nie powinna
- * nosić statusu dyskusji i prawdopodobnie żaden wiersz tego nie robi. Trzecia
- * wartość stała jednak w SQL-u doboru rozmów (`allegro-reklamacje-sync.ts`)
- * od 0.273.0, a dwie listy końcowe przepisane ręcznie w dwóch plikach to
- * jedna lista za dużo: przy następnej zmianie rozjadą się w ciszy.
- */
-/* Lista zeszła do `statusy-spraw.ts`, bo spoiwo kolejek pyta o to samo.
-   Re-eksport zostaje, żeby importy czytające ją stąd dalej działały. */
-export { STATUSY_KONCOWE };
 
 /**
  * Statusy, które POTWIERDZAJĄ nasz werdykt — węższe niż końcowe i to jest
@@ -173,15 +155,10 @@ const PROG_TERMINU_DNI = 3;
 const PROG_BEZ_RUCHU_DNI = 30;
 
 /**
- * Po ilu dniach milczenia „klient czeka" przestaje być prawdą (0.407.0).
+ * Po ilu dniach milczenia „klient czeka" przestaje być prawdą.
  *
- * ZGŁOSZENIE WŁAŚCICIELA ZE ZRZUTEM: „widzę sporo reklamacji, które w naszej
- * aplikacji pokazuje, że klient czeka, a w Allegro są już dawno rozwiązane".
- * Na tamtym ekranie kubełek DO ODPOWIEDZI liczył dwadzieścia dziewięć spraw,
- * a pierwsza z nich wyglądała tak: reklamacja uznana 28 lipca, wymiana
- * zaproponowana, kupujący odpisał 1 sierpnia „Ok. Pozdrawiam." — i przez
- * czterdzieści dziewięć dni czekał w kolejce roboczej na odpowiedź, której
- * nikt nie miał mu dać.
+ * Zgłoszenie właściciela: „widzę sporo reklamacji, które w naszej aplikacji
+ * pokazuje, że klient czeka, a w Allegro są już dawno rozwiązane".
  *
  * DLACZEGO ZEGAR, A NIE TREŚĆ. „Ok. Pozdrawiam." nie wymaga niczego, a „ale
  * przysłaliście znowu nie ten" wymaga wszystkiego — i z pola
@@ -282,23 +259,21 @@ export interface WierszReklamacji {
   zwrotWymagany: boolean | null;
   czatAktywny: boolean;
   wiadomosciIle: number;
-  /** Czy rozmowę urwał NASZ bezpiecznik stron (0.273.0) — patrz `czat_urwany`. */
+  /** Czy rozmowę urwał NASZ bezpiecznik stron — patrz `czat_urwany`. */
   czatUrwany: boolean;
   ostatniaWiadomoscStatus: string | null;
   ostatniaWiadomoscAt: string | null;
   otwartoAt: string;
-  /* ── Kiedy to kupiono (0.282.0) ──────────────────────────────────────────
+  /* ── Kiedy to kupiono ────────────────────────────────────────────────────
      DWA ŹRÓDŁA I JEDNA ETYKIETA BYŁABY KŁAMSTWEM. `zrodlo: "zamowienie"`
      znaczy `LineItem.boughtAt` z pełnego zamówienia — kanoniczna data zakupu.
      `zrodlo: "sprawa"` znaczy `checkoutForm.createdAt` z ładunku reklamacji,
      czyli moment złożenia koszyka; bywa wcześniejszy, gdy koszyk zbierano
-     kilka dni. Ekran nazywa je różnie, bo to różne zegary — blizna 0.121.0
-     wzięła się z nazwania jednego drugim. */
+     kilka dni. Ekran nazywa je różnie, bo to różne zegary. */
   kupionoAt: string | null;
   kupionoZrodlo: "zamowienie" | "sprawa" | null;
-  /* ── WIEK ZAKUPU (0.413.0) ───────────────────────────────────────────────
-     Ta sama zamiana, co przy terminie w 0.121.0: odjęcie jednej daty od
-     drugiej w głowie to praca, którą kolumna ma zdjąć. Przy reklamacji ta
+  /* ── WIEK ZAKUPU ─────────────────────────────────────────────────────────
+     Odjęcie jednej daty od drugiej w głowie to praca, którą kolumna ma zdjąć. Przy reklamacji ta
      liczba rozstrzyga więcej niż sama data — rękojmia biegnie dwa lata od
      wydania rzeczy (art. 568 k.c.), a „usterka wyszła w użyciu" po trzech
      dniach i po dwudziestu miesiącach to dwie różne sprawy.
@@ -309,13 +284,13 @@ export interface WierszReklamacji {
      byłby zgadywaniem pod formalnym pozorem. */
   dniOdZakupu: number | null;
   prowadzi: string | null;
-  /** Tożsamość prowadzącego — po NIEJ liczy się filtr „Moje" (0.278.0). */
+  /** Tożsamość prowadzącego — po NIEJ liczy się filtr „Moje". */
   prowadziId: number | null;
   prowadziAt: string | null;
-  /** Tagi biura (0.279.0). Zawężają listę, NIGDY nie przestawiają kolejki. */
+  /** Tagi biura. Zawężają listę, NIGDY nie przestawiają kolejki. */
   tagi: TagSprawy[];
   notatka: string | null;
-  /* ── Droga powrotna z notatki (0.280.0) ──────────────────────────────────
+  /* ── Droga powrotna z notatki ────────────────────────────────────────────
      Poprzedniej TREŚCI panel nie dostaje — wystarcza mu wiedza, że jest do
      czego wracać. Cofnięcie jest zamianą, więc drugie kliknięcie i tak
      przywraca stan sprzed pierwszego. */
@@ -346,21 +321,18 @@ export interface WierszReklamacji {
   link: string | null;
   linkZamowienia: string | null;
   linkOferty: string | null;
-  /* ── Co widać na wierszu (0.223.0) ────────────────────────────────────────
+  /* ── Co widać na wierszu ──────────────────────────────────────────────────
      Reklamacja dotyczy JEDNEJ oferty, więc obraz jest tu tożsamością sprawy,
      a nie ozdobą: „pękła obudowa" przy zdjęciu kosiarki czyta się w biegu,
      a przy samym numerze wymaga otwarcia sprawy. */
   ofertaNazwa: string | null;
-  /** Trzy stany, jak przy zwrocie od 0.214.0: `jest`, `brak`, `nieznane`. */
+  /** Trzy stany, jak przy zwrocie: `jest`, `brak`, `nieznane`. */
   ofertaZdjecie: StanZdjeciaOferty;
   /** Kartoteka POTWIERDZONA (`oferta_kartoteka`); propozycję liczy szczegół. */
   twId: number | null;
   twSymbol: string | null;
-  /* ── SKĄD JEST TA SYGNATURA (0.403.0) ──────────────────────────────────────
-     Paragon i dzisiejsze mapowanie oferty bywają RÓŻNE — to cała treść
-     0.400.0. Do tego wydania panel dostawał wynik bez źródła, więc pisał
-     „W09-0804" bez różnicy, czy to sygnatura z chwili zakupu, czy z półki.
-     Agent czytający wiersz towaru ma prawo wiedzieć, czemu ufa. */
+  /* ── SKĄD JEST TA SYGNATURA ────────────────────────────────────────────────
+     Paragon i dzisiejsze mapowanie oferty bywają RÓŻNE. Agent czytający wiersz towaru ma prawo wiedzieć, czemu ufa. */
   twZParagonu: boolean;
   /* ── ILE JEST W GRZE ─────────────────────────────────────────────────────
      Właściciel o cenach: „są kluczowe do szybkiego oceniania, czy warto
@@ -486,12 +458,10 @@ export function dniOdZakupu(kupionoAt: string | null, teraz = Date.now()): numbe
 }
 
 /**
- * Czy „klient czeka" jest JESZCZE PRAWDĄ (0.407.0).
+ * Czy „klient czeka" jest JESZCZE PRAWDĄ.
  *
- * JEDEN PREDYKAT, DWÓCH WOŁAJĄCYCH — kubełek i plakietka. Do tego wydania
- * każde z nich liczyło to samo po swojemu i oba były tak samo nieprawdziwe
- * po dwóch miesiącach. Gdyby reguła stała w dwóch miejscach, poprawka
- * jednego z nich zostawiłaby drugie kłamiące dalej.
+ * JEDEN PREDYKAT, DWÓCH WOŁAJĄCYCH — kubełek i plakietka. Gdyby reguła stała
+ * w dwóch miejscach, poprawka jednego zostawiłaby drugie kłamiące dalej.
  *
  * SPRAWA NIEROZSTRZYGNIĘTA CZEKA ZAWSZE, bez względu na wiek: obok niej stoi
  * termin decyzji, który i tak rządzi kolejnością pracy, a dopisek kupującego
@@ -723,15 +693,14 @@ function zWiersza(w: Wiersz, teraz: number): WierszReklamacji {
     wersja: Number(w.wersja ?? 1),
     kubelek: kubelek(rdzen, teraz),
     sygnaly: sygnaly(rdzen, teraz),
-    /* W ADRESIE STOI UUID, nie numer czytelny (0.226.1). Sprawa ma własną
+    /* W ADRESIE STOI UUID, nie numer czytelny. Sprawa ma własną
        stronę `/claims/{uuid}` i adresuje się identyfikatorem zasobu; numer
-       `2585498/2026` jest dla CZŁOWIEKA i zostaje etykietą odnośnika. Do
-       0.226.0 szło tu odwrotnie i kliknięcie dawało 404. */
+       `2585498/2026` jest dla CZŁOWIEKA i zostaje etykietą odnośnika. */
     link: linkReklamacji(String(w.external_id)),
     linkZamowienia: linkZamowienia(tekst(w.order_id)),
     linkOferty: linkOferty(tekst(w.offer_id)),
     ofertaNazwa: tekst(w.oferta_nazwa),
-    /* Trzy stany, nie dwa (blizna 0.214.0). NULL znaczy „jeszcze nie wiemy" —
+    /* Trzy stany, nie dwa. NULL znaczy „jeszcze nie wiemy" —
        i to samo znaczy BRAK WIERSZA snapshotu przy złączeniu lewym, więc obie
        drogi schodzą się w jednej odpowiedzi. Pusty łańcuch znaczy co innego:
        „snapshot jest, Allegro zdjęcia tej oferty nie ma" — a tego nie naprawi
@@ -755,30 +724,23 @@ function zWiersza(w: Wiersz, teraz: number): WierszReklamacji {
  * w całości i filtruje kubełkiem u siebie — przełączenie kubełka nie kosztuje
  * wtedy ani jednego żądania. Ten sam wybór co przy zwrotach.
  *
- * TO ZDANIE BYŁO NIEPRAWDĄ OD 0.273.0 i stąd wziął się próg. Pełny przelot
- * listy dołożony w tamtym wydaniu zapisuje CAŁE archiwum konta, a to zapytanie
- * nie miało ani filtra statusu, ani okna czasowego, ani limitu — do panelu
- * jechała zawartość całej tabeli. Zgłoszenie właściciela brzmiało „w kolejce
- * pojawiają mi się stare reklamacje" i było opisem dokładnie tego.
+ * PRÓG DATY jest konieczny, bo pełny przelot listy zapisuje CAŁE archiwum
+ * konta, a do panelu nie ma prawa jechać cała tabela.
  *
  * PORZĄDEK BIERZE SIĘ Z TERMINU DECYZJI, nie z daty wpływu: pytanie biura
  * brzmi „co się dziś przeterminuje", a nie „co przyszło pierwsze". Sprawy bez
- * terminu idą na koniec — nie mają zegara, więc nie mają pilności. Ten porządek
- * był drugą połową problemu: `decyzja_do ASC` stawia termin sprzed pół roku
- * NAD dzisiejszym, więc archiwum lądowało nie gdziekolwiek, tylko na górze.
+ * terminu idą na koniec — nie mają zegara, więc nie mają pilności.
  *
  * `od` to próg po `otwarto_at`; `null` znaczy „bez progu" i tak wchodzi
  * przełącznik „pokaż starsze" z panelu.
  */
 /**
- * Symbol towaru z PARAGONU, nie z dzisiejszego mapowania oferty (0.400.0).
+ * Symbol towaru z PARAGONU, nie z dzisiejszego mapowania oferty.
  *
  * Zgłoszenie właściciela: „symbol towaru w reklamacji powinno ściągać
- * z paragonu do danego zamówienia". Do 0.399.0 kolejka i szczegół brały
- * kartotekę z `oferta_kartoteka` — czyli z tego, na co oferta wskazuje DZIŚ.
- * Sprzedawca przepina sygnaturę oferty, gdy towar od jednego dostawcy się
- * wyczerpie, więc reklamacja sprzed miesiąca pokazywała część, której klient
- * nigdy nie dostał.
+ * z paragonu do danego zamówienia". Sprzedawca przepina sygnaturę oferty, gdy
+ * towar od jednego dostawcy się wyczerpie, więc dzisiejsze mapowanie pokazałoby
+ * część, której klient nigdy nie dostał.
  *
  * PARAGON BIJE MAPOWANIE, i to jest świadome odwrócenie reguły „za pamięcią
  * stoi decyzja człowieka, więc bije automat". Tamta reguła rozstrzyga, czym
@@ -941,7 +903,7 @@ export function progKolejki(
   if (!od) return { od: null, ukrytych: 0, ukrytychZTerminem: 0 };
   /* Listy statusów wchodzą do SQL-a ZE STAŁYCH, nie przepisane ręką. Druga
      kopia tych samych wartości rozjechałaby się z pierwszą przy najbliższej
-     zmianie — dokładnie tak, jak rozjechały się listy końcowe w 0.273.0. */
+     zmianie. */
   const koncowe = STATUSY_KONCOWE.map(() => "?").join(",");
   const wydane = WERDYKT_WYDANY.map(() => "?").join(",");
   const w = database.prepare(`
@@ -1169,7 +1131,7 @@ export interface SzczegolReklamacji {
   reklamacja: WierszReklamacji;
   czat: WiadomoscReklamacji[];
   zalaczniki: ZalacznikReklamacji[];
-  /** Zwroty tego samego zamówienia — mostek z 0.221.0, ta sama funkcja. */
+  /** Zwroty tego samego zamówienia — ta sama funkcja co w kolejce zwrotów. */
   zwroty: WierszZwrotu[];
   /** Rozmowy o tym samym zakupie; po loginie kupującego NIE dobieramy. */
   rozmowy: RozmowaZakupu[];
@@ -1177,9 +1139,9 @@ export interface SzczegolReklamacji {
   sprawy: SprawaZakupu[];
   /** Droga zakupu przez cztery kolejki, w kolejności czasu (S3 spoiwa). */
   droga: PrzystanekDrogi[];
-  /** Zamówienie z pozycjami i cenami (0.393.0); `null` = jeszcze niepobrane. */
+  /** Zamówienie z pozycjami i cenami; `null` = jeszcze niepobrane. */
   zamowienie: Zamowienie | null;
-  /** Co wiemy o paczce do klienta (0.393.0); `null` = nie ma zamówienia. */
+  /** Co wiemy o paczce do klienta; `null` = nie ma zamówienia. */
   przesylka: StanPrzesylkiZamowienia | null;
   /** Kartoteka Subiekta wywiedziona z oferty, gdy reklamacja ją niesie. */
   kartoteka: ReturnType<typeof kartotekaOferty> | null;
@@ -1188,7 +1150,7 @@ export interface SzczegolReklamacji {
      ale zapisane karty zostają i jadą dalej: to dane biura, nie ekranu,
      a powrót Copilota nie będzie wtedy wymagał zmiany odpowiedzi. */
   karta: ReturnType<typeof kartaSprawy>;
-  /* Ile razy TO SAMO już się zdarzyło (0.413.0) — patrz `historiaSprawy`. */
+  /* Ile razy TO SAMO już się zdarzyło — patrz `historiaSprawy`. */
   historia: HistoriaSprawy;
   /** Od kogo przyszedł ten towar — patrz `ostatniaDostawa`; `null` = nie wiemy. */
   dostawa: OstatniaDostawa | null;
@@ -1225,7 +1187,7 @@ export function kontekstZamowienia(
      `docs/obsluga-klienta-calosc.md`). Reklamacja i rozmowa ze skrzynki
      wiążą się po numerze zamówienia w obie strony. */
   sprawy: SprawaZakupu[]; droga: PrzystanekDrogi[];
-  /* ── CO KLIENT KUPIŁ I ZA ILE (0.393.0) ──────────────────────────────────
+  /* ── CO KLIENT KUPIŁ I ZA ILE ────────────────────────────────────────────
      Zgłoszenie właściciela: „dodaj ceny produktów". Kolumna dowodów miała
      nazwę towaru i SKU, ale ani jednej kwoty — a przy reklamacji z żądaniem
      zwrotu pieniędzy to jest pierwsza liczba, której agent szuka.
@@ -1234,7 +1196,7 @@ export function kontekstZamowienia(
      (`zamowienieRozmowy`), więc pozycje, kartoteki i zdjęcia liczą się raz
      i tak samo. `null` znaczy „zamówienia jeszcze nie pobraliśmy". */
   zamowienie: Zamowienie | null;
-  /* Gdzie jest paczka (0.393.0) — ODCZYT z naszej bazy. Pytanie do Allegro
+  /* Gdzie jest paczka — ODCZYT z naszej bazy. Pytanie do Allegro
      idzie osobną trasą, na jawne kliknięcie: to dwa żądania na zamówienie. */
   przesylka: StanPrzesylkiZamowienia | null;
 } {
@@ -1273,7 +1235,7 @@ export interface SladHistorii {
 }
 
 /**
- * Czy to się już zdarzało — przy TYM towarze i przy TYM kliencie (0.413.0).
+ * Czy to się już zdarzało — przy TYM towarze i przy TYM kliencie.
  *
  * `null` znaczy „nie mamy po czym liczyć", nigdy „zero": sprawa bez
  * potwierdzonej kartoteki nie ma towaru, po którym szukać, a sprawa bywa
@@ -1306,7 +1268,7 @@ const slad = (w: Wiersz | undefined): SladHistorii | null => {
 };
 
 /**
- * Ile razy TO SAMO już się zdarzyło (0.413.0).
+ * Ile razy TO SAMO już się zdarzyło.
  *
  * Właściciel o cenach: „są kluczowe do szybkiego oceniania, czy warto
  * rozpatrywać reklamację". Cena mówi, ile kosztuje ustąpienie; te dwie liczby
@@ -1393,7 +1355,7 @@ export function najnowszaReklamacjaZamowienia(
 /**
  * Wszystko o jednej sprawie — CZYSTY ODCZYT.
  *
- * Otwarcie reklamacji niczego nie mutuje (blizna 0.18.0). Rozmowa dociąga się
+ * Otwarcie reklamacji niczego nie mutuje. Rozmowa dociąga się
  * taktem synchronizacji, a nie wejściem na ekran: pobranie przy patrzeniu
  * byłoby zapisem, a przy okazji żądaniem do Allegro na każde kliknięcie
  * w wiersz kolejki.
@@ -1490,10 +1452,8 @@ export function doZapisu(
  * Ponowne kliknięcie ZDEJMUJE znacznik. Bez tego jedyną drogą wyjścia
  * z pomyłkowego przejęcia byłby cudzy werdykt.
  *
- * ZDEJMOWANIE ROZSTRZYGA TOŻSAMOŚĆ, NIE IMIĘ (0.278.0). Do tego wydania
- * przełącznik porównywał łańcuchy, więc dwie osoby o tym samym imieniu
- * zdejmowały sobie znacznik nawzajem — po cichu, bo objawem jest cudza sprawa
- * we własnym kubełku. Wiersz zastany bez `prowadzi_user_id` (migracja nie
+ * ZDEJMOWANIE ROZSTRZYGA TOŻSAMOŚĆ, NIE IMIĘ: dwie osoby o tym samym imieniu
+ * nie mogą zdejmować sobie znacznika nawzajem. Wiersz zastany bez `prowadzi_user_id` (migracja nie
  * umiała dopasować imienia) traktujemy jako CUDZY: zabranie sprawy jest
  * odwracalne jednym kliknięciem, ciche zdjęcie cudzego znacznika nie.
  */
@@ -1570,8 +1530,7 @@ function pisanieNotatki(
  * tam, gdzie było. Tabela historii dla pola, którego nikt nie audytuje, byłaby
  * drugim miejscem na te same dane osobowe.
  *
- * `false` znaczy „nie ma do czego wracać" i NIE jest błędem: wiersz zastany
- * sprzed 0.280.0 nie zna swojej poprzedniej treści, bo nikt jej nie zapisywał.
+ * `false` znaczy „nie ma do czego wracać" i NIE jest błędem.
  */
 function cofnijNotatkeSprawy(
   database: Db, id: number, autor: { id: number; name: string },

@@ -25,8 +25,7 @@ import { ZAMKNIETY_PROBLEM_W_EDYTORZE } from "./statusy";
  * oferta (pozycje z nazwą i SKU), więc rozmowa z numerem zamówienia nie
  * dostaje bloku „brak powiązania z ofertą" — dostaje kartę zakupu nad osią
  * i wiersz „Zamówienie" w kolumnie kontekstu.
- * Ekran dalej nie podstawia oferty zgadniętej z treści — tak wygrywały
- * kiedyś „zdemontowanym" i „Pozdrawiam".
+ * Ekran nie podstawia oferty zgadniętej z treści.
  */
 export function brakPowiazania(os: WpisOsi[],
   znane?: Pick<OsRozmowy, "zamowienie" | "oferta">): boolean {
@@ -73,14 +72,14 @@ export function Rozmowa(p: {
   agenci: Array<{ userId: number; name: string }>;
   wzmianki: number[];
   onWzmianki: (v: number[]) => void;
-  /* Załączniki do odpowiedzi (0.195.0). Stan i mutacje mieszkają w
+  /* Załączniki do odpowiedzi. Stan i mutacje mieszkają w
      `ekrany/Skrzynka.tsx`, jak każdy inny hak zapytania w tym panelu. */
   zalaczniki: import("../api/rozmowy").ZalacznikSzkicu[];
   dodajeZalacznik: boolean;
   bladZalacznika: string;
   onDodajZalacznik: (plik: File) => void;
   onUsunZalacznik: (id: number) => void;
-  /** Szkic z Copilota (0.231.0). Stan i mutacje w `ekrany/Skrzynka.tsx`, jak reszta. */
+  /** Szkic z Copilota. Stan i mutacje w `ekrany/Skrzynka.tsx`, jak reszta. */
   copilot: import("./SzkicCopilota").PropsSzkicuCopilota;
   konflikt: SzczegolyKonfliktu | null;
   mozeWymusic: boolean;
@@ -96,33 +95,31 @@ export function Rozmowa(p: {
   onOtworzRozmowe: (id: number) => void;
   onPriorytet: (priorytet: "normalny" | "pilny") => void;
   zapisujePriorytet: boolean;
-  /* Znacznik reklamacyjny (0.390.0) — opcjonalny, jak reszta rzeczy, których
+  /* Znacznik reklamacyjny — opcjonalny, jak reszta rzeczy, których
      ten sam komponent bywa rysowany bez obsługi. */
   onReklamacyjna?: (reklamacyjna: boolean) => void;
   zapisujeReklamacyjna?: boolean;
-  /* Zakończ / Otwórz ponownie (23 września 2026) — opcjonalne tym samym wzorcem. */
+  /* Zakończ / Otwórz ponownie — opcjonalne tym samym wzorcem. */
   onWyslijIZakoncz?: () => void;
   onZakoncz?: (mimoPytania: boolean) => void;
   onOtworz?: () => void;
-  /* Odłóż do terminu (0.533.0) — opcjonalne tym samym wzorcem. */
+  /* Odłóż do terminu — opcjonalne tym samym wzorcem. */
   onOdloz?: (doKiedy: string, opis: string) => void;
   onWrocZOdlozenia?: () => void;
   zmieniaStatus?: boolean;
-  /* Etykieta człowieka o kategorii (22 września 2026, wcześniej kciuki).
-     Opcjonalna, bo rozmowa bez rozpoznania nie ma czego potwierdzać — a każdy
+  /* Etykieta człowieka o kategorii. Opcjonalna, bo rozmowa bez rozpoznania nie ma czego potwierdzać — a każdy
      istniejący test tego ekranu opisuje właśnie taką rozmowę. */
   poprawia?: boolean;
   onPoprawKategorie?: (kategoria: Kategoria) => void;
   bladStatusu: string;
 }) {
-  /* Licznik jawnych zjazdów osi na dół (0.260.0). „Pokaż" pod banerem nowej
-     wiadomości do 0.259.0 tylko odświeżał dane i nie ruszał widoku — obiecywał
-     pokazanie i nie pokazywał. Licznik, nie `boolean`: dwa kliknięcia pod rząd
+  /* Licznik jawnych zjazdów osi na dół — „Pokaż" pod banerem nowej
+     wiadomości ma pokazać. Licznik, nie `boolean`: dwa kliknięcia pod rząd
      mają dać dwa zjazdy. Hak stoi PRZED wczesnym `return`, bo rozmowa niewybrana
      wychodzi z tej funkcji wcześniej, a hak warunkowy to złamana zasada haków. */
   const [zjazdy, setZjazdy] = React.useState(0);
 
-  /* „WYBIERZ ROZMOWĘ", GDY JEST WYBRANA, TO KŁAMSTWO (0.533.0). Po wysyłce
+  /* „WYBIERZ ROZMOWĘ", GDY JEST WYBRANA, TO KŁAMSTWO. Po wysyłce
      ekran sam przechodzi dalej, a przez czas wczytywania środek mówił
      „Wybierz rozmowę z listy" — choć wybór już padł. Zdanie odpowiada teraz
      stanowi: wybrana i w drodze albo niewybrana. */
@@ -140,49 +137,41 @@ export function Rozmowa(p: {
   const wskazanaRecznie = Boolean(p.dane.ofertaWskazana);
 
   return <section className="card flex min-h-0 flex-1 flex-col overflow-hidden">
-    {/* `shrink-0` na wszystkim poza osią (0.180.0): po zwężeniu kolumny do
+    {/* `shrink-0` na wszystkim poza osią: po zwężeniu kolumny do
         ~700 px nagłówki zawijają się na dwie linie, a `Os` jest jedynym
         blokiem z bazą 0 — bez tych klauzul kurczyłaby się treść rozmowy,
         czyli jedyna rzecz, po którą agent tu przyszedł. */}
-    {/* ── HIERARCHIĘ ROBIĄ TRZY NARZĘDZIA NARAZ (0.247.0) ─────────────────────
-        Login, „Twoja rozmowa", ocena kategorii i status stały w jednym rzędzie
-        w tym samym stopniu pisma i niemal tej samej wadze — cztery rzeczy
-        walczyły o pierwsze spojrzenie, choć tylko jedna jest tematem ekranu.
+    {/* ── HIERARCHIĘ ROBIĄ TRZY NARZĘDZIA NARAZ ───────────────────────────────
+        Login, „Twoja rozmowa", ocena kategorii i status walczyłyby o pierwsze
+        spojrzenie, choć tylko jedno jest tematem ekranu. Login rośnie
+        i ciemnieje, kto prowadzi — stoi pod nim w 12 px. Rozmiar, waga i barwa
+        mówią to samo, zamiast każde co innego.
 
-        Login rośnie i ciemnieje, kto prowadzi — schodzi pod niego w 12 px.
-        Skala urosła z dwóch stopni do czterech, a rozmiar, waga i barwa mówią
-        teraz to samo, zamiast każde co innego.
-
-        NAGŁÓWEK MA JEDEN RZĄD (0.395.0). Drugi niósł „Prowadzi nikt" i przycisk
-        przejęcia; po zdjęciu przycisku zostałyby dwa słowa na całą linię, a linia
-        w tej kolumnie spycha pytanie klienta niżej. Znacznik schodzi więc POD
-        login, w tej samej kolumnie tytułowej, i nie zabiera własnego pasma. */}
+        NAGŁÓWEK MA JEDEN RZĄD, bo każda linia w tej kolumnie spycha pytanie
+        klienta niżej. Znacznik stoi POD loginem, w tej samej kolumnie
+        tytułowej, i nie zabiera własnego pasma. */}
     <header className="shrink-0 border-b px-4 py-3">
       <div className="flex flex-wrap items-center gap-3">
         <div className="mr-auto min-w-0">
           <LoginKlienta login={rozmowa.klient}
             className="text-naglowek font-bold tracking-tight text-wertis-ink" />
-        {/* ── PRZEJĘCIE DZIEJE SIĘ SAMO (0.395.0) ────────────────────────────
+        {/* ── PRZEJĘCIE DZIEJE SIĘ SAMO ──────────────────────────────────────
             Zgłoszenie właściciela ze zrzutem: „usuń guzik przejmuję rozmowę,
-            to powinno dziać się automatycznie". I dzieje się — od 0.159.0
-            wysyłka odpowiedzi przypisuje rozmowę niczyją w tej samej
-            transakcji, co wiadomość. Guzik prosił o kliknięcie, które i tak
-            padało minutę później przy odpowiedzi.
+            to powinno dziać się automatycznie". Wysyłka odpowiedzi przypisuje
+            rozmowę niczyją w tej samej transakcji, co wiadomość.
 
-            ZOSTAJE ZDANIE, nie sama pustka: bez niego agent po zniknięciu
-            przycisku nie ma skąd wiedzieć, kiedy rozmowa stanie się jego.
+            STOI ZDANIE, nie sama pustka: bez niego agent nie ma skąd
+            wiedzieć, kiedy rozmowa stanie się jego.
 
             Czego to NIE daje, świadomie: mocnego zamka PRZED odpowiedzią.
-            Dwóch agentów przy jednej niczyjej rozmowie rozstrzyga odtąd sam
-            uchwyt obecności (§6.3) i jawna zgoda „odpowiedz mimo to" — ta
-            sama droga, którą i tak trzeba było przejść, gdy kolega siedział
-            przy rozmowie nieprzejętej. */}
+            Dwóch agentów przy jednej niczyjej rozmowie rozstrzyga sam uchwyt
+            obecności (§6.3) i jawna zgoda „odpowiedz mimo to". */}
         </div>
-          {/* PROWADZĄCY ZNAKIEM (23 września 2026, „za dużo tekstu"). Zdanie
+          {/* PROWADZĄCY ZNAKIEM („za dużo tekstu"). Zdanie
               „Prowadzi nikt — przypisze pierwsza odpowiedź" zajmowało linię
               pod loginem. Zostaje kółko: puste przerywane, gdy nikt, z inicjałem,
               gdy ktoś — a całe zdanie w dymku i dla czytnika ekranu. */}
-          {/* ZNAK TYLKO PRZY WYJĄTKU (0.506.0): cudza rozmowa zmienia decyzję
+          {/* ZNAK TYLKO PRZY WYJĄTKU: cudza rozmowa zmienia decyzję
               o pisaniu, więc zostaje na wierzchu. „Nikt" i „Ty" to norma — stoją
               w menu „⋯", żeby nagłówek nie powtarzał jej przy każdej rozmowie. */}
           {rozmowa.wlasciciel && !moja && <ProwadziZnak prowadzi={rozmowa.wlasciciel} ja={false} />}
@@ -192,13 +181,13 @@ export function Rozmowa(p: {
           w telefonie nie jest przejęciem jej. */}
       {/* Etykieta o propozycji Copilota stoi PRZY NIEJ, nie za zębatką: ocenia
           się to, na co się właśnie patrzy. Za zębatką mieszka SUMA etykiet,
-          czyli pomiar — ekran pracy niesie to, co woła o reakcję (0.168.0). */}
-      {/* KATEGORIA POD „⋯" (0.506.0). Pierwsze wdrożenie zostawiło na
+          czyli pomiar — ekran pracy niesie to, co woła o reakcję. */}
+      {/* KATEGORIA POD „⋯". Pierwsze wdrożenie zostawiło na
           wierzchu samą plakietkę; runda krytyki na ekranie 1366 px pokazała, że
           łamie ona nagłówek na dwa rzędy i spycha pytanie klienta. Kategorię
           niesie już kafel wiersza w kolejce i nagłówek soczewki po prawej,
           więc tu byłaby trzecim zapisem. Poprawka została w menu. */}
-        {/* `key` po rozmowie (0.533.0): pytanie „zakończyć bez odpowiedzi?"
+        {/* `key` po rozmowie: pytanie „zakończyć bez odpowiedzi?"
             zostawało otwarte i przechodziło na następną rozmowę. */}
         <Status key={rozmowa.id} rozmowa={rozmowa} blad={p.bladStatusu}
           onPriorytet={p.onPriorytet} zapisujePriorytet={p.zapisujePriorytet}
@@ -223,10 +212,9 @@ export function Rozmowa(p: {
         o pisaniu odpowiedzi, a sprawa zmienia tylko sposób czytania. */}
     <Obecni obecni={p.obecni} mojeId={p.mojeId} />
 
-    {/* Oferta, towar i zamówienie przeniosły się do KOLUMNY KONTEKSTU
-        (0.180.0). Cztery bloki jeden pod drugim spychały pytanie klienta
-        poniżej krawędzi okna, a to ono jest powodem, dla którego agent tu
-        przyszedł. Środkowa kolumna niesie odtąd rozmowę i nic poza nią. */}
+    {/* Oferta, towar i zamówienie stoją w KOLUMNIE KONTEKSTU. Tutaj
+        spychałyby pytanie klienta poniżej krawędzi okna, a to ono jest
+        powodem, dla którego agent tu przyszedł. */}
 
     {p.nowaWiadomosc && <p className="flex shrink-0 items-center gap-2 border-b bg-amber-100 px-4 py-2 text-sm font-semibold text-amber-900">
       <Bell size={16} />Klient dopisał nową wiadomość.
@@ -254,7 +242,7 @@ export function Rozmowa(p: {
       zapisuje={p.zapisujeOferte} blad={p.bladOferty}
       onWskaz={p.onWskazOferte} onDopytaj={p.onDopytajOOferte} />}
 
-    {/* ── EDYTOR NA KOŃCU OSI (0.495.0) — powód w `Edytor.tsx`. ─────────────
+    {/* ── EDYTOR NA KOŃCU OSI — powód w `Edytor.tsx`. ─────────────
         Formularz pomiaru jedzie tą samą drogą i stoi PRZED edytorem: zlecenie
         dla hali to zwykle krok przed odpowiedzią klientowi, nie po niej. */}
     <Os wpisy={os} rozmowaId={rozmowa.id} skokNaDol={zjazdy}
@@ -273,7 +261,7 @@ export function Rozmowa(p: {
               <span className="font-normal text-slate-500"> (opcjonalnie)</span></div>
             <Wyszukiwarka wybrany={p.towar} onWybierz={p.onTowar} etykieta="Wskazana przez Ciebie" />
           </div>
-          {/* ── POLECENIE JEST OBOWIĄZKOWE (0.408.0) ─────────────────────────────
+          {/* ── POLECENIE JEST OBOWIĄZKOWE ───────────────────────────────────────
               Zgłoszenie właściciela: „zadania zlecane dla magazynu mają za dużo
               informacji; powinno być tylko, jakiego produktu dotyczy zadanie — lub
               bez produktu — i co ma zrobić".
@@ -290,7 +278,7 @@ export function Rozmowa(p: {
               placeholder="Np. zmierz rozstaw otworów, podaj w milimetrach" /></label>
           {/* Przycisk MARTWY przy pustym poleceniu, a nie błąd po kliknięciu:
               serwer i tak odmówi, tylko o jeden strzał i jedno zdanie później. */}
-          {/* Zwykłą wielkością liter (0.523.0): wersaliki krzyczały głośniej
+          {/* Zwykłą wielkością liter: wersaliki krzyczały głośniej
               niż „Wyślij do klienta" tuż pod spodem, a to wysyłka jest główna. */}
           <Przycisk wariant="glowny" className="mt-3" onClick={p.onZlec}
             disabled={!p.wskazowka.trim()}>
@@ -311,7 +299,7 @@ export function Rozmowa(p: {
           maZamowienie={p.dane.zamowienie !== null} szkic={p.szkic}
           onWstawDoSzkicu={(t) => p.onSzkic(p.szkic ? `${p.szkic}\n${t}` : t)} />
 
-        {/* `key` po rozmowie (0.533.0): tryb notatki, „Cofnij wyczyszczenie"
+        {/* `key` po rozmowie: tryb notatki, „Cofnij wyczyszczenie"
             z tekstem poprzedniej rozmowy i treść Dopytania przechodziły dalej
             razem z komponentem, bo ekran go nie przemontowywał. */}
         <Edytor key={rozmowa.id} szkic={p.szkic} cudza={cudza} wlasciciel={rozmowa.wlasciciel}

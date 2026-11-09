@@ -146,7 +146,7 @@ export function wspieraWysilek(model: string): boolean {
  */
 export const nadawcaAnthropic: NadawcaKlasyfikacji = async (tresc): Promise<OdpowiedzModelu> => {
   const start = Date.now();
-  /* WŁASNY MODEL KLASYFIKACJI (22 września 2026), nie `config.copilot.model`:
+  /* WŁASNY MODEL KLASYFIKACJI, nie `config.copilot.model`:
      etykieta ma zejść na tańszy model bez ciągnięcia w dół szkicu. Pole puste
      dziedziczy `COPILOT_MODEL`, więc bez zmiany w wertis.env nic się nie rusza. */
   const model = config.copilot.modelKlasyfikacji;
@@ -208,7 +208,7 @@ export const nadawcaAnthropic: NadawcaKlasyfikacji = async (tresc): Promise<Odpo
    Osobna instrukcja, bo klasyfikator i redaktor to dwie różne role, a wspólny
    prefiks „jesteś klasyfikatorem" psułby jedną z nich.                       */
 
-/* Skąd model wie to, co napisał (0.253.0). Enumy biorą się z serwisu — jedna
+/* Skąd model wie to, co napisał. Enumy biorą się z serwisu — jedna
    lista, bez trzeciej kopii. `odwolanie` jest `nullable`, bo przy źródle
    `model` nie ma czego wskazać, a wyjście strukturalne wymaga wszystkich
    kluczy. Pewność deklaruje model, ale sufit narzuca `ustalPewnosc`. */
@@ -597,7 +597,7 @@ export const nadawcaSzkicuAnthropic: NadawcaSzkicu =
     wersja: PROMPT_SZKICU,
     numerujWyniki: true,
     /* ── OBRAZY PRZED TEKSTEM ───────────────────────────────────────────────
-       Ten sam kształt, co przy karcie reklamacyjnej (0.283.0), i z tego
+       Ten sam kształt, co przy karcie reklamacyjnej, i z tego
        samego powodu: bez spisu na końcu tekstu model widzi obrazy, ale nie
        wie, który jest którym `Z`, a wtedy odczyt przestaje być sprawdzalny.
        Spis dokleja serwis do FAKTÓW, nie adapter — tu jest tylko kolejność.
@@ -1028,10 +1028,8 @@ function naNasz(e: unknown): Error {
       "Anthropic odrzuciło klucz (401) — sprawdź ANTHROPIC_API_KEY w wertis.env " +
       "i zrestartuj usługę.");
   }
-  /* PRZED `APIError`, bo `APIConnectionError` PO NIEJ DZIEDZICZY. Do 0.191.0
-     gałąź o braku internetu stała na końcu funkcji i była nieosiągalna: zerwana
-     sieć meldowała się jako „Anthropic odpowiedziało ?", czyli twierdziła, że
-     dostawca odpowiedział — a on nie został nawet zapytany. Kolejność
+  /* PRZED `APIError`, bo `APIConnectionError` PO NIEJ DZIEDZICZY. Inaczej
+     zerwana sieć meldowałaby się jako „Anthropic odpowiedziało ?". Kolejność
      `instanceof` jest tu logiką, nie stylem. */
   if (e instanceof Anthropic.APIConnectionError) {
     return new BladLacznosciCopilota(
@@ -1086,8 +1084,8 @@ function naNasz(e: unknown): Error {
         + "Nic nie zostało policzone ani opłacone — spróbuj za chwilę.",
         e.status ?? 0, slad);
     }
-    /* Surowej odpowiedzi dostawcy na ekran NIE PUSZCZAMY. Do 0.191.0 szło tam
-       `529 {"type":"error",…}` — agent czytał zrzut JSON-a zamiast zdania. */
+    /* Surowej odpowiedzi dostawcy na ekran NIE PUSZCZAMY — agent ma czytać
+       zdanie, nie zrzut JSON-a. */
     return new BladOdpowiedziCopilota(
       `Anthropic odrzuciło żądanie (${e.status ?? "?"}). To nie jest wina tej `
       + "rozmowy — zajrzyj do pomiaru Copilota za zębatką.",
@@ -1112,7 +1110,7 @@ function czytajNaglowek(e: unknown, nazwa: string): string | null {
   return rec[nazwa] ?? rec[nazwa.toLowerCase()] ?? null;
 }
 
-/* ── Copilot reklamacyjny: karta faktów ze sprawy (0.275.0) ──────────────────
+/* ── Copilot reklamacyjny: karta faktów ze sprawy ─────────────────────────
    Zadanie jest CELOWO WĄSKIE: wyciągnij z rozmowy to, co w niej stoi, i nazwij
    to, czego w niej NIE MA. Model nie rozstrzyga sprawy — instrukcja mówi to
    wprost, a serwis sprawdza deterministycznie i odrzuca kartę, w której padnie
@@ -1130,7 +1128,7 @@ const Karta = z.object({
   oczekiwanie: PoleKartyZ.nullable(),
   dowody: z.array(PoleKartyZ),
   brakuje: z.array(z.string()),
-  /* RADA JEST TYPOWANA (0.276.0). Prozą byłoby ładniej i nie dałoby się tego
+  /* RADA JEST TYPOWANA. Prozą byłoby ładniej i nie dałoby się tego
      zmierzyć — a rada bez pomiaru to nie rada. Enum trzyma te same wartości,
      co werdykt wysyłany do Allegro, więc trafność liczy się porównaniem
      dwóch napisów, bez ankiety dla agenta. */
@@ -1212,7 +1210,7 @@ export const nadawcaRozpoznaniaAnthropic: NadawcaRozpoznania =
           ...(wspieraWysilek(config.copilot.model) ? { effort: "medium" as const } : {}),
           format: zodOutputFormat(Karta),
         },
-        /* ── OBRAZY PRZED TEKSTEM (0.283.0) ──────────────────────────────
+        /* ── OBRAZY PRZED TEKSTEM ─────────── ──────────────────────────────
            `content` przestaje być gołym łańcuchem. Obrazy idą PIERWSZE, a spis
            na końcu tekstu mówi, który jest którym `Z` — bez tego cytat `Z2`
            w karcie byłby niesprawdzalny, a sprawdzalny cytat to cała doktryna

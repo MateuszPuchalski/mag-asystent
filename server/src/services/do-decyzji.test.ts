@@ -96,8 +96,8 @@ test("zapis do Subiekta w błędzie jest pilny i idzie przed starszą sprawą", 
 });
 
 test("pominięta pozycja kosza prowadzi do koszy w zakładce Zwroty (0.438.0)", () => {
-  /* Kosze przeszły z MAGAZYNU ZWROTÓW w biurze do panelu — wiersz ma
-     prowadzić tam, gdzie leży ZAŁATWIONE, a nie do widoku, którego już nie ma. */
+  /* Kosze mieszkają w panelu — wiersz ma prowadzić tam, gdzie leży
+     ZAŁATWIONE. */
   const k = Number(db().prepare(`INSERT INTO kosz(kod, status, utworzono_at, utworzono_przez)
     VALUES ('Z-14', 'zamkniety', '2026-09-20T08:00:00.000Z', 'Ala')`).run().lastInsertRowid);
   db().prepare(`INSERT INTO kosz_pozycja(kosz_id, tw_id, symbol, nazwa, ilosc, status, powod, pominieto_at)
@@ -135,8 +135,8 @@ test("serwis nie zakłada tabeli ani nie pisze — sprawdzone po źródle", () =
   assert.doesNotMatch(zrodlo, /logEvent/, "odczyt nie zostawia śladu w dzienniku");
 });
 
-/* ── Dosyłka bez śledzenia (0.541.0) ────────────────────────────────────────
-   Biuro odmawia w panelu Allegro (fakt właściciela z 27 września 2026). Kod
+/* ── Dosyłka bez śledzenia ──────────────────────────────────────────────────
+   Biuro odmawia w panelu Allegro (fakt właściciela). Kod
    przychodzi synchronizacją, a zwrot schodzi z list pracy — więc wiersz
    „Śledzić dosyłkę?” stoi tutaj, z przyciskiem, i gaśnie, gdy dosyłka powstanie. */
 

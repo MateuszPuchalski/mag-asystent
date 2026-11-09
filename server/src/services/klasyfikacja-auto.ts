@@ -9,14 +9,11 @@ import {
 import { TAKSONOMIA_WERSJA } from "./klasyfikacja-slownik.js";
 
 /**
- * Rozpoznanie KAŻDEJ nowej wiadomości klienta (22 września 2026).
+ * Rozpoznanie KAŻDEJ nowej wiadomości klienta.
  *
- * ── SKĄD TO WYDANIE ─────────────────────────────────────────────────────────
- * Specyfikacja z 20 września: każda wiadomość klienta przechodzi przez
- * rozpoznanie, zanim zobaczy ją człowiek. Właściciel wybrał to zamiast
- * przycisku nad kolejką. Do tej wersji rozpoznawało się tylko to, co agent
- * kliknął — więc w pomiarze były wyłącznie rozmowy, które ktoś uznał za warte
- * pieniędzy, a próbka do trafności była skrzywiona już przy wyborze.
+ * Specyfikacja: każda wiadomość klienta przechodzi przez rozpoznanie, zanim
+ * zobaczy ją człowiek. Rozpoznawanie tylko klikniętych skrzywiałoby próbkę
+ * do pomiaru trafności już przy wyborze.
  *
  * ── CO BIERZE ───────────────────────────────────────────────────────────────
  * Rozmowy, których OSTATNIA wiadomość klienta nie ma aktywnej decyzji
@@ -47,7 +44,7 @@ export interface AutoKlasyfikacjaDeps {
 
 export interface WynikAutoKlasyfikacji {
   sklasyfikowanych: number;
-  /** Rozmowy wzięte w tym przebiegu — po nich takt układa szkic (23 września 2026). */
+  /** Rozmowy wzięte w tym przebiegu — po nich takt układa szkic. */
   rozmowy: number[];
   bledow: number;
   przerwane: string | null;

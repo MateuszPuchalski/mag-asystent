@@ -6,18 +6,18 @@ import { Blad, Przycisk, dataLokalna, ile } from "../ui";
 import { KartaWgladu } from "../ui/wglad";
 import { Potwierdz } from "../ui/Potwierdz";
 
-/* ── Serwer (z `biuro.html`, 0.441.0) ───────────────────────────────────
+/* ── Serwer ─────────────────────────────────────────────────────────────
    Wersja, źródło danych, worker i ślad audytowy — oraz dwie operacje
-   ratunkowe, które do 0.111.0 żyły wyłącznie w DEPLOY.md jako polecenia curl.
+   ratunkowe, żeby nie trzeba było poleceń curl.
    Odmowę roli wypowiada serwer (`ratunek_serwera`). RESYNC pyta, bo na
    produkcji to pełny import z Subiekta; odświeżenie zdjęć nie pyta, bo
    kasuje wyłącznie znaczniki „nie ma zdjęcia" i kolektory zapytają ponownie.
 
-   KAŻDY FAKT RAZ (0.509.0). Plik konfiguracji zszedł stąd, bo stoi
-   w opisie karty „Konfiguracja serwera" za zębatką, a zmienić go może
-   tylko admin, który tam właśnie patrzy. Wersja ZOSTAJE, choć mówi ją też
-   karta aktualizacji: tamta jest wyłącznie adminowa, a biuro zgłaszające
-   „coś nie działa" patrzy tutaj i nigdzie indziej jej nie zobaczy. */
+   KAŻDY FAKT RAZ. Plik konfiguracji stoi w opisie karty „Konfiguracja
+   serwera" za zębatką, a zmienić go może tylko admin, który tam właśnie
+   patrzy. Wersja ZOSTAJE, choć mówi ją też karta aktualizacji: tamta jest
+   wyłącznie adminowa, a biuro zgłaszające „coś nie działa" patrzy tutaj
+   i nigdzie indziej jej nie zobaczy. */
 
 /** Wynik resyncu zdaniem, nie zrzutem JSON-a: dwie liczby, po których
  *  człowiek poznaje, że wczytało się tyle, ile się spodziewał. */
@@ -77,7 +77,7 @@ export function KartaSerwera({ zdrowie }: { zdrowie: Zdrowie | undefined }) {
             {w.widziany && <span className="ml-2 text-slate-600">{w.widziany}</span>}</>
         : <><span className="rounded bg-red-100 px-1.5 py-0.5 text-xs font-bold text-ranga-zle">nie żyje</span> — zapisy do Subiekta NIE wchodzą</>)}
       {wiersz("ślad audytowy", `${a?.zdarzen ?? 0} zdarzeń · od ${a?.najstarsze ? dataLokalna(a.najstarsze) : "—"} · baza ${bajty(a?.bazaBajtow)}`)}
-      {/* Kopie robi serwer sam (0.487.0), więc tu biuro widzi, że je robi.
+      {/* Kopie robi serwer sam, więc tu biuro widzi, że je robi.
           Zaległość i błąd przychodzą osobno, zdaniem w „do sprawdzenia". */}
       {wiersz("kopie bazy", h.kopie
         ? `nocna ${h.kopie.nocna ? dataLokalna(h.kopie.nocna) : "jeszcze nie było"} · przed aktualizacją ${

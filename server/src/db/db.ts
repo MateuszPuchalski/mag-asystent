@@ -15,18 +15,9 @@ import { WERSJA } from "../wersja.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
-/* ── Dlaczego wbudowany `node:sqlite`, a nie `better-sqlite3` ────────────────
-   `better-sqlite3` był JEDYNYM modułem natywnym w całym serwerze i blokował
-   dwie rzeczy naraz:
-
-   1. Instalację. `npm ci` na Windows kompiluje go ze źródeł, co potrafi wymagać
-      build tools — czego dokumentacja wdrożenia nawet nie wspominała.
-   2. Spakowanie serwera do jednego pliku wykonywalnego. Moduł natywny nie
-      wchodzi do bundla, a bez tego nie ma `.exe` dla osoby nietechnicznej.
-
-   `node:sqlite` jest w środku Node'a, więc obie przeszkody znikają razem
-   z zależnością. Reszta kodu tego nie zauważa: używaliśmy wyłącznie
-   `prepare/run/all/get/exec/pragma`, bez `pluck`, `iterate`, `raw` i BigIntów.
+/* ── Dlaczego wbudowany `node:sqlite`, a nie moduł natywny ───────────────────
+   Moduł natywny wymaga build tools przy `npm ci` na Windows i nie wchodzi do
+   bundla, a bez bundla nie ma `.exe` dla osoby nietechnicznej.
 
    UWAGA przy budowaniu `.exe`: w Node 22 `node:sqlite` wypisuje ostrzeżenie
    o eksperymentalności na stderr (w usłudze NSSM ląduje ono w logu). Stabilne
@@ -36,23 +27,14 @@ export type Db = DatabaseSync;
 
 let _db: DatabaseSync | null = null;
 
-/* ── Kto jest właścicielem schematu (0.177.1) ────────────────────────────────
-   Do tego wydania migrację wykonywał KAŻDY proces otwierający bazę, bo siedzi
-   ona w `db()`. Skutek zobaczyliśmy 2 września: wyjątek w `migrate()` położył
-   API i workera naraz, a `AppExit Default Restart` bez opóźnienia zamienił to
-   w pętlę. W logu workera zostawało „database is locked" — objaw prowadzący
-   diagnozę w złe miejsce, bo baza była zablokowana przez API mielące migrację
-   w kółko.
+/* ── Kto jest właścicielem schematu ──────────────────────────────────────────
+   Schemat zakłada i migruje WYŁĄCZNIE serwer API. Wyjątek w `migrate()`
+   w każdym procesie położyłby API i workera naraz, a NSSM zamieniłby to
+   w pętlę restartów z mylącym „database is locked".
 
-   Odtąd schemat zakłada i migruje WYŁĄCZNIE serwer API. Nie jest to pomysł
-   nowy w tym repo: worker Sfery w C# pracuje tak od początku i mówi to wprost
-   w `sfera-worker/src/Db.cs` — otwiera bazę w trybie, który jej nie utworzy,
-   sprawdza obecność tabel i odmawia startu, gdy ich nie ma. Worker w Node był
-   jedynym procesem piszącym, który tej zasady nie dostał.
-
-   Jedna różnica wobec C# jest świadoma: tamten ODMAWIA startu, a worker Node
-   CZEKA (decyzja właściciela). Proces, który pada, NSSM restartuje — a to jest
-   pętla restartów z wyboru, dokładnie ten stan, z którego wychodzimy.        */
+   Worker Sfery w C# (`sfera-worker/src/Db.cs`) przy braku tabel ODMAWIA
+   startu, a worker Node CZEKA (decyzja właściciela), bo proces, który pada,
+   NSSM restartuje w pętli.                                                   */
 let migrowac = true;
 
 /**
@@ -114,8 +96,7 @@ export function db(): DatabaseSync {
      pośredni, którego ta zmiana ma nie dopuścić. */
   if (migrowac) {
     /* Kopia PRZED `schema.sql` i `migrate()`, bo to one kasują tabele przy
-       aktualizacji. Dotąd była prośbą w DEPLOY.md, a `-Aktualizuj` jej nie
-       robił. Tylko proces migrujący, czyli ten, który coś tu zmieni. */
+       aktualizacji. Tylko proces migrujący, czyli ten, który coś tu zmieni. */
     kopiaPrzedMigracja(database, WERSJA);
     const schema = fs.readFileSync(path.join(__dirname, "schema.sql"), "utf8");
     database.exec(schema);
@@ -129,10 +110,6 @@ export function db(): DatabaseSync {
 /**
  * Transakcja. `node:sqlite` nie ma odpowiednika `db.transaction(fn)`
  * z `better-sqlite3`, więc sterujemy nią wprost.
- *
- * Sygnatura celowo bierze i zwraca zwykłą funkcję — miejsca wywołania
- * wyglądają tak samo jak wcześniej, więc podmiana sterownika nie rozlała się
- * po serwisach.
  *
  * ROLLBACK jest tu istotny, a nie kosmetyczny: rozkładanie i przesunięcie
  * stanu zapisują w jednej transakcji pozycję ORAZ zadanie do kolejki Sfery.
@@ -189,26 +166,19 @@ export function migrate(database: DatabaseSync) {
      w `schema.sql`. Stare wiersze mają NULL, czyli „numeru nie znamy". */
   addColumn("sgt_dokument", "nr_oryg", "TEXT");
   addColumn("delivery", "nr_oryg", "TEXT");
-  /* Sygnatura oferty w chwili wskazania (0.219.0) — patrz `oferta_kartoteka`
-     w `schema.sql`. Stare wiersze zostają z NULL i obowiązują jak dotąd. */
+  /* Sygnatura oferty w chwili wskazania — patrz `oferta_kartoteka`. */
   addColumn("oferta_kartoteka", "sku_wtedy", "TEXT");
-  /* Twierdzenia szkicu ze źródłem i pewnością (0.253.0) — patrz
-     `szkic_copilota` w `schema.sql`. Stare szkice dostają pustą listę, i to
-     jest o nich prawda: powstały, zanim model musiał się legitymować. */
+  /* Twierdzenia szkicu ze źródłem i pewnością — patrz `szkic_copilota`. */
   addColumn("szkic_copilota", "twierdzenia", "TEXT NOT NULL DEFAULT '[]'");
   addColumn("szkic_copilota", "odczyt_zdjec", "TEXT NOT NULL DEFAULT '[]'");
-  /* Decyzja klasyfikatora, na której szkic powstał (23 września 2026). Szkic
-     po rozpoznaniu układa się sam, a poprawka kategorii tworzy NOWĄ decyzję —
-     bez tej kolumny nie dałoby się poznać, że szkic pisano pod starą. Stare
-     szkice mają NULL, czyli „nie wiadomo" — i pierwsza poprawka je odświeży. */
+  /* Decyzja klasyfikatora, na której szkic powstał. Poprawka kategorii tworzy
+     NOWĄ decyzję, a po tej kolumnie widać, że szkic pisano pod starą. NULL
+     znaczy „nie wiadomo". */
   addColumn("szkic_copilota", "decyzja_id", "INTEGER");
-  /* Narzędzia, po które sięgnął szkic — patrz `szkic_copilota.narzedzia`
-     w `schema.sql`. Stare szkice dostają pustą listę, i to jest o nich
-     prawda: powstały, zanim szkic mógł sięgać do bazy. */
+  /* Narzędzia, po które sięgnął szkic — patrz `szkic_copilota.narzedzia`. */
   addColumn("szkic_copilota", "narzedzia", "TEXT NOT NULL DEFAULT '[]'");
-  /* Wykonanie propozycji na żywo — patrz `propozycja_przeplywu` w `schema.sql`.
-     Tabela mogła już stać z trybu cienia, a stare wiersze mają NULL, czyli
-     „automat niczego nie wysłał", co jest o nich prawdą. */
+  /* Wykonanie propozycji na żywo — patrz `propozycja_przeplywu`. NULL znaczy
+     „automat niczego nie wysłał". */
   addColumn("propozycja_przeplywu", "wykonana_at", "TEXT");
   addColumn("propozycja_przeplywu", "outbox_id", "INTEGER");
   addColumn("propozycja_przeplywu", "wykonanie_blad", "TEXT");
@@ -219,8 +189,8 @@ export function migrate(database: DatabaseSync) {
   addColumn("sgt_towar", "wym_dlugosc", "TEXT");
   addColumn("sgt_towar", "wym_szerokosc", "TEXT");
   addColumn("sgt_towar", "wym_wysokosc", "TEXT");
-  /* Dopytanie Copilota (0.332.0). Tabela nowa, więc `schema.sql` załatwia
-     świeże bazy; ta linia jest dla istniejących instalacji. */
+  /* Dopytanie Copilota. `schema.sql` załatwia świeże bazy; ta linia jest dla
+     istniejących instalacji. */
   database.exec(`CREATE TABLE IF NOT EXISTS copilot_pytanie (
     id              INTEGER PRIMARY KEY AUTOINCREMENT,
     conversation_id INTEGER NOT NULL REFERENCES conversation(id) ON DELETE CASCADE,
@@ -233,22 +203,17 @@ export function migrate(database: DatabaseSync) {
     przez_user_id   INTEGER REFERENCES app_user(user_id))`);
   database.exec(`CREATE INDEX IF NOT EXISTS ix_copilot_pytanie_rozmowa
     ON copilot_pytanie(conversation_id, id)`);
-  /* Narzędzia, po które model sięgnął przy dopytaniu (0.507.0). Agent ma
-     widzieć, CO sprawdzono, zanim uwierzy odpowiedzi. Stare wymiany mają
-     pustą listę i to jest o nich prawda: modele wtedy narzędzi nie miały. */
+  /* Narzędzia, po które model sięgnął przy dopytaniu. Agent ma widzieć, CO
+     sprawdzono, zanim uwierzy odpowiedzi. */
   addColumn("copilot_pytanie", "narzedzia", "TEXT NOT NULL DEFAULT '[]'");
-  /* Poprawka szkicu z dopytania — patrz `copilot_pytanie` w `schema.sql`.
-     Stare wymiany mają NULL i puste listy, i to jest o nich prawda: model
-     wtedy tylko odpowiadał, szkicu nie poprawiał. */
+  /* Poprawka szkicu z dopytania — patrz `copilot_pytanie` w `schema.sql`. */
   addColumn("copilot_pytanie", "szkic_przed", "TEXT");
   addColumn("copilot_pytanie", "szkic_po", "TEXT");
   addColumn("copilot_pytanie", "szkic_odrzucony", "TEXT");
   addColumn("copilot_pytanie", "szkic_twierdzenia", "TEXT NOT NULL DEFAULT '[]'");
   addColumn("copilot_pytanie", "szkic_zastrzezenia", "TEXT NOT NULL DEFAULT '[]'");
   /* Zdjęcia agenta przy dopytaniu — patrz `copilot_pytanie_zdjecie`
-     w `schema.sql`. Tabela nowa, więc ta linia jest dla istniejących
-     instalacji. Stare wymiany nie mają wierszy i to jest o nich prawda:
-     agent nie mógł wtedy dołączyć zdjęcia. */
+     w `schema.sql`. Ta linia jest dla istniejących instalacji. */
   database.exec(`CREATE TABLE IF NOT EXISTS copilot_pytanie_zdjecie (
     id          INTEGER PRIMARY KEY AUTOINCREMENT,
     pytanie_id  INTEGER NOT NULL REFERENCES copilot_pytanie(id) ON DELETE CASCADE,
@@ -259,12 +224,11 @@ export function migrate(database: DatabaseSync) {
     miniatura   BLOB)`);
   database.exec(`CREATE INDEX IF NOT EXISTS ix_copilot_pytanie_zdjecie_pytanie
     ON copilot_pytanie_zdjecie(pytanie_id, id)`);
-  /* Zapytania do wyszukiwarki w księdze Copilota. Dziś nikt ich nie zleca,
-     ale stare wiersze je niosą, a pomiar kosztów liczy je do rachunku. */
+  /* Zapytania do wyszukiwarki w księdze Copilota; pomiar kosztów liczy je
+     do rachunku. */
   addColumn("copilot_wywolanie", "wyszukiwania", "INTEGER NOT NULL DEFAULT 0");
   /* Znaczniki pomiaru Copilota — patrz `copilot_wywolanie` w `schema.sql`.
-     Stare wiersze mają NULL, czyli „nie wiemy”, i to jest o nich prawda:
-     wersji, źródła ani kodu nikt wtedy nie zapisywał. Zero udawałoby pomiar. */
+     NULL znaczy „nie wiemy”; zero udawałoby pomiar. */
   for (const [kol, typ] of [
     ["kod_bledu", "TEXT"], ["wersja_instrukcji", "TEXT"], ["zrodlo", "TEXT"],
     ["rund", "INTEGER"], ["narzedzi", "INTEGER"], ["twierdzen", "INTEGER"],
@@ -272,9 +236,7 @@ export function migrate(database: DatabaseSync) {
     ["kategoria", "TEXT"],
   ] as const) addColumn("copilot_wywolanie", kol, typ);
   /* Wejście szkicu i dopytania — patrz `copilot_wejscie` w `schema.sql`.
-     Tabela nowa, więc ta linia jest dla istniejących instalacji. Stare
-     wywołania nie mają wierszy i to jest o nich prawda: nikt wtedy wejścia
-     nie zapisywał. */
+     Ta linia jest dla istniejących instalacji. */
   database.exec(`CREATE TABLE IF NOT EXISTS copilot_wejscie (
     id                INTEGER PRIMARY KEY AUTOINCREMENT,
     wywolanie_id      INTEGER UNIQUE REFERENCES copilot_wywolanie(id) ON DELETE SET NULL,
@@ -296,39 +258,23 @@ export function migrate(database: DatabaseSync) {
     wynik_sit         TEXT)`);
   database.exec("CREATE INDEX IF NOT EXISTS ix_copilot_wejscie_at ON copilot_wejscie(at)");
   database.exec("CREATE INDEX IF NOT EXISTS ix_copilot_wejscie_rozmowa ON copilot_wejscie(conversation_id)");
-  /* Treść oferty dla Copilota (0.253.0) — patrz `offer_snapshot`. Wiersze
-     sprzed tego wydania mają NULL w `tresc_synced_at`, czyli „nie pytaliśmy
-     jeszcze"; dociągną się leniwie, przy pierwszym szkicu pod tą ofertą. */
+  /* Treść oferty dla Copilota — patrz `offer_snapshot`. NULL w
+     `tresc_synced_at` znaczy „nie pytaliśmy jeszcze". */
   for (const kol of ["opis", "parametry_json", "pasuje_do_json", "tresc_synced_at"]) {
     addColumn("offer_snapshot", kol, "TEXT");
   }
-  /* Znacznik zbiórki „Pasuje do" ze wszystkich ofert — patrz `offer_snapshot`
-     w `schema.sql`. Stare wiersze mają NULL, czyli „jeszcze nie zbierane". */
+  /* Znacznik zbiórki „Pasuje do" ze wszystkich ofert — patrz `offer_snapshot`. */
   addColumn("offer_snapshot", "pasuje_do_zebrano_at", "TEXT");
-  /* Indeks kodów producenta dla zdjęć kartotek — patrz `offer_snapshot`
-     w `schema.sql`. Stare wiersze mają NULL, czyli „nie z naszej listy"
-     i „nie pytaliśmy o kod", więc pierwszy przebieg biura je dociągnie. */
+  /* Indeks kodów producenta dla zdjęć kartotek — patrz `offer_snapshot`. */
   for (const kol of ["nasza_lista_at", "kod_producenta", "kod_producenta_at", "kod_producenta_blad_at"]) {
     addColumn("offer_snapshot", kol, "TEXT");
   }
-  /* Droga dopasowania zdjęcia — patrz `zdjecie_oferty_wybor`. Stare wybory
-     mają NULL, choć wszystkie szły po sygnaturze: nie dopisujemy faktu,
-     którego wiersz sam nie zapisał. */
+  /* Droga dopasowania zdjęcia — patrz `zdjecie_oferty_wybor`. Starym wyborom
+     nie dopisujemy faktu, którego wiersz sam nie zapisał. */
   addColumn("zdjecie_oferty_wybor", "po", "TEXT");
-  /* Werdykt reklamacji (przyrost trzeci) — patrz `reklamacja_klienta`
-     w `schema.sql`. Tabela stoi na produkcji od 0.222.0, więc kolumny dochodzą
-     migracją; stare sprawy mają NULL, czyli „werdykt nie wyszedł stąd" — i to
-     jest prawda o każdej sprawie rozstrzygniętej w Centrum Sprzedaży. `CHECK`
-     z PEŁNYM zbiorem od razu (blizna 0.135.0), ten sam co w `schema.sql`. */
-  /* Znak urwanej rozmowy (0.273.0) — patrz `reklamacja_klienta` w `schema.sql`.
-     Tabela stoi na produkcji od 0.222.0, więc kolumna dochodzi migracją. Zero
-     dla starych wierszy znaczy „nie urwaliśmy", czyli dokładnie to, co było
-     prawdą do tego wydania: nikt nigdy nie prosił o drugą stronę rozmowy. */
+  /* Znak urwanej rozmowy — patrz `reklamacja_klienta` w `schema.sql`. */
   addColumn("reklamacja_klienta", "czat_urwany", "INTEGER NOT NULL DEFAULT 0");
-  /* Tożsamość prowadzącego sprawę (0.278.0) — patrz `reklamacja_klienta`
-     w `schema.sql`. Do tej pory znacznik był SAMYM IMIENIEM, a przełącznik
-     porównywał łańcuchy. Dwie osoby o tym samym imieniu zdejmowały sobie
-     nawzajem znacznik i nikt tego nie widział.
+  /* Tożsamość prowadzącego sprawę — patrz `reklamacja_klienta` w `schema.sql`.
 
      Wsteczne wypełnienie dopasowuje imię do `app_user.name` i celowo omija
      imiona NIEJEDNOZNACZNE: konto wskazane zgadywaniem byłoby gorsze od
@@ -341,35 +287,21 @@ export function migrate(database: DatabaseSync) {
     )
     WHERE prowadzi IS NOT NULL AND prowadzi_user_id IS NULL
       AND (SELECT count(*) FROM app_user u WHERE u.name = reklamacja_klienta.prowadzi) = 1`);
-  /* Data zamówienia z ładunku sprawy (0.282.0) — patrz `reklamacja_klienta`
-     w `schema.sql`. Zastane wiersze mają NULL i wypełnią się przy najbliższej
-     synchronizacji: zapis sprawy nadpisuje tę kolumnę przy KAŻDYM przebiegu,
-     nie tylko przy pierwszym poznaniu sprawy. */
+  /* Data zamówienia z ładunku sprawy — patrz `reklamacja_klienta`. NULL
+     wypełni najbliższa synchronizacja, bo zapis sprawy nadpisuje tę kolumnę
+     przy KAŻDYM przebiegu. */
   addColumn("reklamacja_klienta", "zamowienie_at", "TEXT");
-  /* Droga powrotna z notatki (0.280.0) — patrz `reklamacja_klienta`
-     w `schema.sql`. Zastane wiersze mają NULL w `notatka_poprzednia`, czyli
-     „nie ma do czego wracać", i to jest o nich prawda: przed tym wydaniem
-     poprzedniego zdania nikt nigdzie nie zapisywał. `notatka_przez` też jest
-     puste — autora zastanej notatki nie da się odtworzyć, bo dziennik niósł
-     samą długość. */
+  /* Droga powrotna z notatki — patrz `reklamacja_klienta` w `schema.sql`.
+     NULL w `notatka_poprzednia` znaczy „nie ma do czego wracać". */
   addColumn("reklamacja_klienta", "notatka_poprzednia", "TEXT");
   addColumn("reklamacja_klienta", "notatka_at", "TEXT");
   addColumn("reklamacja_klienta", "notatka_przez", "TEXT");
   addColumn("reklamacja_klienta", "notatka_user_id", "INTEGER REFERENCES app_user(user_id)");
-  /* Rada maszyny w karcie faktów (0.276.0) — patrz `reklamacja_karta`
-     w `schema.sql`. TE KOLUMNY MIAŁY NIE POTRZEBOWAĆ MIGRACJI i to był błąd,
-     za który zapłacił właściciel: plan 0.276.0 założył, że tabela z 0.275.0
-     „na produkcji jeszcze nie stoi". Stała. `CREATE TABLE IF NOT EXISTS` nie
-     dokłada kolumn do tabeli, która już jest, więc wdrożenie 0.276.0 na bazie
-     po 0.275.0 wywracało KAŻDE rozpoznanie sprawy zdaniem „table
-     reklamacja_karta has no column named rekomendacja".
+  /* Rada maszyny i mapa zdjęć w karcie faktów — patrz `reklamacja_karta`.
 
      Zasada jest bez wyjątków: kolumna dołożona do tabeli, która wyszła
-     w JAKIMKOLWIEK wydaniu, dostaje `addColumn`. Wiek tabeli nie jest
-     argumentem — nie wiemy, które wydanie wdrożono. */
-  /* Mapa zdjęć przy karcie (0.283.0) — patrz `reklamacja_karta`
-     w `schema.sql`. Karty sprzed tego wydania mają pustą listę, czyli
-     prawdę o nich: powstały, zanim Copilot zobaczył pierwsze zdjęcie. */
+     w JAKIMKOLWIEK wydaniu, dostaje `addColumn`. `CREATE TABLE IF NOT EXISTS`
+     nie dokłada kolumn, a nie wiemy, które wydanie wdrożono. */
   addColumn("reklamacja_karta", "zdjecia", "TEXT NOT NULL DEFAULT '[]'");
   addColumn("reklamacja_karta", "rekomendacja", "TEXT");
   addColumn("reklamacja_karta", "pewnosc", "TEXT");
@@ -379,12 +311,13 @@ export function migrate(database: DatabaseSync) {
   addColumn("reklamacja_karta", "ocena",
     "TEXT CHECK (ocena IS NULL OR ocena IN ('trafna','nietrafna'))");
   addColumn("reklamacja_karta", "ocena_at", "TEXT");
-  /* Księga Copilota zna od 0.275.0 także sprawy posprzedażowe. `conversation_id`
-     się do tego nie nadaje: reklamacja nie ma wiersza w `conversation`, a klucz
-     obcy wywróciłby zapis. Tabela stoi na produkcji od etapu F, więc kolumna
-     dochodzi migracją; stare wiersze mają NULL, czyli „to było o rozmowie". */
+  /* Księga Copilota zna także sprawy posprzedażowe. `conversation_id` się do
+     tego nie nadaje: reklamacja nie ma wiersza w `conversation`. NULL znaczy
+     „to było o rozmowie". */
   addColumn("copilot_wywolanie", "reklamacja_id",
     "INTEGER REFERENCES reklamacja_klienta(id) ON DELETE SET NULL");
+  /* Werdykt reklamacji — patrz `reklamacja_klienta`. NULL znaczy „werdykt nie
+     wyszedł stąd". `CHECK` z PEŁNYM zbiorem, ten sam co w `schema.sql`. */
   addColumn("reklamacja_klienta", "werdykt", `TEXT CHECK (werdykt IS NULL OR werdykt IN (
     'ACCEPTED_REPAIR','ACCEPTED_REFUND','ACCEPTED_EXCHANGE','ACCEPTED_PARTIAL_REFUND',
     'REJECTED_ADDITIONAL_REQUIREMENTS_NOT_COMPLETED','REJECTED_PRODUCT_NOT_RETURNED',
@@ -402,104 +335,80 @@ export function migrate(database: DatabaseSync) {
     "TEXT CHECK (zwrot_towaru IS NULL OR zwrot_towaru IN ('wymagany','niewymagany'))");
   addColumn("reklamacja_klienta", "zwrot_towaru_at", "TEXT");
   addColumn("reklamacja_klienta", "ilosc", "INTEGER");
-  /* Prośba o zakończenie dyskusji (0.245.0) — patrz `reklamacja_klienta`
-     w `schema.sql`. WŁASNE kolumny, nie `werdykt_*`: werdykt rozstrzyga
-     reklamację, a `END_REQUEST` jest prośbą w dyskusji i niczego nie zamyka
-     sam. Stare wiersze mają NULL, czyli „o zakończenie nikt stąd nie prosił". */
+  /* Prośba o zakończenie dyskusji — patrz `reklamacja_klienta` w `schema.sql`. */
   addColumn("reklamacja_klienta", "zakonczenie_status", `TEXT CHECK (zakonczenie_status IS NULL OR
     zakonczenie_status IN ('sent','send_uncertain'))`);
   addColumn("reklamacja_klienta", "zakonczenie_at", "TEXT");
   addColumn("reklamacja_klienta", "zakonczenie_przez", "TEXT");
   addColumn("reklamacja_klienta", "zakonczenie_user_id",
     "INTEGER REFERENCES app_user(user_id)");
-  /* Typ wiadomości w kolejce odpowiedzi — tabela z 0.224.0 stoi na produkcji.
-     Stare próby to zwykłe wiadomości, stąd `DEFAULT 'REGULAR'`. */
+  /* Typ wiadomości w kolejce odpowiedzi. Stare próby to zwykłe wiadomości,
+     stąd `DEFAULT 'REGULAR'`. */
   addColumn("reklamacja_outbox", "typ", `TEXT NOT NULL DEFAULT 'REGULAR' CHECK (typ IN
     ('REGULAR','RETURN_REQUIRED_SELLER_LABEL','RETURN_REQUIRED_CUSTOM','RETURN_NOT_REQUIRED'))`);
-  /* Status zwrotu po stronie Allegro (0.164.0). Bez `CHECK` — schemat Allegro
+  /* Status zwrotu po stronie Allegro. Bez `CHECK` — schemat Allegro
      wymienia wartości słownie i nie zamyka ich enumem, a nieznana wartość ma
      przejść, nie wywrócić synchronizację. */
   addColumn("zwrot_klienta", "status_allegro", "TEXT");
   addColumn("zwrot_klienta", "rozliczony_allegro_at", "TEXT");
-  /* Kiedy ostatnio pytaliśmy Allegro o wypłatę tego zwrotu (0.506.1). Kolejka
+  /* Kiedy ostatnio pytaliśmy Allegro o wypłatę tego zwrotu. Kolejka
      sprawdzania kręci się po tej kolumnie — powód przy `zwrotyDoSprawdzeniaWyplaty`. */
   addColumn("zwrot_klienta", "wyplata_sprawdzono_at", "TEXT");
-  /* Ile zwrotów Allegro miało jeszcze do oddania, gdy przebieg się skończył
-     (0.209.0). Bez tej liczby urwanie na limicie stron było CICHE: przebieg
-     kończył się sukcesem, kursor szedł naprzód, a zwroty spoza dziesiątej
-     strony nie wracały nigdy. `NULL` znaczy „nie wiem", nie „zero". */
+  /* Ile zwrotów Allegro miało jeszcze do oddania — patrz
+     `allegro_zwroty_sync_state`. `NULL` znaczy „nie wiem", nie „zero". */
   addColumn("allegro_zwroty_sync_state", "pozostalo", "INTEGER");
-  /* Znacznik naszej autoodpowiedzi (0.227.0) — patrz `message` w `schema.sql`
+  /* Znacznik naszej autoodpowiedzi — patrz `message` w `schema.sql`
      i `oznaczAutoodpowiedziWZastanych` niżej, które wypełnia go wstecz. Stare
      wiersze wchodzą z zerem i backfill je poprawia w tym samym przebiegu. */
   addColumn("message", "auto_odpowiedz", "INTEGER NOT NULL DEFAULT 0");
-  /* Zejście oceny „przecena" (0.209.0).
+  /* Zejście starej oceny „przecena".
 
      MUSI STAĆ PRZED przebudową `zwrot_klienta_pozycja` niżej w tym samym
-     przebiegu. Nowa definicja tamtej tabeli nie zna już `przecena`, więc
-     `INSERT ... SELECT` przepisujący wiersz z tą oceną wywróciłby CHECK
-     i całą migrację — a `migrate()` woła KAŻDY proces, więc instalacja nie
-     wstałaby wcale. To ta sama blizna co przy przekluczaniu pozycji.
+     przebiegu. Nowa definicja tamtej tabeli nie zna `przecena`, więc
+     `INSERT ... SELECT` z tą oceną wywróciłby CHECK i całą migrację.
 
-     Ocena schodzi na `NULL`, nie na „stan" ani „utylizacja". Obie tamte są
-     decyzją o towarze, której nikt nie podjął; `NULL` mówi prawdę — pozycja
-     czeka na ocenę i wróci do kubełka „do oceny". Zwrotu zamkniętego to nie
-     odemknie: `kubelekZwrotu` rozstrzyga stany końcowe pierwsze.
+     Ocena schodzi na `NULL`, nie na „stan" ani „utylizacja": pozycja czeka
+     na ocenę i wróci do kubełka „do oceny".
 
-     KOLUMNY PYTAMY, zanim ją odczytamy. Baza sprzed 0.156.0 nie ma jeszcze
-     `ocena` — dokłada ją dopiero przebudowa niżej — a `UPDATE` na nieistniejącej
-     kolumnie wywraca całą migrację i z nią start każdego procesu. Tam nie ma
-     zresztą czego czyścić: bez kolumny nie było jak zapisać przeceny. */
+     KOLUMNY PYTAMY, zanim ją odczytamy: stara baza nie ma jeszcze `ocena`,
+     a `UPDATE` na nieistniejącej kolumnie wywraca całą migrację. */
   const maOcene = (database.prepare("PRAGMA table_info(zwrot_klienta_pozycja)")
     .all() as Array<{ name: string }>).some((c) => c.name === "ocena");
   if (maOcene) {
     database.exec(`UPDATE zwrot_klienta_pozycja
       SET ocena=NULL, ocena_at=NULL, ocena_przez=NULL WHERE ocena='przecena'`);
   }
-  /* Odhaczenie wzmianki (0.160.0). Do tego wydania `conversation_mention`
-     mówiła tylko „ktoś cię wymienił" i nie znała odpowiedzi na „czy już się
-     tym zająłeś" — a bez niej skrzynka wzmianek pokazywałaby w kółko to samo. */
+  /* Odhaczenie wzmianki — patrz `conversation_mention` w `schema.sql`. */
   addColumn("conversation_mention", "seen_at", "TEXT");
-  /* Zdjęcie listingowe oferty (0.213.0). `offer_snapshot` stoi u klienta od
-     0.178.0, więc adres musi dojść migracją. `NULL` znaczy „Allegro nie podało
-     adresu" — pole jest w specyfikacji opcjonalne — a nie „oferta bez zdjęcia";
-     wiersze sprzed tego wydania uzupełni najbliższy przebieg synchronizacji,
-     bo warunek świeżości w `brakujaceOferty` i tak przepuszcza dobowe. */
+  /* Zdjęcie listingowe oferty — patrz `offer_snapshot` w `schema.sql`. */
   addColumn("offer_snapshot", "primary_image_url", "TEXT");
   /* Indeks stoi TUTAJ, nie w `schema.sql`: tamten plik wykonuje się przed
-     migracją, więc na bazie sprzed 0.160.0 wywróciłby start na nieistniejącej
+     migracją, więc na starej bazie wywróciłby start na nieistniejącej
      kolumnie. Skrzynka wzmianek pyta zawsze o jednego użytkownika i najczęściej
      o same nieodhaczone. */
   database.exec(`CREATE INDEX IF NOT EXISTS ix_conversation_mention_user
     ON conversation_mention(user_id, seen_at)`);
-  /* Status rozmowy (§7, 0.158.0). `new` jako domyślny opisuje prawdę
-     o rozmowach zastanych: przyjechały z synchronizacji i nikt ich nie tknął.
-     `CHECK` powtarza listę ze `schema.sql`, bo baza założona przed tym
-     wydaniem dostaje kolumnę TĘDY i inaczej stałaby bez strażnika. */
+  /* Status rozmowy (§7). `new` jako domyślny opisuje rozmowy zastane.
+     `CHECK` powtarza listę ze `schema.sql`, bo stara baza dostaje kolumnę
+     TĘDY i inaczej stałaby bez strażnika. */
   addColumn("conversation", "status", `TEXT NOT NULL DEFAULT 'new' CHECK(status IN
     ('new','open','waiting_for_customer','waiting_for_internal','snoozed',
      'resolved','closed','spam'))`);
   /* Do kiedy odłożona. Osobno od statusu, bo `snoozed` bez terminu byłby
      stanem, z którego nic nie wyprowadza — a §7 nie zna „odłożona na zawsze". */
   addColumn("conversation", "snoozed_until", "TEXT");
-  /* Priorytet rozmowy (§10.2, 0.181.0). `CHECK` powtarza listę ze `schema.sql`
-     z tego samego powodu co przy statusie: baza sprzed tego wydania dostaje
-     kolumnę TĘDY i inaczej stałaby bez strażnika. */
+  /* Priorytet rozmowy (§10.2). `CHECK` z tego samego powodu co przy statusie. */
   addColumn("conversation", "priorytet",
     "TEXT NOT NULL DEFAULT 'normalny' CHECK(priorytet IN ('normalny','pilny'))");
-  /* Znacznik „sprawa reklamacyjna" (0.390.0) — powód przy kolumnie
-     w `schema.sql`. Baza sprzed tego wydania dostaje go TĘDY; zero znaczy
-     „nikt jeszcze nie oznaczył", a nie „to nie reklamacja". */
+  /* Znacznik „sprawa reklamacyjna" — powód przy kolumnie w `schema.sql`. */
   addColumn("conversation", "reklamacyjna", "INTEGER NOT NULL DEFAULT 0");
-  /* Ręczne „Otwórz ponownie" (23 września 2026). Zakończenie liczy się też
+  /* Ręczne „Otwórz ponownie". Zakończenie liczy się też
      SAMO, przy odczycie — bez tego znacznika otwarta ręką rozmowa po dwóch
      dniach ciszy zakończyłaby się znowu przy następnym odświeżeniu, a agent
      nie miałby jak jej zatrzymać. Znacznik działa do następnej prawdziwej
      wiadomości; potem reguły wracają same. */
   addColumn("conversation", "otwarta_recznie_at", "TEXT");
-  /* Status przesyłki do klienta (0.393.0) — powód przy kolumnach w
-     `schema.sql`. Baza sprzed tego wydania dostaje je tędy; NULL wszędzie
-     znaczy „jeszcze nie pytaliśmy", a nie „przesyłki nie ma". */
+  /* Status przesyłki do klienta — powód przy kolumnach w `schema.sql`. */
   for (const [kol, typ] of [
     ["przesylka_waybill", "TEXT"], ["przesylka_przewoznik", "TEXT"],
     ["przesylka_status", "TEXT"], ["przesylka_dostarczono_at", "TEXT"],
@@ -509,49 +418,23 @@ export function migrate(database: DatabaseSync) {
      znaczy „Allegro nie podało albo zamówienia od tej pory nie czytaliśmy". */
   addColumn("zamowienie_klienta", "realizacja_status", "TEXT");
   addColumn("zamowienie_klienta", "nadanie_do", "TEXT");
-  /* Decyzje biura przy zwrocie (0.156.0). Do niego kolejka bramek routowała
-     po kolumnach, których nic nie zapisywało — każdy zwrot stał w DO DECYZJI
-     na zawsze. Te dwie kolumny domykają zapis kwoty: co weszło do sumy. */
+  /* Decyzje biura przy zwrocie: co weszło do sumy kwoty. */
   addColumn("zwrot_klienta", "kwota_dostawa_grosze", "INTEGER");
   addColumn("zwrot_klienta_pozycja", "w_zwrocie", "INTEGER NOT NULL DEFAULT 0");
-  /* Cztery rzeczy, o które prosiło biuro zwrotów (0.169.0). Wszystkie
-     przyjeżdżały z Allegro od początku i wszystkie były wyrzucane przy
-     mapowaniu — pracownik szukał ich potem w panelu sprzedawcy.
-
-     Login kupującego stoi PRZY ZWROCIE, nie tylko przy zamówieniu: zwrot
-     niesie go zawsze (sonda: 100 na 100), a zamówienie bywa jeszcze
-     niepobrane. To jedyna dana osobowa, którą polityka danych zwrotów
-     dopuszcza wprost — imienia i nazwiska Allegro przy zwrocie nie podaje
-     wcale, a przy zamówieniu ich nie mapujemy.
-
-     Przewoźnik bez `CHECK`: Allegro nie publikuje zamkniętej listy, a sonda
-     złapała `UNKNOWN`, którego nie ma w żadnej specyfikacji. */
-  /* Potrącenie za utratę wartości (0.170.0). Do tego wydania kwota do oddania
-     była binarna per pozycja: cała cena albo nic. Towar wracający używany nie
-     miał jak zjechać w dół, a to jest codzienność biura zwrotów.
-
-     Kwota, nie procent — klient widzi złotówki. Powód obowiązkowy, bo to jego
-     treść tłumaczy klientowi, czemu dostał mniej. */
-  /* Paczki nieodebrane (0.172.0). Allegro nie zna takiego bytu — `CustomerReturn`
-     powstaje z DEKLARACJI klienta, a nieodebrana przesyłka wraca sama. Pieniądze
-     i tak trzeba oddać, więc idzie tą samą kolejką, ale z jawnym oznaczeniem.
-
-     `CHECK` dokłada się TĄ drogą, bo baza sprzed tego wydania inaczej stałaby
-     bez strażnika — ta sama lekcja co przy statusie rozmowy w 0.158.0. */
+  /* Paczki nieodebrane — patrz `zwrot_klienta.zrodlo`. `CHECK` dokłada się
+     TĄ drogą z tego samego powodu co przy statusie rozmowy. */
   addColumn("zwrot_klienta", "zrodlo",
     "TEXT NOT NULL DEFAULT 'allegro' CHECK(zrodlo IN ('allegro','nieodebrana'))");
-  /* Numer listu WYŁĄCZNIE dla paczek nieodebranych — świadomy wyjątek od
-     polityki z 0.163.0. Tam numer leży w kopii odpowiedzi Allegro; tu takiej
-     kopii nie ma, więc numer z etykiety jest jedynym uchwytem do skanu. */
+  /* Numer listu WYŁĄCZNIE dla paczek nieodebranych — patrz
+     `zwrot_klienta.waybill`. */
   addColumn("zwrot_klienta", "waybill", "TEXT");
   addColumn("zwrot_klienta", "notatka", "TEXT");
-  /* Pozycja dopisana przez biuro (0.184.0). `CHECK` tą samą drogą co przy
-     `zwrot_klienta.zrodlo` — baza sprzed wydania stałaby inaczej bez
-     strażnika. Wartość domyślna `allegro` jest tu jedyną poprawną: wszystko,
-     co stoi w bazie przed tą migracją, przyszło ze zgłoszenia klienta. */
+  /* Pozycja dopisana przez biuro. `CHECK` tą samą drogą co przy
+     `zwrot_klienta.zrodlo`. Domyślne `allegro`, bo zastane pozycje przyszły
+     ze zgłoszenia klienta. */
   addColumn("zwrot_klienta_pozycja", "zrodlo",
     "TEXT NOT NULL DEFAULT 'allegro' CHECK(zrodlo IN ('allegro','biuro'))");
-  /* Ręczne przeniesienie na regał outletowy (0.375.0). Puste przy ocenie
+  /* Ręczne przeniesienie na regał outletowy. Puste przy ocenie
      „outlet" znaczy „czeka" — na tym stoi lista robocza biura. */
   addColumn("zwrot_klienta_pozycja", "outlet_at", "TEXT");
   addColumn("zwrot_klienta_pozycja", "outlet_przez", "TEXT");
@@ -577,39 +460,27 @@ export function migrate(database: DatabaseSync) {
   addColumn("zwrot_klienta_pozycja", "potracenie_powod", "TEXT");
   addColumn("zwrot_klienta_pozycja", "potracenie_at", "TEXT");
   addColumn("zwrot_klienta_pozycja", "potracenie_przez", "TEXT");
-  /* Doręczenie paczki zwrotnej (0.187.0). Data z trackingu przewoźnika, nie
+  /* Doręczenie paczki zwrotnej. Data z trackingu przewoźnika, nie
      z obiektu zwrotu — ten podaje wyłącznie moment nadania. */
   addColumn("zwrot_klienta", "dostarczono_at", "TEXT");
   addColumn("zwrot_klienta", "przesylka_status", "TEXT");
-  /* Paczka nieodebrana LEŻY U NAS w chwili rejestracji — biuro wpisuje ją
-     dopiero wtedy, gdy trzyma karton w ręku (0.172.0). Trackingu dla niej nie
-     ma i nie będzie: przewoźnika nie znamy, a Allegro takiego zwrotu nie zna
-     wcale. Dlatego data powrotu jest tu równa dacie rejestracji — to niezmiennik,
-     a nie jednorazowa łatka, więc stoi w migracji i przy każdym starcie
-     domyka wiersze, którym jej brakuje. Bez niego panel pytał „czy dotarła"
-     o karton stojący na biurku operatora. */
+  /* Paczka nieodebrana LEŻY U NAS w chwili rejestracji — biuro wpisuje ją,
+     gdy trzyma karton w ręku, a trackingu dla niej nie ma. Data powrotu
+     równa się więc dacie rejestracji. To niezmiennik, nie jednorazowa łatka,
+     więc domyka wiersze przy każdym starcie. */
   database.exec(`UPDATE zwrot_klienta SET dostarczono_at = paczka_at
                   WHERE zrodlo = 'nieodebrana' AND dostarczono_at IS NULL
                     AND paczka_at IS NOT NULL`);
   addColumn("zwrot_klienta", "kupujacy_login", "TEXT");
   addColumn("zwrot_klienta", "przewoznik", "TEXT");
-  /* ── NAZWA ODBIORCY Z NAKLEJKI (0.367.0) ───────────────────────────────
-     Decyzja właściciela, świadome zdjęcie fragmentu polityki danych. Paczki
-     nadaje klient albo kurier, więc numeru listu z wracającego kartonu nasz
-     system NIGDY nie widział i pierwszy skan takiej paczki musi chybić —
-     żadna synchronizacja tego nie naprawi. Zostaje to, co jeszcze jest na
-     naklejce: nazwa odbiorcy i przewoźnik.
-
-     JEDNA KOLUMNA, nie dwie. Szukanie nie rozróżnia imienia od nazwiska,
-     a jedna kolumna to jedna rzecz do pilnowania przy polityce danych.
-     Ulica, miasto, kod pocztowy, telefon i e-mail zostają zablokowane —
-     zdjęcie kończy się na nazwie. Pilnują tego testy przy mapowaniu
-     zamówień i lista zakazanych członów w `migracja-zwrotow.test.ts`. */
+  /* Nazwa odbiorcy z naklejki — powód przy kolumnie w `schema.sql`. Przy
+     zwrocie zostaje sama nazwa; pilnuje tego lista zakazanych członów
+     w `migracja-zwrotow.test.ts`. */
   addColumn("zwrot_klienta", "odbiorca_nazwa", "TEXT");
   addColumn("zamowienie_klienta", "odbiorca_nazwa", "TEXT");
-  /* ── Reszta adresu dostawy (0.422.0) ─────────────────────────────────────
-     Blokada zdjęta decyzją właściciela; powód i zakres w
-     `docs/obsluga-klienta.md`. Kolumny dokładamy TYLKO przy zamówieniu —
+  /* ── Reszta adresu dostawy ───────────────────────────────────────────────
+     Decyzja właściciela; powód i zakres w `docs/obsluga-klienta.md`.
+     Kolumny dokładamy TYLKO przy zamówieniu —
      zwrot bierze adres z zamówienia, więc druga kopia rozjechałaby się przy
      pierwszej zmianie adresu u Allegro. */
   addColumn("zamowienie_klienta", "odbiorca_telefon", "TEXT");
@@ -617,29 +488,20 @@ export function migrate(database: DatabaseSync) {
   addColumn("zamowienie_klienta", "odbiorca_ulica", "TEXT");
   addColumn("zamowienie_klienta", "odbiorca_miasto", "TEXT");
   addColumn("zamowienie_klienta", "odbiorca_kod", "TEXT");
-  /* Dokument sprzedaży z Subiekta przy zwrocie (0.174.0). Numer trzymamy
+  /* Dokument sprzedaży z Subiekta przy zwrocie. Numer trzymamy
      SNAPSHOTEM, bo `sgt_faktura` czyści się przy każdym imporcie i dokument
      wypada z okna — powiązanie musi przeżyć własne źródło. */
   addColumn("zwrot_klienta", "faktura_dok_id", "INTEGER");
   addColumn("zwrot_klienta", "faktura_numer", "TEXT");
   addColumn("zwrot_klienta", "faktura_typ", "TEXT");
-  /* `CHECK` tą samą drogą co przy `zrodlo` — baza sprzed wydania stałaby
-     inaczej bez strażnika. */
+  /* `CHECK` tą samą drogą co przy `zrodlo`. */
   addColumn("zwrot_klienta", "faktura_zrodlo",
     "TEXT CHECK(faktura_zrodlo IN ('numer','reczne'))");
   addColumn("zwrot_klienta", "faktura_at", "TEXT");
   addColumn("zwrot_klienta", "faktura_przez", "TEXT");
-  /* ── Zapis do Allegro: zwrot pieniędzy i odmowa (0.190.0) ────────────────
-     Do 0.190.0 z tego systemu wychodziła do Allegro wiadomość do klienta
-     i wniosek o rabat. Pieniądze oddawał człowiek w panelu Allegro, a panel
-     zapisywał sam FAKT — czyli kończył pracę tam, gdzie §25 obiecuje nie
-     zaglądać.
-
-     `zwrot_pieniedzy_command_id` powstaje RAZ na zwrot. Allegro daje przy tej
-     końcówce idempotencję po `commandId` i to jest jedyne zabezpieczenie przed
-     drugim przelewem, gdy sieć zerwie się po wysłaniu żądania, a przed
-     odpowiedzią. Nowy identyfikator przy ponowieniu zamieniłby ostrożność
-     w podwójny zwrot cudzych pieniędzy.
+  /* ── Zapis do Allegro: zwrot pieniędzy i odmowa ──────────────────────────
+     Idempotencja `zwrot_pieniedzy_command_id` — patrz `zwrot_klienta`
+     w `schema.sql`.
 
      `platnosc_id` idzie do `zamowienie_klienta`, bo tam jest jego źródło:
      `payment.id` z formularza zakupowego. Zwrot go nie niesie. */
@@ -655,41 +517,26 @@ export function migrate(database: DatabaseSync) {
   addColumn("zwrot_klienta", "odmowa_przez", "TEXT");
   addColumn("zwrot_klienta", "odmowa_user_id", "INTEGER");
   addColumn("zamowienie_klienta", "platnosc_id", "TEXT");
-  /* Forma płatności i żądanie faktury (0.169.0). Przy zwrocie to nie
-     ciekawostka: `CASH_ON_DELIVERY` znaczy, że nie ma karty, na którą oddać
-     pieniądze, a `faktura_zadana` mówi, czy do zwrotu trzeba korekty faktury,
-     czy paragonu.
-
-     `faktura_zadana` to SAMA FLAGA. Dane firmy z `invoice.address` niosą
-     ulicę i miasto, a adresy nie przechodzą przez mapowanie — ta reguła nie
-     ma wyjątku i tutaj też go nie dostaje. */
+  /* Forma płatności i żądanie faktury — patrz `zamowienie_klienta`. */
   addColumn("zamowienie_klienta", "platnosc_typ", "TEXT");
   addColumn("zamowienie_klienta", "platnosc_at", "TEXT");
   addColumn("zamowienie_klienta", "faktura_zadana", "INTEGER");
-  /* Powód porażki SŁOWEM, nie tylko kodem HTTP (0.152.0). Przez sześćdziesiąt
-     dwa przebiegi panel mówił „failed", bo skrzynka stała na błędzie BEZ kodu
-     („Konto Allegro niepołączone — idź do biura"). Serwer znał to zdanie
-     i pisał je do dziennika; na ekran nie trafiało nic. */
+  /* Powód porażki SŁOWEM, nie tylko kodem HTTP — patrz
+     `allegro_inbox_sync_state`. */
   addColumn("allegro_inbox_sync_state", "last_error_text", "TEXT");
-  /* Dno przejrzanej listy (0.164.1). Bez tej kolumny sufit stron musiałby
-     obowiązywać od pierwszego przebiegu — a wtedy instalacja z zaległością
-     większą niż sufit czytałaby w kółko te same 25 stron i nigdy nie zobaczyła
-     resztę. NULL na bazie zastanej jest poprawny: znaczy „zejdź raz do dna
-     bez sufitu", czyli dokładnie to, co robił kod do 0.164.0. */
+  /* Dno przejrzanej listy — patrz `allegro_inbox_sync_state.dno_at`. NULL
+     znaczy „zejdź raz do dna bez sufitu". */
   addColumn("allegro_inbox_sync_state", "dno_at", "TEXT");
-  /* Numer zamówienia wycięty z uwag dokumentu sprzedaży (0.175.0). Read-model
+  /* Numer zamówienia wycięty z uwag dokumentu sprzedaży. Read-model
      `sgt_faktura` czyści się przy imporcie, ale jego SCHEMAT zostaje — bez
      dostawki `INSERT` z nową kolumną wywracałby pierwszą synchronizację po
      aktualizacji. */
   addColumn("sgt_faktura", "zamowienie_z_uwag", "TEXT");
-  /* Dokument korygowany (0.201.0) — ten sam powód co wyżej: read-model czyści
+  /* Dokument korygowany — ten sam powód co wyżej: read-model czyści
      się przy imporcie, ale SCHEMAT zostaje, więc bez dostawki pierwszy INSERT
      po aktualizacji wywróciłby synchronizację. */
   addColumn("sgt_faktura", "koryguje_dok_id", "INTEGER");
-  /* Skąd wziął się numer korekty: `subiekt` = automat znalazł dokument
-     korygujący, `reczne` = człowiek przepisał. Ta sama zasada co przy
-     `faktura_zrodlo` — wybór człowieka nie ma udawać faktu z danych. */
-  /* Ile sztuk NAPRAWDĘ wróciło (0.212.0). `ilosc` niesie DEKLARACJĘ klienta
+  /* Ile sztuk NAPRAWDĘ wróciło. `ilosc` niesie DEKLARACJĘ klienta
      i nadpisuje ją synchronizator przy każdym takcie; tej kolumny nie rusza
      nic poza biurem.
 
@@ -701,14 +548,14 @@ export function migrate(database: DatabaseSync) {
      Rozjazd ilości sprawdza BIURO — decyzja właściciela: „biuro zajmuje się
      otwieraniem i procesowaniem zwrotów". */
   addColumn("zwrot_klienta_pozycja", "ilosc_zwrocona", "REAL");
+  /* Skąd wziął się numer korekty — patrz `zwrot_klienta.korekta_zrodlo`. */
   addColumn("zwrot_klienta", "korekta_zrodlo", "TEXT");
-  /* Ręczne zamknięcie zwrotu bez korekty. Stare wiersze mają NULL, czyli „nikt
-     tego zwrotu ręcznie nie zamykał". */
+  /* Ręczne zamknięcie zwrotu bez korekty. */
   addColumn("zwrot_klienta", "zamkniecie_reczne_at", "TEXT");
   addColumn("zwrot_klienta", "zamkniecie_reczne_przez", "TEXT");
   addColumn("zwrot_klienta", "zamkniecie_reczne_user_id", "INTEGER REFERENCES app_user(user_id)");
   addColumn("zwrot_klienta", "zamkniecie_reczne_powod", "TEXT");
-  /* ŚLAD PO PRZELEWIE ODDANYM POZA ALLEGRO (0.269.0). Przy pobraniu Allegro
+  /* ŚLAD PO PRZELEWIE ODDANYM POZA ALLEGRO. Przy pobraniu Allegro
      nigdy nie trzymało tych pieniędzy — wracają przelewem z banku firmy, więc
      `zwrot_pieniedzy_id` zostaje pusty i zwrot zamyka się bez śladu po
      wypłacie. Biuro zapisuje tu, że przelew poszedł: kiedy, kto i pod jakim
@@ -719,20 +566,13 @@ export function migrate(database: DatabaseSync) {
   addColumn("zwrot_klienta", "przelew_przez", "TEXT");
   addColumn("zwrot_klienta", "przelew_user_id", "INTEGER REFERENCES app_user(user_id)");
   addColumn("zwrot_klienta", "przelew_referencja", "TEXT");
-  /* NOTATKA BIURA PRZY ZWROCIE (0.313.0). Kolumna `notatka` istnieje od
-     0.172.0, ale wypełniała ją WYŁĄCZNIE rejestracja paczki nieodebranej —
-     przy zwrocie z Allegro nie było jak dopisać zdania o ustaleniach.
-
-     Poprzednia treść zostaje na wierszu, żeby zmianę dało się cofnąć: notatka
-     jest polem swobodnym, które nadpisuje ten, kto pisze ostatni. Ten sam
-     wzorzec co przy reklamacjach (0.280.0) i ta sama cena — jeden szczebel
-     wstecz, bez tabeli historii dla pola, którego nikt nie audytuje. */
+  /* NOTATKA BIURA PRZY ZWROCIE. Poprzednia treść zostaje na wierszu, żeby
+     zmianę dało się cofnąć — ten sam wzorzec co przy reklamacjach. */
   addColumn("zwrot_klienta", "notatka_poprzednia", "TEXT");
   addColumn("zwrot_klienta", "notatka_at", "TEXT");
   addColumn("zwrot_klienta", "notatka_przez", "TEXT");
   addColumn("zwrot_klienta", "notatka_user_id", "INTEGER REFERENCES app_user(user_id)");
-  /* PROWADZĄCY ZWROT (0.315.0). Decyzja właściciela z 13 września: zwrot ma
-     nosić znacznik „biorę to", tak samo jak reklamacja od 0.278.0.
+  /* PROWADZĄCY ZWROT: znacznik „biorę to", tak samo jak przy reklamacji.
 
      DWIE KOLUMNY NA JEDNĄ RZECZ i to jest świadome — ten sam wzór co przy
      `reklamacja_klienta`. `prowadzi` niesie imię i zostaje prawdą o tym, co
@@ -743,35 +583,26 @@ export function migrate(database: DatabaseSync) {
   addColumn("zwrot_klienta", "prowadzi", "TEXT");
   addColumn("zwrot_klienta", "prowadzi_user_id", "INTEGER REFERENCES app_user(user_id)");
   addColumn("zwrot_klienta", "prowadzi_at", "TEXT");
-  /* AUTOMAT WNIOSKÓW O RABAT (0.320.0) — tylko dla zwrotów zaciągniętych po
-     wdrożeniu. Decyzja właściciela: automat rusza na nowych, a zaległości
-     zostają przy ręcznym przycisku z 0.164.0.
-
-     Stempel idzie WYŁĄCZNIE w przebiegu dokładającym kolumnę. Bez niego
-     pierwszy takt po wdrożeniu wysłałby do Allegro serię żądań o wnioski dla
-     zwrotów sprzed miesięcy — część wróciłaby odmową, a odmowy nie da się
-     cofnąć jednym kliknięciem. Ten sam wzorzec i ta sama blizna co przy
-     powrocie kosza z bufora (`powrotKoszaPozaAplikacja`). */
+  /* AUTOMAT WNIOSKÓW O RABAT — tylko dla zwrotów zaciągniętych po wdrożeniu
+     (decyzja właściciela); zaległości zostają przy ręcznym przycisku. Powód
+     przy `rabatPozaAutomatem`. */
   rabatPozaAutomatem(database);
   zatrzasnijRozliczone(database);
   /* Konto autora zadania. `created_by` (nazwa) zostaje — to snapshot tego, co
      aplikacja wtedy wiedziała. Worker działa poza żądaniem, więc bez tej
      kolumny nie umiałby przypisać zdarzenia „zapis wszedł do Subiekta" do
-     konta, a nazwa nie jest tożsamością. Stare zadania mają NULL i tak
-     zostaje: zgadywanie po nazwie byłoby gorsze niż uczciwy brak. */
+     konta, a nazwa nie jest tożsamością. NULL zostaje, bo zgadywanie po
+     nazwie byłoby gorsze niż uczciwy brak. */
   addColumn("sfera_queue", "created_by_ref", "INTEGER");
-  /* Zadania istniejące przed odbudową obsługi klienta nie mają rozmowy,
-     z której pochodzą. NULL zachowuje tę prawdę; migracja nie zgaduje
-     powiązań po opisie ani dacie. */
+  /* Rozmowa, z której pochodzi zadanie. Migracja nie zgaduje powiązań po
+     opisie ani dacie. */
   addColumn("zadanie_terenowe", "conversation_id", "INTEGER REFERENCES conversation(id) ON DELETE SET NULL");
   addColumn("zadanie_terenowe", "message_id", "INTEGER REFERENCES message(id) ON DELETE SET NULL");
-  /* Model kanoniczny zaczyna być zasilany w 0.144.0. Wiadomość musi unieść
-     powiązanie z ofertą, a rozmowa flagę nieprzeczytanej — inaczej skrzynka
-     dalej musiałaby czytać surowe lądowisko Allegro. */
+  /* Wiadomość musi unieść powiązanie z ofertą, a rozmowa flagę
+     nieprzeczytanej — inaczej skrzynka czytałaby surowe lądowisko Allegro. */
   addColumn("message", "related_object_type", "TEXT");
   addColumn("message", "related_object_id", "TEXT");
-  /* Zamówienie przy wiadomości (0.166.0). Kolumna dochodzi do tabeli, która
-     stoi u klienta od 0.144.0, a jej treść dla starych wiadomości bierze się
+  /* Zamówienie przy wiadomości. Treść dla starych wiadomości bierze się
      z lądowiska — patrz `dosypZamowienieWiadomosci` niżej. */
   addColumn("message", "related_order_id", "TEXT");
   dosypZamowienieWiadomosci(database);
@@ -779,50 +610,29 @@ export function migrate(database: DatabaseSync) {
   addColumn("conversation", "assigned_user_id", "INTEGER REFERENCES app_user(user_id)");
   addColumn("conversation", "version", "INTEGER NOT NULL DEFAULT 1");
   addColumn("delivery", "source_mag_id", "INTEGER");
-  /* Zamknięcie dostawy jako rozłożonej POZA WERTIS (0.40.0). Kolumny są
-     nullowalne, więc dostawy zamknięte normalnie zostają nietknięte — a puste
+  /* Zamknięcie dostawy jako rozłożonej POZA WERTIS. Puste
      `closed_by` przy statusie `done` znaczy „domknęła się sama, gdy skończyły
      się pozycje", nie „nie wiadomo kto". */
   addColumn("delivery", "closed_by", "TEXT");
   addColumn("delivery", "powod_zamkniecia", "TEXT");
   // telemetria: który egzemplarz kolektora wygenerował zdarzenie
   addColumn("events", "device_id", "TEXT");
-  /* Kto prowadzi pytanie klienta (0.89.0). Tabela `pytanie` istnieje od
-     0.80.0, więc kolumny muszą dojść migracją — bazy z tamtego wydania nie
-     przechodzą przez CREATE TABLE. Nullowalne: sprawa bez prowadzącego jest
-     stanem normalnym, nie brakiem danych. */
-  /* `dosypIdZMaski` (0.128.0) ZESZŁO 24 września 2026. Wpisywało liczbę
-     z loginu `client:<liczba>` jako identyfikator kupującego, a to nie maska,
-     tylko login kupującego bez konta (`docs/allegro-ksztalt.md`). Tabela
-     `pytanie`, do której pisało, jest kasowana przy starcie, a kolumny nikt
-     nie czytał — zeszła martwa dosypka na fałszywym założeniu. */
   /* Konta pracowników (§7). `events.user_id` ZOSTAJE jako tekst — to snapshot
-     tego, co aplikacja wtedy wiedziała, i jedyny ślad po zdarzeniach sprzed
-     kont. Obok dochodzi `user_ref` wskazujące na app_user. Historii się nie
+     tego, co aplikacja wtedy wiedziała. Obok dochodzi `user_ref` wskazujące
+     na app_user. Historii się nie
      kasuje ani nie nadpisuje: zdarzenie, którego nie da się przypisać, zostaje
      z `user_ref = NULL`, bo to jest uczciwe, w odróżnieniu od zgadywania. */
   addColumn("events", "user_ref", "INTEGER");
-  /* Stan synchronizacji urósł w 0.147.0 o to, czego żąda §21 projektu panelu:
-     moment ostatniej PRÓBY i kod jej porażki. Bez nich panel umie powiedzieć
-     tylko „nie udało się", a agent nie wie, czy czekać, czy wołać admina. */
-  /* Kartoteka Subiekta przy pozycji zwrotu (0.152.0). `zwrot_klienta_pozycja`
-     stoi u klienta od 0.150.0, więc te kolumny muszą dojść migracją — bez
-     nich pozycja nie ma jak nieść zdjęcia, bo `zdjecie_cache` i
-     `zdjecie_wlasne` są kluczowane po `tw_id`.
-
-     `ALTER TABLE ... ADD COLUMN` w SQLite NIE przyjmuje klucza obcego, więc
-     `REFERENCES sgt_towar(tw_id) ON DELETE SET NULL` ze `schema.sql` obowiązuje
-     wyłącznie bazy założone od 0.152.0. Dla starszych zostaje sama kolumna
-     i to WYSTARCZA: `sgt_towar` jest read-modelem kasowanym przy każdym
-     imporcie, a twardy klucz obcy właśnie tam kładł kiedyś API (blizna
-     0.148.1). Wiszące `tw_id` odsiewa odczyt, który i tak sprawdza istnienie
-     towaru przed pokazaniem zdjęcia. */
+  /* Kartoteka Subiekta przy pozycji zwrotu — patrz `zwrot_klienta_pozycja`
+     w `schema.sql`. Zwykły INTEGER, bez klucza obcego do `sgt_towar`. */
   addColumn("zwrot_klienta_pozycja", "url", "TEXT");
   addColumn("zwrot_klienta_pozycja", "tw_id", "INTEGER");
   addColumn("zwrot_klienta_pozycja", "tw_symbol", "TEXT");
   addColumn("zwrot_klienta_pozycja", "tw_zrodlo", "TEXT");
   addColumn("zwrot_klienta_pozycja", "tw_at", "TEXT");
   addColumn("zwrot_klienta_pozycja", "tw_przez", "TEXT");
+  /* Moment ostatniej PRÓBY i kod jej porażki (§21 projektu panelu): agent ma
+     wiedzieć, czy czekać, czy wołać admina. */
   addColumn("allegro_inbox_sync_state", "last_attempt_at", "TEXT");
   addColumn("allegro_inbox_sync_state", "last_error_code", "INTEGER");
   addColumn("allegro_inbox_sync_state", "error_thread_count", "INTEGER NOT NULL DEFAULT 0");
@@ -838,9 +648,8 @@ export function migrate(database: DatabaseSync) {
      kolumny do tabeli, która już istnieje — bez tej linii istniejąca instalacja
      miałaby `sgt_magazyn` bez `nazwa` i import wywaliłby się na INSERT. */
   addColumn("sgt_magazyn", "nazwa", "TEXT NOT NULL DEFAULT ''");
-  /* Niezgodność w dostawie wg firmowego formularza (0.21.0). Kolumny są
-     nullowalne, więc wyjątki sprzed zmiany zostają nietknięte — a `ilosc_dok`
-     puste znaczy „zgłoszono, zanim zaczęliśmy zapisywać snapshot", nie zero. */
+  /* Niezgodność w dostawie wg firmowego formularza. Puste `ilosc_dok` znaczy
+     „snapshotu nie ma", nie zero. */
   addColumn("problem", "sym_obcy", "TEXT");
   addColumn("problem", "zamiast_ilosc", "REAL");
   addColumn("problem", "ilosc_dok", "REAL");
@@ -848,61 +657,43 @@ export function migrate(database: DatabaseSync) {
   addColumn("delivery", "kurier_protokol", "TEXT");
   addColumn("delivery", "przesylka_at", "TEXT");
   addColumn("delivery", "przesylka_by", "TEXT");
-  /* Klucz kontrahenta pod logo dostawcy (0.56.0). Read-model odświeża się
+  /* Klucz kontrahenta pod logo dostawcy. Read-model odświeża się
      w całości przy każdej synchronizacji, więc kolumna wypełni się sama —
      ale musi ISTNIEĆ, zanim adapter spróbuje do niej pisać. */
   addColumn("sgt_dokument", "kh_id", "INTEGER");
-  /* Sygnał dla biura, że odpowiedź na notatkę już przyszła (0.57.0). */
+  /* Sygnał dla biura, że odpowiedź na notatkę już przyszła. */
   addColumn("delivery_note", "odp_widziana_at", "TEXT");
-  /* Identyfikator kupującego przy zwrocie (0.56.6). `CREATE TABLE IF NOT
-     EXISTS` nie dokłada kolumny do tabeli, która już istnieje — a `zwrot`
-     stoi u klienta od 0.53.0. Bez tej linii wyszukiwanie wątku wiadomości
-     wywracałoby się na nieznanej kolumnie. */
-  dosypIdKupujacego(database);
-  /* Etap 2 zwrotów (0.58.0): korekta + MM na bufor. `zwrot` i `sfera_queue`
-     stoją u klienta od dawna, a `sgt_sprzedaz` odświeża się w całości przy
-     imporcie — ale kolumna musi ISTNIEĆ, zanim import spróbuje do niej pisać. */
+  /* Wynik strukturalny zadania — patrz `sfera_queue.wynik_json`. */
   addColumn("sfera_queue", "wynik_json", "TEXT");
-  /* Etap 3 zwrotów (0.59.0): kosze i ścieżka reklamacyjna. Nowe tabele idą
-     z CREATE TABLE IF NOT EXISTS; tu tylko kolumny w tabelach zastanych. */
-  /* Kosz z dokumentu MM (0.75.0): numer z kartki wskazuje przesunięcie
+  /* Kosz z dokumentu MM: numer z kartki wskazuje przesunięcie
      z Subiekta, a nie kod nadany w biurze. NULL = kosz złożony w aplikacji. */
   addColumn("kosz", "mm_dok_id", "INTEGER");
   addColumn("kosz", "mm_numer", "TEXT");
-  /* Rodzaj kosza (0.122.0): `zwroty` albo `karton`. Karton to towar źle
-     zebrany, odłożony przez pakujących do jednego pudła — ta sama praca
-     rozkładania, ale bez dokumentu i bez zwrotu.
-
-     Domyślna wartość załatwia zastane wiersze i to nie jest wygoda, tylko
-     prawda: wszystko, co dziś leży w tej tabeli, powstało ze zwrotu albo
-     z przesunięcia MM. Kolumna stoi TU, a nie w schema.sql, żeby nie
-     rozjeżdżać się z `mm_dok_id` — kosz od 0.75.0 opisują dwa miejsca
-     i trzecie byłoby o jedno za dużo. */
+  /* Rodzaj kosza: `zwroty` albo `karton`. Karton to towar źle zebrany,
+     odłożony przez pakujących do jednego pudła — ta sama praca rozkładania,
+     ale bez dokumentu i bez zwrotu. Domyślne `zwroty` opisuje zastane wiersze.
+     Kolumna stoi TU, a nie w schema.sql, jak `mm_dok_id`. */
   addColumn("kosz", "rodzaj", "TEXT NOT NULL DEFAULT 'zwroty'");
-  /* Anulowanie kartonu (0.123.0). Pudło otwarte przez pomyłkę albo porzucone
-     musi mieć jak zniknąć — do tej wersji jedynym wyjściem było rozłożenie
-     wszystkiego. Kolumny nullowalne: brak znacznika znaczy „nie anulowano". */
+  /* Anulowanie kartonu. Pudło otwarte przez pomyłkę albo porzucone musi mieć
+     jak zniknąć. Brak znacznika znaczy „nie anulowano". */
   addColumn("kosz", "anulowano_at", "TEXT");
   addColumn("kosz", "anulowano_przez", "TEXT");
   /* Zadanie MM MAG→ZWROTY, kolejkowane przy domknięciu koszyka składanego
-     w panelu (0.192.0). `kosz_pozycja.mm_queue_id` to co INNEGO: tamto jest
+     w panelu. `kosz_pozycja.mm_queue_id` to co INNEGO: tamto jest
      przesunięciem powrotnym ZWROTY→MAG dla jednej rozłożonej pozycji. */
   addColumn("kosz", "mm_queue_id", "INTEGER REFERENCES sfera_queue(id)");
-  /* MM POWROTNE z bufora (0.266.0). Kosz złożony w aplikacji sam wysłał towar
-     na regał zwrotów, więc sam ma go stamtąd zdjąć po rozłożeniu. Kolumna
-     mówi, czy dokument już zamówiono: pusta przy koszu rozłożonym znaczy
-     „stan wisi na regale, choć towar leży na półce" i pilnuje tego
-     rekoncyliacja. Od 0.277.0 wypełnia ją TAK SAMO kosz z dokumentu MM —
-     powód przy `powrotKoszaZDokumentu`. */
+  /* MM POWROTNE z bufora. Kosz sam ma zdjąć towar z regału zwrotów po
+     rozłożeniu. Kolumna mówi, czy dokument już zamówiono: pusta przy koszu
+     rozłożonym znaczy „stan wisi na regale, choć towar leży na półce" i
+     pilnuje tego rekoncyliacja. Powód przy `powrotKoszaZDokumentu`. */
   addColumn("kosz", "powrot_queue_id", "INTEGER REFERENCES sfera_queue(id)");
   powrotKoszaPozaAplikacja(database);
   powrotKoszaZDokumentu(database);
   /* Skąd wiersz koszyka się wziął — po tym cofnięcie oceny go zdejmuje.
      Kosz z dokumentu Subiekta ma tu `NULL`: tamten rodzi się z pozycji MM. */
   addColumn("kosz_pozycja", "zwrot_pozycja_id", "INTEGER");
-  /* INDEKSY PRACY NA ZWROTACH (audyt zwrotów, 15 września 2026). Kolejka,
-     szczegół zwrotu i koszyk pytają po tych trzech kolumnach przy każdym
-     odświeżeniu, a do tego wydania każde pytanie szło przez całą tabelę.
+  /* INDEKSY PRACY NA ZWROTACH. Kolejka, szczegół zwrotu i koszyk pytają po
+     tych trzech kolumnach przy każdym odświeżeniu.
      Tutaj, a nie w schemacie: dwie z tych kolumn dochodzą w `migrate()`, a
      schemat wykonuje się przed nią — ta sama reguła co przy indeksie `klucz`. */
   database.exec(`
@@ -912,12 +703,8 @@ export function migrate(database: DatabaseSync) {
       ON zwrot_klienta(channel_account_id, order_id);
   `);
   przebudujIndeksKoduKosza(database);
-  /* 0.76.1 — instalacja z 0.75.0 ma tę tabelę bez snapshotu nazwy,
-     a CREATE TABLE IF NOT EXISTS jej nie ruszy. */
-  /* 0.77.0 — powód pominięcia pozycji kosza (status `skipped`). */
-  /* Kto zamknął wyjątek z dostawy (0.357.0). Stare wiersze zostają z NULL
-     i ekran hali mówi o nich „biuro" — zgadywanie autora po dacie byłoby
-     wymyślaniem nazwiska. */
+  /* Kto zamknął wyjątek z dostawy. Przy NULL ekran hali mówi „biuro" —
+     zgadywanie autora po dacie byłoby wymyślaniem nazwiska. */
   addColumn("problem", "resolved_by", "TEXT");
   addColumn("kosz_pozycja", "powod", "TEXT");
   /* Kiedy pominięto — bez tego lista pominięć w biurze nie umie powiedzieć,
@@ -930,21 +717,6 @@ export function migrate(database: DatabaseSync) {
   addColumn("kosz_pozycja", "pozniej_at", "TEXT");
   addColumn("sgt_mm_zwrot_pozycja", "symbol", "TEXT NOT NULL DEFAULT ''");
   addColumn("sgt_mm_zwrot_pozycja", "nazwa", "TEXT NOT NULL DEFAULT ''");
-  /* Kto prowadzi ZWROT (0.121.0). Jako jedyny z czterech rejestrów zwrot nie
-     miał gdzie zapisać znacznika prowadzenia — a kolejka spraw pokazuje go
-     przy wszystkich czterech, więc bez tej kolumny zwrot byłby jedyną sprawą,
-     której nie da się wziąć. Tabela stoi u klienta od 0.53.0, więc migracja.
-     Znacznik, nie blokada: mówi „ktoś to wziął", nie „tobie nie wolno". */
-  /* Kto prowadzi reklamację. `zwrot_pozycja` stoi u klienta od 0.53.0, więc
-     kolumny muszą dojść migracją — jak `pytanie.prowadzi` (0.89.0), z tego
-     samego powodu i z tą samą naturą znacznika, nie blokady. */
-  /* Odpowiedzi w dyskusjach Allegro (0.104.0). Tabela `dyskusja` stoi
-     u klienta od 0.103.0, więc kolumny muszą dojść migracją. Nazwy lustrzane
-     z `pytanie` — celowo: jedna para pojęć (szkic/odpowiedź) w całym biurze. */
-  /* Przełącznik automatycznych szkiców (0.107.0). `ai_config` stoi u klienta
-     od 0.80.0, więc kolumna musi dojść migracją. Domyślne 0 znaczy, że po
-     aktualizacji szkice przestają powstawać same — świadomie, bo o to
-     poprosił właściciel. */
   naLoginIHaslo(database);
   bezBrygadzisty(database);
   ziarnoStrefyZlotej(database);
@@ -958,25 +730,17 @@ export function migrate(database: DatabaseSync) {
      nazwach, więc musi widzieć tabelę już kompletną. */
   zadanieNieTrzymaTowaru(database);
   zadanieWracaDoBiura(database);
-  /* ── KONTEKST ZLECENIA DLA BIURA (0.408.0) ────────────────────────────────
+  /* ── KONTEKST ZLECENIA DLA BIURA ──────────────────────────────────────────
      Osobno od instrukcji, która jedzie na halę — patrz `zadanie_terenowe`
-     w `schema.sql`. Stare wiersze zostają z NULL i ze sklejoną instrukcją.
+     w `schema.sql`.
 
-     STOI TU, PO OBU PRZEBUDOWACH, a nie przy pozostałych `addColumn` na górze,
-     i to nie jest kwestia porządku. Obie funkcje wyżej odtwarzają tę tabelę
-     od zera, z JAWNEJ listy kolumn, i przenoszą dane `INSERT ... SELECT`.
-     Kolumna dołożona przed nimi ginęła razem ze starą tabelą, a pierwszy
-     `SELECT` sięgający po nią wywracał się na „no such column".
-
-     Wyłapał to test migracji z bazy w kształcie 0.141.0 (`db/rozmowy.test.ts`)
-     — czyli dokładnie ten, dla którego istnieje. Na świeżej bazie kolumna
-     przychodzi ze `schema.sql` i tej ścieżki nie widać wcale. */
+     STOI TU, PO OBU PRZEBUDOWACH. Obie funkcje wyżej odtwarzają tę tabelę
+     z JAWNEJ listy kolumn, więc kolumna dołożona przed nimi ginęłaby razem
+     ze starą tabelą. Pilnuje tego `db/rozmowy.test.ts`. */
   addColumn("zadanie_terenowe", "kontekst", "TEXT");
   watekInboxuDopuszczaBrakDaty(database);
   wiadomoscInboxuMaKsztaltAllegro(database);
-  /* Struktura wątku z `beta.v1` (22 września 2026) — patrz
-     `allegro_inbox_thread` w `schema.sql`. Stare wątki mają NULL, czyli
-     „nie czytaliśmy"; dostaną wartości przy najbliższej zmianie w wątku.
+  /* Struktura wątku z `beta.v1` — patrz `allegro_inbox_thread` w `schema.sql`.
      PO `watekInboxuDopuszczaBrakDaty`: tamta przebudowa stawia tabelę od
      nowa bez tych kolumn, więc dołożone wcześniej zginęłyby na starej bazie. */
   addColumn("allegro_inbox_thread", "watek_typ", "TEXT");
@@ -984,33 +748,25 @@ export function migrate(database: DatabaseSync) {
   addColumn("allegro_inbox_thread", "watek_status", "TEXT");
   addColumn("allegro_inbox_thread", "watek_zamowienia", "TEXT");
   addColumn("allegro_inbox_thread", "struktura_at", "TEXT");
-  /* Rola autora z `beta.v1` — patrz `message` w `schema.sql`. Stare
-     wiadomości mają NULL, czyli „przyszła z `public.v1`", i to jest prawda. */
+  /* Rola autora z `beta.v1` — patrz `message` w `schema.sql`. */
   addColumn("message", "autor_rola", "TEXT");
-  /* Wstrzymanie bety skrzynki — patrz `allegro_inbox_sync_state`. NULL znaczy
-     „nie wstrzymana", i tak było przed tą kolumną. */
+  /* Wstrzymanie bety skrzynki — patrz `allegro_inbox_sync_state`. */
   addColumn("allegro_inbox_sync_state", "beta_wstrzymana_do", "TEXT");
   addColumn("allegro_inbox_sync_state", "beta_powod", "TEXT");
-  /* Los szkicu przy wysyłce (22 września 2026) — patrz `outbox` w
-     `schema.sql`. Stare wysyłki mają NULL: wtedy nikt tego nie liczył. */
+  /* Los szkicu przy wysyłce — patrz `outbox` w `schema.sql`. */
   addColumn("outbox", "szkic_los",
     "TEXT CHECK (szkic_los IS NULL OR szkic_los IN ('bez_zmian','poprawiony'))");
   /* Cofanie pomyłek przy rozkładaniu dostawy — patrz `delivery_line.cofniecie`
-     i `problem.zrodlo` w `schema.sql`. Stare wiersze mają NULL, a to znaczy
-     dokładnie to, co było prawdą przed tym wydaniem: odłożenia sprzed niego
-     nie da się cofnąć, a każde stare zgłoszenie złożył człowiek. */
+     i `problem.zrodlo` w `schema.sql`. */
   addColumn("delivery_line", "cofniecie", "TEXT");
   /* Start liczenia pomyłek złapanych przy pakowaniu — patrz
-     `sellasist_sync_state.pomylki_od_at` w `schema.sql`. Tabela stoi już na
-     produkcji, a NULL znaczy prawdę: z kluczem jeszcze nic nie przeczytano. */
+     `sellasist_sync_state.pomylki_od_at` w `schema.sql`. */
   addColumn("sellasist_sync_state", "pomylki_od_at", "TEXT");
   /* Kto zbierał pomyłkę złapaną przy pakowaniu — patrz
-     `sellasist_pomylka_zlapana` w `schema.sql`. Stare wiersze mają NULL
-     w obu kolumnach, więc ustalenie zbierającego dopyta je samo. */
+     `sellasist_pomylka_zlapana` w `schema.sql`. */
   addColumn("sellasist_pomylka_zlapana", "zbieral_sellasist_id", "INTEGER");
   addColumn("sellasist_pomylka_zlapana", "zbieral_sprawdzono_at", "TEXT");
-  /* Szukanie loginu zbierającego — patrz `sellasist_pracownik_login`. NULL
-     przy starych wierszach znaczy prawdę: loginu jeszcze nie szukano. */
+  /* Szukanie loginu zbierającego — patrz `sellasist_pracownik_login`. */
   addColumn("sellasist_pomylka_zlapana", "pracownik_szukano_at", "TEXT");
   /* Metoda dostawy zamówienia Sellasist — patrz `sellasist_zamowienie.dostawa`
      w `schema.sql`. NULL znaczy „lustro jej jeszcze nie czytało", a każda
@@ -1024,15 +780,12 @@ export function migrate(database: DatabaseSync) {
   znacznikiIso(database);
   identyfikatorZOferty(database);
   identyfikatorOdDostawcy(database);
-  /* DOSYŁKA: EPIZODY, OKNO NUMERU I LICZNIKI PRZEJŚĆ (0.536.1). Tabela
-     `klient_dosylka` stoi na produkcji od 0.536.0 bez tych czterech kolumn,
-     a `CREATE TABLE IF NOT EXISTS` ich nie dołoży. Bez tej migracji każdy
-     odczyt sprawy kończyłby się „no such column”.
+  /* DOSYŁKA: EPIZODY, OKNO NUMERU I LICZNIKI PRZEJŚĆ — patrz `klient_dosylka`.
 
      Liczniki dostają wartość z obecnego stanu, i to tylko w chwili dołożenia
-     kolumny. 0.536.0 liczył odcisk `k` i `q` jako liczbę wierszy doręczonych
-     i z kłopotem. Zero w nowym liczniku przy zapisanym `k: 1` połknęłoby
-     następne doręczenie, bo 1 nie jest większe od 1. */
+     kolumny. Stary odcisk `k` i `q` liczył wiersze doręczone i z kłopotem.
+     Zero w nowym liczniku przy zapisanym `k: 1` połknęłoby następne
+     doręczenie, bo 1 nie jest większe od 1. */
   if (database.prepare("SELECT 1 FROM sqlite_master WHERE type='table' AND name='klient_dosylka'").get()) {
     const bylyLiczniki = (database.prepare("PRAGMA table_info(klient_dosylka)").all() as Array<{ name: string }>)
       .some((c) => c.name === "doreczen");
@@ -1044,12 +797,10 @@ export function migrate(database: DatabaseSync) {
       database.exec(`UPDATE klient_dosylka
         SET doreczen = CASE WHEN dostarczono_at IS NOT NULL THEN 1 ELSE 0 END,
             problemow = CASE WHEN status IN ('ISSUE','RETURNED') THEN 1 ELSE 0 END`);
-      /* Zapisany odcisk nie może stać WYŻEJ niż nowa suma. 0.536.0 liczył
-         wiersze z kłopotem TERAZ: potwierdzony kłopot, po którym paczka ruszyła,
-         zostawiał `q: 1` przy sumie 0. Następny kłopot dałby 1 — nie więcej
-         niż 1 — i sprawa by nie wstała. To ten sam błąd, który liczniki
-         przejść usuwają, więc przycinamy go razem z nimi. Sprawa ma jeden
-         login (UNIQUE), więc suma po sprawie to suma po loginie. */
+      /* Zapisany odcisk nie może stać WYŻEJ niż nowa suma. Stary odcisk liczył
+         wiersze z kłopotem TERAZ, więc mógł zostawić `q: 1` przy sumie 0,
+         a wtedy następny kłopot nie obudziłby sprawy. Sprawa ma jeden login
+         (UNIQUE), więc suma po sprawie to suma po loginie. */
       /* Zapas „Cofnij” też, bo cofnięcie zakończenia przywraca go jako odcisk. */
       for (const pole of ["znane_json", "przed_zakonczeniem_znane_json"] as const) {
         for (const [klucz, kolumna] of [["k", "doreczen"], ["q", "problemow"]] as const) {
@@ -1062,7 +813,7 @@ export function migrate(database: DatabaseSync) {
       }
     }
   }
-  /* INDEKSY LOGINU BEZ WIELKOŚCI LITER (0.535.0, sprawa klienta). Profil
+  /* INDEKSY LOGINU BEZ WIELKOŚCI LITER (sprawa klienta). Profil
      i sprawa klienta pytają o login w czterech tabelach przy każdym otwarciu,
      a „Moje” — przy każdym odświeżeniu, raz na każdą prowadzoną sprawę.
      Porównanie idzie `COLLATE NOCASE`, a indeksu z kolatacją BINARY SQLite do
@@ -1072,9 +823,7 @@ export function migrate(database: DatabaseSync) {
 
      Indeks częściowy ręcznych wskazań zamówienia niesie drugą połowę
      `ROZMOWA_ZAMOWIENIA` (`droga-klienta.ts`): bez niego każde pytanie
-     o rozmowy zamówienia przeglądało cały dziennik rozmów. Pomiar na 5000
-     rozmowach: 4 ms na pytanie bez indeksów, 0,06 ms z nimi — a „Moje” pyta
-     raz na każdą prowadzoną sprawę klienta, co 30 sekund.
+     o rozmowy zamówienia przeglądałoby cały dziennik rozmów.
 
      TUTAJ, nie w schemacie, i PO przebudowach: `zwrot_klienta.kupujacy_login`
      dochodzi `addColumn`, a `watekInboxuDopuszczaBrakDaty` stawia wątki od
@@ -1107,8 +856,8 @@ export function migrate(database: DatabaseSync) {
 }
 
 /**
- * Etykiety z 0.191.0 przechodzą do `decyzja_klasyfikacji` jako HISTORIA
- * (22 września 2026), a stara tabela znika.
+ * Etykiety z `klasyfikacja_rozmowy` przechodzą do `decyzja_klasyfikacji` jako
+ * HISTORIA, a stara tabela znika.
  *
  * NIEAKTYWNE, i to jest cała decyzja tej migracji. Etykieta „dobor" z ośmiu
  * kategorii nie jest ani trafieniem, ani pudłem wobec piętnastu, więc
@@ -1125,8 +874,7 @@ export function migrate(database: DatabaseSync) {
  * nieaktywny i żaden czytelnik ich nie pokazuje; kod `V1_BEZ_AKCJI` mówi, że
  * to nie jest zdanie modelu.
  *
- * Wiersz bez `message_id` nie ma do czego przylgnąć i przepada razem z tabelą
- * — tak jak przepadała jego etykieta przy pierwszym dopisku klienta.
+ * Wiersz bez `message_id` nie ma do czego przylgnąć i przepada razem z tabelą.
  */
 function przeniesKlasyfikacjeRozmow(database: DatabaseSync) {
   const jest = () => database.prepare(
@@ -1155,11 +903,8 @@ function przeniesKlasyfikacjeRozmow(database: DatabaseSync) {
 }
 
 /**
- * Szablony odpowiedzi znikają (22 września 2026, decyzja właściciela).
- *
- * Powstały w 0.399.0, bo agenci wklejali zdania z notatnika. Od 0.430.0
- * szkic Copilota czeka przy każdej wiadomości klienta i niesie te same zdania
- * razem z faktami rozmowy. Szablon stał się drugą drogą do tego samego pola.
+ * Szablony odpowiedzi znikają (decyzja właściciela): szkic Copilota niesie te
+ * same zdania razem z faktami rozmowy.
  *
  * TABELA BEZ CZYTELNIKA NIE JEST ARCHIWUM, TYLKO PUŁAPKĄ — to samo zdanie,
  * co przy nakładce spraw niżej. Kto chce tych treści, robi kopię bazy PRZED
@@ -1250,30 +995,14 @@ function bezDoboruIWiedzy(database: DatabaseSync) {
 }
 
 /**
- * Kasacja nakładki spraw (0.388.0).
+ * Kasacja nakładki spraw. Na to samo pytanie odpowiada droga zakupu
+ * (dekalog obsługi, punkt 2 w `docs/obsluga-klienta-calosc.md`).
  *
- * Sprawa była KLAMRĄ nad rozmowami: tytułem i listą wątków, bez statusu,
- * bez osi, bez terminu i bez prowadzącego. Powstała w 0.161.0 z decyzji
- * podjętej PRZED liczbami, których żądało pytanie 1
- * (`docs/obsluga-klienta.md`) — i te liczby nigdy nie padły.
- *
- * ZASTĄPIŁA JĄ DROGA ZAKUPU (0.387.0). Tamta odpowiada na to samo pytanie
- * — „co jeszcze dotyczy tego klienta" — po numerze zamówienia, przez cztery
- * kolejki, bez kliknięcia i bez wpisywania tytułu. Dwa paski nad jedną
- * rozmową mówiące o tym samym to podwojenie, którego dekalog obsługi
- * zabrania w punkcie 2 (`docs/obsluga-klienta-calosc.md`).
- *
- * Decyzja właściciela z 18 września 2026: martwy kod, usunąć.
- *
- * TABELA BEZ CZYTELNIKA NIE JEST ARCHIWUM, TYLKO PUŁAPKĄ — to samo zdanie,
- * co przy cięciu z 0.140.0. Kto chce tych tytułów, robi kopię bazy PRZED
- * aktualizacją; mówi o tym `DEPLOY.md`.
+ * TABELA BEZ CZYTELNIKA NIE JEST ARCHIWUM, TYLKO PUŁAPKĄ. Kto chce tych
+ * tytułów, robi kopię bazy PRZED aktualizacją; mówi o tym `DEPLOY.md`.
  *
  * ZDARZEŃ OSI NIE KASUJEMY. `sprawa_dolaczona` i `sprawa_odlaczona` zostają
- * w `conversation_event`: wiszą przy ŹRÓDLE (blizna 0.130.0), a dziennik
- * audytu nie ma retencji i czyta się go po latach. Panel przestał je
- * rysować, ale „kto i kiedy sklejał rozmowy" zostaje odpowiedzią możliwą
- * do udzielenia.
+ * w `conversation_event`, bo dziennik audytu nie ma retencji.
  */
 function bezNakladkiSpraw(database: DatabaseSync) {
   /* Klucze obce schodzą PRZED transakcją — w transakcji `PRAGMA foreign_keys`
@@ -1294,10 +1023,11 @@ function bezNakladkiSpraw(database: DatabaseSync) {
 }
 
 /**
- * Kosze rozłożone PRZED 0.266.0 powrotu nie dostają (0.266.0).
+ * Kosze rozłożone, zanim aplikacja zaczęła zamawiać powrót, powrotu nie
+ * dostają.
  *
- * Od tego wydania aplikacja zamawia MM ZWROTY→MAG sama, gdy kosz z panelu
- * zostanie rozłożony. Kosze rozłożone WCZEŚNIEJ rozliczyło biuro ręką
+ * Aplikacja zamawia MM ZWROTY→MAG sama, gdy kosz z panelu zostanie rozłożony.
+ * Kosze rozłożone WCZEŚNIEJ rozliczyło biuro ręką
  * w Subiekcie — wystawienie im dokumentu dziś przesunęłoby stan drugi raz,
  * po miesiącach, na towar, którego nikt nie ruszał. Tak samo kłamałaby
  * rekoncyliacja: wypisałaby historię jako pracę do zrobienia.
@@ -1327,7 +1057,7 @@ function powrotKoszaPozaAplikacja(database: DatabaseSync) {
 }
 
 /**
- * Pozycje zastane w chwili wdrożenia automatu rabatów (0.320.0).
+ * Pozycje zastane w chwili wdrożenia automatu rabatów.
  *
  * Automat składa wniosek zaraz po zaciągnięciu odstąpienia. Zastane pozycje
  * odstąpienia mają sprzed miesięcy — wniosek do nich albo już jest, albo nie
@@ -1355,17 +1085,13 @@ function rabatPozaAutomatem(database: DatabaseSync) {
 }
 
 /**
- * Zatrzask rozliczenia dla zwrotów zastanych w chwili wdrożenia (0.345.0).
+ * Zatrzask rozliczenia dla zwrotów zastanych w chwili wdrożenia.
  *
  * `zwrot_klienta.status_allegro` to JEDEN WSKAŹNIK „TERAZ", a nie historia.
  * Zwrot rozliczony (`FINISHED`) idzie dalej tą samą osią czasu — choćby na
  * `COMMISSION_REFUND_CLAIMED`, który mówi o NASZEJ prowizji, nie o pieniądzach
  * klienta. Wskaźnik przestaje wtedy pokazywać rozliczenie, a kubełek liczony
- * z niego wypychał taki zwrot z ZAMKNIĘTYCH z powrotem do kolejki pracy.
- *
- * Zgłoszenie właściciela: „nadal pokazuje paczki, do których został już
- * stwierdzony zwrot". Wypychał je przy tym NASZ WŁASNY automat rabatów
- * (0.320.0), który składa wniosek zaraz po zaciągnięciu odstąpienia.
+ * z niego wypchnąłby taki zwrot z ZAMKNIĘTYCH z powrotem do kolejki pracy.
  *
  * Ta migracja zatrzaskuje to, co jeszcze widać: zwroty stojące DZIŚ na
  * rozliczeniu dostają datę. Tych, które zdążyły pójść dalej przed wdrożeniem,
@@ -1389,15 +1115,11 @@ function zatrzasnijRozliczone(database: DatabaseSync) {
 }
 
 /**
- * Powrót z regału dla koszy Z DOKUMENTU MM (0.277.0).
+ * Powrót z regału dla koszy Z DOKUMENTU MM.
  *
- * Do 0.276.x dokument powrotny ZWROTY→MAG zamawiała aplikacja wyłącznie dla
- * koszy złożonych w panelu obsługi. Kosz z kartki — czyli droga, którą idzie
- * większość zwrotów — kończył się zapisaniem adresów, a przesunięcie wystawiało
- * biuro ręką w Subiekcie (DEPLOY §6a punkt 4). Kosztowało to dokładnie to samo,
- * co przed 0.266.0 kosze z panelu: towar leżał na półce i nie był sprzedawalny,
- * dopóki ktoś nie pamiętał o drugim dokumencie. Decyzja właściciela z 11
- * września 2026 zdejmuje punkt 4 z biura i oddaje go aplikacji.
+ * Dokument powrotny ZWROTY→MAG zamawia aplikacja także dla kosza z kartki
+ * (decyzja właściciela). Bez niego towar leży na półce i nie jest
+ * sprzedawalny, dopóki ktoś nie pamięta o drugim dokumencie.
  *
  * `mm_mag_z` jest SNAPSHOTEM magazynu źródłowego dokumentu, bo powrót ma wrócić
  * dokładnie tam, skąd towar przyjechał. Odczytanie tego z lustra `sgt_mm_zwrot`
@@ -1424,8 +1146,7 @@ function powrotKoszaZDokumentu(database: DatabaseSync) {
     database.exec("ALTER TABLE kosz ADD COLUMN mm_mag_z INTEGER");
     /* Kosze W ROBOCIE dostają snapshot z lustra, póki dokument jeszcze w nim
        stoi. Bez tego kosz otwarty przed wdrożeniem, a zakończony po nim,
-       zostałby bez powrotu — czyli dokładnie z usterką, którą to wydanie
-       zamyka. Czego w lustrze nie ma, tego nie zgadujemy. */
+       zostałby bez powrotu. Czego w lustrze nie ma, tego nie zgadujemy. */
     const lustro = database.prepare(
       "SELECT 1 FROM sqlite_master WHERE type='table' AND name='sgt_mm_zwrot'").get();
     if (lustro) {
@@ -1446,13 +1167,10 @@ function powrotKoszaZDokumentu(database: DatabaseSync) {
 }
 
 /**
- * Piąty rodzaj identyfikatora: `zamiennik` (0.234.0).
+ * Piąty rodzaj identyfikatora: `zamiennik`.
  *
- * CHECK na `towar_identyfikator.rodzaj` był zamknięty na cztery wartości,
- * a SQLite nie umie go rozszerzyć w miejscu — stąd przebudowa tabeli, ta sama
- * co przy `zwrot_klienta_pozycja`. Powód rozszerzenia stoi w `schema.sql`:
- * numery obcych katalogów siedzą także w sekcjach „Zamiennik:", a stamtąd nie
- * czytał ich nikt, kto zapisuje.
+ * SQLite nie umie rozszerzyć CHECK na `towar_identyfikator.rodzaj` w miejscu
+ * — stąd przebudowa tabeli. Powód rozszerzenia stoi w `schema.sql`.
  *
  * Wiersze przepisujemy WSZYSTKIE, także `zrodlo='reczne'`. Przebudowa
  * identyfikatorów po imporcie kasuje wyłącznie te z opisu, więc wpis biura
@@ -1500,7 +1218,7 @@ function identyfikatorZamiennika(database: DatabaseSync) {
 }
 
 /**
- * Piąta wartość w skrzynce nadawczej spraw: `END_REQUEST` (0.245.0).
+ * Piąta wartość w skrzynce nadawczej spraw: `END_REQUEST`.
  *
  * CHECK na `reklamacja_outbox.typ` był zamknięty na cztery wartości i wszystkie
  * cztery dotyczyły reklamacji. Prośba o zakończenie dyskusji idzie tą samą
@@ -1509,7 +1227,7 @@ function identyfikatorZamiennika(database: DatabaseSync) {
  * w którym nie da się już nic cofnąć.
  *
  * SQLite nie rozszerza CHECK-a w miejscu, stąd przebudowa tabeli — ta sama
- * droga co przy `towar_identyfikator` w 0.234.0. Klucze obce zostają
+ * droga co przy `towar_identyfikator`. Klucze obce zostają
  * w kształcie ze `schema.sql`, a `ON DELETE CASCADE` na sprawie jest tu
  * istotny: skasowanie sprawy ma zabrać jej próby wysyłki.
  */
@@ -1636,13 +1354,11 @@ function autorWysylkiBezBlokadyKont(database: DatabaseSync) {
 }
 
 /**
- * Szóste źródło identyfikatora: `oferta` (0.264.0) plus `oferta_id`.
+ * Szóste źródło identyfikatora: `oferta` plus `oferta_id`.
  *
- * Druga przebudowa tej tabeli i z tego samego powodu co pierwsza: CHECK na
- * `zrodlo` był zamknięty na `('opis','reczne')`, a SQLite nie rozszerza go
- * w miejscu. Powód rozszerzenia stoi w `schema.sql`: numer wpisany przez
- * sprzedawcę w opisie OFERTY nie był wyszukiwalny, bo indeks czyta opisy
- * KARTOTEK. Kolumna `oferta_id` dochodzi w tej samej przebudowie, a nie
+ * Druga przebudowa tej tabeli i z tego samego powodu co pierwsza: SQLite nie
+ * rozszerza CHECK na `zrodlo` w miejscu. Kolumna `oferta_id` dochodzi w tej
+ * samej przebudowie, a nie
  * osobnym `addColumn`, bo przebudowa i tak przepisuje całą definicję —
  * dwie drogi do jednej tabeli rozjeżdżają się przy pierwszej poprawce.
  *
@@ -1701,8 +1417,8 @@ function identyfikatorZOferty(database: DatabaseSync) {
  * powodu co dwie poprzednie: CHECK na `zrodlo` nie rozszerza się w miejscu.
  *
  * Idzie PO `identyfikatorZOferty`, więc zastaje tabelę już z `oferta_id`
- * i przepisuje ją razem z tą kolumną. Baza, która przeskoczy oba wydania,
- * przechodzi dwie przebudowy po kolei, a nie jedną sklejoną — każda ma swój
+ * i przepisuje ją razem z tą kolumną. Stara baza przechodzi dwie przebudowy
+ * po kolei, a nie jedną sklejoną — każda ma swój
  * warunek i swój test, a sklejka byłaby trzecią drogą do tej samej tabeli.
  *
  * Wiersze przepisujemy WSZYSTKIE, z `id`, jak wyżej: wpis biura i numer
@@ -1750,26 +1466,12 @@ function identyfikatorOdDostawcy(database: DatabaseSync) {
 }
 
 /**
- * Znacznik autoodpowiedzi na wiadomościach, które już leżą w bazie (0.227.0).
- *
- * ── DLACZEGO KOLUMNA, A NIE LICZENIE PRZY ODCZYCIE ────────────────────────
- * Regułę zna JEDNA funkcja (`czyAutoresponder`) i to ona ma tu zostać jedyną.
- * Odczyt liczyłby ją przy każdym rysowaniu kolejki, a wersja SQL-owa byłaby
- * DRUGĄ kopią — rozjechałaby się przy pierwszej poprawce, a objawem byłaby
- * rozmowa uznana za odpisaną, bo odbiła się echem naszego potwierdzenia.
- *
- * Backfill idzie po wiadomościach WYCHODZĄCYCH: klient cytujący nasze
- * potwierdzenie niesie ten sam podpis, a jego list jest pytaniem. To ten sam
- * warunek, który stoi przy zapisie.
- */
-/**
  * Klucz naturalny załącznika wiadomości: `(message_id, file_name)`.
  *
  * Indeks stoi TUTAJ, nie w `schema.sql`, bo `schema.sql` wykonuje się przed
- * migracją, a baza sprzed tego wydania może mieć duplikaty — synchronizator
- * wstawiał załączniki bez żadnego ograniczenia. `CREATE UNIQUE INDEX` na
- * takich wierszach wywróciłby start (ta sama blizna co `ux_zwrot_klienta_pozycja_klucz`,
- * 0.174.2). Zostaje najniższe `id`: na nim wiszą ETagi w przeglądarkach biura.
+ * migracją, a stara baza może mieć duplikaty. `CREATE UNIQUE INDEX` na takich
+ * wierszach wywróciłby start (jak przy `ux_zwrot_klienta_pozycja_klucz`).
+ * Zostaje najniższe `id`: na nim wiszą ETagi w przeglądarkach biura.
  */
 function zalacznikiBezDubli(database: DatabaseSync) {
   database.exec(`DELETE FROM message_attachment
@@ -1779,12 +1481,11 @@ function zalacznikiBezDubli(database: DatabaseSync) {
 }
 
 /**
- * Dosypka załączników z lądowiska (precedens 0.166.0: numer zamówienia).
+ * Dosypka załączników z lądowiska.
  *
- * Do tego wydania załączniki wchodziły wyłącznie z NOWĄ wiadomością, więc
- * wiadomości sprzed 0.155.0 — i każda, która pierwszy raz przyszła ze
- * statusem `NEW` — nie mają wierszy, choć `allegro_inbox_message.surowe_json`
- * trzyma całą listę. Bierzemy wyłącznie wiadomości BEZ żadnego załącznika
+ * Stare wiadomości — i każda, która pierwszy raz przyszła ze statusem `NEW` —
+ * mogą nie mieć wierszy, choć `allegro_inbox_message.surowe_json` trzyma
+ * całą listę. Bierzemy wyłącznie wiadomości BEZ żadnego załącznika
  * w bazie, więc każdy start po pierwszym jest tani; klucz upsertu chroni
  * przed dublem, gdyby synchronizacja zdążyła pierwsza.
  */
@@ -1809,6 +1510,16 @@ function dosypZalacznikiZLadowiska(database: DatabaseSync) {
   if (wierszy) console.info(`[migracja] załączniki z lądowiska: ${wierszy} wierszy przy ${kandydaci.length} wiadomościach`);
 }
 
+/**
+ * Znacznik autoodpowiedzi na wiadomościach, które już leżą w bazie.
+ *
+ * Regułę zna JEDNA funkcja (`czyAutoresponder`); wersja SQL-owa byłaby DRUGĄ
+ * kopią i rozjechałaby się przy pierwszej poprawce.
+ *
+ * Backfill idzie po wiadomościach WYCHODZĄCYCH: klient cytujący nasze
+ * potwierdzenie niesie ten sam podpis, a jego list jest pytaniem. To ten sam
+ * warunek, który stoi przy zapisie.
+ */
 function oznaczAutoodpowiedziWZastanych(database: DatabaseSync) {
   if (!maKolumne(database, "message", "auto_odpowiedz")) return;
   /* Tylko wiersze jeszcze nieoznaczone: bez tego każdy start przepisywałby
@@ -1820,9 +1531,7 @@ function oznaczAutoodpowiedziWZastanych(database: DatabaseSync) {
   if (!doOznaczenia.length) return;
 
   /* Nawias na końcu NIE jest ozdobą: `transaction` ZWRACA funkcję, a nie
-     wykonuje jej. Bez wywołania backfill kończył się cichym niczym — licznik
-     w komunikacie zgadzał się, bo stoi poza transakcją, a kolumna zostawała
-     zerem. Złapał to dopiero test migracji. */
+     wykonuje jej. Bez wywołania backfill kończyłby się cichym niczym. */
   transaction(database, () => {
     const ustaw = database.prepare("UPDATE message SET auto_odpowiedz=1 WHERE id=?");
     for (const m of doOznaczenia) ustaw.run(m.id);
@@ -1834,38 +1543,14 @@ function oznaczAutoodpowiedziWZastanych(database: DatabaseSync) {
 }
 
 /**
- * Pozycja zwrotu przestaje wisieć na read-modelu (0.154.0).
- *
- * DO 0.153.1 `zwrot_klienta_pozycja.tw_id` miało
- * `REFERENCES sgt_towar(tw_id) ON DELETE SET NULL`. Import z Subiekta kasuje
- * CAŁY read-model i wstawia go od nowa co `MSSQL_SYNC_MS` — czyli domyślnie
- * co minutę zerował KAŻDĄ kartotekę potwierdzoną przez człowieka. Cicho,
- * bez błędu, z „Bez kartoteki" jako jedynym objawem.
- *
- * Przewrotność tamtego stanu: `ALTER TABLE` w SQLite nie umie dołożyć klucza
- * obcego, więc instalacja sprzed 0.152.0 dostała samą kolumnę i powiązania
- * TRZYMAŁA. Traciła je dopiero baza założona ze świeżego schematu.
- *
- * Przy okazji dochodzi `klucz` — naturalny identyfikator pozycji w obrębie
- * zwrotu (`offer_id|nazwa`). Bez niego synchronizator musiał kasować pozycje
- * i wstawiać od nowa, a `id` zmieniało się pod otwartym panelem.
- *
- * Zabieg ten sam co przy `kosz_pozycja` w 0.140.0: nowa tabela, przepisanie
- * kolumn WSPÓLNYCH, podmiana nazwy. Klucze obce schodzą PRZED transakcją, bo
- * w transakcji `PRAGMA foreign_keys` jest ignorowane po cichu.
- */
-/**
  * Rozplata duplikaty `klucz` w obrębie zwrotu — PRZED założeniem indeksu.
  *
- * Blizna 0.174.2, druga z tej samej rodziny. 0.162.1 dołożyło przyrostek
- * `|#n` dla powtórzonej pary `offer_id|nazwa` i to załatwiło duplikaty
- * WPROST. Nie załatwiło zderzenia: pozycja, której NAZWA niesie już tekst
- * `|#2`, dostaje klucz identyczny z drugim wystąpieniem sąsiada. Indeks
- * UNIQUE odrzucał go po przemianowaniu tabeli, `migrate()` rzucał wyjątkiem,
- * a `db()` woła migrację w KAŻDYM procesie — API i worker wpadały w pętlę
- * restartów NSSM, a w logu zostawało „database is locked" jako jedyny objaw.
+ * Przyrostek `|#n` dla powtórzonej pary `offer_id|nazwa` nie wystarcza:
+ * pozycja, której NAZWA niesie już tekst `|#2`, dostaje klucz identyczny
+ * z drugim wystąpieniem sąsiada. Indeks UNIQUE odrzuciłby go, a wyjątek
+ * w `migrate()` kładzie start serwera.
  *
- * Dlatego klucza nie liczymy odtąd „mądrzej". Wyliczenie zostaje takie samo,
+ * Klucza nie liczymy „mądrzej". Wyliczenie zostaje takie samo,
  * bo do klucza przywiązana jest praca człowieka (ocena, kartoteka, zaznaczenie
  * kwoty) i przeliczenie wszystkiego zerwałoby ją w zmigrowanych bazach.
  * Zamiast tego duplikat, który mimo wszystko powstał, dostaje przyrostek
@@ -1898,6 +1583,21 @@ function rozplacDuplikatyKluczy(database: DatabaseSync): number {
   return naprawionych;
 }
 
+/**
+ * Pozycja zwrotu przestaje wisieć na read-modelu.
+ *
+ * `REFERENCES sgt_towar(tw_id) ON DELETE SET NULL` przy `tw_id` zerowałby
+ * co import KAŻDĄ kartotekę potwierdzoną przez człowieka, bo import
+ * z Subiekta kasuje CAŁY read-model.
+ *
+ * Przy okazji dochodzi `klucz` — naturalny identyfikator pozycji w obrębie
+ * zwrotu (`offer_id|nazwa`). Bez niego synchronizator musiałby kasować
+ * pozycje i wstawiać od nowa, a `id` zmieniałoby się pod otwartym panelem.
+ *
+ * Nowa tabela, przepisanie kolumn WSPÓLNYCH, podmiana nazwy. Klucze obce
+ * schodzą PRZED transakcją, bo w transakcji `PRAGMA foreign_keys` jest
+ * ignorowane po cichu.
+ */
 function pozycjaZwrotuBezReadModelu(database: DatabaseSync) {
   const kolumny = (tabela: string) =>
     (database.prepare(`PRAGMA table_info(${tabela})`).all() as Array<{ name: string }>)
@@ -1923,9 +1623,8 @@ function pozycjaZwrotuBezReadModelu(database: DatabaseSync) {
   try {
     transaction(database, () => {
       /* Warunek sprawdzany PONOWNIE, już pod blokadą zapisu — tak samo jak przy
-         `zadanie_terenowe` i wiadomości skrzynki. Od 0.177.1 migruje wyłącznie
-         API, więc równoległych przebiegów jest mniej, ale nie zero: `npm run
-         seed` potrafi chodzić przy żywym serwerze. Bez tego sprawdzenia drugi
+         `zadanie_terenowe` i wiadomości skrzynki: `npm run seed` potrafi
+         chodzić przy żywym serwerze. Bez tego sprawdzenia drugi
          przebieg przeliczałby klucze policzone przez pierwszy. */
       const obceTeraz = database.prepare("PRAGMA foreign_key_list(zwrot_klienta_pozycja)")
         .all() as Array<{ table: string }>;
@@ -1962,14 +1661,9 @@ function pozycjaZwrotuBezReadModelu(database: DatabaseSync) {
       const nowe = kolumny("zwrot_klienta_pozycja_nowa");
       /* `klucz` liczymy przy przepisaniu, bo w starej tabeli go nie było. */
       const wspolne = nowe.filter((c) => c !== "klucz" && stare.includes(c));
-      /* NUMER WYSTĄPIENIA, i to jest poprawka z 0.162.1. Sam `offer_id|nazwa`
-         NIE JEST unikalny w obrębie zwrotu: `CustomerReturnItem` w specyfikacji
-         Allegro nie ma żadnego identyfikatora pozycji, więc ta sama oferta
-         potrafi wystąpić dwa razy — a do 0.153.1 synchronizator wstawiał takie
-         pary bez żadnego ograniczenia. Przy skoku 0.153.1 → 0.162.0 ta
-         przebudowa liczyła im identyczny klucz, indeks UNIQUE go odrzucał
-         i wywracał `migrate()`: instalacja nie wstawała wcale, bo `db()` woła
-         migrację, a `db()` woła KAŻDY proces.
+      /* NUMER WYSTĄPIENIA. Sam `offer_id|nazwa` NIE JEST unikalny w obrębie
+         zwrotu: `CustomerReturnItem` w specyfikacji Allegro nie ma żadnego
+         identyfikatora pozycji, więc ta sama oferta potrafi wystąpić dwa razy.
 
          Pierwsze wystąpienie zostaje przy kluczu bez przyrostka. Dzięki temu
          bazy już zmigrowane nie przekluczają ani jednego wiersza — a do klucza
@@ -1988,9 +1682,8 @@ function pozycjaZwrotuBezReadModelu(database: DatabaseSync) {
         CREATE INDEX IF NOT EXISTS ix_zwrot_klienta_pozycja_zwrot
           ON zwrot_klienta_pozycja(zwrot_id);
       `);
-      /* Indeks UNIQUE zakłada się DOPIERO po rozplątaniu, i to jest cała
-         poprawka 0.174.2. Wcześniej stał w tym samym `exec` co przepisanie,
-         więc jeden zderzony klucz wycofywał transakcję i kładł start. */
+      /* Indeks UNIQUE zakłada się DOPIERO po rozplątaniu, bo jeden zderzony
+         klucz wycofałby transakcję i położył start. */
       rozplacDuplikatyKluczy(database);
       database.exec(`CREATE UNIQUE INDEX IF NOT EXISTS ux_zwrot_klienta_pozycja_klucz
         ON zwrot_klienta_pozycja(zwrot_id, klucz)`);
@@ -2012,7 +1705,7 @@ function indeksKluczaPozycji(database: DatabaseSync) {
   const ma = (database.prepare("PRAGMA table_info(zwrot_klienta_pozycja)")
     .all() as Array<{ name: string }>).some((c) => c.name === "klucz");
   if (!ma) return;
-  /* Także tutaj, nie tylko w przebudowie (0.174.2). Baza, która przebudowę ma
+  /* Także tutaj, nie tylko w przebudowie. Baza, która przebudowę ma
      już za sobą, wchodzi w tę ścieżkę — a duplikat mógł do niej trafić
      zapisem aplikacji, zanim indeks w ogóle powstał. */
   rozplacDuplikatyKluczy(database);
@@ -2021,16 +1714,15 @@ function indeksKluczaPozycji(database: DatabaseSync) {
 }
 
 /**
- * Trzecia ocena pozycji zwrotu: „outlet" (0.375.0).
+ * Trzecia ocena pozycji zwrotu: „outlet".
  *
  * `CHECK` wpisuje się w SQLite w definicję tabeli, a `ALTER TABLE` nie umie go
  * zmienić — poszerzenie listy wartości znaczy więc PRZEBUDOWĘ. Zabieg ten sam
  * co przy `pozycjaZwrotuBezReadModelu`: nowa tabela, przepisanie, podmiana
  * nazwy, klucze obce zdjęte PRZED transakcją.
  *
- * DEFINICJĘ BIERZEMY Z BAZY, nie z tego pliku. Tabela dorosła przez kilkanaście
- * wydań (potrącenie, `w_zwrocie`, kartoteka) i jej kształt u klienta zależy od
- * tego, z której wersji aktualizuje. Wypisanie kolumn tutaj z ręki znaczyłoby,
+ * DEFINICJĘ BIERZEMY Z BAZY, nie z tego pliku. Kształt tabeli u klienta
+ * zależy od tego, z której wersji aktualizuje. Wypisanie kolumn tutaj z ręki znaczyłoby,
  * że przebudowa GUBI każdą, o której ten kod nie wie — a gubi się je po cichu,
  * bo `INSERT ... SELECT` po wspólnych kolumnach nie ma jak o tym powiedzieć.
  * Podmieniamy więc jedną klauzulę w cudzym `CREATE TABLE` i resztę zostawiamy
@@ -2080,8 +1772,8 @@ function ocenaZnaOutlet(database: DatabaseSync) {
          DROP TABLE zwrot_klienta_pozycja;
          ALTER TABLE zwrot_klienta_pozycja_outlet RENAME TO zwrot_klienta_pozycja;`);
       /* Indeksy giną razem ze starą tabelą i trzeba je odtworzyć OBA. Bez
-         `ux_` upsert synchronizatora wstawiałby duplikaty pozycji, a to jest
-         blizna 0.153.1 — praca człowieka przywiązana do klucza. */
+         `ux_` upsert synchronizatora wstawiałby duplikaty pozycji, a do
+         klucza przywiązana jest praca człowieka. */
       database.exec(`CREATE INDEX IF NOT EXISTS ix_zwrot_klienta_pozycja_zwrot
         ON zwrot_klienta_pozycja(zwrot_id)`);
       rozplacDuplikatyKluczy(database);
@@ -2094,24 +1786,22 @@ function ocenaZnaOutlet(database: DatabaseSync) {
 }
 
 /**
- * Zadanie terenowe przestaje blokować przebudowę read-modelu (0.148.1).
+ * Zadanie terenowe przestaje blokować przebudowę read-modelu.
  *
  * `zadanie_terenowe.tw_id` wskazywał na `sgt_towar(tw_id)` BEZ `ON DELETE`,
  * czyli z domyślnym `NO ACTION`. Tymczasem `sgt_towar` jest read-modelem:
  * `importFromMssql` kasuje całą tabelę i wstawia ją od nowa przy każdym
  * odświeżeniu z Subiekta.
  *
- * Skutek był taki, że JEDNO zadanie ze wskazanym towarem wywracało `DELETE
- * FROM sgt_towar` na `FOREIGN KEY constraint failed` — a że import biegnie
- * w `main()` PRZED `app.listen()`, kładło to całe API w pętli restartów NSSM.
- * Mina leżała uzbrojona od 0.141.0 i wybuchła, gdy 0.145.0 dało agentom
- * wyszukiwarkę towaru, czyli pierwszy łatwy sposób na wpisanie `tw_id`.
+ * JEDNO zadanie ze wskazanym towarem wywracałoby `DELETE FROM sgt_towar` na
+ * `FOREIGN KEY constraint failed` — a że import biegnie w `main()` PRZED
+ * `app.listen()`, kładłoby to całe API w pętli restartów NSSM.
  *
  * `SET NULL` jest właściwą odpowiedzią, nie obejściem: zadanie niesie własny
  * snapshot symbolu i nazwy, więc po utracie powiązania nadal mówi hali, o co
  * chodziło. Ta sama tabela trzyma tak `conversation_id` i `message_id`.
  *
- * Zmiana klucza obcego w SQLite wymaga przebudowy tabeli (blizna 0.135.0).
+ * Zmiana klucza obcego w SQLite wymaga przebudowy tabeli.
  */
 function zadanieNieTrzymaTowaru(database: DatabaseSync) {
   const trzymaTowar = () => (database.prepare(
@@ -2183,14 +1873,8 @@ function zadanieNieTrzymaTowaru(database: DatabaseSync) {
 }
 
 /**
- * Hala ma czym odpowiedzieć „nie da się" (0.352.0).
- *
- * Do 0.351.0 zadanie terenowe miało z hali JEDNO wyjście: wynik. Magazynier
- * przed pustą półką mógł więc tylko wpisać brak jako wynik — i zadanie szło do
- * biura oznaczone jako WYKONANE — albo zostawić je w `w_toku`, gdzie nie
- * widział go nikt. Projekt panelu §13.3 wymienia „odrzuca z powodem",
- * „oznacza brak towaru" i „oznacza brak możliwości wykonania" od pierwszej
- * wersji; kod nie miał żadnego z tych trzech.
+ * Hala ma czym odpowiedzieć „nie da się" — powód przy statusie `odeslane`
+ * w `schema.sql` (projekt panelu §13.3).
  *
  * `CHECK` na statusie SQLite poszerzyć w miejscu nie umie, stąd przebudowa —
  * ta sama co przy `towar_identyfikator`. Biegnie PO `zadanieNieTrzymaTowaru`,
@@ -2276,17 +1960,15 @@ function zadanieWracaDoBiura(database: DatabaseSync) {
 
 
 /**
- * Wątek bez ostatniej wiadomości wchodzi do skrzynki (0.151.0).
+ * Wątek bez ostatniej wiadomości wchodzi do skrzynki.
  *
  * Schemat `Thread` w specyfikacji Allegro wymaga WYŁĄCZNIE `id` i `read`.
  * `lastMessageDateTime` i `interlocutor` są opcjonalne, a do tego jawnie
- * `nullable`. Nasze `NOT NULL` na obu kolumnach zamieniało więc poprawną
- * odpowiedź Allegro w błąd zapisu — i to nie teoretycznie, bo wątek świeżo
- * założony żadnej ostatniej wiadomości mieć nie może.
+ * `nullable`, więc `NOT NULL` na obu kolumnach zamieniałoby poprawną
+ * odpowiedź Allegro w błąd zapisu.
  *
  * Kursor synchronizatora porównuje się PARĄ (data, id), więc wątek bez daty
  * nie ma jak w tej parze stanąć — i nie staje, patrz `allegro-inbox-sync.ts`.
- * To osobna sprawa od zapisu i została rozwiązana osobno.
  */
 function watekInboxuDopuszczaBrakDaty(database: DatabaseSync) {
   const wymagaDaty = () => (database.prepare(
@@ -2321,20 +2003,13 @@ function watekInboxuDopuszczaBrakDaty(database: DatabaseSync) {
 }
 
 /**
- * Lądowisko skrzynki przestaje opisywać Allegro, którego nie ma (0.151.0).
+ * Lądowisko skrzynki przestaje opisywać Allegro, którego nie ma.
  *
- * `allegro_inbox_message` miała `author_role NOT NULL` i `read NOT NULL`.
- * Centrum wiadomości nie przysyła ani jednego z tych pól: autora opisuje
- * `author.isInterlocutor`, a stan wiadomości — `status`. Nie miały więc
- * źródła, tylko wartość zmyśloną przy zapisie.
+ * Stara `allegro_inbox_message` miała `author_role NOT NULL` i `read NOT
+ * NULL`, a Centrum wiadomości nie przysyła ani jednego z tych pól: autora
+ * opisuje `author.isInterlocutor`, a stan wiadomości — `status`.
  *
- * To nie jest kosmetyka nazw. Cały kształt odczytu był wymyślony razem
- * z kodem (`lastMessageDate` zamiast `lastMessageDateTime`, `relatedObject`
- * zamiast `relatesTo`), więc synchronizacja NIGDY nie zapisała ani jednego
- * wiersza — każdy wątek wywracał wstawkę na niezwiązanym parametrze. Tabela
- * jest u klienta pusta i przebudowa nic nie kosztuje.
- *
- * Mimo to przebudowa PRZEPISUJE dane zamiast kasować tabelę: gdyby gdzieś
+ * Przebudowa PRZEPISUJE dane zamiast kasować tabelę: gdyby gdzieś
  * stały wiersze z ręcznego eksperymentu, kasowanie zabrałoby też `surowe_json`,
  * czyli jedyny ślad prawdziwej odpowiedzi Allegro. `author_is_interlocutor`
  * wyliczamy ze starej roli (wszystko poza `SELLER` to rozmówca).
@@ -2390,10 +2065,8 @@ function wiadomoscInboxuMaKsztaltAllegro(database: DatabaseSync) {
 }
 
 /**
- * Kasacja obsługi klienta (0.140.0).
- *
- * Rejestry pytań, dyskusji, opinii i zwrotów Allegro oraz nakładka spraw
- * odeszły razem z kodem, który je czytał. Tabela bez czytelnika nie jest
+ * Kasacja starej obsługi klienta: rejestrów pytań, dyskusji, opinii i zwrotów
+ * Allegro oraz nakładki spraw. Tabela bez czytelnika nie jest
  * archiwum, tylko pułapką: następna osoba czytająca schemat zobaczy model
  * danych, którego nikt nie utrzymuje, i uzna go za obowiązujący.
  *
@@ -2402,8 +2075,7 @@ function wiadomoscInboxuMaKsztaltAllegro(database: DatabaseSync) {
  *
  * Kolejność kasowania wynika z kluczy obcych: najpierw dzieci. `kosz_pozycja`
  * przebudowujemy, bo jej `zwrot_id` wskazywał na znikającą tabelę — SQLite
- * nie umie skasować kolumny z kluczem obcym inaczej niż przez nową tabelę
- * (ten sam zabieg co przy `zwrotNieobowiazkowyWKoszu` w 0.75.0).
+ * nie umie skasować kolumny z kluczem obcym inaczej niż przez nową tabelę.
  */
 function bezObslugiKlienta(database: DatabaseSync) {
   const maKolumne = (tabela: string, kolumna: string) =>
@@ -2418,7 +2090,7 @@ function bezObslugiKlienta(database: DatabaseSync) {
     transaction(database, () => {
       if (maKolumne("kosz_pozycja", "zwrot_id")) {
         /* Kolumny przepisujemy WSPÓLNE dla obu kształtów: baza klienta bywa
-           starsza niż schemat i nie ma wszystkich pól z 0.79.0. */
+           starsza niż schemat i nie ma wszystkich pól. */
         const stare = (
           database.prepare("PRAGMA table_info(kosz_pozycja)").all() as Array<{ name: string }>
         ).map((c) => c.name);
@@ -2460,11 +2132,9 @@ function bezObslugiKlienta(database: DatabaseSync) {
          raz za znacznikiem — bo bazy klientów wciąż mają te tabele i każda
          musi je stracić. Skutek uboczny: tabela nazwana tak samo powstałaby
          ze `schema.sql` i znikała sekundę później, po cichu i bez błędu,
-         bo `migrate()` chodzi PO schemacie.
-
-         Dlatego zwroty wróciły w 0.150.0 jako `zwrot_klienta`, a nie `zwrot`.
-         Kto następnym razem wskrzesza read-model sprzedaży, nazywa go
-         `sgt_faktura`, nie `sgt_sprzedaz`. Pilnuje tego `db/migracja-zwrotow.test.ts`. */
+         bo `migrate()` chodzi PO schemacie. Dlatego zwroty to `zwrot_klienta`,
+         a read-model sprzedaży `sgt_faktura`. Pilnuje tego
+         `db/migracja-zwrotow.test.ts`. */
       for (const tabela of [
         "sprawa_tag", "sprawa_zdarzenie", "sprawa_zrodlo", "sprawa", "regula", "szablon",
         "watek_meta", "opinia", "dyskusja", "dopasowanie", "pytanie", "ai_config",
@@ -2479,18 +2149,6 @@ function bezObslugiKlienta(database: DatabaseSync) {
   }
 }
 
-/**
- * Ziarno słownika tagów spraw (0.279.0).
- *
- * Trzy wartości wskazał właściciel, pytany wprost, jakimi słowami opisuje
- * postój sprawy. Dwie pierwsze mówią, CZEGO sprawa czeka — przy sprzęcie
- * ogrodniczym to najczęstszy powód, dla którego reklamacja leży tygodniami,
- * a z ekranu nie było tego widać wcale. Trzecia mówi, KTO ma ruszyć.
- *
- * WSIEWAMY WYŁĄCZNIE DO PUSTEGO SŁOWNIKA — ta sama zasada co przy strefie
- * złotej. Biuro, które raz zmieniło nazwę albo wyłączyło tag, nie ma prawa
- * dostać wartości fabrycznych z powrotem przy restarcie procesu.
- */
 /**
  * Pierwsza lista pilnych do zmierzenia, podana przez właściciela razem z samą
  * funkcją. Bez niej przycisk „PILNE" czekałby, aż ktoś w biurze wklei listę.
@@ -2516,6 +2174,14 @@ function ziarnoPilnychWymiarow(database: DatabaseSync) {
   database.prepare("INSERT INTO wymiary_pilne_ziarno(id, at) VALUES (1, ?)").run(teraz);
 }
 
+/**
+ * Ziarno słownika tagów spraw. Trzy wartości wskazał właściciel: dwie mówią,
+ * CZEGO sprawa czeka, trzecia — KTO ma ruszyć.
+ *
+ * WSIEWAMY WYŁĄCZNIE DO PUSTEGO SŁOWNIKA — ta sama zasada co przy strefie
+ * złotej. Biuro, które raz zmieniło nazwę albo wyłączyło tag, nie ma prawa
+ * dostać wartości fabrycznych z powrotem przy restarcie procesu.
+ */
 function ziarnoTagowSpraw(database: DatabaseSync) {
   const n = (database.prepare("SELECT COUNT(*) AS n FROM reklamacja_tag").get() as { n: number }).n;
   if (n > 0) return;
@@ -2526,10 +2192,10 @@ function ziarnoTagowSpraw(database: DatabaseSync) {
 }
 
 /**
- * Ziarno reguł strefy złotej (0.50.0).
+ * Ziarno reguł strefy złotej.
  *
- * Reguły były stałą w kodzie (`services/strefa-zlota.ts`); od 0.50.0 są
- * edytowalne z panelu biura, więc mieszkają w tabeli. Wsiewamy je WYŁĄCZNIE
+ * Reguły są edytowalne z panelu biura, więc mieszkają w tabeli. Wsiewamy je
+ * WYŁĄCZNIE
  * do pustej tabeli: instalacja, w której biuro już cokolwiek zmieniło, nie ma
  * prawa dostać z powrotem wartości fabrycznych przy restarcie.
  *
@@ -2558,7 +2224,7 @@ function ziarnoStrefyZlotej(database: DatabaseSync) {
 }
 
 /**
- * Rola `brygadzista` wychodzi razem z blokadami pozycji (0.47.0).
+ * Rola `brygadzista` wychodzi razem z blokadami pozycji.
  *
  * Istniała po to, żeby ktoś mógł odebrać koledze zajętą pozycję. Bez locków
  * nie ma czego odbierać, a rola bez ani jednego uprawnienia jest gorsza niż
@@ -2577,33 +2243,7 @@ function bezBrygadzisty(database: DatabaseSync) {
 }
 
 /**
- * Sesje rozkładania wychodzą razem z trybem kontenerowym (0.22.0).
- *
- * KOLEJNOŚĆ JEST WARUNKIEM POPRAWNOŚCI, nie stylem. `putaway_items` miało
- * jedyny w tym schemacie klucz obcy (`session_id → putaway_sessions`), a baza
- * chodzi z `PRAGMA foreign_keys = ON`. Dziecko przed rodzicem znaczy „nie ma
- * już wierszy do sprawdzenia"; odwrotna kolejność wywaliłaby start API i workera
- * naraz, na każdej istniejącej instalacji.
- *
- * `PRAGMA foreign_keys = OFF` NIE jest tu potrzebna — inaczej niż przy
- * `naLoginIHaslo`, gdzie na kasowaną tabelę wskazywało coś Z ZEWNĄTRZ. Tutaj
- * jedyny klucz obcy siedzi wewnątrz kasowanej pary i znika razem z nią.
- *
- * `sfera_queue.session_id` zostaje w starych bazach jako martwa kolumna: INSERT
- * wymienia kolumny jawnie, więc działa i z nią, i bez niej, a przebudowa tabeli,
- * którą jednocześnie trzyma otwartą worker, kosztowałaby bez żadnego zysku.
- * To ten sam wybór co przy 0.17.0 (`koszyk`, `mm_ilosc`, `mm_queue_id`).
- */
-/**
- * `kosz_pozycja.zwrot_id` przestaje być obowiązkowe (0.75.0).
- *
- * Kosz z dokumentu MM nie ma zwrotu przypiętego w aplikacji — pozycje niesie
- * przesunięcie wystawione w Subiekcie. DRUGA przebudowa tabeli w tym repo
- * (pierwsza: `naLoginIHaslo`) i z tego samego powodu: SQLite nie umie zdjąć
- * NOT NULL zwykłym ALTER-em. Wiersze zostają co do jednego.
- */
-/**
- * Indeks unikalności kodu kosza — PRZEBUDOWA, nie dopisanie (0.123.0).
+ * Indeks unikalności kodu kosza — PRZEBUDOWA, nie dopisanie.
  *
  * `CREATE UNIQUE INDEX IF NOT EXISTS` nie rusza indeksu, który już istnieje,
  * więc zmiana predykatu w schema.sql sama z siebie nie dociera do instalacji
@@ -2624,6 +2264,17 @@ function przebudujIndeksKoduKosza(database: DatabaseSync) {
   database.exec(`CREATE UNIQUE INDEX ix_kosz_kod_aktywny ON kosz(kod) ${CEL}`);
 }
 
+/**
+ * Sesje rozkładania wychodzą razem z trybem kontenerowym.
+ *
+ * KOLEJNOŚĆ JEST WARUNKIEM POPRAWNOŚCI: `putaway_items` ma klucz obcy do
+ * `putaway_sessions`, a baza chodzi z `PRAGMA foreign_keys = ON`, więc
+ * dziecko idzie przed rodzicem.
+ *
+ * `sfera_queue.session_id` zostaje w starych bazach jako martwa kolumna:
+ * INSERT wymienia kolumny jawnie, a przebudowa tabeli, którą trzyma otwartą
+ * worker, kosztowałaby bez żadnego zysku.
+ */
 function usunSesjeRozkladania(database: DatabaseSync) {
   // `IF EXISTS` załatwia idempotencję w całości: to dwa DROP-y bez stanu
   // pośredniego, więc API i worker mogą je wykonać w dowolnym przeplocie
@@ -2632,26 +2283,14 @@ function usunSesjeRozkladania(database: DatabaseSync) {
 }
 
 /**
- * Uzupełnia `zwrot.kupujacy_id` w zwrotach sprzed 0.56.6.
+ * Uzupełnia `message.related_order_id` z lądowiska.
  *
- * Zwroty założone wcześniej mają pustą kolumnę, więc szukanie wątku
- * wiadomości nie miałoby dla nich czego użyć. Identyfikator siedzi jednak
- * w zapamiętanej odpowiedzi Allegro (`surowe_json`) — wyciągamy go stamtąd
- * raz, zamiast kazać biuru zakładać te zwroty od nowa. Brak `json_extract`
- * w SQLite tylko zostawia kolumnę pustą; migracja nie zatrzyma startu.
- */
-/**
- * Uzupełnia `message.related_order_id` z lądowiska (0.166.0).
+ * Stare wiadomości nie przyjadą drugi raz — `INSERT … DO NOTHING`
+ * w synchronizatorze celowo ich nie nadpisuje. Numer siedzi jednak
+ * w `allegro_inbox_message.surowe_json`, więc dosypujemy go stamtąd raz.
  *
- * Do 0.165.0 synchronizator mapował z `relatesTo` wyłącznie gałąź `offer`,
- * a `order.id` „zostawał w `surowe_json` do czasu, aż będzie miał ekran".
- * Ekran jest, a wiadomości sprzed tego wydania nie przyjadą drugi raz —
- * `INSERT … DO NOTHING` w synchronizatorze celowo ich nie nadpisuje. Numer
- * siedzi jednak w `allegro_inbox_message.surowe_json`, złączonym po
- * identyfikatorze Allegro, więc dosypujemy go stamtąd raz.
- *
- * Wzorzec `dosypIdKupujacego`: idempotentny UPDATE z warunkiem, `try/catch`,
- * start serwera ważniejszy niż dosypka. Wiadomość bez gałęzi `order` zostaje
+ * Idempotentny UPDATE z warunkiem, `try/catch`: start serwera ważniejszy
+ * niż dosypka. Wiadomość bez gałęzi `order` zostaje
  * przy NULL — `json_extract` oddaje wtedy NULL i warunek ją omija.
  */
 function dosypZamowienieWiadomosci(database: DatabaseSync) {
@@ -2674,19 +2313,16 @@ function dosypZamowienieWiadomosci(database: DatabaseSync) {
 }
 
 /**
- * Znaczniki ze spacją → ISO z `T` i `Z` (0.497.1).
+ * Znaczniki ze spacją → ISO z `T` i `Z`.
  *
- * Sześć zapisów w reklamacjach i dyskusjach wstawiało `datetime('now')`,
- * czyli `'2026-09-25 08:00:00'`, do kolumn, w których reszta kodu trzyma
- * ISO. Skutek widoczny: przeglądarka czyta napis ze spacją jako czas
- * LOKALNY, więc zakończenie dyskusji z 10:00 stało w panelu jako 8:00.
- * Skutek cichy: w jednej kolumnie dwa formaty, a porównanie tekstowe
- * ustawia je w złej kolejności tej samej doby (`'T'` > `' '`).
+ * Stare zapisy `datetime('now')` w reklamacjach dają `'RRRR-MM-DD HH:MM:SS'`.
+ * Przeglądarka czyta napis ze spacją jako czas LOKALNY, a porównanie
+ * tekstowe ustawia dwa formaty w złej kolejności tej samej doby.
  *
  * `datetime('now')` w SQLite to UTC, więc `strftime(…, kolumna)` tylko
  * zmienia zapis, nie godzinę. Warunek GLOB łapie WYŁĄCZNIE dokładny kształt
  * ze spacją — ISO i NULL go omijają, więc drugi start niczego nie rusza.
- * Wzorzec `dosypIdKupujacego`: start serwera ważniejszy niż poprawka.
+ * Start serwera ważniejszy niż poprawka.
  */
 export const KOLUMNY_ZNACZNIKOW_ZE_SPACJA: ReadonlyArray<[string, string]> = [
   ["reklamacja_klienta", "zakonczenie_at"],
@@ -2708,25 +2344,15 @@ function znacznikiIso(database: DatabaseSync) {
   }
 }
 
-function dosypIdKupujacego(database: DatabaseSync) {
-  try {
-    database.exec(
-      `UPDATE zwrot
-          SET kupujacy_id = json_extract(surowe_json, '$.buyer.id')
-        WHERE kupujacy_id IS NULL
-          AND surowe_json IS NOT NULL
-          AND json_extract(surowe_json, '$.buyer.id') IS NOT NULL`
-    );
-  } catch {
-    /* Pusto — zwrot bez identyfikatora dalej szuka wątku po loginie. */
-  }
-}
+const maKolumne = (database: DatabaseSync, tabela: string, kolumna: string): boolean =>
+  (database.prepare(`PRAGMA table_info(${tabela})`).all() as Array<{ name: string }>).some(
+    (c) => c.name === kolumna
+  );
 
 /**
- * Przejście z plakietek na login i hasło (0.20.0).
+ * Przejście z plakietek na login i hasło.
  *
- * PIERWSZA przebudowa tabeli w tym repo — reszta migracji to `addColumn`.
- * Tutaj nie ma innej drogi: `badge_code` jest `UNIQUE`, czyli ma indeks,
+ * Przebudowa tabeli, bo `badge_code` jest `UNIQUE`, czyli ma indeks,
  * a SQLite odmawia `DROP COLUMN` na kolumnie indeksowanej.
  *
  * Wiersze ZOSTAJĄ. Wskazują na nie `events.user_ref` i `sfera_queue.created_by_ref`,
@@ -2738,11 +2364,6 @@ function dosypIdKupujacego(database: DatabaseSync) {
  * zmiany mechanizmu wejścia — inaczej kolektor odłożony w piątek pracuje
  * w poniedziałek na uprawnieniach, których nikt już nie potwierdził.
  */
-const maKolumne = (database: DatabaseSync, tabela: string, kolumna: string): boolean =>
-  (database.prepare(`PRAGMA table_info(${tabela})`).all() as Array<{ name: string }>).some(
-    (c) => c.name === kolumna
-  );
-
 function naLoginIHaslo(database: DatabaseSync) {
   if (!maKolumne(database, "app_user", "badge_code")) return;
 
@@ -2800,15 +2421,13 @@ export function nextMmNumber(): string {
 
 
 /**
- * Zastane dane sprzed granic czasu znikają (0.152.0).
+ * Zastane dane sprzed granic czasu znikają.
  *
- * Właściciel wyznaczył progi: skrzynka od 1 września 2026, zwroty od 20 lipca
- * 2026. Pierwsza synchronizacja po naprawie mapowania zdążyła wciągnąć całą
- * historię konta, więc w bazie leży to, czego panel ma nie pokazywać.
+ * Właściciel wyznaczył progi skrzynki i zwrotów (`wertis.env`), a w bazie
+ * może leżeć starsza historia konta, której panel ma nie pokazywać.
  *
  * KASUJEMY, a nie ukrywamy zapytaniem. Baza, która trzyma co innego, niż widać
- * na ekranie, to rozjazd — a rozjazd między tym, co jest, a tym, co widać,
- * kosztował w tym repo już kilka wieczorów. Utrata jest zresztą pozorna:
+ * na ekranie, to rozjazd. Utrata jest zresztą pozorna:
  * przesunięcie progu w `wertis.env` i ponowna synchronizacja sprowadzą te dane
  * z powrotem z Allegro.
  *
@@ -2871,22 +2490,14 @@ function sprzatnijSprzedGranicy(database: DatabaseSync) {
 }
 
 /**
- * Encje HTML znikają z wierszy zapisanych przed 0.152.0.
+ * Encje HTML znikają z zastanych wierszy.
  *
- * Blizna 0.127.0 kupiona drugi raz: `odkodujEncje` czekała gotowa w `tekst.ts`,
- * a mapowanie jej nie wołało, więc `kt&oacute;ry` stał na ekranie dosłownie.
- * Poprawka w synchronizatorze naprawia tylko to, co przyjdzie od teraz — ta
- * migracja bierze to, co już leży.
+ * Synchronizator dekoduje to, co przychodzi, a ta migracja bierze to, co już
+ * leży, np. `kt&oacute;ry`.
  *
  * Dotyka WYŁĄCZNIE modelu pracy. Lądowiska (`allegro_inbox_*`,
  * `allegro_reklamacja`, `allegro_zwrot`) zostają surowe, bo taka jest ich rola:
  * są dowodem tego, co Allegro przysłało.
- *
- * OD 0.250.0 BIERZE TEŻ SPRAWY POSPRZEDAŻOWE I ZWROTY. Powód jest podwójny.
- * Po pierwsze, tamte synchronizatory nie dekodowały niczego, więc encje leżą
- * w bazie od pierwszego dnia. Po drugie — i to dotyczy także skrzynki —
- * tablica encji znała do 0.249.1 wyłącznie polskie znaki, więc `&aacute;`
- * przetrwało nawet tam, gdzie dekoder był wołany.
  *
  * Ta funkcja chodzi PRZY KAŻDYM STARCIE i nie ma znacznika wersji, więc
  * poszerzenie tablicy naprawia zastane wiersze samo — bez osobnej migracji.

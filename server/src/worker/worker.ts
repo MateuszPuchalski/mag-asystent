@@ -8,7 +8,7 @@ import {
   czekaNaDokument, oznaczBlad, pickTask, powrotyPoDokumentachSfery, przetworzZadanie,
 } from "./kolejka.js";
 
-/* ── Worker NIE migruje schematu (0.177.1) ───────────────────────────────────
+/* ── Worker NIE migruje schematu ───────────────────────────────────
    MUSI stać przed pierwszym dotknięciem bazy, a pierwsze jest `zamelduj()`
    niżej — ono woła `db()` przez `process-state.ts`. Wywołane za późno rzuca
    wyjątkiem, zamiast po cichu nie zadziałać.
@@ -85,7 +85,7 @@ function tick() {
 if (schematGotowy()) zamelduj("worker");
 
 console.log(`[worker] start · poll ${config.worker.pollMs}ms · simErrors=${config.worker.simErrors} · SGT_MODE=${config.sgtMode} · zapis=${config.sferaMode}`);
-/* ── Błąd taktu NIE UBIJA WORKERA (0.416.0) ─────────────────────────────────
+/* ── Błąd taktu NIE UBIJA WORKERA ─────────────────────────────────
    Zgłoszenie właściciela: worker Node wywracał się w kółko na `database is
    locked`, prosto z tego timera. Wyjątek rzucony w wywołaniu zwrotnym timera
    nie ma kogo złapać, więc kładł CAŁY proces; NSSM podnosił go z powrotem
@@ -111,7 +111,7 @@ console.log(`[worker] start · poll ${config.worker.pollMs}ms · simErrors=${con
    zostaje w dzienniku aż do pierwszego czystego taktu.                        */
 let bladTaktu: string | null = null;
 
-/* ── Nowy wertis.env z panelu (0.491.0) ─────────────────────────────────────
+/* ── Nowy wertis.env z panelu ─────────────────────────────────────
    API po zapisie ustawienia kończy się samo i NSSM podnosi je z nowym plikiem.
    Worker czyta ten sam plik, więc musi zrobić to samo — inaczej dwa procesy
    pracowałyby na dwóch konfiguracjach, a to jest stan, przed którym

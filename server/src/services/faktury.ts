@@ -3,18 +3,15 @@ import { logEvent } from "./events.js";
 import { config } from "../config.js";
 import { symbolTypu } from "../adapters/typy-dokumentow.js";
 
-/* ── Dokument sprzedaży przy zwrocie (0.174.0) ───────────────────────────────
-   Ostatnia pozycja z listy biura zwrotów: „widoczny numer paragonu". Pracownik
-   szuka go dziś ręcznie w Subiekcie, żeby wystawić korektę — a szuka po dacie
-   i nazwisku, bo nic innego nie ma.
-
-   Read-model `sgt_faktura` wskrzeszony w tym wydaniu daje CZYM szukać. Ten
-   plik odpowiada na jedno pytanie: który z dokumentów w oknie jest sprzedażą
-   z tego zwrotu.
+/* ── Dokument sprzedaży przy zwrocie ─────────────────────────────────────────
+   Pracownik potrzebuje numeru paragonu, żeby wystawić korektę, a w Subiekcie
+   szuka go po dacie i nazwisku. Read-model `sgt_faktura` daje CZYM szukać.
+   Ten plik odpowiada na jedno pytanie: który z dokumentów w oknie jest
+   sprzedażą z tego zwrotu.
 
    ZASADA NACZELNA: automat wiąże WYŁĄCZNIE pewność, resztę pokazuje jako
    poszlaki i czeka na człowieka. To ta sama doktryna co przy sygnaturze
-   w 0.169.0 i z tego samego powodu — powiązanie prowadzi do KOREKTY, a zła
+   i z tego samego powodu — powiązanie prowadzi do KOREKTY, a zła
    korekta idzie do cudzej sprzedaży i cudzych pieniędzy.                    */
 
 /** Ilu kandydatów najwyżej pokazujemy człowiekowi. */
@@ -63,13 +60,11 @@ interface WierszZwrotu {
 }
 
 /**
- * Dokument sprzedaży nie może być starszy niż zakup — a do 0.174.0 mógł.
+ * Dokument sprzedaży nie może być starszy niż zakup.
  *
- * Okno liczyło się wyłącznie od daty ZWROTU, sześćdziesiąt dni wstecz, więc
- * przy zwrocie z września lista kandydatów niosła paragony z lipca, wystawione
- * przed dniem, w którym klient w ogóle złożył zamówienie. Data zakupu leży
- * w bazie obok (`zamowienie_klienta.kupiono_at`) i ekran ją pokazuje, tylko
- * dopasowanie jej nie czytało.
+ * Samo okno od daty ZWROTU niosłoby paragony wystawione przed dniem, w którym
+ * klient złożył zamówienie. Data zakupu leży w bazie obok
+ * (`zamowienie_klienta.kupiono_at`).
  *
  * Jeden dzień luzu, bo `kupiono_at` jest chwilą w UTC, a `data_wyst` samą
  * datą w czasie lokalnym Subiekta — zakup tuż po północy naszego czasu ma
@@ -122,7 +117,7 @@ export function kandydaciFaktury(zwrotId: number, database: Db = defaultDb()): K
   const koniec = String(z.created_at).slice(0, 10);
   const poczatek = dolnaGranicaOkna(String(z.created_at), z.kupiono_at ?? null, OKNO_DNI);
 
-  /* Wyłącznie SPRZEDAŻ. Od 0.201.0 `sgt_faktura` niesie też korekty (żeby
+  /* Wyłącznie SPRZEDAŻ. `sgt_faktura` niesie też korekty (żeby
      automat wiedział, że towar wrócił na stan), a kandydatem na dokument
      sprzedaży zwrotu korekta być nie może — proponowalibyśmy korektę do
      korekty, i to człowiekowi, który ma z tego wystawić dokument. */
@@ -168,7 +163,7 @@ export function kandydaciFaktury(zwrotId: number, database: Db = defaultDb()): K
   for (const dok of dokumenty) {
     const powody: string[] = [];
     /* Dwie drogi tego samego sygnału. Sellasist pisze numer zamówienia
-       w uwagach (0.175.0), inne integracje — w numerze obcym; obie są
+       w uwagach, inne integracje — w numerze obcym; obie są
        dokładne, więc obie wiążą. Powód nazywa miejsce, żeby biuro wiedziało,
        gdzie w Subiekcie na to spojrzeć. */
     const wNumerze = numerWskazuje(dok.nr_oryg, szukane);
@@ -296,7 +291,7 @@ export function wskazFakture(
  * zdjął.
  *
  * Zwrot idzie WŁASNĄ transakcją: jeden wywrócony nie ma prawa zabrać
- * pozostałych (ta sama lekcja co przy wątkach skrzynki w 0.149.2).
+ * pozostałych.
  */
 export function zwiazFakturyPewne(database: Db = defaultDb(), teraz = new Date()): number {
   const zwroty = database.prepare(
@@ -317,12 +312,9 @@ export function zwiazFakturyPewne(database: Db = defaultDb(), teraz = new Date()
   return powiazane;
 }
 
-/* ── Numer korekty czytany z Subiekta (0.201.0) ─────────────────────────────
-   Do tego wydania numer przepisywał człowiek. Powód był zapisany w projekcie
-   panelu: „brak `dok_Id` sprzedaży — read-model zna tylko FZ i PZ". Ten powód
-   WYGASŁ w 0.174.0 razem z read-modelem sprzedaży, a ostatnią brakującą
-   rzeczą była nazwa kolumny wskazującej dokument korygowany. Właściciel
-   sprawdził ją na bazie firmy: `dok_DoDokId`.
+/* ── Numer korekty czytany z Subiekta ───────────────────────────────────────
+   Korektę wskazuje kolumna `dok_DoDokId` dokumentu korygowanego (sprawdzone
+   przez właściciela na bazie firmy), więc numeru nie trzeba przepisywać.
 
    Automat robi DOKŁADNIE to, co przycisk: zapisuje numer i zamyka zwrot.
    Drugiego kształtu zamkniętego zwrotu nie tworzymy — stan „numer bez
@@ -376,7 +368,7 @@ export function zwiazKorekte(
   if (z.korekta_numer !== null || z.zamkniety_at !== null) return false;
   if (z.werdykt !== "przyjety" || z.kwota_grosze === null) return false;
 
-  /* TYP jest bramką, nie ozdobą (0.201.1). `dok_DoDokId` nie znaczy „to jest
+  /* TYP jest bramką, nie ozdobą. `dok_DoDokId` nie znaczy „to jest
      korekta" — zrzut z bazy firmy pokazał tę kolumnę wypełnioną na dwudziestu
      tysiącach paragonów i dwudziestu pięciu tysiącach WZ. To ogólny odnośnik
      „do dokumentu", a nie znacznik korygowania.
@@ -440,7 +432,7 @@ export function zwiazKorektyPewne(database: Db = defaultDb(), teraz = new Date()
   return powiazane;
 }
 
-/* ── DOKUMENTY SPRZEDAŻY ZAMÓWIENIA ROZMOWY (0.499.0) ───────────────────────
+/* ── DOKUMENTY SPRZEDAŻY ZAMÓWIENIA ROZMOWY ─────────────────────────────────
    Soczewka „Faktura" w skrzynce. Klient pisze „paczkę otrzymaliśmy, faktury
    nie", a agent szedł do Subiekta szukać dokumentu po dacie i nazwisku.
    Read-model `sgt_faktura` zna numer zamówienia na dokumencie, więc panel

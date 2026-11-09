@@ -1,17 +1,10 @@
 /**
- * Kopiowanie do schowka, które działa TAKŻE po zwykłym HTTP (0.228.0).
+ * Kopiowanie do schowka, które działa TAKŻE po zwykłym HTTP.
  *
- * ── BLIZNA ────────────────────────────────────────────────────────────────
  * `navigator.clipboard` istnieje wyłącznie w „bezpiecznym kontekście": HTTPS
  * albo `localhost`. Biuro pracuje pod `http://serwer:3001` i pod
  * `http://mag.wertis.local:3001` (DEPLOY.md §„Kolektory"), czyli ANI JEDNO,
  * ANI DRUGIE — obiekt jest tam `undefined`.
- *
- * Do 0.227.0 przyciski kopiowania przy zwrotach wołały `navigator.clipboard?.`
- * z `.catch(() => {})` na końcu. Na biurowej przeglądarce nie kopiowały więc
- * NIC i nie mówiły o tym ani słowa: ikona mrugała „skopiowano", a schowek
- * zostawał pusty. Cisza była gorsza od braku przycisku, bo człowiek wkleja
- * dopiero gdzie indziej i dowiaduje się o niepowodzeniu po fakcie.
  *
  * ── DLACZEGO `execCommand`, SKORO JEST PRZESTARZAŁY ───────────────────────
  * Bo to jedyna droga, którą przeglądarka daje w niezabezpieczonym kontekście.
@@ -19,8 +12,9 @@
  * stanie za HTTPS, pierwsza gałąź weźmie wszystko i ta druga zwyczajnie
  * przestanie się wykonywać.
  *
- * Zwracamy `boolean`, a nie `void`: wołający MA obowiązek pokazać, że się nie
- * udało. To jest cała różnica wobec poprzedniej wersji.
+ * Zwracamy `boolean`, a nie `void`: wołający MA obowiązek pokazać, że się
+ * nie udało. Cicha porażka jest gorsza od braku przycisku, bo człowiek wkleja
+ * dopiero gdzie indziej i dowiaduje się o niej po fakcie.
  */
 export async function kopiujDoSchowka(tekst: string): Promise<boolean> {
   /* Nowoczesna droga — HTTPS albo localhost. Może odmówić także wtedy, gdy

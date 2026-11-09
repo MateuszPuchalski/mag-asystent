@@ -5,18 +5,17 @@ import { Blad, Przycisk, czas } from "../ui";
 import { Tabela, Td } from "../ui/wglad";
 import { KartaZwinieta } from "./KartaZwinieta";
 
-/* ── Test na żywym Allegro (0.495.0) ─────────────────────────────────────
-   Zgłoszenie właściciela po rozmowie o metodzie Feynmana: „build it”. Nasze
-   bramki sprawdzają kod wobec kodu; ta karta pokazuje, czy drogi produkcji
-   działają wobec prawdziwego Allegro. Serwer przechodzi je raz dziennie, bez
-   atrap. Błąd kroku stoi też w DO DECYZJI i prowadzi tutaj.
+/* ── Test na żywym Allegro ───────────────────────────────────────────────
+   Nasze bramki sprawdzają kod wobec kodu; ta karta pokazuje, czy drogi
+   produkcji działają wobec prawdziwego Allegro. Serwer przechodzi je raz
+   dziennie, bez atrap. Błąd kroku stoi też w DO DECYZJI i prowadzi tutaj.
 
    Trzy stany, nie dwa. „Pominięty” to brak danych albo limit Allegro, czyli
    nie wada drogi — czerwień zapalana przy nim uczyłaby ją ignorować.
 
-   ZWINIĘTA (0.509.0), bo przy zdrowych drogach nikt tu nie zagląda. Krok
+   ZWINIĘTA, bo przy zdrowych drogach nikt tu nie zagląda. Krok
    „nie działa" otwiera ją sam: awaria ma być widać, nie tylko dać się
-   znaleźć. Biuro tak samo otwierało kiedyś zwiniętą kartę konta Allegro. */
+   znaleźć. */
 
 export const NAZWA_KROKU: Record<KrokSondy, string> = {
   watki: "wątki skrzynki", sprawa: "sprawa posprzedażowa", zdjecie_rozmowy: "zdjęcie z rozmowy",

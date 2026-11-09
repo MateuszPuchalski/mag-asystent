@@ -1,7 +1,7 @@
 import { KODY, type Akcja, type Kategoria } from "./klasyfikacja-slownik.js";
 import type { Decyzja, WskazowkaAllegro } from "./klasyfikacja-polityka.js";
 
-/* ── Rejestr mapowań struktury Allegro (specyfikacja z 20 września 2026) ─────
+/* ── Rejestr mapowań struktury Allegro ───────────────────────────────────────
 
    Specyfikacja każe najpierw użyć tego, co Allegro mówi o wątku SAMO, a model
    wołać tylko tam, gdzie treść zostaje niejasna. W `beta.v1` wątek ma `type`

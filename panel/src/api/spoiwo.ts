@@ -6,7 +6,7 @@ import type { Pomylka } from "./pomylki";
 
 export type { DosylkaSprawy, NoweZdarzenie, SprawaKlienta, ZrodloNumeruDosylki } from "./typy";
 
-/* ── Ponad kolejkami (23 września 2026) ─────────────────────────────────────
+/* ── Ponad kolejkami ────────────────────────────────────────────────────────
    Kształty z `server/src/services/szukaj-wszedzie.ts` i `klient-historia.ts`.
    Oba odczyty są GET — ani szukanie, ani otwarcie historii niczego nie
    zapisuje. */
@@ -59,7 +59,7 @@ export function useHistoriaSprawy(rodzaj: "zwrot" | "sprawa", id: number, wlaczo
   });
 }
 
-/* ── Profil klienta (24 września 2026) — kształt z `services/profil-klienta.ts` */
+/* ── Profil klienta — kształt z `services/profil-klienta.ts` */
 
 export type RodzajSprawyKlienta = "rozmowa" | "zwrot" | "reklamacja";
 
@@ -81,18 +81,18 @@ export interface ProfilKlienta {
   }>;
   os: WpisHistorii[];
   notatka: { tresc: string; at: string; przez: string; cofalna: boolean } | null;
-  /** Sprawa klienta (S6, 0.535.0); `null`, dopóki nikt nie ustawił kroku. */
+  /** Sprawa klienta (S6); `null`, dopóki nikt nie ustawił kroku. */
   sprawa: SprawaKlienta | null;
   /** Nic nie czeka w kolejkach, a dzień kroku nadszedł — liczy serwer. */
   podpowiedzZakonczenia: boolean;
   /**
-   * DLACZEGO podpowiedź stoi (0.536.0). Doręczona dosyłka to drugi powód
+   * DLACZEGO podpowiedź stoi. Doręczona dosyłka to drugi powód
    * obok terminu kroku, a każdy mówi agentowi co innego. Wartość logiczna
    * wyżej zostaje, bo starsza karta czyta tylko ją.
    */
   podpowiedzPowod: "termin" | "dosylka" | null;
   /**
-   * Odmowa wypłaty z kodem dosyłki, której nikt nie śledzi (0.536.0). To
+   * Odmowa wypłaty z kodem dosyłki, której nikt nie śledzi. To
    * droga ZAPASOWA: śledzenie zakłada sama odmowa na ekranie zwrotu. Tu
    * trafia odmowa, przy której zapis u nas się nie udał, i odmowa z panelu
    * Allegro, której kod przyszedł synchronizacją.
@@ -140,7 +140,7 @@ export function useCofnijNotatkeKlienta(login: string) {
   });
 }
 
-/* ── Sprawa klienta (S6, 0.535.0) — trasy z `routes/spoiwo.ts` ─────────────
+/* ── Sprawa klienta (S6) — trasy z `routes/spoiwo.ts` ──────────────────────
    Cztery zapisy, każdy na kliknięcie i każdy Z CIAŁEM: wszystkie niosą
    `wersja`, więc reguła klienta HTTP (pusty JSON to 400) nie ma tu okazji.
 
@@ -169,7 +169,7 @@ export type OdpowiedzSprawy = { sprawa: SprawaKlienta };
  * sprawę z czynnymi przyciskami. Drugie kliknięcie szło ze starą wersją
  * i dostawało 409 po udanym przejęciu — jak przy notatce wyżej, która czeka.
  *
- * EKSPORT dla ekranu zwrotów (0.536.0). Odmowa wypłaty z kodem dosyłki
+ * EKSPORT dla ekranu zwrotów. Odmowa wypłaty z kodem dosyłki
  * zmienia sprawę klienta, a szuflada historii przy tym samym zwrocie rysuje
  * jej linijkę. Bez odświeżenia stał tam stary krok zamiast kroku dosyłki.
  */
@@ -239,7 +239,7 @@ export function usePrzejmijSprawe(login: string) {
   });
 }
 
-/* ── Dosyłka sprawy klienta (0.536.0) — trasy z `routes/spoiwo.ts` ──────────
+/* ── Dosyłka sprawy klienta — trasy z `routes/spoiwo.ts` ──────────
    Dwa zapisy z profilu, oba na kliknięcie i oba Z CIAŁEM, z wersją i odciskiem
    sprawy narysowanej na ekranie — ta sama kontrola świeżości co przy kroku.
    Reguły `method` na pierwszym miejscu i pełnego adresu obowiązują tu z tego

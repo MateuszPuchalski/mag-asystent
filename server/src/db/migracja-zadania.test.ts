@@ -146,7 +146,7 @@ test("baza już naprawiona przechodzi migrację bez przebudowy", () => {
   assert.equal(klucz?.on_delete, "SET NULL");
 });
 
-/* ── Poszerzenie CHECK-a statusu (0.352.0) ───────────────────────────────────
+/* ── Poszerzenie CHECK-a statusu ───────────────────────────────────
    `odeslane` to piąty status, a SQLite nie umie poszerzyć `CHECK`-a w miejscu.
    Test dowodzi OBU rzeczy naraz: że stara baza faktycznie odrzuca nowy status
    (więc przebudowa jest konieczna, a nie ostrożnościowa) i że po migracji

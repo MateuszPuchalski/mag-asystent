@@ -24,8 +24,7 @@ describe("Kolejka", () => {
     render(<Kolejka rozmowy={[]} stan={STAN} wybranaId={null} laduje={false}
       onWybierz={() => {}} onOdswiez={() => {}} />);
     expect(screen.getByText(/Brak rozmów/)).toBeInTheDocument();
-    /* Od 0.193.0 data stoi PODPISEM pod tytułem kolumny, a nie własnym pasmem
-       — pasm sterujących nad listą było pięć. Zdanie ma zostać, nie pasmo. */
+    /* Data stoi PODPISEM pod tytułem kolumny, a nie własnym pasmem. */
     expect(screen.getByText(/synchronizacja/)).toBeInTheDocument();
   });
 
@@ -48,7 +47,7 @@ describe("Kolejka", () => {
   });
 
   it("podgląd naszej wiadomości jest podpisany, podgląd klienta — nie", () => {
-    /* Kolejka pokazuje słowa KLIENTA (0.166.0). Gdy klient nic nie napisał,
+    /* Kolejka pokazuje słowa KLIENTA. Gdy klient nic nie napisał,
        stoi nasze zdanie z podpisem „Biuro" — bez niego autoodpowiedź konta
        Allegro czytała się jak pytanie. */
     const { rerender } = render(<Kolejka rozmowy={[rozmowa()]} stan={STAN} wybranaId={null}
@@ -71,9 +70,8 @@ describe("Kolejka", () => {
 
   it("nieświeża kolejka nie powtarza alarmu, ale mówi, z kiedy jest stan", () => {
     /* Pusta kolejka przy stojącym synchronizatorze to nie „brak pytań",
-       tylko „nie wiem". Od 0.522.0 mówi to baner alarmu nad kolumnami
-       (`nieswieza` to dokładnie jego warunek), więc plakietka „STAN Z"
-       i stopka zeszły. Godzina synchronizacji przy tytule zostaje (0.193.0). */
+       tylko „nie wiem". Mówi to baner alarmu nad kolumnami (`nieswieza` to
+       dokładnie jego warunek). Godzina synchronizacji stoi przy tytule. */
     render(<Kolejka rozmowy={[rozmowa()]} stan={STAN} wybranaId={null} laduje={false}
       nieswieza onWybierz={() => {}} onOdswiez={() => {}} />);
     expect(screen.queryByText(/STAN Z/)).not.toBeInTheDocument();
@@ -108,11 +106,10 @@ describe("Kolejka", () => {
   it("kubełek MOJE pokazuje wyłącznie rozmowy zalogowanego agenta, przy których ruch jest nasz", async () => {
     await kubelek(/^Moje/);
     expect(screen.getByText("Moja")).toBeInTheDocument();
-    /* Od 23 września 2026 czekanie na klienta nie jest pracą — stoi
+    /* Czekanie na klienta nie jest pracą — stoi
        w „Oczekujących", nie w „Moje". */
     expect(screen.queryByText("Czeka")).not.toBeInTheDocument();
     expect(screen.queryByText("Nieprzypisana")).not.toBeInTheDocument();
-    /* Od 0.506.0 „Oczekujące" i „Zakończone" stoją pod „Więcej". */
     await userEvent.selectOptions(screen.getByLabelText("Więcej kubełków"), "Oczekujące · 1");
     expect(screen.getByText("Czeka")).toBeInTheDocument();
   });
@@ -136,7 +133,7 @@ describe("Kolejka", () => {
        cofnąć — nikt nie szuka sprawy, której nie widać na żadnej liście. */
     await kubelek(/^Nieprzypisane/);
     expect(screen.queryByText("Sprawa z archiwum")).not.toBeInTheDocument();
-    /* „Wszystkie" stoi od 0.533.0 pod „Więcej" — cyfra 6 dalej go wybiera. */
+    /* „Wszystkie" stoi pod „Więcej" — cyfra 6 go wybiera. */
     await userEvent.keyboard("6");
     expect(screen.getByText("Sprawa z archiwum")).toBeInTheDocument();
   });
@@ -172,14 +169,14 @@ describe("Kolejka", () => {
   });
 });
 
-/* ── Wiersz z §10.2 (0.181.0) ────────────────────────────────────────────── */
+/* ── Wiersz z §10.2 ──────────────────────────────────────────────────────── */
 
 const pokaz = (rozmowy: Rozmowa[]) =>
   render(<Kolejka rozmowy={rozmowy} stan={STAN} wybranaId={null} laduje={false}
     onWybierz={() => {}} onOdswiez={() => {}} />);
 
 /* Wiersze w stanach spoza pracy (czeka na klienta, odłożona, zakończona) stoją
-   od 0.533.0 poza domyślnym „Do odpowiedzi" — test wiersza patrzy więc
+   poza domyślnym „Do odpowiedzi" — test wiersza patrzy więc
    w „Wszystkie", jedyny kubełek, który pokazuje każdy stan. */
 const pokazWszystkie = async (rozmowy: Rozmowa[]) => {
   const r = pokaz(rozmowy);
@@ -187,7 +184,7 @@ const pokazWszystkie = async (rozmowy: Rozmowa[]) => {
   return r;
 };
 
-/* ── RANGA STATUSU W WIERSZU (0.251.0) ───────────────────────────────────────
+/* ── RANGA STATUSU W WIERSZU ─────────────────────────────────────────────────
    Najgłośniejszym elementem wiersza była plakietka statusu — a w kubełkach
    roboczych status jest praktycznie stały, więc emfaza szła na słowo, które
    niczego nie rozróżnia. Te cztery testy pilnują nowego podziału: głośne są
@@ -246,8 +243,7 @@ describe("plakietka należy się WYJĄTKOWI, nie normie", () => {
 
 describe("wiersz kolejki niesie to, co §10.2 wymienia", () => {
   it("czas oczekiwania czyta się bez liczenia w głowie — jedna jednostka i kreski", () => {
-    /* 23 września 2026: minuty przy godzinach odeszły razem z „za dużo tekstu".
-       Kreski mówią „jak bardzo", liczba „ile" — patrz `Czekanie.tsx`. */
+    /* Bez minut przy godzinach („za dużo tekstu"). Kreski mówią „jak bardzo", liczba „ile" — patrz `Czekanie.tsx`. */
     pokaz([rozmowa({ czekaOdMs: 2 * 3600_000 + 14 * 60_000 })]);
     expect(screen.getByTitle("czeka 2 g")).toBeInTheDocument();
     expect(screen.queryByText(/14 min/)).not.toBeInTheDocument();
@@ -306,9 +302,7 @@ describe("kategorie Copilota w kolejce", () => {
     ];
     pokaz(lista);
     const wiersze = screen.getAllByRole("button", { name: /Klient/ });
-    /* Login zszedł w 0.193.0 pod treść pytania, więc kolejności nie da się
-       czytać z początku napisu — czytamy ją z tego, KTÓRY login jest w KTÓRYM
-       wierszu. Sprawdzana rzecz jest ta sama: kolejność zostaje. */
+    /* Kolejność czytamy z tego, KTÓRY login jest w KTÓRYM wierszu. */
     expect(wiersze.map((w, i) => w.textContent?.includes(`Klient ${i + 1}`)))
       .toEqual([true, true, true]);
     expect(wiersze[1].textContent).toContain("Dostępność");
@@ -316,7 +310,7 @@ describe("kategorie Copilota w kolejce", () => {
     expect(wiersze[0].textContent).not.toContain("Dostępność");
   });
 
-  /* ── PIGUŁEK KATEGORII NIE MA (22 września 2026) ──────────────────────────
+  /* ── PIGUŁEK KATEGORII NIE MA ─────────────────────────────────────────────
      Decyzja właściciela. Kategoria zostaje na wierszu, ale nad listą nie ma
      już paska, który zawężał kolejkę po przypuszczeniu maszyny. */
   it("nad listą nie ma paska kategorii — nazwa pada tylko na wierszu", () => {
@@ -331,10 +325,9 @@ describe("kategorie Copilota w kolejce", () => {
   });
 });
 
-/* ── Szukanie w kolejce (0.195.0) ────────────────────────────────────────────
-   Zwroty mają wyszukiwarkę od 0.165.0, skrzynka nie miała żadnej: kubełek
-   mówi „czyje to", kategoria „o czym to", a pytania „czy TA rozmowa gdzieś tu
-   jest" nie zadawał nikt, bo nie było jak.                                  */
+/* ── Szukanie w kolejce ──────────────────────────────────────────────────────
+   Kubełek mówi „czyje to", kategoria „o czym to", a szukanie „czy TA
+   rozmowa gdzieś tu jest".                                                  */
 describe("Szukanie w kolejce", () => {
   const lista = [
     rozmowa({ id: 1, klient: "mirek352810", ostatniaWiadomosc: "Czy pasuje szarpak do NAC?" }),
@@ -453,10 +446,8 @@ describe("kolejność listy (0.215.0)", () => {
   });
 });
 
-/* ── KLAWIATURA W SKRZYNCE (0.383.0) ─────────────────────────────────────────
-   Cztery kolejki obsługi, trzy chodziły z klawiatury od 0.245.0. Skrzynka nie
-   miała ani jednego klawisza — a to na niej agent siedzi najdłużej z całego
-   panelu. Żadna decyzja tego nie wybrała; nikt jej tu po prostu nie dorobił.
+/* ── KLAWIATURA W SKRZYNCE ───────────────────────────────────────────────────
+   Na skrzynce agent siedzi najdłużej z całego panelu.
 
    Nasłuch stoi w KOLEJCE, nie w ekranie: kubełek, kategoria i szukanie są
    stanem tej kolejki, więc tylko ona wie, co jest „następne" po zawężeniu.
@@ -547,9 +538,9 @@ describe("Kolejka: klawiatura", () => {
   });
 
   it("cyfra przełącza kubełek, a pierwszy i domyślny jest „Do odpowiedzi”", async () => {
-    /* Od 0.533.0 pierwszy kubełek to praca, nie przeglądanie — „Wszystkie"
-       zeszło pod „Więcej" jako ostatnie, jak w zwrotach
-       i reklamacjach. Cyfra dalej mapuje się wprost na indeks listy. */
+    /* Pierwszy kubełek to praca, nie przeglądanie — „Wszystkie" stoi pod
+       „Więcej" jako ostatnie, jak w zwrotach i reklamacjach. Cyfra mapuje się
+       wprost na indeks listy. */
     zKlawiszami(null, vi.fn());
     expect(screen.getByRole("button", { name: /Do odpowiedzi/ })).toHaveAttribute("aria-pressed", "true");
     await userEvent.keyboard("2");
@@ -570,8 +561,8 @@ describe("Kolejka: klawiatura", () => {
   });
 
   it("fokus w liście „Więcej” nie przesuwa rozmowy — strzałka należy do listy", async () => {
-    /* Strażnik z `nawigacja/fokus.ts` zna SELECT; własny, sprzed 0.522.0,
-       go nie znał i strzałka w liście przerzucała też rozmowę. */
+    /* Strażnik z `nawigacja/fokus.ts` zna SELECT, więc strzałka w liście nie
+       przerzuca rozmowy. */
     const onWybierz = vi.fn();
     zKlawiszami(null, onWybierz);
     screen.getByLabelText("Więcej kubełków").focus();
@@ -580,11 +571,11 @@ describe("Kolejka: klawiatura", () => {
   });
 
   it("pasek pokazuje klawisze, bo skrót, o którym nikt nie wie, nie skraca pracy", async () => {
-    /* Ta sama lekcja co 0.281.0 na reklamacjach. Pasek NIE obiecuje sit
+    /* Pasek NIE obiecuje sit
        „moje"/„niczyje": w skrzynce „Moje" jest kubełkiem pod cyfrą. */
     zKlawiszami(null, vi.fn());
-    /* Skróty siedzą pod „?" od 0.402.0, od 0.522.0 pod tym samym „?" co
-       słownik znaków. Reguła ta sama: pokazane klawisze mają DZIAŁAĆ. */
+    /* Skróty siedzą pod tym samym „?" co słownik znaków. Pokazane klawisze
+       mają DZIAŁAĆ. */
     await userEvent.click(screen.getByRole("button", { name: "Znaki i skróty" }));
     const pomoc = screen.getByRole("region", { name: "Znaki i skróty" });
     expect(pomoc).toHaveTextContent("ruch po liście");
@@ -605,7 +596,7 @@ describe("Kolejka: klawiatura", () => {
   });
 });
 
-/* ── Podziękowanie bez odpowiedzi (22 września 2026) ─────────────────────────
+/* ── Podziękowanie bez odpowiedzi ────────────────────────────────────────────
    Serwer zdejmuje rozmowę z „Czeka na nas", gdy klasyfikator uznał ostatnią
    wiadomość za podziękowanie. Wiersz ma powiedzieć DLACZEGO, bo podgląd to
    słowa klienta. */
@@ -624,7 +615,7 @@ describe("podziękowanie w kolejce", () => {
   });
 });
 
-/* ── Słownik znaków (23 września 2026) ───────────────────────────────────────
+/* ── Słownik znaków ──────────────────────────────────────────────────────────
    Znaki zastąpiły słowa na wierszu, więc ich lista musi stać jedno kliknięcie
    od kolejki — i otwarcie jej nie może niczego zapisać. */
 describe("słownik znaków pod „?”", () => {
@@ -655,7 +646,7 @@ describe("słownik znaków pod „?”", () => {
   });
 });
 
-/* ── Lista widocznych dla „następnej rozmowy" (23 września 2026) ─────────────
+/* ── Lista widocznych dla „następnej rozmowy" ────────────────────────────────
    Następna po wysyłce ma być następną w TYM, co agent przerabia — po kubełku
    i szukaniu. Kolejka trzyma te sita u siebie, więc musi je podać wyżej. */
 describe("kolejka podaje widoczne wiersze", () => {
@@ -673,8 +664,8 @@ describe("kolejka podaje widoczne wiersze", () => {
   });
 });
 
-/* ── „DO ODPOWIEDZI" (0.533.0) ──────────────────────────────────────────────
-   Decyzja właściciela z 26 września 2026: wejście staje na pracy, nie na
+/* ── „DO ODPOWIEDZI" ────────────────────────────────────────────────────────
+   Decyzja właściciela: wejście staje na pracy, nie na
    archiwum. Nasz ruch, niczyje i moje razem; kolegi i czekające — nie. */
 describe("kubełek „Do odpowiedzi”", () => {
   const LISTA = [
@@ -706,10 +697,10 @@ describe("kubełek „Do odpowiedzi”", () => {
   });
 });
 
-/* ── Wiersz w wariancie C (0.548.0) ─────────────────────────────────────────
-   Decyzja właściciela z 28 września 2026: pierwsza linia to login i wiek,
-   pod nią do dwóch linii pytania, bez kafla po lewej. Zmienia się UKŁAD, nie
-   informacja — każdy znacznik z testów wyżej dalej stoi w wierszu. jsdom nie
+/* ── Wiersz: kto i ile czeka, potem pytanie ─────────────────────────────────
+   Decyzja właściciela: pierwsza linia to login i wiek,
+   pod nią do dwóch linii pytania, bez kafla po lewej. Każdy znacznik z testów
+   wyżej stoi w wierszu. jsdom nie
    liczy linii, więc pilnujemy klas i kolejności w drzewie. */
 describe("wiersz w wariancie C", () => {
   const wiersz = (tekst: string) => screen.getByText(tekst).closest("button")!;
@@ -780,10 +771,9 @@ describe("wiersz w wariancie C", () => {
   });
 });
 
-/* ── „Więcej" w rzędzie kubełków (0.548.0, wariant C) ─────────────────────
-   Lista brała resztę rzędu i po zawinięciu stawała się pełnoszerokim paskiem
-   pod pigułkami. Teraz jest zwartym elementem TEGO SAMEGO rzędu i zawija się
-   tylko wtedy, gdy się nie mieści. */
+/* ── „Więcej" w rzędzie kubełków ─────────────────────────────────────────────
+   Lista jest zwartym elementem TEGO SAMEGO rzędu i zawija się tylko wtedy,
+   gdy się nie mieści. */
 describe("„Więcej” w rzędzie kubełków", () => {
   it("stoi obok „Do odpowiedzi”, „Nieprzypisane” i „Moje”, w jednym zawijanym rzędzie", () => {
     pokaz([rozmowa()]);

@@ -7,17 +7,17 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Analiza } from "./Analiza";
 import type { AnalizaAudytu, AnalizaDostaw, Metryki, RaportTygodnia, RaportWydajnosci } from "../api/wglad";
 
-/* ── ANALIZA w panelu (0.440.0) ──────────────────────────────────────────
-   Gwarancje przeniesione z ANALIZY w `biuro.html`:
+/* ── ANALIZA w panelu ────────────────────────────────────────────────────
+   Gwarancje:
 
    1. ZERO ZAPISU PRZY PATRZENIU — oba zakresy, każde okno, to same odczyty.
    2. POBIERANY JEST TYLKO WIDOCZNY ZAKRES.
    3. WYDAJNOŚĆ PER OSOBA stoi z podstawą prawną i zdaniem, że zgłoszony
-      problem NIE jest miarą błędu — strażnik z `biuro.test.ts` przeszedł tu.
+      problem NIE jest miarą błędu.
       Dla roli biuro serwer przysyła `null` i karty nie ma wcale.
    4. KAŻDY ZAKRES MA SWOJE OKNA — czip spoza zbioru trasy nie istnieje.
    5. WGRANIE ZBIÓREK to jedyny zapis i idzie jako `{ csv }`.
-   6. METRYKI słuchają okna pracy hali — przeszły tu ze stanu systemu. */
+   6. METRYKI słuchają okna pracy hali. */
 
 /* Kształt minimalny — treść karty ma własny test w `analiza/Ergonomia.test.tsx`. */
 const ERGONOMIA = {
@@ -115,7 +115,7 @@ beforeEach(() => {
     if (url.startsWith("/api/analiza/tarcie?days=")) return new Response(JSON.stringify({
       dni: 30, osoby: null, razem: { wyslanych: 40, zeSzkicem: 20, bezZmian: 9, udzialBezZmian: 0.45,
         cofnietychWysylek: 3, cofnietychZakonczen: 1, medianaSekDoWysylki: 95, probekCzasu: 38 },
-      /* Pomiary pod decyzje (0.532.0) — kształt minimalny, treść ma własny
+      /* Pomiary pod decyzje — kształt minimalny, treść ma własny
          test przy `analiza/PomiaryDecyzji.tsx`; tu liczy się skład ekranu. */
       oknoCofniecia: { odlozonych: 43, cofnietych: 3, udzial: 0.07, poOknie: 0, bezCzasu: 0,
         kubelki: [{ odSek: 0, doSek: 2, ile: 3 }, { odSek: 2, doSek: 4, ile: 0 }, { odSek: 4, doSek: 6, ile: 0 },
@@ -123,7 +123,7 @@ beforeEach(() => {
       tarcieSzkicu: { zTwierdzeniami: { zeSzkicem: 0, bezZmian: 0, udzialBezZmian: null },
         bezTwierdzen: { zeSzkicem: 0, bezZmian: 0, udzialBezZmian: null }, bezDanych: 20, przedPo: null },
       gotowosc: [], pominiecia: { odKiedy: null, pominiec: 0, wyslanych: 40, wgDnia: [], wgKategorii: [] } }));
-    /* Miary obsługi (0.444.0, przyszły z ustawień). Kształty minimalne —
+    /* Miary obsługi. Kształty minimalne —
        treść każdej karty ma własny test obok niej; tu liczy się skład. */
     if (url === "/api/obsluga/sygnatury") return new Response(JSON.stringify(
       { pozycji: 0, bezSygnatury: 0, trafia: 0, sygnatur: 0, pudla: [], zdublowane: [] }));
@@ -246,8 +246,8 @@ describe("Analiza w panelu", () => {
   });
 });
 
-/* ── Zakres OBSŁUGA KLIENTA (23 września 2026) ───────────────────────────────
-   Luka zapisana w ekranie od 0.440.0. Pilnujemy trzech rzeczy: zakres pobiera
+/* ── Zakres OBSŁUGA KLIENTA ──────────────────────────────────────────────────
+   Pilnujemy trzech rzeczy: zakres pobiera
    tylko siebie, nie zapisuje nic i nie rysuje karty osób, gdy serwer jej
    nie przysłał (rola biuro). */
 describe("zakres Obsługa klienta", () => {
@@ -258,17 +258,16 @@ describe("zakres Obsługa klienta", () => {
     await screen.findByText("Czas odpowiedzi klientowi");
     expect(adresy).toContain("/api/analiza/obsluga?days=30");
     expect(screen.getByText("38 min")).toBeInTheDocument();
-    /* Kategoria stoi w dwóch tabelach od 24 września 2026: czasu
-       i „bez ponownego pytania”. */
+    /* Kategoria stoi w dwóch tabelach: czasu i „bez ponownego pytania”. */
     expect(screen.getAllByText("Dobór").length).toBe(2);
     expect(screen.getByText("nierozpoznane")).toBeInTheDocument();
     expect(screen.queryByText("Według osoby")).toBeNull();
-    /* Wgląd prowadzi do pracy (0.502.0): liczba bieżąca otwiera kolejkę. */
+    /* Wgląd prowadzi do pracy: liczba bieżąca otwiera kolejkę. */
     expect(screen.getByRole("link", { name: /ostatnie słowo klienta teraz/ })).toHaveAttribute("href", "/obsluga/skrzynka");
     expect(zapisy).toEqual([]);
   });
 
-  /* Liczby reklamacji zeszły z kolejki do wglądu: trend i średni czas
+  /* Liczby reklamacji stoją we wglądzie, nie w kolejce: trend i średni czas
      odpowiadają na „jak idzie”, a nie na „co teraz zrobić”. */
   it("pokazuje reklamacje w liczbach z trendem, samym odczytem kolejki", async () => {
     pokaz();
@@ -282,7 +281,7 @@ describe("zakres Obsługa klienta", () => {
     expect(zapisy).toEqual([]);
   });
 
-  /* Tarcie w skrzynce (0.500.0): trzy liczby pod czasem odpowiedzi, bez
+  /* Tarcie w skrzynce: trzy liczby pod czasem odpowiedzi, bez
      karty osób dla biura i bez zapisu przy otwarciu. */
   it("pokazuje tarcie: cofnięcia, czas do wysyłki i szkice bez zmian", async () => {
     pokaz();
@@ -294,7 +293,7 @@ describe("zakres Obsługa klienta", () => {
     expect(screen.getByText("45%")).toBeInTheDocument();
     expect(screen.getByText(/cofniętych wysyłek z 40/)).toBeInTheDocument();
     expect(screen.queryByText("Tarcie według osoby")).toBeNull();
-    /* Pomiary pod decyzje (0.532.0) z tego samego odczytu — bez drugiego
+    /* Pomiary pod decyzje z tego samego odczytu — bez drugiego
        żądania i bez zapisu przy otwarciu. */
     expect(screen.getByText("Pomiary pod decyzje")).toBeInTheDocument();
     expect(screen.getByRole("region", { name: "Okno cofnięcia" })).toBeInTheDocument();
@@ -302,7 +301,7 @@ describe("zakres Obsługa klienta", () => {
     expect(zapisy).toEqual([]);
   });
 
-  /* Bez ponownego pytania (24 września 2026): udział liczony z odpowiedzi
+  /* Bez ponownego pytania: udział liczony z odpowiedzi
      z wynikiem, a niepewność i odpowiedzi bez wyniku stoją obok, nie w nim. */
   it("pokazuje udział bez ponownego pytania i mówi, ile w nim niepewności", async () => {
     pokaz();
@@ -315,8 +314,8 @@ describe("zakres Obsługa klienta", () => {
     expect(screen.queryByText("Bez ponownego pytania według osoby")).toBeNull();
   });
 
-  /* Miary obsługi przeszły tu z ustawień w 0.444.0. Pilnujemy dwóch
-     rzeczy: stoją w zakresie obsługi i żadna nie pobiera się w innym. */
+  /* Miary obsługi: stoją w zakresie obsługi i żadna nie pobiera się
+     w innym. */
   it("niesie miary obsługi z ustawień i pobiera je dopiero w swoim zakresie", async () => {
     pokaz();
     await screen.findByText("Rosa-Pol");
@@ -330,7 +329,7 @@ describe("zakres Obsługa klienta", () => {
   });
 });
 
-/* ── Zakres Użycie (23 września 2026, obszary jedną linią od 0.542.0) ──────
+/* ── Zakres Użycie ───────────────────────────────────────────────────────────
    Obszar stoi wierszem z liczbami, a jego nieużyte czynności otwiera klik —
    po polsku, z kluczem w dymku; użyte zostają zwinięte. Wejście w zakres
    pobiera wyłącznie jego raport i niczego nie zapisuje. */
@@ -353,7 +352,7 @@ describe("zakres Użycie", () => {
   });
 });
 
-/* ── Zakres TYDZIEŃ (0.497.0) ───────────────────────────────────────────────
+/* ── Zakres TYDZIEŃ ─────────────────────────────────────────────────────────
    Raport tygodnia zapisuje takt serwera, a ekran tylko czyta. Pilnujemy:
    zero zapisu przy patrzeniu i przy zmianie tygodnia, porównanie z poprzednim
    w sztukach, brak czipów okna i zdanie zamiast pustej karty. */
@@ -392,9 +391,9 @@ describe("Analiza: zakres Tydzień", () => {
   });
 });
 
-/* ── Okno podane raz (0.512.0) ──────────────────────────────────────────────
-   Nagłówek Analizy mówi „Okno N dni", a etykiety liczb powtarzały to samo
-   przy każdej karcie. Pilnujemy, że powtórka nie wraca, a etykieta z INNYM
+/* ── Okno podane raz ────────────────────────────────────────────────────────
+   Nagłówek Analizy mówi „Okno N dni", więc etykiety liczb nie powtarzają
+   tego przy każdej karcie. Etykieta z INNYM
    oknem (czas na powrót klienta) zostaje. */
 describe("Analiza: okno podane raz", () => {
   it("nagłówek podaje okno, a liczby go nie powtarzają", async () => {

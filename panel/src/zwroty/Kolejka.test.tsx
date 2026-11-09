@@ -4,22 +4,15 @@ import { describe, expect, it, vi } from "vitest";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { Kolejka, dniSlowo } from "./Kolejka";
+import { Kolejka } from "./Kolejka";
+import { dniSlowo } from "../ui";
 import { Dowody } from "./Dowody";
-import type { PozycjaZwrotu, Zamowienie, Zwrot } from "../api/typy";
+import type { Zamowienie, Zwrot } from "../api/typy";
 
 /* Wiersz kolejki ma się czytać W BIEGU. Te testy pilnują trzech rzeczy,
    od których to zależy: pilność widać bez klikania, sygnał zapala się
    tylko wtedy, gdy naprawdę każe przeczytać, a ekran mówi wprost o tym,
    czego NIE wie i czego nie pobiera. */
-
-const POZYCJA: PozycjaZwrotu = {
-  id: 1, zrodlo: "allegro", offerId: "111", ofertaZamowienia: null, ofertaZdjecie: "nieznane" as const, nazwa: "Sekator NAC", ilosc: 1, cenaGrosze: 4999,
-  waluta: "PLN", powod: "DONT_LIKE_IT", powodKomentarz: "za ciężki", ocena: null,
-  wKoszyku: false, iloscZwrocona: null, url: null, twId: null, twSymbol: null, twZrodlo: null, sku: null, ean: null, potracenieGrosze: null, potraceniePowod: null, propozycja: null,
-      rabat: { stan: "brak", lineItemId: "li-1", ilosc: 1, wniosekId: null,
-      prowizjaGrosze: null, waluta: null, typ: null, powod: null, zrodlo: null },
-};
 
 const ZAMOWIENIE: Zamowienie = {
   externalId: "ord-1", status: "READY_FOR_PROCESSING", kupujacyLogin: null,
@@ -55,7 +48,7 @@ const zwrot = (n: Partial<Zwrot> = {}): Zwrot => ({
    klienta zapytań — inaczej hook wywala się, zanim cokolwiek się narysuje. */
 const zKlientem = (ui: React.ReactNode) => {
   const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
-  /* Router, bo odnośniki do rozmów idą przez niego (0.502.0), jak na ekranie. */
+  /* Router, bo odnośniki do rozmów idą przez niego, jak na ekranie. */
   return <QueryClientProvider client={qc}><MemoryRouter>{ui}</MemoryRouter></QueryClientProvider>;
 };
 
@@ -66,7 +59,7 @@ describe("Kolejka zwrotów", () => {
   });
 
   it("kursor gonimy widokiem, bo kolejka siedzi we własnym scrollerze", () => {
-    /* Od 0.165.0 lista przewija się u siebie, a `j`/`k` przesuwają zaznaczenie
+    /* Lista przewija się u siebie, a `j`/`k` przesuwają zaznaczenie
        bez fokusu. Bez tego wywołania operator po trzech naciśnięciach steruje
        czymś, czego nie widzi. jsdom nie liczy układu — atrapa stoi w
        `src/test/setup.ts` — więc sprawdzamy sam fakt dogonienia. */
@@ -166,23 +159,20 @@ describe("Kolejka zwrotów", () => {
 describe("Dowody", () => {
   it("mówi wprost, czego nie pobiera", () => {
     /* Zdanie, które musi być na ekranie, a nie tylko w kodzie. Bliźniacze —
-       o nieznanej kwocie pełnej — przeniosło się w 0.167.0 razem z pozycjami
-       do środkowej kolumny (`Pozycje.test.tsx`). */
+       o nieznanej kwocie pełnej — stoi w `Pozycje.test.tsx`. */
     render(zKlientem(<Dowody zwrot={zwrot()} />));
     expect(screen.getByText(/Danych nadawcy i konta bankowego nie pobieramy/)).toBeInTheDocument();
   });
 
   it("brak paczki jest zdaniem, nie pustym polem", () => {
     render(zKlientem(<Dowody zwrot={zwrot({ paczkaAt: null })} />));
-    /* Od 0.169.0 zdanie mówi PRAWDĘ: Allegro podaje datę nadania paczki przez
-       klienta, a nie datę jej doręczenia do nas. Wcześniejsze „towar jeszcze
-       nie wrócił" twierdziło coś, czego nie wiemy. */
+    /* Allegro podaje datę nadania paczki przez klienta, a nie datę jej
+       doręczenia do nas. */
     expect(screen.getByText(/Klient nie nadał jeszcze paczki/)).toBeInTheDocument();
   });
 
   it("numer listu stoi przy PRZEWOŹNIKU, bo razem mówią, czym to jechało (0.344.0)", () => {
-    /* Do 0.343.0 panel numeru nie znał: polityka 0.163.0 trzymała go wyłącznie
-       w kopii odpowiedzi Allegro. Decyzja właściciela: „zapisuj numery paczek". */
+    /* Decyzja właściciela: „zapisuj numery paczek". */
     render(zKlientem(<Dowody zwrot={zwrot({ waybill: "600000367616070023174201" })} />));
     expect(screen.getByText("600000367616070023174201")).toBeInTheDocument();
   });
@@ -202,19 +192,19 @@ describe("Dowody", () => {
   it("pokazuje CAŁE zamówienie i zaznacza, co wraca", () => {
     /* „Kupił trzy, oddaje jedną" jest kontekstem decyzji, nie ciekawostką. */
     render(zKlientem(<Dowody zwrot={zwrot({ zamowienie: ZAMOWIENIE })} />));
-    /* Od 0.167.0 zwracane pozycje stoją w środkowej kolumnie, więc TUTAJ
+    /* Zwracane pozycje stoją w środkowej kolumnie, więc TUTAJ
        Sekator jest raz — na liście zamówienia. Kontekst „kupił trzy, oddaje
        jedną" niesie znacznik „wraca" przy jego wierszu. */
     expect(screen.getAllByText("Sekator NAC")).toHaveLength(1);
     expect(screen.getByText("Zraszacz obrotowy")).toBeInTheDocument();
-    /* Od 0.455.0 znacznik to strzałka z liczbą; słowo „wraca" niesie
+    /* Znacznik to strzałka z liczbą; słowo „wraca" niesie
        podpowiedź i tekst dla czytnika — dlatego pytamy o całą treść. */
     const wraca = screen.getAllByTitle("Wraca w tym zwrocie");
     expect(wraca).toHaveLength(1);
     expect(wraca[0]).toHaveTextContent(/^wraca 1$/);
   });
 
-  /* ZGŁOSZENIE WŁAŚCICIELA (0.176.0): „wraca dwie sztuki jest mylące, bo w tym
+  /* ZGŁOSZENIE WŁAŚCICIELA: „wraca dwie sztuki jest mylące, bo w tym
      zamówieniu wracała jedna". Plakietka stała obok liczby KUPIONYCH sztuk,
      więc „2 × 18,99 wraca" czytało się jako liczbę wracających. */
   it("przy zwrocie części zakupu plakietka mówi ile z ilu", () => {
@@ -227,7 +217,7 @@ describe("Dowody", () => {
     expect(screen.getByText("2 × 18,99 PLN")).toBeInTheDocument();
   });
 
-  /* ZGŁOSZENIE WŁAŚCICIELA (0.176.0): „dokument sprzedaży powinien być
+  /* ZGŁOSZENIE WŁAŚCICIELA: „dokument sprzedaży powinien być
      w zamówieniu". Stał osobną sekcją na DNIE kolumny, pod wiadomościami. */
   it("numer dokumentu sprzedaży stoi w sekcji zamówienia", () => {
     render(zKlientem(<Dowody zwrot={zwrot({ zamowienie: ZAMOWIENIE, faktura: {
@@ -248,9 +238,8 @@ describe("Dowody", () => {
   });
 
   it("bez pobranego zamówienia pokazuje identyfikator i MÓWI, CO ZROBIĆ", () => {
-    /* Do audytu z 15 września 2026 zdanie odsyłało do CZEKANIA na
-       synchronizację, choć przycisk „Dociągnij teraz" stoi dwa wiersze niżej.
-       Operator czekał na coś, co miał pod ręką. */
+    /* Zdanie nie odsyła do CZEKANIA na synchronizację, bo przycisk
+       „Dociągnij teraz" stoi dwa wiersze niżej. */
     render(zKlientem(<Dowody zwrot={zwrot()} />));
     expect(screen.getByText("ord-1")).toBeInTheDocument();
     expect(screen.getByText(/dociągnij je, żeby pozycje dostały kartotekę/)).toBeInTheDocument();
@@ -267,8 +256,7 @@ describe("Dowody", () => {
   });
 
   it("przewoźnik stoi przy PACZCE, nie przy zwrocie jako sprawie", () => {
-    /* Mówi o tym, czym paczka jedzie — a nie o zwrocie. Do 0.206.0 stał
-       w sekcji „Zwrot" razem z numerem i loginem, które już tam nie stoją. */
+    /* Mówi o tym, czym paczka jedzie — a nie o zwrocie. */
     render(zKlientem(<Dowody zwrot={zwrot({ przewoznik: "INPOST" })} />));
     expect(screen.getByText(/Przewoźnik: InPost/)).toBeInTheDocument();
   });
@@ -298,9 +286,8 @@ describe("Dowody", () => {
   });
 
   it("data paczki to data NADANIA, a doręczenie ma własną datę", () => {
-    /* Dwie nieprawdy po kolei. Do 0.167.0 ekran pisał przy dacie nadania
-       „Wróciła". Do 0.186.0 pisał „Allegro nie podaje daty doręczenia do nas"
-       — a podaje, w `/order/carriers/{id}/tracking`. */
+    /* Data nadania to nie „Wróciła", a datę doręczenia do nas Allegro
+       podaje w `/order/carriers/{id}/tracking`. */
     render(zKlientem(<Dowody zwrot={zwrot({
       dostarczonoAt: "2026-08-24T10:41:00Z", przesylkaStatus: "DELIVERED" })} />));
     expect(screen.getByText(/Nadana przez klienta/)).toBeInTheDocument();
@@ -328,10 +315,8 @@ describe("Dowody", () => {
   });
 
   it("brak wiedzy o przesyłce mówi o sobie, zamiast orzekać, że nie dotarła", () => {
-    /* TRZECIA NIEPRAWDA W TEJ SEKCJI (0.188.0). Stało tu „Jeszcze do nas nie
-       dotarła" — zdanie twierdzące stawiane wtedy, gdy przewoźnik nie
-       powiedział NIC. Ekran ma przyznać, że nie wie, a nie zgadywać: paczka
-       leżąca w magazynie od trzech dni wyglądała tak samo jak zaginiona. */
+    /* Gdy przewoźnik nie powiedział NIC, ekran przyznaje, że nie wie, a nie
+       zgaduje „nie dotarła". */
     render(zKlientem(<Dowody zwrot={zwrot({
       dostarczonoAt: null, przesylkaStatus: null })} />));
     expect(screen.getByText(/Nie wiadomo, czy dotarła/)).toBeInTheDocument();
@@ -339,10 +324,10 @@ describe("Dowody", () => {
   });
 
   it("paczka nieodebrana nie była NADANA PRZEZ KLIENTA — wróciła sama", () => {
-    /* Klient jej właśnie nie odebrał, więc niczego nie nadawał (0.172.0),
+    /* Klient jej właśnie nie odebrał, więc niczego nie nadawał,
        a `paczkaAt` jest przy niej chwilą, w której biuro wpisało karton do
        kolejki. Ta paczka jest u nas na pewno — i tak ma się pokazywać.
-       Słowo „nieodebrana" stoi od 0.518.0 raz, w plakietce nagłówka. */
+       Słowo „nieodebrana" stoi raz, w plakietce nagłówka. */
     render(zKlientem(<Dowody zwrot={zwrot({
       zrodlo: "nieodebrana", paczkaAt: "2026-08-28T09:00:00.000Z",
       dostarczonoAt: "2026-08-28T09:00:00.000Z" })} />));
@@ -352,8 +337,7 @@ describe("Dowody", () => {
   });
 
   it("kolumna dowodów nie ma sekcji o innych sprawach zakupu: mówi je tylko pasek drogi", () => {
-    /* Do tego wydania stała tu sekcja „Ten zakup u nas" z przystankami drogi
-       i rodzeństwem spraw. Pasek pod nagłówkiem niesie to samo ze stanem. */
+    /* Rodzeństwo spraw niesie wyłącznie pasek pod nagłówkiem. */
     render(zKlientem(<Dowody zwrot={zwrot({ rozmowy: [
       { id: 7, temat: "Kiedy zwrot pieniędzy?", status: "open",
         ostatniaAt: "2026-09-01T10:00:00.000Z" }] })} />));
@@ -362,8 +346,8 @@ describe("Dowody", () => {
   });
 
   it("bez pobranego zamówienia ekran daje drogę wyjścia, nie samo czekanie", () => {
-    /* Diagnoza „czemu ta pozycja nie ma kartoteki" wymagała wcześniej
-       czekania dziesięciu minut na najrzadszy z trzech tickerów. */
+    /* Diagnoza „czemu ta pozycja nie ma kartoteki" nie czeka na najrzadszy
+       z trzech tickerów. */
     const { rerender } = render(zKlientem(<Dowody zwrot={zwrot()} />));
     expect(screen.getByRole("button", { name: /Dociągnij teraz/ })).toBeInTheDocument();
 
@@ -375,11 +359,8 @@ describe("Dowody", () => {
   });
 
   it("przycisk zostaje TAKŻE przy pobranym zamówieniu", () => {
-    /* Blizna 0.220.0. Przycisk stał wyłącznie przy zamówieniu niepobranym,
-       a to jest gałąź, w której akurat najmniej pomaga: gdy zamówienie już
-       jest, a kartoteki nie ma, ten przycisk uruchamia jedyną ręczną drogę
-       do powiązania. Bez niego zostawało klikanie „Zatwierdź" przy każdej
-       pozycji z osobna. */
+    /* Gdy zamówienie już jest, a kartoteki nie ma, ten przycisk uruchamia
+       jedyną ręczną drogę do powiązania. */
     render(zKlientem(<Dowody zwrot={zwrot({ zamowienie: ZAMOWIENIE })} />));
     expect(screen.getByRole("button", { name: /Dociągnij teraz/ })).toBeInTheDocument();
   });

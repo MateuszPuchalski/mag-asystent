@@ -1,8 +1,8 @@
 import { chwilaUtc, czasLokalny, dataLokalna, dodajDni, polnocLokalna } from "../czas.js";
 
-/* ── Dosyłka: zdanie, ton i dni robocze (0.536.0, S6) ───────────────────────
-   Drugi przyrost sprawy klienta: krok „dosłać” dostaje numer przesyłki,
-   przewoźnika i śledzenie. Ten plik to CZYSTA część — zdanie o dosyłce,
+/* ── Dosyłka: zdanie, ton i dni robocze (S6) ────────────────────────────────
+   Krok „dosłać” w sprawie klienta niesie numer przesyłki, przewoźnika
+   i śledzenie. Ten plik to CZYSTA część — zdanie o dosyłce,
    jej ton i rachunek dni roboczych. Bez bazy i bez sieci.
 
    CZYSTY, BO CZYTA GO PIĘĆ MIEJSC. Sprawa klienta, oś zwrotu pieniędzy,
@@ -10,7 +10,7 @@ import { chwilaUtc, czasLokalny, dataLokalna, dodajDni, polnocLokalna } from "..
    zdaniem. Każde z nich czyta `klient_dosylka` własnym zapytaniem, a zdanie
    składa stąd. Import serwisu `dosylka.ts` z tamtych plików zamknąłby cykl
    (`prowadzenie-klienta.ts` ← `dosylka.ts`), a pętla importów przy stałej
-   liczonej w chwili ładowania bywa pustym zbiorem — blizna w `statusy-spraw.ts`.
+   liczonej w chwili ładowania bywa pustym zbiorem (`statusy-spraw.ts`).
 
    ZDANIE SKŁADA SERWER, panel tylko je drukuje. Jedno brzmienie na profilu,
    w „Moje”, przy zwrocie i w historii klienta — cztery kopie w panelu
@@ -22,9 +22,9 @@ import { chwilaUtc, czasLokalny, dataLokalna, dodajDni, polnocLokalna } from "..
 
 /**
  * Kody odmowy wypłaty, które znaczą „wysłaliśmy towar jeszcze raz”.
- * `NEW_ITEM_SENT` podał właściciel 27 września 2026 (zły towar).
- * `MISSING_PART_SENT` doszedł w 0.536.0, bo brakująca część jedzie tak samo,
- * drugą paczką — to do oceny właściciela, nie jego fakt.
+ * `NEW_ITEM_SENT` podał właściciel (zły towar). `MISSING_PART_SENT` też,
+ * bo brakująca część jedzie tak samo, drugą paczką — to do oceny
+ * właściciela, nie jego fakt.
  */
 export const KODY_DOSYLKI = ["NEW_ITEM_SENT", "MISSING_PART_SENT"] as const;
 export type KodDosylki = (typeof KODY_DOSYLKI)[number];
@@ -244,7 +244,7 @@ export const DOSYLKI_SQL = `SELECT d.*, o.przesylka_przewoznik AS przewoznik_zam
  *     tylko nazywa dosyłkę, którą biuro już wysłało i śledzi;
  *   - wiersz powstał albo dostał numer PO zgłoszeniu tego zwrotu według
  *     Allegro — dosyłka wysłana po zwrocie jest odpowiedzią na niego, nie na
- *     wcześniejszy. Numer liczy się osobno (0.536.1): trzecia paczka wpisana
+ *     wcześniejszy. Numer liczy się osobno: trzecia paczka wpisana
  *     do wiersza z pierwszej odmowy ginęła przy odmowie drugiego zwrotu.
  * Wiersz starszy od zwrotu to poprzednia dosyłka: nowa odmowa ją zastępuje.
  * Bez daty zgłoszenia w lądowisku drugi warunek milczy — `julianday(NULL)`.
@@ -283,7 +283,7 @@ export const pilnaDosylka = (d: DosylkaSprawy): boolean => d.bezNumeru || d.ton 
  * Doręczenie po chwili `widzianeDo` — ostatnim ruchu człowieka przy sprawie.
  *
  * Liczy się chwila ZAPISU doręczenia na serwerze (`sprawdzonoAt`), nie data
- * kuriera (0.536.1). Ticker nie pyta o doręczoną, więc jej `sprawdzonoAt` to
+ * kuriera. Ticker nie pyta o doręczoną, więc jej `sprawdzonoAt` to
  * moment zapisu. Numer wpisany po czasie do paczki już doręczonej dawał inaczej
  * doręczenie „sprzed” wpisania i gasił podpowiedź „Zakończ sprawę?”.
  */

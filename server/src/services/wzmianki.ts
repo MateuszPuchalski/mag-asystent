@@ -3,12 +3,10 @@ import { db } from "../db/db.js";
 import { logEvent } from "./events.js";
 
 /**
- * Skrzynka wzmianek — „wspomniano o mnie" (§6.4, 0.160.0).
+ * Skrzynka wzmianek — „wspomniano o mnie" (§6.4).
  *
- * Do tego wydania `conversation_mention` była ZAPISEM BEZ ODCZYTU poza jedną
- * rozmową: wzmianka wracała wyłącznie do tego, kto sam otworzył właściwy wątek.
- * Kto nie zgadł którego, nie dowiadywał się nigdy — a wzmianka jest prośbą
- * o zajęcie się czymś, więc niedostarczona kosztuje tyle, co niezadana.
+ * Wzmianka jest prośbą o zajęcie się czymś, więc niedostarczona kosztuje tyle,
+ * co niezadana. Bez skrzynki wraca tylko do tego, kto otworzył właściwy wątek.
  *
  * Skrzynka jest PER UŻYTKOWNIK i to nie jest wygoda, tylko granica danych:
  * `userId` bierze się z sesji, nigdy z parametru żądania. Wzmianka niesie

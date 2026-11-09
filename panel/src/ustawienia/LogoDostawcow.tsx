@@ -7,7 +7,7 @@ import { Blad, Przycisk } from "../ui";
 import { Potwierdz } from "../ui/Potwierdz";
 import { KartaWgladu, Tabela, Td } from "../ui/wglad";
 
-/* ── Logo dostawców (z `biuro.html` 0.56.0 / 0.87.0, 0.444.0) ───────────
+/* ── Logo dostawców ──────────────────────────────────────────────────────
    Logo pokazuje się magazynierowi po lewej stronie wiersza listy dostaw —
    firmę poznaje się wzrokiem, zanim przeczyta się numer dokumentu. To samo
    logo stoi przy dostawcy w Dostawach tego panelu.
@@ -69,8 +69,7 @@ export function LogoDostawcow() {
   };
 
   return <KartaWgladu id="karta-logo" tytul="Logo dostawców"
-    /* Rada o logo sprzed 0.87.0 zeszła (0.521.0): dotyczyła jednorazowej
-       poprawki sprzed wielu wydań, a stała przy karcie na zawsze. */
+    /* Bez rady o dawnej jednorazowej poprawce logo. */
     opis={<>Widoczne przy dostawie na kolektorze i w Dostawach. Dowolny plik graficzny — PNG, JPG, WEBP albo SVG;
       przeglądarka zmniejszy go i obetnie przezroczysty margines.</>}>
     <input ref={plik} type="file" accept="image/*,.svg" hidden aria-label="Plik logo dostawcy"

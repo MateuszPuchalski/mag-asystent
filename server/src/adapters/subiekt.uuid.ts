@@ -1,4 +1,4 @@
-/* ── Identyfikator zamówienia Allegro w polu uwag dokumentu (0.175.0) ────────
+/* ── Identyfikator zamówienia Allegro w polu uwag dokumentu ────────
    Zrzut z Subiekta firmy pokazał, gdzie integracja NAPRAWDĘ wpisuje numer
    zamówienia: nie w `dok_NrPelnyOryg`, tylko w `dok_Uwagi`, w postaci
    `b9732a20-a621-11f1-8e66-3787b0f6d855 ; Client:143874145`. Read-model

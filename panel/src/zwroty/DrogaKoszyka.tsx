@@ -1,7 +1,7 @@
 import React from "react";
 import { ChevronRight, FileText, Package, Truck, Warehouse } from "lucide-react";
 
-/* ── Droga koszyka: cztery przystanki zamiast akapitu (0.453.0) ───────────────
+/* ── Droga koszyka: cztery przystanki zamiast akapitu ─────────────────────────
    Zgłoszenie właściciela po przeglądzie ekranu: „ulżyj przeładowaniu tekstem,
    użyj ikon". Pasek koszyka nosił stałe zdanie o MM, korektach i hali — to samo
    przy każdym pudle, codziennie. Czytane raz, potem przeskakiwane wzrokiem,

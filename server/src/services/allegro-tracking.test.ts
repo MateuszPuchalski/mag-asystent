@@ -7,10 +7,9 @@ import { odpytajTracking, stanZHistorii, uzupelnijDoreczenia } from "./allegro-t
 import { TRACKING_NA_ZADANIE, urlTrackingu } from "../adapters/allegro.http.js";
 import { BladLimituAllegro, BladOdpowiedziAllegro } from "../adapters/allegro.js";
 
-/* ── Kiedy paczka zwrotna do nas dotarła (0.187.0) ───────────────────────────
-   Do 0.186.0 panel twierdził, że „Allegro nie podaje daty doręczenia do nas".
-   Podaje — w `/order/carriers/{id}/tracking`, gdzie każda zmiana statusu ma
-   `occurredAt`. Zdanie wzięło się ze zbyt wąskiego czytania obiektu zwrotu.  */
+/* ── Kiedy paczka zwrotna do nas dotarła ─────────────────────────────────────
+   Datę doręczenia podaje `/order/carriers/{id}/tracking`, gdzie każda zmiana
+   statusu ma `occurredAt`. Obiekt zwrotu niesie tylko datę nadania.         */
 
 const schema = fs.readFileSync(new URL("../db/schema.sql", import.meta.url), "utf8");
 
@@ -127,7 +126,7 @@ test("partie idą PO PRZEWOŹNIKU i po dwadzieścia numerów", async () => {
   assert.equal(adresy.filter((u) => u.includes("/DPD/")).length, 1);
 });
 
-/* ── Wspólne odpytanie dla zwrotów i dosyłki (0.536.0) ──────────────────────
+/* ── Wspólne odpytanie dla zwrotów i dosyłki ────────────────────────────────
    Jedna droga do końcówki trackingu, dwie polityki przy 429: zwroty idą
    dalej jak przed wydzieleniem, dosyłka oddaje limit taktowi. */
 

@@ -1,7 +1,6 @@
 /**
- * Jedno miejsce na składanie CSV — wcześniej każdy eksport (audyt, problemy,
- * reslot, rekoncyliacja) miał własną kopię escapowania i BOM-a, a kopie już
- * zaczęły się rozjeżdżać w szczegółach cytowania.
+ * Jedno miejsce na składanie CSV: kopie escapowania i BOM-a w każdym
+ * eksporcie rozjeżdżałyby się w szczegółach cytowania.
  *
  * Dwa separatory są celowe i zostają: `;` dla eksportów „dla biura" (Excel PL
  * otwiera bez kreatora importu), `,` dla audytu (RFC 4180 — plik przenośny,

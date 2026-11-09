@@ -6,18 +6,16 @@ import { MemoryRouter, Route, Routes, useLocation } from "react-router-dom";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Skrzynka } from "./Skrzynka";
 
-/* ── EKRAN SKRZYNKI (0.533.0) ───────────────────────────────────────────────
-   Skrzynka nie miała testu EKRANU — tylko testy swoich klocków. Reguła
-   „zero zapisu przy patrzeniu" nie miała więc tu strażnika, a pętla pracy
-   (wysyłka → następna rozmowa → pisanie) nie była sprawdzana jako całość.
-   Każda usterka, którą naprawiło to wydanie, żyła właśnie na styku klocków:
+/* ── EKRAN SKRZYNKI ─────────────────────────────────────────────────────────
+   Test EKRANU, nie klocków: pętla pracy (wysyłka → następna rozmowa →
+   pisanie) żyje na styku klocków.
 
    1. ZERO ZAPISU. Otwarcie ekranu nie wysyła nic poza GET. Otwarcie rozmowy
-      wysyła jedno: uchwyt obecności (§6.3, decyzja 0.159.0) — pamięć procesu,
-      nie wiersz w bazie.
-   2. WYSYŁKA POPRZEDNIEJ NIE BLOKUJE BIEŻĄCEJ. Jedna mutacja niosła obie drogi.
-   3. TEKST ZOSTAJE PRZY SWOJEJ ROZMOWIE. j/k kasowały niezapisaną odpowiedź,
-      a notatka przechodziła do następnej rozmowy.
+      wysyła jedno: uchwyt obecności (§6.3) — pamięć procesu, nie wiersz
+      w bazie.
+   2. WYSYŁKA POPRZEDNIEJ NIE BLOKUJE BIEŻĄCEJ.
+   3. TEKST ZOSTAJE PRZY SWOJEJ ROZMOWIE. j/k nie kasują niezapisanej
+      odpowiedzi, a notatka nie przechodzi do następnej rozmowy.
    4. KLAWIATURA OD LISTY DO WYSYŁKI. Enter do pola, Ctrl+Enter spoza pola,
       podwójne Ctrl+Enter nie wysyła następnej rozmowy.
    5. NASTĘPNA ROZMOWA CZEKA W PAMIĘCI, zanim agent do niej przejdzie. */
@@ -326,7 +324,7 @@ describe("EKRAN SKRZYNKI: pętla pracy", () => {
     expect(nieGet().some((z) => z.url.endsWith("/send"))).toBe(false);
   });
 
-  /* ── Pomiary pod decyzje (0.533.0) ────────────────────────────────────── */
+  /* ── Pomiary pod decyzje ──────────────────────────────────────────────── */
   it("wyjście z rozmowy bez ruchu zgłasza jedno pominięcie — z kategorią, nigdy przy otwarciu", async () => {
     const u = userEvent.setup();
     /* Pełny kształt rozpoznania — ten sam, co w `skrzynka/Copilot.test.tsx`. */

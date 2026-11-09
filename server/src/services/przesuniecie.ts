@@ -8,14 +8,9 @@ import { parseLocs } from "../locs.js";
 import { logEvent } from "./events.js";
 import { putawayLine, validateDeliveryLocation } from "./delivery.js";
 
-/* ── Przesunięcie stanu między magazynami (0.22.0) ───────────────────────────
-   Do 0.22.0 dokument MM umiał powstać w JEDNYM miejscu: przy zatwierdzeniu
-   wózka w sesji kontenerowej. Cała machineria trybu B — dwie tabele, dziesięć
-   funkcji, osiem tras — istniała dla procesu zdarzającego się cztery razy
-   w roku, a najzwyklejsze pytanie „towar leży na MGP, jak go przenieść na
-   halę" nie miało odpowiedzi w ogóle.
-
-   Teraz jest jedna czynność: przesuń tyle a tyle sztuk z magazynu do magazynu.
+/* ── Przesunięcie stanu między magazynami ────────────────────────────────────
+   Odpowiedź na najzwyklejsze pytanie „towar leży na MGP, jak go przenieść
+   na halę". Jedna czynność: przesuń tyle a tyle sztuk z magazynu do magazynu.
    Kontener rozkłada się tak jak każda inna dostawa, a przesunięcie stanu jest
    od niego niezależne.                                                       */
 

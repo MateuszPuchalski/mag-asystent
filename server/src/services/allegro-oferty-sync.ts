@@ -5,28 +5,20 @@ import { BladLimituAllegro } from "../adapters/allegro.js";
 import { kontoKanalu } from "./kanal-konto.js";
 import { naGrosze } from "./allegro-zwroty-sync.js";
 
-/* ── Uzupełnianie ofert do rozmów (0.178.0) ──────────────────────────────────
-   Pytanie zadane pod ofertą niesie SAM NUMER (`relatesTo.offer.id`). Do
-   0.177.1 panel ten numer pokazywał i na tym kończył, więc agent szedł po
-   tytuł do panelu Allegro — czyli tam, gdzie `panel-obslugi-klienta.md` §25
-   obiecuje nie zaglądać. Mail powiadamiający z Allegro ma tytuł, cenę
-   i zdjęcie w bloku „Wiadomość dotyczy"; panel miał mniej niż powiadomienie,
-   od którego zaczynała się cała ta skrzynka.
-
-   Tytuł znaliśmy dotąd WYŁĄCZNIE z pozycji zamówienia o tym numerze oferty
-   (`services/skrzynka.ts`). To działa po zakupie i nie działa wcale przy
-   pytaniu SPRZED zakupu — a takie właśnie przychodzi pod ofertą.
+/* ── Uzupełnianie ofert do rozmów ────────────────────────────────────────────
+   Pytanie zadane pod ofertą niesie SAM NUMER (`relatesTo.offer.id`). Agent
+   ma widzieć tytuł, cenę i zdjęcie bez wychodzenia do panelu Allegro
+   (`panel-obslugi-klienta.md` §25). Pozycja zamówienia zna tytuł dopiero po
+   zakupie, a pytanie pod ofertą przychodzi zwykle SPRZED zakupu.
 
    JEDNO ŻĄDANIE NA PARTIĘ, nie na ofertę: `offer.id` w `/sale/offers` jest
    tablicą (`docs/allegro/swagger.yaml`), więc dwadzieścia numerów kosztuje
    jedno wywołanie. `/sale/product-offers/{id}` obok dałoby ten sam tytuł po
    jednym strzale na sztukę.
 
-   ZDJĘCIE LISTINGOWE OD 0.213.0. `OfferListingDto.primaryImage.url` jedzie
-   w TEJ SAMEJ odpowiedzi i do 0.210.0 wypadało przy mapowaniu — specyfikacja
-   opisuje to pole jako „The image used as a thumbnail on the listings".
-   Wzięcie go nie kosztuje żądania, uprawnienia ani limitu; kosztowało wyłącznie
-   decyzję, którą właściciel podjął w 0.213.0 (patrz `schema.sql`).
+   ZDJĘCIE LISTINGOWE. `OfferListingDto.primaryImage.url` jedzie w TEJ SAMEJ
+   odpowiedzi — specyfikacja opisuje to pole jako „The image used as
+   a thumbnail on the listings". Nie kosztuje żądania, uprawnienia ani limitu.
 
    Ten przebieg nie chodzi po ofertach konta — dociąga wyłącznie te, na które
    wskazuje wiadomość, i najwyżej `NA_PRZEBIEG` naraz.                       */
@@ -73,19 +65,12 @@ export interface OfertySyncDeps {
  * Numery ofert do pobrania: te bez snapshotu ORAZ te ze snapshotem starszym
  * niż doba.
  *
- * Warunek świeżości ma tę samą blizna-genezę, co przy zamówieniach (0.153.1):
- * sam `IS NULL` zamieniłby jedno nieudane pobranie w stan trwały, którego nie
+ * Sam `IS NULL` zamieniłby jedno nieudane pobranie w stan trwały, którego nie
  * da się odkręcić inaczej niż ręcznie w bazie.
  *
- * Kolejność od najnowszej wiadomości: gdy do nadrobienia jest więcej ofert niż
- * partia, agent najpierw dostaje tytuły przy rozmowach, które ma dziś na
- * ekranie, a nie przy najstarszych w historii.
- *
- * ── DWA ŹRÓDŁA NUMERÓW OD 0.213.0 ─────────────────────────────────────────
- * Do 0.210.0 przebieg chodził wyłącznie po ofertach WSKAZANYCH W WIADOMOŚCI,
- * bo snapshot służył jednej rzeczy: tytułowi przy rozmowie. Od 0.213.0 niesie
- * też adres zdjęcia listingowego, a zdjęcie jest potrzebne również przy
- * ZWROCIE — czyli tam, gdzie rozmowy nie ma wcale.
+ * ── DWA ŹRÓDŁA NUMERÓW ────────────────────────────────────────────────────
+ * Oferty WSKAZANE W WIADOMOŚCI dają tytuł przy rozmowie. Zdjęcie jest
+ * potrzebne również przy ZWROCIE, gdzie rozmowy nie ma wcale.
  *
  * Drugie źródło to `zamowienie_klienta_pozycja.offer_id`, czyli
  * `lineItems[].offer.id` ze specyfikacji zamówienia. Bierzemy TĘ kolumnę,
@@ -93,17 +78,11 @@ export interface OfertySyncDeps {
  * wciąż nie znamy (`[WERYFIKUJ]` w `docs/allegro-ksztalt.md`) — pytanie
  * Allegro takim numerem kosztowałoby żądania i nie oddawałoby nic.
  *
- * WIADOMOŚCI IDĄ PIERWSZE i to jest cała rola `rzad` w sortowaniu. Partia ma
- * dwadzieścia miejsc; gdy do nadrobienia jest więcej, agent patrzący na
- * rozmowę ma dostać tytuł przed zdjęciem przy zwrocie sprzed miesiąca.
+ * WIADOMOŚCI IDĄ PIERWSZE i to jest cała rola `rzad` w sortowaniu, a w nich
+ * najnowsze. Partia ma dwadzieścia miejsc; agent patrzący na rozmowę ma
+ * dostać tytuł przed zdjęciem przy zwrocie sprzed miesiąca.
  *
- * ── SNAPSHOT NIEKOMPLETNY TO NIE SNAPSHOT ŚWIEŻY (0.214.0) ────────────────
- * Warunek świeżości puszczał wiersz z wczoraj, choć nie miał on jeszcze
- * kolumny `primary_image_url` — bo kolumna weszła w 0.213.0, a wiersz powstał
- * wcześniej. Zdjęcia czekały więc na to, aż snapshot zestarzeje się o dobę,
- * i tak właśnie wyglądało to na ekranie: „bez zdjęcia" przy ofercie, która
- * na Allegro zdjęcie ma.
- *
+ * ── SNAPSHOT NIEKOMPLETNY TO NIE SNAPSHOT ŚWIEŻY ──────────────────────────
  * `primary_image_url IS NULL` znaczy „nie pytaliśmy jeszcze o obraz" i jest
  * trzecim powodem pobrania. Pętli z tego nie ma, bo po pobraniu kolumna
  * dostaje ADRES albo pusty łańcuch — patrz `zapisz`.
@@ -175,8 +154,8 @@ export async function uzupelnijOferty(deps: OfertySyncDeps = {}): Promise<number
     pobrane = (body?.offers ?? []).filter((o): o is Oferta => typeof o?.id === "string");
   } catch (e) {
     /* Limit z Allegro przerywa przebieg — dalsze żądania pogłębiłyby przerwę.
-       Każdy inny błąd zostaje ostrzeżeniem: brak tytułu cofa panel do stanu
-       sprzed tego wydania, więc nie ma za co zatrzymywać taktu. */
+       Każdy inny błąd zostaje ostrzeżeniem: panel bez tytułu dalej działa,
+       więc nie ma za co zatrzymywać taktu. */
     if (e instanceof BladLimituAllegro) throw e;
     console.warn(`[allegro-oferty] ${e instanceof Error ? e.message : e}`);
     return 0;
@@ -228,20 +207,17 @@ export async function zapewnijSnapshotOferty(
 }
 
 /**
- * Snapshot jednej oferty z `/sale/offers`. Eksportowany od 0.270.0, bo
- * czytelników tej samej odpowiedzi jest odtąd dwóch: ten przebieg (pytanie
- * po `offer.id`) i `allegro-oferty-po-sygnaturze.ts` (pytanie po
- * `external.id`). Ta sama odpowiedź zapisywana dwoma kawałkami kodu
- * rozjechałaby się przy pierwszym nowym polu — a rozjazd byłby cichy, bo obie
- * ścieżki piszą do tej samej tabeli.
+ * Snapshot jednej oferty z `/sale/offers`. Czytelników tej samej odpowiedzi
+ * jest dwóch: ten przebieg (pytanie po `offer.id`) i
+ * `allegro-oferty-po-sygnaturze.ts` (pytanie po `external.id`). Ta sama
+ * odpowiedź zapisywana dwoma kawałkami kodu rozjechałaby się przy pierwszym
+ * nowym polu — a rozjazd byłby cichy, bo obie ścieżki piszą do tej samej tabeli.
  */
 export function zapiszSnapshotOferty(database: Db, o: Oferta, konto: number, at: string): void {
   const kwota = o.sellingMode?.price;
-  /* ── PUSTY ŁAŃCUCH ZNACZY „PYTALIŚMY, NIE MA" (0.214.0) ──────────────────
-     Do 0.213.0 brak adresu schodził na `NULL` — ten sam znak, którym wiersz
-     sprzed tego wydania mówi „nikt jeszcze nie pytał". Dwa różne fakty pod
-     jednym znakiem to dokładnie ta blizna, którą `dopasowanie-sku.ts` opisuje
-     przy SKU oferty: tam `undefined` znaczy „nie mamy snapshotu", a `""` —
+  /* ── PUSTY ŁAŃCUCH ZNACZY „PYTALIŚMY, NIE MA" ────────────────────────────
+     `NULL` znaczy „nikt jeszcze nie pytał". Ta sama zasada co przy SKU oferty
+     w `dopasowanie-sku.ts`: `undefined` znaczy „nie mamy snapshotu", a `""` —
      „mamy snapshot, tylko sprzedawca nie wypełnił pola".
 
      Bez tego rozróżnienia nie da się ani odpytać wiersza niekompletnego raz

@@ -12,13 +12,12 @@ import type { ProblemView, ProblemType } from "../types.js";
    się zmierzyć, ile kosztują, ani zgłosić reklamacji dostawcy.               */
 
 /* ── Kategorie niezgodności ─────────────────────────────────────────────────
-   Lista jest ZAMKNIĘTA i od 0.21.0 jest to DOSŁOWNIE lista z firmowego
-   formularza „Niezgodność w dostawie". Powód jest prosty: zgłoszenie
-   z kolektora i formularz wysyłany dostawcy to dotąd były dwa różne zestawy
-   pól, a różnicę uzupełniało biuro z pamięci.
+   Lista jest ZAMKNIĘTA i jest to DOSŁOWNIE lista z firmowego formularza
+   „Niezgodność w dostawie": zgłoszenie z kolektora i formularz dla dostawcy
+   mają mieć ten sam zestaw pól, żeby biuro nie uzupełniało różnicy z pamięci.
 
    ZGŁASZALNE i NAZYWALNE to dwie różne listy, i to jest zamierzone. Wyjątki
-   sprzed 0.21.0 zostają w bazie na zawsze — historii się nie kasuje — więc
+   ze starymi kluczami zostają w bazie na zawsze — historii się nie kasuje — więc
    muszą mieć etykietę, inaczej protokół dla dostawcy pokazałby surowy klucz
    `qty_short`. Zgłosić ich już jednak nie sposób: formularz ich nie zna.
 
@@ -37,8 +36,6 @@ export const PROBLEM_TYPES: ProblemType[] = [
 /**
  * Czy taki wyjątek wolno dziś zapisać — wyłącznie kategorie formularza.
  *
- * Do 0.26.0 przechodziły też klucze sprzed 0.21.0 (okno wdrożenia APK przez
- * MDM); wszystkie kolektory mają już nowe APK, więc okno się zamknęło.
  * Stare klucze zostają wyłącznie NAZYWALNE (etykiety niżej) — historia
  * w bazie musi mieć etykietę na protokole dla dostawcy.
  */
@@ -52,7 +49,7 @@ export const PROBLEM_TYPES_LABELS: Readonly<Record<ProblemType, string>> = {
   damaged: "Uszkodzone w transporcie",
   qty_mismatch: "Zła ilość",
   extra_item: "Artykuł niezamówiony",
-  // sprzed 0.21.0 — do nazwania, nie do zgłoszenia
+  // stare klucze — do nazwania, nie do zgłoszenia
   qty_short: "Za mało",
   qty_over: "Za dużo",
   no_space: "Brak miejsca",
@@ -61,7 +58,7 @@ export const PROBLEM_TYPES_LABELS: Readonly<Record<ProblemType, string>> = {
 };
 
 /**
- * Zakres kategorii — lustro `ZakresProblemu` w `:core` (0.57.0).
+ * Zakres kategorii — lustro `ZakresProblemu` w `:core`.
  *
  * Kategoria spoza tej listy dotyczy POZYCJI. Zapisujemy tu wyjątki od reguły,
  * a nie całą tabelę, bo nowy typ ma domyślnie wymagać pozycji — to bezpieczna
@@ -71,7 +68,7 @@ export const PROBLEM_TYPES_LABELS: Readonly<Record<ProblemType, string>> = {
 const ZAKRES_DOSTAWA: ReadonlySet<string> = new Set<string>(["extra_item"]);
 
 /**
- * Ile NIEROZWIĄZANYCH wyjątków ma każdy z podanych dokumentów (0.57.0).
+ * Ile NIEROZWIĄZANYCH wyjątków ma każdy z podanych dokumentów.
  *
  * Jedno zapytanie na całą listę dostaw, nie jedno na wiersz. Powstało, bo
  * panel biura był na wyjątki ŚLEPY: wyjątek liczy się jako pozycja domknięta
@@ -118,9 +115,7 @@ const QTY_REQUIRED: ReadonlySet<string> = new Set(PROBLEM_TYPES);
 
 const nowIso = () => new Date().toISOString();
 
-/* Magazyn zdjęć wyprowadzony do `foto.ts` w 0.352.0 — drugim odbiorcą jest
-   zadanie terenowe (§13.3). Nazwy zostają tutejsze, żeby reszta pliku i jego
-   testy czytały się jak dotąd. */
+/* Magazyn zdjęć mieszka w `foto.ts`, bo drugim odbiorcą jest zadanie terenowe. */
 const savePhoto = (base64: string) => zapiszZdjecie(base64);
 
 /** Referencja zdjęcia po id problemu (null = brak zdjęcia albo brak problemu). */
@@ -148,7 +143,7 @@ export interface RaiseProblemInput {
    * Zostaw linii jej dotychczasowy status zamiast ustawiać `problem`.
    *
    * Jedyny klient to automatyczne zgłoszenie NADMIARU przy zamknięciu dostawy
-   * (0.64.0). Tam towar fizycznie leży na półce, więc pozycja JEST odłożona —
+   *. Tam towar fizycznie leży na półce, więc pozycja JEST odłożona —
    * przestawienie jej na `problem` kazałoby magazynierowi wrócić do roboty,
    * której nie ma. Nadmiar jest sprawą biura wobec dostawcy, nie zadaniem hali.
    *
@@ -326,7 +321,7 @@ export function raiseProblem(
   if (SYM_OBCY_REQUIRED.has(input.typ) && !input.symObcy?.trim()) {
     return { error: "Podaj numer katalogowy artykułu spoza dokumentu" };
   }
-  /* ZAKRES W OBIE STRONY (0.57.0). Do tej wersji stała tu tylko połowa reguły
+  /* ZAKRES W OBIE STRONY. Do tej wersji stała tu tylko połowa reguły
      i tylko dla „złej ilości". Druga połowa jest nowa i to ona zamyka dziurę:
      „artykuł niezamówiony" — z definicji towar SPOZA dokumentu — dawało się
      przypiąć do dowolnej pozycji faktury i ustawić jej status `problem`. */
@@ -394,7 +389,7 @@ export function raiseProblem(
   // linia z problemem wypada z rutyny — nie blokuje zamknięcia reszty dostawy
   if (input.lineId && !input.zachowajStatusLinii) {
     db().prepare("UPDATE delivery_line SET status='problem' WHERE id=?").run(input.lineId);
-    // wyjątek NIE domyka dostawy sam (od 0.439.0 — patrz `closeIfComplete`);
+    // wyjątek NIE domyka dostawy sam (patrz `closeIfComplete`);
     // wołanie zostaje, bo reguła domknięcia ma jedno miejsce, nie dwa
     closeIfComplete(input.deliveryId, user);
   }
@@ -457,11 +452,8 @@ export function listUnresolved(): ProblemView[] {
 /**
  * Wyjątki ZAMKNIĘTE ostatnio — żeby hala dowiedziała się, co postanowiono.
  *
- * Do 0.356.0 ta droga nie istniała. Magazynier zgłaszał niezgodność ze
- * zdjęciem, biuro ją zamykało i pisało `resolved_note`, a kolektor pobierał
- * wyłącznie `listUnresolved` — więc zgłoszenie po prostu ZNIKAŁO z ekranu.
- * Z punktu widzenia hali wyglądało to identycznie jak zignorowanie, a to uczy
- * najprostszej rzeczy: nie zgłaszać.
+ * Zgłoszenie, które znika z ekranu bez odpowiedzi, wygląda dla hali jak
+ * zignorowane, a to uczy najprostszej rzeczy: nie zgłaszać.
  *
  * OKNO, nie „wszystkie": lista ma pokazać, co postanowiono, odkąd człowiek
  * ostatnio patrzył, a nie historię magazynu. Kilkaset zamkniętych wyjątków

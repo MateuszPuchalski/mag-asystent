@@ -11,7 +11,7 @@ import { przebudujIdentyfikatory } from "./identyfikatory.js";
  * Dziś to same identyfikatory, po których stan szuka numeru z pytania.
  * Wołane z `importFromMssql` po commicie, z `seed()` po wstawieniu kartotek
  * i raz przy starcie w `main()`, gdy pochodne są puste. Nigdy z `buildApp()`
- * (testy tras) i nigdy z `migrate()` (jeden właściciel schematu, 0.177.1).
+ * (testy tras) i nigdy z `migrate()` (jeden właściciel schematu).
  *
  * Każda przebudowa w osobnym try/catch: pęknięty parser nie ma prawa
  * wywrócić importu, który już się udał. Czas trafia do dziennika, bo budżet

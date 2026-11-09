@@ -6,9 +6,9 @@ import { migrate } from "../db/db.js";
 import { kartotekaPoSku } from "./dopasowanie-sku.js";
 import { AUTOMAT, pokrycieSygnatur, zwiazPewne } from "./sygnatury.js";
 
-/* ── Sygnatura wiąże i widać, ile wiąże (0.169.0) ────────────────────────────
-   Wiązanie oferty z kartoteką po `offer.external.id` działa od 0.152.0, ale do
-   0.168.0 nie dało się zobaczyć, ILE trafia — ani nie wiązało się samo.      */
+/* ── Sygnatura wiąże i widać, ile wiąże ──────────────────────────────────────
+   Wiązanie oferty z kartoteką po `offer.external.id`: ile trafia i czy wiąże
+   się samo.                                                                  */
 
 const schema = fs.readFileSync(new URL("../db/schema.sql", import.meta.url), "utf8");
 const mkDb = () => { const d = new DatabaseSync(":memory:"); d.exec(schema); migrate(d); return d; };

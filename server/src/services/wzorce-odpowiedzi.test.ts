@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { KATEGORIE } from "./klasyfikacja-slownik.js";
 import { WZORCE_ODPOWIEDZI, wzorzecOdpowiedzi } from "./wzorce-odpowiedzi.js";
 
-/* ── Wzorzec odpowiedzi dla kategorii (23 września 2026) ─────────────────────
+/* ── Wzorzec odpowiedzi dla kategorii ────────────────────────────────────────
    Pilnujemy trzech rzeczy. Każda kategoria słownika ma wzorzec. Wzorzec przy
    sprawach, które rozstrzyga człowiek, mówi „nie obiecuj". Kategoria spoza
    słownika nie dostaje wzorca zgadniętego. */

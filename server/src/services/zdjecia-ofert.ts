@@ -4,13 +4,12 @@ import { createHash } from "node:crypto";
 import { config } from "../config.js";
 import { db as defaultDb, nowIso, type Db } from "../db/db.js";
 
-/* ── Cache zdjęć listingowych z Allegro (0.213.0) ────────────────────────────
+/* ── Cache zdjęć listingowych z Allegro ──────────────────────────────────────
    Adres `primaryImage.url` leży w `offer_snapshot`; tutaj mieszka PLIK.
 
-   DLACZEGO PRZEZ SERWER, A NIE WPROST Z `<img src>`. Do 0.210.0 zdjęcia oferty
-   nie było wcale, z uzasadnieniem „obrazek z serwera Allegro znaczyłby wyjście
-   przeglądarki biura poza własną sieć". Ten zakaz obowiązuje dalej i ten moduł
-   jest sposobem, żeby go DOTRZYMAĆ, a nie obejść: do sieci wychodzi serwer,
+   DLACZEGO PRZEZ SERWER, A NIE WPROST Z `<img src>`. Obrazek z serwera Allegro
+   znaczyłby wyjście przeglądarki biura poza własną sieć. Ten moduł jest
+   sposobem, żeby tego zakazu DOTRZYMAĆ, a nie obejść: do sieci wychodzi serwer,
    który i tak rozmawia z Allegro, a przeglądarka bierze plik z naszej trasy.
 
    Trzy rzeczy, które to daje poza prywatnością:
@@ -40,13 +39,11 @@ import { db as defaultDb, nowIso, type Db } from "../db/db.js";
 const DOZWOLONE_HOSTY = [".allegroimg.com"];
 
 /**
- * Co wiadomo o zdjęciu oferty, ZANIM ktokolwiek pójdzie po plik (0.214.0).
+ * Co wiadomo o zdjęciu oferty, ZANIM ktokolwiek pójdzie po plik.
  *
  * Ekran musi umieć powiedzieć trzy różne rzeczy, bo każda każe co innego
  * zrobić: „czekam na Allegro" naprawi się samo w kilka minut, „Allegro nie ma
  * zdjęcia tej oferty" nie naprawi się nigdy, a obraz — jest do obejrzenia.
- * Jeden napis „bez zdjęcia" na wszystkie trzy to ta sama blizna, co sześć
- * zerwanych ogniw łańcucha kartoteki wyglądających identycznie (0.153.1).
  */
 export type StanZdjeciaOferty = "jest" | "brak" | "nieznane";
 

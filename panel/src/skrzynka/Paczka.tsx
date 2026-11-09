@@ -1,4 +1,3 @@
-import React from "react";
 import { Truck } from "lucide-react";
 import type { ZamowienieRozmowy } from "../api/typy";
 import { useSprawdzPrzesylkeRozmowy } from "../api/rozmowy";

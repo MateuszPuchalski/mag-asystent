@@ -1,14 +1,12 @@
-import React from "react";
 import { describe, expect, it, vi } from "vitest";
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { PrzyciskZalacznika, ZalacznikiWysylki, poLudzku } from "./ZalacznikiWysylki";
 import type { ZalacznikSzkicu } from "../api/rozmowy";
 
-/* ── Załączniki do odpowiedzi (0.195.0) ──────────────────────────────────────
-   Odczyt załączników klienta stał od 0.155.0, wysyłka nie istniała wcale —
-   agent szedł po zdjęcie do panelu Allegro, czyli tam, skąd panel miał go
-   zabrać (§25: „agent obsłuży typowe pytanie bez otwierania panelu Allegro").
+/* ── Załączniki do odpowiedzi ────────────────────────────────────────────────
+   Agent wysyła zdjęcie z panelu (§25: „agent obsłuży typowe pytanie bez
+   otwierania panelu Allegro").
 
    Lista pokazuje pliki, które SĄ JUŻ w Allegro: wgranie dzieje się przy
    dodaniu, nie przy WYŚLIJ. Dlatego nazwa i rozmiar to fakty, nie zapowiedzi. */
@@ -18,10 +16,8 @@ const plik = (n: Partial<ZalacznikSzkicu> = {}): ZalacznikSzkicu => ({
   dodal: "A. Lewandowska", ...n,
 });
 
-/* Od 0.249.0 spinacz i lista to DWA komponenty, bo mają różne miejsca na
-   ekranie: przycisk w rzędzie działań, lista przy komponowanej wiadomości.
-   Test renderuje oba razem, bo tak stoją w edytorze — rozdzielenie było
-   o układ, nie o zachowanie. */
+/* Spinacz i lista to DWA komponenty, bo mają różne miejsca na ekranie.
+   Test renderuje oba razem, bo tak stoją w edytorze. */
 type Props = {
   lista: ZalacznikSzkicu[]; dodaje: boolean; blad: string; wylaczone: boolean;
   onDodaj: (p: File) => void; onUsun: (id: number) => void;
@@ -39,7 +35,7 @@ describe("Załączniki DO WYSYŁKI (pasek pod edytorem)", () => {
   it("bez plików mówi, CO wolno dołączyć", () => {
     /* Puste miejsce nie odpowiada na pytanie „czy tu w ogóle można". */
     pasek();
-    /* Ograniczenie formatu ZOSTAJE, ale w podpowiedzi (0.247.0) — czyli tam,
+    /* Ograniczenie formatu ZOSTAJE, ale w podpowiedzi — czyli tam,
        gdzie się go szuka w chwili wątpliwości, a nie w osobnym zdaniu przy
        każdym otwarciu rozmowy. Test pilnuje, że nie zniknęło z ekranu. */
     expect(screen.getByRole("button", { name: /Dołącz plik/ }))

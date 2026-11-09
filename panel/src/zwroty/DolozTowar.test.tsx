@@ -1,11 +1,10 @@
-import React from "react";
 import { describe, expect, it, vi, beforeEach } from "vitest";
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { DolozTowar } from "./DolozTowar";
 import type { TowarDoKosza } from "../api/zwroty";
 
-/* ── Dołożenie towaru do koszyka: skan albo kartoteka (0.365.0) ──────────────
+/* ── Dołożenie towaru do koszyka: skan albo kartoteka ────────────────────────
    Zgłoszenie właściciela, z granicą wypowiedzianą zaraz po nim: „tylko
    z poziomu obsługi zwrotów, jak jeszcze nie jest zamknięty".
 

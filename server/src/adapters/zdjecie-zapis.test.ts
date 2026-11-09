@@ -4,7 +4,7 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 
-/* ── Zapis zdjęcia do kartoteki Subiekta (0.88.0) ────────────────────────────
+/* ── Zapis zdjęcia do kartoteki Subiekta ────────────────────────────
    Do 0.87.0 zdjęcia były WYŁĄCZNIE do odczytu i tak to opisywał
    `docs/subiekt-gt-struktura.md`. To jest pierwszy INSERT tej aplikacji do bazy
    firmy, więc bramkujemy tu wszystko, co da się zbramkować bez serwera MSSQL:

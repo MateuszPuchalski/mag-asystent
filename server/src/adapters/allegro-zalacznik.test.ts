@@ -122,7 +122,7 @@ test("sonda oddaje kody i typy każdej próby, nigdy bajtów", async () => {
   assert.equal(JSON.stringify(w).includes("97dc0b60"), false, "UUID nie wychodzi z sondy");
 });
 
-/* ── Zdjęcia rozmowy dla Copilota idą TĄ SAMĄ drogą co podgląd (24 września 2026) ──
+/* ── Zdjęcia rozmowy dla Copilota idą TĄ SAMĄ drogą co podgląd ──
    Zgłoszenie właściciela: „copilot prawdopodobnie nie czyta zdjęć, które klient
    podesłał". Nie czytał. `przygotujZdjeciaRozmowy` pobierał zapisany adres
    z `upload.allegro.pl`, który na brzegu odpowiada 403 (sonda z 10 września),

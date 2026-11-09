@@ -4,7 +4,7 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 
-/* ── Masowa podmiana adresów z arkusza (0.138.0) ─────────────────────────────
+/* ── Masowa podmiana adresów z arkusza ───────────────────────────────────────
    Funkcja zapisuje do bazy firmy SETKI kartotek jednym kliknięciem, więc test
    pilnuje przede wszystkim tego, czego NIE wolno:
 
@@ -173,7 +173,7 @@ test("plik ponad limit jest odrzucany w całości, z podaniem liczby", () => {
   assert.throws(() => L.przeliczImport(duzy), /2000/);
 });
 
-/* ── Wybór, co zostaje z obecnego pola (0.139.0) ─────────────────────────── */
+/* ── Wybór, co zostaje z obecnego pola ─────────────────────────── */
 
 test("bez wyboru arkusz podmienia CAŁE pole — zachowanie sprzed 0.139.0", () => {
   const r = L.przeliczImport([{ symbol: "08-25001", lokalizacja: "A10-06-01" }]);

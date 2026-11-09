@@ -7,7 +7,7 @@ import path from "node:path";
 process.env.DB_PATH = path.join(fs.mkdtempSync(path.join(os.tmpdir(), "wertis-naglowki-")), "t.db");
 process.env.LOG_LEVEL = "silent";
 
-/* ── Co NAPRAWDĘ wysyłamy do Allegro (0.173.0) ───────────────────────────────
+/* ── Co NAPRAWDĘ wysyłamy do Allegro ───────────────────────────────
    PIERWSZY TEST TEJ FUNKCJI Z PODSTAWIONYM `fetch`. Dotąd sprawdzaliśmy
    budowę adresów i obsługę błędów, ale nigdy nagłówków — a to w nich siedział
    błąd: ciało szło jako `application/json`, czyli typ, którego specyfikacja
@@ -89,7 +89,7 @@ test("ODCZYT nie deklaruje typu treści — pusty content-type bywa powodem odmo
   assert.equal(zebrane[0].headers.accept, PUBLIC);
 });
 
-/* ── Ciało binarne: załącznik wiadomości (0.195.0) ───────────────────────────
+/* ── Ciało binarne: załącznik wiadomości ───────────────────────────
    `PUT /messaging/message-attachments/{id}` jako JEDYNY nasz zapis nie
    przyjmuje wersji zasobu w `content-type`. Specyfikacja wymienia przy nim
    sześć typów plików i nic poza tym.                                        */
@@ -121,8 +121,8 @@ test("415 przy BINARIACH nie chodzi po wersjach — to odmowa typu pliku", async
 });
 
 test("prosimy o POLSKI — `accept-language` jedzie przy każdym żądaniu (0.273.0)", async () => {
-  /* Do 0.272.0 tego nagłówka nie było w serwerze NIGDZIE, więc pola zależne od
-     języka przychodziły w domyślnym Allegro. Specyfikacja wymienia go wprost
+  /* Bez tego nagłówka pola zależne od języka przychodzą w domyślnym
+     Allegro. Specyfikacja wymienia go wprost
      przy `GET /sale/issues` („Expected language of subject field") i przy
      `GET …/chat` („Expected language of messages", z przykładem `en-US`).
 
@@ -144,7 +144,7 @@ test("prosimy o POLSKI — `accept-language` jedzie przy każdym żądaniu (0.27
   }
 });
 
-/* ── Wymuszona beta nie przestawia rodziny (22 września 2026) ───────────────
+/* ── Wymuszona beta nie przestawia rodziny ───────────────
    Listę wątków i Problem z zakupem czytamy w `beta.v1`. Wiadomości zwykłego
    wątku chodzą po negocjowanym `public.v1` i ich mapowanie stoi na tamtym
    kształcie — a to ta sama rodzina `threads`. Gdyby wymuszona beta zapisała

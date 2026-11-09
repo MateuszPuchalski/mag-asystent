@@ -21,9 +21,8 @@ import { DRABINA, oczysc, segmentyPoEtykiecie } from "./opis-sekcje.js";
    a A nie wymienia B, to na karcie A nie pokazujemy nic — sekcja ma być
    odczytem opisu, nie wnioskiem serwera o tym, co się z czym zamienia.
 
-   LISTA BEZ ETYKIETY (0.61.0). Część kartotek nie ma żadnego nagłówka, tylko
-   sam ciąg `S11100 // G74050 // MF381350`. Do 0.61.0 dawało to PUSTĄ sekcję,
-   bo bez etykiety parser nie miał od czego zacząć. Teraz `//` samo w sobie
+   LISTA BEZ ETYKIETY. Część kartotek nie ma żadnego nagłówka, tylko sam ciąg
+   `S11100 // G74050 // MF381350`. `//` samo w sobie
    jest sygnałem: w prozie się nie zdarza, a postawił je człowiek, który
    wypisywał listę. Tryb bez etykiety jest jednak WĘŻSZY od zwykłego i opisuje
    go `TRYB_DOMYSLNY` niżej.                                                  */

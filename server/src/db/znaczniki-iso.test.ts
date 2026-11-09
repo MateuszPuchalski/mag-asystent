@@ -5,7 +5,7 @@ import path from "node:path";
 import { DatabaseSync } from "node:sqlite";
 import { KOLUMNY_ZNACZNIKOW_ZE_SPACJA, migrate } from "./db.js";
 
-/* ── Znaczniki ISO (0.497.1) ─────────────────────────────────────────────
+/* ── Znaczniki ISO ─────────────────────────────────────────────
    Dwie gwarancje. Stare wiersze ze spacją migracja zamienia na ISO, nie
    ruszając godziny ani wierszy już poprawnych. W źródłach serwera nie ma
    `datetime('now'` — ani w zapisie, ani w granicy okna. Oba błędy już

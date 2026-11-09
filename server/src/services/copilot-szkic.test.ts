@@ -57,8 +57,8 @@ beforeEach(() => {
   biuro = Number(d.prepare("INSERT INTO app_user(login,name,role) VALUES ('ala','A. Lewandowska','biuro')").run().lastInsertRowid);
   konto = Number(d.prepare("INSERT INTO channel_account(channel,external_account_id) VALUES ('allegro','s')").run().lastInsertRowid);
   const n = "2026-09-07T10:00:00Z";
-  /* Login siedzi w WĄTKU Allegro, a temat rozmowy to tytuł oferty — dokładnie
-     ten układ, w którym klasyfikacja do 0.230.0 nie maskowała loginu. */
+  /* Login siedzi w WĄTKU Allegro, a temat rozmowy to tytuł oferty — układ,
+     w którym łatwo przeoczyć maskowanie loginu. */
   d.prepare(`INSERT INTO allegro_inbox_thread(id,read,interlocutor_login,surowe_json,synced_at)
     VALUES ('w-1',1,'zielony_ogrod','{}',?)`).run(n);
   rozmowa = Number(d.prepare(`INSERT INTO conversation(channel_account_id,external_conversation_id,subject)
@@ -422,13 +422,12 @@ test("pozycje ponad sufit nie wchodzą, a ostatni fakt mówi, ile pominięto", (
   assert.match(poz[2].zdanie, /„Pilnik"[^\n]*bez kartoteki w Subiekcie; pozostałych 1 pozycji nie podajemy/);
 });
 
-/* ── Linki do naszych aktywnych aukcji (0.270.0) ─────────────────────────── */
+/* ── Linki do naszych aktywnych aukcji ───────────────────────────────────── */
 
 test("link do NASZEJ oferty wchodzi do faktów, z numeracją biegnącą dalej", () => {
-  /* Do 0.269.0 model nie dostawał ani jednego adresu, więc zamiast wskazać
-     ofertę pisał klientowi, żeby poszukał po nazwie albo po EAN-ie. Fakt
-     dokłada się PO `kontekstSzkicu`, bo wymaga sieci — a numeracja musi biec
-     dalej, bo „F12" w odwołaniu modelu ma znaczyć jedno zdanie, nie dwa. */
+  /* Bez adresu oferty model każe klientowi szukać po nazwie albo po EAN-ie.
+     Fakt dokłada się PO `kontekstSzkicu`, bo wymaga sieci — a numeracja musi
+     biec dalej, bo „F12" w odwołaniu modelu ma znaczyć jedno zdanie, nie dwa. */
   const k = S.kontekstSzkicu(rozmowa, subiekt);
   const symbol = [...k.kartoteki.values()][0].symbol;
   const z = S.dopiszLinkiOfert(k, new Map([[symbol.toLowerCase().replace(/[^a-z0-9]/g, ""), {
@@ -502,9 +501,9 @@ test("ścieżka szczęśliwa: wiersz, księga „szkic”, zdarzenie bez treści
 });
 
 test("numer BEZ deklaracji źródła odrzuca szkic: księga notuje błąd, wiersza nie ma", async () => {
-  /* Do 0.252.0 odrzucał tu sam fakt, że numeru nie ma w bazie. Od 0.253.0
-     odrzuca CISZA: model wolno sięgnąć do własnej wiedzy, ale nie wolno mu
-     podać numeru, którego agent nie ma jak sprawdzić przed wysłaniem. */
+  /* Odrzuca CISZA, nie brak numeru w bazie: model wolno sięgnąć do własnej
+     wiedzy, ale nie wolno mu podać numeru, którego agent nie ma jak
+     sprawdzić przed wysłaniem. */
   await assert.rejects(
     S.ulozSzkic(rozmowa, KTO(), nadawca({ tresc: "Pasuje uszczelka XYZ-9999 (F1)." }), subiekt),
     (e: Error) => /XYZ-9999/.test(e.message) && /odrzucony/.test(e.message));
@@ -618,13 +617,13 @@ test("pomiar rozbija księgę po zadaniu i liczy odrzucenia, nie wstawienia", as
   assert.ok(sz.kosztUsd > 0);
   assert.deepEqual(p.szkice, {
     ile: 1, odrzuconych: 0,
-    /* Los przy wysyłce (22 września 2026) — tu nic nie wysłano. */
+    /* Los przy wysyłce — tu nic nie wysłano. */
     wyslanychBezZmian: 0, wyslanychPoprawionych: 0,
   });
 });
 
 test("pomiar podaje czas czekania na model: mediana i p90 po zadaniu, błąd bez czasu odpada", () => {
-  /* 0.532.0. Księga zapisywała `ms` od początku, a nikt go nie czytał. */
+  /* Czas czekania z `ms` w księdze. */
   db().prepare("DELETE FROM copilot_wywolanie").run();
   const wpisz = db().prepare(`INSERT INTO copilot_wywolanie(zadanie,model,ms,wynik) VALUES (?,'m',?,?)`);
   for (const ms of [1_000, 2_000, 3_000, 4_000, 5_000, 6_000, 7_000, 8_000, 9_000, 30_000]) wpisz.run("szkic", ms, "ok");
@@ -775,8 +774,7 @@ test("załącznik UNSAFE nie jedzie do dostawcy nawet wtedy, gdy jest obrazem", 
 test("ten sam numer BEZ zadeklarowanego odczytu dalej wywraca szkic", async () => {
   powieszZdjecie("tabliczka.png");
   /* Dowód, że test wyżej mierzy poprawkę, a nie pobożne życzenie: identyczna
-     treść bez `odczytZeZdjec` ma paść na tym samym odsiewie, co przed tym
-     wydaniem. Zdjęcia nie zniosły reguły „numer albo ze źródła, albo wcale" —
+     treść bez `odczytZeZdjec` ma paść na odsiewie. Zdjęcia nie zniosły reguły „numer albo ze źródła, albo wcale" —
      dały jej jedno źródło więcej, sprawdzalne i widoczne dla agenta. */
   await assert.rejects(
     S.ulozSzkic(rozmowa, KTO(), szpieg({
@@ -786,9 +784,9 @@ test("ten sam numer BEZ zadeklarowanego odczytu dalej wywraca szkic", async () =
     /nie mówiąc, skąd go ma/);
 });
 
-/* ── Rozpoznanie w faktach szkicu (22 września 2026) ────────────────────────
-   Szkic był szyty pod dobór i prosił o tabliczkę także klienta, który pytał
-   o paczkę. Teraz dostaje rozpoznanie jako fakt — przypuszczenie, nie źródło. */
+/* ── Rozpoznanie w faktach szkicu ───────────────────────────────────────────
+   Szkic nie ma prosić o tabliczkę klienta, który pyta o paczkę. Dostaje
+   rozpoznanie jako fakt — przypuszczenie, nie źródło. */
 
 function rozpoznaj(kategoria: string, akcja: string, n: { wymaga?: number; brakZam?: number } = {}) {
   db().prepare(`INSERT INTO decyzja_klasyfikacji(conversation_id,message_id,wersja,aktywna,zrodlo,status,
@@ -804,7 +802,7 @@ test("rozpoznanie wchodzi do faktów, a pytanie o paczkę nie dostaje intake o m
   assert.match(String(r?.zdanie), /ORDER_STATUS; następny krok: GET_SHIPMENT/);
   assert.match(String(r?.zdanie), /brakuje danych zamówienia/);
   assert.match(String(r?.zdanie), /nie obiecuj rozstrzygnięcia/);
-  /* Wzorzec odpowiedzi dla kategorii (23 września 2026) stoi w tym samym fakcie. */
+  /* Wzorzec odpowiedzi dla kategorii stoi w tym samym fakcie. */
   assert.match(String(r?.zdanie), /jak odpowiedzieć: podaj stan zamówienia i przesyłki/);
   assert.equal(k.fakty.some((f) => f.rodzaj === "intake"), false);
 });
@@ -837,7 +835,7 @@ test("twierdzenie oparte na rozpoznaniu schodzi do „niepewne” ze źródłem 
   assert.equal(b.obnizona, true);
 });
 
-/* ── Przesyłka w faktach szkicu (23 września 2026) ──────────────────────────
+/* ── Przesyłka w faktach szkicu ─────────────────────────────────────────────
    Klient pytający pod zamówieniem pyta najczęściej „gdzie paczka". Pilnujemy
    trzech decyzji: fakt stoi tylko po sprawdzeniu (milczenie zamiast zgadywania),
    numer przesyłki NIE idzie do dostawcy modelu, a Allegro pytamy wyłącznie
@@ -899,7 +897,7 @@ test("przed szkicem pytamy Allegro o stan pusty albo stary, o doręczoną już n
   assert.equal(wolane.length, 0, "doręczona już się nie zmieni");
 });
 
-/* ── „Kiedy będzie" przy braku na stanie (0.502.0) ─────────────────────────
+/* ── „Kiedy będzie" przy braku na stanie ───────────────────────────────────
    Fakt stoi tylko przy braku, nie niesie dostawcy ani numeru dokumentu
    i mówi wprost, że termin jest terminem dostawcy. */
 test("kiedy będzie: tylko przy braku, bez dostawcy, termin nazwany terminem dostawcy", () => {

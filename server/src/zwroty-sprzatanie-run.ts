@@ -4,7 +4,7 @@ import {
   type PodsumowanieSprzatania,
 } from "./services/zwroty-sprzatanie.js";
 
-/* ── Kasowanie zwrotów rozliczonych poza aplikacją (0.340.0) ────────────────
+/* ── Kasowanie zwrotów rozliczonych poza aplikacją ────────────────
    Osobny proces, nie trasa w API — ta sama zasada co przy `zwroty:reset`:
    trasa dałaby przycisk kasujący historię firmy jednym kliknięciem, a to jest
    operacja nieodwracalna, którą wykonuje się świadomie z konsoli.

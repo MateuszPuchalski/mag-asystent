@@ -1,10 +1,9 @@
 import { describe, it, expect, vi } from "vitest";
-import React from "react";
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type { OfertaRozmowy as Dane, StanZdjeciaOferty } from "../api/typy";
 
-/* Zdjęcie oferty (0.213.0): pobranie idzie `fetch`em, a w jsdomie nie ma dokąd
+/* Zdjęcie oferty: pobranie idzie `fetch`em, a w jsdomie nie ma dokąd
    go wysłać. Atrapa mówi „obraz jest", więc widać, czy kafel w ogóle staje. */
 vi.mock("../towar/useZdjecie", () => ({
   useZdjecie: () => null,
@@ -85,7 +84,7 @@ describe("zdjęcie listingowe oferty", () => {
     expect(screen.getByText(/Zdjęcie z oferty Allegro/)).toBeInTheDocument();
   });
 
-  /* ── TRZY STANY, TRZY ZDANIA (0.214.0) ────────────────────────────────────
+  /* ── TRZY STANY, TRZY ZDANIA ──────────────────────────────────────────────
      Właściciel przysłał zrzut: przy zwrocie stały dwa kafle „BEZ ZDJĘCIA",
      a oferta na Allegro zdjęcie miała. Snapshot był po prostu starszy niż
      kolumna z adresem — czyli ekran mówił „nie ma", gdy prawdą było „jeszcze
@@ -105,7 +104,7 @@ describe("zdjęcie listingowe oferty", () => {
   });
 });
 
-/* ── Lista „Pasuje do" (23 września 2026) ────────────────────────────────────
+/* ── Lista „Pasuje do" ───────────────────────────────────────────────────────
    Zwinięta, bo bywa na dwieście pozycji. Na wierzchu stoi sama liczba. */
 describe("lista zgodności oferty", () => {
   const Z = (n: Partial<NonNullable<Dane["zgodnosc"]>> = {}): NonNullable<Dane["zgodnosc"]> => ({

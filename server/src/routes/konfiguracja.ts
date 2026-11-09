@@ -12,7 +12,7 @@ import { logEvent } from "../services/events.js";
 import { BladZmiany, zmienKlucz } from "../services/konfiguracja-zapis.js";
 import { zaplanujRestart } from "../services/restart.js";
 
-/* ── Konfiguracja serwera w panelu (0.488.0) ─────────────────────────────────
+/* ── Konfiguracja serwera w panelu ─────────────────────────────────
    Sam odczyt. Bramka: wyłącznie admin, bo lista pokazuje adres bazy firmy,
    login SQL i konta, z którymi rozmawia serwer. Biuro nie ma tu nic do
    zrobienia, a lista celów wystawiona szerzej niż trzeba jest ryzykiem bez
@@ -22,7 +22,7 @@ import { zaplanujRestart } from "../services/restart.js";
    `privileged` do dziennika, a to jest zapis przy samym patrzeniu — reguła
    zero zapisu przy otwarciu ekranu obowiązuje także karty ustawień. */
 
-/* Stan z decyzją automatu (0.494.0): panel pokazuje to samo zdanie, którym
+/* Stan z decyzją automatu: panel pokazuje to samo zdanie, którym
    kieruje się takt. `decyzjaTeraz` nie pobiera niczego i niczego nie zleca. */
 function zAutomatem() {
   const u = ustawieniaAuto();
@@ -40,7 +40,7 @@ export async function konfiguracjaRoutes(app: FastifyInstance) {
     return stanKonfiguracji(envFile);
   });
 
-  /* ── Zmiana jednego klucza (0.491.0) ────────────────────────────────────
+  /* ── Zmiana jednego klucza ────────────────────────────────────
      Jeden klucz na żądanie, nie formularz całości. Każda zmiana przechodzi
      osobno przez próbę startu i zostawia osobny wpis w dzienniku, więc
      „kto przestawił próg skrzynki" ma jedną odpowiedź, a nie paczkę.
@@ -72,7 +72,7 @@ export async function konfiguracjaRoutes(app: FastifyInstance) {
     },
   );
 
-  /* ── Aktualizacja serwera (0.492.0) ─────────────────────────────────────
+  /* ── Aktualizacja serwera ─────────────────────────────────────
      Odczyt jak przy konfiguracji: sam admin, bez `autoryzuj`, bo patrzenie
      nie zostawia śladu. Lista wydań pochodzi z pamięci, którą odświeża takt
      w `main()` albo przycisk „Sprawdź teraz" — samo otwarcie karty nie

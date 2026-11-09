@@ -30,8 +30,8 @@ describe("DialogKonfliktu", () => {
   });
 
   it("„wyślij mimo to\" jest martwy bez jawnej zgody", async () => {
-    /* Blizna 0.110.0: odpowiedź szła na starą wersję pytania po cichu.
-       Zgoda musi być kliknięciem, a nie domysłem. */
+    /* Odpowiedź nie idzie po cichu na starą wersję pytania. Zgoda musi być
+       kliknięciem, a nie domysłem. */
     const wyslij = vi.fn();
     render(<DialogKonfliktu {...props} onWyslijMimoTo={wyslij} />);
     const przycisk = screen.getByRole("button", { name: "WYŚLIJ MIMO TO" });

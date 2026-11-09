@@ -6,10 +6,8 @@ import path from "node:path";
 
 /* ── Wyjątki przy dostawie ──────────────────────────────────────────────────
    Zgłoszenie wyjątku to jedyne miejsce, w którym magazynier mówi „tego nie da
-   się zrobić po rutynie", i jedyne źródło reklamacji u dostawcy. Do tej pory
-   nie miało ani jednego testu po stronie serwera — walidacje żyły w dwóch
-   kopiach (tu i w `core/problem/ProblemModel.kt`), a pilnowała ich tylko ta
-   kotlinowa.
+   się zrobić po rutynie", i jedyne źródło reklamacji u dostawcy. Walidacje
+   żyją w dwóch kopiach (tu i w `core/problem/ProblemModel.kt`).
 
    Ten plik pilnuje strony SERWERA, i to jest jego cały powód: reguły kolektora
    są uprzejmością wobec człowieka w alejce, a nie zabezpieczeniem. Kolektor
@@ -88,9 +86,8 @@ test("lista kategorii zgadza się z formularzem i z kolektorem", () => {
 });
 
 test("klucz sprzed 0.21.0 nie zapisuje się, ale nadal ma nazwę", () => {
-  /* Okno wdrożenia APK 0.21.0 zamknęło się w 0.26.0: stare klucze wypadły
-     z listy zapisywalnych. Etykieta zostaje — wyjątki z historii muszą mieć
-     nazwę na protokole dla dostawcy. */
+  /* Etykieta zostaje — wyjątki z historii muszą mieć nazwę na protokole
+     dla dostawcy. */
   assert.ok("error" in zglos({ typ: "qty_short", lineId, qty: 3 }));
   assert.equal(P.etykietaTypu("qty_short"), "Za mało");
   assert.ok(!P.PROBLEM_TYPES.includes("qty_short" as never));
@@ -127,8 +124,7 @@ test("każda kategoria formularza wymaga ilości", () => {
 
 test("artykuł spoza dokumentu wymaga numeru katalogowego", () => {
   /* `wrong_item` i `extra_item` opisują towar, którego na fakturze NIE MA —
-     nie ma więc linii, z której dałoby się odczytać symbol. Do 0.21.0 takiego
-     towaru nie dało się zgłosić w ogóle: skan kończył się toastem. */
+     nie ma więc linii, z której dałoby się odczytać symbol. */
   for (const typ of ["wrong_item", "extra_item"]) {
     const r = zglos({ typ, qty: 2, photoBase64: ZDJECIE });
     assert.ok("error" in r, typ);
@@ -146,11 +142,9 @@ test("zła ilość bez pozycji z dokumentu odpada", () => {
   assert.match((r as { error: string }).error, /dokument/i);
 });
 
-/* ── Zakres kategorii (0.57.0) ────────────────────────────────────────────────
-   Reguła działa w OBIE strony i to jest tu sedno. Do 0.57.0 stała tylko jej
-   połowa, i tylko dla „złej ilości" — więc „artykuł niezamówiony", z definicji
-   towar SPOZA dokumentu, dawało się przypiąć do dowolnej pozycji faktury
-   i ustawić jej status `problem`.                                            */
+/* ── Zakres kategorii ─────────────────────────────────────────────────────────
+   Reguła działa w OBIE strony: „artykuł niezamówiony", towar SPOZA dokumentu,
+   nie przypina się do pozycji faktury.                                       */
 
 test("każda kategoria pozycji odpada bez wskazanej pozycji", () => {
   for (const typ of ["qty_mismatch", "missing_item", "damaged", "wrong_item"] as const) {
@@ -333,14 +327,9 @@ test("średnik i cudzysłów w opisie nie rozwalają kolumn", () => {
   assert.equal(wiersz.split('"')[0].split(";").length, 7, "kolumny przed opisem bez zmian");
 });
 
-/* ── Co biuro postanowiło wraca na halę (0.357.0) ────────────────────────────
-   Do 0.356.0 kolektor pobierał wyłącznie `listUnresolved`, więc zgłoszenie po
-   zamknięciu ZNIKAŁO z jego ekranu. Z punktu widzenia magazyniera wyglądało to
-   identycznie jak zignorowanie — a to uczy najprostszej rzeczy: nie zgłaszać.
-
-   Nagłówek `ProblemsScreen.kt` mówi to samo od 0.30.0: „zgłoszenie, którego
-   nikt nigdy nie zobaczy, to ta sama niewiedza co przed wdrożeniem". Pilnował
-   tego tylko dla kierunku tam.                                               */
+/* ── Co biuro postanowiło wraca na halę ──────────────────────────────────────
+   Zgłoszenie znikające po zamknięciu wygląda dla magazyniera jak zignorowane —
+   a to uczy najprostszej rzeczy: nie zgłaszać.                               */
 
 test("zamknięty wyjątek wraca na halę z powodem I Z NAZWISKIEM", () => {
   const z = zglos({ typ: "missing_item", qty: 0, lineId });
@@ -355,7 +344,7 @@ test("zamknięty wyjątek wraca na halę z powodem I Z NAZWISKIEM", () => {
   assert.equal(lista[0].id, id);
   assert.equal(lista[0].resolvedNote, "Dostawca przyśle brakujące w środę.");
   /* Nazwisko, nie samo „biuro": magazynier ma iść z pytaniem do człowieka,
-     a nie do tabeli. Do 0.356.0 szło wyłącznie do księgi zdarzeń. */
+     a nie do tabeli. */
   assert.equal(lista[0].resolvedBy, "A. Lewandowska");
   assert.equal(lista[0].createdBy, "Jan Kowalski", "widać też, kto zgłaszał");
 

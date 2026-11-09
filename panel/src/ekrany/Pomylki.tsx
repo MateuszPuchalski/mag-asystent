@@ -198,8 +198,8 @@ export function Pomylki() {
    arkusz na koniec miesiąca. Liczby zbierał i pakował stoją obok winy,
    bo bez nich „trzy razy winny" nie mówi, z ilu paczek.
 
-   ZESTAWIENIE OSÓB WIDZI CAŁE BIURO, decyzją właściciela z 22 października
-   2026: kto zbierał i kto zawinił to wiedza do pracy, jak w arkuszu. Pusta
+   ZESTAWIENIE OSÓB WIDZI CAŁE BIURO, decyzją właściciela: kto zbierał
+   i kto zawinił to wiedza do pracy, jak w arkuszu. Pusta
    lista znaczy, że nikogo jeszcze nie wpisano, i tabela wtedy nie staje. */
 const ZRODLO: Record<Pomylka["zrodlo"], string> = {
   odmowa: "z odmowy wypłaty", dosylka: "z dosyłki", recznie: "zgłoszone ręcznie",
@@ -296,8 +296,8 @@ function Podsumowanie({ d, onMiesiac }: { d: PodsumowaniePomylek; onMiesiac: (m:
    Jedna liczba z obu mieszałaby złapane z przepuszczonymi. Obie stoją więc
    obok siebie w zdaniu, z tych samych dni: tak widać, czy kontrola działa.
 
-   KTO ZBIERAŁ WIDZI CAŁE BIURO, decyzją właściciela z 22 października
-   2026, ta sama reguła co rachunek win rejestru. Serwer zna z dziennika
+   KTO ZBIERAŁ WIDZI CAŁE BIURO, decyzją właściciela, ta sama reguła co
+   rachunek win rejestru. Serwer zna z dziennika
    Sellasist sam numer pracownika, bo API nie wystawia listy pracowników.
    Admin przypisuje numer osobie raz, a potem wszyscy widzą imię.
 

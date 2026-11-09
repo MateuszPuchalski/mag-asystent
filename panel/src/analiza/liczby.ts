@@ -1,7 +1,7 @@
 import { odmien } from "../ui";
 
-/* ── Liczby analizy po polsku (z `biuro.html`, w panelu od 0.440.0) ──────
-   Trzy małe funkcje, które biuro trzymało przy wykresach. Osobny plik, bo
+/* ── Liczby analizy po polsku ────────────────────────────────────────────
+   Trzy małe funkcje przy wykresach. Osobny plik, bo
    każda ma pułapkę, którą test ma przytrzymać: przecinek dziesiętny, odmianę
    ułamka i zdanie o szczycie, które przy medianie zero NIE wolno dzielić. */
 
@@ -22,8 +22,8 @@ export const dzienSkrot = (iso: string): string => `${iso.slice(8, 10)}.${iso.sl
 /**
  * Zdanie o szczycie — z FAKTÓW, nie z interpretacji.
  *
- * Makieta biura pisała pod wykresem „szczyt zbiega się z sezonem kosiarek".
- * Drugiej połowy takiego zdania nie da się policzyć: to sąd człowieka. Serwer
+ * Zdanie w rodzaju „szczyt zbiega się z sezonem kosiarek" ma drugą połowę,
+ * której nie da się policzyć: to sąd człowieka. Serwer
  * oddaje więc sam szczyt i medianę reszty, a przy za cienkiej próbce — `null`,
  * i wtedy zdania nie ma. Milczenie jest lepsze od zdania, które brzmi jak
  * wniosek, a jest szumem.

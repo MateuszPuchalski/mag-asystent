@@ -9,13 +9,13 @@ import type { DosylkaSprawy, ProfilKlienta as Profil, SprawaKlienta, WidokSellas
 import { dataLokalna } from "../ui";
 import { pomylka } from "../test/pomylki";
 
-/* ── PROFIL KLIENTA (24 września 2026) ───────────────────────────────────────
+/* ── PROFIL KLIENTA ──────────────────────────────────────────────────────────
    Pilnujemy: otwarcie niczego nie zapisuje; sygnał „źle" prowadzi do sprawy;
    zamówienie rozwija się do pozycji; notatka zapisuje się na kliknięcie,
    a cofnięcie idzie bez ciała (reguła klienta HTTP); nieznany login to
    zdanie, nie pusty profil.
 
-   SPRAWA KLIENTA (S6, 0.535.0) dokłada swoje: otwarcie z prowadzoną sprawą
+   SPRAWA KLIENTA (S6) dokłada swoje: otwarcie z prowadzoną sprawą
    dalej wysyła same GET-y; karta bez sprawy to jedna linijka; gotowy termin
    zapisuje krok jednym kliknięciem; zakończenie niesie wersję i odcisk,
    a „Cofnij" — wersję i odcisk z ODPOWIEDZI; „Przejmij" widać tylko przy
@@ -186,8 +186,8 @@ describe("PROFIL KLIENTA", () => {
     expect(within(droga).getByRole("link", { name: /Zwrot z .* — otwórz zwrot/ }))
       .toHaveAttribute("href", "/obsluga/zwroty/11");
     expect(screen.getByRole("link", { name: /Otwarta reklamacja/ })).toHaveAttribute("href", "/obsluga/reklamacje/3");
-    /* „Otwarte w kolejkach", nie „Otwarte sprawy" (0.535.0): słowo „sprawa"
-       znaczy na tym ekranie już tylko sprawę klienta. */
+    /* „Otwarte w kolejkach", nie „Otwarte sprawy": słowo „sprawa" znaczy na
+       tym ekranie tylko sprawę klienta. */
     expect(within(screen.getByRole("region", { name: "Otwarte w kolejkach" })).getByText("czeka na nas")).toBeTruthy();
     expect(screen.queryByRole("region", { name: "Otwarte sprawy" })).toBeNull();
   });
@@ -292,7 +292,7 @@ describe("SPRAWA KLIENTA na profilu", () => {
     expect(zapis.url).toBe("/api/obsluga/klient/Chrzanowski1234/sprawa/krok");
     const cialo = JSON.parse(zapis.body!);
     /* `wersja: 0` — wiersza jeszcze nie ma; odcisk jedzie zawsze, bo trasa
-       wymaga każdego klucza (blizna 0.224.1). */
+       wymaga każdego klucza. */
     expect(cialo).toEqual({ krok: "dosłać", krokDo: expect.any(String), wersja: 0, odcisk: "" });
     expect(Date.parse(cialo.krokDo)).toBeGreaterThan(Date.now());
     expect(new Date(cialo.krokDo).getHours()).toBe(8);
@@ -535,7 +535,7 @@ describe("granice kalendarza kroku", () => {
   });
 });
 
-/* ── DOSYŁKA na karcie sprawy (0.536.0) ──────────────────────────────────────
+/* ── DOSYŁKA na karcie sprawy ────────────────────────────────────────────────
    Pilnujemy: otwarcie z dosyłkami i propozycją dalej wysyła same GET-y;
    dosyłka to linijka z barwą tonu i numerem do skopiowania bez serwera;
    wpisany numer idzie przycięty, z przewoźnikiem domyślnym, wersją i odciskiem

@@ -2,7 +2,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { podzielStopke } from "./stopka.js";
 
-/* ── Stopka firmowa (0.219.1) ─────────────────────────────────────────────────
+/* ── Stopka firmowa ───────────────────────────────────────────────────────────
    Reguła tnie od NAZWY SPÓŁKI do końca wiadomości, więc pomyłka kosztuje
    ucięcie odpowiedzi. Testy pilnują obu stron tego ryzyka.                   */
 

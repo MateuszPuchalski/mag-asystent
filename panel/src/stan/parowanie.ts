@@ -1,17 +1,17 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { api } from "../api/klient";
 
-/* ── Parowanie konta Allegro — jedna pętla (z `biuro.html`, 0.441.0) ─────
-   Trzy gwarancje przeniesione z biura, każda z własną blizną:
+/* ── Parowanie konta Allegro — jedna pętla ────────────────────────────────
+   Trzy gwarancje:
 
    1. JEDNA PĘTLA. Drugi klik nie startuje drugiej — dwie pętle to podwojony
       rytm żądań do allegro.pl, a endpoint parowania stoi na tym samym hoście
-      co sklep i liczy go anti-bot (0.106.0).
+      co sklep i liczy go anti-bot.
    2. RYTM DYKTUJE SERWER (`nastepnyPollMs`): rośnie z czasem czekania, żeby
       zostawiona zakładka nie pytała co trzy sekundy przez godzinę.
    3. `brak` KOŃCZY PĘTLĘ. Sesja parowania żyje w pamięci procesu serwera;
-      restart ją zjada. Do 0.113.0 `brak` kręcił się jak `czekam` i przycisk
-      POŁĄCZ był martwy aż do przeładowania strony (0.114.0).
+      restart ją zjada. Kręcenie się dalej jak przy `czekam` zostawiłoby
+      przycisk POŁĄCZ martwy aż do przeładowania strony.
 
    PRZERWIJ nie wysyła żądania i nie musi: bez pytania z przeglądarki serwer
    do Allegro nic nie wysyła, a kod sam wygaśnie. */

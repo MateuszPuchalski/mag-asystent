@@ -1,14 +1,12 @@
-import React from "react";
 import { describe, expect, it, vi, beforeEach } from "vitest";
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { NaOutlet } from "./NaOutlet";
 import type { PozycjaNaOutlet } from "../api/typy";
 
-/* ── Lista robocza outletu (0.375.0) ────────────────────────────────────────
-   Ta lista jest warunkiem, pod którym weszła trzecia ocena. „Przecena" zeszła
-   w 0.209.0, bo kończyła się znacznikiem w bazie — a znacznik bez czytelnika
-   jest ślepym zaułkiem.
+/* ── Lista robocza outletu ──────────────────────────────────────────────────
+   Ta lista jest warunkiem trzeciej oceny: znacznik bez czytelnika byłby
+   ślepym zaułkiem.
 
    Stąd dwie rzeczy warte testu. Lista ma MÓWIĆ, że dokumentu z naszej strony
    nie będzie, i ma dać się DOMKNĄĆ jednym kliknięciem. Pusta ma zniknąć: stały
@@ -51,7 +49,7 @@ describe("Lista robocza regału outletowego", () => {
   });
 
   it("stoi jednym wierszem z liczbą, a pozycje pokazuje dopiero kliknięcie", async () => {
-    /* Zwinięta (0.525.0), jak pasek uwag obok: regał obsługuje się raz na
+    /* Zwinięta, jak pasek uwag obok: regał obsługuje się raz na
        jakiś czas, więc pełna lista nie ma stać nad kolejką na stałe. */
     stan.pozycje = [POZYCJA(), POZYCJA({ pozycjaId: 8, symbol: "SEK-02" })];
     render(<NaOutlet />);

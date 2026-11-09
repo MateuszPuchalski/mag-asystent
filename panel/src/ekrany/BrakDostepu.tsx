@@ -1,12 +1,11 @@
 import { Lock } from "lucide-react";
 import { Karta, Przycisk } from "../ui";
 
-/* ── KONTO MAGAZYNIERA W BIURZE (0.431.0) ───────────────────────────────────
-   Panel jest biurem, a biuro to role `biuro` i `admin`. Do tej wersji
-   magazynier logował się bez przeszkód i dostawał puste kolumny, bo każda
-   trasa odmawiała mu po cichu 403. Tu dostaje jedno zdanie: gdzie jest, czego
-   nie ma i co zrobić. Bramka stoi w przeglądarce DLA CZŁOWIEKA — dane i tak
-   chroni serwer przy każdej trasie. */
+/* ── KONTO MAGAZYNIERA W BIURZE ─────────────────────────────────────────────
+   Panel jest biurem, a biuro to role `biuro` i `admin`. Magazynier zamiast
+   pustych kolumn (każda trasa odmawia mu 403) dostaje jedno zdanie: gdzie
+   jest, czego nie ma i co zrobić. Bramka stoi w przeglądarce DLA CZŁOWIEKA
+   — dane i tak chroni serwer przy każdej trasie. */
 export function BrakDostepu({ login, rola, wyloguj }: { login: string; rola: string; wyloguj: () => void }) {
   return <div className="grid min-h-screen place-items-center bg-slate-100 p-5">
     <Karta className="w-full max-w-md p-6">

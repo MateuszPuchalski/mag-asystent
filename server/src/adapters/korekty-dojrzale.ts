@@ -1,4 +1,4 @@
-/* ── Korekta wchodzi do read-modelu dopiero przy DRUGIM imporcie (0.350.1) ──
+/* ── Korekta wchodzi do read-modelu dopiero przy DRUGIM imporcie ──
    Blizna z produkcji, 15 września 2026. Worker Sfery zapisywał ZW do
    PA 745/MAG/09/2026; Subiekt nadał numer ZW 463/MAG/09/2026, wpisał
    dokument i ODMÓWIŁ zapisu, wycofując transakcję. Import czyta

@@ -7,23 +7,23 @@ import { Tabela, Td } from "../ui/wglad";
 import { KartaZwinieta } from "./KartaZwinieta";
 import { Potwierdz } from "../ui/Potwierdz";
 
-/* ── Masowa zmiana lokalizacji z arkusza (z `biuro.html` 0.138.0, 0.441.0) ─
+/* ── Masowa zmiana lokalizacji z arkusza ──────────────────────────────────
    Stoi POD kolejką zapisów świadomie: to ta kolejka wykona skutek tej karty,
    a sto zadań, które się w niej pojawią, ma być widoczne w tym samym
    spojrzeniu.
 
    Karta stoi WYŁĄCZNIE u administratora. Serwer odmawia pozostałym już przy
-   podglądzie (`routes/lokalizacje-masowe.ts`), więc biuro dostawało kartę,
-   której każdy przycisk kończył się odmową. Odmowę dalej wypowiada serwer —
-   przeglądarka tylko nie pokazuje drogi, która na pewno się nie uda.
+   podglądzie (`routes/lokalizacje-masowe.ts`), więc każdy przycisk kończyłby
+   się odmową. Odmowę dalej wypowiada serwer — przeglądarka tylko nie
+   pokazuje drogi, która na pewno się nie uda.
 
-   WYBÓR „ZOSTAW" ŻYJE W STANIE, nie w polach wyboru (0.139.0): każde
+   WYBÓR „ZOSTAW" ŻYJE W STANIE, nie w polach wyboru: każde
    przeliczenie rysuje tabelę od nowa, a zaznaczenia w DOM-ie znikałyby przy
    pierwszym kliknięciu. Zaznaczone znaczy „zdejmij", bo arkusz PODMIENIA
    pole; „zostaw" jest wyjątkiem od tej reguły, nie nową regułą.
 
-   ZWINIĘTA (0.509.0): arkusz wgrywa się raz na jakiś czas, a otwarta karta
-   stała z długą instrukcją na drugim miejscu ekranu. Miejsce pod kolejką
+   ZWINIĘTA: arkusz wgrywa się raz na jakiś czas, a długa instrukcja nie ma
+   stać na drugim miejscu ekranu. Miejsce pod kolejką
    zostaje. Stan wgranego pliku żyje w tym komponencie, nie w ramie, więc
    zwinięcie w połowie przeglądu niczego nie gubi. */
 

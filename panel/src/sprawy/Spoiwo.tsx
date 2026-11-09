@@ -10,8 +10,8 @@ import { adresPomylki } from "../api/pomylki";
    Odnośniki idą przez `Link` (w pasku drogi), nie przez `<a href>`: gołe
    `href` przeładowuje stronę i wspólny cache zapytań startuje od zera.
 
-   Własnych bloków list spraw tu już nie ma. Inne sprawy zakupu mówi
-   wyłącznie pasek drogi, a stan, termin i prowadzącego niesie jego przystanek. */
+   Inne sprawy zakupu mówi wyłącznie pasek drogi, a stan, termin
+   i prowadzącego niesie jego przystanek. */
 
 /** Jak nazywa się przystanek i dokąd prowadzi — jedno miejsce na wszystkie.
     `cel` to biernik do nazwy łącza („otwórz rozmowę”): czytnik ma usłyszeć,

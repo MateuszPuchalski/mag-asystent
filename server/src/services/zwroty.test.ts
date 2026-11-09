@@ -18,7 +18,7 @@ import {
 import { zamknijKosz } from "./kosze-zwrotow.js";
 import { paczkiKlienta, zamowienieRozmowy } from "./zamowienia.js";
 
-/* ── Strażnicy kolejki zwrotów (0.150.0) ─────────────────────────────────────
+/* ── Strażnicy kolejki zwrotów ───────────────────────────────────────────────
    Ekran ma zjadać klikanie, a nie je mnożyć. Trzy rzeczy to gwarantują
    i trzy są tu sprawdzane: kubełek WYNIKA z faktów (nie z osobnej kolumny,
    która się rozjedzie), kolejność bierze się z terminu ustawowego (nie
@@ -57,7 +57,7 @@ function zamowienie(d: Db, ext: string, pozycje: Array<{ offerId: string; nazwa:
 function towar(d: Db, twId: number, symbol: string, ean: string | null = null) {
   d.prepare("INSERT INTO sgt_towar(tw_id,symbol,nazwa,ean) VALUES (?,?,?,?)")
     .run(twId, symbol, `Towar ${symbol}`, ean);
-  /* Wiersz stanu — od 0.372.2 kartoteka bez niego nie wchodzi do pudła. */
+  /* Wiersz stanu — kartoteka bez niego nie wchodzi do pudła. */
   d.prepare("INSERT OR IGNORE INTO sgt_stan(tw_id,mag_id,stan) VALUES (?,1,0)").run(twId);
 }
 
@@ -107,11 +107,9 @@ function dodaj(d: Db, utworzono: string, pola: Record<string, unknown> = {},
 }
 
 test("termin obsługi liczy się OD PACZKI U NAS i ma siedem dni", () => {
-  /* ZMIANA REGUŁY W 0.339.0, nie poprawka liczby. Do 0.338.0 stało tu
-     czternaście dni od zgłoszenia klienta, czyli termin ustawowy na oddanie
-     pieniędzy. Właściciel: „Allegro narzuca obsługę zwrotów do 7 dni po
-     otrzymaniu zwrotu" — i tym zegarem ma iść kolejność pracy, bo to po nim
-     Allegro rozlicza sprzedawcę.
+  /* Właściciel: „Allegro narzuca obsługę zwrotów do 7 dni po otrzymaniu
+     zwrotu" — i tym zegarem ma iść kolejność pracy, bo po nim Allegro
+     rozlicza sprzedawcę.
 
      Zegar nie rusza, dopóki paczki nie ma: wymyślony termin dla przesyłki
      w drodze kazałby gonić pracę, której nie da się wykonać. */
@@ -125,7 +123,7 @@ test("termin obsługi liczy się OD PACZKI U NAS i ma siedem dni", () => {
 });
 
 test("początek terminu bierze się z DORĘCZENIA, a bez trackingu z nadania", () => {
-  /* TA SAMA REGUŁA CO PRZY SYGNALE „BRAK DOWODU" (0.187.0). Dwie definicje
+  /* TA SAMA REGUŁA CO PRZY SYGNALE „BRAK DOWODU". Dwie definicje
      „paczka wróciła" rozjechałyby się przy pierwszej poprawce jednej z nich,
      a wtedy wiersz świeciłby terminem, mówiąc obok, że paczki nie ma. */
   const brak = { dostarczonoAt: null, paczkaAt: null, przesylkaStatus: null };
@@ -142,14 +140,9 @@ test("początek terminu bierze się z DORĘCZENIA, a bez trackingu z nadania", (
 });
 
 test("zwrot ROZLICZONY PRZEZ ALLEGRO schodzi z kolejki pracy (0.339.0)", () => {
-  /* Zgłoszenie właściciela: „pokazuje za dużo zwrotów do procesowania,
-     pokazuje zwroty, za które pieniądze zostały już zwrócone".
-
-     Ze SCHEMATU `CustomerReturn.status`: `FINISHED` to „the payment has been
+  /* Ze SCHEMATU `CustomerReturn.status`: `FINISHED` to „the payment has been
      refunded, return process is finished", `FINISHED_APT` to to samo ręką
-     Allegro Protect. Do 0.338.0 kubełek liczył się z pięciu naszych faktów
-     i tego statusu nie czytał wcale — zwrot rozliczony w panelu Allegro stał
-     u nas w DO DECYZJI i pytał „przyjąć czy odrzucić?" bez końca. */
+     Allegro Protect. */
   const bazowy = {
     rejectionCode: null, werdykt: null, zamknietyAt: null,
     kwotaGrosze: null, korektaNumer: null, pozycje: [{ ocena: null }],
@@ -169,18 +162,9 @@ test("zwrot ROZLICZONY PRZEZ ALLEGRO schodzi z kolejki pracy (0.339.0)", () => {
 });
 
 test("rozliczenie ZATRZASKUJE SIĘ — status Allegro idzie dalej, kubełek nie (0.345.0)", () => {
-  /* Zgłoszenie właściciela: „nadal pokazuje paczki, do których został już
-     stwierdzony zwrot".
-
-     `status_allegro` to wskaźnik TERAZ, nie historia. Zwrot rozliczony idzie
+  /* `status_allegro` to wskaźnik TERAZ, nie historia. Zwrot rozliczony idzie
      dalej tą samą osią czasu Allegro — a wypycha go tam NASZ WŁASNY automat
-     rabatów (0.320.0), składający wniosek zaraz po zaciągnięciu odstąpienia.
-     Właściciel nazwał to wprost: `COMMISSION_REFUND_CLAIMED` to zwrot rabatu
-     DLA NAS, nie zwrot pieniędzy klientowi.
-
-     Bez zatrzasku zwrot zamknięty w poniedziałek wracał we wtorek do kolejki
-     jako DO DECYZJI — z pytaniem „przyjąć czy odrzucić?" o sprawę, której
-     pieniądze dawno wyszły. */
+     rabatów: `COMMISSION_REFUND_CLAIMED` to zwrot rabatu DLA NAS. */
   const bazowy = {
     rejectionCode: null, werdykt: null, zamknietyAt: null,
     kwotaGrosze: null, korektaNumer: null, pozycje: [{ ocena: null }],
@@ -252,26 +236,21 @@ test("sygnał zapala się tylko tam, gdzie każe przeczytać wiersz", () => {
      uczyłaby operatora przewijać czerwone wiersze. */
   assert.deepEqual(w({ kubelek: "zamkniety", dni: -30, paczkaAt: null }), []);
 
-  /* ── Dowodem jest DORĘCZENIE, nie nadanie (0.187.0) ──────────────────────
-     Do 0.186.0 sygnał gasł, gdy klient nadał paczkę. Zwrot doręczony i ten
-     jadący od tygodnia wyglądały w kolejce identycznie, a to jest różnica
-     między „mam towar" a „czekam na towar". */
+  /* ── Dowodem jest DORĘCZENIE, nie nadanie ────────────────────────────────
+     To różnica między „mam towar" a „czekam na towar". */
   assert.deepEqual(w({ przesylkaStatus: "IN_TRANSIT" }), ["brak_dowodu"],
     "paczka w drodze to nie paczka u nas");
   assert.deepEqual(w({ przesylkaStatus: "NOTICE_LEFT" }), ["brak_dowodu"],
     "awizo tym bardziej");
   assert.deepEqual(w({ przesylkaStatus: "DELIVERED", dostarczonoAt: "2026-08-31T09:00:00Z" }), [],
     "doręczona gasi sygnał");
-  /* Bez trackingu zostaje dawne kryterium: lepszy sygnał z daty nadania niż
-     jego brak. Przewoźnik bywa nieznany, a Allegro nie zawsze odpowie. */
+  /* Bez trackingu zostaje data nadania: lepszy sygnał niż jego brak. Przewoźnik bywa nieznany, a Allegro nie zawsze odpowie. */
   assert.deepEqual(w({ przesylkaStatus: null, dostarczonoAt: null }), [],
     "brak trackingu → data nadania jak dawniej");
 });
 
 test("sygnały o pieniądzach mówią, W KTÓRĄ STRONĘ patrzeć", () => {
-  /* Do 0.209.0 status przelewu zapisywał się RAZ, z odpowiedzi na
-     `POST /payments/refunds`, i nikt go już nie czytał. Przelew odrzucony
-     przez Allegro godzinę później wyglądał u nas dokładnie jak udany.
+  /* Odpowiedź na `POST /payments/refunds` nie mówi, czy przelew wyszedł.
      Potwierdzeniem jest `CustomerReturn.status`, bo `GET` po identyfikatorze
      zwrotu płatności w specyfikacji nie istnieje. */
   const TERAZ = Date.parse("2026-09-05T12:00:00Z");
@@ -345,8 +324,8 @@ test("suma pozycji mnoży cenę przez ilość i zostaje w groszach", () => {
 });
 
 test("kolejność bierze się z terminu, a ten liczy się OD PACZKI (0.339.0)", () => {
-  /* Blizna 0.121.0 zostaje w mocy — zegar steruje kolejnością pracy — ale od
-     0.339.0 jest to zegar OBSŁUGI: siedem dni od paczki u nas. Zwrot zgłoszony
+  /* Zegar steruje kolejnością pracy i jest to zegar OBSŁUGI: siedem dni od
+     paczki u nas. Zwrot zgłoszony
      dawno, którego paczka przyszła wczoraj, NIE jest pilniejszy: pracy przy
      nim można dotknąć dopiero od wczoraj. */
   const d = stanowisko();
@@ -404,9 +383,8 @@ test("propozycja kwoty to suma pozycji, nie zgadywana kwota pełna", () => {
 });
 
 test("kwota pełna dochodzi dopiero z zamówieniem — wcześniej jest brakiem, nie sumą", () => {
-  /* Do 0.151.0 ekran musiał pisać zdanie „bez kosztu dostawy", bo ten stoi
-     przy zamówieniu, nie przy zwrocie. Teraz albo znamy całość, albo mówimy
-     wprost, że jej nie znamy. */
+  /* Koszt dostawy stoi przy zamówieniu, nie przy zwrocie. Albo znamy całość,
+     albo mówimy wprost, że jej nie znamy. */
   const d = stanowisko();
   dodaj(d, "2026-08-31T00:00:00Z", { order_id: "ord-1" },
     [{ ilosc: 2, cena: 8999, offerId: "111" }]);
@@ -419,8 +397,7 @@ test("kwota pełna dochodzi dopiero z zamówieniem — wcześniej jest brakiem, 
 });
 
 test("panel pokazuje CAŁE zamówienie i zaznacza, co wraca", () => {
-  /* Klient kupił trzy rzeczy, oddaje jedną — to jest kontekst, którego
-     ekran do 0.151.0 nie miał wcale. */
+  /* Klient kupił trzy rzeczy, oddaje jedną — to jest kontekst decyzji. */
   const d = stanowisko();
   dodaj(d, "2026-08-31T00:00:00Z", { order_id: "ord-1" },
     [{ ilosc: 1, cena: 8999, offerId: "111" }]);
@@ -436,7 +413,7 @@ test("panel pokazuje CAŁE zamówienie i zaznacza, co wraca", () => {
   assert.equal(zam.kupujacyLogin, null);
 });
 
-/* ── Ile sztuk wraca (0.176.0) ───────────────────────────────────────────────
+/* ── Ile sztuk wraca ─────────────────────────────────────────────────────────
    Zgłoszenie właściciela: „wraca dwie sztuki jest mylące, bo w tym zamówieniu
    wracała jedna". Plakietka niosła sam FAKT powrotu, a stała obok liczby
    KUPIONYCH sztuk — więc czytało się ją jako liczbę wracających.           */
@@ -482,12 +459,10 @@ test("propozycja kartoteki liczy się z SKU zamówienia i niesie źródło", () 
 });
 
 test("licznik dzieli czekanie na AUTOMAT i na człowieka", () => {
-  /* Dwa różne stany wyglądały do 0.220.0 tak samo — jedną liczbą „czeka na
-     zatwierdzenie". Pierwszy jest USTERKĄ: pewność `sku` wiąże automat sam,
+  /* Pierwszy stan jest USTERKĄ: pewność `sku` wiąże automat sam,
      więc pozycja z taką propozycją stoi tu tylko wtedy, gdy automat nie
      chodzi. Drugi jest PRACĄ: zgadywanie prowadzi do korekty stanu, więc
-     klika je człowiek. Jedna liczba na oba kazała szukać usterki tam, gdzie
-     jej nie ma — albo jej nie zauważyć. */
+     klika je człowiek. */
   const d = stanowisko();
   towar(d, 10, "SEK-46");
   towar(d, 11, "NOZ-12");
@@ -532,7 +507,7 @@ test("zwrot niesie odnośniki, a brak numeru nie robi linku donikąd", () => {
     [{ ilosc: 1, cena: 8999, offerId: "111", url: "https://allegro.pl/oferta/sekator-111" }]);
   zamowienie(d, "ord-1", [{ offerId: "111", nazwa: "Sekator NAC", sku: null, cena: 8999 }]);
   const z = listaZwrotow(d, TERAZ)[0];
-  /* Centrum Sprzedaży z numerem w `search` (0.207.0) — to jedyny z trzech
+  /* Centrum Sprzedaży z numerem w `search` — to jedyny z trzech
      wzorców, który przeszedł przez żywe konto. Zakres dat startuje od DNIA
      ZGŁOSZENIA: stała granica wycięłaby starszy zwrot i wyszukanie po
      poprawnym numerze oddałoby pustkę. */
@@ -544,11 +519,9 @@ test("zwrot niesie odnośniki, a brak numeru nie robi linku donikąd", () => {
     "adres oferty to jedyny link opisany w specyfikacji");
 });
 
-/* ── Decyzje biura: werdykt, ocena, kwota (0.156.0) ──────────────────────────
-   Do tego wydania kolejka bramek była DEKORACJĄ. `kubelekZwrotu` routuje po
-   czterech kolumnach — `werdykt`, `ocena` pozycji, `kwota_grosze`,
-   `korekta_numer` — a żadnej z nich nic nie zapisywało. Każdy zwrot stał więc
-   w DO DECYZJI na zawsze, chyba że ktoś odrzucił go w panelu Allegro.
+/* ── Decyzje biura: werdykt, ocena, kwota ────────────────────────────────────
+   `kubelekZwrotu` routuje po czterech kolumnach — `werdykt`, `ocena` pozycji,
+   `kwota_grosze`, `korekta_numer` — i te zapisy je wypełniają.
 
    Ocena wchodzi razem z werdyktem i kwotą nie z rozpędu, tylko dlatego, że bez
    niej nic nie przechodzi z DO OCENY do DO ZWROTU — łańcucha nie dałoby się
@@ -569,7 +542,7 @@ function zwrotDoDecyzji(d: Db) {
   const id = Number(d.prepare(`INSERT INTO zwrot_klienta
     (channel_account_id,external_id,order_id,created_at,synced_at)
     VALUES (?,?,?,?,?)`).run(konto, `z-${n}`, `ord-${n}`,
-      /* Wczoraj, nie stała data (0.452.0) — zwrot bez decyzji po
+      /* Wczoraj, nie stała data — zwrot bez decyzji po
          `ZWROT_WYGASA_DNI` wychodzi z kolejki, a ten pomocnik ma stać W NIEJ. */
       new Date(Date.now() - 86_400_000).toISOString(), "2026-09-01T08:00:00Z").lastInsertRowid);
   const poz = [1, 2].map((i) => Number(d.prepare(`INSERT INTO zwrot_klienta_pozycja
@@ -644,7 +617,7 @@ test("kwotę liczy SERWER z zaznaczenia, nie panel", () => {
 });
 
 test("oddajemy dostawę, którą klient WYBRAŁ — nie najtańszą z oferty", () => {
-  /* Decyzja właściciela z 3 września 2026. Ustawa pozwala oddać mniej: przy
+  /* Decyzja właściciela. Ustawa pozwala oddać mniej: przy
      opcji droższej niż najtańsza zwykła sprzedawca nie musi dopłacać różnicy.
      Oddajemy więcej świadomie, bo tak samo rozlicza to Allegro. Ten test
      istnieje po to, żeby nikt nie „poprawił" tego jako niedopatrzenia. */
@@ -711,7 +684,7 @@ test("każda decyzja zostawia ślad w audycie", () => {
   assert.ok(typy.some((t) => t.includes("ocena")), `brak oceny w ${typy.join(",")}`);
 });
 
-/* ── Korekta domyka kolejkę (0.162.0) ────────────────────────────────────────
+/* ── Korekta domyka kolejkę ──────────────────────────────────────────────────
    Piąty kubełek był ślepym zaułkiem: `kubelekZwrotu` routuje po
    `korekta_numer`, a tej kolumny nic nie zapisywało. Zwrot z zapisaną kwotą
    stał w DO KOREKTY na zawsze.
@@ -767,13 +740,13 @@ test("korekta przed kwotą odpada — nie ma czego korygować", () => {
   assert.throws(() => zapiszKorekte(d, id, "KFS 12/2026", 4, KTO), /kwot/i);
 });
 
-/* ── Drabina cofania (0.202.0) ───────────────────────────────────────────────
+/* ── Drabina cofania ─────────────────────────────────────────────────────────
    §25a.5 obiecuje cofnięcie wszędzie poza oddaniem pieniędzy i odmową. Każdy
    kubełek cofa DOKŁADNIE ten krok, który go wprowadził — testy niżej pilnują,
    że schodzi się po jednym szczeblu i że oba nieodwracalne kroki zatrzymują
    całość.                                                                  */
 
-/* ── Ile sztuk naprawdę wróciło (0.212.0) ───────────────────────────────────
+/* ── Ile sztuk naprawdę wróciło ─────────────────────────────────────────────
    Klient zgłasza dwie, w kartonie przyjeżdża jedna. Liczy BIURO — decyzja
    właściciela: to ono otwiera i procesuje zwroty.                          */
 
@@ -823,7 +796,7 @@ test("puste to NIE zero — deklaracja rządzi, dopóki nikt nie policzył", () 
 
 test("więcej niż zgłoszono ODPADA — nadmiar z kartonu to inna pozycja", () => {
   /* Podniesienie liczby tutaj wypłaciłoby za sztuki, o których zwrocie klient
-     nigdy nie napisał. Na nadmiar jest `dopiszPozycje` od 0.184.0. */
+     nigdy nie napisał. Na nadmiar jest `dopiszPozycje`. */
   const d = stanowisko();
   const KTO = biuro(d);
   const { id, poz } = zwrotDoDecyzji(d);
@@ -835,7 +808,7 @@ test("więcej niż zgłoszono ODPADA — nadmiar z kartonu to inna pozycja", () 
     "odmowa niczego nie zapisuje");
 });
 
-/* ── Drogi, które prowadziły donikąd (0.484.7) ──────────────────────────────
+/* ── Drogi, które prowadziły donikąd ────────────────────────────────────────
    Przegląd niespójności: komunikat albo reguła odsyłały do ruchu, którego
    w tym samym stanie nie dało się wykonać. */
 
@@ -868,7 +841,7 @@ test("przyjęcia z zapisaną kwotą nie cofam — kwota bez ocen istnieje", () =
   assert.throws(() => cofnijWerdykt(d, id, 3, KTO), /cofnij kwotę/);
 });
 
-/* ── Kwota rozjechana z pozycjami (0.210.0) ─────────────────────────────────
+/* ── Kwota rozjechana z pozycjami ───────────────────────────────────────────
    Synchronizator nadpisuje ilość i cenę pozycji przy każdym takcie, a zapisanej
    kwoty nie dotyka nic. Zwrot poprawiony po wycenie wypłacał starą kwotę.   */
 
@@ -981,12 +954,8 @@ test("cofnięcie oceny zdejmuje pozycję z OTWARTEGO koszyka i wraca do DO OCENY
 });
 
 test("ocena pozycji z kosza, który MA DOKUMENT, ODMAWIA i nazywa kosz", () => {
-  /* Do 0.202.0 przechodziła po cichu: `zdejmijZKosza` szukał kosza otwartego,
-     a jego brak oddawał `false`, którego nikt nie czytał. Towar zostawał na
-     dokumencie, który pojechał na halę — bez oceny, która go tam posłała.
-
-     Od 0.334.0 bramką jest DOKUMENT, nie samo zamknięcie: kosz bez papieru
-     wolno poprawić (test niżej). Tu papier już jest, więc odmowa zostaje. */
+  /* Bramką jest DOKUMENT, nie samo zamknięcie: kosz bez papieru wolno
+     poprawić (test niżej). Tu papier już jest, więc odmowa zostaje. */
   const d = stanowisko();
   const KTO = biuro(d);
   const { id, poz } = zwrotDoDecyzji(d);
@@ -996,7 +965,7 @@ test("ocena pozycji z kosza, który MA DOKUMENT, ODMAWIA i nazywa kosz", () => {
   rozstrzygnijZwrot(d, id, "przyjety", null, 1, KTO);
   const kosz = ocenPozycje(d, poz[0], "stan", 2, KTO).koszyk!;
   const kod = (d.prepare("SELECT kod FROM kosz WHERE id=?").get(kosz) as { kod: string }).kod;
-  /* Korekta przed zamknięciem — od 0.200.0 bez niej MM nie wychodzi wcale. */
+  /* Korekta przed zamknięciem — bez niej MM nie wychodzi wcale. */
   d.prepare("UPDATE zwrot_klienta SET korekta_numer='KFS 1/2026' WHERE id=?").run(id);
   zamknijKosz(d, kosz, KTO);
   d.prepare("UPDATE zwrot_klienta SET korekta_numer=NULL WHERE id=?").run(id);
@@ -1017,7 +986,7 @@ test("ocena pozycji z kosza, który MA DOKUMENT, ODMAWIA i nazywa kosz", () => {
 });
 
 test("kosz zamknięty BEZ dokumentu wolno poprawić, a pozycja wraca do NIEGO", () => {
-  /* Zgłoszenie właściciela (0.334.0): „dodałem zestaw, a powinienem rozbić go
+  /* Zgłoszenie właściciela: „dodałem zestaw, a powinienem rozbić go
      przed dodaniem do MM — nie chce się zrobić". Kosz stał zamknięty tygodniami,
      bo MM czeka na komplet korekt, i pomyłki nie dało się odkręcić w aplikacji.
 
@@ -1176,7 +1145,7 @@ test("dwóch agentów nie zamyka jednego zwrotu dwoma numerami", () => {
   assert.equal(listaZwrotow(d).find((z) => z.id === id)?.korektaNumer, "KFS 12/2026");
 });
 
-/* ── Skan etykiety zwrotnej (0.163.0) ────────────────────────────────────────
+/* ── Skan etykiety zwrotnej ──────────────────────────────────────────────────
    Kod z prawdziwej etykiety InPostu, podany przez właściciela. Fikstura używa
    go dosłownie, bo test na wymyślonym „PX1" nie powiedziałby nic o tym, że
    dwadzieścia cztery cyfry przechodzą przez całą drogę. */
@@ -1271,7 +1240,7 @@ test("zwrot bez lądowiska nie wywraca szukania", () => {
   assert.ok(znajdzZwrotPoKodzie("1234/Z04A", d).zwrotId, "numer zwrotu dalej działa");
 });
 
-/* ── Cztery rzeczy, o które prosiło biuro zwrotów (0.169.0) ─────────────── */
+/* ── Cztery rzeczy, o które prosiło biuro zwrotów ─────────────── */
 
 test("wiersz niesie kupującego i przewoźnika, bez pobranego zamówienia", () => {
   /* Login przy ZWROCIE, nie tylko przy zamówieniu: zwrot niesie go zawsze,
@@ -1309,7 +1278,7 @@ test("bez potwierdzonej kartoteki EAN-u nie zgadujemy", () => {
 });
 
 test("zwrot pokazuje rozmowy o TYM zakupie, po numerze zamówienia", () => {
-  /* Mostkiem jest `message.related_order_id` z 0.166.0 — ani jednego nowego
+  /* Mostkiem jest `message.related_order_id` — ani jednego nowego
      żądania do Allegro. Jeden zakup potrafi mieć kilka wątków, więc lista. */
   const d = stanowisko();
   rozmowa(d, "w-1", "ord-9", "Pytanie o zwrot", "2026-08-31T10:00:00Z");
@@ -1357,9 +1326,7 @@ test("zwrot bez powiązanych wiadomości ma pustą listę, a nie brak pola", () 
 });
 
 test("zwrot bez pozycji też dostaje wiersz w kolejce", () => {
-  /* Inaczej zniknąłby z listy i nikt by się nie dowiedział, że jest. Test
-     pytał o to przez zestawienie CSV, które zeszło w 0.370.0 — pytanie jest
-     jednak o KOLEJKĘ i tam się je zadaje wprost. */
+  /* Inaczej zniknąłby z listy i nikt by się nie dowiedział, że jest. */
   const d = stanowisko();
   dodaj(d, "2026-08-30T09:00:00Z", {}, []);
   const w = listaZwrotow(d, TERAZ);
@@ -1367,7 +1334,7 @@ test("zwrot bez pozycji też dostaje wiersz w kolejce", () => {
   assert.deepEqual(w[0].pozycje, []);
 });
 
-/* ── Potrącenie za utratę wartości (0.170.0) ────────────────────────────── */
+/* ── Potrącenie za utratę wartości ────────────────────────────── */
 
 const KTO = { id: 1, name: "Ala z biura" };
 
@@ -1453,7 +1420,7 @@ test("potrącenie zostawia ślad w dzienniku, razem z powodem", () => {
   assert.match(e.payload, /brak opakowania/);
 });
 
-/* ── Paczki nieodebrane (0.172.0) ───────────────────────────────────────── */
+/* ── Paczki nieodebrane ───────────────────────────────────────── */
 
 test("nieodebrana paczka wchodzi w kolejkę, ale nie udaje zgłoszenia klienta", () => {
   /* Allegro takiego bytu nie zna — `CustomerReturn` powstaje z DEKLARACJI
@@ -1468,26 +1435,9 @@ test("nieodebrana paczka wchodzi w kolejkę, ale nie udaje zgłoszenia klienta",
   assert.match(z.externalId, /^nieodebrana:/, "identyfikator mówi, skąd jest");
   assert.equal(z.linkZwrotu, null, "w Allegro nie ma czego otworzyć");
   assert.ok(z.paczkaAt, "paczka JEST u nas — inaczej nie byłoby czego rejestrować");
-  /* I dlatego DOTARŁA — to jedyny zwrot, przy którym wiemy to na pewno.
-     Do 0.188.0 pole zostawało puste, więc panel pytał „czy dotarła"
-     o karton, który operator właśnie postawił na biurku. Trackingu tu nie
-     ma i nie będzie: przewoźnika nie znamy, a Allegro tego zwrotu nie zna. */
+  /* I dlatego DOTARŁA — to jedyny zwrot, przy którym wiemy to na pewno. */
   assert.equal(z.dostarczonoAt, z.paczkaAt,
     "nieodebrana leży u nas w chwili rejestracji");
-});
-
-test("nieodebrana zapamiętuje LOGIN klienta — to po nim biuro do niej wraca", () => {
-  /* Zgłoszenie właściciela: „nieodebrane paczki powinienem móc wyszukiwać po
-     loginie klienta". Pole szukania w panelu zna login od 0.337.0 i mówi to
-     wprost, ale TEJ paczce login brał się wyłącznie z zamówienia — a numeru
-     zamówienia przy nieodebranej najczęściej nie ma. Karton wraca sam, bez
-     zgłoszenia i bez kopii z Allegro. */
-  const d = stanowisko();
-  const w = zarejestrujNieodebrana(d, { waybill: "PACZ-1", login: "  jan_kowalski  " }, KTO);
-
-  const z = listaZwrotow(d, TERAZ).find((x) => x.id === w.zwrotId)!;
-  assert.equal(z.kupujacyLogin, "jan_kowalski", "spacje ze schowka nie wchodzą do bazy");
-  assert.equal(z.orderId, null, "login wystarcza sam — bez numeru zamówienia");
 });
 
 test("login bez wpisania bierze się z zamówienia, ale zostaje w KOLUMNIE zwrotu", () => {
@@ -1502,12 +1452,6 @@ test("login bez wpisania bierze się z zamówienia, ale zostaje w KOLUMNIE zwrot
   assert.equal(w.pozycji, 1, "numer zamówienia dalej przepisuje pozycje");
   assert.equal((d.prepare("SELECT kupujacy_login AS l FROM zwrot_klienta WHERE id=?")
     .get(w.zwrotId) as { l: string | null }).l, "ania_z_allegro");
-
-  /* Wpisany bije ten z zamówienia: pochodzi od człowieka patrzącego na sprawę. */
-  const drugi = zarejestrujNieodebrana(d,
-    { waybill: "PACZ-3", orderId: "ord-log", login: "ktos_inny" }, KTO);
-  assert.equal((d.prepare("SELECT kupujacy_login AS l FROM zwrot_klienta WHERE id=?")
-    .get(drugi.zwrotId) as { l: string | null }).l, "ktos_inny");
 });
 
 test("dziennik notuje FAKT loginu, nie sam login", () => {
@@ -1515,14 +1459,16 @@ test("dziennik notuje FAKT loginu, nie sam login", () => {
      w kolumnie zwrotu i stamtąd się ją czyta — kopia w dzienniku byłaby
      drugim miejscem do pilnowania przy tej samej polityce danych. */
   const d = stanowisko();
-  zarejestrujNieodebrana(d, { waybill: "PACZ-4", login: "jan_kowalski" }, KTO);
+  zamowienie(d, "ord-l", [{ offerId: "1", nazwa: "Sekator", sku: null, cena: 4999 }]);
+  d.prepare("UPDATE zamowienie_klienta SET kupujacy_login='jan_kowalski' WHERE external_id='ord-l'").run();
+  zarejestrujNieodebrana(d, { waybill: "PACZ-4", orderId: "ord-l" }, KTO);
   const e = d.prepare("SELECT payload FROM events WHERE type='zwrot_nieodebrana'")
     .get() as { payload: string };
   assert.equal(JSON.parse(e.payload).zLoginem, true);
   assert.doesNotMatch(e.payload, /jan_kowalski/);
 });
 
-/* ── Wybór paczki z historii klienta (0.365.0) ──────────────────────────────
+/* ── Wybór paczki z historii klienta ────────────────────────────────────────
    Zgłoszenie właściciela: „kupujący może mieć wiele paczek kupionych
    w historii sklepu, więc muszę mieć możliwość wybrania paczki". Sam login
    mówi, CZYJA to paczka; nie mówi, KTÓRA.                                   */
@@ -1611,9 +1557,8 @@ test("wiersz paczki niesie nazwę odbiorcy — po niej rozpoznaje się karton", 
 });
 
 test("telefon znajduje paczkę mimo trzech różnych kształtów numeru", () => {
-  /* TRZECI UCHWYT (0.422.0), decyzja właściciela. Klient pisze „gdzie moja
-     paczka?" i podaje SAM NUMER TELEFONU — do 0.421.1 agent nie miał czym go
-     zamienić na zamówienie i musiał wyjść do Allegro albo Sellasista.
+  /* TRZECI UCHWYT, decyzja właściciela. Klient pisze „gdzie moja
+     paczka?" i podaje SAM NUMER TELEFONU.
 
      Numer nie ma jednego kształtu. Allegro zapisuje to, co wpisał człowiek,
      agent przepisuje to, co przyszło w wiadomości, i ani razu nie jest to ten
@@ -1635,9 +1580,7 @@ test("telefon znajduje paczkę mimo trzech różnych kształtów numeru", () => 
 
 test("wiersz paczki niesie ulicę — to ona rozróżnia dwoje o jednym nazwisku", () => {
   /* Fragment nazwiska pokazuje cudze zakupy przy zbieżności nazwisk i to jest
-     świadoma cena od 0.367.0. Do 0.421.1 operator nie miał jednak CZYM tych
-     dwoje rozróżnić: wiersz niósł samą nazwę, a dwaj Kowalscy z jednego
-     miasta wyglądali identycznie. */
+     świadoma cena. Dwaj Kowalscy z jednego miasta różnią się ulicą. */
   const d = stanowisko();
   zakup(d, "ord-1", "jan_k", "2026-08-20T10:00:00Z");
   zakup(d, "ord-2", "jan_k2", "2026-08-21T10:00:00Z");
@@ -1654,31 +1597,10 @@ test("wiersz paczki niesie ulicę — to ona rozróżnia dwoje o jednym nazwisku
     "ulica rozstrzyga; miasto samo nie, bo zbieżność bywa w jednym mieście");
 });
 
-test("nieodebrana zapamiętuje NAZWĘ Z NAKLEJKI i przewoźnika", () => {
-  /* Dwa uchwyty, które zostają po tym, jak pierwszy skan chybi. Przewoźnika
-     przy nieodebranej Allegro nie zna wcale — do 0.366.0 kolumna zostawała
-     pusta, a operator widzi go na naklejce. */
-  const d = stanowisko();
-  const w = zarejestrujNieodebrana(d, {
-    waybill: "PACZ-N1", odbiorcaNazwa: "  Jan Kowalski  ", przewoznik: "inpost",
-  }, KTO);
-
-  const z = listaZwrotow(d, TERAZ).find((x) => x.id === w.zwrotId)!;
-  assert.equal(z.odbiorcaNazwa, "Jan Kowalski", "spacje ze schowka nie wchodzą do bazy");
-  assert.equal(z.przewoznik, "INPOST", "przewoźnik stoi surowo, wersalikami jak z Allegro");
-});
-
-test("nazwa odbiorcy wpisana ręką bije tę z zamówienia", () => {
-  /* Ta sama zasada co przy loginie: wpisane pochodzi od człowieka patrzącego
-     na naklejkę, a adres dostawy bywa inny niż kupujący. */
+test("nazwa odbiorcy przychodzi z zamówienia do kolumny zwrotu", () => {
   const d = stanowisko();
   zakup(d, "ord-1", "jan_kowalski", "2026-08-20T10:00:00Z");
   d.prepare("UPDATE zamowienie_klienta SET odbiorca_nazwa='Jan Kowalski' WHERE external_id='ord-1'").run();
-
-  const zPola = zarejestrujNieodebrana(d,
-    { waybill: "PACZ-A", orderId: "ord-1", odbiorcaNazwa: "Biuro Kowalex" }, KTO);
-  assert.equal((d.prepare("SELECT odbiorca_nazwa AS n FROM zwrot_klienta WHERE id=?")
-    .get(zPola.zwrotId) as { n: string }).n, "Biuro Kowalex");
 
   const zZamowienia = zarejestrujNieodebrana(d, { waybill: "PACZ-B", orderId: "ord-1" }, KTO);
   assert.equal((d.prepare("SELECT odbiorca_nazwa AS n FROM zwrot_klienta WHERE id=?")
@@ -1686,15 +1608,14 @@ test("nazwa odbiorcy wpisana ręką bije tę z zamówienia", () => {
 });
 
 test("dziennik notuje FAKT nazwy odbiorcy, nie samą nazwę", () => {
-  /* Ta sama polityka co przy loginie: dana osobowa ma jedno miejsce.
-     Przewoźnik daną osobową nie jest, więc idzie wprost. */
+  /* Ta sama polityka co przy loginie: dana osobowa ma jedno miejsce. */
   const d = stanowisko();
-  zarejestrujNieodebrana(d,
-    { waybill: "PACZ-D", odbiorcaNazwa: "Jan Kowalski", przewoznik: "DPD" }, KTO);
+  zamowienie(d, "ord-o", [{ offerId: "1", nazwa: "Sekator", sku: null, cena: 4999 }]);
+  d.prepare("UPDATE zamowienie_klienta SET odbiorca_nazwa='Jan Kowalski' WHERE external_id='ord-o'").run();
+  zarejestrujNieodebrana(d, { waybill: "PACZ-D", orderId: "ord-o" }, KTO);
   const e = d.prepare("SELECT payload FROM events WHERE type='zwrot_nieodebrana'")
     .get() as { payload: string };
   assert.equal(JSON.parse(e.payload).zOdbiorca, true);
-  assert.equal(JSON.parse(e.payload).przewoznik, "DPD");
   assert.doesNotMatch(e.payload, /Kowalski/);
 });
 
@@ -1713,7 +1634,7 @@ test("zamówienie bez daty zakupu stoi na końcu, nie na górze", () => {
 test("migracja domyka datę powrotu paczkom nieodebranym sprzed poprawki", () => {
   /* Niezmiennik, nie jednorazowa łatka: wiersz nieodebranej bez daty powrotu
      jest sprzeczny sam ze sobą, więc `migrate()` domyka go przy każdym
-     starcie. Baza produkcyjna ma takie wiersze z 0.172.0. */
+     starcie. */
   const d = stanowisko();
   const w = zarejestrujNieodebrana(d, { waybill: "STARA-1" }, KTO);
   d.prepare("UPDATE zwrot_klienta SET dostarczono_at=NULL WHERE id=?").run(w.zwrotId);
@@ -1727,8 +1648,7 @@ test("migracja domyka datę powrotu paczkom nieodebranym sprzed poprawki", () =>
 
 test("paczkę nieodebraną znajduje skan po numerze listu", () => {
   /* Numer z etykiety jest tu JEDYNYM uchwytem: nie ma kopii odpowiedzi
-     Allegro, w której dałoby się go szukać. Stąd świadomy wyjątek od
-     polityki z 0.163.0. */
+     Allegro, w której dałoby się go szukać. */
   const d = stanowisko();
   const w = zarejestrujNieodebrana(d, { waybill: "AD00R28X72" }, KTO);
   const t = znajdzZwrotPoKodzie("AD00R28X72", d);
@@ -1737,10 +1657,8 @@ test("paczkę nieodebraną znajduje skan po numerze listu", () => {
 });
 
 test("przyrostek klucza liczy POWTÓRZENIA, nie numery wierszy", () => {
-  /* Poprawka 0.174.2. Do niej przyrostek brał numer wiersza z pętli, więc
-     druga pozycja zamówienia dostawała `|#2`, choć niczego nie powtarzała.
-     Taki napis w kluczu zderzał się potem w migracji z prawdziwym duplikatem
-     sąsiada i kładł start aplikacji w pętli restartów. */
+  /* Numer wiersza w kluczu zderzałby się w migracji z prawdziwym duplikatem
+     sąsiada i kładł start aplikacji. */
   const d = stanowisko();
   zamowienie(d, "ord-dup", [
     { offerId: "111", nazwa: "Sekator", sku: null, cena: 4999 },
@@ -1777,12 +1695,10 @@ test("znane zamówienie oddaje swoje pozycje, żeby było co wycenić", () => {
   zamowienie(d, "ord-N", [
     { offerId: "of-1", nazwa: "Sekator", sku: "SEK-46", cena: 4999 },
     { offerId: "of-2", nazwa: "Filtr", sku: null, cena: 1000, ilosc: 2 }]);
-  const w = zarejestrujNieodebrana(d,
-    { waybill: "PX2", orderId: "ord-N", notatka: "awizo dwa razy" }, KTO);
+  const w = zarejestrujNieodebrana(d, { waybill: "PX2", orderId: "ord-N" }, KTO);
   assert.equal(w.pozycji, 2);
 
   const [z] = listaZwrotow(d, TERAZ);
-  assert.equal(z.notatka, "awizo dwa razy");
   assert.deepEqual(z.pozycje.map((p) => p.nazwa), ["Sekator", "Filtr"]);
   assert.equal(z.sumaPozycjiGrosze, 4999 + 2000, "cena razy ilość, jak wszędzie");
   assert.ok(z.zamowienie, "zamówienie dopina się tą samą drogą co przy zwrocie");
@@ -1803,10 +1719,10 @@ test("rejestracja zostawia ślad w dzienniku", () => {
   assert.ok(e, "każda mutacja ma autora, także ta");
 });
 
-/* ── Login kupującego (0.177.0) ──────────────────────────────────────────────
+/* ── Login kupującego ────────────────────────────────────────────────────────
    Zgłoszenie właściciela: „nie widzę nigdzie w otwartym zwrocie loginu
    klienta". Login niesie Allegro w DWÓCH odpowiedziach — przy zwrocie i przy
-   zamówieniu — a ekran czytał wyłącznie pierwszą.                           */
+   zamówieniu.                                                               */
 
 test("login kupującego spada z zamówienia, gdy zwrot go nie niesie", () => {
   const d = stanowisko();
@@ -1836,7 +1752,7 @@ test("bez obu źródeł login zostaje pusty — zgadywania nie ma", () => {
   assert.equal(listaZwrotow(d, TERAZ)[0].kupujacyLogin, null);
 });
 
-/* ── Produkt dopisany przez biuro (0.184.0) ──────────────────────────────────
+/* ── Produkt dopisany przez biuro ────────────────────────────────────────────
    Klient zgłasza jedną rzecz, a odsyła dwie. Regulamin Allegro tej zgodności
    nie wymaga — liczy się terminowe oświadczenie o odstąpieniu, nie zgodność
    przesyłki ze zgłoszeniem. Pieniądze i tak trzeba oddać.                    */
@@ -1993,9 +1909,7 @@ test("dopisana pozycja wchodzi do kwoty jak każda inna", () => {
 });
 
 test("oś zwrotu opowiada DROGĘ, nie same cofnięcia", () => {
-  /* Blizna 0.284.0: na oś pisały wyłącznie cofnięcia, bo tylko one ją
-     zapisywały. Karta pokazywałaby „Cofnięto przyjęcie" nad pustką po samym
-     przyjęciu — a biuro pyta, co się ze sprawą działo, nie co odkręcono. */
+  /* Biuro pyta, co się ze sprawą działo, nie co odkręcono. */
   const d = stanowisko();
   const KTO_OSI = biuro(d);
   const id = dodaj(d, "2026-08-30T09:00:00Z", {}, [{ ilosc: 1, cena: 5000 }]);
@@ -2077,9 +1991,8 @@ test("notatkę da się dopisać przy zwrocie ZAMKNIĘTYM", () => {
 });
 
 test("szczegół po identyfikatorze składa TEN SAM wiersz, co kolejka", () => {
-  /* Audyt zwrotów, 15 września 2026. Trasa szczegółu budowała całą historię,
-     żeby wyjąć jeden wiersz, a szczegół odświeża się po każdym zapisie. Zawężony
-     odczyt ma dać wiersz identyczny co do pola — inaczej szczegół i kolejka
+  /* Szczegół odświeża się po każdym zapisie, więc czyta zawężony odczyt. Ten
+     ma dać wiersz identyczny co do pola — inaczej szczegół i kolejka
      mówiłyby o tym samym zwrocie co innego. Drugi zwrot, drugie zamówienie
      i druga rozmowa stoją tu po to, żeby zawężenie miało co odciąć. */
   const d = stanowisko();
@@ -2101,10 +2014,9 @@ test("szczegół po identyfikatorze składa TEN SAM wiersz, co kolejka", () => {
     "nieznany zwrot to pusta lista, nie wyjątek");
 });
 
-/* ── Trzecia ocena: outlet obsługiwany ręką (0.375.0) ───────────────────────
-   Warunek, pod którym ta ocena w ogóle weszła, brzmiał: ma kończyć się listą
-   roboczą, a nie samym znacznikiem. Znacznik bez czytelnika to „przecena"
-   z 0.209.0 drugi raz.                                                       */
+/* ── Trzecia ocena: outlet obsługiwany ręką ─────────────────────────────────
+   Ocena ma kończyć się listą roboczą, a nie samym znacznikiem: znacznik bez
+   czytelnika to ślepy zaułek.                                               */
 
 /** Zwrot przyjęty, z pozycją wiszącą na kartotece prowadzonej magazynowo. */
 function zwrotZKartoteka(d: Db, KTO: { id: number; name: string }) {
@@ -2176,7 +2088,7 @@ test("przeniesienia nie da się zameldować dla pozycji BEZ tej oceny", () => {
   assert.throws(() => przeniesionoNaOutlet(d, poz[0], KTO), /nie jest oceniona na outlet/);
 });
 
-/* ── Stary zwrot bez decyzji wychodzi z kolejki (0.452.0) ────────────────────
+/* ── Stary zwrot bez decyzji wychodzi z kolejki ──────────────────────────────
    Wywiad z właścicielem: „Do decyzji" liczyło 743 sprawy, „głównie stare".
    Sprzedawca ma siedem dni na oddanie pieniędzy, a ósmego Allegro oddaje je
    samo — po progu pytanie „przyjąć czy odrzucić?" nie ma już treści. */
@@ -2204,10 +2116,10 @@ test("zwrot bez decyzji starszy niż próg jest zamknięty — liczone, nie zapi
   assert.equal(zwrot(100, { utworzono: null }), "decyzja");
 });
 
-/* ── Pieniądze trzymają zwrot w pracy (0.476.0) ──────────────────────────
-   Przegląd zwrotów z 23 września: automatyczny ZW zamykał zwrot minutę po
-   kwocie, a pieniądze biuro oddaje ręką w Allegro. Zapomniany zwrot oddawało
-   ósmego dnia samo Allegro — w całości, bez potrącenia. */
+/* ── Pieniądze trzymają zwrot w pracy ────────────────────────────────────
+   Automatyczny ZW zamyka zwrot minutę po kwocie, a pieniądze biuro oddaje
+   ręką w Allegro. Zapomniany zwrot oddaje ósmego dnia samo Allegro — w całości,
+   bez potrącenia. */
 
 const TERAZ_P = Date.parse("2026-09-20T12:00:00Z");
 const zaplacony = {
@@ -2260,7 +2172,7 @@ test("wypłata nie zdejmuje nieodebranej z pracy przed korektą (0.493.0)", () =
   assert.equal(kubelekZwrotu({ ...z, werdykt: "przyjety", pozycje: [{ ocena: "stan" }],
     kwotaGrosze: 4999, korektaNumer: "ZW 1/MAG/09/2026" }), "zamkniety",
     "po korekcie zamyka, bo pieniądze już wyszły");
-  /* Zwrot z Allegro zamyka wypłata jak dotąd — decyzja z 0.339.0. */
+  /* Zwrot z Allegro zamyka wypłata. */
   assert.equal(kubelekZwrotu({ ...z, zrodlo: "allegro" }), "zamkniety");
 });
 
@@ -2277,7 +2189,7 @@ test("zamknięty korektą, a niezapłacony — wraca do DO ZWROTU", () => {
     TERAZ_P), "korekta");
 });
 
-/* ── Drugi zwrot tego samego zamówienia (0.493.0) ─────────────────────────
+/* ── Drugi zwrot tego samego zamówienia ───────────────────────────────────
    Decyzja właściciela: klient z nieodebraną paczką zgłasza czasem potem
    odstąpienie w Allegro. Dwa zwroty to dwie kwoty za jeden towar. */
 
@@ -2319,9 +2231,8 @@ test("drugi zwrot gaśnie na zwrocie zamkniętym, ale odnośnik zostaje", () => 
   assert.ok(!z.sygnaly.includes("drugi_zwrot"));
 });
 
-/* ── Klient nie odesłał paczki (0.505.0) ────────────────────────────────────
-   Zgłoszenie właściciela przy zwrocie 5ZRQ/2026: odstąpienie zgłoszone
-   20 sierpnia, paczka nigdy nienadana. Pieniądze się nie należą. */
+/* ── Klient nie odesłał paczki ──────────────────────────────────────────────
+   Odstąpienie zgłoszone, paczka nigdy nienadana. Pieniądze się nie należą. */
 
 test("po czternastu dniach bez nadanej paczki sygnał mówi „nie odesłał”, nie „nie nadana”", () => {
   const baza = {

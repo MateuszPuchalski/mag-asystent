@@ -15,13 +15,12 @@ const Schemat = z.object({
 });
 type Dane = z.infer<typeof Schemat>;
 
-/* Pierwsze konto (0.496.0). Do tej pory zakładał je instalator, pytając
-   o hasło w oknie PowerShella na serwerze — a panel pustej instalacji
-   pokazywał logowanie, na które nie było czym się zalogować. Serwer umie to
-   od dawna: w pustej bazie `POST /api/users` przyjmuje pierwsze konto bez
-   sesji i wymusza rolę admin (`routes/auth.ts`). Ten formularz tylko z tego
-   korzysta, a regułę loginu i hasła zna serwer — tu jej nie powtarzamy
-   ponad minimum, które da się powiedzieć przed wysłaniem. */
+/* Pierwsze konto. Bez tego panel pustej instalacji pokazywałby logowanie,
+   na które nie ma czym się zalogować. W pustej bazie `POST /api/users`
+   przyjmuje pierwsze konto bez sesji i wymusza rolę admin
+   (`routes/auth.ts`). Ten formularz tylko z tego korzysta, a regułę loginu
+   i hasła zna serwer — tu jej nie powtarzamy ponad minimum, które da się
+   powiedzieć przed wysłaniem. */
 const SchematPierwszego = z.object({
   name: z.string().trim().min(1, "Podaj imię i nazwisko"),
   login: z.string().trim().min(3, "Login: co najmniej 3 znaki"),
@@ -88,12 +87,12 @@ export function Logowanie({ zalogowano }: { zalogowano: () => void }) {
 
   return <main className="grid min-h-screen place-items-center bg-wertis-ink p-5">
     <div className="card w-full max-w-sm p-7">
-      {/* Logo sklepu zamiast ikony i słowa (23 września 2026) — to pierwszy
-          ekran, jaki widzi nowa osoba w biurze, więc ma wyglądać jak ta firma. */}
+      {/* Logo sklepu zamiast ikony i słowa — to pierwszy ekran, jaki widzi
+          nowa osoba w biurze, więc ma wyglądać jak ta firma. */}
       <div className="mb-7">
         <h1 className="m-0"><img src={logo} alt="WERTIS — sklep z częściami" className="h-14 w-auto" /></h1>
-        {/* „Biuro", nie „Obsługa klienta", od 0.446.0: pod tym adresem jest
-            całe biuro — dostawy, kosze, wgląd i ustawienia, nie tylko skrzynka. */}
+        {/* „Biuro", nie „Obsługa klienta": pod tym adresem jest całe biuro —
+            dostawy, kosze, wgląd i ustawienia, nie tylko skrzynka. */}
         <p className="mt-2 text-sm text-slate-500">Biuro</p>
       </div>
       {pusta ? <PierwszeKonto zalogowano={zalogowano} /> : <form aria-label="Logowanie" onSubmit={handleSubmit(wyslij)}>

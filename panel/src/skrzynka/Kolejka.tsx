@@ -20,14 +20,12 @@ import { useNoweKlucze } from "./Ruch";
    do trasy nic by dziś nie oszczędziło, a rozmnożyłoby reguły przynależności
    na dwie strony.
 
-   Znacznik „po terminie" na wierszu liczy dalej SERWER (`poTerminie`), bo
-   odłożenia zapisane przed 22 września 2026 wciąż wygasają. Nowych nikt nie
-   nadaje, więc kubełek na nie odszedł, a znacznik zgaśnie sam. */
+   Znacznik „po terminie" na wierszu liczy SERWER (`poTerminie`). */
 type Kubelek = "doOdpowiedzi" | "nieprzypisane" | "moje" | "oczekujace" | "zakonczone" | "wszystkie";
 
-/* ── Kolejność listy (0.215.0) ───────────────────────────────────────────────
+/* ── Kolejność listy ─────────────────────────────────────────────────────────
    Domyślna zostaje po serwerze: PILNE, potem najdłużej czekające pytanie —
-   decyzja właściciela z 0.181.0 i odpowiedź na pytanie „za co się wziąć".
+   decyzja właściciela i odpowiedź na pytanie „za co się wziąć".
    „Od najnowszych" odpowiada na INNE pytanie — „co właśnie przyszło" — i jest
    przełącznikiem, nie nową regułą, tym samym wzorem co data nadania przy
    zwrotach. PILNE zostaje na górze w obu porządkach: flaga ręczna przebija
@@ -51,16 +49,14 @@ export function odNajnowszych(rozmowy: Rozmowa[]): Rozmowa[] {
     || b.id - a.id);
 }
 
-/** Kubełki przeglądania, nie pracy — pod „Więcej" (0.506.0). */
+/** Kubełki przeglądania, nie pracy — pod „Więcej". */
 const POD_WIECEJ: ReadonlyArray<Kubelek> = ["oczekujace", "zakonczone", "wszystkie"];
 
-/* ── „DO ODPOWIEDZI" JEST PIERWSZY I DOMYŚLNY (0.533.0) ─────────────────────
-   Decyzja właściciela z 26 września 2026. Wejście stawało na „Wszystkie",
-   a tam stoją też zakończone — i to NA GÓRZE, bo serwer układa po najstarszym
-   pytaniu klienta (0.181.0), a pytanie sprzed miesięcy jest najstarsze.
-   „Następna" po wysyłce potrafiła więc trafić w archiwum. Praca dzieliła się
-   za to na dwa kubełki: dopisek klienta, któremu już odpisałem, stał
-   w „Moje", nowe pytanie — w „Nieprzypisane".
+/* ── „DO ODPOWIEDZI" JEST PIERWSZY I DOMYŚLNY ───────────────────────────────
+   Decyzja właściciela. W „Wszystkie" zakończone stoją NA GÓRZE, bo serwer
+   układa po najstarszym pytaniu klienta, więc „Następna" po wysyłce
+   trafiałaby w archiwum. Praca nie dzieli się też na dwa kubełki: dopisek
+   klienta, któremu już odpisałem, i nowe pytanie stoją razem.
 
    „Do odpowiedzi" to nasz ruch bez cudzych: niczyje i moje razem. Kolega
    ma swoje u siebie, a jego rozmowę dalej widać w „Wszystkie". „Wszystkie"
@@ -70,12 +66,12 @@ const KUBELKI: Array<{ klucz: Kubelek; etykieta: string }> = [
   { klucz: "nieprzypisane", etykieta: "Nieprzypisane" },
   { klucz: "moje", etykieta: "Moje" },
   { klucz: "oczekujace", etykieta: "Oczekujące" },
-  /* Zakończone (23 września 2026): ręką agenta albo samo — podziękowanie,
+  /* Zakończone: ręką agenta albo samo — podziękowanie,
      dwa dni ciszy, wątek zamknięty w Allegro. Osobno, żeby pomyłkowe
      zakończenie dało się znaleźć i otworzyć, a nie tylko w „Wszystkie". */
   { klucz: "zakonczone", etykieta: "Zakończone" },
   { klucz: "wszystkie", etykieta: "Wszystkie" },
-  /* Odłożone stoją w „Oczekujących" (0.533.0) — czekają na termin, jak
+  /* Odłożone stoją w „Oczekujących" — czekają na termin, jak
      tamte na klienta albo halę. Osobny kubełek byłby czwartym miejscem do
      sprawdzania, a po terminie rozmowa i tak wraca sama do „Do odpowiedzi". */
 ];
@@ -83,12 +79,10 @@ const KUBELKI: Array<{ klucz: Kubelek; etykieta: string }> = [
 /* Spam znika z kolejki roboczej, ale NIE z panelu: widać go w „Wszystkie".
    Ukrycie go wszędzie znaczyłoby, że pomyłki nie da się cofnąć. */
 
-/* ── KTÓRY STATUS ZASŁUGUJE NA PLAKIETKĘ (0.251.0) ───────────────────────────
-   Do 0.249.1 każdy wiersz zaczynał się od plakietki statusu — a w kubełkach
-   roboczych („Nieprzypisane", „Moje") status jest praktycznie STAŁY. Najgłośniejszy
-   element wiersza powtarzał więc w kółko to samo słowo i nie rozróżniał niczego,
-   podczas gdy rzecz, która wiersze RÓŻNI — czas oczekiwania — stała drobnym
-   drukiem na końcu skanowania.
+/* ── KTÓRY STATUS ZASŁUGUJE NA PLAKIETKĘ ─────────────────────────────────────
+   W kubełkach roboczych („Nieprzypisane", „Moje") status jest praktycznie
+   STAŁY. Plakietka na każdym wierszu powtarzałaby w kółko to samo słowo,
+   a wiersze RÓŻNI czas oczekiwania.
 
    `waiting_for_us` niesie dokładnie ten sam fakt co zegar: serwer zwraca ten
    status wtedy i tylko wtedy, gdy ostatnia wiadomość jest przychodząca
@@ -110,7 +104,7 @@ const NASZ_RUCH: ReadonlySet<StatusRozmowy> = new Set([
   "waiting_for_internal",
 ]);
 
-/* ── KUBEŁKI ROBOCZE TO NASZ RUCH (23 września 2026) ─────────────────────────
+/* ── KUBEŁKI ROBOCZE TO NASZ RUCH ────────────────────────────────────────────
    Zgłoszenie właściciela: „potrzebuję sposobu, żeby rozmowa była rozwiązana".
    „Nieprzypisane" i „Moje" patrzyły wyłącznie na prowadzącego, więc rozmowa
    po naszej odpowiedzi stała w nich na zawsze — a czekanie na klienta to nie
@@ -150,9 +144,9 @@ export function Kolejka({ rozmowy, stan, copilot, klasyfikacja, onRozpoznaj = ()
   mojeId?: number | null;
   onWybierz: (id: number) => void;
   /** Identyfikatory WIDOCZNYCH wierszy po kubełku i szukaniu — dla „następnej
-      rozmowy" po wysyłce (23 września 2026). Kolejka trzyma te sita u siebie. */
+      rozmowy" po wysyłce. Kolejka trzyma te sita u siebie. */
   onWidoczne?: (ids: number[]) => void;
-  /** Przełącznik powiadomień systemowych (23 września 2026) — patrz `Sygnaly.ts`.
+  /** Przełącznik powiadomień systemowych — patrz `Sygnaly.ts`.
       Brak = przeglądarka ich nie zna, więc przycisku nie ma. */
   powiadomienia?: { stan: StanPowiadomien; przelacz: () => void };
   onOdswiez: () => void;
@@ -162,7 +156,7 @@ export function Kolejka({ rozmowy, stan, copilot, klasyfikacja, onRozpoznaj = ()
   /* Kolejka nieświeża wygląda inaczej, bo znaczy co innego. Pusta lista przy
      stojącym synchronizatorze to nie „brak pytań", tylko „nie wiem". */
   nieswieza?: boolean;
-  /* Lista nie przyszła wcale (0.546.0). Wtedy kolejka nie wie, ile czeka,
+  /* Lista nie przyszła wcale. Wtedy kolejka nie wie, ile czeka,
      więc nie mówi „brak rozmów" ani „0" — mówi, że nie wie, i dlaczego. */
   bladBezDanych?: string | null;
 }) {
@@ -177,11 +171,10 @@ export function Kolejka({ rozmowy, stan, copilot, klasyfikacja, onRozpoznaj = ()
   const doOdpowiedziKlucze = rozmowy
     .filter((r) => wKubelku(r, "doOdpowiedzi", mojeId)).map((r) => String(r.id));
   const nowe = useNoweKlucze(doOdpowiedziKlucze, !laduje && mojeId !== null);
-  /* ── Szukanie w kolejce (0.195.0) ──────────────────────────────────────────
-     Zwroty mają wyszukiwarkę od 0.165.0, skrzynka nie miała żadnej: kubełek
-     mówi „czyje to", a pytania „czy TA rozmowa gdzieś
-     tu jest" nie zadawał nikt — bo nie było jak. „Klient pisał o tym miesiąc
-     temu" znaczyło przewijanie listy.
+  /* ── Szukanie w kolejce ────────────────────────────────────────────────────
+     Kubełek mówi „czyje to", a szukanie odpowiada „czy TA rozmowa gdzieś
+     tu jest". Bez niego „klient pisał o tym miesiąc temu" znaczy przewijanie
+     listy.
 
      Filtr liczy się W PAMIĘCI EKRANU, bez debounce'u i bez ruchu do serwera —
      lista i tak przyjeżdża w całości, ten sam wzorzec co przy kubełkach. */
@@ -202,7 +195,7 @@ export function Kolejka({ rozmowy, stan, copilot, klasyfikacja, onRozpoznaj = ()
     || r.ostatniaWiadomosc.toLowerCase().includes(szukane)
     || (r.wlasciciel ?? "").toLowerCase().includes(szukane));
 
-  /* ── WIERSZ MÓWI, NA CZYM TRAFIŁ (0.425.0) ────────────────────────────────
+  /* ── WIERSZ MÓWI, NA CZYM TRAFIŁ ──────────────────────────────────────────
      Szukanie po TREŚCI jest potrzebne i zostaje — tak się wraca do sprawy,
      której loginu nikt nie pamięta. Ma jednak skutek, którego wiersz nie
      pokazywał: wpisane nazwisko trafia też w cudzą wiadomość, w której to
@@ -223,11 +216,9 @@ export function Kolejka({ rozmowy, stan, copilot, klasyfikacja, onRozpoznaj = ()
       ? "trafienie po prowadzącym" : "trafienie w treści, nie w loginie";
   };
 
-  /* ── KLAWIATURA W SKRZYNCE (0.383.0) ─────────────────────────────────
-     Trzy kolejki obsługi, dwie chodziły z klawiatury od 0.245.0 — zwroty
-     i reklamacje. Skrzynka nie miała ANI JEDNEGO klawisza, a to na
-     niej agent siedzi najdłużej z całego panelu (patrz `Edytor.tsx`, 0.247.0).
-     Żadna decyzja tego nie wybrała; po prostu nikt jej tu nie dorobił.
+  /* ── KLAWIATURA W SKRZYNCE ───────────────────────────────────────────
+     Na skrzynce agent siedzi najdłużej z całego panelu (patrz `Edytor.tsx`),
+     więc chodzi z klawiatury jak zwroty i reklamacje.
 
      NASŁUCH MIESZKA W KOLEJCE, nie w ekranie, i to jest różnica wobec tamtych
      trzech. Tam ekran zna listę, więc wie, co jest „następne". Tutaj kubełek
@@ -239,10 +230,10 @@ export function Kolejka({ rozmowy, stan, copilot, klasyfikacja, onRozpoznaj = ()
      POLE TEKSTOWE WYGRYWA ZAWSZE. Na tym ekranie agent PISZE — bez tej bramki
      `j` w słowie „już" przerzucałoby rozmowę spod kursora.
 
-     Strażnik jest WSPÓLNY, z `nawigacja/fokus.ts` (0.522.0). Własny nie znał
-     SELECT-a, a kolejka ma dwa: „Więcej" i kolejność. Strzałka w otwartej
-     liście zmieniała wtedy naraz jej wartość i rozmowę pod kursorem.
-     Od 0.546.0 strażnik milczy też pod oknem modalnym (`klawiszZajety`). */
+     Strażnik jest WSPÓLNY, z `nawigacja/fokus.ts`, bo zna SELECT-a, a kolejka
+     ma dwa: „Więcej" i kolejność. Strzałka w otwartej liście zmieniałaby
+     naraz jej wartość i rozmowę pod kursorem. Strażnik milczy też pod oknem
+     modalnym (`klawiszZajety`). */
   const naKlawisz = useRef<(e: KeyboardEvent) => void>(() => {});
   naKlawisz.current = (e: KeyboardEvent) => {
     if (klawiszZajety(e.target)) return;
@@ -260,7 +251,7 @@ export function Kolejka({ rozmowy, stan, copilot, klasyfikacja, onRozpoznaj = ()
       return;
     }
     /* Cyfra mapuje się wprost na indeks listy: „Do odpowiedzi" to 1,
-       a „Wszystkie" od 0.533.0 ostatnia — jak w tamtych trzech ekranach. */
+       a „Wszystkie" ostatnia — jak w tamtych trzech ekranach. */
     if (/^[1-9]$/.test(e.key) && Number(e.key) <= KUBELKI.length) {
       e.preventDefault();
       setKubelek(KUBELKI[Number(e.key) - 1].klucz);
@@ -273,10 +264,10 @@ export function Kolejka({ rozmowy, stan, copilot, klasyfikacja, onRozpoznaj = ()
   }, []);
 
   return <section className="card flex min-h-0 flex-col overflow-hidden">
-    {/* `shrink-0` nad scrollerem i `min-h-0` na nim (0.180.0). Bez tego przy
+    {/* `shrink-0` nad scrollerem i `min-h-0` na nim. Bez tego przy
         węższej kolumnie kubełki zawijają się na trzy rzędy, a lista — jedyny
         blok z bazą 0 — kurczy się do zera. Wzorzec z kolumn zwrotów. */}
-    {/* JEDNO PASMO ZAMIAST DWÓCH (0.193.0). Data synchronizacji stała we
+    {/* JEDNO PASMO ZAMIAST DWÓCH. Data synchronizacji stała we
         WŁASNYM pasku pod nagłówkiem, a pigułka „Synchronizacja 18:29 · 0 błędów"
         niesie tę samą rzecz w pasku górnym, na każdym ekranie panelu. Pięć
         pasm sterujących nad pierwszym wierszem zjadało ćwierć wysokości
@@ -285,7 +276,7 @@ export function Kolejka({ rozmowy, stan, copilot, klasyfikacja, onRozpoznaj = ()
         Dlaczego data w ogóle tu jest: pusta lista o 9:00 znaczy co innego, gdy
         synchronizator stanął o 6:00, a co innego, gdy przebiegł minutę temu.
         Tego zdania nie usuwamy — schodzi obok tytułu, w rozmiar podpisu. */}
-    {/* NAGŁÓWEK W JEDNYM WIERSZU (0.251.0). Tytuł i data synchronizacji stały
+    {/* NAGŁÓWEK W JEDNYM WIERSZU. Tytuł i data synchronizacji stały
         jeden pod drugim i kosztowały 73 px — czyli więcej niż wiersz z pytaniem
         klienta. Data ZOSTAJE (patrz akapit wyżej: pusta lista o 9:00 znaczy co
         innego przy stojącym synchronizatorze), tylko schodzi obok tytułu,
@@ -298,7 +289,7 @@ export function Kolejka({ rozmowy, stan, copilot, klasyfikacja, onRozpoznaj = ()
         synchronizacja {czas(stan.ostatniaSynchronizacja)}
         {stan.bledy > 0 && <span className="ml-1 font-bold text-amber-700">· błędów: {stan.bledy}</span>}
       </p>
-      {/* JEDEN „?" ZAMIAST DWÓCH (0.522.0). Słownik znaków stał w nagłówku,
+      {/* JEDEN „?" ZAMIAST DWÓCH. Słownik znaków stał w nagłówku,
           skróty klawiszy w paśmie szukania — dwa znaki zapytania o dwóch
           regułach otwierania. Pomoc tej kolejki jest jedna, więc otwiera się
           jednym przyciskiem i zamyka jak każde okienko panelu. */}
@@ -317,8 +308,7 @@ export function Kolejka({ rozmowy, stan, copilot, klasyfikacja, onRozpoznaj = ()
           powiadomienia.stan === "wlaczone" ? "text-wertis-ink" : "text-slate-500"}`}>
         {powiadomienia.stan === "wlaczone" ? <Bell size={16} /> : <BellOff size={16} />}</button>}
       <ZnakCopilota stan={copilot} kandydaci={doRozpoznania(wKubelkuTeraz, copilot)} />
-      {/* Plakietka „STAN Z …" zeszła (0.522.0). Zapalała się wyłącznie przy
-          alarmie synchronizacji, a baner alarmu nad kolumnami mówi już „dane
+      {/* Bez plakietki „STAN Z …": baner alarmu nad kolumnami mówi „dane
           sprzed…" pełnym zdaniem. Godzinę niesie zdanie obok tytułu. */}
       <button type="button" className="rounded p-1 text-slate-500 hover:bg-slate-100" onClick={onOdswiez}
         title="Odśwież" aria-label="Odśwież" aria-busy={odswieza}>
@@ -341,26 +331,22 @@ export function Kolejka({ rozmowy, stan, copilot, klasyfikacja, onRozpoznaj = ()
       <span className="sr-only"> — {dymekProblemowZakupu(problemyZakupu)}</span>
     </p>}
     </header>
-    {/* ── CEL KLIKALNY MA 24 px, A ZA WYSOKOŚĆ PŁACI PASMO (0.255.0) ─────────
-        0.251.0 ścisnęło pigułki z `py-1` do `py-0.5`, żeby odzyskać wysokość
-        dla listy pytań. Zmierzone: dało to cele 20 px przy progu 24×24 z WCAG
-        2.2 AA (2.5.8). Odzyskane piksele nie były moje do wzięcia.
-
-        Pigułka wraca na `py-1`, a rachunek pokrywa własne wypełnienie pasma:
+    {/* ── CEL KLIKALNY MA 24 px, A ZA WYSOKOŚĆ PŁACI PASMO ───────────────────
+        `py-0.5` dawało cele 20 px przy progu 24×24 z WCAG 2.2 AA (2.5.8).
+        Pigułka ma `py-1`, a rachunek pokrywa własne wypełnienie pasma:
         `py-1.5` → `py-1`. Kubełki zawijają się na dwa rzędy przy kolumnie
         400 px, więc pigułki kosztują +8 px, a pasmo oddaje 4 px. Netto +4 px
         chromu — cena, której próg dostępności jest wart. */}
-    {/* ── TRZY KUBEŁKI NA WIERZCHU, DWA POD „WIĘCEJ" (0.506.0) ─────────────
-        Zgłoszenie agenta: „przytłacza". Pięć pigułek zawijało się na dwa rzędy
-        nad pierwszym pytaniem. Robota dzieje się w trzech; „Oczekujące"
+    {/* ── TRZY KUBEŁKI NA WIERZCHU, DWA POD „WIĘCEJ" ───────────────────────
+        Zgłoszenie agenta: „przytłacza". Pięć pigułek zawijałoby się na dwa
+        rzędy nad pierwszym pytaniem. Robota dzieje się w trzech; „Oczekujące"
         i „Zakończone" to przeglądanie — stoją pod „Więcej" z liczbą, a cyfry
-        4 i 5 dalej je wybierają. Od 0.522.0 ten układ mieszka
-        w `ui/FiltrZWiecej.tsx`, bo te same „Więcej" dostały inne kolejki.
+        4 i 5 je wybierają. Układ mieszka w `ui/FiltrZWiecej.tsx`, bo to samo
+        „Więcej" mają inne kolejki.
 
-        „WIĘCEJ" W RZĘDZIE KUBEŁKÓW (0.548.0, wariant C). Lista brała resztę
-        rzędu, więc po zawinięciu robiła się pełnoszerokim paskiem pod
-        pigułkami — drugim pasmem sterowania nad pytaniami. Tryb zwarty mierzy
-        ją treścią: stoi obok „Moje" i schodzi niżej tylko, gdy się nie mieści. */}
+        „WIĘCEJ" W RZĘDZIE KUBEŁKÓW. Tryb zwarty mierzy listę treścią: stoi
+        obok „Moje" i schodzi niżej tylko, gdy się nie mieści. Inaczej byłaby
+        drugim pasmem sterowania nad pytaniami. */}
     <div className="flex shrink-0 flex-wrap items-center gap-1 border-b px-2 py-1">
       <FiltrZWiecej<Kubelek> zwarty wybrany={kubelek} onWybierz={setKubelek} wiecej={POD_WIECEJ}
         pozycje={KUBELKI.map((k) => ({ klucz: k.klucz, etykieta: k.etykieta,
@@ -373,7 +359,7 @@ export function Kolejka({ rozmowy, stan, copilot, klasyfikacja, onRozpoznaj = ()
     <div className="flex shrink-0 items-center gap-2 border-b px-2 py-1.5">
       <div className="relative min-w-0 flex-1">
         <Search size={14} className="absolute left-2 top-1/2 -translate-y-1/2 text-slate-400" />
-        {/* Podpowiedź MIEŚCI SIĘ w polu (0.546.0). „Szukaj: login, treść,
+        {/* Podpowiedź MIEŚCI SIĘ w polu. „Szukaj: login, treść,
             prowadzący" potrzebowało 192 px, a pole ma 136 px przy 1280 i 1440
             — agent czytał „prc". „Szukaj" mówi lupa i nazwa pola, a miejsce
             na krzyżyk rezerwujemy dopiero, gdy krzyżyk stoi: to daje 156 px
@@ -392,20 +378,20 @@ export function Kolejka({ rozmowy, stan, copilot, klasyfikacja, onRozpoznaj = ()
         <option value="czekanie">najdłużej czekające</option>
         <option value="najnowsze">od najnowszych</option>
       </select>
-      {/* Skróty klawiszy zeszły stąd do „?" w nagłówku (0.522.0) — obok
-          słownika znaków, jedną pomocą zamiast dwóch. */}
+      {/* Skróty klawiszy stoją pod „?" w nagłówku — obok słownika znaków,
+          jedną pomocą zamiast dwóch. */}
     </div>
     <PasekCopilota stan={copilot} kandydaci={doRozpoznania(wKubelkuTeraz, copilot)}
       trwa={klasyfikacja?.trwa} wynik={klasyfikacja?.wynik} blad={klasyfikacja?.blad}
       onRozpoznaj={onRozpoznaj} />
-    {/* ── PIGUŁEK KATEGORII NIE MA (22 września 2026) ──────────────────────
+    {/* ── PIGUŁEK KATEGORII NIE MA ─────────────────────────────────────────
         Decyzja właściciela. Pasek liczył kategorie w kubełku i zawężał listę
         po PRZYPUSZCZENIU maszyny — przy piętnastu klasach potrafił zająć trzy
         rzędy nad pierwszym pytaniem. Kategoria zostaje na wierszu i w nagłówku
         rozmowy. Zakaz przestawiania kolejki po kategorii stoi dalej: kolejność
         niosą fakty — flaga „pilne" i czas oczekiwania. */}
     <div className={`min-h-0 flex-1 overflow-y-auto ${nieswieza ? "opacity-60" : ""}`}>
-      {/* Klawisze NA EKRANIE, wzorem reklamacji (0.281.0). Dekalog p. 2:
+      {/* Klawisze NA EKRANIE, wzorem reklamacji. Dekalog p. 2:
           rozpoznanie jest tańsze od pamiętania, a skrót, o którym nikt nie wie,
           nie skraca niczyjej pracy. Sit „moje"/„niczyje" skrzynka nie ma —
           „Moje" jest tu KUBEŁKIEM, więc siedzi już pod cyfrą i drugi raz nie
@@ -431,7 +417,7 @@ export function Kolejka({ rozmowy, stan, copilot, klasyfikacja, onRozpoznaj = ()
       {!laduje && rozmowy.length > 0 && !widoczne.length && szukane === "" &&
         <Pusto waga="lista">Ten kubełek jest pusty — zajrzyj do „Wszystkie".</Pusto>}
       {widoczne.map((r) => {
-        /* ── ZEGAR MIERZY NASZ DŁUG, NIE WIEK ROZMOWY (0.251.0) ───────────
+        /* ── ZEGAR MIERZY NASZ DŁUG, NIE WIEK ROZMOWY ─────────────────────
            `czekaOdMs` liczy się od ostatniej wiadomości KLIENTA. Przy statusie
            „Czeka na klienta" znaczy to, że odpisaliśmy — a wiersz i tak pisał
            „czeka 15 g", czyli mierzył czas komuś, kto na nic nie czeka. Słowo
@@ -440,13 +426,13 @@ export function Kolejka({ rozmowy, stan, copilot, klasyfikacja, onRozpoznaj = ()
         const zegar = NASZ_RUCH.has(r.status) ? r.czekaOdMs : null;
         const wyjatkowy = WYJATKOWE.has(r.status);
         const trafienie = powodTrafienia(r);
-        /* ── ZNACZNIKI POD PYTANIEM (0.548.0, wariant C) ─────────────────
-           Rząd staje tylko wtedy, gdy ma co nieść. Kolejność jak dotąd:
+        /* ── ZNACZNIKI POD PYTANIEM ───────────────────────────────────────
+           Rząd staje tylko wtedy, gdy ma co nieść. Kolejność:
            najpierw to, co krzyczy (reklamacyjna, status-wyjątek), potem
            fakty wyciszone. Lista zamiast warunku na każdym dziecku, bo pusty
            rząd z marginesem wyglądałby jak ucięty wiersz. */
         const znaczniki: React.ReactNode[] = [];
-        /* ZNACZNIK REKLAMACYJNY (0.390.0) przed statusem: mówi, JAK prowadzimy
+        /* ZNACZNIK REKLAMACYJNY przed statusem: mówi, JAK prowadzimy
            sprawę, a nie co się z nią stało. Sprawy w Allegro za nim nie ma —
            założyć ją może tylko kupujący. */
         if (r.reklamacyjna) znaczniki.push(<span key="rekl"
@@ -501,7 +487,7 @@ export function Kolejka({ rozmowy, stan, copilot, klasyfikacja, onRozpoznaj = ()
         if (r.wlasciciel) znaczniki.push(<span key="prowadzi"
           className="flex items-center gap-1 font-semibold text-slate-600">
           <UserCheck size={12} />{r.wlasciciel}</span>);
-        /* Odłożona mówi DO KIEDY (0.533.0): „Odłożona" bez daty każe
+        /* Odłożona mówi DO KIEDY: „Odłożona" bez daty każe
            otworzyć rozmowę, żeby się dowiedzieć, czy to jutro, czy za tydzień. */
         if (r.status === "snoozed" && r.odlozoneDo && !r.poTerminie) znaczniki.push(<span key="odlozona"
           className="flex items-center gap-1 text-slate-600">
@@ -509,7 +495,7 @@ export function Kolejka({ rozmowy, stan, copilot, klasyfikacja, onRozpoznaj = ()
         if (r.poTerminie) znaczniki.push(<span key="termin" title="termin odłożenia minął"
           className="flex items-center text-ranga-uwaga">
           <AlarmClock size={13} aria-hidden="true" /><span className="sr-only">po terminie</span></span>);
-        /* Kolega SIEDZI przy tym pytaniu (0.159.0). Bez tego znaku dwóch
+        /* Kolega SIEDZI przy tym pytaniu. Bez tego znaku dwóch
            agentów pisze tę samą odpowiedź, a dowiadują się o tym dopiero
            przy wysyłce — czyli po straconej pracy. */
         if (r.oglada && r.oglada.userId !== mojeId) znaczniki.push(<span key="oglada"
@@ -520,13 +506,12 @@ export function Kolejka({ rozmowy, stan, copilot, klasyfikacja, onRozpoznaj = ()
           /* Znacznik dla Entera „do pola odpowiedzi" (`Edytor.tsx`): z wiersza
              kolejki Enter prowadzi do pisania, a nie klika wiersza drugi raz. */
           data-wiersz-kolejki=""
-          /* ── ZAZNACZENIE PRZESTAJE BYĆ BURSZTYNOWE (0.265.0) ───────────────
-             `bg-amber-50` znaczyło w panelu naraz „wybrany wiersz" i „coś tu
-             jest nie tak": tym samym `#FFFBEB` malowały się pasmo braku oferty,
-             konflikt przejęcia, ostrzeżenie Copilota, notatka wewnętrzna
-             i formularz pomiaru. Dwa z tych znaczeń są PRZECIWSTAWNE.
+          /* ── ZAZNACZENIE NIE JEST BURSZTYNOWE ──────────────────────────────
+             `bg-amber-50` znaczy w panelu „coś tu jest nie tak" (pasmo braku
+             oferty, ostrzeżenie Copilota, notatka wewnętrzna) — przeciwieństwo
+             „wybranego wiersza".
 
-             Zaznaczenie schodzi na szarość, bo jest stanem STRUKTURALNYM, nie
+             Zaznaczenie stoi na szarości, bo jest stanem STRUKTURALNYM, nie
              znaczeniowym — a wolnej rodziny barw już nie ma: czerwień to błąd,
              zieleń powodzenie, fiolet przypuszczenie Copilota, błękit zdarzenia
              na osi. Marka zostaje na belce 3 px, gdzie nie udaje pasma.
@@ -539,8 +524,8 @@ export function Kolejka({ rozmowy, stan, copilot, klasyfikacja, onRozpoznaj = ()
              8,4:1. Dalej, na `slate-300`, wiersz zaczyna wyglądać na wyłączony.
 
              `border-l-[3px]` stoi PRZY KAŻDYM wierszu, nie tylko przy wybranym:
-             dokładana dopiero przy zaznaczeniu przesuwała treść o trzy piksele
-             w prawo, więc kliknięcie w wiersz szarpało tekstem.
+             dokładana dopiero przy zaznaczeniu przesuwałaby treść o trzy piksele
+             w prawo.
 
              LEWY MARGINES JEST SZERSZY OD PRAWEGO, bo mieszka w nim kropka
              nieprzeczytanej — patrz komentarz przy niej. */
@@ -550,26 +535,22 @@ export function Kolejka({ rozmowy, stan, copilot, klasyfikacja, onRozpoznaj = ()
               : "border-l-transparent hover:bg-slate-50"} ${
             /* Wybrany wiersz nie błyska: jest już szary. */
             wybranaId !== r.id && nowe.has(String(r.id)) ? "motion-safe:animate-wiersz-nowy" : ""}`}>
-          {/* ── WARIANT C: KTO I ILE CZEKA, POTEM PYTANIE (0.548.0) ───────────
-              Decyzja właściciela z 28 września 2026. Pierwsza linia to login
-              i wiek, pod nią do dwóch linii pytania. Kafla kategorii po lewej
-              nie ma: zabierał szerokość, którą pytanie dostaje w drugiej linii.
+          {/* ── KTO I ILE CZEKA, POTEM PYTANIE ────────────────────────────────
+              Decyzja właściciela. Pierwsza linia to login i wiek, pod nią do
+              dwóch linii pytania. Bez kafla kategorii po lewej: zabierałby
+              szerokość, którą pytanie dostaje w drugiej linii.
 
-              To odwraca dwie wcześniejsze decyzje i świadomie. 0.193.0 dało
-              pierwszy plan treści, bo „login nie mówi nic". Treść zostaje
-              najcięższym blokiem wiersza, a login stoi nad nią drobno i mono,
-              bo od drogi klienta jest kluczem sprawy. 23 września pytanie
-              zeszło do jednej linii („za dużo tekstu"). Wróciły dwie, bo
-              zniknęły kafel i osobny rząd loginu, które tamte piksele jadły. */}
+              Treść jest najcięższym blokiem wiersza, a login stoi nad nią
+              drobno i mono, bo w drodze klienta jest kluczem sprawy. */}
           <span className="flex w-full min-w-0 items-center gap-2">
-            {/* KROPKA, NIE SŁOWO (0.193.0). Stało tu „NOWE", a obok, w plakietce
-                statusu, „NOWA" — dwa różne fakty jednym wyrazem. Kropka to znak
+            {/* KROPKA, NIE SŁOWO. Słowo „NOWE" obok plakietki statusu „NOWA"
+                to dwa różne fakty jednym wyrazem. Kropka to znak
                 nieprzeczytanego znany ze wszystkich skrzynek; nazwę niesie
                 `title` i tekst dla czytnika ekranu. Stoi tam, gdzie wzrok
-                wchodzi w wiersz — od wariantu C to pierwsza linia.
+                wchodzi w wiersz — w pierwszej linii.
 
-                KROPKA WISI NA MARGINESIE, nie w linii. W linii odpychała znak
-                kategorii i login o 16 px, więc lewa krawędź loginów skakała
+                KROPKA WISI NA MARGINESIE, nie w linii. W linii odpychałaby znak
+                kategorii i login o 16 px, więc lewa krawędź loginów skakałaby
                 z wiersza na wiersz. Oko szukało wtedy początku każdego loginu
                 osobno, zamiast zjechać w dół po jednej krawędzi. `-ml-3 -mr-1`
                 przy odstępie `gap-2` i marginesie `pl-5` stawia kropkę 4 px od
@@ -579,9 +560,9 @@ export function Kolejka({ rozmowy, stan, copilot, klasyfikacja, onRozpoznaj = ()
             {r.nieprzeczytana && <span title="Nieprzeczytana wiadomość"
               className="-ml-3 -mr-1 inline-block h-2 w-2 shrink-0 rounded-full bg-wertis-amber">
               <span className="sr-only">NOWE</span></span>}
-            {/* ZNAK KATEGORII NA POCZĄTKU (23 września 2026). Kategoria, prośba
+            {/* ZNAK KATEGORII NA POCZĄTKU, bez kafla. Kategoria, prośba
                 o człowieka i podziękowanie czytają się, zanim wzrok dojdzie do
-                treści — patrz `ZnakKategorii`. Od 0.548.0 bez kafla. */}
+                treści — patrz `ZnakKategorii`. */}
             <ZnakKategorii kopilot={r.kopilot} podziekowal={r.podziekowal} />
             <span className="min-w-0 truncate font-mono text-sm font-bold text-slate-800">{r.klient}</span>
             {/* PILNE w linii loginu: odpowiada na to samo pytanie co wiek po
@@ -593,7 +574,7 @@ export function Kolejka({ rozmowy, stan, copilot, klasyfikacja, onRozpoznaj = ()
                 PILNE</span>}
             {/* WIEK NA PRAWEJ KRAWĘDZI, w barwie pilności — `Czekanie`. Stoi
                 w jednej kolumnie przez całą przewijaną listę. Data ustępuje
-                zegarowi (0.251.0), bo przy „czeka na nas" oba mierzą tę samą
+                zegarowi, bo przy „czeka na nas" oba mierzą tę samą
                 wiadomość; gdy zegara nie ma, data jest jedynym czasem wiersza.
                 Data jest KRÓTKA (`kiedy`), bo pełna ścinała login o rok
                 i godzinę sprzed dni, których w tej kolumnie nikt nie czyta. */}
@@ -604,14 +585,14 @@ export function Kolejka({ rozmowy, stan, copilot, klasyfikacja, onRozpoznaj = ()
                   className="text-podpis tabular-nums text-slate-500">{kiedy(r.ostatniaWiadomoscAt)}</span>}
             </span>
           </span>
-          {/* ── WIERSZ MÓWI, NA CZYM TRAFIŁ (0.425.0) ──────────────────────
+          {/* ── WIERSZ MÓWI, NA CZYM TRAFIŁ ────────────────────────────────
               Powód trafienia STOI PRZY LOGINIE, bo to jego dotyczy: mówi „ten
               login nie zawiera tego, czego szukasz". Pod loginem, nie w jego
               linii — tam zepchnąłby login i wiek, a pojawia się tylko przy
               szukaniu. */}
           {trafienie && <span className="flex items-center gap-1 text-podpis font-semibold text-slate-600">
             <Search size={12} aria-hidden="true" />{trafienie}</span>}
-          {/* Podgląd to słowa KLIENTA (0.166.0). Gdy klient nic nie napisał, stoi
+          {/* Podgląd to słowa KLIENTA. Gdy klient nic nie napisał, stoi
               nasza wiadomość — ale z podpisem, bo bez niego czytałoby się ją jak
               pytanie. Autoodpowiedź konta Allegro wyglądała tak przez pół roku.
               Podziękowanie jest przygaszone, bo nie czeka na nas — przez barwę
@@ -626,9 +607,8 @@ export function Kolejka({ rozmowy, stan, copilot, klasyfikacja, onRozpoznaj = ()
               {znaczniki}</span>}
         </button>;
       })}
-      {/* Stopka „Dalsze wiersze mogą istnieć w Allegro…" zeszła (0.522.0):
-          stała tylko przy alarmie, a baner alarmu mówi to samo — „nowe pytania
-          mogą już czekać, a ich tu nie widać". Przygaszona lista zostaje. */}
+      {/* Bez stopki o dalszych wierszach w Allegro: baner alarmu mówi to samo —
+          „nowe pytania mogą już czekać, a ich tu nie widać". */}
     </div>
   </section>;
 }

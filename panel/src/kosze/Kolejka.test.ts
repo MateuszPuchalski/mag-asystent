@@ -10,10 +10,9 @@ const KOSZ = (n: Partial<WierszKosza>): WierszKosza => ({
   wirtualny: false, ...n,
 });
 
-/* ── Rozłożone po chwili rozłożenia (0.486.4) ────────────────────────────────
-   Zgłoszenie właściciela: „rozłożone koszyki układaj kolejnością rozłożenia".
+/* ── Rozłożone po chwili rozłożenia ──────────────────────────────────────────
    Kosz założony wcześniej bywa rozłożony później — porządek serwera (po
-   założeniu) mieszał dzień pracy hali. */
+   założeniu) mieszałby dzień pracy hali. */
 describe("kolejność koszy w kubełku", () => {
   it("rozłożone: najświeżej rozłożony na górze, bez chwili — na końcu", () => {
     const lista = [

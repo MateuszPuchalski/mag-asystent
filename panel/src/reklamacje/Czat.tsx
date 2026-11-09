@@ -17,7 +17,7 @@ import { rozbierzFormularz, Tresc, zawieraOpis } from "./tresc";
    Treść zgłoszenia i rozmowa są tym, po co agent otwiera ten ekran, więc stoją
    w GŁÓWNYM oknie. Kolumna obok niesie fakty o sprawie, nie jej treść.
 
-   DYMKI JAK W KOMUNIKATORZE, z makiety właściciela. Klient po lewej na szarym
+   DYMKI JAK W KOMUNIKATORZE. Klient po lewej na szarym
    tle, sklep po prawej na błękicie. Strona mówi „czyje”, a barwa to tylko
    wzmacnia, więc barwa nigdy nie stoi sama (WCAG 1.4.1). Nad dymkiem stoi
    linia „kto · kiedy”, bo rozmowa bywa trójstronna: `BUYER`, `SELLER`
@@ -123,7 +123,7 @@ function Dymek({ prawa, tlo, kto, kiedy, zgloszenie = false, children }: {
 }
 
 /* ── AUTOMAT ALLEGRO TO ZDARZENIE, NIE WYPOWIEDŹ ─────────────────────────────
-   Makieta właściciela: wiadomość automatu stoi cienkim wierszem z ikoną
+   Wiadomość automatu stoi cienkim wierszem z ikoną
    w kółku, krótką nazwą i czasem po prawej, bez dymka. Automat nie jest
    rozmówcą, więc dymek udawałby trzecią osobę w rozmowie i zabierał jej
    wysokość.
@@ -298,7 +298,7 @@ function WierszAutomatow({ lista, dodatki }: {
   </li>;
 }
 
-/* ── PRZESYŁKI NA OSI (makieta „Przesyłki”) ─────────────────────────────────
+/* ── PRZESYŁKI NA OSI ────────────────────────────────────────────────────────
    Od nas: pełne niebieskie koło ze strzałką na zewnątrz, po prawej, po
    stronie sklepu. Od klienta: puste szare koło ze strzałką do środka, po
    lewej. Kierunek niosą strona, kształt i słowo, więc barwa nie stoi sama. */
@@ -363,9 +363,9 @@ function WierszPrzesylki({ z }: { z: ZdarzeniePrzesylki }) {
 }
 
 /* ── AUTOMATY TEJ SAMEJ PACZKI TO WIERSZ PRZESYŁKI ──────────────────────────
-   Makieta właściciela: etykieta i nadanie zwrotu stoją jednym wierszem
-   przesyłki. Bez tego oś mówiła o jednej paczce dwa razy, raz słowami
-   automatu, raz plakietką z trackingu. Wiążemy po numerze listu, bo tylko
+   Etykieta i nadanie zwrotu stoją jednym wierszem przesyłki, żeby oś nie
+   mówiła o jednej paczce dwa razy, raz słowami automatu, raz plakietką
+   z trackingu. Wiążemy po numerze listu, bo tylko
    on jest wspólny dla treści automatu i dla zwrotu. */
 function WierszPrzesylkiZAutomatami({ z, lista, dodatki }: {
   z: ZdarzeniePrzesylki; lista: WiadomoscReklamacji[];
@@ -455,7 +455,7 @@ export function ulozOs(wiadomosci: WiadomoscReklamacji[], zdarzenia: ZdarzeniePr
 }
 
 /* ── ZGŁOSZENIE TO PIERWSZY DYMEK KLIENTA ────────────────────────────────────
-   Makieta właściciela: zgłoszenie nie stoi przypiętą kartą nad rozmową, tylko
+   Zgłoszenie nie stoi przypiętą kartą nad rozmową, tylko
    jest jej pierwszą wypowiedzią. Ma autora, chwilę i miejsce w wątku, a nad
    zdaniem klienta linię „Powód: … · chce …”, bo bez niej zdanie bywa niejasne.
 

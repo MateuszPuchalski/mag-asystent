@@ -4,9 +4,9 @@ import type { PozycjaZwrotu } from "../api/typy";
 import { zlote } from "../api/zwroty";
 import { Przycisk, Pole } from "../ui";
 
-/* ── Potrącenie za utratę wartości (0.170.0) ─────────────────────────────────
-   Do tego wydania kwota była BINARNA per pozycja: cała cena albo nic. Towar
-   wracający używany nie miał jak zjechać w dół, a to codzienność biura zwrotów.
+/* ── Potrącenie za utratę wartości ───────────────────────────────────────────
+   Kwota per pozycja nie jest binarna: towar wracający używany zjeżdża w dół,
+   a to codzienność biura zwrotów.
 
    Kwota, nie procent — decyzja właściciela. Klient widzi złotówki, a procent
    przy każdej pozycji zostawiałby końcówki, których nikt nie umie wytłumaczyć.
@@ -30,9 +30,9 @@ export function Potracenie({ p, trwa, blad, onZapisz, otworz = 0, tylkoOdczyt = 
   trwa: boolean;
   blad: string;
   onZapisz: (grosze: number | null, powod: string) => void;
-  /** Zwrot z korektą (0.484.7): potrącenie widać, cofnięcia nie — serwer by odmówił. */
+  /** Zwrot z korektą: potrącenie widać, cofnięcia nie — serwer by odmówił. */
   tylkoOdczyt?: boolean;
-  /** Znacznik klawisza `D` (0.479.0) — zasada jak w `IloscZwrocona`. */
+  /** Znacznik klawisza `D` — zasada jak w `IloscZwrocona`. */
   otworz?: number;
 }) {
   const [otwarte, setOtwarte] = useState(false);
@@ -72,7 +72,7 @@ export function Potracenie({ p, trwa, blad, onZapisz, otworz = 0, tylkoOdczyt = 
       <BadgeMinus size={12} />oddaj mniej za ten towar</button>;
   }
 
-  /* KLAWIATURA OD POCZĄTKU DO KOŃCA (0.479.0). Przegląd zwrotów z 23
+  /* KLAWIATURA OD POCZĄTKU DO KOŃCA. Przegląd zwrotów z 23
      września: formularz był wyłącznie dla myszy. Enter w którymkolwiek polu
      zapisuje, gdy jest kwota i powód; Escape zamyka. */
   const klawisz = (e: React.KeyboardEvent) => {

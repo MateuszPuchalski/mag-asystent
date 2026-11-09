@@ -11,7 +11,7 @@ import {
   type DosylkaSprawy,
 } from "./dosylka-opis.js";
 
-/* ── Sprawa klienta: kto prowadzi, następny krok, zakończenie (0.535.0) ─────
+/* ── Sprawa klienta: kto prowadzi, następny krok, zakończenie ───────────────
    S6 `docs/obsluga-klienta-calosc.md`, decyzja właściciela. Kolejki mówią, co
    czeka w każdej z nich z osobna, ale nie mówią, co z KLIENTEM: „czekamy na
    zwrot, potem dosyłamy” żyło w głowie agenta albo w notatce, której nic nie
@@ -20,8 +20,7 @@ import {
 
    DWA STANY, NIE SŁOWNIK. „W toku” zawsze ma krok z datą, „zakończona” nie
    ma biegnącego kroku. Status bez następnego kroku to lista rzeczy „w toku”,
-   na które nikt nie patrzy — dokładnie ten kształt, który kosztował cztery
-   tabele nakładki spraw (blizna 0.140.0).
+   na które nikt nie patrzy.
 
    NOWE LICZY SIĘ PRZY ODCZYCIE, nie tickerem. W wierszu leży ODCISK faktów
    po stronie klienta z chwili ostatniego ruchu człowieka (`znane_json`),
@@ -29,9 +28,8 @@ import {
    z nowym zdarzeniem wraca na „Moje” prowadzącego sama — ticker, który raz
    nie wstanie, zostawiłby ją zakończoną na zawsze.
 
-   OKNO OBUDZENIA: TRZYDZIEŚCI DNI OD ZAKOŃCZENIA (decyzja właściciela
-   z 27 września 2026, S6). Decyzja z 26 września mówiła o obudzeniu bez
-   granicy; okno ją zawęża z powodu niżej. „Moje” liczy odcisk prowadzonych spraw przy każdym
+   OKNO OBUDZENIA: TRZYDZIEŚCI DNI OD ZAKOŃCZENIA (decyzja właściciela, S6).
+   „Moje” liczy odcisk prowadzonych spraw przy każdym
    odświeżeniu, co 30 sekund, synchronicznie na pętli serwera. Bez granicy
    ten koszt rósłby z każdą sprawą zakończoną kiedykolwiek. Miesiąc mieści
    ustawowe 14 dni na odstąpienie i drogę paczki z powrotem. Później nowa
@@ -56,13 +54,12 @@ import {
 
    Ten plik NIE importuje profilu (`profil-klienta.ts` czyta stąd), a
    `droga-klienta.ts` nie importuje tego pliku. Pętla importów przy stałej
-   liczonej w chwili ładowania modułu bywa pustym zbiorem — blizna opisana
-   w `statusy-spraw.ts`.
+   liczonej w chwili ładowania modułu bywa pustym zbiorem (`statusy-spraw.ts`).
 
-   DOSYŁKA (0.536.0) mieszka w `dosylka.ts`, który importuje ten plik —
+   DOSYŁKA mieszka w `dosylka.ts`, który importuje ten plik —
    więc tu jest wyłącznie SQL na `klient_dosylka` i zdanie z czystego
    `dosylka-opis.ts`. Doręczenie dosyłki i kłopot u przewoźnika budzą sprawę.
-   To POSZERZENIE reguły z 26 września, nie jej przypadek: dosyłkę wysyła
+   To POSZERZENIE reguły, nie jej przypadek: dosyłkę wysyła
    biuro, więc to nasz ruch, ale jej los zgłasza przewoźnik. Stoi jawnie
    w S6, do oceny właściciela. */
 
@@ -160,7 +157,7 @@ interface Odcisk {
   r: number;
   /** Wiadomości klienta albo doradcy Allegro w reklamacjach. */
   w: number;
-  /** Doręczenia dosyłek (0.536.1): suma liczników PRZEJŚĆ z wierszy, która
+  /** Doręczenia dosyłek: suma liczników PRZEJŚĆ z wierszy, która
    *  nigdy nie maleje. Druga doręczona budzi, choć pierwszą ktoś potwierdził,
    *  a zastąpienie wiersza nie cofa licznika, więc nie udaje nowego zdarzenia. */
   k: number;
@@ -228,7 +225,7 @@ type Licznik = keyof Omit<Odcisk, "m">;
  * Reklamacje liczą się wyłącznie z `typ = 'CLAIM'`: wiersze dawnych dyskusji
  * zostały w tabeli i nie mają budzić sprawy klienta.
  *
- * `k` i `q` (0.536.1) sumują liczniki przejść dosyłek tego loginu, także
+ * `k` i `q` sumują liczniki przejść dosyłek tego loginu, także
  * archiwalnych. Dosyłkę zakłada biuro, ale doręczenie i kłopot zgłasza
  * przewoźnik — to jedyne fakty dosyłki, o których prowadzący może nie
  * wiedzieć. Suma PRZEJŚĆ, nie wierszy w stanie: kłopot, potem „w drodze”,
@@ -269,9 +266,7 @@ function policzOdcisk(
   };
 }
 
-/* Klucze `k` i `q` doszły w 0.536.0, więc odcisk każdej sprawy zmienił
-   napis: ekran otwarty w chwili aktualizacji dostaje raz 409 ze świeżą
-   sprawą. Zapamiętany odcisk bez tych kluczy nie budzi (`noweZdarzenia`). */
+/* Zapamiętany odcisk bez kluczy `k` i `q` nie budzi (`noweZdarzenia`). */
 const naNapis = (o: Odcisk): string =>
   JSON.stringify({ m: o.m, z: o.z, p: o.p, d: o.d, r: o.r, w: o.w, k: o.k, q: o.q });
 
@@ -351,7 +346,7 @@ function noweZdarzenia(
     nowe.push({ rodzaj: "wiadomosc_sprawy", tekst: `${kto} w reklamacji`,
       at: tekst(w?.at), cel: w ? `/obsluga/reklamacje/${w.id}` : null });
   }
-  /* Dosyłka (0.536.0). Odnośnika nie ma: dosyłka stoi na karcie sprawy,
+  /* Dosyłka. Odnośnika nie ma: dosyłka stoi na karcie sprawy,
      a sprawa i tak prowadzi na profil — `cel: null` znaczy „tu, na profilu”. */
   const DOSYLKA = `FROM klient_dosylka d JOIN klient_prowadzenie p ON p.id = d.sprawa_id
     WHERE p.login = ? COLLATE NOCASE`;
@@ -364,9 +359,8 @@ function noweZdarzenia(
        a data najnowszej ZNANEJ przypisałaby obudzenie dosyłce potwierdzonej.
 
        „Po ruchu” liczy się chwilą, w której SERWER zapisał doręczenie
-       (`sprawdzono_at`), nie datą kuriera (0.536.1). Numer wpisany w poniedziałek
-       do paczki doręczonej w piątek dawał doręczenie „sprzed” wpisania — więc
-       bez daty i na końcu listy. Oba zegary po stronie serwera, jak przy
+       (`sprawdzono_at`), nie datą kuriera: numer wpisany w poniedziałek do
+       paczki doręczonej w piątek dałby doręczenie „sprzed” wpisania. Oba zegary po stronie serwera, jak przy
        wiadomościach klienta. */
     const at = tekst(w?.at);
     const zapisano = tekst(w?.zapisano) ?? at;
@@ -513,7 +507,7 @@ function sprawdzOdcisk(
  * Czy odcisk ekranu różni się od bieżącego WYŁĄCZNIE licznikami dosyłki.
  * Doręczenie albo kłopot zgłasza przewoźnik, nie klient — zdanie „Klient
  * dopisał coś” kazałoby szukać wiadomości, której nie ma. Odcisk ekranu bez
- * `k` i `q` (sprzed 0.536.0) nie przechodzi: tam różnica to nowy kształt.
+ * `k` i `q` (starszy kształt) nie przechodzi: tam różnica to nowy kształt.
  */
 function tylkoDosylka(odcisk: string, biezacy: Odcisk): boolean {
   let ekran: Partial<Odcisk>;
@@ -579,7 +573,7 @@ export function zapiszKrokSprawy(
        niesie `klient_sprawa_krok` niżej: to jeden ruch, nie dwa.
 
        Skończona to doręczona, zawrócona albo spoza okna śledzenia. Dosyłka
-       w drodze zostaje żywa (0.536.1): agent kończy sprawę, gdy nada
+       w drodze zostaje żywa: agent kończy sprawę, gdy nada
        etykietę, a wznawia, gdy klient pyta „gdzie paczka?”. Odłożona do
        historii przestałaby być śledzona, a panel nie ma jak jej wskrzesić. */
     if (w.zakonczono_at != null) {
@@ -589,7 +583,7 @@ export function zapiszKrokSprawy(
         .run(id, new Date(p.teraz.getTime() - OKNO_SLEDZENIA_MS).toISOString());
     }
     /* Prowadzący zostaje. Ustawia go tylko sprawa bez prowadzącego —
-       tak jak odpowiedź przydziela rozmowę od 0.159.0. Zapas dla „Cofnij”
+       tak jak odpowiedź przydziela rozmowę. Zapas dla „Cofnij”
        znika: po nowym kroku nie ma już zakończenia do cofnięcia. */
     database.prepare(`UPDATE klient_prowadzenie SET krok = ?, krok_do = ?,
         zakonczono_at = NULL, zakonczyl = NULL, zakonczyl_user_id = NULL,
@@ -660,7 +654,7 @@ export function potwierdzPoZapisie(
  * Odmowa ze zwrotu dopisuje do „znanego” brakujące klucze `k` i `q` — i nic
  * poza tym, bo odmowa niczego nie potwierdza.
  *
- * Sprawa sprzed 0.536.0 ma odcisk bez `k` i `q`, a klucz nieobecny nie budzi
+ * Sprawa w starszym kształcie ma odcisk bez `k` i `q`, a klucz nieobecny nie budzi
  * (`noweZdarzenia`). Odmowa nie zapisuje odcisku, więc bez tego dopisku
  * dosyłka takiej sprawy nie obudziłaby jej nigdy. Liczniki nie maleją, więc
  * zastąpiony wiersz nie wymaga tu żadnej poprawki.

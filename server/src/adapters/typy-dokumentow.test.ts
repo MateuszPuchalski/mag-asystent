@@ -32,9 +32,8 @@ test("kod bez nazwy nie udaje sąsiada", () => {
 });
 
 test("lista etykiet jest lustrem ustawienia, nie jego poprawioną wersją", () => {
-  /* Kod nienazwany ZOSTAJE na liście. Wypadał do 0.22.1 i to był gorszy błąd
-     niż brzydka nazwa: lista dostaw pustoszała bez powodu widocznego dla
-     kogokolwiek. */
+  /* Kod nienazwany ZOSTAJE na liście: pustosząca bez powodu lista dostaw
+     byłaby gorsza niż brzydka nazwa. */
   assert.deepEqual(zTypami([config.mssql.dokTypFZ, 77], etykietyDostaw), ["FZ", "TYP-77"]);
 });
 

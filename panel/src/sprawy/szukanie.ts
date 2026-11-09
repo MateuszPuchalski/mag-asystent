@@ -1,23 +1,16 @@
-/* ── Dopasowanie frazy do sprawy (0.367.0) ──────────────────────────────────
-   Zgłoszenie właściciela: „szukanie nieodebranych paczek odbywa się głównie za
-   pomocą loginu użytkownika i innych informacji na przesyłce — usprawnij
-   i przebuduj".
-
-   CAŁA ZMIANA JEST W SPACJI. Do 0.366.0 fraza szła do `includes()` w całości,
-   więc „kowalski inpost" nie znajdowało NICZEGO — nie dlatego, że tych danych
-   nie ma, tylko dlatego, że nie stoją obok siebie w jednym polu. A operator
-   trzymający karton ma pod ręką właśnie kilka drobnych uchwytów naraz:
+/* ── Dopasowanie frazy do sprawy ────────────────────────────────────────────
+   Nieodebrane paczki szuka się głównie po loginie i danych z przesyłki.
+   Operator trzymający karton ma pod ręką kilka drobnych uchwytów naraz:
    nazwisko z naklejki, logo przewoźnika, kawałek numeru. Żaden z nich sam nie
-   zawęża, wszystkie razem zawężają do jednego wiersza.
+   zawęża, wszystkie razem zawężają do jednego wiersza — choć nie stoją obok
+   siebie w jednym polu.
 
    ILOCZYN PO CZŁONACH, SUMA PO POLACH. Każdy człon musi trafić w KTÓREŚ pole;
    nie muszą trafiać w to samo. Odwrotna reguła („którykolwiek człon") byłaby
-   gorsza niż dzisiejsza: dopisanie drugiego słowa ROZSZERZAŁOBY wynik, więc
-   im więcej człowiek wie o paczce, tym dłuższą dostawałby listę.
+   gorsza: dopisanie drugiego słowa ROZSZERZAŁOBY wynik, więc im więcej
+   człowiek wie o paczce, tym dłuższą dostawałby listę.
 
-   DWA EKRANY, JEDNA KOPIA. Reklamacje i zwroty trzymały ten sam `useMemo`
-   przepisany znak w znak. Pomocnik i tak musiał gdzieś zamieszkać, więc
-   kopie schodzą do jednej przy okazji, a nie osobnym wydaniem.               */
+   Reklamacje i zwroty biorą jedną kopię tej reguły.                          */
 
 /**
  * Czy sprawa o tych uchwytach pasuje do wpisanej frazy.
@@ -39,8 +32,8 @@ export function rozbij(fraza: string): string[] {
   return zloz(fraza.trim()).split(/\s+/).filter(Boolean);
 }
 
-/* ── OGONKI NIE DZIELĄ (0.486.2) ─────────────────────────────────────────────
-   Od kiedy w szukaniu zwrotów stoją nazwy towarów, „gaznik" musi trafiać
+/* ── OGONKI NIE DZIELĄ ───────────────────────────────────────────────────────
+   W szukaniu zwrotów stoją nazwy towarów, więc „gaznik" musi trafiać
    w „Gaźnik" — magazynier wpisuje z klawiatury bez polskich znaków, a nazwy
    z Allegro je mają. Ta sama mapa co po stronie serwera (`server/src/tekst.ts`):
    jawna, bo `ł` nie ma rozkładu kanonicznego i NFD by go przepuściło. Działa

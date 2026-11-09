@@ -60,11 +60,9 @@ export type ZrodloDecyzji =
   | "reklamacje" | "zwroty" | "skrzynka" | "sonda" | "zadania" | "dosylki" | "braki" | "sellasist";
 
 /**
- * Dokąd prowadzi wiersz — adres w panelu. Do 0.441.0 był tu też wariant
- * `{ biuro: "nadzor" }` dla stanu systemu, który mieszkał jeszcze w biurze;
- * przeszedł, a razem z nim zniknął ostatni wiersz prowadzący poza panel.
- * Stan systemu dostaje w adresie KARTĘ, bo wiersz ma trafić tam, gdzie
- * rozstrzyga się jego sprawa, a nie na górę ekranu.
+ * Dokąd prowadzi wiersz — adres w panelu. Stan systemu dostaje w adresie
+ * KARTĘ, bo wiersz ma trafić tam, gdzie rozstrzyga się jego sprawa, a nie
+ * na górę ekranu.
  */
 export type CelDecyzji = { panel: string };
 
@@ -177,13 +175,12 @@ function odpowiedziHali(): PozycjaDecyzji[] {
 }
 
 /**
- * Zadanie, które hala ODESŁAŁA (0.502.0) — nie da się albo brak towaru.
+ * Zadanie, które hala ODESŁAŁA — nie da się albo brak towaru.
  *
- * Status `odeslane` istniał od 0.352.0, ale do „Do zrobienia" nie wchodził.
- * Rozmowa dostawała wpis na oś, a zadanie ze zwrotu czy ręczne wisiało
- * w Zadaniach, dopóki ktoś tam nie zajrzał. To jest decyzja biura, której
- * hala nie podejmie: ponowić inaczej, anulować albo iść do Subiekta.
- * Wiersz prowadzi do Zadań, bo tam stoją „ponów" i „anuluj".
+ * To jest decyzja biura, której hala nie podejmie: ponowić inaczej,
+ * anulować albo iść do Subiekta. Bez wiersza zadanie wisiałoby w Zadaniach,
+ * dopóki ktoś tam nie zajrzy. Wiersz prowadzi do Zadań, bo tam stoją
+ * „ponów" i „anuluj".
  */
 function odeslaneZadania(): PozycjaDecyzji[] {
   return listaZadan({ status: "odeslane" }).map((z) => ({
@@ -210,10 +207,8 @@ function kosze(): PozycjaDecyzji[] {
     co: `${p.symbol} · ${p.kod}${p.powod ? ` · ${p.powod}` : ""}`,
     od: p.at,
     pilne: false,
-    /* Kosze mieszkają od 0.438.0 w zakładce Zwroty, bo tam powstają.
-       Adres niesie kosz i kubełek (0.502.0): do tego wydania wiersz lądował
-       w kubełku „praca", a pominięcia stoją w „pominiete" — agent klikał
-       „załatwione?" i nie widział tego, o co pytano. */
+    /* Kosze mieszkają w zakładce Zwroty, bo tam powstają. Adres niesie kosz
+       i kubełek „pominiete": agent ma zobaczyć to, o co pyta „załatwione?". */
     cel: { panel: `/obsluga/zwroty/kosze/${p.koszId}?kubelek=pominiete` },
   }));
   const otwarte: PozycjaDecyzji[] = listaKoszy()
@@ -291,7 +286,7 @@ function kontoAllegro(): PozycjaDecyzji[] {
 }
 
 /**
- * Test na żywym Allegro (0.495.0): ostatni przebieg ma krok z błędem.
+ * Test na żywym Allegro: ostatni przebieg ma krok z błędem.
  *
  * Droga produkcji nie działa, a nikt by tego nie zauważył — tak przez 150
  * wydań nie działały zdjęcia Copilota. Nie „pilne”: to nie termin wobec
@@ -373,13 +368,12 @@ const KOD_ODMOWY: Record<string, string> = {
 /**
  * Odmowy wypłaty z kodem dosyłki, których nikt nie śledzi — wiersz na zwrot.
  *
- * BIURO ODMAWIA W PANELU ALLEGRO (fakt właściciela z 27 września 2026),
- * z nawyku. Kod przychodzi synchronizacją, a zwrot schodzi do grupy
- * „odrzucony”, poza kolejkę decyzji. Przycisk „Śledź dosyłkę” przy zwrocie
- * i propozycja na profilu stały więc poza drogą, którą biuro chodzi — to nasz
- * wniosek z kodu, nie pomiar.
+ * BIURO ODMAWIA W PANELU ALLEGRO (fakt właściciela), z nawyku. Kod
+ * przychodzi synchronizacją, a zwrot schodzi do grupy „odrzucony”, poza
+ * kolejkę decyzji. Przycisk „Śledź dosyłkę” przy zwrocie i propozycja na
+ * profilu stoją więc poza drogą, którą biuro chodzi.
  *
- * WIERSZ Z PRZYCISKIEM, NIE AUTOMAT — decyzja właściciela z tego samego dnia.
+ * WIERSZ Z PRZYCISKIEM, NIE AUTOMAT — decyzja właściciela.
  * Krok w sprawie klienta dalej stawia człowiek. Prowadzący sprawy zostaje,
  * a sprawę bez prowadzącego dostaje ten, kto kliknął — ta sama reguła co
  * przy każdym kroku. Automat nie miałby kogo wskazać: Allegro nie mówi, kto

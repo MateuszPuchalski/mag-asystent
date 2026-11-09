@@ -6,7 +6,7 @@ import path from "node:path";
 import { spawnSync } from "node:child_process";
 import { DatabaseSync } from "node:sqlite";
 
-/* ── Schemat ma JEDNEGO właściciela: serwer API (0.177.1) ────────────────────
+/* ── Schemat ma JEDNEGO właściciela: serwer API ────────────────────
    2 września wyjątek w `migrate()` położył API i workera naraz, bo migrację
    wykonywał każdy proces otwierający bazę. W logu workera zostawało „database
    is locked" — objaw prowadzący diagnozę w złe miejsce, bo bazę blokowało API

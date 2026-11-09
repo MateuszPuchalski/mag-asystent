@@ -3,7 +3,7 @@ import { userOf } from "../context.js";
 import { przesunStan } from "../services/przesuniecie.js";
 
 /**
- * Przesunięcie stanu między magazynami (0.22.0).
+ * Przesunięcie stanu między magazynami.
  *
  * Jedna trasa zamiast ośmiu tras sesji kontenerowej. Bez sprawdzania roli:
  * przenoszenie towaru to codzienna czynność magazynowa, tak samo jak

@@ -5,39 +5,19 @@ import { enqueueMM } from "./queue.js";
 import { iloscLiczona } from "./ilosc-zwrotu.js";
 import { skladPozycji, zapamietajSklad, type Skladnik, type SkladPozycji } from "./komplety.js";
 
-/* ── Koszyk zwrotów składany w panelu (0.192.0) ─────────────────────────────
-   Właściciel opisał obieg, który biuro robi od lat ręką:
+/* ── Koszyk zwrotów składany w panelu ───────────────────────────────────────
+   Agent przy zwrotach otwiera pustą MM i dokłada kolejno towar ze zwrotów;
+   pełny koszyk zamyka MM. Dokument wystawia Sfera, a numer wraca z kolejki
+   i staje na ekranie.
 
-     „gdy agent zasiada do zwrotów, to otwiera pustą MM i dodaje kolejno
-      przedmioty ze zwrotów; gdy koszyk się zapełni, zamyka MM i tak w kółko"
+   Reguła „tylko lokalizacja" dotyczy SUROWYCH zapisów do bazy Subiekta.
+   Dokumenty idą osobnym kanałem, przez Sferę, tak samo jak korekta zwrotu.
 
-   Ten plik jest tym obiegiem, tyle że dokument wystawia Sfera, a nie człowiek.
-   Kartka z numerem napisanym odręcznie przestaje być potrzebna — numer wraca
-   z kolejki i staje na ekranie.
-
-   ── Dlaczego to wraca dopiero teraz ──────────────────────────────────────
-   Ścieżka koszyków istniała i wypadła w 0.17.0 z jednym, twardym powodem:
-   „domknięcie koszyka kolejkuje MM, a dokumentów MM na produkcji nie da się
-   dziś wystawić". Ten powód wygasł — worker Sfery w C# ma prawdziwe
-   `CreateMM` (`sfera-worker/src/ISferaAdapter.cs`). Schemat `kosz` czekał na
-   to bez zmian: status `otwarty` nosi w komentarzu zdanie „biuro dokłada
-   zwroty", które przez rok nie miało kto wykonać.
-
-   Reguła „tylko lokalizacja" z 0.16.0 nie jest tu złamana: dotyczy SUROWYCH
-   zapisów do bazy Subiekta, a dokumenty idą osobnym, przyjętym kanałem —
-   przez Sferę, tak samo jak korekta zwrotu.
-
-   ── Trzy decyzje właściciela z 3 września 2026 ───────────────────────────
-   1. Do koszyka wchodzi WYŁĄCZNIE towar oceniony „na stan". Przecena
-      i utylizacja zostają poza tą ścieżką; utylizacji nie wolno wysłać MM na
-      regał zwrotów, bo to towar, który ma zejść ze stanu, a nie pojechać na
-      półkę.
-   2. Otwarty koszyk jest JEDEN NA OPERATORA. Fizyczny kosz stoi przy jednym
-      biurku, więc dwie osoby przy zwrotach nie mieszają towaru w jednym
-      dokumencie.
-   3. Dokładanie nie jest osobnym ruchem. Ocena „na stan", którą operator
-      i tak naciska, JEST dołożeniem do koszyka — najszybsza decyzja to ta,
-      której nie podejmuje się dwa razy.                                     */
+   ── Reguły obiegu ─────────────────────────────────────────────────────────
+   1. Do koszyka wchodzi WYŁĄCZNIE towar oceniony „na stan". Utylizacja nie
+      jedzie MM na regał zwrotów, bo ma zejść ze stanu.
+   2. Dokładanie nie jest osobnym ruchem. Ocena „na stan" JEST dołożeniem do
+      koszyka — najszybsza decyzja to ta, której nie podejmuje się dwa razy. */
 
 /** Kto podpisuje wypuszczenie MM po dojściu ostatniej korekty. Nie człowiek —
     to nie on kliknął; ten sam wzorzec co `AUTOMAT` w `services/sygnatury.ts`. */
@@ -47,7 +27,7 @@ const AUTOMAT_KOREKTY = "automat (komplet korekt)";
 const PRZEDROSTEK = "Z-";
 
 /**
- * Do czego ten koszyk służy (0.211.0).
+ * Do czego ten koszyk służy.
  *
  * `zwroty` idzie na regał zwrotów, `odpad` na magazyn odpadu. Różnią się
  * WYŁĄCZNIE magazynem docelowym MM — reszta drogi jest ta sama, bo fizycznie
@@ -67,7 +47,7 @@ export const magazynDocelowy = (rodzaj: RodzajKosza): number =>
   rodzaj === "odpad" ? config.magId.ODP : config.magId.ZWROTY;
 
 export interface StanKosza {
-  /** Do czego służy — panel pokazuje dwa koszyki obok siebie (0.211.0). */
+  /** Do czego służy — panel pokazuje dwa koszyki obok siebie. */
   rodzaj: RodzajKosza;
   id: number;
   kod: string;
@@ -81,7 +61,7 @@ export interface StanKosza {
     nazwa: string;
     ilosc: number;
     /**
-     * Wiersz przyszedł z OCENY ZWROTU (0.365.0).
+     * Wiersz przyszedł z OCENY ZWROTU.
      *
      * Ekran rozstrzyga po tym, którą drogą wyjścia pokazać: wiersz ze zwrotu
      * schodzi cofnięciem oceny na karcie zwrotu, dołożony ręką — krzyżykiem
@@ -89,7 +69,7 @@ export interface StanKosza {
      */
     zeZwrotu: boolean;
     /**
-     * Zwrot, z którego wiersz przyszedł; `null` przy dołożonym ręką (0.476.0).
+     * Zwrot, z którego wiersz przyszedł; `null` przy dołożonym ręką.
      *
      * Po nim klawisz oceny wie, do którego z kilku otwartych pudeł trafił już
      * towar TEGO zwrotu — reguła w `ekrany/Zwroty.tsx`, przy klawiszach oceny.
@@ -115,10 +95,9 @@ function nowyKod(database: Db): string {
 }
 
 /* ── Kartoteka, której dokument MM nie ruszy ────────────────────────────────
-   Koszyk Z-8 zamknął się z kosztem przesyłki w środku, a Sfera odrzuciła jego
-   MM zdaniem „Brak towaru w magazynie" (0.371.0). Wiersz wszedł SKANEM, więc
-   bramka stojąca przy zamykaniu kosza przyszłaby o dwadzieścia pięć kartotek
-   za późno — poprawia się to tam, gdzie się to popełnia, czyli przy dokładaniu.
+   Koszt przesyłki w pudle odbija MM od Sfery zdaniem „Brak towaru
+   w magazynie". Bramka przy zamykaniu kosza przyszłaby za późno, więc stoi
+   przy dokładaniu, gdzie się to popełnia.
 
    Rozstrzygamy DWIEMA rzeczami, które wiemy na pewno, a nie zgadywaniem
    rodzaju kartoteki. Kolumny `tw_Rodzaj` nie ma w read-modelu i nie ma jej
@@ -195,15 +174,9 @@ function otwarteTegoRodzaju(
 /**
  * Do którego pudła trafia ta sztuka.
  *
- * KILKA PUDEŁ NARAZ OD 0.379.0. Decyzja właściciela odwraca tę z 3 września
- * („otwarty koszyk jest JEDEN na operatora"): przy biurku stoi czasem kilka
- * kartonów o różnym przeznaczeniu, a jeden na operatora znaczył, że trzeba
- * zamknąć pierwszy, żeby zacząć drugi.
- *
- * Cena tej swobody jest jedna i właściciel wybrał ją świadomie: przy kilku
- * otwartych pudłach OCENA PYTA, do którego. Zgadywanie „do najnowszego" byłoby
- * tanie w kodzie i drogie na hali — towar trafiałby do cudzego kartonu bez
- * jednego słowa na ekranie.
+ * Operator może mieć kilka otwartych pudeł, więc przy kilku OCENA PYTA,
+ * do którego. Zgadywanie „do najnowszego" wkładałoby towar do cudzego
+ * kartonu bez słowa na ekranie.
  *
  * Bez wskazania rozstrzygamy tylko tam, gdzie nie ma czego zgadywać: zero
  * otwartych pudeł zakłada nowe, jedno bierze siebie.
@@ -223,7 +196,7 @@ export function koszDoDolozenia(
     return Number(k.id);
   }
 
-  /* PO RODZAJU, nie tylko po właścicielu (0.211.0). Operator ma przy biurku
+  /* PO RODZAJU, nie tylko po właścicielu. Operator ma przy biurku
      osobne pudła na zwroty i na odpad — a bez tego warunku pozycja do
      utylizacji wpadłaby do pierwszego z brzegu i pojechała na zły magazyn. */
   const otwarte = otwarteTegoRodzaju(database, kto, rodzaj);
@@ -246,27 +219,15 @@ function zalozPudlo(database: Db, kto: { id: number; name: string },
   return id;
 }
 
-/* ── Koszyk zakładany WPROST, bez zwrotu pod ręką (0.378.0) ─────────────────
-   Zgłoszenie właściciela: „potrzebuję tworzenia koszy zwrotowych i dodawania
-   produktów do nich jako oddzielna opcja".
-
-   To ODWRACA granicę z 0.365.0 („tylko z poziomu obsługi zwrotów"), i to jest
-   cała treść tej zmiany. Tamta granica zakładała, że pudło zawsze powstaje
-   przy rozpakowywanym zwrocie. Nie zawsze: agent siada do zwrotów i najpierw
-   stawia przy biurku pusty karton, a dopiero potem otwiera pierwszą paczkę.
-
-   ZASADA „JEDEN KOSZYK NA OPERATORA" ZOSTAJE (decyzja z 3 września 2026).
-   Fizyczny kosz stoi przy jednym biurku, więc drugie naciśnięcie NOWY KOSZYK
-   oddaje ten sam kosz zamiast zakładać drugi. Bez tego dwie osoby przy
-   zwrotach mieszałyby towar w jednym dokumencie — albo jedna osoba w dwóch.  */
+/* ── Koszyk zakładany WPROST, bez zwrotu pod ręką ───────────────────────────
+   Agent często stawia przy biurku pusty karton, zanim otworzy pierwszą
+   paczkę, więc pudło nie musi powstawać przy rozpakowywanym zwrocie.        */
 
 /**
- * Zakłada koszyk WPROST — za każdym naciśnięciem NOWE pudło (0.379.0).
+ * Zakłada koszyk WPROST — za każdym naciśnięciem NOWE pudło.
  *
- * Do 0.378.0 drugie naciśnięcie oddawało ten sam kosz, bo obowiązywała zasada
- * „jeden koszyk na operatora". Właściciel ją odwrócił: przy biurku stoi czasem
- * kilka kartonów, a zamykanie pierwszego po to, żeby zacząć drugi, wystawia
- * dokument na pudło, które jeszcze nie odjechało.
+ * Przy biurku stoi czasem kilka kartonów, a zamykanie pierwszego, żeby
+ * zacząć drugi, wystawiałoby dokument na pudło, które jeszcze nie odjechało.
  */
 export function zalozKoszyk(
   database: Db, kto: { id: number; name: string }, teraz = new Date(),
@@ -282,27 +243,18 @@ export function zalozKoszyk(
 }
 
 /**
- * Usuwa CAŁY koszyk — także napełniony (0.380.0).
- *
- * Do 0.379.0 schodził wyłącznie pusty. Zgłoszenie właściciela: „zrób, żeby
- * można było usunąć cały koszyk zwrotowy". Powód widać było na jego ekranie:
- * pudła odrzucone przez Sferę stały w pasku z kilkoma kartotekami usługowymi
- * w środku, a jedyną drogą było zdejmowanie ich wiersz po wierszu.
+ * Usuwa CAŁY koszyk — także napełniony.
  *
  * BRAMKĄ JEST DOKUMENT, tak samo jak przy poprawianiu zawartości. Koszyk
- * z wystawioną MM nie schodzi i nie zejdzie: papier pojechał na halę, ktoś
- * rozkłada z niego towar, a stan w Subiekcie już się przesunął. Kasowanie
- * takiego kosza u nas nie cofnęłoby ani jednej z tych rzeczy — zostawiłoby
- * tylko halę bez listy.
+ * z wystawioną MM nie schodzi: papier pojechał na halę, a stan w Subiekcie
+ * już się przesunął. Kasowanie kosza u nas nie cofnęłoby żadnej z tych rzeczy.
  *
- * OCENY WRACAJĄ, wiersz po wierszu, tą samą regułą co przy zdejmowaniu jednego
- * (0.379.0): to ocena wsadziła towar do pudła, więc usunięcie pudła bez jej
- * zdjęcia zostawiłoby karty zwrotów mówiące o regale, na który nic nie jedzie.
- * Zwroty wracają do kubełka DO OCENY, każdy ze zdaniem na osi.
+ * OCENY WRACAJĄ, wiersz po wierszu, tą samą regułą co przy zdejmowaniu
+ * jednego: to ocena wsadziła towar do pudła. Zwroty wracają do kubełka
+ * DO OCENY, każdy ze zdaniem na osi.
  *
- * ZADANIE MM SCHODZI RAZEM Z KOSZYKIEM. Pudło odrzucone przez Sferę ma przy
- * sobie zadanie w błędzie; zostawione bez kosza wisiałoby w kolejce jako praca
- * nad czymś, czego nie ma.
+ * ZADANIE MM SCHODZI RAZEM Z KOSZYKIEM. Zostawione bez kosza wisiałoby
+ * w kolejce jako praca nad czymś, czego nie ma.
  */
 export function usunKoszyk(
   database: Db, koszId: number, kto: { id: number; name: string },
@@ -381,8 +333,8 @@ export function dolozDoKosza(
   rodzaj: RodzajKosza = "zwroty", koszId?: number | null,
 ): number | null {
   /* Odpad bez numeru magazynu w `wertis.env` nie ma dokąd jechać. Koszyka
-     wtedy NIE zakładamy: ocena zapisuje się jak przed 0.211.0, a ekran
-     powie, że do koszyka nie weszła. */
+     wtedy NIE zakładamy: ocena się zapisuje, a ekran powie, że do koszyka
+     nie weszła. */
   if (magazynDocelowy(rodzaj) <= 0) return null;
   const p = database.prepare(
     `SELECT p.id, p.offer_id, p.tw_id, p.nazwa, p.ilosc, p.ilosc_zwrocona,
@@ -394,7 +346,7 @@ export function dolozDoKosza(
       ilosc: number; ilosc_zwrocona: number | null; channel_account_id: number } | undefined;
   if (!p) return null;
 
-  /* CO WCHODZI, ROZSTRZYGA PARAGON (0.328.0). Komplet sprzedany jako jedna
+  /* CO WCHODZI, ROZSTRZYGA PARAGON. Komplet sprzedany jako jedna
      oferta leży na magazynie osobno, a rozbicie ma wyłącznie dokument
      sprzedaży — patrz `services/komplety.ts`. Pozycja bez składu nie wchodzi
      do koszyka i to nie jest awaria, tylko stan pracy: ekran mówi, czego nie
@@ -430,7 +382,7 @@ export function dolozDoKosza(
     .get(kosz, pozycjaId) as { id: number } | undefined;
   if (stoi) return kosz;
 
-  /* TO, CO WRÓCIŁO, nie deklaracja klienta (0.212.0) — `skladPozycji` liczy
+  /* TO, CO WRÓCIŁO, nie deklaracja klienta — `skladPozycji` liczy
      sztuki tą samą regułą. Na dokument MM idzie towar, który fizycznie leży
      w pudle; liczba z Allegro opisuje zamiar klienta. */
   const ile = iloscLiczona(p);
@@ -458,33 +410,24 @@ export function dolozDoKosza(
   return kosz;
 }
 
-/* ── Towar dołożony RĘKĄ: skanem albo z kartoteki (0.365.0) ─────────────────
-   Zgłoszenie właściciela: „dodaj możliwość dodawania produktów do koszyka
-   zwrotowego poprzez zeskanowanie produktu lub wybranie go z kartoteki".
-
-   To jest świadome poszerzenie decyzji nr 3 z 3 września 2026 („dokładanie nie
-   jest osobnym ruchem"), a nie jej cofnięcie. Tamta decyzja opisywała ocenę
-   zwrotu i tam nic się nie zmienia: „na stan" dalej dokłada samo. Ale pudło
-   bywa pełniejsze niż zgłoszenie:
+/* ── Towar dołożony RĘKĄ: skanem albo z kartoteki ───────────────────────────
+   Ocena „na stan" dalej dokłada sama, ale pudło bywa pełniejsze niż
+   zgłoszenie:
 
      - paczka NIEODEBRANA zarejestrowana bez numeru zamówienia nie ma ani
        jednej pozycji, więc nie ma czego oceniać — a towar leży na biurku,
-     - klient dokłada do paczki rzecz, której nie zgłosił (blizna 0.184.0),
+     - klient dokłada do paczki rzecz, której nie zgłosił,
      - zwrot bywa u nas szybciej niż jego kopia z Allegro.
-
-   We wszystkich trzech wypadkach jedyną drogą towaru z biurka na półkę było
-   dotąd czekanie. Teraz jest skan.
 
    ── CZEGO TAKI WIERSZ NIE NIESIE ────────────────────────────────────────
    Nie ma za sobą zwrotu, więc nie ma ceny, nie wnosi nic do rozliczenia
    z klientem i NIE WCHODZI do bramki korekt (`brakujaceKorekty` pyta po
    `zwrot_pozycja_id`). Przesuwa wyłącznie TOWAR: na MM wchodzi tak samo jak
-   pozostałe wiersze, a po rozłożeniu wraca z bufora tą samą drogą. Pieniądze
-   zostają tam, gdzie były — przy zwrocie, korekcie albo przy decyzji biura.
+   pozostałe wiersze, a po rozłożeniu wraca z bufora tą samą drogą.
 
-   Tym różni się od `zaznaczSkladnik`, który dopisywać kartotek nie pozwala
-   i nie będzie: tamten rusza wiersze POZYCJI ZWROTU, gdzie cena i sztuki mają
-   pochodzić z dokumentu sprzedaży, a nie z pola tekstowego.                  */
+   Tym różni się od `zaznaczSkladnik`, który dopisywać kartotek nie pozwala:
+   tamten rusza wiersze POZYCJI ZWROTU, gdzie cena i sztuki mają pochodzić
+   z dokumentu sprzedaży, a nie z pola tekstowego.                          */
 
 /** Ile sztuk wolno dołożyć jednym ruchem. Kosz to pudło, nie dostawa. */
 export const MAX_SZTUK_RECZNIE = 999;
@@ -565,33 +508,14 @@ export function dolozTowar(
 }
 
 /**
- * Zdejmuje z koszyka wiersz dołożony ręką (0.365.0).
- *
- * TYLKO TAKI. Wiersz ze zwrotu schodzi cofnięciem oceny i to zostaje jedyną
- * jego drogą: ocena jest faktem o towarze, a nie zawartością pudła, więc
- * kasowanie jej z drugiej strony rozjechałoby kartę zwrotu z koszykiem.
+ * Zdejmuje z koszyka wiersz dołożony ręką.
  *
  * Pomyłka przy skanie jest normalnym elementem tej pracy, nie wyjątkiem —
  * dlatego bez roli i bez pytania „czy na pewno".
  *
- * BRAMKĄ JEST DOKUMENT, NIE ZAMKNIĘCIE (0.371.0). Do tego wydania stało tu
- * `status === "otwarty"` — węziej niż wszędzie indziej w tym pliku, z granicy
- * postawionej przez właściciela w 0.365.0: „tylko z poziomu obsługi zwrotów,
- * jak jeszcze nie jest zamknięty". Nowe zgłoszenie właściciela zdejmuje tamtą
- * granicę: „pozwól mi edytować koszyki zwrotowe, z których nie zostały jeszcze
- * utworzone MM".
- *
- * Kosztowała dokładnie tyle, ile miała chronić. Do koszyka Z-8 (25 kartotek)
- * wszedł skanem KOSZT PRZESYŁKI — kartoteka bez stanu na magazynie. Kosz się
- * zamknął, MM wyszła i Sfera odrzuciła ją zdaniem „Brak towaru w magazynie",
- * bo usługi nie da się przesunąć. Wiersza nie dało się zdjąć NIGDZIE: tu
- * blokowało zamknięcie, a PRZELICZ ZE ZWROTÓW w biurze rusza wyłącznie wiersze
- * ze zwrotów i dołożony ręką zostawia na miejscu.
- *
- * Uzasadnienie z 0.365.0 („pudło zamknięte odjechało od biurka") trzyma się
- * wyłącznie wtedy, gdy WYSZEDŁ PAPIER. Bez dokumentu nikt tego towaru nigdzie
- * nie posłał — pudło stoi, a poprawka jest zwykłą pracą, nie przepisywaniem
- * historii. To ten sam wniosek, który 0.334.0 wyciągnęło dla `zdejmijZKosza`.
+ * BRAMKĄ JEST DOKUMENT, NIE ZAMKNIĘCIE. Bez wystawionej MM nikt tego towaru
+ * nigdzie nie posłał: pudło stoi, a poprawka jest zwykłą pracą. Inaczej
+ * wiersz usługowy, który Sfera odrzuciła, nie dałby się zdjąć nigdzie.
  */
 export function zdejmijTowar(
   database: Db, pozycjaId: number, kto: { id: number; name: string },
@@ -605,35 +529,28 @@ export function zdejmijTowar(
         zwrot_pozycja_id: number | null; kod: string; rodzaj: string | null } | undefined;
     if (!w) throw new Error("Nie znam takiej pozycji koszyka.");
     /* KARTON NIE JEST KOSZYKIEM ZWROTÓW i po zdjęciu bramki zamknięcia trzeba
-       to powiedzieć wprost. Karton nie jedzie na MM w ogóle (0.122.0), więc
+       to powiedzieć wprost. Karton nie jedzie na MM w ogóle, więc
        `koszDoEdycji` przepuszcza go zawsze — a pudło dostawy stojące na hali
        z listą do rozłożenia nie jest niczyją pomyłką przy skanie. */
     if ((w.rodzaj ?? "zwroty") !== "zwroty" && (w.rodzaj ?? "zwroty") !== "odpad") {
       throw new Error(`Koszyk ${w.kod} nie jest koszykiem zwrotów ani odpadu.`);
     }
     const koszId = Number(w.kosz_id);
-    /* TA SAMA BRAMKA CO WSZĘDZIE W TYM PLIKU (0.371.0). Własny warunek
+    /* TA SAMA BRAMKA CO WSZĘDZIE W TYM PLIKU. Własny warunek
        rozjechałby się z `zdejmijZKosza` i `przeliczKosz` przy pierwszej zmianie
        jednej z nich — a rozjazd znaczyłby tu wiersz zdjęty z dokumentu, który
        już pojechał na halę. */
     if (!koszDoEdycji(database, koszId)) {
       throw new Error(`Koszyk ${w.kod} ma już dokument MM — jego zawartości aplikacja nie zmieni.`);
     }
-    /* ── WIERSZ ZE ZWROTU SCHODZI TAKŻE STĄD (0.379.0) ─────────────────
-       Do tego wydania odmawiał: „zdejmuje się ją cofnięciem oceny". Reguła
-       była słuszna w zamyśle — jedna droga na jeden skutek — a w praktyce
-       zostawiła koszyki bez wyjścia. Z-8 na produkcji odbił się od Sfery na
-       kartotece usługowej, nie miał ani jednego wiersza dołożonego ręką
-       i przez to ani jednego krzyżyka: żeby go odetkać, trzeba było odnaleźć
-       zwrot, z którego przyszedł feralny wiersz. Zgłoszenie właściciela
-       brzmiało „pozwól edytować te koszyki".
+    /* ── WIERSZ ZE ZWROTU SCHODZI TAKŻE STĄD ───────────────────────────
+       Inaczej koszyk odrzucony przez Sferę na wierszu z oceny nie miałby
+       wyjścia z tego ekranu.
 
        OCENA SCHODZI RAZEM Z WIERSZEM, i to jest warunek spójności, nie dodatek.
        To ocena „na stan" wsadziła towar do pudła, więc wyjęcie go bez zdjęcia
        oceny zostawiłoby kartę zwrotu mówiącą, że sztuka jedzie na regał,
-       którego dokument jej nie niesie. Zwrot wraca do kubełka DO OCENY i ktoś
-       podejmuje decyzję jeszcze raz — tym razem wiedząc, czego Sfera nie
-       przyjmie.
+       którego dokument jej nie niesie. Zwrot wraca do kubełka DO OCENY.
 
        SUROWY SQL, bo `zwroty.ts` importuje ten plik; import w drugą stronę
        zamknąłby cykl modułów. Ten sam wzorzec co w `zw-automat.ts`. */
@@ -673,11 +590,8 @@ export function zdejmijTowar(
 /**
  * Koszyk ZAMKNIĘTY, na którym siedzi ta pozycja — albo `null`.
  *
- * Bramka dla zmiany i cofnięcia oceny (0.202.0). Do tego wydania zmiana oceny
- * na pozycji z zamkniętego kosza przechodziła po cichu: `zdejmijZKosza` szuka
- * wyłącznie kosza otwartego i przy braku trafienia oddaje `false`, którego
- * nikt nie czytał. Towar zostawał na dokumencie MM, który pojechał na halę,
- * a w bazie nie było już oceny, która go tam posłała.
+ * Bramka dla zmiany i cofnięcia oceny. Bez niej towar zostałby na dokumencie
+ * MM, który pojechał na halę, a w bazie nie byłoby oceny, która go tam posłała.
  *
  * Oddajemy KOD, nie samo „tak": człowiek ma wiedzieć, na którym papierze
  * szukać, a nie tylko że się nie da.
@@ -685,12 +599,9 @@ export function zdejmijTowar(
 export function zamknietyKoszPozycji(
   database: Db, pozycjaId: number,
 ): { id: number; kod: string } | null {
-  /* BRAMKĄ JEST DOKUMENT, NIE STATUS (0.334.0). Do tego wydania blokowało samo
-     zamknięcie kosza — a kosz bywa zamknięty tygodniami, bo MM czeka na komplet
-     korekt. Zgłoszenie właściciela: „dodałem zestaw, a powinienem rozbić go
-     przed dodaniem do MM" — i nie dało się tego poprawić, choć żaden dokument
-     jeszcze nie wyszedł. Pomyłka była nie do odkręcenia w aplikacji, a towar
-     leżał w pudle przy biurku.
+  /* BRAMKĄ JEST DOKUMENT, NIE STATUS. Kosz bywa zamknięty tygodniami, bo MM
+     czeka na komplet korekt, a pomyłkę w pudle przy biurku trzeba móc
+     poprawić, póki żaden dokument nie wyszedł.
 
      Zadanie w toku blokuje tak samo jak gotowy numer: worker mógł już zacząć
      wystawiać dokument, a wtedy edycja rozjechałaby papier z zawartością.
@@ -710,7 +621,7 @@ export function zamknietyKoszPozycji(
 }
 
 /**
- * Czy z tego kosza wolno jeszcze wyjmować i dokładać (0.334.0).
+ * Czy z tego kosza wolno jeszcze wyjmować i dokładać.
  *
  * Ta sama bramka co wyżej, tylko pytana o KOSZ, nie o pozycję — potrzebuje jej
  * ekran biura, żeby nie pokazywać przycisków, których serwer i tak nie przyjmie.
@@ -729,21 +640,18 @@ export function koszDoEdycji(database: Db, koszId: number): boolean {
 /**
  * Zdejmuje pozycję z koszyka po cofnięciu albo zmianie oceny.
  *
- * TYLKO Z KOSZA BEZ DOKUMENTU (0.334.0). Kosz z wystawioną MM pojechał już na
+ * TYLKO Z KOSZA BEZ DOKUMENTU. Kosz z wystawioną MM pojechał już na
  * halę z papierem — wyjęcie z niego wiersza rozjechałoby dokument z zawartością,
  * a magazynier szukałby towaru, którego nikt nie wyjął z kartonu.
  */
 export function zdejmijZKosza(
   database: Db, pozycjaId: number, kto: { id: number; name: string },
 ): number | null {
-  /* WSZYSTKIE wiersze tej pozycji, nie pierwszy z brzegu: od 0.328.0 komplet
-     wchodzi do koszyka kilkoma kartotekami. Zdjęcie jednej zostawiłoby resztę
-     zestawu na dokumencie MM — czyli towar na papierze, którego nikt nie wyjął
-     z pudła. */
-  /* KOSZ ZAMKNIĘTY BEZ DOKUMENTU TEŻ (0.334.0). Pudło stoi przy biurku,
-     a papieru nie ma — poprawka jest wtedy zwykłą pracą, nie przepisywaniem
-     historii. Bramkę trzyma `zamknietyKoszPozycji`: gdy dokument już wyszedł,
-     wołający dostaje odmowę, zanim tu dojdzie. */
+  /* WSZYSTKIE wiersze tej pozycji, nie pierwszy z brzegu: komplet wchodzi
+     do koszyka kilkoma kartotekami. Zdjęcie jednej zostawiłoby resztę
+     zestawu na dokumencie MM. */
+  /* KOSZ ZAMKNIĘTY BEZ DOKUMENTU TEŻ. Bramkę trzyma `zamknietyKoszPozycji`:
+     gdy dokument już wyszedł, wołający dostaje odmowę, zanim tu dojdzie. */
   const wiersze = database.prepare(
     `SELECT kp.id, kp.kosz_id FROM kosz_pozycja kp
        JOIN kosz k ON k.id = kp.kosz_id
@@ -769,18 +677,13 @@ export function zdejmijZKosza(
 }
 
 /**
- * Skład pozycji z zaznaczeniem: co WEJDZIE i co już LEŻY w koszyku (0.335.0).
+ * Skład pozycji z zaznaczeniem: co WEJDZIE i co już LEŻY w koszyku.
  *
- * Zgłoszenie właściciela: „powinno rozbijać na komponenty do zaznaczania,
- * które idą do MM". Komplet wchodził dotąd w całości albo wcale, a wracają
- * z niego nieraz same części — reszta zostaje u klienta albo nadaje się
- * wyłącznie na odpad.
+ * Z kompletu wracają nieraz same części, więc składniki zaznacza się osobno.
  *
- * SUMA DWÓCH LIST, nie sam `skladPozycji`. Koszyk bywa starszy niż dzisiejsze
- * reguły: kosz złożony przed 0.328.0 niesie zestaw jednym wierszem, którego
- * rozbicie z paragonu już nie zaproponuje. Pominięcie takiego wiersza znaczyłoby
- * ptaszek, którego nie da się odznaczyć — czyli towar na dokumencie, o którym
- * ekran milczy.
+ * SUMA DWÓCH LIST, nie sam `skladPozycji`. Starszy kosz niesie zestaw jednym
+ * wierszem, którego rozbicie z paragonu już nie zaproponuje. Pominięcie go
+ * znaczyłoby ptaszek, którego nie da się odznaczyć.
  */
 export interface SkladDoZaznaczenia extends Omit<SkladPozycji, "skladniki"> {
   skladniki: Array<Skladnik & {
@@ -885,7 +788,7 @@ function zdarzenieSkladnika(
 }
 
 /**
- * Zdejmuje z koszyka jeden składnik kompletu albo wkłada go z powrotem (0.335.0).
+ * Zdejmuje z koszyka jeden składnik kompletu albo wkłada go z powrotem.
  *
  * PTASZEK RUSZA WIERSZ KOSZYKA, nie osobną tabelę zaznaczeń, i to jest cała
  * decyzja tej funkcji. `kosz_pozycja` JEST prawdą o tym, co pojedzie na MM —
@@ -913,7 +816,7 @@ function zaznaczSkladnikBezTransakcji(
     `SELECT id, kosz_id, tw_id FROM kosz_pozycja WHERE zwrot_pozycja_id=? ORDER BY id`)
     .all(pozycjaId) as Array<{ id: number; kosz_id: number; tw_id: number }>;
   if (!wiersze.length) {
-    /* OCENA JUŻ STOI, A POZYCJI W PUDLE NIE MA (0.484.7). Wtedy „oceń ją na
+    /* OCENA JUŻ STOI, A POZYCJI W PUDLE NIE MA. Wtedy „oceń ją na
        stan" odsyłało do ruchu, który przed chwilą dał ten sam wynik:
        `dolozDoKosza` znowu zwróci `null` z tego samego powodu. Zdanie mówi
        więc powód — ten sam, który zatrzymał dołożenie. */
@@ -934,7 +837,7 @@ function zaznaczSkladnikBezTransakcji(
   const koszId = Number(wiersze[0].kosz_id);
   const kod = (database.prepare("SELECT kod FROM kosz WHERE id=?").get(koszId) as
     { kod: string }).kod;
-  /* TA SAMA BRAMKA CO WSZĘDZIE (0.334.0): dokument zamyka drogę, samo
+  /* TA SAMA BRAMKA CO WSZĘDZIE: dokument zamyka drogę, samo
      zamknięcie kosza nie. Własny warunek rozjechałby się z resztą pliku. */
   if (!koszDoEdycji(database, koszId)) {
     throw new Error(`Koszyk ${kod} ma już dokument MM — jego zawartości aplikacja nie zmieni.`);
@@ -958,9 +861,9 @@ function zaznaczSkladnikBezTransakcji(
        wtedy na papier przez zwykłą literówkę w numerze. */
     const s = skladPozycji(database, pozycjaId).skladniki.find((x) => x.twId === twId);
     if (!s) throw new Error("Tej kartoteki nie ma w składzie pozycji — nie wolno jej dopisać.");
-    /* TA SAMA BRAMKA CO PRZY DOKŁADANIU (0.377.0). Bez niej ptaszek byłby
-       obejściem: koszyk napełniony przed 0.374.0 dostawał wiersz usługowy
-       z powrotem przez odznaczenie i zaznaczenie go na nowo. */
+    /* TA SAMA BRAMKA CO PRZY DOKŁADANIU. Bez niej ptaszek byłby
+       obejściem: wiersz usługowy wracałby przez odznaczenie i zaznaczenie
+       go na nowo. */
     const powod = powodPozaMagazynem(database, twId);
     if (powod) throw new Error(`„${s.symbol}" nie wejdzie do pudła: ${powod}.`);
     database.prepare(
@@ -974,7 +877,7 @@ function zaznaczSkladnikBezTransakcji(
        ten sam skutek kosztowałyby pytanie, czym się różnią. */
     if (stoi.length === wiersze.length) {
       /* Cofnięcie oceny odmawia na zwrocie z korektą (`podKlucz`) — wtedy
-         zdanie musi nazwać krok, który je odblokowuje (0.484.7). */
+         zdanie musi nazwać krok, który je odblokowuje. */
       const zam = database.prepare(`SELECT z.zamkniety_at FROM zwrot_klienta z
         JOIN zwrot_klienta_pozycja p ON p.zwrot_id = z.id WHERE p.id=?`).get(pozycjaId) as
         { zamkniety_at: string | null } | undefined;
@@ -999,10 +902,9 @@ function zaznaczSkladnikBezTransakcji(
 /**
  * Odkłada składnik kompletu na outlet zamiast do koszyka albo to cofa.
  *
- * Zgłoszenie właściciela: z kompletu jeden składnik wraca w porządku, drugi
- * jest używany. Odznaczony ptaszkiem nie trafia na żadną listę, a ocena
- * „na outlet" zabiera z pudła cały zestaw. Pieniędzy to nie rusza: klient dostaje
- * całość, więc kwota i potrącenia stoją przy pozycji jak dotąd.
+ * Z kompletu jeden składnik wraca w porządku, drugi bywa używany. Odznaczony
+ * ptaszkiem nie trafia na żadną listę, a ocena „na outlet" zabiera z pudła
+ * cały zestaw. Pieniędzy to nie rusza: kwota i potrącenia stoją przy pozycji.
  *
  * TYLKO PRZY OCENIE „NA STAN". Przy innej ocenie cała pozycja idzie jedną
  * drogą, a odłożenie części byłoby drugą decyzją o tym samym towarze.
@@ -1107,18 +1009,15 @@ function cofnijOutletSkladnika(
 }
 
 /**
- * Przelicza zawartość zamkniętego kosza od nowa, ze zwrotów (0.334.0).
+ * Przelicza zawartość zamkniętego kosza od nowa, ze zwrotów.
  *
- * Zgłoszenie właściciela: „dodałem zestaw, a powinienem rozbić ten zestaw przed
- * dodaniem do MM — nie chce się zrobić". Kosz stał zamknięty, czekając na
- * komplet korekt, a pomyłki nie dało się odkręcić w aplikacji.
+ * Kosz stoi zamknięty, czekając na komplet korekt, a pomyłkę w rozbiciu
+ * zestawu trzeba móc odkręcić w aplikacji.
  *
- * PRZELICZENIE, A NIE EDYCJA WIERSZY, i to jest cała decyzja tej funkcji.
- * Ręczne dopisywanie kartotek do dokumentu MM znaczyłoby drugą drogę obok
- * `skladPozycji` — i drugie miejsce, w którym na papier może trafić towar,
- * którego nikt nie zwrócił. Tutaj źródłem zostaje to samo co zawsze: ocena
- * „na stan" i rozbicie z paragonu. Zmieniło się tylko to, że od 0.328.0
- * rozbicie jest lepsze niż w dniu, w którym kosz powstał.
+ * PRZELICZENIE, A NIE EDYCJA WIERSZY. Ręczne dopisywanie kartotek do MM
+ * byłoby drugą drogą obok `skladPozycji` — i drugim miejscem, w którym na
+ * papier trafia towar, którego nikt nie zwrócił. Źródłem zostaje ocena
+ * „na stan" i rozbicie z paragonu.
  *
  * Pozycje bez zwrotu (kartony, koszyki z dokumentu) NIE SĄ tu ruszane: nie ma
  * ich z czego przeliczyć, a skasowanie zostawiłoby pudło bez zawartości.
@@ -1179,7 +1078,7 @@ export function przeliczKosz(
 }
 
 /**
- * Stany zadania MM, w których DOKUMENTU JESZCZE NIE MA (0.420.0).
+ * Stany zadania MM, w których DOKUMENTU JESZCZE NIE MA.
  *
  * Tylko z tych wolno je zgasić przy poprawce zawartości. `done` i `processing`
  * na tej liście nie stoją i stać nie będą: przy pierwszym papier już wyszedł,
@@ -1188,35 +1087,22 @@ export function przeliczKosz(
 const MM_BEZ_DOKUMENTU = ["pending", "waiting_for_doc", "error"];
 
 /**
- * Unieważnia zadanie MM ułożone dla poprzedniej zawartości kosza (0.334.0).
+ * Unieważnia zadanie MM ułożone dla poprzedniej zawartości kosza.
  *
  * Kosz bez `mm_queue_id` wraca pod `wypuscGotoweKoszyki` i dostaje świeże
  * zadanie z nową zawartością — na tym polega cała ta funkcja.
  *
- * ── GASIMY STARE ZADANIE, NIE TYLKO ODPINAMY (0.420.0) ────────────────────
- * Do tego wydania anulowane było wyłącznie zadanie `pending`; `error`
- * i `waiting_for_doc` zostawały żywe w kolejce i tylko traciły związek
- * z koszem. Uzasadnienie brzmiało „ślad po nieudanej próbie" i było dobre —
- * tylko że ślad zostaje także po anulowaniu, bo `error_msg` nikt nie kasuje.
- * Znikał za to przycisk PONÓW, a to on był problemem.
- *
- * Koszyk Z-23 zebrał tak TRZY żywe zadania MM naraz. Przebieg był prosty:
- * w czasie awarii pustej sesji Sfery każde zadanie MM tego kosza schodziło
- * w `error`, każda poprawka zawartości odpinała je i zamawiała nowe, a potem
- * biuro naciskało PONÓW na starych wierszach — bo w kolejce wyglądały jak
- * zwykła praca do odzyskania. Każde wskrzeszone zadanie wystawia WŁASNY
- * dokument MM na to samo pudło, czyli ten sam towar przesunięty trzy razy.
- * Odkręca się to w Subiekcie dokumentami korygującymi, nie w aplikacji.
- *
- * `waiting_for_doc` jest tym samym przypadkiem, tylko cichszym: worker odłożył
- * zadanie na minutę i sam po nie wróci. Nikt nie musi niczego naciskać.
+ * ── GASIMY STARE ZADANIE, NIE TYLKO ODPINAMY ──────────────────────────────
+ * `error` i `waiting_for_doc` też schodzą, nie tylko `pending`. Odpięte, ale
+ * żywe zadanie wygląda w kolejce jak praca do odzyskania. Każde wskrzeszone
+ * PONÓW wystawia WŁASNY dokument MM na to samo pudło, czyli ten sam towar
+ * przesunięty kilka razy. Ślad po nieudanej próbie zostaje w `error_msg`.
  *
  * ── ZADANIE W TOKU ZATRZYMUJE CAŁĄ POPRAWKĘ ───────────────────────────────
  * `processing` znaczy, że worker trzyma to zadanie TERAZ i może być w środku
  * `Zapisz()`. Nie wolno go zgasić (dokument mógł już powstać) ani odpiąć po
- * cichu (powstanie dokument, o którym kosz nie będzie wiedział). Jedyna uczciwa
- * odpowiedź to odmowa całej poprawki — wołający jest w transakcji, więc
- * wycofuje się z niej w całości.
+ * cichu (powstanie dokument, o którym kosz nie będzie wiedział). Wołający jest
+ * w transakcji, więc odmowa wycofuje całą poprawkę.
  *
  * Bramka `koszDoEdycji` odsiewa ten stan wcześniej i normalnie tu nie dojdzie.
  * Ten warunek jest drugą linią na wyścig: między sprawdzeniem bramki a tym
@@ -1231,7 +1117,7 @@ function uniewaznijZadanieMm(
   const z = database.prepare("SELECT status FROM sfera_queue WHERE id=?")
     .get(k.mm_queue_id) as { status: string } | undefined;
   const stan = String(z?.status ?? "");
-  /* `done` to NIE „w toku" (0.484.7): dokument już stoi, więc czekanie nic
+  /* `done` to NIE „w toku": dokument już stoi, więc czekanie nic
      nie da — zawartości po MM się nie poprawia. */
   if (stan === "done") {
     throw new Error(
@@ -1244,9 +1130,8 @@ function uniewaznijZadanieMm(
       "Poczekaj, aż kolejka je domknie, i popraw zawartość dopiero wtedy.");
   }
   if (z && MM_BEZ_DOKUMENTU.includes(stan)) {
-    /* `error_msg` zostaje nietknięty — ślad po nieudanej próbie czyta się
-       z wiersza tak samo jak dotąd. Zmienia się tylko to, że nikt tego
-       zadania już nie wskrzesi: PONÓW przyjmuje wyłącznie `error`. */
+    /* `error_msg` zostaje nietknięty jako ślad po nieudanej próbie. PONÓW
+       przyjmuje wyłącznie `error`, więc `cancelled` nikt już nie wskrzesi. */
     database.prepare(
       `UPDATE sfera_queue SET status='cancelled',
         processed_at=(strftime('%Y-%m-%dT%H:%M:%fZ','now')) WHERE id=?`).run(k.mm_queue_id);
@@ -1271,7 +1156,7 @@ export function stanOtwartegoKosza(
 function stanKosza(database: Db, koszId: number, rodzaj: RodzajKosza): StanKosza {
   const k = database.prepare("SELECT id, kod, utworzono_at FROM kosz WHERE id=?")
     .get(koszId) as { id: number; kod: string; utworzono_at: string };
-  /* `LEFT JOIN`, bo pozycja zwrotu bywa skasowana resetem (0.199.0), a wiersz
+  /* `LEFT JOIN`, bo pozycja zwrotu bywa skasowana resetem, a wiersz
      koszyka zostaje — wtedy nie wiemy, z którego zwrotu przyszedł. */
   const pozycje = database.prepare(
     `SELECT p.id, p.symbol, p.nazwa, p.ilosc, p.zwrot_pozycja_id, zp.zwrot_id
@@ -1295,11 +1180,8 @@ function stanKosza(database: Db, koszId: number, rodzaj: RodzajKosza): StanKosza
 }
 
 /**
- * WSZYSTKIE otwarte pudła operatora, od najstarszego (0.379.0).
- *
- * Do 0.378.0 oddawało najwyżej jedno na rodzaj, bo tyle wolno było mieć.
- * Decyzja właściciela to odwróciła — a lista, która pokazuje jedno z kilku,
- * kłamałaby o tym, ile kartonów stoi przy biurku.
+ * WSZYSTKIE otwarte pudła operatora, od najstarszego. Lista z jednym
+ * z kilku kłamałaby o tym, ile kartonów stoi przy biurku.
  */
 export function otwarteKoszyki(database: Db, kto: { name: string }): StanKosza[] {
   const rodzaje: RodzajKosza[] = ["zwroty", "odpad"];
@@ -1316,7 +1198,7 @@ export function otwarteKoszyki(database: Db, kto: { name: string }): StanKosza[]
 /**
  * Zwroty wnoszące pozycje do koszyka, którym BRAKUJE numeru korekty.
  *
- * `LEFT JOIN` świadomie: `zwroty:reset` (0.199.0) kasuje zwroty, zostawiając
+ * `LEFT JOIN` świadomie: `zwroty:reset` kasuje zwroty, zostawiając
  * pozycje zamkniętych koszyków jako snapshot z wiszącym `zwrot_pozycja_id`.
  * Wiersz bez zwrotu NIE BLOKUJE — koszyk czekający wiecznie na dokument, po
  * którym nie ma śladu, jest gorszy niż wypuszczony.
@@ -1338,8 +1220,8 @@ export function brakujaceKorekty(database: Db, koszId: number): Array<{
 /**
  * Wkłada MM koszyka do kolejki. Oddaje `id` zadania.
  *
- * Wydzielone, bo od 0.200.0 wołają to DWIE drogi: zamknięcie koszyka, którego
- * korekty już są, i późniejsze wypuszczenie po dopisaniu ostatniego numeru.
+ * Wołają to DWIE drogi: zamknięcie koszyka, którego korekty już są,
+ * i późniejsze wypuszczenie po dopisaniu ostatniego numeru.
  */
 function zakolejkujMm(
   database: Db, k: { id: number; kod: string; rodzaj: RodzajKosza },
@@ -1358,9 +1240,8 @@ function zakolejkujMm(
   }
   const items = [...wgTowaru].map(([twId, qty]) => ({ twId, qty }));
 
-  /* Przez `enqueueMM`, nie własnym INSERT-em. Do 0.201.3 był to DRUGI writer
-     kolejki w produkcji — a niezmiennik o kształcie zadania MM stoi przy
-     `enqueueMM` i tam się go czyta. Zadanie jest WIELOPOZYCYJNE i bez `twId`:
+  /* Przez `enqueueMM`, nie własnym INSERT-em: niezmiennik o kształcie
+     zadania MM stoi przy `enqueueMM`. Zadanie jest WIELOPOZYCYJNE i bez `twId`:
      jeden koszyk to jeden dokument i jedna kartka dla magazyniera. Guard
      kolejności nic przez to nie traci, bo MM idzie Z magazynu głównego —
      na bufor zwrotów albo na odpad — i sprzedawalnym towaru nie czyni. */
@@ -1393,15 +1274,14 @@ function zakolejkujMm(
  * i rozłożyłby towar raz.
  */
 export function wypuscGotoweKoszyki(database: Db, teraz = new Date()): number {
-  /* OBA RODZAJE (0.211.0). Bramka korekty obowiązuje odpad tak samo jak
+  /* OBA RODZAJE. Bramka korekty obowiązuje odpad tak samo jak
      zwroty: towar wraca na magazyn główny dopiero po korekcie, więc MM na
      odpad zdjęłoby stan, którego jeszcze nie ma.
 
      TAKŻE KOSZ JUŻ ROZŁOŻONY. Zamknięcie jest czynnością fizyczną, więc hala
-     rozkłada kosz, zanim biuro wpisze korekty. Do tego wydania automat patrzył
-     wyłącznie na `zamkniety`: kosz rozłożony przed korektą tracił swoje MM
-     na zawsze, a MM powrotne zdejmowało z regału zwrotów stan, którego tam
-     nie było. `powrot_poza_aplikacja` odsiewa kosze rozliczone ręką przez biuro
+     rozkłada kosz, zanim biuro wpisze korekty. Bez tego kosz rozłożony przed
+     korektą tracił swoje MM, a MM powrotne zdejmowało z regału zwrotów stan,
+     którego tam nie było. `powrot_poza_aplikacja` odsiewa kosze rozliczone ręką przez biuro
      — dokument wystawiony dziś przesunąłby ich towar drugi raz. */
   const czekajace = database.prepare(
     `SELECT id, kod, rodzaj FROM kosz
@@ -1413,14 +1293,13 @@ export function wypuscGotoweKoszyki(database: Db, teraz = new Date()): number {
   let wypuszczone = 0;
   for (const k of czekajace) {
     if (brakujaceKorekty(database, Number(k.id)).length > 0) continue;
-    /* PUSTY KOSZ NIE DOSTAJE DOKUMENTU (0.334.0). Od tego wydania da się
-       wyjąć pozycję z kosza zamkniętego bez dokumentu — a kosz opróżniony do
-       zera dostałby tu MM bez ani jednej linii, którą Sfera i tak odrzuci. */
+    /* PUSTY KOSZ NIE DOSTAJE DOKUMENTU. Z kosza zamkniętego bez dokumentu
+       da się wyjąć pozycje, a MM bez ani jednej linii Sfera i tak odrzuci. */
     const { n } = database.prepare(
       "SELECT COUNT(*) AS n FROM kosz_pozycja WHERE kosz_id=?").get(k.id) as { n: number };
     if (!n) continue;
     /* Każdy koszyk WŁASNĄ transakcją: jeden wywrócony nie ma prawa zabrać
-       pozostałych — ta sama lekcja co przy sygnaturach w 0.169.0. */
+       pozostałych. */
     transaction(database, () => {
       const queueId = zakolejkujMm(database,
         { id: Number(k.id), kod: k.kod, rodzaj: k.rodzaj },
@@ -1442,19 +1321,15 @@ export interface KoszykCzekajacy {
   /** Zwroty bez numeru korekty — człowiek ma wiedzieć, czego szukać. */
   brakuje: Array<{ zwrotId: number; numer: string }>;
   /**
-   * Odmowa Sfery, gdy zadanie MM stanęło w błędzie — inaczej `null` (0.371.0).
+   * Odmowa Sfery, gdy zadanie MM stanęło w błędzie — inaczej `null`.
    *
    * Niepusta wartość znaczy też, że zadanie WCIĄŻ WISI przy koszu: dopóki
    * wisi, nie ma czego wypuszczać i przycisk „wystaw" nie ma tu prawa stać.
    */
   blad: string | null;
   /**
-   * CAŁA zawartość pudła, nie tylko wiersze dołożone ręką (0.379.0).
-   *
-   * Do tego wydania stały tu wyłącznie wiersze ze skanu, bo tylko one dawały
-   * się zdjąć. Koszyk Z-8 pokazał cenę tej reguły: odbił się od Sfery na
-   * kartotece usługowej przyniesionej OCENĄ, więc nie miał ani jednego
-   * krzyżyka i nie było jak go odetkać z tego ekranu.
+   * CAŁA zawartość pudła, nie tylko wiersze dołożone ręką: koszyk odbity od
+   * Sfery na wierszu z oceny musi mieć krzyżyk na tym ekranie.
    *
    * `zeZwrotu` zostaje, bo zdjęcie takiego wiersza cofa przy okazji ocenę —
    * i ekran ma to powiedzieć PRZED kliknięciem, a nie po nim.
@@ -1462,21 +1337,19 @@ export interface KoszykCzekajacy {
   pozycje: Array<{
     pozycjaId: number; symbol: string; nazwa: string; ilosc: number; zeZwrotu: boolean;
     /**
-     * Ile TEGO towaru leży na magazynie, z którego MM ma go zabrać (0.381.0).
+     * Ile TEGO towaru leży na magazynie, z którego MM ma go zabrać.
      *
      * Sfera odrzuca dokument zdaniem „Brak towaru w magazynie" i NIE MÓWI,
-     * którego. Zgłoszenie właściciela z produkcji: „dostaję brak towaru
-     * w magazynie, ale nie mówi jakiego, abym mógł go usunąć z koszyka".
-     * Liczba stąd wskazuje wiersz palcem — a zdejmuje się go tym samym
+     * którego. Liczba stąd wskazuje wiersz palcem — a zdejmuje się go tym samym
      * krzyżykiem, który już przy nim stoi.
      */
     stanMag: number;
     /** Czy tego wiersza NIE DA SIĘ przesunąć: na magazynie jest go za mało. */
     brakNaMag: boolean;
-    /** Ile z `stanMag` jest zarezerwowane (0.486.5) — zarezerwowanego MM nie zabierze. */
+    /** Ile z `stanMag` jest zarezerwowane — zarezerwowanego MM nie zabierze. */
     rezerwacja: number;
     /**
-     * Na magazynie JEST, ale wolnego (stan − rezerwacje) za mało (0.486.5).
+     * Na magazynie JEST, ale wolnego (stan − rezerwacje) za mało.
      * Osobno od `brakNaMag`, bo naprawa jest inna: zdjąć rezerwację
      * w Subiekcie, a nie wyjmować towar z pudła.
      */
@@ -1539,15 +1412,11 @@ export function zwiazKoszykZDokumentem(
 
 /**
  * Koszyki zamknięte BEZ DOKUMENTU — wszystko, co jeszcze czeka na człowieka
- * albo na papier (0.371.0).
+ * albo na papier.
  *
- * Do tego wydania lista pokazywała wyłącznie kosze, którym brakuje korekt,
- * i wyłącznie takie, do których nie przypięto jeszcze zadania. Koszyk Z-8
- * wypadł przez obie dziury naraz: korekty miał komplet, zadanie MM dostał,
- * a Sfera odrzuciła je zdaniem „Brak towaru w magazynie", bo skanem wszedł do
- * niego KOSZT PRZESYŁKI — kartoteka bez stanu, której nie da się przesunąć.
- * Kosz zniknął wtedy z panelu: dokumentu nie ma, pudło stoi, i nikt nie mówi
- * dlaczego. Cisza jest tu gorsza od złej wiadomości.
+ * Także kosz z kompletem korekt i zadaniem MM odrzuconym przez Sferę: bez
+ * niego dokumentu nie ma, pudło stoi, a panel milczy. Cisza jest tu gorsza
+ * od złej wiadomości.
  *
  * TRZY STANY, JEDEN PASEK. Kosz bez dokumentu czeka dokładnie na jedno z:
  * brakującą korektę, poprawkę zawartości po odmowie Sfery, albo na samo
@@ -1559,7 +1428,7 @@ export function zwiazKoszykZDokumentem(
  * a jedyną odpowiedzią byłoby „czekaj".
  */
 /**
- * Z którego magazynu miała zabrać towar ta MM (0.381.0).
+ * Z którego magazynu miała zabrać towar ta MM.
  *
  * Z ZADANIA, nie z konfiguracji: koszyk odpadu i koszyk zwrotów jadą dziś
  * z tego samego magazynu, ale zadanie zna swój `magFrom` na pewno, a
@@ -1572,8 +1441,7 @@ function magazynZrodlowy(payload: string | null): number {
     const p = JSON.parse(payload) as { magFrom?: number };
     return Number(p.magFrom) || config.magId.MAG;
   } catch {
-    /* Uszkodzony payload nie ma prawa zabrać paska: pytamy o magazyn główny
-       i pokazujemy kosz tak, jak dotąd. */
+    /* Uszkodzony payload nie ma prawa zabrać paska: pytamy o magazyn główny. */
     return config.magId.MAG;
   }
 }
@@ -1602,13 +1470,10 @@ export function koszykiBezDokumentu(database: Db): KoszykCzekajacy[] {
     const lista = wiersze.all(magazynZrodlowy(k.payload), k.id) as Array<
       { id: number; tw_id: number; symbol: string; nazwa: string; ilosc: number;
         zwrot_pozycja_id: number | null; stan: number; rez: number }>;
-    /* ── SUMA PO KARTOTECE, NIE PO WIERSZU (0.486.5) ──────────────────────
-       Zgłoszenie właściciela z kosza Z-29: „Brak towaru w magazynie — nie
-       pokazuje którego". Żaden wiersz nie był czerwony, bo porównanie szło
-       wierszem: dwa zwroty tej samej kartoteki po sztuce przechodziły przy
-       stanie 1, a MM prosi o dwie. Druga dziura: rezerwacje. Subiekt nie
-       zabierze zarezerwowanego towaru, a liczyliśmy sam `stan` — choć
-       gdzie indziej w aplikacji dostępne to od dawna stan − rezerwacje. */
+    /* ── SUMA PO KARTOTECE, NIE PO WIERSZU ────────────────────────────────
+       Dwa zwroty tej samej kartoteki po sztuce przechodziłyby wierszem przy
+       stanie 1, a MM prosi o dwie. Subiekt nie zabierze też zarezerwowanego
+       towaru, więc dostępne to stan − rezerwacje. */
     const suma = new Map<number, number>();
     for (const p of lista) suma.set(Number(p.tw_id), (suma.get(Number(p.tw_id)) ?? 0) + Number(p.ilosc));
     return {
@@ -1638,10 +1503,9 @@ export function koszykiBezDokumentu(database: Db): KoszykCzekajacy[] {
  * a nikt nie wie, na czym stoi sprawa. Kubełek DO KOREKTY zbiera tę samą
  * pracę, więc to jedno zdanie przy koszyku, nie nowy ekran.
  *
- * WĘŻSZY WIDOK tej samej listy od 0.371.0. Rozjazd zbioru z `wypuscGotoweKoszyki`
- * dałby kosz, który czeka, a o którym nikt nie mówi — więc filtr, nie drugie
- * zapytanie. Czyta to `reconcile`, który mówi „brakuje: ..." i o koszu bez
- * ani jednego brakującego numeru nie miałby co powiedzieć.
+ * WĘŻSZY WIDOK tej samej listy co `wypuscGotoweKoszyki`, więc filtr, nie
+ * drugie zapytanie. Czyta to `reconcile`, który mówi „brakuje: ..." i o koszu
+ * bez brakującego numeru nie miałby co powiedzieć.
  */
 export function koszykiCzekajaceNaKorekty(database: Db): KoszykCzekajacy[] {
   return koszykiBezDokumentu(database)
@@ -1649,33 +1513,28 @@ export function koszykiCzekajaceNaKorekty(database: Db): KoszykCzekajacy[] {
 }
 
 /**
- * Wypuszcza MM koszyka MIMO BRAKUJĄCYCH KOREKT (0.368.0).
+ * Wypuszcza MM koszyka MIMO BRAKUJĄCYCH KOREKT.
  *
- * Decyzja właściciela: „dodaj opcję sforsowania zamknięcia koszyka, nawet
- * jeśli nie ma wszystkich ZW". Bramka z 0.200.0 zostaje domyślna i zostaje
- * słuszna — to jest wyjście awaryjne obok niej, nie jej zdjęcie.
+ * Bramka korekt zostaje domyślna i słuszna — to jest wyjście awaryjne obok
+ * niej, nie jej zdjęcie.
  *
  * CO TO KOSZTUJE, powiedziane wprost, bo płaci to magazyn. MM zdejmuje towar
  * z magazynu GŁÓWNEGO, a ze zwrotu towar trafia tam dopiero po korekcie
  * wystawionej w Subiekcie. Dokument wypuszczony wcześniej idzie na stan,
  * którego jeszcze nie ma: Sfera odrzuci go przy braku stanu albo — gdy
- * Subiekt dopuszcza ujemne — zepchnie stan pod zero i różnica wyrówna się
- * dopiero z korektą. To dokładnie ten błąd kolejności, który naprawiło
- * 0.200.0, więc droga jest ŚWIADOMA i zostawia ślad z imionami zwrotów.
+ * Subiekt dopuszcza ujemne — zepchnie stan pod zero. Droga jest więc ŚWIADOMA
+ * i zostawia ślad z imionami zwrotów.
  *
  * KIEDY MA SENS. Korekta bywa wystawiona poza aplikacją albo wystawi się za
  * chwilę, a kosz fizycznie stoi na drodze i blokuje pracę hali. Człowiek przy
  * biurku wie to, czego baza nie wie — i to on bierze decyzję na siebie.
  *
  * JEDNA DROGA NA OBA STANY. Kosz otwarty zamyka się po drodze; kosz już
- * zamknięty albo rozłożony dostaje sam dokument. Osobna opcja przy zamykaniu
- * i osobny przycisk przy koszu czekającym byłyby dwiema nazwami na jedną
- * decyzję, a kosz, który stoi tygodniami, jest właśnie tym drugim przypadkiem.
+ * zamknięty albo rozłożony dostaje sam dokument.
  *
  * CZEGO NIE FORSUJE: kosza z dokumentem (papier już wyszedł), kosza pustego
  * (dokument bez linii nie jest dokumentem) i kosza rozliczonego poza
- * aplikacją (jego towar przesunął już ktoś ręką). Te trzy odmowy nie są
- * ostrożnością, tylko brakiem czegokolwiek do zrobienia.
+ * aplikacją (jego towar przesunął już ktoś ręką).
  */
 export function wypuscMmMimoKorekt(
   database: Db, koszId: number, kto: { id: number; name: string }, teraz = new Date(),
@@ -1694,7 +1553,7 @@ export function wypuscMmMimoKorekt(
     if (Number(k.powrot_poza_aplikacja) === 1) {
       throw new Error(`Koszyk ${k.kod} rozliczono poza aplikacją — jego towar już wrócił.`);
     }
-    /* Karton nie jedzie na MM w ogóle (0.122.0): towar nie opuścił magazynu,
+    /* Karton nie jedzie na MM w ogóle: towar nie opuścił magazynu,
        więc nie ma czego przesuwać i forsowanie niczego by nie odblokowało. */
     if (k.rodzaj !== "zwroty" && k.rodzaj !== "odpad") {
       throw new Error(`Koszyk ${k.kod} nie jedzie na MM — dokumentu nie ma i nie będzie.`);
@@ -1731,12 +1590,9 @@ export function wypuscMmMimoKorekt(
 /**
  * Zamyka koszyk. Dokument MM wychodzi DOPIERO PO KOREKTACH.
  *
- * Do 0.199.0 zamknięcie kolejkowało MM od razu — i to był błąd kolejności,
- * nie kosmetyka. MM zdejmuje towar z magazynu GŁÓWNEGO, a towar ze zwrotu
- * trafia na ten magazyn dopiero wtedy, gdy biuro wystawi w Subiekcie korektę
- * albo zwrot do paragonu. Dokument szedł więc na stan, którego jeszcze nie
- * było. Właściciel opisał właściwą kolejność sam (`docs/obsluga-klienta.md`):
- * „paczka wraca, korekta, MM na bufor".
+ * MM zdejmuje towar z magazynu GŁÓWNEGO, a towar ze zwrotu trafia tam dopiero
+ * po korekcie albo zwrocie do paragonu w Subiekcie. Kolejność to „paczka
+ * wraca, korekta, MM na bufor" (`docs/obsluga-klienta.md`).
  *
  * Kosz staje się `zamkniety` OD RAZU, bo zamknięcie jest czynnością FIZYCZNĄ:
  * kosz się zapełnił, więc odchodzi od biurka. Wiązanie tego z papierologią
@@ -1773,8 +1629,7 @@ export function zamknijKosz(
         WHERE id=?`).run(at, kto.name, koszId);
 
     /* Komplet korekt sprawdzamy PO zamknięciu, na zapisanym już koszu: gdy
-       niczego nie brakuje, MM wychodzi w tej samej transakcji i operator nie
-       widzi różnicy wobec dawnego zachowania. */
+       niczego nie brakuje, MM wychodzi w tej samej transakcji. */
     const braki = brakujaceKorekty(database, koszId);
     const queueId = braki.length === 0
       ? zakolejkujMm(database, { id: koszId, kod: k.kod, rodzaj: k.rodzaj }, kto, at)

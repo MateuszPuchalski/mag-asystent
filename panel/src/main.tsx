@@ -45,16 +45,14 @@ import { SzufladaTowaru } from "./towar/Szuflada";
 const klient = nowyKlientZapytan();
 
 /* `korzen` znaczy „to jest strona domowa panelu" i tylko ona dopasowuje się
-   po równości. Do 0.149.0 aktywną zakładkę wybierało wyrażenie
-   `endsWith("skrzynka") ? naSkrzynce : !naSkrzynce` — działało dla DWÓCH
-   zakładek i przy trzeciej podświetlałoby Zadania na ekranie zwrotów.
+   po równości.
 
    `kreska` stawia przed zakładką cienką kreskę: oddziela pracę na sprawach
-   od magazynu, który przyszedł tu z dolnego rzędu (0.538.0). */
+   od magazynu. */
 const ZAKLADKI = [
-  /* DO DECYZJI JEST DOMEM PANELU (0.435.0) — cel biura z §7 w jednym widoku:
+  /* DO DECYZJI JEST DOMEM PANELU — cel biura z §7 w jednym widoku:
      wszystko, co czeka na rozstrzygnięcie biura, z magazynu i z obsługi naraz.
-     Zadania zeszły pod własny adres na koniec rzędu: to praca zlecana hali,
+     Zadania mają własny adres na końcu rzędu: to praca zlecana hali,
      a nie to, od czego biuro zaczyna dzień. */
   /* „DO ZROBIENIA" OD 23 WRZEŚNIA 2026: „Moje" i „Wzmianki" przestały być
      osobnymi zakładkami i stoją sekcjami na tym ekranie — trzy zakładki
@@ -68,10 +66,9 @@ const ZAKLADKI = [
      więc stoi w zakładkach pracy, a nie w menu „Więcej". */
   { do: "/obsluga/pomylki", etykieta: "Pomyłki", ikona: <PackageX size={16} />, korzen: false, kreska: false },
   { do: "/obsluga/zadania", etykieta: "Zadania", ikona: <ClipboardList size={16} />, korzen: false, kreska: false },
-  /* DOSTAWY ZAKŁADKĄ (0.538.0), nie w menu „Więcej". Do 27 września
-     2026 stały w dolnym rzędzie obok wglądu. Przyjęcie dostawy to praca
+  /* DOSTAWY ZAKŁADKĄ, nie w menu „Więcej". Przyjęcie dostawy to praca
      dzienna, a menu jest na rzeczy otwierane kilka razy w miesiącu.
-     KOSZY TU NIE MA od 0.438.0 — decyzją właściciela mieszkają w zakładce
+     KOSZY TU NIE MA — decyzją właściciela mieszkają w zakładce
      Zwroty, bo są dalszym ciągiem zwrotu. Powód przy `zwroty/Przelacznik.tsx`. */
   { do: "/obsluga/dostawy", etykieta: "Dostawy", ikona: <Truck size={16} />, korzen: false, kreska: true },
   /* ZDJĘCIA OBOK DOSTAW: to też praca na kartotece Subiekta, nie na sprawie
@@ -94,10 +91,10 @@ function Licznik({ liczba, opis }: { liczba: number; opis: string }) {
 /* Ta sama zasada co przy wzmiankach: sprawa czekająca na biuro ma być widoczna
    z każdego ekranu, a nie dopiero po wejściu na „Do zrobienia".
 
-   JEDEN LICZNIK NA DWA ŹRÓDŁA (23 września 2026). Wzmianki straciły własną
-   zakładkę, a ich licznik nie mógł zniknąć razem z nią — prośba kolegi ma
-   być widoczna z każdego ekranu. Dochodzi więc do licznika decyzji; „Moje"
-   licznika nie ma i nie miało, bo sprawa prowadzona to nie sprawa czekająca. */
+   JEDEN LICZNIK NA DWA ŹRÓDŁA. Wzmianki nie mają własnej zakładki, a prośba
+   kolegi ma być widoczna z każdego ekranu, więc dochodzi do licznika
+   decyzji. „Moje" licznika nie ma, bo sprawa prowadzona to nie sprawa
+   czekająca. */
 function LicznikDoZrobienia() {
   const decyzje = useDoDecyzji().data?.liczniki.wszystko ?? 0;
   const wzmianki = useWzmianki().data?.nowe ?? 0;
@@ -156,9 +153,7 @@ function PasekBoczny({ wyloguj }: { wyloguj: () => void }) {
           {z.kreska && <span aria-hidden="true" className="mx-1 my-1 h-px bg-white/15" />}
           <Link to={z.do}
             /* Zaznaczenie zakładki jest barwą marki: na ciemnym pasku nie ma
-               ostrzeżeń, z którymi bursztyn mógłby się pomylić. Kolizję
-               z pasmami `bg-amber-50` opisuje ustalenie 02 i dotyczy białych
-               list, nie tego paska.
+               ostrzeżeń, z którymi bursztyn mógłby się pomylić.
 
                bursztyn: zakładka na ciemnym tle jest marką */
             aria-current={aktywna ? "page" : undefined} title={z.etykieta}
@@ -212,7 +207,7 @@ function App() {
   }, []);
   if (!zalogowany) return <Logowanie zalogowano={() => setZalogowany(true)} />;
   /* Druk protokołu rysuje się POZA ramą: to kartka do wydruku, nie ekran
-     pracy, więc bez nagłówka i zakładek (0.435.0). */
+     pracy, więc bez nagłówka i zakładek. */
   return <BramkaRoli wyloguj={wyloguj}>
     <Routes>
       <Route path="/obsluga/druk/protokol/:dokId" element={<Protokol />} />
@@ -221,7 +216,7 @@ function App() {
   </BramkaRoli>;
 }
 
-/* Magazynier dostaje zdanie zamiast pustych kolumn (0.431.0). Dopóki rola
+/* Magazynier dostaje zdanie zamiast pustych kolumn. Dopóki rola
    nie przyjdzie, rama rysuje się normalnie — każda trasa i tak pyta serwer
    o uprawnienia, więc krótka chwila przed odpowiedzią niczego nie odsłania. */
 function BramkaRoli({ wyloguj, children }: { wyloguj: () => void; children: React.ReactNode }) {
@@ -232,16 +227,14 @@ function BramkaRoli({ wyloguj, children }: { wyloguj: () => void; children: Reac
 }
 
 function Rama({ wyloguj }: { wyloguj: () => void }) {
-  /* ── Rama trzyma OKNO (0.165.0) ────────────────────────────────────────────
-     Do 0.164.0 przewijał się dokument, czyli wszystkie kolumny naraz: żeby
-     zobaczyć dół dowodów przy zwrocie, operator zjeżdżał z oczu kolejce
-     i paskowi decyzji. Teraz okno jest zamknięte tutaj, a przewijają się
-     kolumny u siebie — dokładnie jak w makiecie panelu
-     (`docs/projekt-widokow/Main.dc.html`), do której front nigdy nie doszedł.
+  /* ── Rama trzyma OKNO ──────────────────────────────────────────────────────
+     Przewijają się kolumny u siebie, nie dokument: inaczej żeby zobaczyć dół
+     dowodów przy zwrocie, operator zjeżdżałby z oczu kolejce i paskowi
+     decyzji.
 
      `<main>` jest `overflow-hidden`, nie `overflow-y-auto`: ekran, który sam
      zarządza swoimi scrollerami, nie ma dostać drugiego, zewnętrznego. Dwa
-     paski przewijania jeden w drugim byłyby gorsze niż jeden dzisiejszy.
+     paski przewijania jeden w drugim byłyby gorsze niż jeden.
      Ceną jest to, że KAŻDY ekran ma mieć własny scroller.
 
      Blokada zaczyna się dopiero od `lg`. Niżej grid i tak jest jednokolumnowy,
@@ -254,17 +247,10 @@ function Rama({ wyloguj }: { wyloguj: () => void }) {
      stoi bezwarunkowo, bo bez związanej wysokości jest bezczynna: `flex-1`
      rozciąga do treści, a `overflow-hidden` nie ma czego przycinać.
 
-     `h-dvh`, nie `h-screen`, i `lg:min-h-0` kasujące `min-h-screen`: na
-     tablecie w poziomie `100vh` bywa większe niż widoczne okno i strona
-     przewijałaby się o te kilkadziesiąt pikseli — czyli akurat o tyle, żeby
-     blokada wyglądała na zepsutą.
-
-     Wysokość bierze `rama-okna` z `index.css`, NIE `lg:h-dvh` (0.233.0).
-     Powód jest jednozdaniowy: przeglądarka, która nie zna `dvh`, wyrzuca całą
-     deklarację, a `lg:min-h-0` skasowało już `min-h-screen` — ramie nie
-     zostawał żaden limit i przewijał się cały dokument. Klasa niesie `vh`
-     i `dvh` po kolei, czego jedna klasa Tailwinda zapisać nie umie. */
-  /* Szuflada towaru (0.502.0) obejmuje całą ramę: przycisk towaru stoi na
+     Wysokość bierze `rama-okna` z `index.css`, nie żadna jednostka okna
+     (`h-dvh`, `h-screen`); powód stoi przy tej klasie. `lg:min-h-0` kasuje
+     `min-h-screen`, które zostaje dla widoku wąskiego. */
+  /* Szuflada towaru obejmuje całą ramę: przycisk towaru stoi na
      dziewięciu ekranach, a szuflada ma otwierać się nad każdym z nich. */
   return <SzufladaTowaru><div className="rama-okna flex min-h-screen lg:min-h-0 lg:overflow-hidden">
     <PasekBoczny wyloguj={wyloguj} />
@@ -276,11 +262,9 @@ function Rama({ wyloguj }: { wyloguj: () => void }) {
         Pasek braku połączenia stoi NAD nim: awaria jest ważniejsza niż nowość. */}
     <PasekPolaczenia />
     <CoNowego />
-    {/* BEZ `max-w` i bez `mx-auto` (0.198.0). Ogranicznik 1500 px przyszedł
-        z makiety i nikt go nigdy nie uzasadnił w kodzie. Na monitorze 1920
-        oddawał 210 pikseli na margines z każdej strony, na 2560 — po 530,
-        a kolumny stały wąskie: kolejka ucinała nazwy, kontekst dusił zdjęcie
-        i tabelę stanu. Czytelność linijki tekstu pilnuje próg przy samych
+    {/* BEZ `max-w` i bez `mx-auto`: ogranicznik szerokości oddawałby
+        szerokiemu monitorowi setki pikseli na marginesy, a kolumny stałyby
+        wąskie. Czytelność linijki tekstu pilnuje próg przy samych
         wypowiedziach (`Os.tsx`), bo tylko tam jest czego pilnować. */}
     <main className="w-full p-5 lg:min-h-0 lg:flex-1 lg:overflow-hidden">
       <Routes>
@@ -303,7 +287,7 @@ function Rama({ wyloguj }: { wyloguj: () => void }) {
             go nie gubi, a link do sprawy da się wkleić koledze. */}
         <Route path="/obsluga/zwroty" element={<Zwroty />} />
         <Route path="/obsluga/zwroty/:id" element={<Zwroty />} />
-        {/* Kosze pod adresem zwrotów, bo mieszkają w ich zakładce (0.438.0).
+        {/* Kosze pod adresem zwrotów, bo mieszkają w ich zakładce.
             Człon stały `kosze` wygrywa z `:id` — router ocenia dopasowanie
             dokładniejsze wyżej, więc numer zwrotu nie połknie koszy. */}
         <Route path="/obsluga/zwroty/kosze" element={<Kosze />} />
@@ -315,13 +299,12 @@ function Rama({ wyloguj }: { wyloguj: () => void }) {
         <Route path="/obsluga/stan" element={<Stan />} />
         <Route path="/obsluga/dziennik" element={<Dziennik />} />
         <Route path="/obsluga/analiza" element={<Analiza />} />
-        {/* Dawne zakładki „Moje" i „Wzmianki" (do 23 września 2026) są dziś
-            sekcjami ekranu startowego. Adres zapamiętany w przeglądarce trafia
-            tam, zamiast w pusty ekran. */}
+        {/* „Moje" i „Wzmianki" są sekcjami ekranu startowego. Adres zapamiętany
+            w przeglądarce trafia tam, zamiast w pusty ekran. */}
         <Route path="/obsluga/moje" element={<Navigate to="/obsluga/" replace />} />
         <Route path="/obsluga/wzmianki" element={<Navigate to="/obsluga/" replace />} />
-        {/* Profil klienta ma adres po loginie (24 września 2026): link da się
-            wkleić koledze, a szukanie i każda historia prowadzą tu wprost. */}
+        {/* Profil klienta ma adres po loginie: link da się wkleić koledze,
+            a szukanie i każda historia prowadzą tu wprost. */}
         <Route path="/obsluga/klient/:login" element={<ProfilKlienta />} />
         {/* Ustawienia mają własny adres jak każdy ekran: link da się wkleić
             koledze, a odświeżenie strony nie wyrzuca z powrotem do Zadań. */}

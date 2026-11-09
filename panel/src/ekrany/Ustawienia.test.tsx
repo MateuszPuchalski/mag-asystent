@@ -13,16 +13,15 @@ import zrodloWiecej from "../nawigacja/Wiecej.tsx?raw";
 import zrodloStanu from "./Stan.tsx?raw";
 import zrodloAnalizy from "./Analiza.tsx?raw";
 
-/* ── USTAWIENIA w panelu (0.444.0) ─────────────────────────────────────
-   Gwarancje przeniesione z testów widoku ustawień w
-   `server/src/routes/biuro.test.ts` oraz te, które ekran miał wcześniej:
+/* ── USTAWIENIA w panelu ───────────────────────────────────────────────
+   Gwarancje:
 
    1. ZERO ZAPISU PRZY PATRZENIU — także przeniesienie danych firmy
       z przeglądarki stoi za przyciskiem, nie dzieje się przy otwarciu.
    2. Przycisk przeniesienia TYLKO przy pustym serwerze i danych w przeglądarce.
    3. Akcje kont widzi admin; biuro widzi listę bez przycisków.
    4. Żądania bez ciała nie deklarują typu treści (WYLOGUJ WSZĘDZIE, USUŃ
-      LOGO) — strażnik pustego ciała z `biuro.test.ts` przeszedł tu.
+      LOGO).
    5. Reguły strefy: pusty komplet nie wyjeżdża, zapis niesie komplet.
    6. Słownik tagów: wyłączone widać, kasowania nie ma, sufit jest widoczny.
    7. Miary obsługi i stan integracji mieszkają gdzie indziej. */
@@ -162,12 +161,12 @@ describe("Ustawienia w panelu", () => {
     expect(grupy.map((b) => b.querySelector("span")!.textContent))
       .toEqual(["Firma", "Magazyn", "Ludzie i urządzenia", "Obsługa klienta", "Serwer"]);
     expect(grupy[0]).toHaveAttribute("aria-current", "page");
-    /* Zdania o innych ekranach i o dawnym wydaniu zeszły (0.521.0). */
+    /* Bez zdań o innych ekranach. */
     expect(screen.queryByText(/Pomiary obsługi są w Analizie/)).toBeNull();
     expect(screen.queryByText(/0\.87\.0/)).toBeNull();
   });
 
-  /* Pięć grup (0.529.0): przejście przez wszystkie to same odczyty, a każda
+  /* Pięć grup: przejście przez wszystkie to same odczyty, a każda
      karta stoi w grupie, na którą wpływa — decyzje właściciela też. */
   it("przejście przez wszystkie grupy: karty na swoich miejscach, zero zapisu", async () => {
     pokaz();
@@ -227,7 +226,7 @@ describe("Ustawienia w panelu", () => {
   it("zapis danych firmy wysyła komplet sześciu pól", async () => {
     pokaz();
     const k = await waitFor(() => karta("Dane firmy do protokołów"));
-    /* Formularz stoi za „Zmień" (0.521.0) — na wierzchu jest odczyt. */
+    /* Formularz stoi za „Zmień" — na wierzchu jest odczyt. */
     await userEvent.click(await within(k).findByRole("button", { name: "Zmień" }));
     await userEvent.type(within(k).getByRole("textbox", { name: "Miejscowość" }), "Kraków");
     await userEvent.click(within(k).getByRole("button", { name: "Zapisz" }));
@@ -300,8 +299,8 @@ describe("Ustawienia w panelu", () => {
     expect(wyslane).toEqual([]);
   });
 
-  /* Wariant B (0.543.0): nazwa po polsku, wartość, która obowiązuje, słowem.
-     Przy domyślnej stała kreska — liczbę znał tylko `config.ts`. */
+  /* Nazwa po polsku i wartość, która obowiązuje, słowem — także przy
+     domyślnej. */
   it("decyzja właściciela: nazwa, obowiązująca wartość słowem, klucz w dymku", async () => {
     pokaz("/obsluga/ustawienia?grupa=obsluga");
     const k = await waitFor(() => karta("Zwroty i reklamacje"));
@@ -319,7 +318,7 @@ describe("Ustawienia w panelu", () => {
     expect(wyslane).toEqual([]);
   });
 
-  /* Szkice przed pracą (26 września 2026): trzy decyzje właściciela stoją
+  /* Szkice przed pracą: trzy decyzje właściciela stoją
      przy Copilocie, obok sufitów, na które wpływają — z opisem skutku. */
   it("szkice przed pracą: przełącznik, okno i limit w grupie Copilota, zero zapisu", async () => {
     const wiersz = (klucz: string, opis: string, edycja: Record<string, unknown>, nazwa: string,
@@ -424,7 +423,7 @@ describe("Ustawienia w panelu", () => {
   it("nowy kolektor: kod do APK z adresu serwera, nie z paska przeglądarki", async () => {
     pokaz("/obsluga/ustawienia?grupa=ludzie");
     const k = await waitFor(() => karta("Nowy kolektor"));
-    /* Kod stoi za „Pokaż kod" (0.521.0); adres jest na wierzchu od razu. */
+    /* Kod stoi za „Pokaż kod"; adres jest na wierzchu od razu. */
     await userEvent.click(await within(k).findByRole("button", { name: /Pokaż kod/ }));
     expect(await within(k).findByRole("img", { name: "Kod QR: http://192.168.1.49:3001/api/aktualizacja/apk" }))
       .toBeInTheDocument();
@@ -461,7 +460,7 @@ describe("Ustawienia w panelu", () => {
     const linia = (await within(k).findByText(/Automatycznie:/)).closest("p") as HTMLElement;
     expect(linia.textContent).toMatch(/w nocy 3:00–5:00, wydanie starsze niż 6 h\./);
     expect(linia.textContent).toMatch(/0\.494\.0 wymaga działania/);
-    /* Nazwa zmiennej nie stoi w zdaniu (0.521.0) — tylko w dymku. */
+    /* Nazwa zmiennej nie stoi w zdaniu — tylko w dymku. */
     expect(linia.textContent).not.toMatch(/AKTUALIZACJA_AUTO/);
     expect(within(linia).getByTitle("Klucz AKTUALIZACJA_AUTO")).toHaveTextContent("„Serwer i kopie”");
     expect(wyslane).toEqual([]);
@@ -505,7 +504,7 @@ describe("Ustawienia w panelu", () => {
     expect(within(k).getByRole("button", { name: "Zaktualizuj do 0.494.0" })).toBeDisabled();
   });
 
-  /* Pasek postępu (0.504.0): kroki z instalatora, bez procentów z zegara;
+  /* Pasek postępu: kroki z instalatora, bez procentów z zegara;
      w trakcie nie ma formularza, a samo patrzenie nadal niczego nie zapisuje. */
   it("aktualizacja w toku: pasek z krokiem instalatora zamiast formularza", async () => {
     AKTUALIZACJA = { ...AKTUALIZACJA_WZOR, ostatnia: {
@@ -571,7 +570,7 @@ describe("Ustawienia w panelu", () => {
     pokaz("/obsluga/ustawienia?grupa=ludzie");
     await screen.findByText("Jan Wrona");
     const k = karta("Konta i sesje");
-    /* Biuro zakłada magazynierów (0.490.0); reset, wyłączenie i sesje są
+    /* Biuro zakłada magazynierów; reset, wyłączenie i sesje są
        adminowe i ich przyciski dalej nie istnieją. */
     expect(within(k).getAllByRole("button").map((b) => b.textContent)).toEqual(["Dodaj osobę"]);
     expect(within(k).getByText(/Reset hasła, wyłączenie konta i sesje są po stronie administratora/)).toBeInTheDocument();
@@ -633,7 +632,7 @@ describe("Ustawienia w panelu", () => {
     pokaz("/obsluga/ustawienia?grupa=ludzie");
     await screen.findByText("Jan Wrona");
     const wiersz = screen.getByText("Jan Wrona").closest("tr") as HTMLElement;
-    /* Wiersz na wierzchu niesie jeden przycisk, nie trzy (0.521.0). */
+    /* Wiersz na wierzchu niesie jeden przycisk, nie trzy. */
     expect(within(wiersz).getAllByRole("button").map((b) => b.getAttribute("aria-label")))
       .toEqual(["Czynności konta Jan Wrona"]);
     const menu = within(wiersz).getByRole("button", { name: "Czynności konta Jan Wrona" });
@@ -712,7 +711,7 @@ describe("Ustawienia w panelu", () => {
        dwudziestym pierwszym tagu byłaby ścianą w połowie czynności. */
     pokaz("/obsluga/ustawienia?grupa=obsluga");
     await screen.findByText("stary tag");
-    /* Karta tej samej rangi co sąsiednie (0.521.0): nagłówek i przyciski. */
+    /* Karta tej samej rangi co sąsiednie: nagłówek i przyciski. */
     expect(karta("Tagi spraw")).toBeInTheDocument();
     expect(within(karta("Tagi spraw")).getAllByRole("button", { name: "Zmień nazwę" })).toHaveLength(2);
     expect(screen.getByText("wyłączony")).toBeInTheDocument();
@@ -741,7 +740,7 @@ describe("Ustawienia w panelu", () => {
   });
 
   it("zębatka i trasa istnieją — ekran bez drzwi to ekran, którego nie ma", () => {
-    /* Od 0.538.0 drzwi stoją w menu „Więcej" i tam mieszka adres; rama
+    /* Drzwi stoją w menu „Więcej" i tam mieszka adres; rama
        go importuje, więc trasa i link czytają tę samą stałą. */
     expect(zrodloWiecej).toContain('export const USTAWIENIA = "/obsluga/ustawienia"');
     expect(zrodloRamy).toContain('import { USTAWIENIA, Wiecej } from "./nawigacja/Wiecej"');

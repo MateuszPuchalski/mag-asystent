@@ -4,7 +4,7 @@ import {
   _wyczyscObecnosc, przyRozmowie, setTyping, trzymajacy, uchwyty, wejdzDoRozmowy, wyjdzZRozmowy,
 } from "./conversation-realtime.js";
 
-/* ── Uchwyt rozmowy (0.158.0) ────────────────────────────────────────────────
+/* ── Uchwyt rozmowy ──────────────────────────────────────────────────────────
    Cały ten stan żyje w PAMIĘCI i to jest jego istota (§6.3): wejście na ekran
    niczego nie zapisuje, a restart usługi nie zostawia rozmowy zablokowanej
    przez agenta, który wyszedł z pracy w czwartek. Testy podają czas ręcznie,

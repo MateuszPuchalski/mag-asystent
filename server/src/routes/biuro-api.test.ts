@@ -5,7 +5,7 @@ import os from "node:os";
 import path from "node:path";
 import type { FastifyInstance } from "fastify";
 
-/* ── Trasy biura po zniknięciu strony `/biuro` (0.446.0) ──────────────────
+/* ── Trasy biura po zniknięciu strony `/biuro` ──────────────────
    Do 0.446.0 te testy stały w `biuro.test.ts` obok strażników struktury
    `biuro.html`. Strona zniknęła, a strażnicy struktury razem z nią — ich
    gwarancje przejęły testy ekranów panelu, każda nazwana w tamtym pliku
@@ -60,10 +60,8 @@ test("stare adresy biura prowadzą do panelu, tymczasowo", async () => {
 });
 
 test("strona biura nie wraca, a build nie kopiuje jej katalogu", () => {
-  /* Blizna z 0.420.1: build kopiował do `dist/web` pliki wymienione z nazwy
-     i jeden zapomniany plik położył usługę przy starcie. Od 0.446.0
-     `src/web` nie istnieje wcale — `cpSync` na nim rzuciłby przy KAŻDYM
-     buildzie, więc build go nie woła. Panel jedzie do `dist/web/obsluga`. */
+  /* `src/web` nie istnieje — `cpSync` na nim rzuciłby przy KAŻDYM buildzie,
+     więc build go nie woła. Panel jedzie do `dist/web/obsluga`. */
   const web = path.resolve(import.meta.dirname, "../web");
   assert.ok(!fs.existsSync(path.join(web, "biuro.html")), "biuro.html wrócił");
   const pkg = JSON.parse(fs.readFileSync(new URL("../../package.json", import.meta.url), "utf8")) as
@@ -74,13 +72,6 @@ test("strona biura nie wraca, a build nie kopiuje jej katalogu", () => {
   assert.doesNotMatch(trasy, /readFileSync/, "trasy biura nie czytają już plików przy starcie");
 });
 
-test("trasa /sw.js wyszła razem z pogrzebem starej PWA", async () => {
-  // jednorazowe sprzątanie po PWA z 0.3.0 skończyło się w 0.26.0
-  const r = await app.inject({ method: "GET", url: "/sw.js" });
-  assert.equal(r.statusCode, 404);
-});
-
-
 test("dane strony zostają za bramką sesji", async () => {
   // dokładnie trasy, z których strona czyta — regresja w którejkolwiek
   // otworzyłaby dane magazynu każdemu w LAN
@@ -90,7 +81,7 @@ test("dane strony zostają za bramką sesji", async () => {
     "/api/delivery/1/problems",
     "/api/delivery/1/problems.csv",
     "/api/problems/1/photo",
-    /* Zakładka STAN SYSTEMU i DZIENNIK (0.27.0). Metryki i kolejka mówią, ile
+    /* Zakładka STAN SYSTEMU i DZIENNIK. Metryki i kolejka mówią, ile
        kto zeskanował i co się nie zapisało, a ślad audytowy mówi to imiennie —
        więc bramka obejmuje je tak samo jak dostawy. */
     "/api/metrics",
@@ -101,11 +92,11 @@ test("dane strony zostają za bramką sesji", async () => {
     "/api/events/csv",
     "/api/analiza",
     "/api/analiza/csv",
-    // Pozycje dokumentu (0.36.0) — mówią, co przyjechało, po ile i gdzie leży.
+    // Pozycje dokumentu — mówią, co przyjechało, po ile i gdzie leży.
     "/api/biuro/dokument/1",
-    // Dostawy zdjęte z listy pracy (0.40.0) — niosą nazwiska i powody.
+    // Dostawy zdjęte z listy pracy — niosą nazwiska i powody.
     "/api/biuro/zamkniete-poza",
-    // Archiwum dostaw (0.235.0) — historia z nazwiskami i adresami półek.
+    // Archiwum dostaw — historia z nazwiskami i adresami półek.
     "/api/biuro/dostawy/archiwum",
   ]) {
     const r = await app.inject({ method: "GET", url });
@@ -134,7 +125,7 @@ test("strona czyta stan serwera bez sesji — i tylko to", async () => {
   const h = r.json();
   assert.ok(typeof h.wersja === "string");
   assert.ok("worker" in h);
-  /* Stan Allegro dla ikony w pasku (0.114.0). Publicznie wolno mu nieść
+  /* Stan Allegro dla ikony w pasku. Publicznie wolno mu nieść
      TYLKO stan, środowisko i datę wygaśnięcia — nigdy login ani token. */
   assert.ok(typeof h.allegro?.stan === "string");
   assert.deepEqual(
@@ -195,9 +186,8 @@ test("pusty powód odpada na trasie, a nie dopiero w bazie", async () => {
 
 
 test("dostawa spoza okna importu daje się otworzyć z panelu (0.235.0)", async () => {
-  /* Sedno całej zmiany po stronie trasy. Do 0.235.0 podgląd zaczynał się od
-     read-modelu i kończył na 404 — a 404 wygląda w panelu identycznie jak
-     dokument, którego nigdy nie było. */
+  /* Podgląd nie kończy się na 404 z read-modelu, bo 404 wygląda w panelu
+     identycznie jak dokument, którego nigdy nie było. */
   const DOK = 91_235;
   const d = db();
   const id = Number(
@@ -239,22 +229,15 @@ test("dostawa spoza okna importu daje się otworzyć z panelu (0.235.0)", async 
 
 
 test("raport per osoba jedzie z podstawą prawną — nigdy bez niej", () => {
-  /* ODWRÓCENIE decyzji z 0.27.0, na polecenie właściciela (8.08.2026, wpis
-     0.48.0 w CHANGELOG). Do 0.47.x ten test pilnował, żeby strona raportu
-     wydajności NIE miała — monitoring pracowniczy (Kodeks pracy art. 22²)
-     wymaga zapisu w regulaminie i uprzedzenia załogi, a przycisk obok metryk
-     robiłby z obowiązku formalnego przypadek.
-
-     Właściciel został o tym uprzedzony i świadomie zdecydował inaczej. Test
+  /* Monitoring pracowniczy (Kodeks pracy art. 22²) wymaga zapisu
+     w regulaminie i uprzedzenia załogi. Właściciel świadomie zdecydował
+     o sekcji imiennej (CHANGELOG). Test
      pilnuje więc tego, co przy tej decyzji pozostaje niezbywalne: sekcja
      imienna istnieje RAZEM z miejscem na podstawę prawną, którą serwer
      wysyła w odpowiedzi. Zniknięcie któregokolwiek z tych elementów to
      regresja prawna, nie kosmetyczna.
 
-     Od 0.440.0 sekcja mieszka w analizie PANELU i test czyta tamto źródło.
-     Gwarancja przeszła razem z widokiem, a nie została w pliku, z którego
-     widok zniknął — zielony test nad pustym miejscem niczego by nie pilnował.
-     Zachowanie (karta z podstawą dla admina, brak karty dla roli biuro)
+     Sekcja mieszka w analizie PANELU i test czyta tamto źródło. Zachowanie (karta z podstawą dla admina, brak karty dla roli biuro)
      sprawdza `panel/src/ekrany/Analiza.test.tsx`. */
   const zrodlo = fs.readFileSync(
     path.resolve(import.meta.dirname, "../../../panel/src/analiza/ZakresHali.tsx"),
@@ -267,10 +250,9 @@ test("raport per osoba jedzie z podstawą prawną — nigdy bez niej", () => {
 
 
 test("filtr stoi w pasku wtedy i tylko wtedy, gdy rządzi całą zakładką", () => {
-  /* Od 0.94.0 reguła wglądu brzmi: PASEK NAD KARTAMI OBIECUJE, ŻE RZĄDZI
-     CAŁYM WIDOKIEM. Dziennik i analiza (0.440.0) oraz stan systemu
-     (0.441.0) przeszły do panelu i reguła przeszła z nimi — ten test
-     czyta teraz ich źródła.
+  /* Reguła wglądu: PASEK NAD KARTAMI OBIECUJE, ŻE RZĄDZI CAŁYM WIDOKIEM.
+     Dziennik, analiza i stan systemu mieszkają w panelu, więc test czyta ich
+     źródła.
 
      Przy stanie systemu pasek byłby kłamstwem: kolejka zapisów, kolizje kodów
      i serwer mówią o TERAZ i żaden zakres dni ich nie rusza. Jedyne okno
@@ -322,7 +304,7 @@ test("panel naprawia, nie tylko patrzy: kolejka, ratunek serwera, konta (0.111.0
   assert.match(konta, /useWylogujWszedzie/, "zgubiony kolektor ma swój przycisk");
   assert.match(konta, /useResetHasla/, "reset hasła zszedł z curl na przycisk");
   assert.match(konta, /type="password"/, "nowe hasło wpisuje się w pole maskowane, nie w prompt()");
-  /* Dziennik przeszedł do panelu (0.440.0) razem z filtrem osoby. */
+  /* Dziennik przeszedł do panelu razem z filtrem osoby. */
   const dziennik = fs.readFileSync(
     path.resolve(import.meta.dirname, "../../../panel/src/ekrany/Dziennik.tsx"), "utf8");
   assert.match(dziennik, /zmien\("userRef"/, "dziennik filtruje po osobie, nie tylko urządzeniu");
@@ -330,7 +312,7 @@ test("panel naprawia, nie tylko patrzy: kolejka, ratunek serwera, konta (0.111.0
 
 
 test("awaria najmłodszej tabeli nie wywraca dwóch starszych (0.364.0)", () => {
-  /* Blizna z 0.361.0: `.catch` stał za `.json()`, a `api()` rzuca przy każdej
+  /* `.catch` za `.json()` nie łapie niczego, bo `api()` rzuca przy każdej
      odpowiedzi spoza 2xx — czyli PRZED `.json()`. Zabezpieczenie nie łapało
      niczego, co naprawdę pada, i 500 z najmłodszej trasy zabierało z ekranu
      metryki oraz kolizje kodów, bo trzy tabele czytał JEDEN `Promise.all`.
@@ -348,7 +330,7 @@ test("awaria najmłodszej tabeli nie wywraca dwóch starszych (0.364.0)", () => 
 
 
 test("STAN SYSTEMU zaczyna od tego, co czeka na biuro (0.427.0)", () => {
-  /* Od 0.441.0 stan systemu stoi w panelu (`ekrany/Stan.tsx`) i test czyta
+  /* Stan systemu stoi w panelu (`ekrany/Stan.tsx`) i test czyta
      tamtą kolejność kart. Najpierw rzeczy, które czekają na ruch biura, potem
      rzeczy do czytania. Powód każdego przestawienia stoi w komentarzu ekranu. */
   const stan = fs.readFileSync(path.resolve(import.meta.dirname, "../../../panel/src/ekrany/Stan.tsx"), "utf8");

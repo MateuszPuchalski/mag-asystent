@@ -9,7 +9,7 @@ process.env.DB_PATH = path.join(fs.mkdtempSync(path.join(os.tmpdir(), "wertis-de
 process.env.LOG_LEVEL = "silent";
 process.env.SGT_MODE = "seeded";
 
-/* ── Telemetria urządzenia: lista dozwolonych typów (0.326.0) ────────────────
+/* ── Telemetria urządzenia: lista dozwolonych typów ────────────────
    `POST /api/device/event` przepuszcza WYŁĄCZNIE typy z listy — inaczej byłby
    otwartym wpisem do dziennika audytowego z dowolnego kolektora w sieci.
 
@@ -104,7 +104,7 @@ test("żądanie bez typu też odpada", async () => {
 });
 
 test("typy sprzed tej zmiany dalej przechodzą", async () => {
-  /* Lista rośnie, nie podmienia się: upadki urządzeń jadą tą drogą od 0.31.0. */
+  /* Lista rośnie, nie podmienia się: upadki urządzeń jadą tą drogą. */
   for (const type of ["device_drop", "battery_low", "scan_timing"]) {
     assert.equal((await wyslij({ type, ms: 120 })).statusCode, 200, type);
   }

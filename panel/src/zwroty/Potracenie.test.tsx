@@ -1,13 +1,11 @@
-import React from "react";
 import { describe, expect, it, vi } from "vitest";
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { Potracenie, naGrosze } from "./Potracenie";
 import type { PozycjaZwrotu } from "../api/typy";
 
-/* ── Potrącenie za utratę wartości (0.170.0) ─────────────────────────────────
-   Do 0.169.0 kwota była binarna per pozycja: cała cena albo nic. Te testy
-   pilnują dwóch rzeczy naraz — że da się oddać mniej, i że nie da się oddać
+/* ── Potrącenie za utratę wartości ───────────────────────────────────────────
+   Kwota per pozycja nie jest binarna. Te testy pilnują dwóch rzeczy naraz — że da się oddać mniej, i że nie da się oddać
    liczby bez uzasadnienia ani większej niż wart jest towar. */
 
 const POZYCJA = (n: Partial<PozycjaZwrotu> = {}): PozycjaZwrotu => ({

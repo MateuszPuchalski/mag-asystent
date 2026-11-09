@@ -18,7 +18,7 @@ import type { DeliveryDocument } from "../types.js";
    Odpowiedź leży w naszych własnych tabelach. `delivery` i `delivery_line`
    trzymają numer, dostawcę, datę dokumentu, każdą pozycję, adres faktyczny
    i nazwisko odkładającego — i NIGDY nie są czyszczone. Analiza dostaw
-   (`analizaDostaw`) czyta stamtąd od dawna okna 30/90/180 dni. Ten serwis
+   (`analizaDostaw`) czyta stamtąd okna 30/90/180 dni. Ten serwis
    robi to samo dla listy.
 
    Granicą archiwum jest NIEOBECNOŚĆ w read-modelu, a nie liczba dni. Dzięki

@@ -4,7 +4,7 @@ import fs from "node:fs";
 import { DatabaseSync } from "node:sqlite";
 import { migrate } from "./db.js";
 
-/* ── Szablony odpowiedzi odeszły (22 września 2026) ──────────────────────────
+/* ── Szablony odpowiedzi odeszły ──────────────────────────
    Decyzja właściciela. Szkic Copilota czeka przy każdej wiadomości klienta
    i niesie te same zdania razem z faktami, więc szablon był drugą drogą do
    tego samego pola edytora.

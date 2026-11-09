@@ -8,7 +8,7 @@ import {
   zapiszPrzelew, zwrocPieniadze, ZwrotPieniedzyConflict,
 } from "./zwrot-pieniedzy.js";
 
-/* ── Zwrot pieniędzy i odmowa w Allegro (0.190.0) ────────────────────────────
+/* ── Zwrot pieniędzy i odmowa w Allegro ──────────────────────────────────────
    To jest PIERWSZE miejsce, z którego ten system rusza cudze pieniądze.
    Testy pilnują więc nie kształtu ekranu, tylko czterech rzeczy, po których
    poznaje się, że wolno to wypuścić:
@@ -81,8 +81,8 @@ test("żądanie ma cztery pola wymagane przez schemat i kwotę z serwera", async
   assert.match(String(c.commandId), /^[0-9a-f-]{36}$/);
   /* Dostawa idzie w złotych, bo tak żąda `Price`, a grosze trzyma baza. */
   assert.deepEqual(c.delivery, { value: { amount: "14.99", currency: "PLN" } });
-  /* Pozycja zamówienia z ZAZNACZENIA. Do 15 września 2026 tego pola nie było
-     i kwota z ekranu nie docierała do Allegro. */
+  /* Pozycja zamówienia z ZAZNACZENIA — bez niej kwota z ekranu nie dociera
+     do Allegro. */
   assert.deepEqual(c.lineItems, [{ id: "li-1", type: "QUANTITY", quantity: 1 }]);
 });
 
@@ -113,8 +113,7 @@ test("potrącenie idzie kwotą wprost — QUANTITY oddałoby pełną cenę", asy
 });
 
 test("powód potrącenia jedzie do klienta w sellerComment (0.476.0)", async () => {
-  /* Formularz potrącenia obiecywał „to jego treść zobaczy klient", a do
-     przeglądu zwrotów z 23 września powód nie wychodził z panelu wcale. */
+  /* Formularz potrącenia obiecuje „to jego treść zobaczy klient". */
   const d = stanowisko();
   const id = zwrotGotowy(d, { kwota: 3999 + 1499 });
   d.prepare(`UPDATE zwrot_klienta_pozycja SET potracenie_grosze=1000, potracenie_powod='rysa na ostrzu'
@@ -251,9 +250,7 @@ test("udany zwrot zapisuje numer, zdarzenie i podnosi wersję", async () => {
 });
 
 test("ekran czyta zapisany przelew i mówi, czy ALLEGRO go potwierdziło", async () => {
-  /* Do 0.209.0 stały tu trzy `null`-e mimo wypełnionych kolumn: ekran nie
-     wiedział ani kiedy przelew poszedł, ani co Allegro na niego odpowiedziało.
-     Potwierdzeniem jest `CustomerReturn.status`, bo `GET` po identyfikatorze
+  /* Potwierdzeniem jest `CustomerReturn.status`, bo `GET` po identyfikatorze
      zwrotu płatności w specyfikacji nie istnieje. */
   const d = stanowisko();
   const id = zwrotGotowy(d);
@@ -339,7 +336,7 @@ test("kod spoza schematu jest odrzucany u nas, nie w Allegro", async () => {
   await assert.rejects(
     () => odmowZwrotuPieniedzy(d, id, "WYMYSLONY", null, 1, KTO, async () => null),
     /Nieznany kod/);
-  /* Siedem kodów ze schematu — nie cztery, jak mówił opis do 0.190.0. */
+  /* Siedem kodów ze schematu. */
   assert.equal(KODY_ODMOWY.length, 7);
 });
 
@@ -391,10 +388,10 @@ test("odmowa złożona w panelu Allegro zamyka odmowę i wypłatę jak nasza —
   assert.equal(s.moznaZapisacPrzelew, true, "notatka o przelewie poza Allegro zostaje otwarta");
 });
 
-/* ── Ślad po przelewie oddanym poza Allegro (0.269.0) ────────────────────────
+/* ── Ślad po przelewie oddanym poza Allegro ──────────────────────────────────
    Przy pobraniu Allegro nigdy nie trzymało tych pieniędzy, więc trasa zwrotu
-   jest zamknięta z definicji. Do 0.268.0 zwrot zamykał się korektą BEZ ŚLADU
-   po wypłacie — klient bez pieniędzy wyglądał tak samo jak rozliczony.     */
+   jest zamknięta z definicji. Bez śladu klient bez pieniędzy wygląda tak samo
+   jak rozliczony.                                                          */
 
 test("pobranie: zapis przelewu zostawia ślad, oś i podniesioną wersję", () => {
   const d = stanowisko();
@@ -477,7 +474,7 @@ test("zamknięty zwrot NIE blokuje zapisu — przelew idzie zwykle po korekcie",
   assert.ok(zapiszPrzelew(d, id, 1, KTO, null).kiedy);
 });
 
-/* ── Zamknięcie a pieniądze (audyt zwrotów, 15 września 2026) ───────────────
+/* ── Zamknięcie a pieniądze (audyt zwrotów) ─────────────────────────────────
    Biuro wystawia korektę zwykle PRZED przelewem. Korekta zamyka zwrot, a do
    tego wydania zamknięty zwrot chował ODDAJ PIENIĄDZE — na nagraniu z pracy
    przelew szedł więc w Sales Center, obok gotowego przycisku.               */
@@ -493,7 +490,7 @@ test("korekta zamyka zwrot, ale NIE drogę do oddania pieniędzy", async () => {
 });
 
 test("zwrot rozliczony przez Allegro nie proponuje drugiego przelewu", () => {
-  /* Zatrzask z 0.345.0: wskaźnik idzie dalej osią czasu, rozliczenie zostaje. */
+  /* Zatrzask: wskaźnik idzie dalej osią czasu, rozliczenie zostaje. */
   const d = stanowisko();
   const id = zwrotGotowy(d);
   d.prepare(`UPDATE zwrot_klienta SET rozliczony_allegro_at='2026-09-10T08:00:00Z',

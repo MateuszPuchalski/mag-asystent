@@ -35,7 +35,7 @@ before(async () => {
 
 beforeEach(() => {
   const d = db();
-  /* `klient_prowadzenie` pierwszy (0.536.0): odmowa z kodem dosyłki zakłada
+  /* `klient_prowadzenie` pierwszy: odmowa z kodem dosyłki zakłada
      sprawę klienta, a jej prowadzący to klucz obcy do `app_user` bez kaskady.
      Kaskada zabiera przy okazji `klient_dosylka`. */
   for (const t of ["klient_prowadzenie", "zwrot_zdarzenie", "zwrot_skladnik_outlet", "zwrot_klienta_pozycja", "zwrot_klienta", "allegro_zwrot",
@@ -50,7 +50,7 @@ beforeEach(() => {
   zwrot = Number(d.prepare(`INSERT INTO zwrot_klienta(channel_account_id,external_id,
     reference_number,order_id,created_at,paczka_at,synced_at)
     VALUES (?,'zw-1','REF-1','ord-1',?,'2026-08-28T09:00:00Z','2026-09-01T09:00:00Z')`)
-    /* Zgłoszenie WCZORAJ, nie stała data (0.452.0): zwrot bez decyzji
+    /* Zgłoszenie WCZORAJ, nie stała data: zwrot bez decyzji
        starszy niż `ZWROT_WYGASA_DNI` wychodzi z kolejki, a te testy pytają
        o kolejkę, nie o wiek. Stała data zamieniłaby je w bombę zegarową. */
     .run(konto, new Date(Date.now() - 86_400_000).toISOString()).lastInsertRowid);
@@ -80,35 +80,35 @@ const TRASY = () => [
   { method: "POST" as const, url: "/api/obsluga/zwroty/pozycje/1/rabat" },
   { method: "POST" as const, url: "/api/obsluga/zwroty/skan" },
   { method: "POST" as const, url: "/api/obsluga/zwroty/skan/dociagnij" },
-  /* Zapisy do Allegro (0.190.0). Wchodzą do tej listy jak każda inna trasa:
+  /* Zapisy do Allegro. Wchodzą do tej listy jak każda inna trasa:
      bramka roli stoi przed uprawnieniem, więc hala nie zobaczy nawet powodu
      odmowy uprzywilejowanej. */
   { method: "POST" as const, url: `/api/obsluga/zwroty/${zwrot}/pieniadze` },
   { method: "POST" as const, url: `/api/obsluga/zwroty/${zwrot}/odmowa-platnosci` },
-  /* Notatka i rozjazdy (0.313.0). Rozjazdy są ODCZYTEM, a mimo to stoją tu
+  /* Notatka i rozjazdy. Rozjazdy są ODCZYTEM, a mimo to stoją tu
      razem z zapisami: niosą kody koszy i numery zwrotów po terminie, czyli
      pracę biura, nie halę. */
   { method: "POST" as const, url: `/api/obsluga/zwroty/${zwrot}/notatka` },
   { method: "POST" as const, url: `/api/obsluga/zwroty/${zwrot}/notatka/cofnij` },
   { method: "GET" as const, url: "/api/obsluga/zwroty/rozjazdy" },
-  /* PROWADZĄCEGO, TAGÓW I EKSPORTU CSV TU JUŻ NIE MA (0.370.0) — właściciel
+  /* PROWADZĄCEGO, TAGÓW I EKSPORTU CSV TU JUŻ NIE MA — właściciel
      wskazał je wprost jako niepotrzebne przy zwrotach. Reklamacje
      mają jedno i drugie dalej, z własnymi bramkami. */
-  /* Paczki klienta (0.367.0) — ODCZYT, ale POST-em, bo uchwytem bywa nazwisko
+  /* Paczki klienta — ODCZYT, ale POST-em, bo uchwytem bywa nazwisko
      z naklejki, a adres ląduje w logu żądań. Bramka roli ta sama: to lista
      cudzych zakupów, czyli praca biura. */
   { method: "POST" as const, url: "/api/obsluga/zwroty/paczki-klienta" },
-  /* Zamówienia kupującego z Allegro (0.450.0) — zapisuje i kosztuje
+  /* Zamówienia kupującego z Allegro — zapisuje i kosztuje
      żądanie do Allegro, więc bramka roli stoi tak samo jak przy odczycie. */
   { method: "POST" as const, url: "/api/obsluga/zwroty/paczki-klienta/allegro" },
-  /* Wypuszczenie MM mimo brakujących korekt (0.368.0). Wyjście awaryjne obok
+  /* Wypuszczenie MM mimo brakujących korekt. Wyjście awaryjne obok
      bramki z 0.200.0 — hala nie ma prawa go nawet zobaczyć, bo decyzję bierze
      na siebie człowiek przy biurku. */
   { method: "POST" as const, url: "/api/obsluga/zwroty/kosz/mm-mimo-korekt" },
-  /* Przyjęcie paczki nieodebranej (0.493.0) zakłada zwrot, czyli przyszłe
+  /* Przyjęcie paczki nieodebranej zakłada zwrot, czyli przyszłe
      pieniądze do oddania. Decyzja biura, nie hali. */
   { method: "POST" as const, url: "/api/obsluga/zwroty/przyjmij-nieodebrana" },
-  /* „Śledź dosyłkę” (0.536.0) zakłada krok w sprawie klienta — praca biura. */
+  /* „Śledź dosyłkę” zakłada krok w sprawie klienta — praca biura. */
   { method: "POST" as const, url: `/api/obsluga/zwroty/${zwrot}/dosylka` },
   /* Składnik kompletu na outlet — przesunięcie towaru, praca biura. */
   { method: "POST" as const, url: "/api/obsluga/zwroty/pozycje/1/skladnik/outlet" },
@@ -165,7 +165,7 @@ test("zwrot spoza bazy to 404, nie pusty obiekt", async () => {
 });
 
 test("otwarcie kolejki nie zapisuje NICZEGO", async () => {
-  /* Umowa z 0.18.0. Liczymy wiersze we WSZYSTKICH tabelach, których ten
+  /* Umowa „zero zapisu przy patrzeniu”. Liczymy wiersze we WSZYSTKICH tabelach, których ten
      ekran dotyka — nie tylko w dzienniku, bo zapis potrafi wylądować obok. */
   const { naglowki } = login("biuro", "Ala trzecia");
   const licz = () => {
@@ -290,29 +290,29 @@ test("zwroty mają czterdzieści dwie trasy POST, każda z uzasadnieniem", async
      `method:` po źródle `biuro.html`. */
   const zrodlo = fs.readFileSync(new URL("./zwroty.ts", import.meta.url), "utf8");
   const posty = zrodlo.match(/app\.post[<(]/g) ?? [];
-  /* Dwudziesta trzecia i czwarta (0.269.0): zapis przelewu oddanego poza
+  /* Dwudziesta trzecia i czwarta: zapis przelewu oddanego poza
      Allegro i jego cofnięcie. Przy pobraniu to JEDYNY ślad po wypłacie —
      Allegro tych pieniędzy nie trzymało, więc trasa `pieniadze` jest tam
      zamknięta z definicji, a zwrot zamykał się bez dowodu, że oddaliśmy. */
-  /* Dwudziesta piąta i szósta (0.313.0): notatka biura i cofnięcie jej zmiany.
+  /* Dwudziesta piąta i szósta: notatka biura i cofnięcie jej zmiany.
      Kolumna `notatka` stała w bazie od 0.172.0, ale wypełniała ją wyłącznie
      rejestracja paczki nieodebranej — przy zwrocie z Allegro nie było jak
      zapisać ustalenia, więc wracało ono do panelu Allegro albo do niczyjej
      pamięci. Druga trasa jest z §25a.5: notatkę nadpisuje ten, kto pisze
      ostatni, a skasowane zdanie musi mieć drogę powrotną. */
-  /* Dwudziesta siódma (0.315.0): znacznik „biorę to". JEDNA trasa na wzięcie
+  /* Dwudziesta siódma: znacznik „biorę to". JEDNA trasa na wzięcie
      i oddanie, bo to przełącznik — druga kazałaby panelowi wiedzieć, czyj jest
      znacznik, zanim kliknie. Trasy TAGÓW tego licznika nie ruszają: rejestruje
      je `trasyTagowSprawy` z `routes/tagi.ts`, wspólnie dla trzech ekranów. */
-  /* Dwudziesta ósma (0.335.0): ptaszek przy składniku kompletu. JEDNA trasa
+  /* Dwudziesta ósma: ptaszek przy składniku kompletu. JEDNA trasa
      na oba kierunki, bo to przełącznik — ciało niesie stan docelowy, nie
      czynność. Dokładania pozycji dalej nie ma i to się NIE zmieniło: ptaszek
      rusza wiersz kompletu, który ocena „na stan" już do koszyka włożyła. */
-  /* Dwudziesta dziewiąta (0.336.0): ręczne wskazanie składu kompletu. Automat
+  /* Dwudziesta dziewiąta: ręczne wskazanie składu kompletu. Automat
      odsyłał do tej drogi zdaniem „wskaż skład ręcznie", a drogi nie było —
      odejmowanie z paragonu wymaga kartoteki przy KAŻDEJ pozostałej ofercie
      zamówienia, a te wypełniają się dopiero przy zwrocie tamtej oferty. */
-  /* Trzydziesta i pierwsza (0.365.0): towar dołożony do koszyka ręką i jego
+  /* Trzydziesta i pierwsza: towar dołożony do koszyka ręką i jego
      zdjęcie. Decyzja właściciela: „dodaj możliwość dodawania produktów do
      koszyka zwrotowego poprzez zeskanowanie produktu lub wybranie go
      z kartoteki" — i zaraz potem „tylko z poziomu obsługi zwrotów, jak
@@ -326,18 +326,16 @@ test("zwroty mają czterdzieści dwie trasy POST, każda z uzasadnieniem", async
      Druga trasa jest ceną pierwszej: skan bywa pomyłką, a wiersz bez zwrotu
      nie ma oceny, którą dałoby się cofnąć. Bez niej jedynym wyjściem byłoby
      zamknięcie pudła z cudzym towarem w środku. */
-  /* Trzydziesta druga (0.367.0): paczki klienta. Trasa ISTNIAŁA od 0.365.0
-     i była GET-em — licznik jej nie widział, bo umowa liczy `app.post`.
-     Zmieniła metodę, nie pracę: dalej NIC NIE ZAPISUJE.
+  /* Trzydziesta druga: paczki klienta. POST, choć NIC NIE ZAPISUJE.
 
-     Powód jest ten sam co przy `/skan` z 0.163.0: uchwyt jechał w adresie
-     (`?login=`), a od tego wydania bywa nim nazwisko z naklejki. Adres ląduje
+     Powód jest ten sam co przy `/skan`: uchwytem bywa nazwisko z naklejki,
+     a adres ląduje
      w logu żądań serwera, więc dana osobowa pojechałaby do pliku, którego
      polityka zwrotów nie obejmuje. Ciało żądania do loga nie wchodzi.
 
      Licznik rośnie o jeden, a zapisów nie przybywa ani jeden — i to jest cała
      treść tego zdania w uzasadnieniu. */
-  /* Trzydziesta trzecia (0.368.0): wypuszczenie MM koszyka MIMO brakujących
+  /* Trzydziesta trzecia: wypuszczenie MM koszyka MIMO brakujących
      korekt. Decyzja właściciela: „dodaj opcję sforsowania zamknięcia koszyka,
      nawet jeśli nie ma wszystkich ZW". Osobna trasa, nie flaga przy `zamknij`:
      flagę łatwo ustawić przez pomyłkę i nie widać jej ani w tej liście, ani
@@ -349,7 +347,7 @@ test("zwroty mają czterdzieści dwie trasy POST, każda z uzasadnieniem", async
      Znika `/prowadzi`. Trasy tagów tego licznika nigdy nie ruszały (rejestruje
      je `trasyTagowSprawy`), a eksport CSV był GET-em — obie rzeczy schodzą
      razem z prowadzącym, ale nie tutaj widać ich odejście. */
-  /* Trzydziesta trzecia (0.375.0): meldunek „ta sztuka stoi już na regale
+  /* Trzydziesta trzecia: meldunek „ta sztuka stoi już na regale
      outletowym". Licznik rośnie o jeden, a do Subiekta nie idzie NIC — trasa
      stawia znacznik w naszej bazie i tyle. Outlet obsługuje dziś ręka
      (decyzja właściciela, 16 września 2026), więc dokumentu nie ma skąd wziąć.
@@ -358,7 +356,7 @@ test("zwroty mają czterdzieści dwie trasy POST, każda z uzasadnieniem", async
      znacznik „outlet" byłby ślepym zaułkiem, za który 0.209.0 zdjęło
      „przecenę" — a lista czekających bez sposobu na jej domknięcie rosłaby
      w nieskończoność. */
-  /* Trzydziesta czwarta i piąta (0.378.0): założenie koszyka WPROST i porzucenie
+  /* Trzydziesta czwarta i piąta: założenie koszyka WPROST i porzucenie
      pustego. Zgłoszenie właściciela: „potrzebuję tworzenia koszy zwrotowych
      i dodawania produktów do nich jako oddzielna opcja". Do tego wydania koszyk
      powstawał wyłącznie jako skutek uboczny pierwszego dołożenia.
@@ -367,7 +365,7 @@ test("zwroty mają czterdzieści dwie trasy POST, każda z uzasadnieniem", async
      koszyk staje się dokumentem dopiero przy zamknięciu, a porzucenie dotyczy
      wyłącznie pustego. Druga trasa jest warunkiem pierwszej — bez niej NOWY
      KOSZYK byłby drogą w jedną stronę, bo pustego kosza nie da się zamknąć. */
-  /* Trzydziesta szósta (0.450.0): zamówienia kupującego prosto z Allegro,
+  /* Trzydziesta szósta: zamówienia kupującego prosto z Allegro,
      po loginie. Zgłoszenie właściciela: paczki nieodebrane biuro szukało na
      stronie Allegro, bo nasza baza zna tylko zamówienia, do których prowadzi
      zwrot, wiadomość albo reklamacja — a przy takiej paczce nie prowadzi nic.
@@ -376,16 +374,14 @@ test("zwroty mają czterdzieści dwie trasy POST, każda z uzasadnieniem", async
      i panel odpytuje ją `useQuery`, więc potrafi wrócić sama przy odświeżeniu
      okna. Ta zapisuje zamówienia i kosztuje żądanie do Allegro, więc idzie
      wyłącznie z ręki operatora. Pieniędzy ani dokumentów nie rusza. */
-  /* LICZNIK SCHODZI O JEDEN W 0.451.0 — drugi raz w historii tej umowy.
-     Odchodzi DWUNASTA, rejestracja paczki nieodebranej. Decyzja właściciela:
-     „usuń opcję rejestracji paczki — ja tylko wyszukuję ją w Allegro", a potem
-     „usuń też trasę rejestracji z serwera". Zwroty zarejestrowane wcześniej
-     zostają w kolejce; nowych ta aplikacja już nie zakłada. */
-  /* Trzydziesta szósta (0.493.0): przyjęcie paczki nieodebranej jednym
+  /* Rejestracji paczki nieodebranej nie ma (decyzja właściciela: „ja tylko
+     wyszukuję ją w Allegro"). Zwroty zarejestrowane wcześniej zostają
+     w kolejce. */
+  /* Trzydziesta szósta: przyjęcie paczki nieodebranej jednym
      kliknięciem przy zamówieniu z wyniku szukania. Nowa decyzja właściciela,
      po pytaniu „jak procesujemy paczki nieodebrane". Formularz z 0.451.0 nie
      wraca: trasa niczego nie pyta, bierze zamówienie wskazane przez biuro. */
-  /* Trzydziesta siódma (0.536.0): „Śledź dosyłkę” przy zwrocie. Odmowa
+  /* Trzydziesta siódma: „Śledź dosyłkę” przy zwrocie. Odmowa
      z kodem dosyłki zakłada śledzenie sama, w tym samym ruchu; ta trasa jest
      PONOWIENIEM, gdy odmowa przeszła, a zapis dosyłki nie — odmowy w Allegro
      nie da się powtórzyć, więc bez niej dosyłka takiego zwrotu przepadałaby.
@@ -444,7 +440,7 @@ test("dokument sprzedaży wskazuje człowiek, a szczegół podaje kandydatów", 
   /* Numer paragonu to ostatnia pozycja z listy biura zwrotów. Bez niego
      pracownik szukał sprzedaży w Subiekcie po dacie i nazwisku. */
   const d = db();
-  /* Data wystawienia PRZED zgłoszeniem, liczona od niego (0.452.0).
+  /* Data wystawienia PRZED zgłoszeniem, liczona od niego.
      Zgłoszenie w fixture jest „wczoraj", a kandydaci szukają w oknie
      wokół niego — stała data wypadłaby z okna za kilka tygodni. */
   d.prepare(`INSERT INTO sgt_faktura(dok_id,typ,nr_pelny,nr_oryg,data_wyst)
@@ -728,7 +724,7 @@ test("przyjęcie da się cofnąć przez HTTP, dopóki nikt nic nie ocenił", asy
 });
 
 test("kwotę da się cofnąć przez HTTP i zapisać inną", async () => {
-  /* Drabina cofania (0.202.0): DO KOREKTY cofa kwotę, DO ZWROTU cofa ocenę.
+  /* Drabina cofania: DO KOREKTY cofa kwotę, DO ZWROTU cofa ocenę.
      Ten test przechodzi cały szczebel, bo dopiero on pokazuje, że po
      cofnięciu zwrot wraca do kubełka, w którym wycena jest w ogóle możliwa. */
   const { naglowki } = login("biuro", "Ala z biura");
@@ -835,7 +831,7 @@ test("wniosek o rabat: bez dopasowanej pozycji zamówienia trasa mówi POWÓD", 
   assert.equal((db().prepare("SELECT count(*) n FROM allegro_rabat").get() as { n: number }).n, 0);
 });
 
-/* ── Skan etykiety zwrotnej (0.163.0) ─────────────────────────────────────── */
+/* ── Skan etykiety zwrotnej ─────────────────────────────────────── */
 
 const ETYKIETA = "600000367616070023174201";
 
@@ -916,9 +912,8 @@ test("rozjazdy oddają WYŁĄCZNIE kontrole zwrotów, nie całą halę", async (
 });
 
 test("oś zwrotu wychodzi z odczytu szczegółu, rosnąco po czasie", async () => {
-  /* Trasa oddawała oś od 0.156.0 i nikt jej nie rysował — panel dostał typ
-     `WpisOsiZwrotu` i zostawił go nieużytym. Kształt pilnujemy tutaj, bo od
-     0.313.0 rysuje go karta w kolumnie dowodów. */
+  /* Kształt osi pilnujemy tutaj, bo rysuje go karta w kolumnie dowodów
+     (`WpisOsiZwrotu`). */
   const d = db();
   const wstaw = d.prepare(`INSERT INTO zwrot_zdarzenie
     (zwrot_id,rodzaj,tresc,dane_json,kiedy_at,kto) VALUES (?,?,?,?,?,?)`);
@@ -974,7 +969,7 @@ test("notatka zapisuje się przy zwrocie ZAMKNIĘTYM i da się ją cofnąć", as
   }
 });
 
-/* ── Paczka nieodebrana jednym kliknięciem (0.493.0) ────────────────────── */
+/* ── Paczka nieodebrana jednym kliknięciem ────────────────────── */
 
 function zamowienie(orderId: string, pozycji = 1) {
   const d = db();
@@ -1044,7 +1039,7 @@ test("nieznane zamówienie albo zamówienie bez pozycji nie zakłada pustego zwr
     "SELECT COUNT(*) AS n FROM zwrot_klienta WHERE zrodlo='nieodebrana'").get() as { n: number }).n, 0);
 });
 
-/* ── Odmowa z dosyłką i „Śledź dosyłkę” (0.536.0) ───────────────────────────
+/* ── Odmowa z dosyłką i „Śledź dosyłkę” ───────────────────────────
    Trasa odmowy składa dwa serwisy. Pilnujemy trzech rzeczy: dosyłka jedzie
    w odpowiedzi tylko przy kodach dosyłki; porażka jej zapisu NIE zamienia
    nieodwracalnej odmowy w błąd; ponowienie jest idempotentne. */

@@ -7,7 +7,7 @@ import {
 } from "../services/tagi-spraw.js";
 import { ROLE_BIUROWE } from "../services/users.js";
 
-/* ── Trasy tagów spraw (0.279.0) ─────────────────────────────────────────────
+/* ── Trasy tagów spraw ─────────────────────────────────────────────
    SŁOWNIK JEST WSPÓLNY dla reklamacji i zwrotów, więc trasy słownika stoją
    osobno, a nie pod `/reklamacje`. Przypięcie do sprawy zostaje tam, gdzie
    sprawa — w `routes/reklamacje.ts` — bo tamta trasa zna już swoją bramkę.

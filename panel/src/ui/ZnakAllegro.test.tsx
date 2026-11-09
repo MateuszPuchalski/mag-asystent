@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 import { render, screen } from "@testing-library/react";
 import { ZnakAllegro } from "./ZnakAllegro";
 
-/* ── Znak Allegro (0.252.0) ──────────────────────────────────────────────────
+/* ── Znak Allegro ────────────────────────────────────────────────────────────
    Testy pilnują trzech rzeczy, bo na każdej z nich ten znak może cicho
    przestać robić to, po co stoi na ekranie: ma NAZYWAĆ się Allegro dla
    czytnika ekranu, ma trzymać proporcje logotypu i ma być znakiem MARKI,

@@ -1,7 +1,7 @@
 import type { SzczegolReklamacji, Zwrot } from "../api/typy";
 
 /* ── PRZESYŁKI NA OSI ROZMOWY ────────────────────────────────────────────────
-   Makieta właściciela stawia paczki na tej samej osi co wiadomości. Agent
+   Paczki stoją na tej samej osi co wiadomości. Agent
    czyta wtedy jedną historię: klient napisał, paczka wyszła, paczka doszła.
    Dwie osobne listy kazałyby mu składać tę kolejność w głowie.
 
@@ -10,7 +10,7 @@ import type { SzczegolReklamacji, Zwrot } from "../api/typy";
    liczy wyłącznie dane; rysuje je `Czat.tsx`.
 
    KODY Z PLIKU, NIE Z PAMIĘCI. Osiem wartości `ParcelTrackingStatus.code`
-   z `docs/allegro/swagger.yaml` dzieli się na sześć plakietek makiety.
+   z `docs/allegro/swagger.yaml` dzieli się na sześć plakietek.
    Kod spoza listy nie dostaje plakietki, bo zgadnięta byłaby kłamstwem.  */
 
 export type KierunekPrzesylki = "od_klienta" | "od_nas";

@@ -64,7 +64,7 @@ export function useSynchronizuj() {
   return useMutation({
     /* Żądanie BEZ ciała nie deklaruje typu treści — pilnuje tego `api()`
        i jego test. Pusty JSON to `FST_ERR_CTP_EMPTY_JSON_BODY` i gołe
-       „Bad Request" na ekranie; ta blizna kosztowała dwa razy. */
+       „Bad Request" na ekranie. */
     mutationFn: () => api<WynikSynchronizacji>("/api/obsluga/reklamacje/synchronizuj",
       { method: "POST" }),
     onSettled: () => qc.invalidateQueries({ queryKey: kluczeReklamacji.kolejka }),
@@ -89,14 +89,13 @@ export function useProwadze() {
  * Pobranie załącznika.
  *
  * Idzie przez `pobierzPlik`, a nie przez `<a href>`: sesja jedzie nagłówkiem
- * `x-session`, którego odnośnik nie niesie. Pobranie załącznika rozmowy było
- * z tego powodu zepsute od 0.155.0 do 0.219.1 i wyglądało, jakby działało.
+ * `x-session`, którego odnośnik nie niesie.
  */
 export const pobierzZalacznik = (reklamacjaId: number, zalacznikId: number, nazwa: string) =>
   pobierzPlik(`/api/obsluga/reklamacje/${reklamacjaId}/zalaczniki/${zalacznikId}`, nazwa);
 
 /**
- * Odpowiedź w rozmowie reklamacyjnej (0.224.0) — pierwszy zapis tego ekranu
+ * Odpowiedź w rozmowie reklamacyjnej — pierwszy zapis tego ekranu
  * wychodzący do Allegro.
  *
  * Konfliktu 409 hook CELOWO nie łapie: rozróżnia je ekran, bo każdy każe co
@@ -127,7 +126,7 @@ export function useOdpowiedz() {
     onSettled: (_d, _e, v) => {
       void qc.invalidateQueries({ queryKey: kluczeReklamacji.reklamacja(v.id) });
       void qc.invalidateQueries({ queryKey: kluczeReklamacji.kolejka });
-      /* Wysłana odpowiedź zdejmuje załączniki po stronie serwera (0.486.0).
+      /* Wysłana odpowiedź zdejmuje załączniki po stronie serwera.
          Bez tego pigułki plików wisiały w edytorze do powrotu na kartę
          i obiecywały załącznik, którego następna wiadomość już nie niesie. */
       void qc.invalidateQueries({ queryKey: kluczeReklamacji.zalacznikiWysylki(v.id) });
@@ -196,10 +195,9 @@ export function useZwrotTowaru() {
 }
 
 /**
- * Odświeżenie JEDNEJ sprawy z Allegro (0.273.0).
+ * Odświeżenie JEDNEJ sprawy z Allegro.
  *
- * Do 0.272.0 świeży stan sprawy dawał wyłącznie pełny przebieg listy, czyli
- * takt trzech minut. Agent, który właśnie wysłał odpowiedź albo werdykt,
+ * Pełny przebieg listy to takt trzech minut. Agent, który właśnie wysłał odpowiedź albo werdykt,
  * patrzy na ekran TERAZ — i najbardziej wtedy, gdy wysyłka skończyła się
  * niejednoznacznie: jedno żądanie rozstrzyga to, po co pasek odsyłał do
  * Centrum Sprzedaży.
@@ -220,10 +218,10 @@ export function useOdswiez() {
   });
 }
 
-/* ── Załączniki WYCHODZĄCE przy odpowiedzi (0.274.0) ─────────────────────────
+/* ── Załączniki WYCHODZĄCE przy odpowiedzi ───────────────────────────────────
    Kształt `ZalacznikSzkicu` jest wspólny ze skrzynką i to nie przypadek:
    ekran rysuje je TYM SAMYM komponentem (`skrzynka/ZalacznikiWysylki.tsx`),
-   zgodnie z decyzją właściciela z 0.246.0 o wspólnym załączniku.            */
+   zgodnie z decyzją właściciela o wspólnym załączniku.                      */
 
 export function useZalacznikiSprawy(id: number | null) {
   return useQuery({
@@ -259,7 +257,7 @@ export function useUsunZalacznikSprawy() {
 }
 
 /**
- * Gdzie jest paczka do klienta (0.393.0).
+ * Gdzie jest paczka do klienta.
  *
  * Kliknięcie JAWNE: pytanie kosztuje DWA żądania u Allegro, więc nie ma
  * prawa wyjść z samego otwarcia ekranu.

@@ -1,9 +1,9 @@
 import { describe, expect, it } from "vitest";
 import { pasujeDoFrazy, rozbij } from "./szukanie";
 
-/* Zgłoszenie właściciela: „szukanie nieodebranych paczek odbywa się głównie za
-   pomocą loginu użytkownika i innych informacji na przesyłce". Cała zmiana jest
-   w spacji — operator z kartonem w ręku ma kilka drobnych uchwytów naraz. */
+/* Nieodebrane paczki szuka się po loginie i danych z przesyłki. Operator
+   z kartonem w ręku ma kilka drobnych uchwytów naraz, więc fraza dzieli
+   się po spacjach. */
 
 const KODY = ["1111/z04a", "ord-77", "jan_kowalski", "jan kowalski", "inpost", "paczkomat"];
 

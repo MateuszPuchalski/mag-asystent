@@ -1,6 +1,5 @@
-/* ── „CO SIĘ ZMIENIŁO" — WYCIĄG Z HISTORII ZMIAN (0.500.0) ──────────────────
-   Panel zmienia się kilka razy w tygodniu, a agent dowiadywał się o tym,
-   trafiając na przycisk w innym miejscu. Zaskoczenie kosztuje uwagę przy
+/* ── „CO SIĘ ZMIENIŁO" — WYCIĄG Z HISTORII ZMIAN ────────────────────────────
+   Panel zmienia się kilka razy w tygodniu. Zaskoczenie kosztuje uwagę przy
    KAŻDEJ zmianie; jedno zdanie przy pierwszym wejściu po wydaniu — raz.
 
    WYCIĄG POWSTAJE PRZY BUDOWANIU, NIE W PRZEGLĄDARCE. `CHANGELOG.md` ma ponad
@@ -14,7 +13,7 @@
    zamykać pasek bez czytania — ta sama pułapka co okno „czy na pewno".
 
    Plik jest czysty i bez zależności od przeglądarki, bo woła go też
-   `vite.config.ts` w Node przy budowaniu. */
+   `wtyczka-zmian.ts` w Node przy budowaniu. */
 
 export interface WydanieZmian {
   wersja: string;
@@ -40,9 +39,9 @@ export function najnowszeZmiany(md: string, ile = 3): WydanieZmian[] {
     /* Tylko akapit OTWARTY pogrubieniem — punkt listy z pogrubionym słowem
        to szczegół wewnątrz zmiany, nie jej tytuł. */
     const n = biezace && /^\*\*(.+?)\*\*/.exec(linia);
-    /* `[wymaga działania]` to znak dla wdrożenia, nie wiadomość dla biura
-       (0.546.0). Wzór fragmentu w `zmiany/README.md` go pogrubia, więc bez
-       tego wyjątku stawałby na pasku obok zmian, które ktoś zauważy. */
+    /* `[wymaga działania]` to znak dla wdrożenia, nie wiadomość dla biura.
+       Wzór fragmentu w `zmiany/README.md` go pogrubia, więc bez tego
+       wyjątku stawałby na pasku obok zmian, które ktoś zauważy. */
     if (biezace && n && !n[1].startsWith("[wymaga działania")) {
       biezace.naglowki.push(n[1].replace(/[.:]\s*$/, ""));
     }

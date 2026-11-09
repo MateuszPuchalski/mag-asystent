@@ -11,22 +11,10 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 export const envFile = loadEnvFile();
 
 /**
- * Liczba z env. Śmieci są BŁĘDEM, nie cichym powrotem do domyślnej.
- *
- * Wcześniej `MAG_ID_MAG=jeden` dawało po cichu 1. Przy magazynach to znaczy
- * dostawa w złej zakładce, a przy porcie — serwer pod innym adresem niż ten
- * wpisany na kolektorach. Obie awarie wyglądają jak „aplikacja nie działa"
- * i żadna nie prowadzi do literówki w pliku.
- */
-/**
  * Adres URL z odwrotnymi ukośnikami wyprostowany na zwykłe.
  *
- * POWSTAŁO Z WDROŻENIA, KTÓRE POŁOŻYŁO MAGAZYN. Ktoś wpisał
- * `TLO_URL=http:\\127.0.0.1:8791`, serwer odmówił startu, a `wertis-api`
- * i `wertis-worker` przestały wstawać. Objawem na ekranie było
- * `SERVICE_PAUSED` z NSSM — nikt nie kojarzy tego z ukośnikiem.
- *
- * Ta pomyłka jest na Windowsie NATURALNA, a nie niedbała: w tym samym pliku
+ * `TLO_URL=http:\\127.0.0.1:8791` zatrzymałby start usług, a objawem
+ * byłoby `SERVICE_PAUSED` z NSSM. Ta pomyłka jest na Windowsie NATURALNA, a nie niedbała: w tym samym pliku
  * konfiguracyjnym KAŻDA inna wartość ze znakiem podziału używa `\` — bo są to
  * ścieżki (`C:\wertis`, `ZDJECIA_KATALOG=D:\zdjecia`, `TLO_MODEL`). Ręka
  * pisze dalej to samo.
@@ -38,6 +26,7 @@ export const envFile = loadEnvFile();
  */
 export const prostujUkosniki = (v: string): string => v.replace(/\\/g, "/");
 
+/** Liczba z env. Śmieci są BŁĘDEM, nie cichym powrotem do domyślnej. */
 const num = (v: string | undefined, def: number, name?: string) => {
   if (v === undefined || v === "") return def;
   const n = Number(v);
@@ -93,10 +82,10 @@ export const config = {
   },
 
   /**
-   * Aktualizacja automatyczna (0.494.0), `services/aktualizacja-auto.ts`.
+   * Aktualizacja automatyczna, `services/aktualizacja-auto.ts`.
    *
    * DOMYŚLNIE „zaraz", TAKŻE NA PRODUKCJI — decyzja właściciela z wywiadu
-   * o wdrażaniu (0.496.0). Magazyn pracuje na jedną zmianę, dwie minuty
+   * o wdrażaniu. Magazyn pracuje na jedną zmianę, dwie minuty
    * postoju są do przyjęcia o każdej porze, a zmiana ma dojść tego samego
    * dnia. Dziesięć minut bez zapisu (`CISZA_MIN`) i godzina od wydania
    * wystarczą; okno nocne zostaje jako tryb `noc` dla tego, kto go zechce.
@@ -183,12 +172,9 @@ export const config = {
      * (patrz docs/subiekt-gt-struktura.md):
      *   1-FZ, 2-FS, 3-RZ, 4-RS, 5-KFZ, 6-KFS, 9-MM, 10-PZ, 11-WZ, 12-PW,
      *   13-RW, 14-ZW, 15-ZD, 16-ZK, 21-PA, 29-IW
-     * Domyślne `DOK_TYP_PZ` wynosiło wcześniej 5, czyli KFZ — korektę faktury
-     * zakupu. Na prawdziwej bazie aplikacja listowałaby korekty jako dostawy
-     * i nie zobaczyła ani jednego PZ.
      */
-    /* STAŁE, nie klucze (0.489.0). Wynikają ze struktury bazy, a nie
-       z ustawień podmiotu, więc wpis w `wertis.env` mógł je tylko zepsuć.
+    /* STAŁE, nie klucze. Wynikają ze struktury bazy, a nie
+       z ustawień podmiotu, więc wpis w `wertis.env` mógłby je tylko zepsuć.
        Rejestr zgłasza pozostawiony wpis jako nieznany klucz. */
     dokTypFZ: 1,
     dokTypPZ: 10,
@@ -214,13 +200,8 @@ export const config = {
      * zakupu, a PZ powstaje z zupełnie innego procesu, więc na liście pracy
      * magazyniera byłoby czystym szumem.
      *
-     * Domyślne było wcześniej `1,10` (FZ i PZ), bo w firmie, gdzie towar wchodzi
-     * obiema drogami, dla magazyniera to ta sama praca: paleta do rozłożenia.
-     * Tam wraca się do `DOK_TYPY_DOSTAW=1,10` — to nadal jedno ustawienie,
-     * nie zmiana kodu.
-     *
-     * Do sierpnia 2026 ta lista była ZASZYTA w zapytaniu, choć zwroty tuż obok
-     * miały już listę z konfiguracji. Niespójność, nie decyzja projektowa.
+     * W firmie, gdzie towar wchodzi obiema drogami, ustawia się
+     * `DOK_TYPY_DOSTAW=1,10` (FZ i PZ) — dla magazyniera to ta sama praca.
      */
     dokTypyDostaw: (process.env.DOK_TYPY_DOSTAW ?? "1")
       .split(",")
@@ -268,23 +249,22 @@ export const config = {
     /**
      * Wyrażenie SQL 0/1: dokument w buforze. `dok_Status` ma udokumentowane
      * wartości {0-wycofany, 1-wykonany, 2-unieważniony, 3-odłożony, 4-MM wydany,
-     * 5..8-zamówienia}. Bufor to dokument **odłożony** (3); poprzednie domyślne
-     * `= 0` wskazywało dokumenty **wycofane**, czyli mylił się w obie strony.
+     * 5..8-zamówienia}. Bufor to dokument **odłożony** (3), nie wycofany (0).
      */
-    /* Stała od 0.489.0. Surowy SQL z pliku ustawień był drogą do wstrzyknięcia
+    /* Stała, bo surowy SQL z pliku ustawień byłby drogą do wstrzyknięcia
        czegokolwiek w zapytanie do bazy firmy, a wartość nie zależy od podmiotu. */
     bufferExpr: "CASE WHEN d.dok_Status = 3 THEN 1 ELSE 0 END",
     /** Interwał odświeżania read-modelu sgt_* z MSSQL [ms]. */
     syncMs: num(process.env.MSSQL_SYNC_MS, 60000, "MSSQL_SYNC_MS"),
     /**
      * Limit pojedynczego zapytania do bazy Subiekta [ms]. Domyślne 15 s
-     * drivera było za krótkie dla odczytów wsadowych importu na obciążonej
-     * maszynie (0.53.1) — 30 s daje zapas, a dłużej znaczy, że baza naprawdę
+     * drivera jest za krótkie dla odczytów wsadowych importu na obciążonej
+     * maszynie — 30 s daje zapas, a dłużej znaczy, że baza naprawdę
      * nie wyrabia i błąd jest właściwą odpowiedzią.
      */
     requestTimeoutMs: num(process.env.MSSQL_REQUEST_TIMEOUT_MS, 30000, "MSSQL_REQUEST_TIMEOUT_MS"),
     /**
-     * Dokumenty SPRZEDAŻY do dopasowywania zwrotów Allegro (0.53.0).
+     * Dokumenty SPRZEDAŻY do dopasowywania zwrotów Allegro.
      *
      * FS i PA z tej samej listy kodów co wyżej, więc wartości pewne. Sprzedaż
      * w tej firmie idzie OBIEMA drogami (część zamówień na fakturę, część na
@@ -335,14 +315,14 @@ export const config = {
     /**
      * Kolumna `dok__Dokument` wskazująca dokument KORYGOWANY.
      *
-     * Nazwa sprawdzona na bazie firmy (0.201.0), nie zgadnięta: trójka
+     * Nazwa sprawdzona na bazie firmy, nie zgadnięta: trójka
      * `dok_DoDokId` / `dok_DoDokNrPelny` / `dok_DoDokDataWyst` odpowiada
      * właściwościom obiektu Sfery (`DoDokumentuId`, `DoDokumentuNumerPelny`,
      * `DoDokumentuDataWystawienia`). Zgodność w obie strony jest tu całym
      * dowodem — w tym repo zgadnięta nazwa kosztowała już cztery wydania.
      *
-     * Puste = automat numerów korekt wyłączony; biuro przepisuje je ręką, jak
-     * przed 0.201.0. Tak samo działa brak kolumny albo brak prawa do niej:
+     * Puste = automat numerów korekt wyłączony; biuro przepisuje je ręką.
+     * Tak samo działa brak kolumny albo brak prawa do niej:
      * import sprzedaży schodzi wtedy o szczebel niżej, zamiast się wywrócić.
      */
     korektaColumn: process.env.MSSQL_KOREKTA_COLUMN ?? "dok_DoDokId",
@@ -362,7 +342,7 @@ export const config = {
   },
 
   /**
-   * Zwroty Allegro (0.53.0) — pierwsza integracja HTTP wychodząca w tym
+   * Zwroty Allegro — pierwsza integracja HTTP wychodząca w tym
    * serwerze. Klient na globalnym `fetch` (Node ≥22.5), zero zależności.
    *
    * `clientId` jest WYŁĄCZNIKIEM I KONFIGURACJĄ W JEDNYM (wzorzec
@@ -410,8 +390,8 @@ export const config = {
     /** Takt synchronizacji Centrum wiadomości; 0 wyłącza ticker. */
     inboxSyncMs: num(process.env.ALLEGRO_INBOX_SYNC_MS, 60_000, "ALLEGRO_INBOX_SYNC_MS"),
     /**
-     * Od kiedy skrzynka w ogóle widzi rozmowy. Decyzja właściciela z 0.152.0:
-     * 1 września 2026, czyli dzień uruchomienia obsługi klienta.
+     * Od kiedy skrzynka w ogóle widzi rozmowy. Decyzja właściciela: dzień
+     * uruchomienia obsługi klienta.
      *
      * Domyślna wartość to PÓŁNOC CZASU LOKALNEGO, zapisana w UTC — Polska jest
      * we wrześniu na UTC+2. Data w kodzie musi być w UTC, bo porównuje się ją
@@ -444,7 +424,7 @@ export const config = {
        nie minutami — Allegro część z nich rozpatruje samo. Rzadziej niż zwroty. */
     rabatySyncMs: num(process.env.ALLEGRO_RABATY_SYNC_MS, 900_000, "ALLEGRO_RABATY_SYNC_MS"),
     /**
-     * Takt dosyłek (0.536.1): wykrycie numeru przy zamówieniu i śledzenie
+     * Takt dosyłek: wykrycie numeru przy zamówieniu i śledzenie
      * paczki w sprawach klienta w toku; 0 wyłącza ticker.
      *
      * SIEDEMNAŚCIE MINUT, nie kwadrans. Dosyłka jedzie dniami, więc
@@ -467,13 +447,12 @@ export const config = {
     /**
      * Od kiedy kolejka POKAZUJE sprawy. Decyzja właściciela: 1 LIPCA 2026,
      * północ czasu lokalnego (stąd 30 czerwca 22:00 UTC — Polska jest w lipcu
-     * na UTC+2). Zgłoszenie brzmiało „w kolejce pojawiają mi się stare
-     * reklamacje", a doprecyzowanie — „pokaż tylko reklamacje od 1 lipca".
+     * na UTC+2).
      *
      * TO JEST PRÓG WIDOKU, NIE POBIERANIA, i tym różni się od `zwrotyOd`.
      * Tamten próg odcina sprawę przy synchronizacji; ten odcina ją na liście,
      * a baza wie dalej wszystko. Powód jest konkretny: pełny przelot listy
-     * (0.273.0) zamyka sprawy rozstrzygnięte w Centrum Sprzedaży i musi
+     * zamyka sprawy rozstrzygnięte w Centrum Sprzedaży i musi
      * widzieć archiwum, żeby to robić. Próg przy pobieraniu zabrałby nam tę
      * robotę razem z licznikiem „ogona".
      *
@@ -488,9 +467,8 @@ export const config = {
     /**
      * Ile dni ma sprzedawca na OBSŁUŻENIE zwrotu od jego otrzymania.
      *
-     * SIEDEM, OD DORĘCZENIA PACZKI (0.339.0) — regulamin Allegro. Do 0.338.0
-     * stało tu czternaście liczonych od zgłoszenia klienta, czyli termin
-     * ustawowy na oddanie pieniędzy. Decyzja właściciela: kolejką ma rządzić
+     * SIEDEM, OD DORĘCZENIA PACZKI — regulamin Allegro. Decyzja właściciela:
+     * kolejką ma rządzić
      * ten zegar, który realnie go wiąże, bo to po nim Allegro rozlicza
      * sprzedawcę. Termin ustawowy nie znika z prawa — znika z KOLEJNOŚCI
      * PRACY, a przy paczce jadącej do nas tydzień oba i tak wypadają blisko.
@@ -501,13 +479,12 @@ export const config = {
     zwrotTerminDni: num(process.env.ZWROT_TERMIN_DNI, 7, "ZWROT_TERMIN_DNI"),
     /**
      * Po ilu dniach od ZGŁOSZENIA zwrot bez decyzji uznajemy za rozliczony
-     * (0.452.0).
+     *.
      *
-     * Wywiad z właścicielem, 23 września 2026: kolejka „Do decyzji" liczyła
-     * 743 sprawy, „głównie stare". Sprzedawca ma siedem dni na oddanie
+     * Sprzedawca ma siedem dni na oddanie
      * pieniędzy, a ósmego dnia Allegro oddaje je samo. Po czterdziestu pięciu
      * dniach wypłata jest więc faktem, nawet gdy zatrzask z operacji płatniczych
-     * (0.426.0) go nie złapał. Liczbę wybrał właściciel, z zapasem na paczki,
+     * go nie złapał. Liczbę wybrał właściciel, z zapasem na paczki,
      * które długo jechały.
      *
      * W env z tego samego powodu co termin wyżej: to liczba z cudzego
@@ -517,9 +494,8 @@ export const config = {
     /**
      * Od kiedy widzimy zwroty. Decyzja właściciela: 20 SIERPNIA 2026, północ
      * czasu lokalnego (stąd 19 sierpnia 22:00 UTC — Polska jest w sierpniu
-     * na UTC+2). Do 0.152.0 stało tu 20 lipca; właściciel przesunął próg
-     * o miesiąc, a że to jest ustawienie, a nie stała, przesunie go znowu
-     * bez wydania.
+     * na UTC+2). To ustawienie, a nie stała, więc próg przesuwa się bez
+     * wydania.
      *
      * ZASTĄPIŁO OKNO WZGLĘDNE `ALLEGRO_ZWROTY_DNI_WSTECZ`, i to jest zmiana
      * natury, nie jednostki. Tamto liczyło się WYŁĄCZNIE przy pierwszym
@@ -533,19 +509,15 @@ export const config = {
      */
     zwrotyOd: data(process.env.ALLEGRO_ZWROTY_OD, "2026-08-19T22:00:00Z", "ALLEGRO_ZWROTY_OD"),
     /**
-     * Od kiedy raport woła o zwrot rozliczony POZA aplikacją (0.340.0).
+     * Od kiedy raport woła o zwrot rozliczony POZA aplikacją.
      *
-     * Kontrola `zwrot_rozliczony_bez_korekty` powstała w 0.339.0 razem
-     * z decyzją, że taki zwrot schodzi z kolejki pracy — miała nie dać mu
-     * zniknąć w ciszy razem z korektą i towarem. Na historii firmy wołałaby
-     * jednak o setki spraw sprzed wdrożenia, których korekt nikt już wstecz
-     * nie wystawi, a raport z setką wierszy przestaje być czytany (blizna
-     * 0.319.0: czterysta trzydzieści trzy wiersze zjadły cały ekran).
+     * Kontrola `zwrot_rozliczony_bez_korekty` nie daje takiemu zwrotowi
+     * zniknąć w ciszy. Na historii firmy wołałaby o setki spraw, których
+     * korekt nikt już wstecz nie wystawi, a raport z setką wierszy przestaje
+     * być czytany.
      *
-     * Decyzja właściciela: liczymy OD DNIA WDROŻENIA 0.340.0, czyli 15
-     * WRZEŚNIA 2026, północ czasu lokalnego (stąd 14 września 22:00 UTC —
-     * Polska jest we wrześniu na UTC+2). Łapiemy to, co jeszcze da się
-     * naprawić, i nie wypominamy tego, czego nie da.
+     * Decyzja właściciela: liczymy OD DNIA WDROŻENIA kontroli, północ czasu
+     * lokalnego zapisana w UTC.
      *
      * Próg stoi po dacie ZGŁOSZENIA zwrotu, bo momentu rozliczenia Allegro
      * nam nie podaje — jest tylko status „teraz". Data zgłoszenia jest
@@ -578,7 +550,7 @@ export const config = {
      * to wpisem w `wertis.env`, a nie wydaniem aplikacji.
      */
     /**
-     * Zwrot — CENTRUM SPRZEDAŻY z wyszukiwaniem po numerze (0.207.0).
+     * Zwrot — CENTRUM SPRZEDAŻY z wyszukiwaniem po numerze.
      *
      * Do tego wydania stał tu `moje-allegro/sprzedaz/zwroty/{id}`: adres
      * zgadnięty, bo zwrot nie ma w panelu własnej strony pod identyfikatorem.
@@ -605,7 +577,7 @@ export const config = {
         ? "https://allegro.pl.allegrosandbox.pl/moje-allegro/sprzedaz/zamowienia/{id}"
         : "https://allegro.pl/moje-allegro/sprzedaz/zamowienia/{id}"),
     /**
-     * Oferta — adres PUBLICZNY, nie panel sprzedawcy (0.178.0).
+     * Oferta — adres PUBLICZNY, nie panel sprzedawcy.
      *
      * Agent klikający ofertę z rozmowy chce zobaczyć to, co widzi klient:
      * zdjęcia, parametry i opis. Panel sprzedawcy pokazałby formularz edycji,
@@ -617,12 +589,11 @@ export const config = {
         ? "https://allegro.pl.allegrosandbox.pl/oferta/{id}"
         : "https://allegro.pl/oferta/{id}"),
     /**
-     * Reklamacja w Centrum Sprzedaży — adres ZWERYFIKOWANY (0.226.1).
+     * Reklamacja w Centrum Sprzedaży — adres ZWERYFIKOWANY.
      *
-     * Wzorzec z 0.222.0 był zgadnięty z analogii do zwrotu i okazał się zły
-     * w OBU członach naraz: sprawa ma własną stronę `/claims/{uuid}`, a nie
-     * wiersz na liście z wyszukiwaniem, i adresuje się identyfikatorem
-     * zasobu, a nie numerem czytelnym. Kliknięcie właściciela dawało 404.
+     * Sprawa ma własną stronę `/claims/{uuid}`, a nie wiersz na liście
+     * z wyszukiwaniem, i adresuje się identyfikatorem zasobu, a nie numerem
+     * czytelnym.
      *
      * Parametru `sellerId` NIE MA w tym wzorcu świadomie — dokleja go
      * `linkReklamacji`, żeby przy pustym `ALLEGRO_SELLER_ID` w adresie nie
@@ -634,7 +605,7 @@ export const config = {
         ? "https://allegro.pl.allegrosandbox.pl/moje-allegro/sprzedaz/dyskusje"
         : "https://salescenter.allegro.com/claims/{id}"),
     /**
-     * Identyfikator sprzedawcy do adresów Centrum Sprzedaży (0.226.1).
+     * Identyfikator sprzedawcy do adresów Centrum Sprzedaży.
      *
      * Strona sprawy chce `?sellerId=` i tej liczby nie mamy skąd wziąć sami:
      * `channel_account.external_account_id` trzyma clientId OAuth (inna
@@ -714,7 +685,7 @@ export const config = {
     /** Magazyn zwrotów od klientów (biuro kompletuje kartony i wystawia dokument). */
     ZWROTY: num(process.env.MAG_ID_ZWROTY, 3, "MAG_ID_ZWROTY"),
     /**
-     * Magazyn ODPADU — towar z oceny „utylizacja" (0.211.0).
+     * Magazyn ODPADU — towar z oceny „utylizacja".
      *
      * ZERO ZNACZY WYŁĄCZONE i to jest cała domyślna wartość. Pozostałe trzy
      * magazyny mają domyślne numery, bo pomyłka daje najwyżej pusty ekran.
@@ -725,7 +696,7 @@ export const config = {
      */
     ODP: num(process.env.MAG_ID_ODP, 0, "MAG_ID_ODP"),
     /**
-     * Magazyn SERWISOWY — towar, którego zabrakło w dostawie (0.391.0).
+     * Magazyn SERWISOWY — towar, którego zabrakło w dostawie.
      *
      * ZERO ZNACZY WYŁĄCZONE, dokładnie z tego samego powodu co przy odpadzie
      * wyżej: pomyłka w numerze WYSTAWIA DOKUMENT, a MM nie cofa się jednym
@@ -741,10 +712,10 @@ export const config = {
   },
 
   /**
-   * `tw_Id` kartoteki „PRZESYŁKA" z paragonów Allegro (0.349.0).
+   * `tw_Id` kartoteki „PRZESYŁKA" z paragonów Allegro.
    *
    * Automatyczny ZW zeruje ten wiersz albo go zostawia — zależnie od pola
-   * „Koszt dostawy" przy zwrocie (decyzja właściciela, 15 września 2026).
+   * „Koszt dostawy" przy zwrocie (decyzja właściciela).
    * Numer, a nie symbol z `POZYCJE_NIE_TOWAROWE`: worker porównuje `TowarId`
    * pozycji dokumentu, a symbolu na pozycji ZW nie czyta.
    *
@@ -799,7 +770,7 @@ export const config = {
   },
 
   /**
-   * Zdjęcia kartotek na karcie towaru (0.30.0).
+   * Zdjęcia kartotek na karcie towaru.
    *
    * `zrodlo` jest WYŁĄCZNIKIEM I KONFIGURACJĄ W JEDNYM — puste znaczy „funkcji
    * nie ma" i to jest domyślne. Dwa osobne klucze (włącznik + źródło) mogłyby
@@ -838,8 +809,8 @@ export const config = {
      * jedyną obroną przed kartoteką ze skanem 20 MB jest odmowa.
      */
     maxKb: num(process.env.ZDJECIA_MAX_KB, 2048, "ZDJECIA_MAX_KB"),
-    /* Cztery pokrętła pamięci podręcznej niżej są STAŁYMI od 0.489.0. Nikt ich
-       nie ustawiał, a każde było kolejnym kluczem do przeczytania. */
+    /* Cztery pokrętła pamięci podręcznej niżej są STAŁYMI: każdy klucz to
+       kolejna rzecz do przeczytania. */
     /** Limit katalogu `data/zdjecia` [MB]; ponad to wypada najdawniej oglądane. */
     cacheMb: 512,
     /** Po ilu godzinach pytamy źródło ponownie o to samo zdjęcie. */
@@ -866,11 +837,9 @@ export const config = {
      */
     bladTtlMin: 5,
 
-    /* ── Dodawanie zdjęcia z kolektora (0.88.0) ──────────────────────────────
-       Do 0.87.0 zdjęcia były WYŁĄCZNIE do odczytu i tak to opisywała
-       `docs/subiekt-gt-struktura.md`. Ten klucz tę granicę przesuwa — trzeci
-       raz po lokalizacji (spec §5.2) i kodzie kreskowym (0.37.0), a pierwszy
-       raz INSERT-em, nie zmianą jednej kolumny.
+    /* ── Dodawanie zdjęcia z kolektora ──────────────────────────────
+       Ten klucz przesuwa granicę zapisu do Subiekta — obok lokalizacji
+       (spec §5.2) i kodu kreskowego, i jako jedyny INSERT-em.
 
        JEDEN KLUCZ, nie dwa, i to z tego samego powodu co przy `ZDJECIA_ZRODLO`
        wyżej: jest zarazem wyłącznikiem i wyborem miejsca zapisu. Osobny
@@ -921,7 +890,7 @@ export const config = {
   },
 
   /**
-   * Zdjęcia listingowe ofert Allegro (0.213.0).
+   * Zdjęcia listingowe ofert Allegro.
    *
    * OSOBNY BLOK od `zdjecia`, choć oba opisują cache obrazów — i to nie jest
    * symetria dla samej symetrii. Tamte zdjęcia idą z bazy firmy przez sieć
@@ -933,8 +902,7 @@ export const config = {
    * pobieramy tak czy owak, a plik ciągnie się dopiero wtedy, gdy ktoś na
    * ekranie na niego patrzy. Nie ma czego wyłączać, bo nie ma stałego kosztu.
    */
-  /* Wszystkie pięć pól to STAŁE od 0.489.0 — pokrętła pamięci podręcznej,
-     których nie opisywał żaden dokument i nie ustawiał nikt. */
+  /* Wszystkie pięć pól to STAŁE — pokrętła pamięci podręcznej. */
   allegroZdjecia: {
     /**
      * Szerokość miniatury w pikselach — segment `/s{px}/` w adresie CDN-u.
@@ -958,7 +926,7 @@ export const config = {
   },
 
   /**
-   * Usuwanie tła ze zdjęcia wgrywanego z kolektora (0.88.0).
+   * Usuwanie tła ze zdjęcia wgrywanego z kolektora.
    *
    * OSOBNY PROCES, nie biblioteka. Model działa na runtime ONNX, czyli na
    * module natywnym — a serwer WERTIS ma dwie zależności i zero modułów
@@ -992,9 +960,8 @@ export const config = {
   /**
    * Wzorce kodu lokalizacji — JEDNO źródło prawdy dla całego systemu (plan §3).
    * Serwer jest właścicielem tej reguły; kolektor pobiera ją w `GET /api/locations`
-   * i nie ma własnej kopii. Wcześniej żyła w czterech miejscach o trzech różnych
-   * kształtach i to była przyczyna, dla której symbol towaru `W32-0203` udawał
-   * lokalizację.
+   * i nie ma własnej kopii, bo kopie o różnych kształtach kazały symbolowi
+   * towaru `W32-0203` udawać lokalizację.
    *
    * Formaty są rozłączne po liczbie myślników i to jest cały dyskryminator:
    *   regał  `A01-02-03`  2 myślniki    paleta `PAL-042`  1 myślnik + prefiks
@@ -1038,14 +1005,9 @@ export const config = {
 
   /* ── Copilot obsługi klienta (etap F, §14) ────────────────────────────────
      KLUCZA TU NIE MA I NIE BĘDZIE. `config` bywa wypisywany do diagnostyki
-     i do komunikatów błędów — dokładnie tą drogą klucz Anthropic trafił do
-     `logs\\wertis-api.err.log` w 0.84.1 i trzeba go było unieważnić. Klient
-     SDK czyta `ANTHROPIC_API_KEY` ze środowiska sam; my trzymamy wyłącznie
-     odpowiedź na pytanie „czy jest".
-
-     Do 0.140.1 stały tu pola `AI_PROVIDER`, `AI_MODEL`, `ANTHROPIC_API_KEY`
-     i `AI_TIMEOUT_MS` — odeszły razem z funkcją, którą opisywały. To jest
-     nowa konfiguracja pisana od zera, nie wskrzeszenie tamtej. */
+     i do komunikatów błędów, czyli do logów. Klient SDK czyta
+     `ANTHROPIC_API_KEY` ze środowiska sam; my trzymamy wyłącznie odpowiedź
+     na pytanie „czy jest". */
   copilot: {
     /** `off` = wyłączony i to jest stan domyślny (decyzja właściciela). */
     mode: (process.env.COPILOT_MODE ?? "off") as "off" | "anthropic",
@@ -1055,10 +1017,8 @@ export const config = {
      */
     model: process.env.COPILOT_MODEL ?? "claude-opus-5",
     /**
-     * Model WYŁĄCZNIE do klasyfikacji (22 września 2026). Do tej wersji jedno
-     * pole `COPILOT_MODEL` rządziło klasyfikacją, szkicem i dopytaniem naraz,
-     * więc zejście na tańszy model przy etykiecie ciągnęło w dół także szkic
-     * — a to szkic czyta klient. Puste pole znaczy „jak `COPILOT_MODEL`":
+     * Model WYŁĄCZNIE do klasyfikacji, żeby zejście na tańszy model przy
+     * etykiecie nie ciągnęło w dół szkicu — a to szkic czyta klient. Puste pole znaczy „jak `COPILOT_MODEL`":
      * instalacja bez tej zmiennej zachowuje się dokładnie tak jak dotąd.
      */
     modelKlasyfikacji: process.env.COPILOT_MODEL_KLASYFIKACJA
@@ -1089,12 +1049,9 @@ export const config = {
      */
     wycofane: ["KLASYFIKATOR_DOSTAWCA", "JEV_MODEL"].filter((k) => process.env[k]),
     /**
-     * SZKIC SAM DLA NOWEGO PYTANIA POD OFERTĄ (0.317.0).
+     * SZKIC SAM DLA NOWEGO PYTANIA POD OFERTĄ.
      *
-     * Domyślnie WYŁĄCZONY, i to nie jest ostrożność na zapas. Przełącznik
-     * automatycznych szkiców istniał już raz, w 0.107.0, i stał na zerze
-     * „świadomie, bo o to poprosił właściciel" (komentarz przy migracji
-     * `ai_config`). Wraca na prośbę właściciela, ale wraca wyłączony: włączenie
+     * Domyślnie WYŁĄCZONY (decyzja właściciela): włączenie
      * czegoś, co wydaje pieniądze bez kliknięcia, ma być decyzją podjętą przy
      * `wertis.env`, a nie skutkiem ubocznym aktualizacji.
      */
@@ -1106,7 +1063,7 @@ export const config = {
      * partia szkiców. Skrzynka ma chodzić równo niezależnie od tego, ile
      * szkiców czeka.
      */
-    /* Stała od 0.489.0; koszt hamują limity na przebieg i na godzinę. */
+    /* Stała; koszt hamują limity na przebieg i na godzinę. */
     autoMs: 300_000,
     /**
      * Ile szkiców na JEDEN przebieg. Ten sam rodzaj hamulca co `maxPartia`
@@ -1122,7 +1079,7 @@ export const config = {
      */
     autoNaGodzine: Math.max(1, Number(process.env.COPILOT_AUTO_NA_GODZINE ?? 30) || 30),
     /**
-     * KLASYFIKACJA KAŻDEJ NOWEJ WIADOMOŚCI KLIENTA (22 września 2026).
+     * KLASYFIKACJA KAŻDEJ NOWEJ WIADOMOŚCI KLIENTA.
      *
      * Decyzja właściciela: rozpoznanie ma biec samo, nie z przycisku nad
      * kolejką. Wyłączone DOMYŚLNIE z tego samego powodu co szkic z taktu:
@@ -1131,7 +1088,7 @@ export const config = {
      */
     autoKlasyfikacja: process.env.COPILOT_AUTO_KLASYFIKACJA === "1",
     /**
-     * SZKIC ZARAZ PO ROZPOZNANIU (23 września 2026, decyzja właściciela:
+     * SZKIC ZARAZ PO ROZPOZNANIU (decyzja właściciela:
      * „ułóż odpowiedź automatycznie po klasyfikacji, gotową do zatwierdzenia").
      *
      * WŁĄCZONE DOMYŚLNIE i to jest świadomy wyjątek od reguły dwóch pól wyżej.
@@ -1143,8 +1100,7 @@ export const config = {
      */
     szkicPoRozpoznaniu: process.env.COPILOT_SZKIC_PO_ROZPOZNANIU !== "0",
     /**
-     * NARZĘDZIA KARTOTEKI PRZY SZKICU (decyzja właściciela z 19 października
-     * 2026). Szkic sięga do bazy tak jak dopytanie, bo klient pyta o towar
+     * NARZĘDZIA KARTOTEKI PRZY SZKICU (decyzja właściciela). Szkic sięga do bazy tak jak dopytanie, bo klient pyta o towar
      * spoza faktów, a odpowiedź leży obok. Włączone domyślnie, bo to odczyt
      * lokalny bez nowych kosztów poza rundami modelu. `0` albo `false`
      * wyłącza, gdy rundy okażą się za drogie.
@@ -1182,7 +1138,7 @@ export const config = {
     klasyfikacjaOknoDni: Math.max(1,
       Number(process.env.COPILOT_KLASYFIKACJA_OKNO_DNI ?? 7) || 7),
     /**
-     * SZKICE PRZED PRACĄ (26 września 2026, decyzja właściciela).
+     * SZKICE PRZED PRACĄ (decyzja właściciela).
      *
      * Po weekendzie zaległość skrzynki trafiała na sufit godzinowy dokładnie
      * wtedy, gdy przychodzili agenci: pierwsza godzina dostawała około
@@ -1210,7 +1166,7 @@ export const config = {
       Number(process.env.COPILOT_PRZED_PRACA_LIMIT ?? 100) || 100),
   },
 
-  /* ── Przepływ kategorii na żywo (6 października 2026) ──────────────────────
+  /* ── Przepływ kategorii na żywo ──────────────────────
      Jedyna droga, którą odpowiedź idzie do klienta bez kliknięcia człowieka.
      Powód i bramki stoją w `services/przeplyw-na-zywo.ts`. */
   przeplyw: {
@@ -1247,7 +1203,7 @@ const PREFIKSY_KLUCZY = ["sk-ant-", "sk-", "Bearer "];
 /**
  * Wartość zmiennej środowiskowej bezpieczna do wypisania w komunikacie błędu.
  *
- * Powód jest z produkcji (0.84.1): ktoś wkleił klucz Anthropic do
+ * Powód jest z produkcji: ktoś wkleił klucz Anthropic do
  * `AI_PROVIDER` zamiast do `ANTHROPIC_API_KEY` — pola sąsiadują ze sobą
  * w `wertis.env.example`. Serwer odmówił startu i wypisał wartość zmiennej
  * do komunikatu, NSSM podniósł go automatycznie, a każdy obieg pętli dopisał
@@ -1275,10 +1231,8 @@ function assertMode(name: string, value: string, allowed: readonly string[]): vo
   }
 }
 assertMode("SGT_MODE", config.sgtMode, ["seeded", "mssql"]);
-/* COPILOT_MODE idzie przez `assertMode` z jednego powodu: w `wertis.env.example`
-   sąsiaduje z ANTHROPIC_API_KEY, czyli stoi dokładnie w tej samej pułapce,
-   w którą wpadł AI_PROVIDER w 0.84.1. Maska nie jest tu ostrożnością na wyrost,
-   tylko powtórzeniem strażnika, którego to pole jeszcze nie ma. */
+/* COPILOT_MODE idzie przez `assertMode`, bo w `wertis.env.example` sąsiaduje
+   z ANTHROPIC_API_KEY: wklejony tu klucz trafiłby do komunikatu bez maski. */
 assertMode("COPILOT_MODE", config.copilot.mode, ["off", "anthropic"]);
 
 /**
@@ -1424,10 +1378,8 @@ export function bledyKonfiguracji(c: Config = config): string[] {
   }
 
   /* Copilot (etap F). BRAK KLUCZA NIE JEST BŁĘDEM KONFIGURACJI — stoi w
-     `ostrzezeniaKonfiguracji()` niżej. Do 0.230.0 zdanie o tym lądowało w TEJ
-     liście, a każda pozycja tej listy wywraca start: usługa mówiła „serwer
-     działa dalej" i umierała, czyli odwrotność tego, co obiecywał komentarz
-     i §14.5. Wyszło przy sprawdzaniu ekranu bez klucza w 0.231.0. */
+     `ostrzezeniaKonfiguracji()` niżej, bo każda pozycja tej listy wywraca
+     start (§14.5). */
   /* Model spoza rodziny `claude-` to niemal na pewno wklejka nie w to pole.
      Wartość przez maskę, bo to pole sąsiaduje z kluczem w wertis.env.example. */
   if (c.copilot.model && !c.copilot.model.startsWith("claude-")) {
@@ -1486,7 +1438,7 @@ export function bledyKonfiguracji(c: Config = config): string[] {
   if (c.zdjecia.zrodlo === "plik" && !c.zdjecia.katalog) {
     bledy.push("ZDJECIA_ZRODLO=plik wymaga ZDJECIA_KATALOG — katalogu ze zdjęciami.");
   }
-  /* Zapis zdjęcia do Subiekta (0.88.0). Objaw pomyłki byłby tu gorszy niż
+  /* Zapis zdjęcia do Subiekta. Objaw pomyłki byłby tu gorszy niż
      pusty slot: magazynier robi zdjęcie, widzi je na karcie — bo leży w bazie
      WERTIS — a do kartoteki nic nie wchodzi, bo zadanie ląduje w błędzie.
      Praca wygląda na wykonaną i nikt nie sprawdza kolejki. Dlatego niepełna
@@ -1544,9 +1496,6 @@ export function bledyKonfiguracji(c: Config = config): string[] {
       `TLO_URL=${bezpiecznaWartosc(c.tlo.url)} — ma być adresem http(s), np. http://127.0.0.1:8791.`,
     );
   }
-  /* Sprawdzenie `brakTtlH < 24` odeszło w 0.489.0 razem z kluczem: pamięć
-     braku jest stałą 12 h. Powód progu zostaje przy polu w `zdjecia`. */
-
   // Wzorce adresów przychodzą z env; zły regex wysypuje każdy skan, nie start.
   for (const p of c.locPatterns) {
     try {
@@ -1575,7 +1524,7 @@ export function bledyKonfiguracji(c: Config = config): string[] {
   if (c.allegro.mode === "http" && !c.allegro.clientId) {
     bledy.push("ALLEGRO_MODE=http wymaga ALLEGRO_CLIENT_ID i ALLEGRO_CLIENT_SECRET.");
   }
-  /* Ustawienie zdjęte w 0.152.0. Ciche zignorowanie byłoby gorsze niż błąd:
+  /* Ustawienie zdjęte. Ciche zignorowanie byłoby gorsze niż błąd:
      kto je zostawił, ten liczy, że działa, a zwroty milczałyby wtedy inaczej,
      niż każe wpis w `wertis.env`. */
   if ((process.env.ALLEGRO_ZWROTY_DNI_WSTECZ ?? "") !== "") {
@@ -1592,7 +1541,7 @@ export function bledyKonfiguracji(c: Config = config): string[] {
  * Ostrzeżenia: zdania do dziennika, które NIE zatrzymują startu.
  *
  * Osobna lista, bo „błąd konfiguracji" znaczy tu odmowę startu, a odmowa
- * startu w usłudze NSSM to pętla restartów — objaw blizny 0.84.x. Brak klucza
+ * startu w usłudze NSSM to pętla restartów. Brak klucza
  * Copilota ma dać działający serwer i zdanie na ekranie zamiast przycisku.
  */
 export function ostrzezeniaKonfiguracji(c: Config = config): string[] {

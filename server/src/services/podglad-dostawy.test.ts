@@ -138,7 +138,6 @@ function otworz(sym: string): { id: number; lineId: number } {
 const linia = (sym: string) => P.podgladDokumentu(DOK)!.lines.find((l) => l.sym === sym)!;
 
 test("odłożona pozycja niesie autora i godzinę", () => {
-  // te trzy kolumny leżały w bazie od 0.17.0 i nie czytał ich NIKT
   const { lineId } = otworz("LS51-139");
   D.putawayLine(lineId, "A01-02-03", "Jan Kowalski");
   const l = linia("LS51-139");
@@ -215,8 +214,7 @@ test("postęp liczy wyjątek jako domknięty (D8)", () => {
 /* ── Snapshot zostaje snapshotem ──────────────────────────────────────────── */
 
 test("pozycja NIETKNIĘTA idzie za kartoteką", () => {
-  /* Do 0.36.1 adres zamrażał się przy otwarciu dostawy i biuro oglądało go
-     nieaktualnym choćby przez tydzień. Tu obowiązuje ta sama reguła co na
+  /* Adres nie zamraża się przy otwarciu dostawy. Tu obowiązuje ta sama reguła co na
      kolektorze — inaczej dwa ekrany pokazywałyby dwie różne półki, żaden nie
      mówiąc, że to dwie różne liczby. */
   otworz("LS51-139");
@@ -252,8 +250,7 @@ test("podgląd otwartej dostawy nie kasuje niczego ze snapshotu", () => {
 test("podgląd niesie płatnika i flagę logo — panel wie, czy pytać o obraz", () => {
   /* Panel biura rysuje logo dostawcy przy dokumencie tak samo jak kolektor
      w swojej liście. Bez tej pary pól musiałby strzelać po obraz „na wszelki
-     wypadek" i zbierać serię 404 — dokładnie ten błąd dał w 0.56.0 355 wpisów
-     w dzienniku produkcyjnym na tysiąc. */
+     wypadek" i zbierać serię 404. */
   const d = db();
   d.prepare("DELETE FROM dostawca_logo").run();
   d.prepare("UPDATE sgt_dokument SET kh_id = 4100 WHERE dok_id = ?").run(DOK);

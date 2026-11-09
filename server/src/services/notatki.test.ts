@@ -178,10 +178,9 @@ test("ślad w audycie po obu stronach rozmowy", () => {
   assert.deepEqual(typy.map((t) => t.user_id), ["Ewa z biura", "Jan z hali"]);
 });
 
-/* ── Odpowiedź wraca do biura (0.57.0) ────────────────────────────────────────
+/* ── Odpowiedź wraca do biura ─────────────────────────────────────────────────
    Notatka wymusza odpowiedź, żeby pytanie nie zginęło. Ten sygnał domyka tę
-   samą pętlę z drugiej strony: do 0.57.0 odpowiedź widać było wyłącznie po
-   wejściu w tę konkretną dostawę, a biuro nie miało powodu tam wracać.       */
+   samą pętlę z drugiej strony: biuro nie ma powodu wracać do tej dostawy.   */
 
 test("notatka BEZ odpowiedzi nie trafia do biura", () => {
   // czeka na magazyniera, nie na biuro — mieszanie tych dwóch kolejek

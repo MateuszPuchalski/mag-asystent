@@ -1,11 +1,10 @@
-import React from "react";
 import { describe, expect, it } from "vitest";
 import { render, screen, within } from "@testing-library/react";
 import { Etapy } from "./Etapy";
 
-/* Oś etapów (0.453.0) zastąpiła zdania o tym, gdzie jest zwrot. Pilnujemy
-   trzech rzeczy: że bieżący przystanek jest oznaczony dla oka i dla czytnika,
-   że pytanie kubełka nie zginęło, tylko przeszło do podpowiedzi, i że odmowa
+/* Oś etapów mówi, gdzie jest zwrot. Pilnujemy trzech rzeczy: że bieżący
+   przystanek jest oznaczony dla oka i dla czytnika, że pytanie kubełka stoi
+   w podpowiedzi, i że odmowa
    nie obiecuje kroków, na które sprawa już nie wejdzie. */
 describe("Etapy zwrotu", () => {
   it("bieżący kubełek jest przystankiem `aria-current`, z pytaniem w podpowiedzi", () => {

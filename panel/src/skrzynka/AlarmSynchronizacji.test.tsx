@@ -1,7 +1,8 @@
 import { describe, expect, it, vi } from "vitest";
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { AlarmSynchronizacji, wiek } from "./AlarmSynchronizacji";
+import { AlarmSynchronizacji } from "./AlarmSynchronizacji";
+import { wiek } from "../ui";
 import type { Zdrowie } from "../api/typy";
 
 const zdrowie = (n: Partial<Zdrowie["allegroInbox"]> = {}): Zdrowie => ({
@@ -35,7 +36,7 @@ describe("AlarmSynchronizacji", () => {
 
   it("nie obiecuje, że ręczna synchronizacja ominie przerwę", () => {
     render(<AlarmSynchronizacji zdrowie={zdrowie()} synchronizuj={() => {}} trwa={false} blad="" />);
-    /* Od 0.517.0 zdanie stoi w dymku przycisku, nie w stałym akapicie —
+    /* Zdanie stoi w dymku przycisku, nie w stałym akapicie —
        obietnica dotyczy przycisku, więc tam ją prostujemy. */
     expect(screen.getByRole("button", { name: /Synchronizuj teraz/ }))
       .toHaveAttribute("title", expect.stringMatching(/Retry-After.*nie omija tej przerwy/));

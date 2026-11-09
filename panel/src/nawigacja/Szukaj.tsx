@@ -10,8 +10,7 @@ import { Blad, Pusto } from "../ui";
 import { PrzyciskTowaru } from "../towar/Szuflada";
 import { useOkno } from "./fokus";
 
-/* ── Szukanie ponad kolejkami, Ctrl+K (23 września 2026) ────────────────────
-   Każdy ekran miał własne pole szukania i trzeba było wiedzieć, które wybrać.
+/* ── Szukanie ponad kolejkami, Ctrl+K ───────────────────────────────────────
    Numer przesyłki w ręku nie mówi, czy to zwrot, czy dostawa. Jedno okno
    z każdego ekranu odpowiada na „gdzie to jest" bez znajomości naszego
    podziału na kolejki — punkt 1 dekalogu obsługi.
@@ -44,10 +43,9 @@ export function OknoSzukania({ onZamknij }: { onZamknij: () => void }) {
     return () => clearTimeout(t);
   }, [fraza]);
   const wynik = useSzukajWszedzie(zapytanie);
-  /* Wpisane TERAZ, nie po pauzie (24 września 2026). Zrzut właściciela:
-     pole puste, a okno dalej mówiło „nic nie pasuje do" starej frazy, bo
-     komunikat czytał zapytanie sprzed ćwierć sekundy. Stan okna idzie za
-     polem; serwer pyta się dalej po pauzie. */
+  /* Wpisane TERAZ, nie po pauzie: przy pustym polu okno nie może mówić
+     „nic nie pasuje do" starej frazy. Stan okna idzie za polem; serwer pyta
+     się dalej po pauzie. */
   const wpisane = fraza.trim();
   const czeka = wpisane !== zapytanie || wynik.isFetching;
   const trafienia = useMemo(() => (zapytanie.length >= 3 ? wynik.data?.trafienia ?? [] : []),
@@ -81,9 +79,9 @@ export function OknoSzukania({ onZamknij }: { onZamknij: () => void }) {
 
   return <div className="fixed inset-0 z-50 flex items-start justify-center bg-black/30 px-4 pt-[12vh]"
     onClick={onZamknij}>
-    {/* `text-slate-900` jawnie (0.515.0): okno rysuje się wewnątrz nagłówka
-        z `text-white`, więc wpisana fraza dziedziczyła biel na białym polu
-        i agent nie widział, co pisze. Zmierzone w przeglądarce. */}
+    {/* `text-slate-900` jawnie: okno rysuje się wewnątrz nagłówka
+        z `text-white`, więc wpisana fraza dziedziczyłaby biel na białym
+        polu. */}
     <div role="dialog" {...okno} aria-label="Szukaj wszędzie" onClick={(e) => e.stopPropagation()} onKeyDown={naKlawisz}
       className="flex max-h-[70vh] w-full max-w-2xl flex-col overflow-hidden rounded-xl bg-white text-slate-900 shadow-2xl">
       <label className="flex shrink-0 items-center gap-3 border-b px-4 py-3">

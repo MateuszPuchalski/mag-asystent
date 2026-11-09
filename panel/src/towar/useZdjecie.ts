@@ -1,42 +1,29 @@
 import { useEffect, useState } from "react";
 import { token } from "../api/klient";
 
-/* ── Zdjęcia kartotek w panelu obsługi (0.152.0) ─────────────────────────────
-   Pierwszy obraz w tym froncie. Panel magazynu (`biuro.html`) pokazuje je od
-   dawna i zapłacił po drodze za trzy rzeczy, których nie ma sensu kupować
-   drugi raz — więc ten moduł przenosi je razem z uzasadnieniami.
+/* ── Obrazy za sesją: jedna kolejka i jedna pamięć ───────────────────────────
+   Wszystkie źródła obrazów panelu idą przez ten moduł, bo mają tę samą
+   mechanikę. Osobna kopia rozjechałaby się z tą przy pierwszej poprawce,
+   a objawem byłaby lista dobijająca serwer o obrazy, których nie ma.
 
-   1. TRASA STOI ZA SESJĄ. `/api/products/:twId/zdjecie` żąda nagłówka
-      `x-session`, więc `<img src>` wprost dostanie 401. Obraz trzeba pobrać
-      `fetch`em i podać jako `blob:`.
-   2. PAMIĘĆ NEGATYWU. Mapa trzyma też `null` — „ten towar NA PEWNO nie ma
-      zdjęcia". Bez tego lista pytałaby serwer o brak przy każdym przerysowaniu,
-      a większość kartotek zdjęcia nie ma.
+   1. TRASA STOI ZA SESJĄ. Trasy obrazów żądają nagłówka `x-session`, więc
+      `<img src>` wprost dostanie 401 i narysuje ikonę zepsutego obrazu.
+      Obraz trzeba pobrać `fetch`em i podać jako `blob:`.
+   2. PAMIĘĆ NEGATYWU. Mapa trzyma też `null` — „ten obraz NA PEWNO nie
+      istnieje". Bez tego lista pytałaby serwer o brak przy każdym
+      przerysowaniu, a większość kartotek zdjęcia nie ma.
    3. NAJWYŻEJ TRZY POBRANIA NARAZ. Przy pierwszym trafieniu serwer ciągnie
       plik z bazy firmy; czterdzieści równoległych żądań zagłodziłoby
-      kolektory stojące przy regale. Ta liczba jest w `biuro.html` od
-      0.60.0 i ma tam ten sam komentarz.
+      kolektory stojące przy regale.
+
+   Klucz mapy to ŚCIEŻKA trasy, nie identyfikator towaru, bo źródeł jest
+   kilka: kartoteki, oferty Allegro, załączniki klienta i reklamacji, zdjęcia
+   hali i logo dostawców.
 
    Miniatur KARTOTEK nie ma i nie będzie: serwer nie skaluje obrazów (zero
    modułów natywnych). Kafel dostaje pełny obraz i `object-fit: cover`.
-
-   ── DRUGIE ŹRÓDŁO OBRAZÓW (0.213.0) ───────────────────────────────────────
-   Doszły zdjęcia listingowe ofert Allegro. Mechanika jest CO DO JOTY ta sama —
-   sesja w nagłówku, pamięć negatywu, trzy pobrania naraz — więc kolejka i mapa
-   są wspólne, a klucz zmienił się z `twId` na ŚCIEŻKĘ trasy. Druga kopia tych
-   trzech rzeczy rozjechałaby się z pierwszą przy pierwszej poprawce, a objawem
-   rozjazdu byłaby lista dobijająca serwer o obrazy, których nie ma.
-
-   Miniatury ofert ISTNIEJĄ i robi je CDN Allegro — zmniejsza serwer, ale nie
-   nasz. Panel o tym nie wie i wiedzieć nie musi: dostaje adres własnej trasy,
-   a rozmiar dobiera `services/zdjecia-ofert.ts`.
-
-   ── TRZECIE ŹRÓDŁO: ZAŁĄCZNIKI KLIENTA (0.219.1) ──────────────────────────
-   0.218.0 wystawiło zdjęcie z wiadomości wprost przez `<img src>` — czyli
-   dokładnie tak, jak punkt 1 wyżej ZABRANIA od 0.152.0. Na ekranie właściciela
-   wyszła ikona zepsutego obrazu, bo trasa oddała 401. Blizna kupiona trzeci
-   raz w tym samym froncie; dlatego załączniki dochodzą TUTAJ, a nie dostają
-   własnego pobierania obok.                                                  */
+   Miniatury ofert robi CDN Allegro, a rozmiar dobiera
+   `services/zdjecia-ofert.ts` — panel dostaje adres własnej trasy.         */
 
 const ROWNOLEGLE = 3;
 
@@ -149,8 +136,7 @@ function zamow(sciezka: string): Promise<string | null> {
  * `undefined` znaczy „jeszcze nie wiadomo" i tylko wtedy wolno pokazać stan
  * ładowania — inaczej kafel migałby przy każdym przerysowaniu listy.
  *
- * Adresów `blob:` nie zwalniamy: żyją do przeładowania panelu, dokładnie jak
- * w `biuro.html`. Zwolnienie przy odmontowaniu komponentu unieważniłoby je
+ * Adresów `blob:` nie zwalniamy: żyją do przeładowania panelu. Zwolnienie przy odmontowaniu komponentu unieważniłoby je
  * drugiemu miejscu, które pokazuje ten sam towar.
  */
 function useObraz(sciezka: string | null): string | null | undefined {
@@ -175,11 +161,9 @@ function useObraz(sciezka: string | null): string | null | undefined {
        bierze `useZdjecieZalacznika`. */
     : bladSwiezy(sciezka) !== null ? null : undefined;
 
-  /* Zamówienie idzie za STANEM, nie za montażem. Do 0.248.0 pytał tylko efekt
-     montażu, więc gdy po minucie wpis porażki wygasł, a komponent przerysował
-     się z innego powodu (błąd pobrania w stanie lokalnym), hak oddawał
-     `undefined` i nikt nie pytał serwera — ramka „wczytuję…" stała na stałe,
-     bez ponowienia. Zrzut właściciela z 10 września to dokładnie ten stan.
+  /* Zamówienie idzie za STANEM, nie za montażem. Gdy wpis porażki wygaśnie,
+     a komponent przerysuje się z innego powodu, hak ma zapytać serwer
+     ponownie — inaczej ramka „wczytuję…" stałaby na stałe.
      Świeża porażka dalej NIE pyta drugi raz — `stan` jest wtedy `null`. */
   useEffect(() => {
     if (sciezka != null && stan === undefined && !wToku.has(sciezka)) void zamow(sciezka);
@@ -207,7 +191,7 @@ export function useZdjecie(twId: number | null | undefined): string | null | und
 }
 
 /**
- * Zdjęcie listingowe oferty Allegro (0.213.0).
+ * Zdjęcie listingowe oferty Allegro.
  *
  * Adres jest NASZ, nie `a.allegroimg.com` — zakaz wyprowadzania przeglądarki
  * biura poza własną sieć obowiązuje dalej, a plik ciągnie serwer. Panel nie
@@ -229,11 +213,10 @@ export const sciezkaPodgladuReklamacji = (reklamacjaId: number, zalacznikId: num
   `/api/obsluga/reklamacje/${reklamacjaId}/zalaczniki/${zalacznikId}/podglad`;
 
 /**
- * Podgląd załącznika wiadomości (0.219.1).
+ * Podgląd załącznika wiadomości.
  *
- * Trasa `/api/obsluga/zalaczniki/:id/podglad` stoi za sesją jak dwie poprzednie,
- * więc `<img src>` na nią dostaje 401 i rysuje ikonę zepsutego obrazu. Wspólna
- * kolejka jest tu warta więcej niż przy kartotekach: jedna wiadomość niesie
+ * Wspólna kolejka jest tu warta więcej niż przy kartotekach: jedna wiadomość
+ * niesie czasem kilka zdjęć z telefonu, a te bywają wielomegabajtowe.
  * czasem kilka zdjęć z telefonu, a te bywają wielomegabajtowe.
  *
  * `null` (nieudane pobranie) NIE jest awarią ekranu — pod obrazem stoi nazwa
@@ -244,28 +227,21 @@ export function useZdjecieZalacznika(id: number | null | undefined): {
 } {
   const sciezka = id == null ? null : sciezkaPodgladuSkrzynki(id);
   const url = useObraz(sciezka);
-  /* Zdanie i ponowienie WYŁĄCZNIE tutaj: w skrzynce brak zdjęcia to sama
-     nazwa pliku bez powodu, a właściciel patrzył na to od 0.219.2. Kartoteka
-     i oferta zostają przy `null` — tam brak obrazu jest stanem codziennym. */
+  /* Zdanie i ponowienie WYŁĄCZNIE tutaj: w skrzynce brak zdjęcia bez powodu
+     to sama nazwa pliku. Kartoteka i oferta zostają przy `null` — tam brak
+     obrazu jest stanem codziennym. */
   const { blad, ponow } = useBladObrazu(sciezka);
   return { url, blad, ponow };
 }
 
 /**
- * CZWARTE ŹRÓDŁO: załączniki reklamacji (0.223.0).
+ * Załączniki reklamacji.
  *
- * Ta sama mechanika, co przy trzech poprzednich — sesja w nagłówku, pamięć
- * negatywu, trzy pobrania naraz — więc wchodzi do WSPÓLNEJ kolejki, a nie
- * obok niej. Osobne pobieranie rozjechałoby się z tym przy pierwszej
- * poprawce; nagłówek tego pliku opisuje, ile razy już to kosztowało.
- *
- * TEN SAM KSZTAŁT WYNIKU, CO W SKRZYNCE (wydanie „wspólny załącznik"). Do tej
- * pory hak oddawał sam adres, więc czat reklamacji nie umiał powiedzieć,
- * CZEMU zdjęcia nie ma — 503 „konto niepołączone" wyglądało dokładnie jak
- * 415 „to nie obraz" i spadało na przycisk pobrania bez słowa. Dwa źródła
- * o różnym kształcie wyniku to dwa rysunki tego samego na ekranie; jeden
- * z nich zawsze zostaje w tyle przy poprawce. Zmiana nazwy jest celowa:
- * atrapa ze starą nazwą ma krzyknąć brakiem eksportu, nie oddać cicho string.
+ * TEN SAM KSZTAŁT WYNIKU, CO W SKRZYNCE. Sam adres nie mówi, CZEMU zdjęcia
+ * nie ma — 503 „konto niepołączone" wyglądałoby dokładnie jak 415 „to nie
+ * obraz" i spadało na przycisk pobrania bez słowa. Dwa źródła o różnym
+ * kształcie wyniku to dwa rysunki tego samego na ekranie; jeden z nich
+ * zawsze zostaje w tyle przy poprawce.
  *
  * `null` w `zalacznikId` = nie pytaj: plik bez `podglad` (PDF, paragon) nie
  * dobija trasy, która i tak odda 415.
@@ -280,12 +256,7 @@ export function useZdjecieZalacznikaReklamacji(
 }
 
 /**
- * PIĄTE ŹRÓDŁO: zdjęcie od hali przy zadaniu terenowym (0.352.0).
- *
- * Ta sama mechanika co przy czterech poprzednich i z tego samego powodu:
- * `/api/zadania-terenowe/:id/zalacznik/:zid` stoi za sesją, więc `<img src>`
- * dostaje 401 i rysuje ikonę zepsutego obrazu. Nagłówek tego pliku liczy, ile
- * razy ta blizna już kosztowała — piąty raz kupowałby ją świadomie.
+ * Zdjęcie od hali przy zadaniu terenowym.
  *
  * Zdanie o porażce jest tu potrzebne jak w skrzynce, nie jak przy kartotece:
  * zdjęcie z hali jest CZĘŚCIĄ ODPOWIEDZI na pytanie klienta. Jego brak bez
@@ -302,12 +273,7 @@ export function useZdjecieZadania(
 }
 
 /**
- * SZÓSTE I SIÓDME ŹRÓDŁO: zdjęcie dowodowe z hali i logo dostawcy (0.435.0).
- *
- * Przyszły z `biuro.html` razem z ekranem dostaw. Tam miały własną kolejkę
- * i własną pamięć — tę samą mechanikę, z której ten plik powstał w 0.152.0.
- * Druga kopia w panelu byłaby dokładnie tym rozjazdem, przed którym ostrzega
- * nagłówek: lista dostaw dobijałaby serwer o obrazy, których nie ma.
+ * Zdjęcie dowodowe z hali i logo dostawcy.
  *
  * Zdjęcie dowodowe to PODSTAWA REKLAMACJI u dostawcy, więc jego brak ma powód
  * na ekranie, jak w skrzynce — a nie cichy pusty kafel.
@@ -349,7 +315,7 @@ export function useLogoDostawcy(khId: number | null | undefined, maLogo: boolean
 export const sciezkaLogo = (khId: number) => `/api/dostawcy/${khId}/logo`;
 
 /**
- * Zapomina obraz pod ścieżką i każe go pobrać od nowa (0.444.0).
+ * Zapomina obraz pod ścieżką i każe go pobrać od nowa.
  *
  * Pamięć tego pliku trzyma obraz do przeładowania panelu — i to jest dobre
  * dla zdjęć, które się nie zmieniają. Logo dostawcy zmienia się z ustawień

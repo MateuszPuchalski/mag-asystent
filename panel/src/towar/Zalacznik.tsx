@@ -57,8 +57,8 @@ function nazwaZPobraniem(nazwa: string, pobierz: (() => Promise<void>) | null,
   return <span className="flex min-w-0 items-center gap-1.5">
     <Paperclip size={12} className="shrink-0 text-slate-400" />
     {pobierz
-      /* PRZYCISK, nie odnośnik: `<a href>` nie niesie nagłówka `x-session`
-         i pobranie było przez to zepsute od 0.155.0 do 0.219.1. */
+      /* PRZYCISK, nie odnośnik: `<a href>` nie niesie nagłówka `x-session`,
+         więc pobranie by nie działało. */
       ? <button type="button" className="min-w-0 break-all text-left font-bold text-slate-700 underline hover:text-slate-900"
           onClick={() => {
             setBladPobrania(null);
@@ -150,9 +150,9 @@ export function KartaZalacznika({ nazwa, podglad, obraz, pobierz, powodBrakuPobr
 }
 
 /* ── Kafel w dymku rozmowy ───────────────────────────────────────────────────
-   Makieta właściciela stawia zdjęcia W DYMKU wiadomości, kaflami 112×84.
-   Pełne zdjęcie do 256 px wypychało następną wiadomość poza ekran, a osobna
-   kolumna rozrywała wiadomość od jej zdjęcia. Kafel mówi „co klient przysłał”,
+   Zdjęcia stoją W DYMKU wiadomości, kaflami 112×84. Pełne zdjęcie do 256 px
+   wypychałoby następną wiadomość poza ekran, a osobna kolumna rozrywałaby
+   wiadomość od jej zdjęcia. Kafel mówi „co klient przysłał”,
    a szczegół daje powiększenie jednym kliknięciem.
 
    DWA CELE W JEDNYM KAFLU: obraz powiększa, pasek z nazwą pobiera. Pobranie

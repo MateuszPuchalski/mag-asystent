@@ -78,7 +78,7 @@ const kto = () => {
 
 /** Jedno zdanie o tym, dlaczego przycisku nie ma. Pisze je SERWER. */
 /**
- * Szkic zaraz po rozpoznaniu (23 września 2026) — W TLE, bo partia ma do
+ * Szkic zaraz po rozpoznaniu — W TLE, bo partia ma do
  * dwudziestu rozmów po kilka sekund każda. Oddaje, ile szkiców zlecono, żeby
  * panel mógł powiedzieć „układam szkic" zamiast milczeć. Wyłączony Copilot
  * i przełącznik w `wertis.env` nie zlecają niczego — testy tras nie mają
@@ -114,11 +114,11 @@ export async function copilotRoutes(app: FastifyInstance) {
       wlaczony: czemuWylaczony() === null,
       powod: czemuWylaczony(),
       model: config.copilot.model,
-      /* Osobny model klasyfikacji (22 września 2026) — bez niego ekran nie
+      /* Osobny model klasyfikacji — bez niego ekran nie
          miałby jak powiedzieć, że etykieta i szkic idą różnymi modelami. */
       modelKlasyfikacji: modelKlasyfikatora(),
       maxPartia: config.copilot.maxPartia,
-      /* Czy automat sam rozpoznaje i układa (22 września 2026). Panel chowa
+      /* Czy automat sam rozpoznaje i układa. Panel chowa
          po tym ręczne „Rozpoznaj" do roli ponowienia: przycisk, który robi to
          samo co takt, uczyłby płacić dwa razy za jedną etykietę. */
       autoKlasyfikacja: config.copilot.autoKlasyfikacja,
@@ -127,7 +127,7 @@ export async function copilotRoutes(app: FastifyInstance) {
     };
   });
 
-  /* Pomiar siedzi ZA ZĘBATKĄ (0.168.0): ekran pracy niesie to, co woła
+  /* Pomiar siedzi ZA ZĘBATKĄ: ekran pracy niesie to, co woła
      o reakcję, a diagnostyka mieszka w ustawieniach. */
   app.get("/api/obsluga/copilot/pomiar", async (_req, reply) => {
     const nie = odmowa(reply);

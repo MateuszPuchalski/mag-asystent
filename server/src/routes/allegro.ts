@@ -12,7 +12,7 @@ import { ROLE_BIUROWE } from "../services/users.js";
 import { stanProblemowZakupu } from "../services/allegro-inbox-sync-state.js";
 import { db } from "../db/db.js";
 
-/* ── Konto Allegro — parowanie i stan (0.140.0) ──────────────────────────────
+/* ── Konto Allegro — parowanie i stan ──────────────────────────────
    Te cztery trasy mieszkały do 0.137.2 w `routes/zwroty.ts` i odeszłyby razem
    z rejestrem zwrotów. Zostają, bo token nie należał do zwrotów: to jedno
    połączenie konta sprzedawcy, z którego skorzysta nowa obsługa klienta,

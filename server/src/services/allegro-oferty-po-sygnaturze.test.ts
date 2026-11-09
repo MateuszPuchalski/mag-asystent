@@ -5,8 +5,7 @@ import { DatabaseSync } from "node:sqlite";
 import { migrate } from "../db/db.js";
 import { ofertyPoSygnaturze, SYGNATUR_NA_ZADANIE } from "./allegro-oferty-po-sygnaturze.js";
 
-/* ── Która z NASZYCH ofert sprzedaje tę kartotekę (0.270.0) ──────────────────
-   Serwis odpowiada na pytanie, na które do 0.269.0 nie odpowiadał nikt.
+/* ── Która z NASZYCH ofert sprzedaje tę kartotekę ────────────────────────────
    Testy pilnują czterech rzeczy, z których każda jest decyzją, nie detalem:
    pytamy JEDNYM żądaniem i tylko o aktywne, błąd nie przerywa szkicu, pusta
    lista nie idzie do sieci wcale, a oferta bez sygnatury milczy zamiast
@@ -65,7 +64,7 @@ test("pusta lista sygnatur NIE idzie do sieci", async () => {
 test("błąd Allegro NIE przerywa szkicu — także limit", async () => {
   /* To jest OSTATNIE żądanie do Allegro na drodze szkicu, więc reguła
      „limit przerywa, bo drugie żądanie pogłębia przerwę" nie ma tu czego
-     chronić. Szkic bez linku jest wart tyle, ile był wart do 0.269.0. */
+     chronić. Szkic bez linku jest coś wart. */
   const d = baza();
   const wynik = await ofertyPoSygnaturze(["W28-0304"], {
     database: d, query: async () => { throw new Error("429 Too Many Requests"); },

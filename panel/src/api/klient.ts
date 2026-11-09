@@ -6,7 +6,7 @@ const KLUCZ = "wertis-panel-token";
 /** Sesja wygasła albo jej nie ma — ekran ma wrócić do logowania, nie do błędu. */
 export class BrakSesji extends Error {}
 
-/* ── SESJA WYGASŁA W TRAKCIE PRACY (0.431.0) ────────────────────────────────
+/* ── SESJA WYGASŁA W TRAKCIE PRACY ──────────────────────────────────────────
    Do tej wersji 401 kończyło się na `BrakSesji` i niczym więcej: react-query
    przestawał ponawiać, a ekran zostawał z pustymi kolumnami i starym
    nagłówkiem. Człowiek nie dostawał formularza logowania, dopóki sam nie
@@ -20,7 +20,7 @@ export function zglosBrakSesji(blad: unknown): void {
   if (blad instanceof BrakSesji) window.dispatchEvent(new Event(SESJA_WYGASLA));
 }
 
-/* ── SERWER NIE ODPOWIADA (0.546.0) ─────────────────────────────────────────
+/* ── SERWER NIE ODPOWIADA ───────────────────────────────────────────────────
    Serwer bierze wydanie sam, kilka razy dziennie, i na chwilę znika. Panel
    pokazywał wtedy angielskie „Failed to fetch" albo gołe „Błąd 502", a listy
    bez danych mówiły „nic nie czeka" — agent brał brak połączenia za brak
@@ -79,10 +79,7 @@ export async function api<T = any>(sciezka: string, init: RequestInit = {}): Pro
      treść zadeklarowaną jako JSON (FST_ERR_CTP_EMPTY_JSON_BODY, 400), a ekran
      pokazuje wtedy gołe „Bad Request".
 
-     To jest blizna z `biuro.html` (patrz komentarz przy tamtejszym `api()`)
-     kupiona drugi raz. Tam kosztowała cztery martwe czynności naraz; tutaj —
-     przycisk SYNCHRONIZUJ TERAZ, czyli ten, który ma pomóc, gdy synchronizacja
-     stoi. Kolektor zna tę regułę osobno: `ApiService.kt` wysyła `EMPTY_BODY`
+     Kolektor zna tę regułę osobno: `ApiService.kt` wysyła `EMPTY_BODY`
      bez nagłówka typu.
 
      Kusi, żeby to uprościć z powrotem do jednego obiektu. Nie upraszczaj:
@@ -114,13 +111,11 @@ export async function api<T = any>(sciezka: string, init: RequestInit = {}): Pro
 }
 
 /**
- * Pobranie pliku na dysk agenta (0.219.1).
+ * Pobranie pliku na dysk agenta.
  *
  * ── DLACZEGO NIE `<a href>` ───────────────────────────────────────────────
  * Sesja jedzie NAGŁÓWKIEM, a zwykły odnośnik nagłówków nie niesie — kliknięcie
  * wychodzi bez `x-session` i serwer odpowiada „Brak sesji — zaloguj się".
- * Załączniki wiadomości miały ten błąd od 0.155.0: nazwa pliku była
- * odnośnikiem, więc pobranie NIGDY nie działało, a wyglądało, jakby działało.
  *
  * Token do adresu NIE WCHODZI. Ścieżki lądują w logach serwera, w historii
  * przeglądarki i w nagłówku `Referer`, więc klucz sesji w adresie to klucz

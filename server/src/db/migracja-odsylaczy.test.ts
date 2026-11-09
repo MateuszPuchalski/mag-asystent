@@ -14,7 +14,7 @@ import { migrate } from "./db.js";
 
 const schema = fs.readFileSync(new URL("./schema.sql", import.meta.url), "utf8");
 
-/* Kształt z produkcji między 0.264.0 a importem odsyłaczy — co do kolumny. */
+/* Kształt z produkcji sprzed importu odsyłaczy — co do kolumny. */
 const STARA = `CREATE TABLE towar_identyfikator (
   id              INTEGER PRIMARY KEY AUTOINCREMENT,
   tw_id           INTEGER NOT NULL,

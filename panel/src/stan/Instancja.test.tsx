@@ -4,10 +4,9 @@ import React from "react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { EtykietaInstancji } from "./Instancja";
 
-/* ── Etykieta instancji (0.446.0) ─────────────────────────────────────────
-   Gwarancja przeniesiona z ikony SYSTEM w `biuro.html` (0.69.0): instancja
-   inna niż produkcja jest podpisana na każdym ekranie, a produkcja nie
-   dostaje znaczka wcale — wieczny znaczek przestaje być widziany. */
+/* ── Etykieta instancji ───────────────────────────────────────────────────
+   Instancja inna niż produkcja jest podpisana na każdym ekranie, a produkcja
+   nie dostaje znaczka wcale — wieczny znaczek przestaje być widziany. */
 
 const HEALTH = {
   allegroInbox: { status: "current", alarm: false, ostatniaProba: null, ostatniaUdanaSynchronizacja: null,

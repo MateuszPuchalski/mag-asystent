@@ -4,7 +4,7 @@ import { coSwieci, historiaPozaZakupem, historiaWierszaKlienta, klientMaHistorie
   ofertaWKarcie, paczkaWyzej, pozycjeWKolumnie, towarOtwartyNaStart }
   from "./kokpit";
 
-/* ── Reguły ciemnego kokpitu (0.498.0) ──────────────────────────────────────
+/* ── Reguły ciemnego kokpitu ────────────────────────────────────────────────
    Szara linia jest bezpieczna tylko wtedy, gdy reguła „w normie" nie kłamie.
    Dlatego każda reguła ma tu parę: stan, w którym gaśnie, i stan, w którym
    MUSI się zapalić. Test tylko z pierwszej połowy przepuściłby regułę, która
@@ -57,7 +57,7 @@ describe("co świeci w kolumnie kontekstu", () => {
     expect(coSwieci(z("ISSUE", "2026-09-25T10:00:00Z"))).toEqual([]);
   });
 
-  /* Soczewka paczki (0.531.0) stoi nad „Wymaga Ciebie" i mówi o awizo sama.
+  /* Soczewka paczki stoi nad „Wymaga Ciebie" i mówi o awizo sama.
      Para jak wszędzie tutaj: przy pytaniu o towar awizo dalej musi świecić. */
   it("awizo nie świeci drugi raz, gdy paczkę pokazuje soczewka", () => {
     const z = (kategoria: string) => dane({
@@ -76,7 +76,7 @@ describe("co świeci w kolumnie kontekstu", () => {
   });
 });
 
-/* ── Karta towaru otwarta tylko przy pytaniu o towar (0.506.0) ─────────────
+/* ── Karta towaru otwarta tylko przy pytaniu o towar ───────────────────────
    Zgłoszenie agenta: „przytłacza". Przy zwrocie, dostawie czy fakturze karta
    oferty z cenami i EAN stała otwarta, choć pasmo mówiło już nazwę i stan. */
 describe("karta towaru na starcie według rodzaju pytania", () => {
@@ -90,7 +90,7 @@ describe("karta towaru na starcie według rodzaju pytania", () => {
   });
 });
 
-/* ── Puste wiersze znikają (0.531.0, decyzja właściciela z 26 września) ──
+/* ── Puste wiersze znikają, decyzją właściciela ─────────────────────────────
    Para przy każdej regule: stan, w którym wiersz gaśnie, i stan, w którym
    MUSI stanąć. Reguła gasząca wszystko schowałaby klienta z historią. */
 describe("pusty wiersz Klient", () => {
@@ -128,7 +128,7 @@ describe("historia bez tego zakupu", () => {
       sprawa,
     });
     const poza = historiaPozaZakupem(pelna, "z")!;
-    /* Rozmowa z numerem tego zamówienia też zostaje. Serwer daje dziś
+    /* Rozmowa z numerem tego zamówienia też zostaje. Serwer daje
        rozmowom pusty numer, a reguła ma przetrwać dzień, w którym zacznie
        go podawać: inna rozmowa to wcześniejszy kontakt, nie ten zakup. */
     expect(poza.wpisy.map((w) => `${w.rodzaj}:${w.zamowienieId}`))

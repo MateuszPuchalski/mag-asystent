@@ -44,7 +44,7 @@ function zalogowany(rola: Rola): string {
   return token;
 }
 
-/* Analiza dostaw (0.100.0) dzieli tę bramkę, choć jej dane nie są imienne.
+/* Analiza dostaw dzieli tę bramkę, choć jej dane nie są imienne.
    Powód jest inny i wypisany przy trasie: karta odpowiada na „u którego
    dostawcy jest problem", a to ocena kontrahenta, nie stan magazynu. */
 const CHRONIONE = ["/api/analiza", "/api/analiza/csv", "/api/biuro/dostawy/analiza", "/api/analiza/obsluga",
@@ -80,7 +80,7 @@ test("biuro dostaje komplet sekcji", async () => {
   assert.ok(a.rytm);
   assert.ok(a.szukania);
   assert.ok(Array.isArray(a.urzadzenia));
-  /* Raport per osoba jest od 0.431.0 wyłącznie administratora, decyzją
+  /* Raport per osoba jest wyłącznie administratora, decyzją
      właściciela — biuro dostaje resztę analizy bez niego. */
   assert.equal(a.wydajnosc, null, "rola biuro nie dostaje raportu per osoba");
 });
@@ -142,7 +142,7 @@ test("śmieciowe okno wraca do 7 dni, nie wywraca", async () => {
 });
 
 test("CSV: BOM, sekcje i podstawa prawna nad danymi imiennymi", async () => {
-  // Sekcja imienna trafia wyłącznie do administratora (0.431.0).
+  // Sekcja imienna trafia wyłącznie do administratora.
   const token = zalogowany("admin");
   const r = await app.inject({
     method: "GET",
@@ -185,7 +185,7 @@ test("czas odpowiedzi: biuro bez rozbicia na osoby, administrator z nim", async 
 });
 
 test("pomiar tarcia: biuro bez rozbicia na osoby, administrator z nim", async () => {
-  /* 0.500.0. Udział szkiców wysłanych bez zmian na osobę to ocena pracy
+  /* Udział szkiców wysłanych bez zmian na osobę to ocena pracy
      człowieka — ta sama reguła co czas odpowiedzi. */
   const czytaj = async (t: string) => (await app.inject({
     method: "GET", url: "/api/analiza/tarcie?days=30", headers: { "x-session": t } })).json();
@@ -198,7 +198,7 @@ test("pomiar tarcia: biuro bez rozbicia na osoby, administrator z nim", async ()
 });
 
 test("pomiary pod decyzje: cztery sekcje dla biura, bez ludzi i bez zapisu przy odczycie", async () => {
-  /* 26 września 2026, 0.532.0. Okno cofnięcia, tarcie przy szkicu,
+  /* Okno cofnięcia, tarcie przy szkicu,
      gotowość per klasa i pominięcia to liczby o SKRZYNCE, nie o osobach —
      więc biuro dostaje je w całości, a odczyt niczego nie dopisuje. */
   const t = zalogowany("biuro");
@@ -216,7 +216,7 @@ test("pomiary pod decyzje: cztery sekcje dla biura, bez ludzi i bez zapisu przy 
   assert.equal(zapisow(), przed, "odczyt pomiaru dopisał zdarzenie");
 });
 
-/* Raporty tygodni (0.497.0). Trasy tylko czytają: raport zapisuje takt
+/* Raporty tygodni. Trasy tylko czytają: raport zapisuje takt
    w `main()`, a tydzień niepoliczony to 404, nie liczenie w locie. */
 test("raporty tygodni: lista, raport z poprzednim, 404 i zero zapisu", async () => {
   const token = zalogowany("biuro");

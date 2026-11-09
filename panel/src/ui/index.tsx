@@ -16,27 +16,24 @@ export const Przycisk = ({ wariant = "drugi", className = "", ...p }: PrzyciskPr
   <button className={`${wariant === "glowny" ? "btn-primary" : "btn-secondary"} ${className}`} {...p} />;
 
 /**
- * Nagłówek sekcji w kolumnie kontekstu (0.249.0).
+ * Nagłówek sekcji w kolumnie kontekstu.
  *
- * Trzy sekcje tej samej rangi — Oferta, Zamówienie, Subiekt GT — miały trzy
- * różne kształty: dwie `<b>` w 14 px przy ikonie 15 px, trzecia plakietkę
- * z wersalikami. Czytelnik nie ma jak wiedzieć, że to jeden poziom.
+ * Sekcje tej samej rangi — Oferta, Zamówienie, Subiekt GT — mają jeden
+ * kształt, żeby czytelnik widział, że to jeden poziom.
  *
  * Nagłówek CICHNIE do etykiety, zamiast rosnąć. Nazwa towaru pod nim jest
  * treścią sekcji i to ona ma być w niej najgłośniejsza; nagłówek mówi tylko,
  * czyje to dane — a §4.3 żąda, żeby to było widać przy każdym fakcie.
  */
 /**
- * Etykieta pojedynczej WARTOŚCI (0.256.0).
+ * Etykieta pojedynczej WARTOŚCI.
  *
- * To nie jest nagłówek sekcji, choć wygląda podobnie i dlatego rozjechało się
- * na cztery zapisy: dwa razy 12 px bez wagi, raz 11 px bez wagi, raz 10 px
- * półgrubo. Nagłówek nazywa BLOK, ta etykieta nazywa jedną liczbę albo jedno
- * zdanie stojące tuż obok.
+ * To nie jest nagłówek sekcji, choć wygląda podobnie. Nagłówek nazywa BLOK,
+ * ta etykieta nazywa jedną liczbę albo jedno zdanie stojące tuż obok.
  *
  * Dlatego NIE jest pogrubiona, a nagłówek sekcji jest: waga to jedyne, co je
  * na ekranie rozróżnia, gdy obie są drobne i w wersalikach. Przy „Dostępny"
- * pogrubienie było wręcz szkodliwe — etykieta konkurowała z liczbą 24 px,
+ * pogrubienie byłoby wręcz szkodliwe — etykieta konkurowałaby z liczbą 24 px,
  * którą podpisuje.
  */
 export const EtykietaWartosci = ({ className = "", children }: {
@@ -45,11 +42,8 @@ export const EtykietaWartosci = ({ className = "", children }: {
   <span className={`text-podpis uppercase tracking-wide text-slate-500 ${className}`}>
     {children}</span>;
 
-/* ── ROZSZERZONY NA CAŁY PANEL (0.256.0) ─────────────────────────────────────
-   Do 0.255.0 używały go trzy pliki, a obok stało SIEDEMNAŚCIE ręcznie
-   sklejonych nagłówków tej samej rangi, w pięciu wagach (`font-bold`,
-   `font-semibold`, gołe) i dwóch rozmiarach (11 px i 12 px). Pięć zapisów
-   jednej roli to nie jest wariant — to brak decyzji.
+/* ── JEDEN NAGŁÓWEK SEKCJI NA CAŁY PANEL ─────────────────────────────────────
+   Kilka zapisów jednej roli to nie jest wariant — to brak decyzji.
 
    `jako` istnieje, bo znacznik niesie ZNACZENIE, nie tylko wygląd: tam, gdzie
    stało `<h3>`, czytnik ekranu ma dalej słyszeć nagłówek. Domyślny `<span>`
@@ -89,18 +83,14 @@ export const KLASA_STATUSU: Record<string, string> = {
   "closed": "bg-stan-zamknieta text-stan-zamknieta-tekst",
   "spam": "bg-stan-spam text-stan-spam-tekst",
 };
-/**
- * Ranga i jej barwa pisma — JEDNA mapa (0.536.1). Do tego wydania mieszkała
- * wyłącznie w `skrzynka/StanIntegracji.tsx`; zdania o dosyłce potrzebowały
- * tej samej i zamiast drugiej kopii mapa przeszła tutaj.
- */
+/** Ranga i jej barwa pisma — JEDNA mapa dla stanu integracji i zdań o dosyłce. */
 export type Ranga = "zle" | "uwaga" | "ok" | "nic";
 export const BARWA_RANGI: Record<Ranga, string> = {
   zle: "text-ranga-zle", uwaga: "text-ranga-uwaga", ok: "text-ranga-ok", nic: "text-ranga-nic",
 };
 
 /**
- * Barwa zdania z tonem serwera (0.536.0) — dziś zdania o dosyłce.
+ * Barwa zdania z tonem serwera — dziś zdania o dosyłce.
  *
  * To samo zdanie pada na ekranie zwrotu, na profilu i przy historii kolejek,
  * więc barwę bierze z mapy wyżej, nie z własnej. Bez tonu pismo jest zwykłe,
@@ -114,29 +104,18 @@ export const Plakietka = ({ status, children, className = "" }:
     KLASA_STATUSU[status ?? ""] ?? "bg-slate-100 text-slate-600"} ${className}`}>{children}</span>;
 
 /* ── JEDEN KSZTAŁT WYBORU NA CAŁY PANEL ──────────────────────────────────────
-   Rząd pigułek, z których jedna jest wybrana, stał w panelu SZEŚĆ RAZY
-   w TRZECH kształtach. Atrament na szarej bieżni (kubełki skrzynki, zakładki
-   kontekstu), atrament bez tła nieaktywnego na własnej białej bieżni (filtr
-   zadań) i bursztyn bez tła nieaktywnego (kubełki zwrotów i reklamacji
-   — ten sam kod przepisany dwa razy, znak w znak). Do tego trzy
-   rozmiary pisma, dwa promienie i dwie wagi.
+   Rząd pigułek, z których jedna jest wybrana, ma w panelu jeden kształt.
+   Agent przechodzący ze Skrzynki na Zwroty nie musi odczytywać na nowo, co
+   tu znaczy „wybrane".
 
-   Agent przechodzący ze Skrzynki na Zwroty musiał za każdym razem odczytać na
-   nowo, co tu znaczy „wybrane". Trzy zapisy jednej roli to nie są warianty,
-   tylko brak decyzji — ta sama diagnoza, co przy nagłówku sekcji w 0.256.0.
-
-   WYGRAŁ ATRAMENT NA SZAREJ BIEŻNI i to nie jest wybór większościowy, tylko
-   dwa argumenty. Po pierwsze, nieaktywna pigułka Z TŁEM mówi „wybiera się
-   JEDEN z tych", a bez tła mówi „oto kilka rzeczy do kliknięcia" — dokładnie
-   ten argument postawiło 0.247.0 przy przełączniku edytora. Po drugie,
-   bursztyn niesie już markę, akcję główną, kropkę nieprzeczytanego i pasmo
-   ostrzeżenia; zdjęcie mu piątego znaczenia jest zaliczką na ustalenie 02.
+   ATRAMENT NA SZAREJ BIEŻNI, z dwóch powodów. Po pierwsze, nieaktywna
+   pigułka Z TŁEM mówi „wybiera się JEDEN z tych", a bez tła mówi „oto kilka
+   rzeczy do kliknięcia". Po drugie, bursztyn niesie już markę, akcję główną,
+   kropkę nieprzeczytanego i pasmo ostrzeżenia.
 
    PRÓG DOTYKU WCHODZI DO KOMPONENTU. `py-1` przy interlinii 12/16 daje 24 px,
-   czyli próg 2.5.8 z WCAG 2.2 AA. Do 0.261.0 pilnowała tego bramka osobno
-   w każdym pliku — i przegapiła kategorie Copilota, bo szukała znacznika
-   `<button` trzy linie nad klasą, a tam stał cztery. Wysokość wpisana raz,
-   w jednym miejscu, nie ma jak się rozjechać.
+   czyli próg 2.5.8 z WCAG 2.2 AA. Wysokość wpisana raz, w jednym miejscu,
+   nie ma jak się rozjechać.
 
    KOMPONENT ODDAJE SAME PIGUŁKI, nie pasmo. Pojemniki są w każdym miejscu
    inne — `<nav>` z obwódką, pasmo z polem szukania obok, rząd z przyciskiem
@@ -161,23 +140,19 @@ export type PozycjaFiltra<T> = {
   ikona?: React.ReactNode;
 };
 
-/* `number` w ograniczeniu od 0.279.0: tagi identyfikuje NUMER wiersza, a nie
-   nazwa — nazwa jest edytowalna i zmiana literki nie ma prawa zgubić filtru.
-   Komponent i tak wołał już `String(p.klucz)` na klucz Reacta, więc to jest
-   poszerzenie deklaracji, a nie zachowania. */
+/* `number` w ograniczeniu: tagi identyfikuje NUMER wiersza, a nie nazwa —
+   nazwa jest edytowalna i zmiana literki nie ma prawa zgubić filtru. */
 export function FiltrSegmentowy<T extends string | number | null>({
   wybrany, onWybierz, pozycje, rowne = false, ton = TON_FILTRA, kafle = false,
 }: {
   /**
-   * KAFLE zamiast pigułek (0.454.0) — kubełki zwrotów. Zgłoszenie właściciela:
-   * „ulżyj przeładowaniu tekstem, użyj ikon". Osiem pigułek w trzech rzędach
-   * czytało się jak akapit; kafel kładzie liczbę na pierwszym planie, bo to
-   * po niej operator wybiera, a etykieta schodzi pod nią, drobniej.
+   * KAFLE zamiast pigułek — kubełki zwrotów. Kafel kładzie liczbę na
+   * pierwszym planie, bo to po niej operator wybiera, a etykieta schodzi pod
+   * nią, drobniej.
    *
    * TO JEST TRYB TEGO SAMEGO WYBORU, nie osobny komponent: ten sam
    * `aria-pressed`, te same barwy i ten sam próg dotyku, tylko inny układ
-   * wnętrza. Reguła z 0.262.0 — jeden kształt wyboru w panelu — zostaje.
-   * Siatkę daje rodzic, bo tylko on zna szerokość kolumny.
+   * wnętrza. Siatkę daje rodzic, bo tylko on zna szerokość kolumny.
    */
   kafle?: boolean;
   wybrany: T;
@@ -224,8 +199,7 @@ export function FiltrSegmentowy<T extends string | number | null>({
         wybrany === p.klucz ? wybrana : niewybrana}`}>
       {p.etykieta}
       {/* SPACJA, nie `ml-1`: margines rysuje odstęp, ale nie wchodzi do nazwy
-          dostępnej — czytnik ekranu przeczytałby wtedy „Do decyzji3". Kubełki
-          zwrotów robiły dokładnie to od 0.209.0.
+          dostępnej — czytnik ekranu przeczytałby wtedy „Do decyzji3".
 
           `tabular-nums`, bo Barlow ma cyfry PROPORCJONALNE. Zmierzone na
           wczytanym foncie, przy 12 px: dwucyfrowy licznik zajmuje od 8,44 px
@@ -241,62 +215,23 @@ export function FiltrSegmentowy<T extends string | number | null>({
   </>;
 }
 
-/**
- * Zakładki jednej kolumny (0.180.0).
- *
- * Kolumna dowodów przy ZWROCIE ma sekcje jedna pod drugą, bo to jedna lista
- * faktów o jednej sprawie. Kolumna kontekstu przy ROZMOWIE ma zakładki, bo
- * niesie dwa RÓWNORZĘDNE tematy: co klient kupuje i co mamy na półce.
- * Sekcje kazałyby przewijać obok tematu, którego akurat nie czytasz.
- *
- * `aria-pressed` zamiast roli `tab`: pełny wzorzec zakładek żąda strzałek,
- * `aria-controls` i zarządzania ogniskiem, a to są dwa przyciski przełączające
- * treść pod spodem. Ta sama decyzja co przy kubełkach kolejki.
- *
- * ZOSTAJE jako osobna nazwa, choć pigułki bierze z `FiltrSegmentowy`: dwa
- * wywołania czytają się lepiej przez „zakładki" niż przez „filtr", bo tu
- * wybiera się WIDOK, a nie zawężenie listy. Różnica kształtu jest jedna —
- * równa szerokość — i mieszka w `rowne`.
- */
-export function Zakladki<T extends string>({ wybrana, onWybierz, pozycje }: {
-  wybrana: T;
-  onWybierz: (v: T) => void;
-  /* `ile` od 23 września 2026: zakładka z zerem mówi „tu nic nie ma" bez
-     klikania. Zrzut właściciela pokazał dwie z czterech zakładek z jednym
-     zdaniem w środku — każda kosztowała kliknięcie, żeby się tego dowiedzieć. */
-  pozycje: Array<PozycjaFiltra<T>>;
-}) {
-  return <div className="flex gap-1 border-b border-slate-200 px-2 py-2">
-    <FiltrSegmentowy<T> wybrany={wybrana} onWybierz={onWybierz} pozycje={pozycje} rowne />
-  </div>;
-}
-
-/* ── PUSTKA MA DWIE WAGI, BO ODPOWIADA NA DWA PYTANIA (0.267.0) ────────────────
-   Ustalenie 10 z audytu. Puste stany stały w panelu w kilku kształtach naraz:
-   `Pusto` obsługiwał dziesięć miejsc, a obok stały akapity sklejone ręcznie —
-   `p-6 text-center text-sm`, `p-4 text-sm` i gołe `text-sm` — czyli trzy
-   zapisy jednej roli.
-
-   DWIE WAGI, NIE JEDNA. „Wybierz rozmowę z listy" wypełnia całą kolumnę i jest
-   jedyną rzeczą na ekranie. „Ten kubełek jest pusty" opisuje LISTĘ wewnątrz
-   kolumny, w której nagłówek, filtry i pole szukania dalej stoją. Zrównanie
-   ich zrobiłoby z pustej listy drugi ekran powitalny — a ekran powitalny
-   z ikoną 38 px w miejscu wiersza kolejki zjadłby pół kolumny.
+/* ── PUSTKA MA DWIE WAGI, BO ODPOWIADA NA DWA PYTANIA ─────────────────────────
+   „Wybierz rozmowę z listy" wypełnia całą kolumnę i jest jedyną rzeczą na
+   ekranie. „Ten kubełek jest pusty" opisuje LISTĘ wewnątrz kolumny, w której
+   nagłówek, filtry i pole szukania dalej stoją. Zrównanie ich zrobiłoby
+   z pustej listy drugi ekran powitalny — a ekran powitalny z ikoną 38 px
+   w miejscu wiersza kolejki zjadłby pół kolumny.
 
    CZEGO `Pusto` NIE OBEJMUJE: drobnych podpisów w kartach („brak
    identyfikatorów w opisie"). To są etykiety WARTOŚCI, nie puste stany —
-   stoją obok pól, które wartości mają, i mają własną rolę od 0.256.0
-   (`EtykietaWartosci`). Pierwsze podejście do tego wydania wciągnęło je tutaj
-   wzorcem po klasach i dało czterdzieści sześć zamian zamiast dziewiętnastu.
+   stoją obok pól, które wartości mają (`EtykietaWartosci`).
 
-   `Pusto` NIE MIAŁ KLASY ROZMIARU i dziedziczył 16 px z `body` — jedyny taki
-   w panelu po 0.258.0. Wchodzi na drabinę: `text-tresc`, bo to jest zdanie,
-   które się CZYTA, a nie etykieta, którą się rozpoznaje.
+   `text-tresc`, bo to jest zdanie, które się CZYTA, a nie etykieta, którą
+   się rozpoznaje.
 
-   IKONA IDZIE REFERENCJĄ, NIE ELEMENTEM. Do 0.265.0 wywołujący podawał gotowy
-   `<Inbox size={38} />` i przez to rozmiar rozjechał się na 32, 38 i 40 px,
-   a `text-slate-300` trafiło na trzy ikony z dziesięciu. Referencja komponentu
-   odbiera tę możliwość: rozmiar i barwę ustala jedno miejsce.               */
+   IKONA IDZIE REFERENCJĄ, NIE ELEMENTEM. Gotowy element pozwalałby każdemu
+   wywołującemu dać inny rozmiar i barwę. Referencja komponentu odbiera tę
+   możliwość: rozmiar i barwę ustala jedno miejsce.                          */
 
 /** Ile miejsca zajmuje pustka: cała kolumna czy lista w jej środku. */
 type WagaPustki = "ekran" | "lista";
@@ -306,7 +241,7 @@ const KSZTALT_PUSTKI: Record<WagaPustki, string> = {
   lista: "p-4 text-center text-sm",
 };
 
-/** Rozmiar ikony pustego ekranu. Jedna wartość, bo do 0.265.0 były trzy. */
+/** Rozmiar ikony pustego ekranu — jedna wartość dla całego panelu. */
 const IKONA_PUSTKI = 38;
 
 export function Pusto({ waga = "ekran", ikona: Ikona, children }: {
@@ -315,10 +250,9 @@ export function Pusto({ waga = "ekran", ikona: Ikona, children }: {
   ikona?: React.ComponentType<{ size?: number; className?: string }>;
   children: React.ReactNode;
 }) {
-  /* Ikona i zdanie w JEDNEJ grupie (0.546.0). Waga „ekran" to siatka, a siatka
-     z dwojgiem dzieci dzieli kolumnę na dwa wiersze: ikona stała na środku
-     górnej połowy, zdanie na środku dolnej, trzysta pikseli od siebie. Oko
-     czytało to jako dwie osobne rzeczy. Jedno dziecko siatka centruje całe. */
+  /* Ikona i zdanie w JEDNEJ grupie. Waga „ekran" to siatka, a siatka
+     z dwojgiem dzieci dzieli kolumnę na dwa wiersze i rozsuwa je o setki
+     pikseli. Jedno dziecko siatka centruje całe. */
   return <div className={`text-slate-500 ${KSZTALT_PUSTKI[waga]}`}>
     <div>
       {Ikona && <Ikona size={IKONA_PUSTKI} className="mx-auto text-slate-300" />}
@@ -331,17 +265,14 @@ export const Blad = ({ children }: { children: React.ReactNode }) =>
   children ? <p className="rounded-lg bg-red-50 p-4 text-sm text-red-700">{children}</p> : null;
 
 /**
- * Trzy kolumny obu ekranów obsługi — JEDNA definicja (0.198.0).
+ * Trzy kolumny obu ekranów obsługi — JEDNA definicja.
  *
  * §10.1 mówi: „jeden nawyk, nie dwa" i wymienia wprost układ, SZEROKOŚCI
- * kolumn i przewijanie. Mimo to skrzynka miała kolejkę 22 rem, a zwroty
- * 320 px — rozjazd o 32 piksele, którego nikt nie zdecydował. Stoi tu, żeby
- * następna zmiana szerokości nie musiała trafić w dwa pliki.
+ * kolumn i przewijanie. Stoi tu, żeby zmiana szerokości nie musiała trafić
+ * w dwa pliki.
  *
- * Kolumny ROSNĄ z ekranem, bo do 0.197.4 nie rosły wcale: `<main>` miał
- * `max-w-[1500px]`, więc monitor 1920 oddawał 210 pikseli na margines
- * z każdej strony, a 2560 — po 530. Właściciel nazwał to wprost:
- * „rozszerzenie kolumn, nie zostawiać niepotrzebnych marginesów po bokach".
+ * Kolumny ROSNĄ z ekranem, żeby szeroki monitor nie oddawał setek pikseli
+ * na puste marginesy.
  *
  * Rosną SKRAJNE, nie środkowa. W kolejce i w kontekście szerokość zamienia
  * się w treść: mniej uciętych nazw, więcej wiersza tabeli, szersze zdjęcie.
@@ -349,14 +280,11 @@ export const Blad = ({ children }: { children: React.ReactNode }) =>
  * dwadzieścia znaków czyta się GORZEJ, nie lepiej — dlatego wypowiedzi mają
  * własny próg czytelności (`Os.tsx`), a nie ten z okna.
  *
- * NA NAJWĘŻSZYM PROGU ŚRODEK NIE MOŻE BYĆ NAJWĘŻSZY (audyt 26.09.2026).
- * Przy 1024 px boki po 21 rem zostawiały sprawie ok. 280 px — mniej niż
- * kolumnie kontekstu — i opis wyjątku łamał się po dwa słowa w linijce.
- * Na `lg` oddaje KONTEKST, nie kolejka: środek ma ok. 360 px przy 1024
- * i jest najszerszy z trzech. Kolejka zostaje przy 21 rem, bo przy 19 rem
- * kafelki kubełków w Zwrotach ucinały etykiety („Do decy…", „Zamkni…") —
- * sprawdzone na zrzucie przed i po. Kontekst pokazuje dowody i liczby,
- * które przy 16 rem układają się w dwie kolumny bez utraty treści.
+ * NA NAJWĘŻSZYM PROGU ŚRODEK NIE MOŻE BYĆ NAJWĘŻSZY. Na `lg` oddaje
+ * KONTEKST, nie kolejka: środek ma ok. 360 px przy 1024 i jest najszerszy
+ * z trzech. Kolejka zostaje przy 21 rem, bo przy 19 rem kafelki kubełków
+ * w Zwrotach ucinają etykiety („Do decy…", „Zamkni…"). Kontekst pokazuje
+ * dowody i liczby, które przy 16 rem układają się w dwie kolumny.
  */
 export const SIATKA_TRZECH_KOLUMN =
   "grid gap-4 lg:min-h-0 lg:flex-1 lg:grid-rows-[minmax(0,1fr)] " +
@@ -365,28 +293,19 @@ export const SIATKA_TRZECH_KOLUMN =
   "2xl:grid-cols-[25rem_minmax(0,1fr)_28rem]";
 
 /** Czas w formacie, który czyta biuro — jedna funkcja na cały panel. */
-/* ── ZNACZNIK CZASU BEZ SEKUND (0.272.0) ───────────────────────────────────────
-   Ustalenie 13 z audytu. `toLocaleString("pl")` bez opcji oddaje
-   „10.09.2026, 14:23:05" — z sekundami, zawsze, we wszystkich 52 wywołaniach.
+/* ── ZNACZNIK CZASU BEZ SEKUND ─────────────────────────────────────────────────
    Sekunda nie rozstrzyga w tym panelu NICZEGO: ani kiedy klient napisał, ani
    kiedy przebiegła synchronizacja, ani kiedy hala oddała pomiar.
 
-   Kod wiedział o tym wcześniej niż audyt. TRZY miejsca obcinały sekundy ręcznie
-   przez `czas(...).slice(-8, -3)` — wycinek liczony od KOŃCA sformatowanego
-   napisu, czyli zakład o to, ile znaków ma data. Zakład przestawał wychodzić
-   dokładnie w chwili, w której ta funkcja przestaje dawać sekundy: na
-   „10.09.2026, 14:23" ten sam wycinek daje „6, 14". Dlatego jedno i drugie
-   musiało wejść jednym wydaniem.
-
-   `godzina()` istnieje właśnie po to i pyta o godzinę WPROST, zamiast wycinać
-   ją z dłuższego napisu.                                                     */
+   `godzina()` pyta o godzinę WPROST, zamiast wycinać ją z dłuższego napisu:
+   wycinek liczony od końca to zakład o to, ile znaków ma data.             */
 
 /** Data i godzina, bez sekund — „10.09.2026, 14:23". */
 export const czas = (v: string | null | undefined) =>
   v ? new Date(v).toLocaleString("pl", { dateStyle: "short", timeStyle: "short" }) : "—";
 
 /**
- * Termin z dniem tygodnia — „pt., 02.10, 08:00" (0.533.0).
+ * Termin z dniem tygodnia — „pt., 02.10, 08:00".
  *
  * Dla odłożenia rozmowy: o terminie powrotu myśli się dniem tygodnia („wróci
  * w poniedziałek"), a rok nic nie rozstrzyga, bo odłożenie ma najwyżej
@@ -397,13 +316,12 @@ export const termin = (v: Date | string) =>
     hour: "2-digit", minute: "2-digit" });
 
 /**
- * Data i godzina Z SEKUNDAMI — „10.09.2026, 14:23:05" (0.440.0).
+ * Data i godzina Z SEKUNDAMI — „10.09.2026, 14:23:05".
  *
  * Jedyny wyjątek od `czas()` i ma jednego odbiorcę: DZIENNIK. Ślad audytowy
  * to diagnostyka, a tam sekunda rozstrzyga — kolejność skanu i odrzucenia,
  * które przyszły w tej samej minucie, albo dwa kliknięcia jednej osoby.
- * Biuro pokazywało sekundy w dzienniku od zawsze i przeprowadzka ich nie
- * zabiera. Stoi tutaj, bo `Czas.test.ts` trzyma formaty dat w jednym pliku.
+ * Stoi tutaj, bo `Czas.test.ts` trzyma formaty dat w jednym pliku.
  */
 export const stempel = (v: string | null | undefined) =>
   v ? new Date(v).toLocaleString("pl", { dateStyle: "short", timeStyle: "medium" }) : "—";
@@ -411,22 +329,11 @@ export const stempel = (v: string | null | undefined) =>
 /**
  * Wiek po ludzku — „41 min", „2 g 36 min", „3 dni".
  *
- * Mieszkał w `skrzynka/AlarmSynchronizacji.tsx` od 0.152.0 i miał tam jednego
- * odbiorcę. Od 0.352.0 ma dwóch: alarm i zegar zadań terenowych, gdzie zdanie
- * „ile danych brakuje" zamienia się w „jak dawno biuro poprosiło".
+ * Dwóch odbiorców: alarm synchronizacji i zegar zadań terenowych.
  *
- * DOBA ROZBIJA SIĘ NA DNI (0.352.0). Do tego wydania funkcja kończyła się na
- * godzinach, bo alarm synchronizacji liczy minuty i nikt nie dawał jej doby.
- * Zadanie terenowe potrafi czekać tydzień, a „172 g 12 min" to liczba, którą
- * czytelnik musi podzielić w głowie, żeby się przestraszyć. Poniżej doby nic
- * się nie zmienia — alarm dostaje dokładnie to co dotąd.
- *
- * DNI LICZY `dniSlowo`, nie własny ternar (scalenie 0.352.0 z 0.353.0). Obie
- * gałęzie dopisały do tego pliku odmianę tego samego słowa naraz: ta funkcja
- * swoją, a wydanie o liczebniku — wspólną regułę niżej. Wynik był poprawny
- * w obu miejscach, bo „dni" brzmi tak samo w obu formach mnogich, ale dwa
- * zapisy jednej odmiany w JEDNYM pliku to już nie oszczędność, tylko rozjazd
- * czekający na okazję.
+ * DOBA ROZBIJA SIĘ NA DNI. Zadanie terenowe potrafi czekać tydzień, a
+ * „172 g 12 min" to liczba, którą czytelnik musi podzielić w głowie, żeby się
+ * przestraszyć. Dni liczy `dniSlowo`, żeby odmiana stała w jednym miejscu.
  */
 export function wiek(ms: number | null): string {
   if (ms == null) return "—";
@@ -457,7 +364,7 @@ export const dzien = (v: string | null | undefined) =>
     : "—";
 
 /**
- * Dzień i miesiąc cyframi — „30.09” (0.536.0).
+ * Dzień i miesiąc cyframi — „30.09”.
  *
  * Dla podpowiedzi przy doręczonej dosyłce. Serwer pisze tę samą datę w zdaniu
  * dosyłki jako „DD.MM”, a podpowiedź stoi tuż pod nim — dwa zapisy jednego
@@ -522,13 +429,11 @@ export function kiedy(v: string | null | undefined, teraz: Date = new Date()): s
 }
 
 /**
- * Wiersz kolejki biura — rama wspólna dla dostaw i koszy (0.438.0).
+ * Wiersz kolejki biura — rama wspólna dla dostaw i koszy.
  *
  * Belka 3 px przy KAŻDYM wierszu, bursztynowa przy wybranym, i szare tło —
  * ten sam zapis co w kolejkach zwrotów i skrzynki, żeby ręka nie uczyła się
- * drugiej listy. Do tego wydania mieszkał prywatnie w `dostawy/Kolejka.tsx`;
- * kosze potrzebowały go drugi raz, a dwie kopie jednej ramy rozjeżdżają się
- * przy pierwszej poprawce odstępu.
+ * drugiej listy.
  *
  * Wybór DOGANIA widok (`scrollIntoView` z `nearest`) — powód przy tej samej
  * linijce w `zwroty/Kolejka.tsx`.
@@ -549,12 +454,11 @@ export function WierszKolejki({ aktywny, onKlik, children }: {
 }
 
 /**
- * Data lokalna jako „2026-09-22" — dla druków dla dostawców (0.435.0).
+ * Data lokalna jako „2026-09-22" — dla druków dla dostawców.
  *
- * Przyszła z `biuro.html` razem z protokołem rozbieżności. Protokół idzie do
- * dostawcy z datą sporządzenia, a doba liczona w UTC dawałaby po północy
- * czasu polskiego datę dnia poprzedniego. Format cyfrowy, nie słowny, bo tak
- * wypełnia się pole daty na cudzym formularzu.
+ * Protokół idzie do dostawcy z datą sporządzenia, a doba liczona w UTC
+ * dawałaby po północy czasu polskiego datę dnia poprzedniego. Format cyfrowy,
+ * nie słowny, bo tak wypełnia się pole daty na cudzym formularzu.
  */
 export function dataLokalna(v: string | null | undefined): string {
   if (!v) return "";
@@ -568,10 +472,9 @@ export function dataLokalna(v: string | null | undefined): string {
  * Kopiowanie tekstu, którego nikt nie przepisuje z ekranu ręcznie:
  * identyfikatora zamówienia (UUID) i numeru dokumentu z Subiekta.
  *
- * Stało to od 0.166.0 w `zwroty/Dowody.tsx`. Od 0.176.0 numer paragonu też ma
- * ten przycisk — dopóki kliknięcie nie otwiera dokumentu w Subiekcie (byłby
- * do tego potrzebny program na stanowisku, patrz `docs/architektura.md` §4),
- * schowek jest najkrótszą drogą do okna „Znajdź dokument".
+ * Kliknięcie nie otwiera dokumentu w Subiekcie (byłby do tego potrzebny
+ * program na stanowisku, patrz `docs/architektura.md` §4), więc schowek jest
+ * najkrótszą drogą do okna „Znajdź dokument".
  */
 export function Skopiuj({ tekst, tytul = "Kopiuj" }: { tekst: string; tytul?: string }) {
   const { stan, kopiuj } = useKopiowanie(tekst);
@@ -600,10 +503,10 @@ export function PrzyciskKopiuj({ tekst, children }: { tekst: string; children: R
 /**
  * Wspólny stan kopiowania: „gotowe", „skopiowano" i „nie udało się".
  *
- * TRZECI STAN JEST TU NAJWAŻNIEJSZY. Do 0.227.0 nieudane kopiowanie kończyło
- * się `.catch(() => {})`, więc ekran mrugał „skopiowano" nad pustym schowkiem —
- * a człowiek dowiadywał się o tym dopiero przy wklejaniu, gdzie indziej.
- * Uzasadnienie samego kopiowania po HTTP stoi w `ui/kopiuj.ts`.
+ * TRZECI STAN JEST TU NAJWAŻNIEJSZY. Bez niego ekran mrugałby „skopiowano"
+ * nad pustym schowkiem, a człowiek dowiadywałby się o tym dopiero przy
+ * wklejaniu, gdzie indziej. Uzasadnienie kopiowania po HTTP stoi
+ * w `ui/kopiuj.ts`.
  */
 function useKopiowanie(tekst: string) {
   const [stan, setStan] = useState<"gotowe" | "zrobione" | "blad">("gotowe");
@@ -617,12 +520,11 @@ function useKopiowanie(tekst: string) {
 }
 
 /**
- * LOGIN KLIENTA, KTÓRY KOPIUJE SIĘ KLIKNIĘCIEM (0.228.0).
+ * LOGIN KLIENTA, KTÓRY KOPIUJE SIĘ KLIKNIĘCIEM.
  *
- * Decyzja właściciela: „loginy klientów powinny być kopiowalne przez
- * kliknięcie". Login jest tym, po czym szuka się klienta w panelu Allegro
- * i w Subiekcie, a przepisywany z ekranu bywa przekręcony — `bagslublin`
- * i `bags1ublin` wyglądają na monitorze tak samo.
+ * Login jest tym, po czym szuka się klienta w panelu Allegro i w Subiekcie,
+ * a przepisywany z ekranu bywa przekręcony — `bagslublin` i `bags1ublin`
+ * wyglądają na monitorze tak samo.
  *
  * KLIKALNY JEST SAM LOGIN, nie ikona obok. Ikona zostaje jako znak, że da się
  * kliknąć, ale cel dotyku to całe słowo — mniejszy cel to więcej chybień
@@ -631,9 +533,7 @@ function useKopiowanie(tekst: string) {
  * `title` mówi, co się stanie PRZED kliknięciem; `sr-only` mówi, co się stało
  * PO nim. Bez tego drugiego czytnik ekranu milczy o skutku.
  *
- * `min-h-6` (0.546.0): 24 px to próg WCAG 2.2 dla celu (2.5.8). Przycisk
- * miał 20 px i stał za blisko „profilu" i „Historii" — zmierzone axe
- * w Chromium na nagłówku zwrotu.
+ * `min-h-6`: 24 px to próg WCAG 2.2 dla celu (2.5.8).
  */
 export function LoginKlienta({ login, className = "" }: { login: string; className?: string }) {
   const { stan, kopiuj } = useKopiowanie(login);
@@ -674,23 +574,14 @@ export function SymbolTowaru({ symbol }: { symbol: string }) {
   </button>;
 }
 
-/* ── Trzy formy liczby mnogiej (audyt zwrotów, 15 września 2026) ─────────────
+/* ── Trzy formy liczby mnogiej ────────────────────────────────────────────────
    Polszczyzna ma przy liczebniku TRZY formy, nie dwie: „1 pozycja",
-   „2 pozycje", „5 pozycji". Panel liczył dwie w ośmiu miejscach i wychodziło
-   z tego „5 pozycje" (`zwroty/Dopisz.tsx`), „i 5 inne" (`zwroty/Kolejka.tsx`)
-   albo — co gorsza, bo wygląda poprawnie — „2 pasujących zwrotów"
-   (`zwroty/Szukanie.tsx`). Drugi błąd jest częstszy od pierwszego: dwa i trzy
-   zdarzają się na ekranie znacznie częściej niż pięć.
+   „2 pozycje", „5 pozycji". Dwuformowe wyrażenie daje „5 pozycje" albo —
+   co gorsza, bo wygląda poprawnie — „2 pasujących zwrotów".
 
-   REGUŁA STOI W JEDNYM MIEJSCU, bo osiem kopii dwuformowego wyrażenia to
-   dokładnie to, co dało osiem różnych wyników. Jedyna poprawna kopia mieszkała
-   jako prywatna funkcja jednego ekranu i nikt jej nie znalazł — ekran nie jest
-   miejscem na regułę języka.
-
-   `dniSlowo` stało w TRZECH kolejkach przepisane znak w znak i przyjechało
-   tutaj razem z regułą. „dni" brzmi tak samo w obu formach mnogich, więc tamte
-   dwie gałęzie były poprawne — ale trzy kopie jednej odmiany to trzy miejsca,
-   w których następna może się rozjechać.                                     */
+   REGUŁA STOI W JEDNYM MIEJSCU, bo każda kopia dwuformowego wyrażenia to
+   miejsce na osobny błąd. Ekran nie jest miejscem na regułę języka.
+   `dniSlowo` stoi tu z tego samego powodu.                                 */
 
 /**
  * „1 dzień", ale „2 dni" i „12 dni".

@@ -32,9 +32,7 @@ export function tabelaSondy(wyniki: WynikSondyZalacznika[]): string {
  * Zdanie-werdykt. Droga API z 200 — NIEZALEŻNIE od `Accept` — potwierdza
  * specyfikację (`downloadAttachmentGET` oddaje plik dowolnego typu); sam zapisany adres →
  * zostajemy przy zapasie; wszystko 403 → uprawnienie; API 406 → to nasz
- * nagłówek, nie Allegro. Do 0.248.0 werdykt liczył wyłącznie wiersze API
- * Z nagłówkiem i przy 200 „bez Accept" mówił „żadna droga nie oddała pliku" —
- * sonda właściciela pokazała 200 i przeczytała to jako porażkę.
+ * nagłówek, nie Allegro.
  */
 export function werdyktSondy(wyniki: WynikSondyZalacznika[]): string {
   const api = wyniki.find((w) => w.droga === "api" && w.status === 200);

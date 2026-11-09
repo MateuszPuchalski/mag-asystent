@@ -25,7 +25,7 @@ export class DevSferaAdapter implements SferaAdapter {
   }
 
   /**
-   * Dodanie zdjęcia do kartoteki (0.88.0).
+   * Dodanie zdjęcia do kartoteki.
    *
    * W trybie demo nie ma bazy Subiekta ani tabeli `tw_ZdjecieTw`, więc jedynym
    * skutkiem jest ODDANIE ZDJĘCIA CACHE'OWI: wiersz w `zdjecie_wlasne` znika,

@@ -10,14 +10,14 @@ import type { Pominieta, SzczegolKosza, WierszKosza } from "../api/kosze";
 import type { Zwrot } from "../api/typy";
 import { _wyczyscPamiecZdjec } from "../towar/useZdjecie";
 
-/* ── Kosze w zakładce Zwroty (0.438.0) ─────────────────────────────────────
-   Gwarancje przeniesione z MAGAZYNU ZWROTÓW w `biuro.html` i jedna nowa:
+/* ── Kosze w zakładce Zwroty ───────────────────────────────────────────────
+   Gwarancje:
 
    1. ZERO ZAPISU PRZY PATRZENIU — otwarcie ekranu i wejście w kosz to same
       odczyty (umowa z `CLAUDE.md`).
    2. WIĄZANIE KOSZ ↔ ZWROT W OBIE STRONY. Kosz prowadzi do swoich zwrotów,
-      a karta zwrotu do swoich koszy. Do 0.438.0 działała tylko pierwsza
-      połowa — a wiązanie jednostronne to wiązanie, którego nie ma.
+      a karta zwrotu do swoich koszy — wiązanie jednostronne to wiązanie,
+      którego nie ma.
    3. POMINIĘTE czekają na ZAŁATWIONE z notatką; pozycja zostaje pominięta.
    4. „W KTÓRYM KOSZU?" szuka SERWER, po snapshocie z kosza.
    5. PRZEŁĄCZNIK prowadzi między zwrotami a koszami w jednej zakładce. */
@@ -50,7 +50,7 @@ const POMINIETE: Pominieta[] = [{ pozycjaId: 2, koszId: 14, kod: "Z-14", mmNumer
 
 let wyslane: string[] = [];
 let szukane: string[] = [];
-/* Pierwsza odmowa ponowienia MM (0.503.0): `null` = serwer ponawia od razu. */
+/* Pierwsza odmowa ponowienia MM: `null` = serwer ponawia od razu. */
 let odmowaPonowienia: string | null = null;
 
 function odpowiedz(url: string, init?: RequestInit): unknown {
@@ -65,19 +65,19 @@ function odpowiedz(url: string, init?: RequestInit): unknown {
     return { pominiete: [] };
   }
   if (url === "/api/biuro/kosze/17") return { kosz: { ...SZCZEGOL, id: 17, kod: "Z-17", status: "rozlozony" } };
-  /* Kosz jeszcze bez dokumentu — przeliczenie jest dozwolone (0.525.0). */
+  /* Kosz jeszcze bez dokumentu — przeliczenie jest dozwolone. */
   if (url === "/api/biuro/kosze/18") return { kosz: { ...SZCZEGOL, id: 18, kod: "Z-18", status: "otwarty", doEdycji: true } };
   if (url === "/api/biuro/kosze/16") return { kosz: { ...SZCZEGOL, id: 16, kod: "Z-16", status: "otwarty",
-    /* Kartoteka, która blokuje MM (0.530.0) — zgłoszenie przy koszu 1205. */
+    /* Kartoteka, która blokuje MM. */
     brakiMm: [{ twId: 8, symbol: "HM-0520", nazwa: "Gaźnik", magazyn: "ZWR",
       potrzeba: 2, stan: 2, rezerwacja: 1 }] } };
   if (url === "/api/biuro/kosze") return { kosze: [kosz(14, { pominietych: 1 }),
-    /* Kłopoty z MM (0.501.0): rozłożony po odmowie i otwarty z błędem teraz. */
+    /* Kłopoty z MM: rozłożony po odmowie i otwarty z błędem teraz. */
     kosz(15, { status: "rozlozony", problemMm: { prob: 1, ostatniBlad: "Brak towaru w magazynie",
       ostatnioAt: "2026-09-21T09:00:00.000Z", nierozwiazany: false } }),
     kosz(16, { status: "otwarty", problemMm: { prob: 3, ostatniBlad: "Kartoteka w edycji",
       ostatnioAt: "2026-09-22T09:00:00.000Z", nierozwiazany: true } }),
-    /* Bez MM powrotnego (0.505.0): rozłożony, dokument bez znanego kierunku. */
+    /* Bez MM powrotnego: rozłożony, dokument bez znanego kierunku. */
     kosz(17, { status: "rozlozony", rozlozonoAt: "2026-09-20T09:00:00.000Z", bezPowrotu: "kierunek" })] };
   if (url === "/api/biuro/kosze/pominiete") return { pominiete: POMINIETE };
   if (url === "/api/biuro/kosze/14") return { kosz: SZCZEGOL };
@@ -134,7 +134,7 @@ describe("Kosze w zakładce Zwroty", () => {
   });
 
   it("„Rozłożone” i „Anulowane” stoją pod „Więcej” i dalej się wybierają", async () => {
-    /* 0.526.0: oba to „Tylko wgląd", więc schodzą z pigułek do listy. */
+    /* Oba to „Tylko wgląd", więc stoją w liście, nie w pigułkach. */
     pokaz();
     await screen.findByRole("button", { name: /Z-14/ });
     expect(screen.queryByRole("button", { name: /^Rozłożone/ })).toBeNull();
@@ -145,7 +145,7 @@ describe("Kosze w zakładce Zwroty", () => {
   });
 
   it("kosze z kłopotem MM mają znacznik i własny kubełek z treścią odmowy (0.501.0)", async () => {
-    /* Zgłoszenie właściciela: „muszę sprawdzić stany z Subiektem". */
+    /* Biuro sprawdza stany z Subiektem. */
     pokaz();
     const w16 = await screen.findByRole("button", { name: /Z-16/ });
     expect(within(w16).getByText("MM w błędzie")).toBeInTheDocument();
@@ -163,8 +163,7 @@ describe("Kosze w zakładce Zwroty", () => {
   });
 
   it("karta nazywa kartotekę, która blokuje MM, i pozwala ją zdjąć po potwierdzeniu (0.530.0)", async () => {
-    /* Zgłoszenie właściciela przy koszu 1205: „nie pokazuje, o jaki towar
-       chodzi" i „daj możliwość usunięcia tego towaru z tej MM". */
+    /* Karta mówi, o jaki towar chodzi, i pozwala zdjąć go z MM. */
     pokaz("/obsluga/zwroty/kosze/16");
     expect(await screen.findByText(/MM chce 2 szt\. z ZWR, a tam jest 2, z czego 1 zarezerwowane/)).toBeInTheDocument();
     expect(screen.getByText("blokuje MM — brak wolnego stanu")).toBeInTheDocument();
@@ -177,7 +176,7 @@ describe("Kosze w zakładce Zwroty", () => {
   });
 
   it("MM w błędzie ponawia się z karty kosza jednym przyciskiem (0.503.0)", async () => {
-    /* Zgłoszenie właściciela: „dodaj, abym mógł wywołać ponownie". */
+    /* MM w błędzie da się wywołać ponownie. */
     pokaz("/obsluga/zwroty/kosze/16");
     await userEvent.click(await screen.findByRole("button", { name: "Ponów MM" }));
     expect(wyslane).toEqual(['POST /api/biuro/kosze/16/ponow-mm {"sprawdzono":false}']);

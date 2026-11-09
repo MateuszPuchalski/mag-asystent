@@ -5,7 +5,7 @@ import { PasekUdzialu } from "../ui/wykres";
 import { czas, ile, odmien } from "../ui";
 import { NAZWA_KATEGORII } from "../skrzynka/statusy";
 
-/* ── Pomiary pod decyzje (26 września 2026, 0.532.0) ────────────────────
+/* ── Pomiary pod decyzje ────────────────────────────────────────────────
    Właściciel chce rozstrzygać politykę skrzynki danymi, nie przekonaniem.
    Każda sekcja nosi nazwę DECYZJI, której służy, bo liczba bez pytania
    czyta się jak ocena ludzi. Na wierzchu jedno zdanie na decyzję,
@@ -81,9 +81,9 @@ function TarcieSzkicu({ t }: { t: PomiarTarcia["tarcieSzkicu"] }) {
   </Sekcja>;
 }
 
-/* Tydzień to próg ze specyfikacji autowysyłki z 20 września 2026: dowody
-   z tygodnia pracy, bramka per klasa i wyłącznik. Karta podaje tylko
-   dowody — samej autowysyłki nie ma. */
+/* Tydzień to próg ze specyfikacji autowysyłki: dowody z tygodnia pracy,
+   bramka per klasa i wyłącznik. Karta podaje tylko dowody — samej
+   autowysyłki nie ma. */
 const DNI_DOWODU = 7;
 
 function Gotowosc({ g }: { g: GotowoscKlasy[] }) {

@@ -2,16 +2,12 @@ import { transaction, type Db } from "../db/db.js";
 import { zaproponujKartoteke } from "./dopasowanie-sku.js";
 import { potwierdzKartoteke } from "./zwroty.js";
 
-/* ── Pokrycie sygnatur (0.169.0) ─────────────────────────────────────────────
-   Wiązanie oferty Allegro z kartoteką Subiekta po sygnaturze działa od 0.152.0:
+/* ── Pokrycie sygnatur ───────────────────────────────────────────────────────
+   Wiązanie oferty Allegro z kartoteką Subiekta po sygnaturze:
    `offer.external.id` ląduje w `zamowienie_klienta_pozycja.sku`, a
-   `kartotekaPoSku` szuka po nim symbolu. Czego do 0.168.0 NIE DAŁO SIĘ
-   ZOBACZYĆ, to czy to wiązanie w ogóle trafia.
-
-   Wynik był widoczny wyłącznie przy pojedynczej pozycji zwrotu i tylko wtedy,
-   gdy kartoteki jeszcze nie było. Właściciel wypełniający sygnatury w Allegro
-   nie miał jak sprawdzić, czy praca się opłaca — a odpowiedź jest w bazie,
-   po jednym zapytaniu.
+   `kartotekaPoSku` szuka po nim symbolu. Raport mówi, czy to wiązanie trafia,
+   żeby właściciel wypełniający sygnatury w Allegro widział, czy praca się
+   opłaca.
 
    WYŁĄCZNIE ODCZYT. Ani jednego INSERT-a; „zero zapisu przy patrzeniu"
    obowiązuje też diagnostykę.
@@ -96,13 +92,11 @@ export function pokrycieSygnatur(database: Db, limit = LIMIT_LISTY): PokrycieSyg
   };
 }
 
-/* ── Wiązanie bez klikania (0.169.0) ────────────────────────────────────────
+/* ── Wiązanie bez klikania ──────────────────────────────────────────────────
    Decyzja właściciela: „zrób, abym nie musiał zatwierdzać kartotek".
 
-   Do 0.168.0 automat liczył propozycję, a wiązał człowiek — jedno kliknięcie
-   na każdą pozycję zwrotu, także wtedy, gdy sygnatura wskazywała dokładnie
-   jedną kartotekę i nie było czego rozstrzygać. Teraz taki przypadek wiąże
-   się sam, ze źródłem `sku` w `tw_zrodlo`, więc dalej widać, że to automat.
+   Sygnatura wskazująca dokładnie jedną kartotekę nie ma czego rozstrzygać,
+   więc taki przypadek wiąże się sam, ze źródłem `sku` w `tw_zrodlo`, więc dalej widać, że to automat.
 
    WIĄŻE SIĘ WYŁĄCZNIE PEWNOŚĆ `sku`. Pozostałe stopnie zostają propozycją
    i to nie jest ostrożność na zapas:
@@ -153,8 +147,7 @@ export function zwiazPewne(database: Db, teraz = new Date()): number {
     });
     if (d.pewnosc !== "sku" || d.twId === null) continue;
     /* Pozycja idzie WŁASNĄ transakcją: jedna wywrócona (skasowany w tym czasie
-       zwrot, znikły towar) nie ma prawa zabrać pozostałych — ta sama lekcja
-       co przy wątkach skrzynki w 0.149.2. */
+       zwrot, znikły towar) nie ma prawa zabrać pozostałych. */
     try {
       transaction(database, () => potwierdzKartoteke(
         database, Number(p.id), d.twId, "sku",

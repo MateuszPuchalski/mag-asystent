@@ -14,7 +14,7 @@ process.env.DB_PATH = path.join(fs.mkdtempSync(path.join(os.tmpdir(), "wertis-re
 let db: typeof import("../db/db.js").db;
 let reconcile: typeof import("./reconcile.js").reconcile;
 let reconcileCsv: typeof import("./reconcile.js").reconcileCsv;
-/* Kolejka pracy, żeby sprawdzić DRUGĄ stronę decyzji z 0.339.0: zwrot woła
+/* Kolejka pracy, żeby sprawdzić DRUGĄ stronę decyzji: zwrot woła
    w raporcie i jednocześnie NIE stoi już w kubełku. */
 let listaZwrotow: typeof import("./zwroty.js").listaZwrotow;
 
@@ -76,12 +76,10 @@ beforeEach(() => {
 });
 
 /**
- * Zwrot w pracy, którego PACZKA wróciła `dni` dni temu (0.339.0).
+ * Zwrot w pracy, którego PACZKA wróciła `dni` dni temu.
  *
  * Termin obsługi to siedem dni OD DORĘCZENIA, więc to `dostarczono_at`
- * ustawia zegar, a nie data zgłoszenia. Do 0.338.0 ta atrapa podawała samo
- * `created_at` i było to wtedy poprawne — zegar startował właśnie tam.
- * Zgłoszenie stawiamy dwa dni przed paczką, bo tak wygląda prawdziwy zwrot.
+ * ustawia zegar, a nie data zgłoszenia. Zgłoszenie stawiamy dwa dni przed paczką, bo tak wygląda prawdziwy zwrot.
  */
 function zwrotZgloszonyPrzed(dni: number, numer: string): void {
   db().prepare(`INSERT INTO channel_account(channel, external_account_id)
@@ -98,14 +96,9 @@ function zwrotZgloszonyPrzed(dni: number, numer: string): void {
       `-${dni} days`);
 }
 
-/* ── Termin obsługi (0.210.0, przestawiony w 0.339.0) ───────────────────────
-   Do 0.210.0 terminu pilnował WYŁĄCZNIE kolor wiersza w panelu: rekoncyliacja
-   i /api/health nie znały zwrotów wcale, więc termin mijał bez alarmu, jeśli
-   przez tydzień nikt nie otworzył ekranu.
-
-   Od 0.339.0 zegarem jest SIEDEM DNI OD DORĘCZENIA PACZKI (regulamin Allegro),
-   a nie czternaście od zgłoszenia klienta. Zmieniła się reguła, nie kontrola:
-   raport ma dalej łapać to, czego nikt nie otworzył na czas.               */
+/* ── Termin obsługi ────────────────────────────────────────────────────────
+   Kolor wiersza w panelu nie zaalarmuje nikogo, kto nie otworzył ekranu.
+   Zegarem jest SIEDEM DNI OD DORĘCZENIA PACZKI (regulamin Allegro). */
 
 test("zwrot po terminie obsługi trafia do raportu, i to na jego GÓRĘ", () => {
   zwrotZgloszonyPrzed(20, "PO-1");
@@ -139,16 +132,15 @@ test("zwrot ZAMKNIĘTY nie ma już terminu do pilnowania", () => {
   assert.equal(reconcile().rozjazdy.filter((x) => x.rodzaj === "zwrot_po_terminie").length, 0);
 });
 
-/* ── Cena decyzji z 0.339.0 ─────────────────────────────────────────────────
+/* ── Cena decyzji o rozliczonych przez Allegro ─────────────────────────────
    Status `FINISHED` zdejmuje zwrot z kolejki pracy. Pieniądze wróciły do
    klienta, ale korekta w Subiekcie i towar na półce to osobna robota — a zwrot
-   właśnie przestał o nią prosić. Bez korekty nie wyjdzie też MM (bramka
-   0.200.0), więc koszyk z takim zwrotem stanąłby w miejscu na zawsze.
+   właśnie przestał o nią prosić. Bez korekty nie wyjdzie też MM, więc koszyk z takim zwrotem stanąłby w miejscu na zawsze.
    Ten raport jest jedynym miejscem, w którym taki zwrot jeszcze się odezwie. */
 
 test("zwrot rozliczony przez Allegro, bez korekty, WOŁA w raporcie", () => {
   zwrotZgloszonyPrzed(3, "ROZL-1");
-  /* Zgłoszenie DZISIEJSZE: od 0.340.0 kontrola woła tylko o zwroty zgłoszone
+  /* Zgłoszenie DZISIEJSZE: kontrola woła tylko o zwroty zgłoszone
      po progu `ZWROT_ROZLICZONE_OD`, a atrapa cofa datę o kilka dni. */
   db().prepare(`UPDATE zwrot_klienta SET status_allegro='FINISHED',
     created_at=datetime('now') WHERE reference_number='ROZL-1'`).run();
@@ -170,10 +162,9 @@ test("zwrot rozliczony przez Allegro, bez korekty, WOŁA w raporcie", () => {
 });
 
 test("zwrot rozliczony PRZED progiem milczy — to historia, nie praca (0.340.0)", () => {
-  /* Kontrola powstała w 0.339.0, a historia firmy niesie setki zwrotów
-     rozliczonych w panelu Allegro, których korekt nikt już wstecz nie
-     wystawi. Raport z setką wierszy przestaje być czytany — blizna 0.319.0,
-     gdzie czterysta trzydzieści trzy wiersze zjadły cały ekran.
+  /* Historia firmy niesie setki zwrotów rozliczonych w panelu Allegro,
+     których korekt nikt już wstecz nie wystawi. Raport z setką wierszy
+     przestaje być czytany.
 
      Próg stoi w `ZWROT_ROZLICZONE_OD` i domyślnie jest dniem wdrożenia. Ten
      test podaje zwrot ze stycznia, czyli grubo przed każdym sensownym progiem. */
@@ -258,8 +249,7 @@ test("dokument, który nie wyszedł z bufora przez trzy dni", () => {
 
 test("kosz rozłożony bez powrotu z bufora zgłasza się po dobie", () => {
   /* Towar leży na półce, a stan wisi na regale zwrotów — czyli nie jest
-     sprzedawalny, choć fizycznie jest na miejscu. Do 0.264.0 ten stan nie
-     miał ani automatu, ani alarmu. */
+     sprzedawalny, choć fizycznie jest na miejscu. */
   const kosz = (dni: number, kod: string): number => {
     const at = new Date(Date.now() - dni * 86400_000).toISOString();
     const id = Number(db().prepare(
@@ -286,9 +276,8 @@ test("kosz rozłożony bez powrotu z bufora zgłasza się po dobie", () => {
   assert.equal(r.rozjazdy[0].rodzaj, "kosz_bez_powrotu");
   assert.match(r.rozjazdy[0].opis, /Z-2/);
 
-  /* Kosz z dokumentu MM zgłasza się TAK SAMO od 0.277.0: powrót przestał być
-     robotą biura, więc jego brak przestał być stanem normalnym. Do 0.276.x ten
-     sam wiersz był celowo przemilczany. */
+  /* Kosz z dokumentu MM zgłasza się TAK SAMO: powrót nie jest robotą biura,
+     więc jego brak nie jest stanem normalnym. */
   const zDokumentu = kosz(3, "KZ-9");
   db().prepare("UPDATE kosz SET mm_dok_id=1209, mm_mag_z=1 WHERE id=?").run(zDokumentu);
   assert.equal(reconcile().rozjazdy.filter((x) => x.klucz === "KZ-9").length, 1);
@@ -357,7 +346,7 @@ test("CSV otwiera się w Excelu PL bez kreatora", () => {
   assert.match(csv, /^lokalizacja;/m);
 });
 
-/* Granica okna w formacie bazy (0.494.1). `processed_at` zapisuje worker
+/* Granica okna w formacie bazy. `processed_at` zapisuje worker
    jako ISO z `T`. Porównanie z `datetime('now','-1 day')` (ze spacją) dawało
    `'…T…' < '… …'` = FAŁSZ dla całej doby granicznej, więc zadanie w błędzie
    od 25 godzin nie trafiało do raportu przez kolejną dobę. */

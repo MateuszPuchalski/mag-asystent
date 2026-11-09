@@ -5,7 +5,7 @@ import userEvent from "@testing-library/user-event";
 
 const { Edytor, LIMIT_ZNAKOW } = await import("./Edytor");
 
-/* ── Edytor odpowiedzi w reklamacji (0.224.0) ────────────────────────────────
+/* ── Edytor odpowiedzi w reklamacji ──────────────────────────────────────────
    Cztery rzeczy warte testu, bo każdą z nich łatwo zepsuć poprawką wyglądu:
 
    1. PRZYCISK MARTWY PRZY PUSTYM POLU. Puste żądanie i tak wróciłoby z 400,
@@ -14,8 +14,8 @@ const { Edytor, LIMIT_ZNAKOW } = await import("./Edytor");
       (`MessageRequest.text`, maxLength 20000), więc agent nie czeka na
       odmowę serwera.
    3. LICZNIK MÓWI PEŁNĄ LICZBĄ, A BARWĘ DOSTAJE PRZY PROGU. Stoi zawsze,
-      jak na makiecie, ale czerwony napis stojący cały czas przestaje być
-      czytany — dekalog, punkt 5.
+      ale czerwony napis stojący cały czas przestaje być czytany — dekalog,
+      punkt 5.
    4. PRZY ZAMKNIĘTEJ ROZMOWIE EDYTORA NIE MA W DRZEWIE. Nie „disabled":
       pole, w które wolno pisać, a którego nie da się wysłać, jest obietnicą
       bez pokrycia. Ten sam wzorzec co tryb komentarza w skrzynce.          */
@@ -112,9 +112,9 @@ describe("Edytor odpowiedzi w reklamacji", () => {
   });
 
   it("spinacz i lista plików są TYM SAMYM komponentem co w skrzynce (0.274.0)", async () => {
-    /* Decyzja właściciela z 0.246.0 o wspólnym załączniku dotyczyła strony
-       przychodzącej; ta sama racja obowiązuje po drugiej stronie. Ta sama
-       czynność ma wyglądać i zachowywać się identycznie na obu ekranach. */
+    /* Wspólny załącznik to decyzja właściciela dla strony przychodzącej; ta
+       sama racja obowiązuje po drugiej stronie. Ta sama czynność ma wyglądać
+       i zachowywać się identycznie na obu ekranach. */
     const onDodajZalacznik = vi.fn();
     const onUsunZalacznik = vi.fn();
     render(<Edytor {...props({
@@ -135,9 +135,9 @@ describe("Edytor odpowiedzi w reklamacji", () => {
   });
 });
 
-/* ── Szablonów nie ma (22 września 2026) ─────────────────────────────────────
-   Decyzja właściciela: szablony odeszły z całego panelu, razem z trasami
-   i tabelą. Test pilnuje, żeby przycisk nie wrócił przy scalaniu. */
+/* ── Szablonów nie ma ────────────────────────────────────────────────────────
+   Decyzja właściciela: panel nie ma szablonów odpowiedzi. Test pilnuje,
+   żeby przycisk nie wrócił przy scalaniu. */
 describe("Edytor reklamacji bez szablonów", () => {
   it("przy polu odpowiedzi nie ma przycisku szablonów", () => {
     render(<Edytor tresc="" wysyla={false} blad="" czatAktywny
@@ -157,7 +157,7 @@ describe("Edytor reklamacji bez szablonów", () => {
   });
 });
 
-/* ── Jeden edytor trzech kolejek (0.549.0) ──────────────────────────────────
+/* ── Jeden edytor trzech kolejek ────────────────────────────────────────────
    Sprawa odpowiada edytorem skrzynki. Testy pilnują różnic, które wchodzą
    ustawieniem: brak notatki, własny napis i sufit, zamknięty czat. Klawisz N
    należy w sprawach do ekranu („niczyje”), więc edytor nie ma prawa go zjeść. */

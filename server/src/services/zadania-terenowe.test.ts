@@ -7,7 +7,7 @@ import path from "node:path";
 process.env.DB_PATH = path.join(fs.mkdtempSync(path.join(os.tmpdir(), "wertis-zadania-serwis-")), "t.db");
 process.env.SGT_MODE = "seeded";
 
-/* ── Umowa SERWISU, nie tej jednej trasy (0.352.0) ───────────────────────────
+/* ── Umowa SERWISU, nie tej jednej trasy ─────────────────────────────────────
    `routes/zadania-terenowe.test.ts` sprawdza zadania przez HTTP i tak ma
    zostać. Ten plik istnieje dla jednej rzeczy, której tamtędy sprawdzić SIĘ
    NIE DA: limitu rozmiaru zdjęcia w `dodajZalacznik`.
@@ -79,7 +79,7 @@ test("skasowanie zadania zabiera jego zdjęcia — załącznik bez zadania nic n
     "CASCADE ze `schema.sql` działa — inaczej retencja zostawiałaby sieroty");
 });
 
-/* ── Zadanie ze sprawy: skąd i dokąd wraca (0.502.0) ───────────────────────
+/* ── Zadanie ze sprawy: skąd i dokąd wraca ─────────────────────────────────
    Zwrot, reklamacja i dostawa zlecają hali z numerem sprawy.
    Karta zadania prowadzi z powrotem, wynik i odesłanie wracają na oś zwrotu,
    a odesłane zadanie staje w Do zrobienia.                                */

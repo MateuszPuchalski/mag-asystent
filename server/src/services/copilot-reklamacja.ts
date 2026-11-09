@@ -2,7 +2,7 @@ import type { DatabaseSync } from "node:sqlite";
 import { db, transaction } from "../db/db.js";
 import { logEvent } from "./events.js";
 import { kodBledu, zapiszWKsiedze } from "./copilot-ksiega.js";
-import { kosztUsd, type Tokeny } from "./copilot-koszt.js";
+import { type Tokeny } from "./copilot-koszt.js";
 import {
   polacz, zamaskujBlok, zamaskujWatek,
   type TrescBezpieczna, type WiadomoscWatku,
@@ -12,22 +12,12 @@ import {
   przygotujZdjecia, spisZdjec, type Pobieracz, type ZdjecieZBramki,
 } from "./copilot-zdjecia.js";
 
-/* ── Copilot reklamacyjny: ZBIERA DANE, nie radzi (0.275.0) ──────────────────
+/* ── Copilot reklamacyjny: zbiera dane i radzi ───────────────────────────────
 
-   Zgłoszenie właściciela z 11 września: „zintegruj z copilotem, wersja do
-   reklamacji zbierająca dane". Słowo „zbierająca" jest tu całym projektem.
-
-   OD 0.276.0 COPILOT TAKŻE RADZI. Do 0.275.0 ten moduł odrzucał kartę,
-   w której padło słowo z rodziny werdyktu — moja decyzja, uzasadniona tym, że
-   uznanie jest nieodwracalne. Właściciel odwrócił ją tego samego dnia:
-   „copilot powinien też radzić w reklamacji". Wie to lepiej: to on wydaje te
-   werdykty i on płaci za ich skutki.
-
-   BRAMKA NIE ZNIKA, TYLKO ZMIENIA CEL. Rada mieszka WYŁĄCZNIE w polu
-   `rekomendacja` — typowanym, podpisanym na ekranie jako zdanie maszyny.
-   Pola faktograficzne (`usterka`, `kiedy`, `oczekiwanie`, `dowody`) mają
-   zostać opisem tego, co powiedział klient, i pilnuje tego ta sama
-   deterministyczna bramka co wcześniej. Bez niej model przemyciłby werdykt
+   RADA MIESZKA WYŁĄCZNIE w polu `rekomendacja` — typowanym, podpisanym na
+   ekranie jako zdanie maszyny. Pola faktograficzne (`usterka`, `kiedy`,
+   `oczekiwanie`, `dowody`) mają zostać opisem tego, co powiedział klient,
+   i pilnuje tego deterministyczna bramka. Bez niej model przemyciłby werdykt
    w polu, które wygląda jak cytat z kupującego, a agent czytałby to jako
    słowa klienta.
 
@@ -56,7 +46,7 @@ import {
 export interface PoleKarty { tresc: string; zrodlo: string }
 
 /**
- * Co maszyna radzi zrobić (0.276.0).
+ * Co maszyna radzi zrobić.
  *
  * Jedenaście wartości `ClaimStatusChangeRequest.status` plus dwunasta, NASZA:
  * `POPROSIC_O_DOWODY` znaczy „nie ma jeszcze czego rozstrzygać". Bez niej
@@ -101,7 +91,7 @@ export interface KartaSprawy {
   dowody: PoleKarty[];
   /** Czego BRAKUJE, żeby dało się rozstrzygnąć. Najcenniejsza pozycja. */
   brakuje: string[];
-  /** Co maszyna radzi (0.276.0); `null`, gdy nie miała z czego poradzić. */
+  /** Co maszyna radzi; `null`, gdy nie miała z czego poradzić. */
   rada: RadaMaszyny | null;
 }
 
@@ -117,16 +107,11 @@ export type NadawcaRozpoznania = (
 ) => Promise<OdpowiedzRozpoznania>;
 
 /**
- * Słowa werdyktu w polach FAKTOGRAFICZNYCH (0.276.0).
+ * Słowa werdyktu w polach FAKTOGRAFICZNYCH.
  *
- * Do 0.275.0 ta lista odrzucała całą kartę, bo maszyna nie miała radzić wcale.
- * Od 0.276.0 radzi — ale wyłącznie w polu `rada`, typowanym i podpisanym na
- * ekranie. `usterka`, `kiedy`, `oczekiwanie` i `dowody` mają zostać OPISEM
- * tego, co powiedział klient.
- *
- * Bez tej bramki model przemyciłby werdykt w polu, które wygląda jak cytat
- * z kupującego — a agent czytałby „reklamacja zasadna" jako słowa klienta,
- * nie jako opinię maszyny. Podpis pod radą chroni przed pomyleniem autora
+ * Rada stoi wyłącznie w polu `rada`, typowanym i podpisanym na ekranie.
+ * `usterka`, `kiedy`, `oczekiwanie` i `dowody` mają zostać OPISEM
+ * tego, co powiedział klient. Podpis pod radą chroni przed pomyleniem autora
  * tylko wtedy, gdy rada stoi tam, gdzie ma stać.
  *
  * Lista jest krótka i celowo nie próbuje być kompletna — nie da się wyliczyć
@@ -170,10 +155,9 @@ export function odsiejBezPokrycia(
   karta: KartaSprawy, numery: Set<string>,
 ): { karta: KartaSprawy; odsiano: number } {
   let odsiano = 0;
-  /* NUMER BEZ NAWIASÓW (0.282.0). Model widzi w rozmowie `[W3]` i regularnie
+  /* NUMER BEZ NAWIASÓW. Model widzi w rozmowie `[W3]` i regularnie
      tak właśnie cytuje — a wtedy `numery.has("[W3]")` jest fałszem i fakt
-     znikał z karty BEZ ŚLADU, jako rzekomo niepokryty. To było poluzowanie
-     doktryny przez literówkę, nie przez decyzję.
+     znikałby z karty jako rzekomo niepokryty.
 
      To NIE jest rozluźnienie sita: `"W3, Z1"` dalej wypada, bo po zdjęciu
      nawiasów nie jest żadnym znanym numerem. Rozszerzamy zapis, nie regułę. */
@@ -227,7 +211,7 @@ export interface ZadanieRozpoznania {
   database?: DatabaseSync;
   now?: () => Date;
   /* Pobieranie zdjęć WSTRZYKIWANE, jak nadawca: test nie ma prawa iść do
-     Allegro, a rozpoznanie bez tego argumentu zachowuje się jak dotąd. */
+     Allegro. */
   pobierz?: Pobieracz;
   /** `false` wyłącza czytanie zdjęć dla jednego wywołania. */
   zdjecia?: boolean;
@@ -263,10 +247,9 @@ export async function rozpoznajSprawe(z: ZadanieRozpoznania): Promise<KartaSpraw
     tresc: w.tresc,
   })));
 
-  /* ── FAKTY ZE SPRAWY PRZED WĄTKIEM (0.282.0) ──────────────────────────────
-     Do tego wydania model widział wyłącznie czat i dlatego prosił o dane,
-     które Allegro przysłało razem ze sprawą: numer zamówienia, datę, model
-     towaru. Blok dostaje własny numer `S`, bo to też są SŁOWA KLIENTA —
+  /* ── FAKTY ZE SPRAWY PRZED WĄTKIEM ────────────────────────────────────────
+     Bez nich model prosiłby o dane, które Allegro przysłało razem ze sprawą:
+     numer zamówienia, datę, model towaru. Blok dostaje własny numer `S`, bo to też są SŁOWA KLIENTA —
      z formularza reklamacyjnego zamiast z wiadomości — i fakt na nich oparty
      musi przejść przez `odsiejBezPokrycia` tak samo jak fakt z rozmowy.
 
@@ -282,7 +265,7 @@ export async function rozpoznajSprawe(z: ZadanieRozpoznania): Promise<KartaSpraw
 
   const watekBezpieczny = zamaskujWatek(watek, sprawa.kupujacy_login);
 
-  /* ── ZDJĘCIA (0.283.0) ────────────────────────────────────────────────────
+  /* ── ZDJĘCIA ──────────────────────────────────────────────────────────────
      Karta z żywego panelu prosiła o zdjęcia, które w sprawie JUŻ BYŁY.
      Pobranie stoi PRZED wywołaniem modelu i po numeracji rozmowy, bo spis
      zdjęć musi umieć wskazać wiadomość, przy której wisi załącznik.
@@ -311,7 +294,7 @@ export async function rozpoznajSprawe(z: ZadanieRozpoznania): Promise<KartaSpraw
     throw e;
   }
 
-  /* BRAMKA WERDYKTU obejmuje POLA FAKTOGRAFICZNE, nie całą kartę (0.276.0).
+  /* BRAMKA WERDYKTU obejmuje POLA FAKTOGRAFICZNE, nie całą kartę.
      Rada jest teraz dozwolona, ale ma stać w swoim polu — w `usterka` czy
      `dowody` byłaby podpisana słowami klienta. */
   const fakty = JSON.stringify([odp.usterka, odp.kiedy, odp.oczekiwanie, odp.dowody]);
@@ -335,7 +318,7 @@ export async function rozpoznajSprawe(z: ZadanieRozpoznania): Promise<KartaSpraw
 
   const { karta: zPokryciem, odsiano } = odsiejBezPokrycia(odp, numery);
 
-  /* SITO NA „BRAKUJE" (0.282.0). To jedyne pole karty bez cytatu, więc
+  /* SITO NA „BRAKUJE". To jedyne pole karty bez cytatu, więc
      `odsiejBezPokrycia` go nie dotyka — a właśnie ono trzymało sprawę
      w miejscu, prosząc agenta o datę zakupu, którą podaliśmy modelowi
      dwadzieścia linii wyżej. Instrukcja o to prosi, kod tego pilnuje:
@@ -452,11 +435,8 @@ function zapiszWywolanie(
   });
 }
 
-/** Koszt jednego rozpoznania — do paska na ekranie ustawień. */
-export const kosztRozpoznania = (model: string, t: Tokeny): number => kosztUsd(model, t);
-
 /**
- * Trafność rady — liczona z FAKTU, nie z ankiety (0.276.0).
+ * Trafność rady — liczona z FAKTU, nie z ankiety.
  *
  * `schema.sql` niesie przy klasyfikacji zdanie z krytyki właściciela:
  * „confidence bez konsekwencji to…". Tutaj domyka się ono samo, bo nie trzeba
@@ -485,26 +465,4 @@ export function ocenRekomendacje(
   database.prepare("UPDATE reklamacja_karta SET ocena=?, ocena_at=? WHERE reklamacja_id=?")
     .run(ocena, teraz.toISOString(), reklamacjaId);
   return ocena;
-}
-
-/**
- * Ile rad, ile trafnych — do karty Copilota na ekranie ustawień.
- *
- * Bez tej liczby po miesiącu nikt nie będzie umiał powiedzieć, czy rada pomaga.
- * `ocenionych` jest osobno od `rad`, bo sprawy bez werdyktu nie są ani
- * sukcesem, ani porażką modelu — są niedokończone.
- */
-export function trafnoscRad(database: DatabaseSync): {
-  rad: number; ocenionych: number; trafnych: number;
-} {
-  const w = database.prepare(`SELECT
-      COUNT(rekomendacja) AS rad,
-      COUNT(ocena) AS ocenionych,
-      SUM(CASE WHEN ocena='trafna' THEN 1 ELSE 0 END) AS trafnych
-    FROM reklamacja_karta`).get() as Record<string, number | null>;
-  return {
-    rad: Number(w.rad ?? 0),
-    ocenionych: Number(w.ocenionych ?? 0),
-    trafnych: Number(w.trafnych ?? 0),
-  };
 }

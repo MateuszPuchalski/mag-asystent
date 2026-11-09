@@ -88,7 +88,7 @@ export function usePoprawKlasyfikacje() {
   });
 }
 
-/* ── Szkic odpowiedzi z faktów (§14.6, 0.231.0) ──────────────────────────────
+/* ── Szkic odpowiedzi z faktów (§14.6) ───────────────────────────────────────
    Jedna rozmowa na kliknięcie. Unieważnia ROZMOWĘ, bo propozycja jedzie
    w `osRozmowy` obok szkicu agenta — i pomiar, bo każde wywołanie kosztuje. */
 
@@ -193,8 +193,8 @@ export function useWymianyCopilota(rozmowaId: number) {
 export function useZadajPytanie() {
   const qc = useQueryClient();
   return useMutation({
-    /* `zdjecia` tylko wtedy, gdy są. Pytanie bez nich ma to samo ciało co
-       dotąd, więc starszy serwer przyjmie je bez zmian. */
+    /* `zdjecia` tylko wtedy, gdy są. Pytanie bez nich ma ciało bez tego
+       pola, więc starszy serwer przyjmie je bez zmian. */
     mutationFn: (v: { rozmowaId: number; pytanie: string; szkic: string; zdjecia?: ZdjeciePytania[] }) =>
       api<{ wymiana: WymianaCopilota }>("/api/obsluga/copilot/pytanie",
         { method: "POST", body: JSON.stringify(v) }),

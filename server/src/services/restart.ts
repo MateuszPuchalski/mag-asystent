@@ -1,7 +1,7 @@
-/* ── Restart po zmianie konfiguracji (0.491.0) ───────────────────────────────
+/* ── Restart po zmianie konfiguracji ─────────────────────────────────────────
    Konfigurację czyta się raz, przy starcie procesu. Zapis `wertis.env`
-   z panelu działa więc dopiero po restarcie usług, a restart robił dotąd
-   człowiek przy serwerze — dokładnie ta czynność, którą panel ma zdjąć.
+   z panelu działa więc dopiero po restarcie usług — a restart przy serwerze
+   to dokładnie ta czynność, którą panel ma zdjąć.
 
    Mechanizm jest najprostszy możliwy: proces kończy się sam, a NSSM podnosi
    go z powrotem (`AppExit Default Restart`, instalator). Worker Node dowiaduje

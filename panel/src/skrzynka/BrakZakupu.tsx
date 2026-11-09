@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import { useState } from "react";
 import { Link2, ShoppingBag } from "lucide-react";
 import type { KandydatZamowienia } from "../api/typy";
 import { useWskazZamowienie } from "../api/rozmowy";
@@ -9,7 +9,7 @@ import { Przycisk, dzien, ile } from "../ui";
 export const PYTANIE_O_ZAMOWIENIE = "Proszę podać numer zamówienia, którego dotyczy wiadomość.";
 
 /**
- * BRAKUJĄCY ZAKUP NAD POLEM ODPOWIEDZI (0.547.0).
+ * BRAKUJĄCY ZAKUP NAD POLEM ODPOWIEDZI.
  *
  * Rozmowa bez zamówienia odpowiada na domysłach. Copilot pisze wtedy „brak
  * w faktach danych o zamówieniu”, a agent pisze „paczka jest w drodze” bez

@@ -1,10 +1,6 @@
 /* ── Statusy końcowe sprawy posprzedażowej — JEDNA lista dla całego repo ─────
-   Stała mieszkała w `reklamacje.ts` i komentarz przy niej mówił wprost, czego
-   się boi: „dwie listy końcowe przepisane ręcznie w dwóch plikach to jedna
-   lista za dużo — przy następnej zmianie rozjadą się w ciszy". Spoiwo kolejek
-   (`droga-klienta.ts`) potrzebuje dokładnie tej samej odpowiedzi na pytanie
-   „czy ta sprawa jeszcze czeka na ruch", więc lista schodzi tutaj, zamiast
-   urosnąć o trzecią kopię.
+   Dwie listy przepisane ręcznie rozjadą się w ciszy przy następnej zmianie,
+   a reklamacje i spoiwo kolejek (`droga-klienta.ts`) pytają o to samo.
 
    OSOBNY PLIK, a nie import z `reklamacje.ts`, bo tamten importuje spoiwo —
    pętla importów przy stałej liczonej w chwili ładowania modułu bywa pustym

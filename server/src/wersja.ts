@@ -9,8 +9,7 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
  *
  * Numer stoi w `package.json` korzenia repo i z niego biorą go wszyscy:
  * serwer tutaj, APK w `android/app/build.gradle.kts`. Wpisanie go w kod
- * dołożyłoby trzecie miejsce do pamiętania — a dokładnie tak `0.3.0`
- * przetrwało sześć zmergowanych zmian.
+ * dołożyłoby trzecie miejsce do pamiętania.
  *
  * Ścieżka `../package.json` działa w obu układach: `src/` w dev i `dist/`
  * po zbudowaniu — oba leżą jeden poziom pod `server/`.

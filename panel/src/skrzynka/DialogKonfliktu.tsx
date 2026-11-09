@@ -1,21 +1,19 @@
-import React, { useState } from "react";
+import { useState } from "react";
 import { AlertTriangle } from "lucide-react";
 import type { SzczegolyWysylki } from "../api/typy";
 import { NaglowekSekcji, Przycisk, czas } from "../ui";
 import { useOkno } from "../nawigacja/fokus";
 
 /**
- * Konflikt świeżości przy wysyłce (§8.5, blizna 0.110.0).
+ * Konflikt świeżości przy wysyłce (§8.5).
  *
- * Dialog istnieje po to, żeby zgoda była JAWNA. Do 0.110.0 dopisek klienta
- * zakładał drugą sprawę, a odpowiedź szła na starą wersję pytania — po cichu.
- * Dlatego „WYŚLIJ MIMO TO" jest martwy, dopóki człowiek nie potwierdzi, że
+ * Dialog istnieje po to, żeby zgoda była JAWNA: odpowiedź nie idzie po cichu
+ * na starą wersję pytania. Dlatego „WYŚLIJ MIMO TO" jest martwy, dopóki człowiek nie potwierdzi, że
  * wie, na którą wersję pytania odpowiada.
  *
  * Szkic zostaje nietknięty: serwer odrzucił wysyłkę PRZED strzałem do Allegro.
  *
- * `ktoDopisal` jest PARAMETREM od 0.224.0 i domyślnie brzmi „klient", więc
- * skrzynka wygląda dokładnie tak, jak wyglądała. Reklamacja podaje tu czasem
+ * `ktoDopisal` jest PARAMETREM i domyślnie brzmi „klient". Reklamacja podaje tu czasem
  * „doradca Allegro": rozmowa bywa trójstronna, a dialog, który nazywa autora
  * dopisku klientem, mówiłby wtedy nieprawdę o tym, na co agent patrzy.
  */
@@ -32,7 +30,7 @@ export function DialogKonfliktu({
 }) {
   const [zgoda, setZgoda] = useState(false);
   const nowa = szczegoly.nowaWiadomosc ?? null;
-  /* FOKUS W OKNIE (0.546.0). Ctrl+Enter wysyła z pola odpowiedzi, więc
+  /* FOKUS W OKNIE. Ctrl+Enter wysyła z pola odpowiedzi, więc
      okno otwierało się z kursorem dalej w tym polu, pod nakładką. Pisanie
      szło w niewidoczny szkic, a drugie Ctrl+Enter próbowało wysłać znowu.
      Fokus startuje na POPRAW SZKIC: to wyjście, które niczego nie wysyła

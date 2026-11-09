@@ -1,10 +1,9 @@
-import React from "react";
 import { Pin } from "lucide-react";
 import type { WpisOsi } from "../api/typy";
 import { LoginKlienta, czas } from "../ui";
 
 /**
- * Pytanie klienta przypięte nad edytorem (0.260.0).
+ * Pytanie klienta przypięte nad edytorem.
  *
  * ── DLACZEGO W OGÓLE ISTNIEJE ──────────────────────────────────────────────
  * Rozmowa jest kolumną, w której przewija się TYLKO oś: nagłówek, pasek

@@ -2,30 +2,23 @@ import React from "react";
 import { KartaWgladu } from "../ui/wglad";
 import type { PokrycieSygnatur as Pokrycie } from "../api/typy";
 
-/* ── Pokrycie sygnatur (0.169.0) ─────────────────────────────────────────────
+/* ── Pokrycie sygnatur ───────────────────────────────────────────────────────
    Sygnatura oferty (`offer.external.id`) wiąże ją z kartoteką Subiekta po
-   symbolu. Od 0.169.0 pewne trafienie wiąże się SAMO — a ta karta odpowiada
-   na pytanie, którego dotąd nie dało się zadać: ILE się wiąże.
+   symbolu. Pewne trafienie wiąże się SAMO, a ta karta mówi, ILE się wiąże.
 
    Karta nie jest ozdobą, tylko listą roboty. Sygnatura w kolumnie „pudła"
    znaczy jedno kliknięcie w Allegro albo jedną kartotekę w Subiekcie —
    i o tyle mniej zatwierdzania przy zwrotach.                              */
 
-/* ── TON OSTRZEGAWCZY TO `ranga-uwaga`, NIE BARWA MARKI (0.255.0) ────────────
-   Do 0.254.0 liczby wymagające reakcji dostawały `text-wertis-amber`. Zmierzone
-   w przeglądarce: #F7A600 przy 24 px i wadze 700 daje na bieli 2.02:1 (od
-   23 września 2026 marka to #FF9100 — 2.26:1, dalej poniżej), przy
+/* ── TON OSTRZEGAWCZY TO `ranga-uwaga`, NIE BARWA MARKI ──────────────────────
+   Barwa marki (#FF9100) przy 24 px i wadze 700 daje na bieli 2.26:1, przy
    progu 3:1 dla tekstu tej wielkości. Ta barwa jest tłem pod ciemnym pismem
    (tak działa `.btn-primary`) i nie nadaje się na samo pismo.
 
    `ranga-uwaga` (#92400e) daje 7.09:1 i znaczy dokładnie „uwaga" — sąsiednie
-   liczby biorą już `ranga-ok` z tej samej rodziny. Przy okazji realizuje
-   decyzję właściciela o rozdzieleniu barwy MARKI od barwy OSTRZEŻENIA. */
-/* Sam komponent mieszka od 0.440.0 w `ui/wykres.tsx` — analiza biura jest
-   jego drugim odbiorcą. Ten eksport zostaje, żeby karty ustawień nie musiały
-   wiedzieć o przeprowadzce. */
+   liczby biorą już `ranga-ok` z tej samej rodziny. Barwa MARKI i barwa
+   OSTRZEŻENIA są rozdzielone decyzją właściciela. */
 import { Liczba } from "../ui/wykres";
-export { Liczba };
 
 const Lista = ({ tytul, opis, wiersze }: {
   tytul: string; opis: string; wiersze: Pokrycie["pudla"];
@@ -48,11 +41,10 @@ export function PokrycieSygnatur({ dane }: { dane: Pokrycie | undefined }) {
   if (!dane) return null;
   const zSygnatura = dane.pozycji - dane.bezSygnatury;
 
-  /* Rama wspólna z resztą analizy (0.519.0): sześć kart „Obsługa klienta"
-     budowało własną, każda trochę inną, i ekran czytał się jak sześć
-     aplikacji. Podpis „pozycje pobranych zamówień" przeszedł do opisu. */
-  /* Bez zamówień karta jest jednym zdaniem (0.542.0, wariant C Analizy):
-     cztery zera nad zdaniem „jeszcze nie ma" mówiły to samo dwa razy. */
+  /* Rama wspólna z resztą analizy, żeby karty obsługi nie czytały się jak
+     sześć aplikacji. */
+  /* Bez zamówień karta jest jednym zdaniem: cztery zera nad zdaniem
+     „jeszcze nie ma" mówiłyby to samo dwa razy. */
   if (dane.pozycji === 0) return <KartaWgladu tytul="Sygnatura → kartoteka Subiekta"
     pusta="Nie ma jeszcze pobranych zamówień — pokrycie policzy się po pierwszej synchronizacji." />;
   return <KartaWgladu tytul="Sygnatura → kartoteka Subiekta"

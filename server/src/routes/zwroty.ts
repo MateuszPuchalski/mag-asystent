@@ -49,15 +49,12 @@ import { BladSprawy, BrakKlienta } from "../services/prowadzenie-klienta.js";
 import { reconcile } from "../services/reconcile.js";
 import { ROLE_BIUROWE } from "../services/users.js";
 
-/* ── Trasy zwrotów klienckich (0.150.0, decyzje biura od 0.156.0) ────────────
-   SZEŚĆ ZAPISÓW: kartoteka pozycji, werdykt, ocena towaru, kwota oraz — od
-   0.162.0 — numer korekty i jego cofnięcie. Korektę wystawia człowiek
-   w Subiekcie, a panel zapisuje FAKT, że powstała.
+/* ── Trasy zwrotów klienckich ───────────────────────────────────────
+   SZEŚĆ ZAPISÓW: kartoteka pozycji, werdykt, ocena towaru, kwota oraz numer
+   korekty i jego cofnięcie. Korektę wystawia człowiek w Subiekcie, a panel
+   zapisuje FAKT, że powstała.
 
-   Do Allegro wychodzą od 0.190.0 zwrot pieniędzy i odmowa wypłaty, a od
-   0.164.0 wniosek o rabat. Zdanie „pieniądze oddaje w panelu Allegro" stało
-   tu do audytu z 15 września 2026 — dwadzieścia wydań po tym, jak przestało
-   być prawdą.
+   Do Allegro wychodzą zwrot pieniędzy, odmowa wypłaty i wniosek o rabat.
 
    Bramka roli stoi na KAŻDEJ trasie, także na odczycie — tak samo jak przy
    skrzynce. Zwrot niesie numer zamówienia i nazwisko sprawy klienta; to są
@@ -78,12 +75,10 @@ function odmowa(reply: FastifyReply) {
    nazwy: `kosz_bez_powrotu` dotyczy zwrotów, choć nie nosi tego w nazwie, a
    dopisanie piątej kontroli ma być decyzją, nie skutkiem ubocznym nazewnictwa.
 
-   PIĄTA KONTROLA (0.476.0): `zwrot_rozliczony_bez_korekty`. Zwrot rozliczony
-   przez Allegro wychodzi z kolejki, choć u nas nie ma korekty ani oceny —
-   decyzją właściciela z 0.339.0. Kontrola powstała, żeby to nie działo się
-   w ciszy, ale rysowała się wyłącznie w stanie systemu, gdzie obsługa nie
-   zagląda. Przegląd zwrotów z 23 września: taki zwrot znikał z tego ekranu
-   bez śladu, a jego koszyk stał zablokowany na brakującej korekcie. */
+   PIĄTA KONTROLA: `zwrot_rozliczony_bez_korekty`. Zwrot rozliczony przez
+   Allegro wychodzi z kolejki, choć u nas nie ma korekty ani oceny (decyzja
+   właściciela). Kontrola stoi TU, bo w stanie systemu obsługa nie zagląda,
+   a koszyk takiego zwrotu stoi zablokowany na brakującej korekcie. */
 const RODZAJE_ZWROTOW = new Set([
   "zwrot_po_terminie", "zwrot_bez_przelewu", "kosz_czeka_na_korekte", "kosz_bez_powrotu",
   "zwrot_rozliczony_bez_korekty",
@@ -118,7 +113,7 @@ export async function zwrotyRoutes(app: FastifyInstance) {
      wyłączałby przycisk przez większość doby. Agent klika wtedy, gdy najbardziej
      mu zależy — czyli dokładnie w środku limitu, gdyby limit trwał.
 
-     Wiązanie zaległości jak przy dociąganiu zamówień (0.220.0): kto klika,
+     Wiązanie zaległości jak przy dociąganiu zamówień: kto klika,
      chce zobaczyć AKTUALNY stan, a nie jego połowę. */
   app.post("/api/obsluga/zwroty/synchronizuj", async (_req, reply) => {
     const nie = odmowa(reply);
@@ -177,11 +172,11 @@ export async function zwrotyRoutes(app: FastifyInstance) {
       /* Powiązanie ZARAZ PO dociągnięciu: to zamówienie niesie sygnaturę,
          więc dopiero teraz jest z czego wiązać. Bez tego operator klikałby
          „dociągnij" i dalej patrzył na „Bez kartoteki" do następnego taktu.
-         Korekty i koszyki tą samą drogą (0.201.0): kto klika „dociągnij",
+         Korekty i koszyki tą samą drogą: kto klika „dociągnij",
          chce zobaczyć AKTUALNY stan, a nie jego część. */
       return { pobrano, ...powiazZaleglosci(db()) };
     } catch (e) {
-      /* WIĄŻEMY TAKŻE PO BŁĘDZIE (0.220.0). Ten przycisk jest jedyną ręczną
+      /* WIĄŻEMY TAKŻE PO BŁĘDZIE. Ten przycisk jest jedyną ręczną
          drogą do wiązania, a zaległość w bazie nie ma nic wspólnego z tym,
          czy Allegro właśnie odpowiedziało. Odmowa dociągnięcia zostaje
          odmową — treść błędu jedzie na ekran jak dotąd. */
@@ -244,7 +239,7 @@ export async function zwrotyRoutes(app: FastifyInstance) {
       } catch (e) { return konflikt(reply, e); }
     });
 
-  /* Cofnięcie PRZYJĘCIA (0.204.0). Osobna trasa, nie `werdykt` z pustą
+  /* Cofnięcie PRZYJĘCIA. Osobna trasa, nie `werdykt` z pustą
      decyzją: ta przyjmuje wyłącznie dwie wartości i ma tak zostać, żeby
      literówka w ciele nie wyzerowała werdyktu po cichu. Bramki — odmowa,
      oddane pieniądze, ustawione oceny — zna serwis, nie trasa. */
@@ -265,8 +260,8 @@ export async function zwrotyRoutes(app: FastifyInstance) {
       const nie = odmowa(reply);
       if (nie) return nie;
       const o = req.body?.ocena ?? null;
-      /* „Przecena" zeszła w 0.209.0, „outlet" doszedł w 0.375.0 — panel ze
-         starą listą ma dostać 400 z wymienionymi ocenami, a nie cichy zapis
+      /* Panel ze starą listą ocen ma dostać 400 z wymienionymi ocenami, a nie
+         cichy zapis
          wartości, której `CHECK` tabeli i tak nie przyjmie. */
       if (o !== null && !["stan", "utylizacja", "outlet"].includes(o)) {
         return reply.code(400)
@@ -276,7 +271,7 @@ export async function zwrotyRoutes(app: FastifyInstance) {
         return ocenPozycje(db(), Number(req.params.id), o as never,
           Number(req.body?.wersja), kto(), new Date(), req.body?.koszId ?? null);
       } catch (e) {
-        /* WYBÓR PUDŁA WRACA STRUKTURALNIE, nie zdaniem (0.379.0). Ekran ma
+        /* WYBÓR PUDŁA WRACA STRUKTURALNIE, nie zdaniem. Ekran ma
            narysować przyciski z kodami koszyków, a nie kazać człowiekowi
            przepisywać kod z komunikatu o błędzie. */
         if (e instanceof WyborKoszyka) {
@@ -286,15 +281,14 @@ export async function zwrotyRoutes(app: FastifyInstance) {
       }
     });
 
-  /* ── Regał outletowy obsługiwany ręką (0.375.0) ────────────────────────
-     Decyzja właściciela z 16 września 2026: „na razie będziemy obsługiwać
+  /* ── Regał outletowy obsługiwany ręką ────────────────────────
+     Decyzja właściciela: „na razie będziemy obsługiwać
      outlet ręcznie". Magazyn outletowy istnieje w Subiekcie, w aplikacji nie
      jest skonfigurowany, a regał jest jeden i oglądają go klienci stacjonarni.
 
      Stąd kształt tych dwóch tras: aplikacja nie wystawia tu ŻADNEGO dokumentu.
      Mówi tylko, co czeka na przeniesienie, i przyjmuje meldunek, że już nie
-     czeka. To jest warunek, pod którym trzecia ocena w ogóle weszła —
-     bez listy byłaby „przeceną" z 0.209.0 drugi raz. */
+     czeka. Bez tej listy ocena „outlet" nie prowadziłaby donikąd. */
   app.get("/api/obsluga/zwroty/outlet", async (_req, reply) => {
     const nie = odmowa(reply);
     if (nie) return nie;
@@ -321,7 +315,7 @@ export async function zwrotyRoutes(app: FastifyInstance) {
       } catch (e) { return reply.code(400).send({ error: (e as Error).message }); }
     });
 
-  /* Ręczne wskazanie składu kompletu (0.336.0). Zgłoszenie właściciela:
+  /* Ręczne wskazanie składu kompletu. Zgłoszenie właściciela:
      „rozwiąż «nie weszła do koszyka» — nie wiem, gdzie to wskazać".
 
      Automat sam odsyłał do tej drogi zdaniem „wskaż skład ręcznie", a drogi
@@ -349,7 +343,7 @@ export async function zwrotyRoutes(app: FastifyInstance) {
     }
   });
 
-  /* Ptaszek przy składniku kompletu (0.335.0). Zgłoszenie właściciela:
+  /* Ptaszek przy składniku kompletu. Zgłoszenie właściciela:
      „powinno rozbijać na komponenty do zaznaczania, które idą do MM".
 
      JEDNA TRASA NA OBA KIERUNKI, bo to przełącznik — dwie kazałyby panelowi
@@ -406,7 +400,7 @@ export async function zwrotyRoutes(app: FastifyInstance) {
       }
     });
 
-  /* ── Koszyk zwrotów (0.192.0) ──────────────────────────────────────────
+  /* ── Koszyk zwrotów ──────────────────────────────────────────
      Obieg biura, opisany przez właściciela: „gdy agent zasiada do zwrotów, to
      otwiera pustą MM i dodaje kolejno przedmioty ze zwrotów; gdy koszyk się
      zapełni, zamyka MM i tak w kółko".
@@ -418,23 +412,23 @@ export async function zwrotyRoutes(app: FastifyInstance) {
   app.get("/api/obsluga/zwroty/kosz", async (_req, reply) => {
     const nie = odmowa(reply);
     if (nie) return nie;
-    /* `czekajace` jest polem ADDYTYWNYM (0.200.0): koszyki zamknięte bez
+    /* `czekajace` jest polem ADDYTYWNYM: koszyki zamknięte bez
        dokumentu nie należą do żadnego operatora — to praca biura, nie jego
        biurka. Stary panel je zignoruje.
 
-       OD 0.371.0 SZERSZE NIŻ SAME BRAKI KOREKT: kosz, któremu Sfera odrzuciła
-       MM, wypadał stąd i nie było go widać nigdzie. Nazwa pola zostaje, bo
+       SZERSZE NIŻ SAME BRAKI KOREKT: kosz, któremu Sfera odrzuciła MM,
+       inaczej nie byłby widoczny nigdzie. Nazwa pola zostaje, bo
        zmiana nazwy w umowie z panelem kosztowałaby tyle, co cała ta poprawka,
        a czekaniem to nadal jest. */
     return {
-      /* DWA koszyki od 0.211.0 — zwroty i odpad. Lista, nie pole: trzeci
+      /* DWA koszyki — zwroty i odpad. Lista, nie pole: trzeci
          rodzaj (przecena?) nie ma wtedy zmieniać kształtu odpowiedzi. */
       kosze: otwarteKoszyki(db(), kto()),
       czekajace: koszykiBezDokumentu(db()),
     };
   });
 
-  /* ── Towar dołożony ręką: skan albo kartoteka (0.365.0) ──────────────────
+  /* ── Towar dołożony ręką: skan albo kartoteka ──────────────────
      Zgłoszenie właściciela: „dodaj możliwość dodawania produktów do koszyka
      zwrotowego poprzez zeskanowanie produktu lub wybranie go z kartoteki".
 
@@ -504,7 +498,7 @@ export async function zwrotyRoutes(app: FastifyInstance) {
       }
     });
 
-  /* ── Koszyk zakładany WPROST (0.378.0) ─────────────────────────────────
+  /* ── Koszyk zakładany WPROST ─────────────────────────────────
      Zgłoszenie właściciela: „potrzebuję tworzenia koszy zwrotowych i dodawania
      produktów do nich jako oddzielna opcja". Do tego wydania koszyk powstawał
      wyłącznie jako SKUTEK UBOCZNY pierwszego dołożenia — oceny „na stan" albo
@@ -566,9 +560,9 @@ export async function zwrotyRoutes(app: FastifyInstance) {
       } catch (e) { return reply.code(409).send({ error: (e as Error).message }); }
     });
 
-  /* WYPUSZCZENIE MM MIMO BRAKUJĄCYCH KOREKT (0.368.0). Decyzja właściciela:
+  /* WYPUSZCZENIE MM MIMO BRAKUJĄCYCH KOREKT. Decyzja właściciela:
      „dodaj opcję sforsowania zamknięcia koszyka, nawet jeśli nie ma wszystkich
-     ZW". Bramka z 0.200.0 zostaje domyślna — to jest wyjście awaryjne obok
+     ZW". Bramka korekt zostaje domyślna — to jest wyjście awaryjne obok
      niej, nie jej zdjęcie.
 
      OSOBNA TRASA, nie flaga przy `zamknij`. Flaga w ciele robi z wyjątku
@@ -593,7 +587,7 @@ export async function zwrotyRoutes(app: FastifyInstance) {
       } catch (e) { return reply.code(409).send({ error: (e as Error).message }); }
     });
 
-  /* Co ten klient u nas kupił (0.365.0). Odpowiedź na zgłoszenie właściciela:
+  /* Co ten klient u nas kupił. Odpowiedź na zgłoszenie właściciela:
      „kupujący może mieć wiele paczek kupionych w historii sklepu, więc muszę
      mieć możliwość wybrania paczki". Rejestracja nieodebranej pytała o numer
      zamówienia jak o rzecz oczywistą, a to jedyna rzecz, której przy takiej
@@ -606,10 +600,9 @@ export async function zwrotyRoutes(app: FastifyInstance) {
      Konto bierzemy PIERWSZE, tak samo jak rejestracja niżej — dwie różne
      zasady dawałyby listę z jednego konta i wiersz zapisany na drugim.
 
-     POST, CHOĆ NIC NIE ZAPISUJE (0.367.0) — ta sama decyzja i to samo
-     uzasadnienie co przy `/skan` z 0.163.0. Do 0.366.0 uchwyt jechał
-     w adresie (`?login=`), a od tego wydania bywa nim NAZWISKO Z NAKLEJKI:
-     adres ląduje w logu żądań serwera, więc dana osobowa pojechałaby do pliku,
+     POST, CHOĆ NIC NIE ZAPISUJE — ta sama decyzja i to samo uzasadnienie
+     co przy `/skan`. Uchwytem bywa NAZWISKO Z NAKLEJKI, a adres ląduje
+     w logu żądań serwera, więc dana osobowa pojechałaby do pliku,
      którego polityka zwrotów nie obejmuje. Ciało żądania do loga nie wchodzi.
 
      ŚLAD ZOSTAJE, bo to odczyt cudzej danej osobowej — precedens `zwroty_eksport`
@@ -630,7 +623,7 @@ export async function zwrotyRoutes(app: FastifyInstance) {
       return { paczki };
     });
 
-  /* Zamówienia kupującego PROSTO Z ALLEGRO (0.450.0). Trasa wyżej czyta
+  /* Zamówienia kupującego PROSTO Z ALLEGRO. Trasa wyżej czyta
      tylko naszą bazę, a ta nie zna zamówienia paczki nieodebranej: nic do
      niego nie prowadzi, bo klient niczego nie zgłosił. Do tego wydania biuro
      szukało takiej paczki na stronie Allegro i przepisywało numer.
@@ -665,10 +658,8 @@ export async function zwrotyRoutes(app: FastifyInstance) {
       }
     });
 
-  /* ── PRZYJĘCIE PACZKI NIEODEBRANEJ (0.493.0) ──────────────────────────
-     Trasa rejestracji `/nieodebrana` odeszła w 0.451.0 razem z formularzem.
-     Ta wraca NOWĄ decyzją właściciela i pod inną nazwą, bo robi co innego:
-     nie pyta o nic, przyjmuje zamówienie wskazane w wyniku szukania.
+  /* ── PRZYJĘCIE PACZKI NIEODEBRANEJ ──────────────────────────
+     Nie pyta o nic, przyjmuje zamówienie wskazane w wyniku szukania.
      Uzasadnienie i bramki stoją przy `przyjmijNieodebrana`.
 
      Numer listu idzie tylko wtedy, gdy panel ma go ze skanu, który chybił —
@@ -691,11 +682,11 @@ export async function zwrotyRoutes(app: FastifyInstance) {
       } catch (e) { return konflikt(reply, e); }
     });
 
-  /* Potrącenie za utratę wartości (0.170.0). To JEDYNA liczba o pieniądzach,
+  /* Potrącenie za utratę wartości. To JEDYNA liczba o pieniądzach,
      jaką panel wolno mu przysłać — i dlatego jest walidowana w widełkach
      `0…wartość pozycji`, wymaga powodu i wisi przy POZYCJI, a nie przy sumie.
      Sumę dalej składa serwer z zaznaczenia. */
-  /* Dopisanie produktu, którego klient nie zgłosił (0.184.0). Panel przysyła
+  /* Dopisanie produktu, którego klient nie zgłosił. Panel przysyła
      identyfikator POZYCJI ZAMÓWIENIA, nigdy nazwy ani ceny: klient może odesłać
      wyłącznie to, co kupił, a cena ma pochodzić z faktu, nie z pola tekstowego
      (§25a.3 — kwotę składa serwer). */
@@ -723,7 +714,7 @@ export async function zwrotyRoutes(app: FastifyInstance) {
       } catch (e) { return konflikt(reply, e); }
     });
 
-  /* Ile sztuk NAPRAWDĘ wróciło (0.212.0). Liczy biuro przy rozpakowaniu —
+  /* Ile sztuk NAPRAWDĘ wróciło. Liczy biuro przy rozpakowaniu —
      decyzja właściciela. Widełki i bramkę „najpierw przyjmij" zna serwis:
      zależą od deklaracji klienta i od stanu zwrotu, a trasa żadnego z nich
      nie zna. */
@@ -807,7 +798,7 @@ export async function zwrotyRoutes(app: FastifyInstance) {
       } catch (e) { return konflikt(reply, e); }
     });
 
-  /* RABAT TRANSAKCYJNY (0.164.0) — jedyna trasa tego pliku, która WYCHODZI
+  /* RABAT TRANSAKCYJNY — jedyna trasa tego pliku, która WYCHODZI
      do Allegro. Reszta zapisuje wyłącznie u nas. Stąd osobna ostrożność:
      strażnik przed dubletem stoi w serwisie, PRZED siecią, bo końcówka
      Allegro nie ma idempotencji. */
@@ -826,17 +817,17 @@ export async function zwrotyRoutes(app: FastifyInstance) {
       }
     });
 
-  /* ── Skan etykiety zwrotnej (0.163.0) ─────────────────────────────────────
+  /* ── Skan etykiety zwrotnej ─────────────────────────────────────
      TA TRASA JEST POST-em, CHOĆ NICZEGO NIE ZAPISUJE, i to jest świadome.
      Zeskanowany kod w adresie wylądowałby w logu żądań serwera — a numer listu
-     przewozowego prowadzi w systemie kuriera do adresu odbiorcy (`ksztalt.ts`,
-     0.155.0). Stałby się więc trwały tylnymi drzwiami, mimo że w bazie nie ma
+     przewozowego prowadzi w systemie kuriera do adresu odbiorcy (`ksztalt.ts`).
+     Stałby się więc trwały tylnymi drzwiami, mimo że w bazie nie ma
      na niego kolumny. Ten sam argument stoi przy szynie zdarzeń panelu:
      „token lądowałby w logach żądań serwera" (`panel/src/api/zdarzenia.ts`).
 
      Z tego samego powodu nie ma tu `logEvent`: wpis z kodem w dzienniku byłby
      dokładnie tym zapisem, którego unikamy, a bez kodu nie niósłby nic. */
-  /* ── ZWROT PIENIĘDZY I ODMOWA (0.190.0) ────────────────────────────────
+  /* ── ZWROT PIENIĘDZY I ODMOWA ────────────────────────────────
      Druga i trzecia trasa tego pliku wychodząca do Allegro — i pierwsza,
      która rusza PIENIĄDZE. Stąd dwie różnice względem reszty:
 
@@ -844,7 +835,7 @@ export async function zwrotyRoutes(app: FastifyInstance) {
      uprzywilejowana, a nie zwykła praca biura jak wskazanie kartoteki.
 
      Kwoty NIE MA W CIELE ŻĄDANIA i to jest ta sama decyzja, co przy
-     `zapiszKwote` (0.156.0): gdyby panel podawał liczbę, dałoby się oddać
+     `zapiszKwote`: gdyby panel podawał liczbę, dałoby się oddać
      dowolną kwotę żądaniem z pominięciem ekranu. Serwer bierze tę, którą sam
      policzył z zaznaczenia. */
   app.post<{ Params: { id: string }; Body: { wersja?: number } }>(
@@ -864,7 +855,7 @@ export async function zwrotyRoutes(app: FastifyInstance) {
       }
     });
 
-  /* DOSYŁKA W TYM SAMYM RUCHU (0.536.0). Odmowa z kodem „Wysłaliśmy nowy
+  /* DOSYŁKA W TYM SAMYM RUCHU. Odmowa z kodem „Wysłaliśmy nowy
      towar” albo „Wysłaliśmy brakującą część” zakłada śledzenie dosyłki
      i krok „dosłać” w sprawie klienta. Trasa SKŁADA dwa serwisy, bo
      `zwrot-pieniedzy.ts` nie ma prawa importować `dosylka.ts` (cykl przez
@@ -929,7 +920,7 @@ export async function zwrotyRoutes(app: FastifyInstance) {
       }
     });
 
-  /* ── Przelew oddany poza Allegro (0.269.0) ─────────────────────────────────
+  /* ── Przelew oddany poza Allegro ─────────────────────────────────
      Przy pobraniu Allegro nie trzymało pieniędzy, więc trasa wyżej jest
      zamknięta z definicji, a zwrot zamykał się bez śladu po wypłacie. Te dwie
      trasy zapisują NOTATKĘ o przelewie i ją cofają.
@@ -1074,26 +1065,24 @@ export async function zwrotyRoutes(app: FastifyInstance) {
    *
    * To JEDYNY GET w tym pliku, który zostawia ślad w dzienniku — i dlatego
    * stoi poza umową „otwarcie kolejki nie zapisuje niczego". Ta umowa mówi
-   * o PATRZENIU: otwarcie ekranu niczego nie mutuje (blizna 0.18.0). Pobranie
+   * o PATRZENIU: otwarcie ekranu niczego nie mutuje. Pobranie
    * pliku z loginami kupujących nie jest patrzeniem, tylko wyniesieniem
    * danych na dysk — a kto wynosi zestawienia o ludziach, sam trafia do logu.
    * Ta sama zasada stoi przy `analiza_eksport` i `audyt_eksport`.
    */
-  /* ── PROWADZĄCEGO I TAGÓW PRZY ZWROCIE JUŻ NIE MA (0.370.0) ────────────
+  /* ── PROWADZĄCEGO I TAGÓW PRZY ZWROCIE JUŻ NIE MA ────────────
      Zgłoszenie właściciela: „uprość panel zwrotów do wymaganego minimum",
      a po pytaniu o szczegóły wskazanie wprost na sito Moje/Niczyje i tagi.
 
-     Prowadzący wraca do PIERWSZEJ decyzji z 0.315.0, nie do nowej: tamto
-     wydanie ustaliło najpierw, że przy zwrocie prowadzącego NIE MA, bo zwroty
-     prowadzi całe biuro — i tego samego dnia przywróciło go z powrotem. Bez
-     tego zdania następna sesja „naprawi" to trzeci raz.
+     Przy zwrocie prowadzącego NIE MA, bo zwroty prowadzi całe biuro. Bez
+     tego zdania następna sesja „naprawi" to jeszcze raz.
 
      Reklamacje ZOSTAJĄ z jednym i drugim: tam sprawę bierze
      konkretna osoba, więc pytanie „czyje to" jest prawdziwe. Zniknęło
      wiązanie zwrotów, nie maszyneria — `trasyTagowSprawy` i `stempelProwadzi*`
      stoją nietknięte. */
 
-  /* ── NOTATKA BIURA (0.313.0) ────────────────────────────────────────────
+  /* ── NOTATKA BIURA ────────────────────────────────────────────
      Bez `autoryzuj()`: to zdanie zostaje U NAS i niczego nie obiecuje
      klientowi — czyli zwykła praca biura, tak samo jak zapis przelewu.
 
@@ -1126,7 +1115,7 @@ export async function zwrotyRoutes(app: FastifyInstance) {
       } catch (e) { return konflikt(reply, e); }
     });
 
-  /* ── ROZJAZDY ZWROTÓW (0.313.0) ─────────────────────────────────────────
+  /* ── ROZJAZDY ZWROTÓW ─────────────────────────────────────────
      Rekoncyliacja zna cztery kontrole dotyczące zwrotów i rysowała je
      WYŁĄCZNIE w `/biuro`, czyli nie tam, gdzie pracuje obsługa. Raport, który
      trzeba otworzyć na drugim ekranie, nie chroni przed niczym.
@@ -1142,7 +1131,7 @@ export async function zwrotyRoutes(app: FastifyInstance) {
     };
   });
 
-  /* EKSPORTU CSV JUŻ NIE MA (0.370.0) — właściciel wskazał go wprost jako
+  /* EKSPORTU CSV JUŻ NIE MA — właściciel wskazał go wprost jako
      niepotrzebny. Wynosił loginy kupujących do pliku na dysku, czyli poza
      politykę danych zwrotów, i zostawiał ślad `zwroty_eksport` właśnie
      dlatego. Odpadło jedno i drugie. */
@@ -1151,8 +1140,8 @@ export async function zwrotyRoutes(app: FastifyInstance) {
     const nie = odmowa(reply);
     if (nie) return nie;
     const id = Number(req.params.id);
-    /* Filtr po identyfikatorze, nie `.find` po całej historii (audyt zwrotów,
-       15 września 2026) — koszt i powód stoją przy `listaZwrotow`. */
+    /* Filtr po identyfikatorze, nie `.find` po całej historii — koszt i powód
+       stoją przy `listaZwrotow`. */
     const jeden = listaZwrotow(db(), Date.now(), { id });
     const zwrot = jeden.length ? jeden[0] : null;
     if (!zwrot) return reply.code(404).send({ error: "Nie znaleziono zwrotu" });
@@ -1162,7 +1151,7 @@ export async function zwrotyRoutes(app: FastifyInstance) {
     const kandydaci = zwrot.faktura.dokId === null ? kandydaciFaktury(id, db()) : [];
     return {
       zwrot, os: osZwrotu(db(), id), kandydaciFaktury: kandydaci,
-      /* Stan zapisu do Allegro (0.190.0). Liczy go SERWER, bo to on zna
+      /* Stan zapisu do Allegro. Liczy go SERWER, bo to on zna
          przeszkody: brak identyfikatora płatności, pobranie, brak kwoty.
          Panel powtarzający tę regułę rozjechałby się z nią przy pierwszej
          zmianie — a rozjazd znaczyłby tu przycisk obiecujący pracę, której
@@ -1171,36 +1160,35 @@ export async function zwrotyRoutes(app: FastifyInstance) {
       /* Czego jeszcze z tego zamówienia nie ma w zwrocie. Liczone tutaj,
          a nie w kolejce: lista jest potrzebna dopiero przy otwartym zwrocie. */
       doDopisania: doDopisania(id, db()),
-      /* CO NAPRAWDĘ WEJDZIE DO KOSZYKA (0.328.0). Komplet sprzedany jedną
+      /* CO NAPRAWDĘ WEJDZIE DO KOSZYKA. Komplet sprzedany jedną
          ofertą leży na magazynie osobno, a rozbicie ma tylko paragon.
 
          TYLKO W SZCZEGÓLE, nigdy w kolejce: `skladPozycji` pyta o dokument,
          o zamówienie i o mapowanie każdej oferty, a kolejka liczy naraz
          wszystkie zwroty. Ta sama zasada co przy liście wyżej. */
-      /* Z ZAZNACZENIEM (0.335.0): ekran ma pokazać nie tylko CO wejdzie, ale
+      /* Z ZAZNACZENIEM: ekran ma pokazać nie tylko CO wejdzie, ale
          i co już leży w koszyku — inaczej ptaszek rysowałby się z nadziei. */
       sklady: Object.fromEntries(
         zwrot.pozycje.map((p) => [p.id, skladDoZaznaczenia(db(), p.id)])),
-      /* Wiersze paragonu — materiał do RĘCZNEGO składu (0.336.0). Jeden raz na
+      /* Wiersze paragonu — materiał do RĘCZNEGO składu. Jeden raz na
          zwrot, nie raz na pozycję: dokument jest jeden, a kopiowanie go przy
          każdej pozycji rozdęłoby odpowiedź o to samo. */
       wierszeDokumentu: wierszeDokumentuZwrotu(db(), id),
       /* Reklamacje i droga tego zakupu (S1 i S3 spoiwa,
-         `docs/obsluga-klienta-calosc.md`). Zwrot widział rozmowy od 0.169.0,
-         a spraw posprzedażowych nie widział wcale — biuro oddawało pieniądze,
+         `docs/obsluga-klienta-calosc.md`). Bez nich biuro oddałoby pieniądze,
          nie wiedząc o otwartej reklamacji o ten sam towar.
 
          TYLKO W SZCZEGÓLE, jak składy wyżej i z tego samego powodu: kolejka
          liczy naraz wszystkie zwroty, a ten odczyt pyta o każde zamówienie
          osobno. */
       ...kontekstZwrotu(db(), id),
-      /* Kosze z towarem tego zwrotu (0.438.0) — druga strona wiązania
+      /* Kosze z towarem tego zwrotu — druga strona wiązania
          kosz ↔ zwrot, powód przy `koszeZwrotu`. */
       kosze: koszeZwrotu(id),
     };
   });
 
-  /* Wskazanie dokumentu sprzedaży przez człowieka (0.174.0). `dokId: null`
+  /* Wskazanie dokumentu sprzedaży przez człowieka. `dokId: null`
      ZDEJMUJE powiązanie i to jest droga wyjścia z pomyłki, a nie brak funkcji
      (§25a.5 — cofnięcie zamiast potwierdzenia).
 

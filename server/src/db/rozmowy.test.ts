@@ -5,7 +5,7 @@ import os from "node:os";
 import path from "node:path";
 import { DatabaseSync } from "node:sqlite";
 
-/* Bazę sprzed modelu rozmów budujemy ręcznie, w kształcie z 0.141.0: tabela
+/* Bazę sprzed modelu rozmów budujemy ręcznie, w starym kształcie: tabela
    zadań już istnieje, ale nie wie nic o rozmowach. Najważniejszy wiersz testu
    powstaje ZANIM nowy schema.sql i migracja dostaną szansę go zobaczyć — to
    jedyny sposób, żeby sprawdzić, co migracja robi z zastanymi danymi. */

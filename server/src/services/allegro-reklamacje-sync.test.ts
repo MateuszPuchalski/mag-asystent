@@ -11,7 +11,7 @@ import { stanReklamacji } from "./allegro-reklamacje-sync-state.js";
 
 /* Ten plik pilnuje trzech rzeczy, których nie da się sprawdzić na ekranie:
    że dyskusje NIE wchodzą do rejestru, że drugi przebieg nie
-   robi duplikatów (blizna 0.128.0) oraz że rozmowy dociągają się z limitem,
+   robi duplikatów oraz że rozmowy dociągają się z limitem,
    a nie po jednym żądaniu na sprawę.
 
    Baza to schemat PLUS `migrate()` — sam `schema.sql` opisuje kształt,
@@ -135,9 +135,8 @@ test("mapowanie bierze zegar Z ALLEGRO, nie liczy go samo", async () => {
 
   const w = d.prepare("SELECT * FROM reklamacja_klienta WHERE external_id='i-1'")
     .get() as Record<string, unknown>;
-  /* Termin przepisany jeden do jednego. Implementacja sprzed 0.140.0 liczyła
-     ustawowe czternaście dni od zgłoszenia, bo nie wiedziała, że Allegro
-     `decisionDueDate` w ogóle oddaje. */
+  /* Termin przepisany jeden do jednego z `decisionDueDate`, nie liczony
+     u nas od zgłoszenia. */
   assert.equal(w.decyzja_do, "2026-09-20T10:00:00.000Z");
   assert.equal(w.status_do, "2026-09-20T10:00:00.000Z");
   assert.equal(w.order_id, "zam-1", "checkoutForm.id jest mostkiem do zamówienia");
@@ -288,13 +287,10 @@ test("rozmowę dociągamy tylko wtedy, gdy licznik Allegro rozjechał się z baz
 });
 
 test("kolejka dociągania idzie po TERMINIE, a status końcowy jej nie wycisza", () => {
-  /* ── ASERCJA ODWRÓCONA W 0.398.0, ŚWIADOMIE ───────────────────────────────
-     Do 0.397.0 ten test pilnował, żeby sprawa `CLAIM_ACCEPTED` wypadała
-     z kolejki uzupełnień. Pilnował usterki: zgłoszenie właściciela — „mam
-     reklamację, która nie pokazuje dzisiejszych wiadomości" — to dokładnie
-     ten przypadek. Po UZNANIU reklamacji panel wysyła krok „czy towar do
-     odesłania", a kupujący odpisuje w tej samej rozmowie; sprawa miała wtedy
-     status końcowy, więc jej odpowiedzi nie docierały nigdzie.
+  /* ── Status końcowy nie wycisza rozmowy ───────────────────────────────────
+     Po UZNANIU reklamacji panel wysyła krok „czy towar do odesłania",
+     a kupujący odpisuje w tej samej rozmowie przy statusie końcowym. Jego
+     odpowiedzi muszą dotrzeć.
 
      Kosztu to nie podnosi: żądanie wychodzi wyłącznie wtedy, gdy licznik
      Allegro przewyższa liczbę wierszy u nas. */
@@ -318,9 +314,8 @@ test("kolejka dociągania idzie po TERMINIE, a status końcowy jej nie wycisza",
 });
 
 test("po UZNANIU reklamacji rozmowa dalej się dociąga — blizna 0.398.0", () => {
-  /* Zgłoszenie właściciela w czystej postaci. Sprawa uznana, rozmowa dalej
-     czynna, licznik Allegro mówi o wiadomości, której u nas nie ma. Przed
-     0.398.0 sam status wystarczał, żeby nigdy o nią nie zapytać. */
+  /* Sprawa uznana, rozmowa dalej czynna, licznik Allegro mówi o wiadomości,
+     której u nas nie ma. Sam status nie może jej zatrzymać. */
   const d = baza();
   const konto = Number(d.prepare(
     "INSERT INTO channel_account(channel,external_account_id) VALUES ('allegro','s')")
@@ -387,12 +382,10 @@ test("błąd Allegro podnosi licznik i zapisuje kod, a nie znika", async () => {
   assert.ok(s.nextAttemptAt, "następna próba ma termin, a nie „kiedyś”");
 });
 
-/* ── Stronicowanie rozmowy i filtr statusów (0.273.0) ────────────────────────
-   Do 0.272.0 rozmowa jechała JEDNYM żądaniem bez offsetu, choć adres umiał go
-   od początku. Sprawy dłuższe niż sto wiadomości były przez to przycięte na
-   zawsze — a ekran obiecywał przy nich, że reszta dojdzie następną
-   synchronizacją. Gorzej: taka sprawa spełniała warunek doboru rozmów po
-   KAŻDYM przebiegu i głodziła budżet pozostałych.                           */
+/* ── Stronicowanie rozmowy i filtr statusów ──────────────────────────────────
+   Rozmowa dłuższa niż sto wiadomości nie może zostać przycięta. Inaczej
+   spełniałaby warunek doboru rozmów po KAŻDYM przebiegu i głodziła budżet
+   pozostałych.                                                              */
 
 /** Wiadomość czatu o zadanym numerze — tyle, ile trzeba, żeby ją zapisać. */
 const wiad = (n: number) => ({
@@ -462,9 +455,9 @@ test("bezpiecznik stron urywa rozmowę JAWNIE — i sprawa przestaje głodzić b
 });
 
 test("jedna gruba rozmowa NIE wypycha z budżetu spraw, które da się domknąć", async () => {
-  /* Blizna 0.273.0 w czystej postaci: przy budżecie trzech rozmów sprawa
-     gruba stała na czele kolejki w kółko, bo sortowanie idzie po terminie
-     decyzji, a jej warunek był prawdziwy zawsze. */
+  /* Przy budżecie trzech rozmów sprawa gruba nie może stać na czele kolejki
+     w kółko: sortowanie idzie po terminie decyzji, a jej warunek byłby
+     prawdziwy zawsze. */
   const d = baza();
   const sprawy = [
     sprawa({ id: "gruba", decisionDueDate: "2026-09-08T10:00:00.000Z",
@@ -507,8 +500,8 @@ test("przebieg pyta NAJPIERW o sprawy otwarte, potem o całą listę", async () 
 });
 
 test("odświeżenie JEDNEJ sprawy nie rusza pracy człowieka", async () => {
-  /* Blizna 0.128.0 rozszerzona o pracę biura: ponowne pobranie uzupełnia pola
-     z Allegro, ale `prowadzi`, `notatka` i `wersja` należą do nas. */
+  /* Ponowne pobranie uzupełnia pola z Allegro, ale `prowadzi`, `notatka`
+     i `wersja` należą do nas. */
   const d = baza();
   const { query } = apiZeStronami([sprawa()], { "i-1": 3 });
   /* Pierwszy przebieg Z rozmową, żeby licznik zgadzał się przed odświeżeniem —
@@ -550,11 +543,9 @@ test("odświeżenie sprawy, której nie ma, mówi to zamiast strzelać do Allegr
 });
 
 test("BŁĄD JEDNEJ STRONY nie wycisza rozmowy na zawsze — blizna 0.398.0", async () => {
-  /* Druga przyczyna zgłoszenia „reklamacja nie pokazuje dzisiejszych
-     wiadomości". Do 0.397.0 błąd sieci przy drugiej stronie zapisywał tę samą
-     flagę `czat_urwany=1`, co bezpiecznik stron — a `czatyDoUzupelnienia`
-     pomija sprawy z tą flagą. Jedno mignięcie sieci wyrzucało rozmowę
-     z uzupełniania NA STAŁE, bez słowa na ekranie.
+  /* Błąd sieci przy drugiej stronie nie może zapisać flagi `czat_urwany=1`,
+     bo `czatyDoUzupelnienia` pomija sprawy z tą flagą. Jedno mignięcie sieci
+     wyrzucałoby rozmowę z uzupełniania NA STAŁE.
 
      Bezpiecznik mówi „rozmowa jest dłuższa, niż bierzemy" i to jest stan
      trwały. Błąd mówi „tym razem nie wyszło" i musi się dać ponowić. */

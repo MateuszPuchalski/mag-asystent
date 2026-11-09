@@ -115,10 +115,9 @@ test("wątek bez loginu daje pustą historię, nie zgadywanie", () => {
   assert.deepEqual(historiaKlienta(bezLoginu), { login: null, wpisy: [] });
 });
 
-/* ── S2 spoiwa: historia przestaje pomijać trzy kolejki z czterech ───────────
-   Do tego wydania zakładka obiecywała historię klienta, a znała wyłącznie
-   zakupy i rozmowy. Agent czytał „nic się nie działo" o kliencie, który
-   miesiąc wcześniej odesłał towar i złożył reklamację.                      */
+/* ── S2 spoiwa: historia nie pomija trzech kolejek z czterech ───────────────
+   Bez zwrotów i reklamacji agent czytałby „nic się nie działo" o kliencie,
+   który miesiąc wcześniej odesłał towar i złożył reklamację.               */
 
 test("zwrot i reklamacja wchodzą na oś historii klienta, a wiersz dawnej dyskusji nie", () => {
   const zw = zwrotKlienta("zielony_ogrod", "Z-77", "2026-08-10T08:00:00.000Z");
@@ -151,9 +150,9 @@ test("reklamacja bez tematu bierze numer, a nie pustą linię", () => {
   assert.equal(w.tresc, "9/2026");
 });
 
-/* ── Historia ze zwrotu i ze sprawy (23 września 2026) ───────────────────────
+/* ── Historia ze zwrotu i ze sprawy ──────────────────────────────────────────
    Login bierze się z SAMEJ sprawy. Rozmowy dochodzą numerem zamówienia
-   i — od 24 września 2026 — loginem rozmówcy z wątku, bez wielkości liter. */
+   i loginem rozmówcy z wątku, bez wielkości liter. */
 test("ze zwrotu: zakupy, sprawy i rozmowy obiema drogami, bez samego zwrotu", () => {
   zakup("chips20", "ord-1", "Nóż kosiarki", "2026-09-01T10:00:00Z");
   const poNumerze = rozmowa("w-num", null, "gdzie paczka", "2026-09-02T10:00:00Z");
@@ -185,9 +184,9 @@ test("sprawa bez loginu kupującego daje pustą historię", () => {
   assert.deepEqual(historiaSprawy("sprawa", rk, db()).wpisy, []);
 });
 
-/* ── Login bez wielkości liter (24 września 2026) ────────────────────────────
-   Zakładka KLIENT porównywała login dokładnie, a wątek i zamówienie potrafią
-   zapisać go różnie. Klient, który u nas kupował, dostawał pustą historię. */
+/* ── Login bez wielkości liter ───────────────────────────────────────────────
+   Wątek i zamówienie potrafią zapisać login różnie, a klient, który u nas
+   kupował, nie może dostać pustej historii. */
 test("login z wątku różny wielkością liter od zamówienia dalej znajduje zakupy i rozmowy", () => {
   const moja = rozmowa("w-case", "Client:44300444", "pytanie", "2026-09-05T10:00:00Z");
   const druga = rozmowa("w-case-2", "client:44300444", "wcześniejsze", "2026-09-01T10:00:00Z");
@@ -197,7 +196,7 @@ test("login z wątku różny wielkością liter od zamówienia dalej znajduje za
   assert.ok(h.wpisy.some((w) => w.rodzaj === "rozmowa" && w.rozmowaId === druga));
 });
 
-/* ── Wspólne złączenia profilu i sprawy klienta (0.535.0) ───────────────────
+/* ── Wspólne złączenia profilu i sprawy klienta ─────────────────────────────
    `kontaLoginu` i `rozmowyPoLoginie` stały w profilu jako kopie; sprawa
    klienta pyta o to samo. Jedna definicja — i ten sam klient po obu stronach. */
 test("kontaLoginu: cztery źródła, bez wielkości liter, login tak jak w Allegro; nieznany to pusta lista", async () => {

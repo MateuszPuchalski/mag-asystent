@@ -50,7 +50,7 @@ describe("Zamówienie przy rozmowie", () => {
     render(<ZamowienieRozmowy zamowienie={dane({ pobrane: pobrane([pozycja()]) })} rozmowaId={1} />);
     expect(screen.getByText("Szarpak do NAC LS 46-450")).toBeInTheDocument();
     /* Selektor niesie barwę, bo SKU ma być drugoplanowe wobec nazwy towaru.
-       Od 0.255.0 to slate-500 — slate-400 nie przechodziło progu kontrastu. */
+       slate-500, bo slate-400 nie przechodzi progu kontrastu. */
     expect(screen.getByText("SZR-NAC-46", { selector: ".text-slate-500" })).toBeInTheDocument();
     expect(screen.getByText(/1 × 45,99/)).toBeInTheDocument();
     /* Sumę i kroki mówi karta zakupu; „zapłacono" kłamało przy zakupie
@@ -60,7 +60,7 @@ describe("Zamówienie przy rozmowie", () => {
   });
 
   it("pozycja niesie DWA zdjęcia: oferty Allegro i kartoteki Subiekta, każde ze swoim wejściem", () => {
-    /* Zrzut od właściciela (0.215.0): „tutaj powinny być zdjęcia i przy
+    /* Zrzut od właściciela: „tutaj powinny być zdjęcia i przy
        ofercie, i przy towarze". Oba źródła obok siebie, z podpisem. */
     render(<ZamowienieRozmowy zamowienie={dane({ pobrane: pobrane([
       pozycja(), pozycja({ offerId: "999", nazwa: "Linka", sku: "BRAK", twId: null, twSymbol: null, twZrodlo: null }),
@@ -69,8 +69,8 @@ describe("Zamówienie przy rozmowie", () => {
     const subiekt = screen.getAllByTestId("kafel-subiekt");
     expect(oferty.map((k) => k.dataset.oferta)).toEqual(["17235726715", "999"]);
     expect(subiekt.map((k) => k.dataset.tw)).toEqual(["501", "brak"]);
-    expect(/* §4.3 żąda, żeby przy każdym fakcie było widać źródło. Od 0.249.0 podpis
-       mieści się w jednej linii, ale NADAL nazywa oba źródła — bo to one,
+    expect(/* §4.3 żąda, żeby przy każdym fakcie było widać źródło. Podpis
+       mieści się w jednej linii, ale nazywa oba źródła — bo to one,
        nie długość zdania, są tu wymaganiem. */
     screen.getByText(/oferta Allegro .*kartoteka Subiekta/)).toBeInTheDocument();
     /* Kartoteka podpisana symbolem, brak — słowem; oferta rozmowy oznaczona przy pozycji. */

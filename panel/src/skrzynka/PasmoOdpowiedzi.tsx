@@ -9,8 +9,8 @@ import { EtykietaWartosci, dzien } from "../ui";
 
    Prawa kolumna wie wszystko i nie mówi nic pierwsza. Przy pytaniu „przyszły
    nie te prowadnice co trzeba" rozstrzygają TRZY fakty: co klient zamówił,
-   czym to jest u nas i czy to mamy. Leżały wśród około czterdziestu innych,
-   w tej samej wadze, a stan i półka dopiero po przewinięciu sześciu sekcji.
+   czym to jest u nas i czy to mamy. W kolumnie leżą wśród około czterdziestu
+   innych, a stan i półka dopiero po przewinięciu.
 
    TRZY WIERSZE, NIE SKRÓT WSZYSTKIEGO. Czwarty wiersz zaczyna być drugą
    kolumną, a wtedy pasmo przestaje być pasmem. Dekalog ergonomii, punkt 2:
@@ -28,10 +28,9 @@ import { EtykietaWartosci, dzien } from "../ui";
    kartoteki nie ma „To jest" ani „Mamy". Pusta etykieta udawałaby brak towaru
    zamiast braku wiedzy, a „wczytuję…" mówi wprost, że wiedza jest w drodze.
 
-   BEZ WSTAWKI (22 września 2026, decyzja właściciela). Wiersz „Mamy" niósł
-   kiedyś „wstaw do szkicu". Szkic Copilota czeka dziś przy każdej
-   wiadomości i układa odpowiedź z tych samych faktów, więc wstawka dublowała
-   treść w polu. Pasmo zostaje, bo agent sprawdza szkic właśnie z tymi
+   BEZ WSTAWKI, decyzją właściciela. Szkic Copilota czeka przy każdej
+   wiadomości i układa odpowiedź z tych samych faktów, więc wstawka
+   dublowałaby treść w polu. Pasmo zostaje, bo agent sprawdza szkic właśnie z tymi
    trzema faktami przed oczami.                                              */
 
 /** Jeden wiersz pasma; bez wartości nie rysuje się wcale. */
@@ -43,7 +42,7 @@ function Wiersz({ etykieta, children }: { etykieta: string; children: React.Reac
 }
 
 /**
- * Dopisek do „Mamy" o dostawach (0.502.0) — w TYM wierszu, nie w czwartym,
+ * Dopisek do „Mamy" o dostawach — w TYM wierszu, nie w czwartym,
  * bo pasmo ma trzy wiersze (nagłówek pliku). Serwer liczył to dla kolektora,
  * a agent pytany „kiedy będzie" szedł po termin do Subiekta.
  *
@@ -107,8 +106,8 @@ export function PasmoOdpowiedzi({ dane }: { dane: OsRozmowy }) {
   const czekam = <span className="text-slate-500">wczytuję…</span>;
   /* PRZYCZYNĘ MÓWI TEN, KTO JĄ ZNA. Brak połączenia z serwerem ogłasza pasek
      pod nagłówkiem (`Polaczenie.tsx`), więc tu stoi samo „nie wiemy".
-     Czerwone „Subiekt nie odpowiedział" kazało zgłaszać awarię Subiekta,
-     której nie było. Inny błąd mówi, co pękło, bez zgadywania czemu:
+     Czerwone „Subiekt nie odpowiedział" kazałoby zgłaszać awarię Subiekta,
+     której nie ma. Inny błąd mówi, co pękło, bez zgadywania czemu:
      serwer odmawia też, gdy kartoteki już nie ma. */
   const bezSerwera = karta.error instanceof BrakPolaczenia;
   const nieWiemy = <span className="text-slate-500">nie wiemy</span>;

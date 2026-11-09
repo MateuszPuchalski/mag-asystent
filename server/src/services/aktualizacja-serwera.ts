@@ -4,11 +4,7 @@ import { execFile } from "node:child_process";
 import { config } from "../config.js";
 import { WERSJA } from "../wersja.js";
 
-/* ── Aktualizacja serwera z panelu (0.492.0) ─────────────────────────────────
-   Dotąd nowa wersja docierała do magazynu wtedy, gdy ktoś miał czas wejść
-   pulpitem zdalnym na maszynę z Subiektem i uruchomić `-Aktualizuj`. Przy
-   kilkudziesięciu wersjach dziennie serwer stał zwykle kilka wersji z tyłu.
-
+/* ── Aktualizacja serwera z panelu ───────────────────────────────────────────
    Serwer SAM SIĘ NIE AKTUALIZUJE i to jest cała konstrukcja. Aktualizacja
    zatrzymuje usługę `wertis-api`, a NSSM kończy przy tym całe drzewo procesów
    usługi — zginęłaby w połowie, razem z serwerem. Serwer robi więc dwie
@@ -82,7 +78,7 @@ export function wydaniaNowsze(
   obecna: string,
 ): Wydanie[] {
   return surowe
-    /* Wydanie oznaczone na GitHubie jako „pre-release" jest WYCOFANE (0.494.0):
+    /* Wydanie oznaczone na GitHubie jako „pre-release" jest WYCOFANE:
        jedno kliknięcie zdejmuje zepsutą wersję z przycisku i z automatu. */
     .filter((r) => !r.prerelease && !r.draft)
     .map((r) => {
@@ -209,7 +205,7 @@ function czytajJson<T>(plik: string): T | null {
 }
 
 /**
- * Plik postępu przechodzi przez kształt, zanim dotknie panelu (0.504.0).
+ * Plik postępu przechodzi przez kształt, zanim dotknie panelu.
  * Pisze go skrypt na tej samej maszynie, ale nazwa trafia na ekran, a plik
  * z połową zapisu albo z poprzedniej aktualizacji nie może rysować bzdury.
  */
@@ -292,7 +288,7 @@ export async function zlecAktualizacje(
     await uruchamiacz!(nazwaZadania());
   } catch (e) {
     /* Zlecenie bez wykonawcy wisiałoby jako „trwa" i blokowało przycisk.
-       Najczęstsza przyczyna: instalacja sprzed 0.492.0 bez zadania. */
+       Najczęstsza przyczyna: instalacja bez zadania Harmonogramu. */
     fs.rmSync(plik, { force: true });
     throw new BladZlecenia(
       `Nie udało się uruchomić zadania „${nazwaZadania()}" (${e instanceof Error ? e.message : e}). `

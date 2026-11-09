@@ -369,7 +369,8 @@ export async function zadajPytanie(
   logEvent("copilot_pytanie", kto.name, null, {
     conversationId, znakowPytania: tresc.length, znakowOdpowiedzi: odp.tresc.length,
     wymiana: dotad.length + 1, model: odp.model, tokeny: odp.zuzycie,
-    /* Zdjęcia liczbami, jak przy szkicu — patrz blizna w `copilot-zdjecia`. */
+    /* Zdjęcia liczbami, jak przy szkicu: bez licznika błędów dziennik nie
+     pokaże, że żadne zdjęcie nie doszło do modelu. */
     zdjec: zdjecia.zdjecia.length, zdjecBledow: zdjecia.bledow,
     /* Zdjęcia agenta osobno, bo `zdjec` czyta sonda jako „czy zdjęcia
        klienta docierają do modelu”. Bez nazw plików: nazwa bywa daną osobową. */
@@ -470,7 +471,7 @@ function zapiszWywolanie(
   } = {},
 ): number {
   const t = odp?.zuzycie ?? dodatkowo.zuzycie;
-  /* Model pusty przy błędzie bez rund, jak dotąd — pomiar go pomija. Z rundami
+  /* Model pusty przy błędzie bez rund — pomiar go pomija. Z rundami
      wpisujemy model z konfiguracji, bo inaczej pomiar zgubiłby ich koszt. */
   const model = odp?.model ?? (t && (t.wej || t.wyj) ? config.copilot.model : "");
   return zapiszWKsiedze(db(), {

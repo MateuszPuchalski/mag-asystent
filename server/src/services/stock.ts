@@ -19,11 +19,9 @@ import { adnotacjaStrefy } from "./zbiorki.js";
  * (spec §5.1 — „korekta o kolejkę"). Filtr `z` zawęża do przesunięć
  * wyjeżdżających z danego magazynu, `na` — do przyjeżdżających do niego.
  *
- * Do 0.22.0 funkcja znała tylko magazyn ŹRÓDŁOWY i milcząco zakładała, że
- * każde MM jedzie na MAG — bo jedyne, jakie umiała powstać, szło z wózka na
- * halę. Odkąd przesunięcie jest osobną czynnością między dowolną parą
- * magazynów, to założenie kłamałoby przy pierwszym przesunięciu z MAG albo
- * między magazynami bez roli.
+ * Przesunięcie idzie między dowolną parą magazynów, więc założenie „każde MM
+ * jedzie na MAG" kłamałoby przy przesunięciu z MAG albo między magazynami
+ * bez roli.
  */
 export function pendingMmByTw(filtr?: { z?: number; na?: number }): Map<number, number> {
   return sumujMm(czytajKolejkeMm(), filtr);
@@ -57,8 +55,7 @@ function czytajKolejkeMm(): MmZadanie[] {
         magTo?: number;
         items?: Array<{ twId: number; qty: number }>;
       };
-      // zadania sprzed 0.16.0 nie niosły pary magazynów: wszystkie szły z MGP
-      // na MAG, bo innej drogi wtedy nie było
+      // zadania bez pary magazynów szły z MGP na MAG
       out.push({
         z: p.magFrom ?? config.magId.MGP,
         na: p.magTo ?? config.magId.MAG,
@@ -152,9 +149,7 @@ export function buildProductCard(
   const mgpRaw = adapter.getStock(twId, config.magId.MGP);
   const zwRaw = adapter.getStock(twId, config.magId.ZWROTY);
   /* Co z danego magazynu WYJEŻDŻA i co na MAG PRZYJEŻDŻA — dwa różne pytania,
-     odkąd przesunięcie może iść między dowolną parą magazynów. Do 0.22.0
-     wystarczyła jedna liczba, bo każde MM szło z wózka na halę.
-     Kolejka czytana RAZ na kartę — karta odświeża się co 2 s na każdym
+     bo przesunięcie może iść między dowolną parą magazynów. Kolejka czytana RAZ na kartę — karta odświeża się co 2 s na każdym
      kolektorze, a pytań o kierunek jest tyle, ile magazynów na ekranie. */
   const zadaniaMm = czytajKolejkeMm();
   const wyjezdzaZ = (magId: number) => sumujMm(zadaniaMm, { z: magId }).get(twId) ?? 0;
@@ -172,7 +167,7 @@ export function buildProductCard(
     // to, co jeszcze nie doszło do Subiekta — świadomie OBOK `locs`, żeby karta
     // nie zaczęła kłamać w drugą stronę (pokazywać niepotwierdzone jako pewne)
     pendingLocs: pendingLocChanges(twId, locs),
-    /* Ceny kartoteki (0.396.0). Wszystkie poziomy, w kolejności Subiekta —
+    /* Ceny kartoteki. Wszystkie poziomy, w kolejności Subiekta —
        decyzja właściciela. Pusta lista znaczy „nie wiemy": na produkcji tak
        będzie, dopóki import nie dostanie nazw cennika i nowego GRANT-u
        (`tools/sonda-cen.sql`). Ekran nie rysuje wtedy nic, bo pusta tabelka
@@ -182,8 +177,8 @@ export function buildProductCard(
       nettoGrosze: c.netto_grosze, bruttoGrosze: c.brutto_grosze,
     })),
     /* Każdy magazyn traci to, co z niego jedzie; MAG dodatkowo zyskuje
-       wszystko, co jedzie do niego — także z magazynów bez roli, co przed
-       0.22.0 nie mogło się zdarzyć. MAG bywa teraz również źródłem. */
+       wszystko, co jedzie do niego — także z magazynów bez roli. MAG bywa
+       również źródłem. */
     mgp: stockView(mgpRaw.stan, mgpRaw.stan_rez, wyjezdzaZ(config.magId.MGP), 0),
     zwroty: stockView(zwRaw.stan, zwRaw.stan_rez, wyjezdzaZ(config.magId.ZWROTY), 0),
     mag: stockView(magRaw.stan, magRaw.stan_rez, wyjezdzaZ(config.magId.MAG), naMag),
@@ -212,7 +207,7 @@ export function buildProductCard(
       const a = adnotacjaStrefy(twId);
       return a ? { zlotaStrefa: a } : {};
     })(),
-    /* Czy TA instalacja przyjmuje zdjęcia z kolektora (0.88.0).
+    /* Czy TA instalacja przyjmuje zdjęcia z kolektora.
        Pole karty, nie osobna trasa konfiguracji, i to z jednego powodu:
        przycisk „+" ma się pojawiać dokładnie tam, gdzie kolektor już i tak
        pyta o dane. Osobne pobranie znaczyłoby cache, TTL i stan „jeszcze nie

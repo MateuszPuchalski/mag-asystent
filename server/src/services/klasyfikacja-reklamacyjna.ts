@@ -2,7 +2,7 @@ import type { DatabaseSync } from "node:sqlite";
 import { logEvent } from "./events.js";
 import type { Kategoria } from "./klasyfikacja-slownik.js";
 
-/* ── Znacznik reklamacyjny po rozpoznaniu (8 października 2026) ─────────────
+/* ── Znacznik reklamacyjny po rozpoznaniu ────────────────────────────────────
    Decyzja właściciela: rozmowa rozpoznana jako `COMPLAINT` dostaje znacznik
    „reklamacyjna" sama. Ten sam znacznik, który agent stawia ręcznie z menu
    rozmowy (`ustawReklamacyjna`), bo daje już plakietkę, sito i licznik

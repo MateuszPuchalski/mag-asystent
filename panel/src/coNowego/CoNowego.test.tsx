@@ -3,7 +3,7 @@ import React from "react";
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 
-/* ── Pasek „Nowe w panelu" (0.500.0) ───────────────────────────────────────
+/* ── Pasek „Nowe w panelu" ─────────────────────────────────────────────────
    Pilnujemy: pasek pokazuje nowsze niż zamknięte (najnowsze od razu, resztę
    po „+N"), „Rozumiem" zapamiętuje najnowsze i chowa pasek, a samo otwarcie
    niczego nie zapisuje — ani na serwerze, ani w przeglądarce.              */
@@ -23,7 +23,7 @@ describe("pasek „Nowe w panelu”", () => {
     const zapis = vi.spyOn(Storage.prototype, "setItem");
     render(<CoNowego />);
     expect(screen.getByText(/Cofnij po zakończeniu · Znaczki klawiszy/)).toBeInTheDocument();
-    /* Jeden wiersz naraz (0.515.0): starsze wydanie czeka za „+1". */
+    /* Jeden wiersz naraz: starsze wydanie czeka za „+1". */
     expect(screen.queryByText(/Soczewki pytań/)).toBeNull();
     await userEvent.click(screen.getByRole("button", { name: /^\+1/ }));
     expect(screen.getByText(/Soczewki pytań/)).toBeInTheDocument();

@@ -24,11 +24,9 @@ import {
   Blad, Karta, LoginKlienta, Przycisk, Pusto, Skopiuj, barwaTonu, czas, dataCyfrowa, dataLokalna, dzien, dzienMiesiac, termin,
 } from "../ui";
 
-/* ── PROFIL KLIENTA (24 września 2026) ───────────────────────────────────────
-   Zgłoszenie właściciela: „profil klienta ze wszystkim, co z nim związane,
-   w jednym widoku". Do tej wersji klient nie miał adresu — jego historia
-   stała zawsze PRZY sprawie, w zakładce KLIENT albo w szufladzie zwrotu.
-   Teraz ma własny ekran, do którego prowadzi szukanie i każda historia.
+/* ── PROFIL KLIENTA ──────────────────────────────────────────────────────────
+   Wszystko, co związane z klientem, w jednym widoku. Prowadzi tu szukanie
+   i każda historia.
 
    KOLEJNOŚĆ TO KOLEJNOŚĆ PYTAŃ agenta, który otwiera profil przed odpowiedzią:
    „czy coś się pali" (sygnały), „co jest otwarte", „co kupił", „kim jest"
@@ -158,11 +156,11 @@ function Sygnaly({ d }: { d: Profil }) {
   </ul>;
 }
 
-/* ── SPRAWA KLIENTA (S6, 0.535.0) ──────────────────────────────────────────
-   Decyzja właściciela z 26 września 2026 (`docs/obsluga-klienta-calosc.md`
-   S6). Jedna osoba prowadzi braki, kontakt i reklamacje, a jej listą zadań
-   były powiadomienia Allegro w Gmailu. Sprawa trzyma cztery rzeczy: kto
+/* ── SPRAWA KLIENTA (S6) ───────────────────────────────────────────────────
+   Decyzja właściciela (`docs/obsluga-klienta-calosc.md` S6). Jedna osoba
+   prowadzi braki, kontakt i reklamacje. Sprawa trzyma cztery rzeczy: kto
    prowadzi, następny krok z terminem, zakończenie i przebudzenie, gdy klient
+   dopisze coś nowego. Stanu kolejek nie trzyma — ten stoi kartę niżej.
    dopisze coś nowego. Stanu kolejek nie trzyma — ten stoi kartę niżej.
 
    ZWINIĘTA DOMYŚLNIE (dekalog p. 2). Większość klientów sprawy nie ma, więc
@@ -180,7 +178,7 @@ const LIMIT_KROKU = 200;
 const NAJDLUZSZY_KROK_DNI = 60;
 const DOBA_MS = 86_400_000;
 
-/* Trzy kroki, które biuro nazwało w wywiadzie z 26 września 2026. Wypełniają
+/* Trzy kroki, które biuro nazwało jako najczęstsze. Wypełniają
    pole, nie zapisują: „dosłać" bez dopisku, CO dosłać, bywa za krótkie. */
 const PODPOWIEDZI_KROKU = ["czekamy na zwrot", "dosłać", "czekamy na dostawcę"] as const;
 
@@ -212,7 +210,7 @@ function KartaSprawy({ d }: { d: Profil }) {
     bylaForma.current = forma;
   }, [forma]);
   const jaId = ja.data?.user.userId ?? null;
-  /* Porównanie po IDENTYFIKATORZE, nie po imieniu (lekcja 0.278.0): dwie Ole
+  /* Porównanie po IDENTYFIKATORZE, nie po imieniu: dwie Ole
      w biurze to dwie osoby. Dopóki nie wiemy, kim jesteśmy, „Przejmij" się
      nie pokazuje — lepiej o klik później niż przejęcie własnej sprawy. */
   const moja = s !== null && s.prowadziId !== null && s.prowadziId === jaId;
@@ -383,9 +381,9 @@ const ZRODLO_NUMERU: Record<ZrodloNumeruDosylki, string> = {
 /** Zamówienie Allegro skrótem — ten sam zapis co przy rozmowie (`skrzynka/Os.tsx`). */
 const krotkoZamowienie = (id: string) => id.slice(0, 8);
 
-/* JEDNA DOSYŁKA, JEDNA LINIJKA (0.536.0). Zdanie składa serwer, to samo co
+/* JEDNA DOSYŁKA, JEDNA LINIJKA. Zdanie składa serwer, to samo co
    na liście „Moje” i przy historii kolejek. Numer stoi obok z kopiowaniem, bo
-   przepisany z ekranu bywa przekręcony (0.228.0).
+   przepisany z ekranu bywa przekręcony.
 
    ZAMÓWIENIE I ZWROT W LINIJCE. Dosyłek w sprawie bywa kilka, a zdanie
    „Dosyłka w drodze” nie mówi, której paczki dotyczy. Ekran zwrotu prowadzi
@@ -452,15 +450,14 @@ const znanyPrzewoznik = (p: string | null | undefined): p is string =>
   Boolean(p) && p !== NIEZNANY_PRZEWOZNIK;
 
 /* NUMER Z SELLASIST. Przewoźnik ma gotowy wybór: dosyłka jedzie prawie
-   zawsze tym samym przewoźnikiem co pierwsza paczka zamówienia (fakt
-   właściciela z 27 września 2026), więc zwykle zostaje sam numer do wklejenia.
-   Lista to przewoźnicy znani z naszej bazy — pole tekstowe dałoby literówkę
-   w identyfikatorze, której śledzenie nigdy by nie znalazło (dekalog p. 6).
+   zawsze tym samym przewoźnikiem co pierwsza paczka zamówienia, więc zwykle
+   zostaje sam numer do wklejenia. Lista to przewoźnicy znani z naszej bazy —
+   pole tekstowe dałoby literówkę w identyfikatorze, której śledzenie nigdy
+   by nie znalazło (dekalog p. 6).
 
-   BEZ ZNANEGO PRZEWOŹNIKA LISTA ZACZYNA OD PUSTEGO WYBORU. Do tego wydania
-   podsuwała pierwszego z alfabetu, a zapis przechodził jednym kliknięciem
-   z przewoźnikiem, którego nikt nie wybrał. „inny” stoi zawsze: przewoźnik
-   spoza Allegro to prawdziwa odpowiedź, nie brak odpowiedzi. */
+   BEZ ZNANEGO PRZEWOŹNIKA LISTA ZACZYNA OD PUSTEGO WYBORU, żeby zapis nie
+   przeszedł z przewoźnikiem, którego nikt nie wybrał. „inny” stoi zawsze:
+   przewoźnik spoza Allegro to prawdziwa odpowiedź, nie brak odpowiedzi. */
 function FormularzNumeru({ dosylka: x, przewoznicy, pracuje, onZapisz, onAnuluj }: {
   dosylka: DosylkaSprawy;
   przewoznicy: string[];
@@ -586,9 +583,9 @@ function FormularzKroku({ poczatek, pracuje, onZapisz, onAnuluj }: {
   </form>;
 }
 
-/* „OTWARTE W KOLEJKACH", nie „Otwarte sprawy" (0.535.0). Od sprawy klienta
-   słowo „sprawa" na tym ekranie znaczy jedno: to, co ktoś prowadzi dla
-   klienta. Wiersze tutaj to byty kolejek, każdy ze swoim właścicielem. */
+/* „OTWARTE W KOLEJKACH", nie „Otwarte sprawy": słowo „sprawa" na tym
+   ekranie znaczy jedno — to, co ktoś prowadzi dla klienta. Wiersze tutaj to
+   byty kolejek, każdy ze swoim właścicielem. */
 function Otwarte({ d }: { d: Profil }) {
   return <Karta className="overflow-hidden p-0" role="region" aria-label="Otwarte w kolejkach">
     <div className="border-b border-slate-200 bg-slate-50 px-4 py-2"><b>Otwarte w kolejkach</b>

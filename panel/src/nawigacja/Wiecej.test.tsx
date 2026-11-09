@@ -9,7 +9,7 @@ import { WskaznikSynchronizacji } from "./Synchronizacja";
 import { godzina } from "../ui";
 import tsx from "../main.tsx?raw";
 
-/* ── Nagłówek w jednym rzędzie (0.538.0) ───────────────────────────────────
+/* ── Nagłówek w jednym rzędzie ─────────────────────────────────────────────
    Pilnujemy: wgląd, ustawienia i wyjście są w menu „Więcej" jeden klik dalej;
    menu zamyka Esc, klik obok i przejście na ekran; przycisk świeci, gdy
    bieżący ekran leży w menu; otwarcie niczego nie zapisuje. Wskaźnik
@@ -61,7 +61,7 @@ describe("menu „Więcej” w nagłówku", () => {
       expect(within(menu).getByRole("link", { name: nazwa })).toBeTruthy();
     }
     expect(within(menu).getByRole("button", { name: "Wyloguj" })).toBeTruthy();
-    /* Liczba błędów zeszła z paska do menu — ma być jeden klik dalej. */
+    /* Liczba błędów stoi w menu, nie na pasku — jeden klik dalej. */
     expect(await within(menu).findByText(/2 błędów/)).toBeTruthy();
     expect(wyslane).toEqual([]);
   });
@@ -151,7 +151,7 @@ describe("wskaźnik synchronizacji", () => {
   });
 
   it("przed pierwszą synchronizacją kropka nie jest zielona, a dymek mówi dlaczego", async () => {
-    /* Zielone „—" obiecywało działanie, którego nie było (0.546.0). */
+    /* Zielone „—" obiecywałoby działanie, którego nie było. */
     udana = null;
     pokaz();
     const wskaznik = await screen.findByRole("status");

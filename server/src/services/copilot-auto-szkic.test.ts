@@ -8,7 +8,7 @@ process.env.DB_PATH = path.join(fs.mkdtempSync(path.join(os.tmpdir(), "wertis-au
 process.env.SGT_MODE = "seeded";
 process.env.LOG_LEVEL = "silent";
 
-/* ── Szkic sam dla nowego pytania pod ofertą (0.317.0) ───────────────────────
+/* ── Szkic sam dla nowego pytania pod ofertą ─────────────────────────────────
    Ta funkcja WYDAJE PIENIĄDZE BEZ KLIKNIĘCIA i cała jej ostrożność siedzi
    w dwóch hamulcach oraz w wyborze rozmów. Testy pilnują dokładnie tego:
    kogo takt bierze, kogo pomija, ile naraz i kiedy staje.
@@ -104,7 +104,7 @@ test("pytanie BEZ oferty nie dostaje nic — to rozstrzygnięcie właściciela o
 
 test("nasza własna wiadomość i autoodpowiedź nie są pytaniem klienta", async () => {
   /* Autoodpowiedź liczona jako wiadomość klienta kazałaby układać szkic na
-     własne potwierdzenie (blizna 0.227.0). */
+     własne potwierdzenie. */
   rozmowa("w-1", { kierunek: "outgoing" });
   const r2 = rozmowa("w-2");
   dopisz(r2, "w-2", { auto: 1, kiedy: new Date(Date.now() + 1000).toISOString() });
@@ -208,7 +208,7 @@ test("LIMIT dostawcy przerywa przebieg — dalsze wywołania pogłębiają przer
   assert.equal(wywolan, 1, "po limicie nie wołamy drugi raz");
 });
 
-/* ── Rozpoznanie wiadomości a szkic z taktu (22 września 2026) ───────────────
+/* ── Rozpoznanie wiadomości a szkic z taktu ──────────────────────────────────
    Specyfikacja: każda wiadomość klienta dostaje szkic. Takt bierze więc też
    pytanie bez oferty, o ile jego rozpoznanie każe coś zrobić — i czeka na
    rozpoznanie, gdy takt klasyfikacji jest włączony. */

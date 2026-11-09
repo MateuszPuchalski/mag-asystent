@@ -9,7 +9,7 @@ import {
   TAGI_REKLAMACJI,
 } from "./tagi-spraw.js";
 
-/* ── Tagi spraw (0.279.0) ────────────────────────────────────────────────────
+/* ── Tagi spraw ──────────────────────────────────────────────────────────────
    Słownik jest OTWARTY, bo właściciel wybrał „dodatkowo edytowalne". Cena tej
    swobody jest znana: pasek z czterdziestoma pigułkami przestaje filtrować.
    Płacą ją trzy ograniczenia i każde ma tu swój test:
@@ -203,7 +203,7 @@ test("zmiana nazwy nie gubi przypięć, a kolizja nazw jest odmową", () => {
   assert.equal(slownikTagow(d).find((t) => t.id === inny.id)?.nazwa, "czeka na część");
 });
 
-/* ── DRUGA OŚ: ZWROTY (0.315.0) ──────────────────────────────────────────────
+/* ── DRUGA OŚ: ZWROTY ────────────────────────────────────────────────────────
    Słownik zostaje jeden, wiązania idą do własnej tabeli. Trzy rzeczy warte
    testu: niezależność obu osi, sprzątanie po skasowanej sprawie i odmowa dla
    zwrotu, którego nie ma.                                                   */

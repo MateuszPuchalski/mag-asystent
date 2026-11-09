@@ -5,12 +5,9 @@ import { config } from "../config.js";
 /**
  * Magazyn zdjęć dowodowych z kolektora — jeden katalog, jedna droga zapisu.
  *
- * DLACZEGO OSOBNY MODUŁ (0.352.0). Te trzy funkcje mieszkały w `problems.ts`
- * od 0.21.0 i miały tam jednego odbiorcę: niezgodność w dostawie. Zadanie
- * terenowe dostaje zdjęcie tą samą drogą (projekt panelu §13.3, „robi
- * zdjęcie"), a drugi odbiorca w tamtym pliku znaczyłby albo import serwisu
- * dostaw po jedną nazwę pliku, albo drugą kopię `photoDir()` — czyli katalog
- * rozjeżdżający się po pierwszej literówce.
+ * DLACZEGO OSOBNY MODUŁ. Odbiorców jest dwóch: niezgodność w dostawie
+ * i zadanie terenowe (projekt panelu §13.3, „robi zdjęcie"). Druga kopia
+ * `photoDir()` rozjeżdżałaby katalog po pierwszej literówce.
  *
  * KATALOG JEST INNY NIŻ `zdjecia.ts`. Tam są zdjęcia kartotek pobrane
  * z Subiekta — cudze, odtwarzalne, kasowalne. Tu są zdjęcia ZROBIONE przez
@@ -20,7 +17,7 @@ import { config } from "../config.js";
 
 let katalogGotowy = false;
 
-/** `data/photos` obok pliku bazy — ta sama ścieżka co od 0.21.0. */
+/** `data/photos` obok pliku bazy — ścieżka, pod którą leżą już zdjęcia. */
 export function katalogZdjec(): string {
   const dir = path.resolve(path.dirname(config.dbPath), "photos");
   if (!katalogGotowy) {

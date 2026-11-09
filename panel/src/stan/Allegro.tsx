@@ -8,15 +8,14 @@ import { KartaWgladu } from "../ui/wglad";
 import { Potwierdz } from "../ui/Potwierdz";
 import { useParowanie } from "./parowanie";
 
-/* ── Konto Allegro (z `biuro.html`, 0.441.0) ────────────────────────────
+/* ── Konto Allegro ──────────────────────────────────────────────────────
    Stan połączenia widzi biuro; parowanie i rozłączenie wykonuje admin —
    serwer odmawia pozostałym, a karta nie pokazuje przycisku, który na pewno
    skończy się odmową.
 
-   Biuro trzymało tę kartę ZWINIĘTĄ i otwierało ją samo, gdy konto się
-   rozłączyło. Tu karta jest zawsze otwarta i ma trzy linijki: zwijanie
-   oszczędzało miejsce na ekranie, na którym stało dziesięć kart, a jego
-   pamięć w przeglądarce była osobną rzeczą do utrzymania. */
+   Karta jest zawsze otwarta i ma trzy linijki. Zwijanie z pamięcią
+   w przeglądarce byłoby osobną rzeczą do utrzymania, a trzy linijki nie
+   zabierają miejsca. */
 
 export function KartaAllegro({ admin }: { admin: boolean }) {
   const stan = useStanAllegro();
@@ -31,8 +30,8 @@ export function KartaAllegro({ admin }: { admin: boolean }) {
         <a href={parowanie.link} target="_blank" rel="noopener noreferrer" className="font-semibold underline">link potwierdzenia</a>
         {" "}i przepisz kod:</p>
       <p className="text-tytul font-bold tracking-[0.2em]">{parowanie.userCode}</p>
-      {/* Zdanie o blokadzie przeszło z biura znak w znak (0.106.0): endpoint
-          parowania stoi na hoście sklepu i liczy go anti-bot. */}
+      {/* Zdanie o blokadzie: endpoint parowania stoi na hoście sklepu
+          i liczy go anti-bot. */}
       <p className="text-slate-600">
         Gdy Allegro pokaże stronę blokady, nie klikaj w kółko. Kliknij Przerwij, odczekaj kilkanaście minut
         i otwórz link z innej sieci — najprościej z telefonu po danych komórkowych. Nie otwieraj go przez

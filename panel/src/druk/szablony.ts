@@ -1,12 +1,10 @@
 import type { Wyjatek } from "../api/dostawy";
 import { dataLokalna } from "../ui";
 
-/* ── Szablony protokołu dla dostawcy (0.435.0) ─────────────────────────────
-   Przeniesione z `biuro.html` ZNAK W ZNAK co do treści druku. To są wierne
-   kopie cudzych formularzy (GEKO, PARTNER) — ich kształt ustalił dostawca,
-   nie my, i każda „poprawka" zrobiłaby z nich druk, którego serwis dostawcy
-   nie rozpozna. Zmieniło się wyłącznie opakowanie: zamiast `window.open`
-   z `document.write` druk ma własny adres w panelu (`/obsluga/druk/...`),
+/* ── Szablony protokołu dla dostawcy ───────────────────────────────────────
+   Wierne kopie cudzych formularzy (GEKO, PARTNER) — ich kształt ustalił
+   dostawca, nie my, i każda „poprawka" zrobiłaby z nich druk, którego serwis
+   dostawcy nie rozpozna. Druk ma własny adres w panelu (`/obsluga/druk/...`),
    więc da się go odświeżyć i wkleić koledze.
 
    Czyste funkcje na tekst, a nie komponenty: szablon to HTML dostawcy

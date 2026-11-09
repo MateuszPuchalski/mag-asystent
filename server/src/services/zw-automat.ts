@@ -7,10 +7,10 @@ import { skladPozycji } from "./komplety.js";
 import { wypuscGotoweKoszyki } from "./kosze-zwrotow.js";
 import { enqueueZw } from "./queue.js";
 
-/* ── Automatyczny ZW do paragonu (0.349.0) ──────────────────────────────────
+/* ── Automatyczny ZW do paragonu ────────────────────────────────────────────
    Na nagraniu pracy biura ręczny ZW był najdłuższym krokiem zwrotu: paragon,
    „Wypisz zwrot", zera w pozycjach, które nie wróciły, rodzaj i płatność.
-   Decyzje właściciela z 15 września 2026:
+   Decyzje właściciela:
    • ZW powstaje SAM po zapisaniu kwoty — bez przycisku;
    • ZW niesie PEŁNĄ wartość zwróconego towaru, a potrącenie za uszkodzenie
      albo użycie idzie wyłącznie przez zwrot pieniędzy w Allegro;
@@ -180,13 +180,11 @@ export function zakolejkujZw(
 }
 
 /**
- * ZW dla zwrotów, przy których zapis kwoty trafił na brak paragonu (0.476.0).
+ * ZW dla zwrotów, przy których zapis kwoty trafił na brak paragonu.
  *
- * Przegląd zwrotów z 23 września: `zakolejkujZw` woła wyłącznie zapis kwoty.
- * Paragon wiąże się z opóźnieniem — takt Allegro co pięć minut, import
- * Subiekta co minutę — więc zwrot zapisany o chwilę za wcześnie nie dostawał
- * ZW nigdy. Nikt nie wiedział, że czeka: automat milczy przy braku paragonu,
- * bo do tej chwili był to zwykle zwrot do faktury.
+ * `zakolejkujZw` woła wyłącznie zapis kwoty. Paragon wiąże się z opóźnieniem
+ * — takt Allegro co pięć minut, import Subiekta co minutę — więc zwrot
+ * zapisany o chwilę za wcześnie inaczej nie dostałby ZW nigdy.
  *
  * Woła to `powiazZaleglosci` po każdym takcie, zaraz po wiązaniu dokumentów.
  *
@@ -245,8 +243,7 @@ export function odsunZwPrzedRecznym(
   if (q.status === "done") {
     throw new Error(co === "korekta"
       ? `Automat wystawił już ${q.numer ?? "ZW"} — numer wpisze się sam w ciągu minuty.`
-      /* Usunięcie ZW w Subiekcie nie zmienia statusu zadania, więc stare
-         zdanie odsyłało do ruchu bez skutku (0.484.7). Działa kolejność:
+      /* Usunięcie ZW w Subiekcie nie zmienia statusu zadania. Działa kolejność:
          numer wpisuje się sam, potem cofnięcie korekty, potem kwota. */
       : `${q.numer ?? "ZW"} już stoi w Subiekcie — numer wpisze się tu sam w ciągu minuty. ` +
         "Potem cofnij korektę i popraw kwotę; dokument w Subiekcie skoryguj ręcznie.");

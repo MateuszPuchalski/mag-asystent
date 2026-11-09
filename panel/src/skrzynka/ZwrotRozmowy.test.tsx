@@ -1,11 +1,10 @@
 import { describe, expect, it } from "vitest";
-import React from "react";
 import { render, screen } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import type { Zwrot } from "../api/typy";
 import { ZwrotRozmowy } from "./ZwrotRozmowy";
 
-/* ── Zwrot tego zamówienia przy rozmowie (0.221.0) ──────────────────────────
+/* ── Zwrot tego zamówienia przy rozmowie ────────────────────────────────────
    Klient pyta pod zamówieniem o zwrot, którego dokonał. Blok ma odpowiadać na
    trzy pytania bez wychodzenia z rozmowy: co z paczką, jaka decyzja i kwota,
    ile zostało do terminu — tym samym słownikiem, co kolejka zwrotów.       */

@@ -7,7 +7,7 @@ import path from "node:path";
 process.env.DB_PATH = path.join(fs.mkdtempSync(path.join(os.tmpdir(), "wertis-przesylka-")), "t.db");
 process.env.SGT_MODE = "seeded";
 
-/* ── Gdzie jest paczka do klienta (0.393.0) ──────────────────────────────────
+/* ── Gdzie jest paczka do klienta ────────────────────────────────────────────
    Przy reklamacji to pytanie pierwsze: „czy on to w ogóle dostał". Testy
    pilnują czterech rzeczy, z których każda jest decyzją, a nie kształtem:
 
@@ -146,7 +146,7 @@ test("odczyt bez pytania Allegro niczego nie mutuje", () => {
   assert.equal(Number(db().prepare("SELECT COUNT(*) AS n FROM events").get()!.n), przed);
 });
 
-/* ── Dosyłka jako nakładka przy odczycie (0.536.0) ──────────────────────────
+/* ── Dosyłka jako nakładka przy odczycie ────────────────────────────────────
    Reguła „doręczona przebija” zostaje — pierwsza paczka odpowiada na pytanie
    „czy on to dostał”. Dosyłka staje OBOK, bez numeru, żeby doręczony
    oryginał nie zasłonił niedoręczonej drugiej paczki. */

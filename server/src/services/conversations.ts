@@ -7,11 +7,8 @@ import { AKTYWNA_DECYZJA, CEL_KLASYFIKACJI } from "./copilot-klasyfikacja.js";
 import { ROLE_ALLEGRO, glosAllegroPoZamknieciu } from "./glos-allegro.js";
 
 /**
- * Imię do dziennika bierzemy z konta, nie z parametru.
- *
- * `events.user_id` jest tekstem i do lipca 2026 przyjmował dowolny łańcuch
- * z nagłówka — stąd literówki i warianty tej samej osoby w audycie. Odczyt
- * z `app_user` zamyka tę drogę: mutacja i jej wpis mówią o tym samym koncie.
+ * Imię do dziennika bierzemy z konta, nie z parametru: tekst z nagłówka
+ * dawałby literówki i warianty tej samej osoby w audycie.
  */
 export function imieAutora(database: DatabaseSync, userId: number): string {
   const u = database.prepare("SELECT name FROM app_user WHERE user_id=?").get(userId) as
@@ -33,7 +30,7 @@ export interface NowaWiadomosc {
 }
 
 /**
- * AUTOODPOWIEDŹ ROZPOZNAJEMY RAZ, PRZY ZAPISIE (0.227.0).
+ * AUTOODPOWIEDŹ ROZPOZNAJEMY RAZ, PRZY ZAPISIE.
  *
  * Reguła zna jedno miejsce, a kolumna niesie wynik dalej — do kolejki i do
  * wyliczenia stanu. Liczenie tego przy odczycie kazałoby powtórzyć regułę
@@ -41,18 +38,12 @@ export interface NowaWiadomosc {
  *
  * Kierunek jest CZĘŚCIĄ reguły, nie warunkiem przed nią: tylko WYCHODZĄCE,
  * bo klient cytujący nasze potwierdzenie niesie ten sam podpis, a jego list
- * jest pytaniem, nie odbiciem. Dlatego funkcja bierze oba pola — wołający,
- * który dostałby samą treść, musiałby dopisać sobie drugą połowę reguły.
- * Kierunek jest ZAWĘŻONY do dwóch wartości, bo goły `string` przepuściłby
- * literówkę, a ta dałaby ciche zero — czyli dokładnie tę usterkę, którą
- * ta funkcja zamyka.
+ * jest pytaniem, nie odbiciem. Kierunek jest ZAWĘŻONY do dwóch wartości, bo
+ * goły `string` przepuściłby literówkę, a ta dałaby ciche zero.
  *
- * Osobna funkcja, bo wołających jest dwóch: `zapiszWiadomosc` i synchronizator
- * skrzynki. Do 0.256.0 synchronizator wstawiał wiersz BEZ tej kolumny, więc
- * zostawało `DEFAULT 0` i nasza własna autoodpowiedź liczyła się jako ruch
- * biura — aż do najbliższego restartu, kiedy flagę dosypywała migracja.
- * Rozmowa z pytaniem klienta przechodziła przez to na „czeka na klienta"
- * i znikała z listy tych, które czekają na odpowiedź.
+ * Wołających jest dwóch: `zapiszWiadomosc` i synchronizator skrzynki. Pominięta
+ * flaga liczyłaby naszą autoodpowiedź jako ruch biura, a pytanie klienta
+ * znikałoby z listy czekających na odpowiedź.
  */
 export function flagaAutoodpowiedzi(
   direction: NowaWiadomosc["direction"], tresc: string,
@@ -79,7 +70,7 @@ export function zapiszWiadomosc(dane: NowaWiadomosc, database: DatabaseSync = db
     auto,
   );
   const id = wynik.changes === 0 ? null : Number(wynik.lastInsertRowid);
-  /* ── ZDARZENIE NIESIE KIERUNEK (0.228.0) ──────────────────────────────────
+  /* ── ZDARZENIE NIESIE KIERUNEK ────────────────────────────────────────────
      Panel zapalał pasek „Klient dopisał nową wiadomość" na KAŻDE
      `message.created` — także na naszą własną odpowiedź, która wraca
      z synchronizacji, i na autoodpowiedź. Agent odpisywał i po chwili dostawał
@@ -99,10 +90,10 @@ export function zapiszWiadomosc(dane: NowaWiadomosc, database: DatabaseSync = db
 /**
  * Atomowe przejęcie: tylko jedna instrukcja UPDATE może zmienić wolny wiersz.
  *
- * Całość idzie transakcją, bo od 0.145.1 przejęcie zapisuje TRZY rzeczy naraz:
+ * Całość idzie transakcją, bo przejęcie zapisuje TRZY rzeczy naraz:
  * właściciela na rozmowie, wiersz historii przypisań i zdarzenie audytu.
  * Rozjazd między nimi znaczyłby rozmowę z właścicielem, którego nikt nie
- * przydzielił — a to dokładnie ten rodzaj ciszy, który kosztował 0.137.1.
+ * przydzielił.
  */
 export function przejmijRozmowe(conversationId: number, userId: number, expectedVersion: number,
   database: DatabaseSync = db()) {
@@ -138,7 +129,7 @@ export function przejmijRozmowe(conversationId: number, userId: number, expected
     logEvent("rozmowa_przejeta", imieAutora(database, userId), null,
       { conversationId, wersjaPrzed: expectedVersion, wersjaPo: version }, undefined, database);
 
-    /* PRZEJĘCIE OTWIERA ROZMOWĘ (§7, 0.158.0). Rozmowa, którą ktoś wziął, nie
+    /* PRZEJĘCIE OTWIERA ROZMOWĘ (§7). Rozmowa, którą ktoś wziął, nie
        jest już `new`; wymaganie osobnego kliknięcia w status robiłoby z niego
        biurokrację, którą agenci zaczną pomijać. Stany końcowe zostają
        nietknięte: przejęcie sprawy zamkniętej jej nie wskrzesza.
@@ -247,7 +238,7 @@ export function wskazOferte(conversationId: number, ofertaId: string, autorId: n
 }
 
 /**
- * Ręczne wskazanie KARTOTEKI dla oferty z rozmowy (0.179.0).
+ * Ręczne wskazanie KARTOTEKI dla oferty z rozmowy.
  *
  * Zapis idzie do `oferta_kartoteka` — tej samej pamięci, z której korzystają
  * zwroty. To celowe: para oferta–kartoteka jest jedna, niezależnie od tego,
@@ -289,7 +280,7 @@ export function wskazKartoteke(conversationId: number, ofertaId: string, twId: n
       .get(twId) as { tw_id: number; symbol: string } | undefined;
     if (!towar) throw new Error("Nie znaleziono kartoteki o tym numerze");
 
-    /* Sygnatura oferty W TEJ CHWILI (0.219.0): gdy sprzedawca ją przepnie,
+    /* Sygnatura oferty W TEJ CHWILI: gdy sprzedawca ją przepnie,
        to wskazanie ma ustąpić nowej sygnaturze — patrz `pamiecAktualna`. */
     const snapshot = database.prepare(
       "SELECT sku FROM offer_snapshot WHERE channel_account_id=? AND external_id=?")
@@ -320,9 +311,9 @@ export function wskazKartoteke(conversationId: number, ofertaId: string, twId: n
 export function zapiszSzkic(conversationId: number, userId: number, body: string,
   expectedLastMessageId: number | null, expectedVersion: number | null, database: DatabaseSync = db()) {
   return transaction(database, () => {
-    /* Po czasie, nie po `id` — ta sama blizna i ta sama reguła, co kontrola
-       świeżości w `wysylka.ts` (23 września 2026): panel bierze ostatnią
-       wiadomość z osi, a oś stoi po czasie. */
+    /* Po czasie, nie po `id` — ta sama reguła co kontrola świeżości
+       w `wysylka.ts`: panel bierze ostatnią wiadomość z osi, a oś stoi
+       po czasie. */
     const last = database.prepare(
       "SELECT id FROM message WHERE conversation_id=? ORDER BY sent_at DESC, id DESC LIMIT 1")
       .get(conversationId) as { id: number } | undefined;
@@ -368,14 +359,6 @@ export function dodajKomentarz(conversationId: number, authorUserId: number, bod
   })();
 }
 
-/** Granica adaptera: komentarze nie mogą zostać pomylone z wiadomością. */
-export function payloadAllegroWiadomosci(messageId: number, database: DatabaseSync = db()) {
-  const row = database.prepare("SELECT body FROM message WHERE id=? AND direction='outgoing'").get(messageId) as
-    { body: string } | undefined;
-  if (!row) throw new Error("Do Allegro można wysłać wyłącznie wiadomość wychodzącą");
-  return { text: row.body };
-}
-
 /**
  * Dopisuje wynik zadania terenowego na oś rozmowy.
  *
@@ -383,10 +366,8 @@ export function payloadAllegroWiadomosci(messageId: number, database: DatabaseSy
  * a nie wiadomością klienta — treści klienta nic tu nie nadpisuje.
  *
  * Zapisem zadania steruje `wykonajZadanie` z `zadania-terenowe.ts` i to ono
- * woła tę funkcję wewnątrz swojej transakcji. Osobna ścieżka „zakończ zadanie"
- * istniała w pierwotnej wersji tej zmiany i została usunięta: omijała bramkę
- * własności (wynik mógł zapisać ktoś, kto zadania nie przejął) oraz `logEvent`,
- * którego CLAUDE.md wymaga od każdej mutacji.
+ * woła tę funkcję wewnątrz swojej transakcji, z bramką własności
+ * i `logEvent`.
  */
 export function dopiszZdarzenieWyniku(
   conversationId: number,
@@ -415,7 +396,7 @@ export function dopiszZdarzenieWyniku(
 }
 
 /**
- * Dopisuje na oś rozmowy ODESŁANIE zadania — czyli brak wyniku (0.352.0).
+ * Dopisuje na oś rozmowy ODESŁANIE zadania — czyli brak wyniku.
  *
  * Osobny typ zdarzenia, a nie `field_task_result` z doklejonym zdaniem
  * „nie da się". Oś jest księgą: wpis mówiący „wynik" o zadaniu, które wyniku
@@ -448,12 +429,7 @@ export function dopiszZdarzenieOdeslania(
     { taskId: zadanieId, reasonCode: powodKod, reason: powod });
 }
 
-/* ── Statusy rozmowy §7 (0.158.0) ────────────────────────────────────────────
-   Do tego wydania `conversation` nie miała kolumny statusu. Kolejka nie
-   odróżniała sprawy załatwionej od nietkniętej, a rozmowa raz otwarta rosła
-   w nieskończoność — §26 pyta „kiedy zamykamy rozmowę", a nie było czego
-   zamykać.
-
+/* ── Statusy rozmowy §7 ──────────────────────────────────────────────────────
    Lista pochodzi wprost z §7 i jest ZAMKNIĘTA. Status spoza niej znaczyłby,
    że ktoś dołożył pojęcie, którego dokument nie zna.                        */
 
@@ -462,18 +438,12 @@ export const STATUSY_ROZMOWY = ["new", "open", "waiting_for_customer", "waiting_
 export type StatusRozmowy = (typeof STATUSY_ROZMOWY)[number];
 
 /**
- * Stany, które WYNIKAJĄ Z ROZMOWY i których agent nie nadaje (0.225.0).
+ * Stany, które WYNIKAJĄ Z ROZMOWY i których agent nie nadaje.
  *
- * ── DLACZEGO ──────────────────────────────────────────────────────────────
- * Właściciel: „w większości nie powinienem był robić tego ręcznie — otwarta,
- * czeka na klienta, czeka na nas powinno być odczytywane z wiadomości".
- * I miał rację: kto ma następny ruch, WIDAĆ po ostatniej wiadomości. Ręczne
- * ustawianie tego jest przepisywaniem faktu, który już stoi w wątku — czyli
- * pracą, której jedynym możliwym wynikiem jest pomyłka.
- *
- * Stan wyliczany nie potrzebuje nikogo, kto go pilnuje. To ta sama zasada,
- * którą 0.158.0 zapisało przy odłożeniu: odłożenie kończy się samo, bo liczymy
- * je przy odczycie, zamiast budzić rozmowy tickerem.
+ * Kto ma następny ruch, WIDAĆ po ostatniej wiadomości. Ręczne ustawianie
+ * tego byłoby przepisywaniem faktu, który już stoi w wątku — czyli pracą,
+ * której jedynym możliwym wynikiem jest pomyłka. Stan wyliczany nie
+ * potrzebuje nikogo, kto go pilnuje.
  *
  * `waiting_for_internal` NIE JEST na tej liście, choć też jest automatyczny:
  * jego stawia zlecenie pomiaru, a zdejmuje wynik z hali. To nie wynika
@@ -484,18 +454,11 @@ const WYLICZANE_Z_WIADOMOSCI: ReadonlySet<string> = new Set([
   "new", "open", "waiting_for_customer", "waiting_for_us",
 ]);
 
-/* ── ZAKOŃCZENIE ROZMOWY (23 września 2026) ──────────────────────────────────
-   Decyzja właściciela: „potrzebuję sposobu, żeby rozmowa była rozwiązana".
-   Od 22 września nic nie ustawiało `resolved` ani `closed` — trasa ręczna
-   odeszła razem z menu dziewięciu statusów. Skutek: rozmowa po naszej
-   odpowiedzi stała w „Moje" na zawsze, bo kubełki robocze patrzą na
-   prowadzącego, a jedynym wyjściem było zamknięcie, którego nikt nie mógł
-   nadać.
-
+/* ── ZAKOŃCZENIE ROZMOWY ─────────────────────────────────────────────────────
    DWA PYTANIA, NIE JEDNO. „Kto ma ruch" liczy się z wiadomości i nikt go
    nie nadaje. „Czy sprawa jest skończona" to JEDEN werdykt — Zakończona —
-   i tylko on wraca do rąk agenta. Menu statusów nie wraca: kosztowało już
-   jedno wydanie, bo nikt go nie używał dobrze.
+   i tylko on jest w rękach agenta. Bez niego rozmowa po naszej odpowiedzi
+   stałaby w „Moje" na zawsze.
 
    Werdykt zapada na dwa sposoby. Ręką agenta: kolumna `resolved`. Sam,
    przy odczycie, bez tickera i bez zapisu — w trzech przypadkach, każdy
@@ -508,9 +471,8 @@ const WYLICZANE_Z_WIADOMOSCI: ReadonlySet<string> = new Set([
    także w wątku, który Allegro zamknęło. Pomyłka w drugą stronę kosztuje
    klienta bez odpowiedzi, a tego nikt by nie zauważył.
 
-   `closed` sprzed tej wersji czyta się jak `resolved` — dwa werdykty
-   różniły się tylko tym, czy obudzona rozmowa wraca do puli. Właściciel
-   zdecydował: jeden werdykt, a prowadzący zostaje. Migracji nie ma. */
+   Zapisane `closed` czyta się jak `resolved`: jeden werdykt, a prowadzący
+   zostaje. */
 
 export type ZrodloZakonczenia = "agent" | "podziekowanie" | "cisza" | "allegro";
 
@@ -570,12 +532,11 @@ export interface DecyzjaDoStatusu {
 
 /**
  * Czy ostatnia wiadomość klienta to podziękowanie, na które nie odpisujemy
- * (22 września 2026, decyzja właściciela).
+ * (decyzja właściciela).
  *
  * ── DLACZEGO ──────────────────────────────────────────────────────────────
- * Od odejścia ręcznych statusów rozmowa zakończona „dziękuję" stała w „Czeka
- * na nas" z zegarem, choć nikt nie miał tu nic do zrobienia. Klasyfikator
- * rozpoznaje podziękowanie od początku: instrukcja każe dać mu `OTHER`
+ * Rozmowa zakończona „dziękuję" nie ma stać w „Czeka na nas" z zegarem.
+ * Klasyfikator rozpoznaje podziękowanie: instrukcja każe dać mu `OTHER`
  * z `NO_ACTION`, a takt szkiców już je pomija.
  *
  * ── TYLKO DECYZJA MODELU, BEZ SPRAWDZANIA TEKSTU ─────────────────────────
@@ -599,20 +560,14 @@ export function klientPodziekowal(d: DecyzjaDoStatusu | null, naszaOdpowiedz: bo
 /**
  * Stany, z których PRZYCHODZĄCA wiadomość budzi rozmowę.
  *
- * To jest sedno wydania 0.158.0. Klient dopisuje pytanie do sprawy, którą biuro
- * uznało za załatwioną; bez tego przejścia rozmowa zostaje na liście
- * „rozwiązane" i nikt do niej nie zagląda. Status, który nie wraca sam, jest
- * gorszy od jego braku — wygląda jak porządek i nim nie jest.
+ * Klient dopisuje pytanie do sprawy, którą biuro uznało za załatwioną; bez
+ * tego przejścia rozmowa zostaje na liście „rozwiązane" i nikt do niej nie
+ * zagląda. Status, który nie wraca sam, jest gorszy od jego braku.
  *
- * `closed` DOŁĄCZYŁO W 0.257.0 i to jest odwrócenie tamtej decyzji. Stał tu
- * argument, że werdykt cofnięty automatem kazałby zamykać tę samą rozmowę
- * w kółko. Argument mylił dwa koszty: ponowne zamknięcie to jedno kliknięcie,
- * a przepadłe pytanie klienta to sprawa, o której nikt się nie dowie. Rozmowa
- * zamknięta wypadała ze WSZYSTKICH kubełków roboczych kolejki i stała już
- * tylko w „Wszystkie", gdzie się nie pracuje. Klient, który pisze dalej,
- * mówi wprost, że sprawa nie jest skończona.
+ * `closed` też budzi: ponowne zamknięcie to jedno kliknięcie, a przepadłe
+ * pytanie klienta to sprawa, o której nikt się nie dowie.
  *
- * `spam` zostaje POZA tym zbiorem i jest teraz jedynym takim werdyktem —
+ * `spam` zostaje POZA tym zbiorem i jest jedynym takim werdyktem —
  * to po niego sięga się, gdy ktoś zasypuje skrzynkę. Gdyby wracał, biuro
  * nie miałoby czym uciszyć natręta.
  */
@@ -622,13 +577,11 @@ const BUDZONE: ReadonlySet<string> = new Set([
 ]);
 
 /**
- * Stany, z których obudzenie ODDAJE ROZMOWĘ DO PULI (0.257.0).
+ * Stany, z których obudzenie ODDAJE ROZMOWĘ DO PULI.
  *
  * Decyzja właściciela: „Zamknięta" wraca do „Nieprzypisanych", nie do biurka
- * tego, kto ją zamknął. To jedyna rzecz, którą oba werdykty się różnią po
- * 0.257.0, i dlatego oba mają dalej sens: „Rozwiązana" znaczy „załatwiłem,
- * wraca do mnie", „Zamknięta" — „skończyłem z tym, bierze kto wolny". Bez tej
- * różnicy zostałyby dwie pozycje w menu robiące dokładnie to samo.
+ * tego, kto ją zamknął. „Rozwiązana" znaczy „załatwiłem, wraca do mnie",
+ * „Zamknięta" — „skończyłem z tym, bierze kto wolny".
  *
  * Zbiór, a nie porównanie w miejscu użycia, bo o zwolnieniu decyduje ta sama
  * lista, którą tu widać — kolejny werdykt oddający rozmowę dopisuje się
@@ -658,7 +611,7 @@ function statusZapisany(
   const r = database.prepare("SELECT status, snoozed_until FROM conversation WHERE id=?")
     .get(conversationId) as { status: string; snoozed_until: string | null } | undefined;
   if (!r) throw new Error("Nie znaleziono rozmowy");
-  /* Odłożenie wygasa samo — liczone przy odczycie, jak od 0.158.0. */
+  /* Odłożenie wygasa samo — liczone przy odczycie. */
   return (r.status === "snoozed" && r.snoozed_until && Date.parse(r.snoozed_until) <= teraz
     ? "open" : r.status) as StatusRozmowy;
 }
@@ -667,17 +620,12 @@ export function statusRozmowy(
   database: DatabaseSync, conversationId: number, teraz = Date.now(),
 ): StatusRozmowy {
   /* Kierunek OSTATNIEJ PRAWDZIWEJ wiadomości. Po `sent_at`, a `id` tylko
-     rozstrzyga remis w tej samej sekundzie — tak stoi oś rozmowy. Do
-     23 września 2026 stało tu samo `id` z uzasadnieniem „tak samo jak oś",
-     a oś sortuje po czasie. Synchronizacja wpisywała paczkę od najnowszej,
-     więc nasza odpowiedź z panelu Allegro i dopisek klienta z jednej paczki
-     potrafiły zamienić się miejscami — i rozmowa „czekała na klienta".
+     rozstrzyga remis w tej samej sekundzie — tak stoi oś rozmowy.
 
-     AUTOODPOWIEDŹ NIE LICZY SIĘ JAKO NASZ RUCH (0.227.0). „Dziękujemy za
+     AUTOODPOWIEDŹ NIE LICZY SIĘ JAKO NASZ RUCH. „Dziękujemy za
      kontakt" wychodzi samo, w sekundę po pytaniu, i nie odpowiada na nic —
-     a liczone jako nasza wiadomość przestawiało rozmowę na „czeka na klienta"
-     i zdejmowało ją z listy tych, które czekają na odpowiedź. Pytanie klienta
-     ginęło przez to, że skrzynka grzecznie potwierdziła jego odbiór. */
+     liczone jako nasza wiadomość zdejmowałoby rozmowę z listy tych, które
+     czekają na odpowiedź. */
   return statusIZakonczenie(database, conversationId, teraz).status;
 }
 
@@ -716,7 +664,7 @@ export function statusIZakonczenie(
  * To jest DOKŁADNIE wejście `podziekowal` z `wyliczStatus`: ostatnia prawdziwa
  * wiadomość (ta sama kolejność co w `statusIZakonczenie`) jest klienta,
  * a klasyfikator uznał ją za podziękowanie. BEZ bramek stanu rozmowy —
- * werdyktu zapisanego i `otwarta_recznie_at`. Sprawa klienta (0.535.0)
+ * werdyktu zapisanego i `otwarta_recznie_at`. Sprawa klienta
  * pyta o WIADOMOŚĆ, nie o rozmowę: „Otwórz ponownie” albo „Zakończona” to
  * nasz ruch i nie ma prawa zmienić, czy klient napisał coś nowego.
  */
@@ -755,10 +703,9 @@ function podziekowanieWRozmowie(database: DatabaseSync, conversationId: number):
 }
 
 /**
- * Zmiana statusu ZDARZENIEM po naszej stronie — dziś jedynym jest zlecenie
- * pomiaru, które stawia `waiting_for_internal`. Trasy ręcznej nie ma od
- * 22 września 2026 (decyzja właściciela). Gałąź odłożenia zostaje, bo
- * zapisane wcześniej odłożenia dalej wygasają przy odczycie.
+ * Zmiana statusu ZDARZENIEM po naszej stronie — jedynym jest zlecenie
+ * pomiaru, które stawia `waiting_for_internal`. Trasy ręcznej nie ma.
+ * Gałąź odłożenia zostaje, bo zapisane odłożenia wygasają przy odczycie.
  */
 export function ustawStatus(
   database: DatabaseSync, conversationId: number, status: StatusRozmowy,
@@ -777,7 +724,7 @@ export function ustawStatus(
 }
 
 /**
- * Werdykt „Zakończona" z ręki agenta (23 września 2026).
+ * Werdykt „Zakończona" z ręki agenta.
  *
  * STRAŻ PYTANIA BEZ ODPOWIEDZI. Gdy ruch jest po naszej stronie — ostatnie
  * słowo klienta i to nie podziękowanie — zakończenie wymaga jawnej zgody
@@ -815,7 +762,7 @@ export function zakonczRozmowe(
  */
 export function otworzRozmowe(
   database: DatabaseSync, conversationId: number, userId: number, teraz = new Date(),
-  /* Otwarcie z paska „Cofnij" tuż po zakończeniu (0.500.0). Osobny wpis
+  /* Otwarcie z paska „Cofnij" tuż po zakończeniu. Osobny wpis
      w dzienniku, bo to pomyłka złapana w porę, a nie decyzja po dniach —
      pomiar tarcia (`services/tarcie.ts`) liczy wyłącznie te pierwsze. */
   zCofniecia = false,
@@ -846,20 +793,17 @@ export function otworzRozmowe(
 export const NAJDLUZSZE_ODLOZENIE_MS = 30 * 86_400_000;
 
 /**
- * „Odłóż do terminu" (0.533.0, decyzja właściciela z 26 września 2026).
+ * „Odłóż do terminu".
  *
- * WRACA TO, CO ODESZŁO 22 WRZEŚNIA — ale w innym kształcie i z innego powodu.
- * Tamto było ręcznym statusem z menu i zniknęło razem z nim. Po jego zdjęciu
- * rozmowa, w której ruchu teraz nie ma (dostawca milczy, klient przyśle
- * zdjęcie jutro), stała w kubełku roboczym jako NAJSTARSZA — czyli na samej
- * górze, bo kolejność niesie czas oczekiwania (0.181.0). Agent przeskakiwał ją
- * przy każdym wejściu, a jedyne obejścia były gorsze: pusta wiadomość do
+ * Rozmowa, w której ruchu teraz nie ma (dostawca milczy, klient przyśle
+ * zdjęcie jutro), stałaby w kubełku roboczym na samej górze, bo kolejność
+ * niesie czas oczekiwania. Obejścia byłyby gorsze: pusta wiadomość do
  * klienta albo zakończenie z pytaniem bez odpowiedzi.
  *
- * ZAWSZE Z TERMINEM. Odłożenie bez daty jest cmentarzem i tego się właściciel
- * obawiał. Wygasa samo przy odczycie (`statusZapisany`, jak od 0.158.0), a nowa
- * wiadomość klienta budzi rozmowę wcześniej (`obudzPrzychodzaca`) — prowadzący
- * zostaje, bo odłożenie to nie oddanie sprawy.
+ * ZAWSZE Z TERMINEM. Odłożenie bez daty jest cmentarzem. Wygasa samo przy
+ * odczycie (`statusZapisany`), a nowa wiadomość klienta budzi rozmowę
+ * wcześniej (`obudzPrzychodzaca`) — prowadzący zostaje, bo odłożenie to nie
+ * oddanie sprawy.
  *
  * `doKiedy === null` zdejmuje odłożenie. To droga „Cofnij" i „Wróć teraz":
  * jeden przycisk w jedną stronę, drugi w drugą, bez osobnej trasy.
@@ -905,7 +849,7 @@ export function odlozRozmowe(
 export type PriorytetRozmowy = "normalny" | "pilny";
 
 /**
- * Ręczna flaga „pilne" (§10.2, 0.181.0).
+ * Ręczna flaga „pilne" (§10.2).
  *
  * Priorytet jest RĘCZNY, bo automat nie ma z czego go wyliczyć: terminu
  * odpowiedzi §26 nie rozstrzygnęło, a bez niego „pilne" znaczyłoby tylko
@@ -943,11 +887,9 @@ export function ustawPriorytet(
 /**
  * Rdzeń zmiany statusu BEZ własnej transakcji.
  *
- * Rozdzielenie nie jest kosmetyką. Dwaj wołający — synchronizator i wysyłka —
- * pracują JUŻ WEWNĄTRZ transakcji, a `BEGIN` w `BEGIN` SQLite odrzuca. Przy
- * pierwszym podejściu ta funkcja otwierała transakcję zawsze i cała
- * synchronizacja przestała cokolwiek zapisywać: wyjątek wpadał w izolację
- * wątku z 0.149.2 i każdy wątek lądował jako „zepsuty".
+ * Dwaj wołający — synchronizator i wysyłka — pracują JUŻ WEWNĄTRZ transakcji,
+ * a `BEGIN` w `BEGIN` SQLite odrzuca. Własna transakcja wywracałaby każdy
+ * wątek synchronizacji jako „zepsuty".
  *
  * Kto woła spoza transakcji, bierze `ustawStatus`; kto z wewnątrz — to.
  */
@@ -1034,11 +976,10 @@ function zapiszZmianeStatusu(
 }
 
 /**
- * Znacznik „to jest sprawa reklamacyjna" (0.390.0).
+ * Znacznik „to jest sprawa reklamacyjna".
  *
- * Zgłoszenie właściciela: „chcę tylko zaznaczyć, że to jest pytanie
- * reklamacyjne i będzie traktowane jako reklamacja, ale nie będzie
- * w allegrowych reklamacjach".
+ * Rozmowę prowadzi się jak reklamację, choć nie ma jej
+ * w reklamacjach Allegro.
  *
  * TEJ SPRAWY NIE DA SIĘ ZAŁOŻYĆ W ALLEGRO i to nie jest nasza decyzja:
  * `/sale/issues` w `docs/allegro/swagger.yaml` ma wyłącznie GET. Sprawę
@@ -1051,7 +992,7 @@ function zapiszZmianeStatusu(
  * więcej — plakietkę w kolejce, sito w kolejce i licznik. Zegara USTAWOWEGO
  * nie dokłada, bo rozmowa go nie ma: termin przy reklamacji przychodzi
  * z Allegro (`decisionDueDate`), a policzony u nas rozjeżdżałby się z tym,
- * który widzi kupujący (blizna 0.121.0).
+ * który widzi kupujący.
  *
  * PRZEŁĄCZNIK, nie droga w jedną stronę. Agent bierze pytanie za reklamacyjne
  * po pierwszym zdaniu klienta, a po odpowiedzi hali okazuje się, że to pytanie

@@ -4,7 +4,7 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 
-/* ── Raport „czego nikt nie używa" (23 września 2026) ────────────────────────
+/* ── Raport „czego nikt nie używa" ───────────────────────────────────────────
    Dwie gwarancje. Rejestr typów zna KAŻDY literał z `logEvent(...)` w źródłach
    serwera — inaczej funkcja nigdy nie naciśnięta nie trafiłaby do raportu,
    bo nie ma jej ani w dzienniku, ani w rejestrze. I raport jest odczytem:
@@ -128,7 +128,7 @@ test("obszar po przedrostku typu", () => {
   assert.equal(U.obszarZdarzenia("kosz_rozlozony"), "Kosze");
   assert.equal(U.obszarZdarzenia("reklamacje_synchronizacja_reczna"), "Reklamacje");
   assert.equal(U.obszarZdarzenia("cos_nowego"), "Inne");
-  /* Sprawa klienta (0.535.0) żyje na profilu, nie w skrzynce — przedrostek
+  /* Sprawa klienta żyje na profilu, nie w skrzynce — przedrostek
      `klient_sprawa` musi stać PRZED ogólnym `klient_`, bo wygrywa pierwszy. */
   assert.equal(U.obszarZdarzenia("klient_sprawa_krok"), "Profil klienta");
   assert.equal(U.obszarZdarzenia("klient_sprawa_zakonczona"), "Profil klienta");

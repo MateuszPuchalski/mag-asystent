@@ -209,8 +209,8 @@ test("`ile` liczy CAŁE dopasowanie, także poza limitem", () => {
 /* ── Wejście w dostawę archiwalną ─────────────────────────────────────────── */
 
 test("podgląd dokumentu spoza okna importu czyta NASZ snapshot", () => {
-  /* Do 0.235.0 była tu odmowa 404 — dostawa sprzed trzech tygodni wyglądała
-     w panelu identycznie jak dokument, którego nigdy nie było. */
+  /* Odmowa 404 sprawiałaby, że dostawa sprzed trzech tygodni wygląda w panelu
+     identycznie jak dokument, którego nigdy nie było. */
   dostawa(830, { linie: [{ status: "done" }] });
   const p = P.podgladDokumentu(830);
   assert.ok(p, "dostawa archiwalna daje się otworzyć");

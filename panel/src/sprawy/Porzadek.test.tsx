@@ -4,9 +4,9 @@ import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { PasekPorzadku, posortuj, type OsPorzadku } from "./Porzadek";
 
-/* ── Porządek kolejek obsługi (0.401.0) ──────────────────────────────────────
-   Zgłoszenie właściciela: „dodaj sortowanie po dacie etc". Testy pilnują
-   czterech decyzji, bo każda da się cicho odwrócić przy pierwszym refaktorze:
+/* ── Porządek kolejek obsługi ────────────────────────────────────────────────
+   Testy pilnują czterech decyzji, bo każda da się cicho odwrócić przy
+   pierwszym refaktorze:
 
    1. PUSTE ZAWSZE NA KOŃCU. Sprawa bez terminu nie jest najpilniejsza ani
       najmniej pilna — jest sprawą, o której ta oś nic nie mówi.
@@ -76,9 +76,9 @@ describe("pasek porządku", () => {
   beforeEach(() => localStorage.clear());
 
   it("PRZYCISK MÓWI BIEŻĄCĄ OŚ, a menu oddaje wybór", async () => {
-    /* 0.402.0: pasmo pigułek zeszło do jednego przycisku z menu. Napis na
-       przycisku jest tu sednem — jedno spojrzenie zamiast czytania czterech
-       napisów, żeby poznać ten wybrany. */
+    /* Jeden przycisk z menu, nie pasmo pigułek. Napis na przycisku jest tu
+       sednem — jedno spojrzenie zamiast czytania czterech napisów, żeby
+       poznać ten wybrany. */
     const onZmien = vi.fn();
     render(<PasekPorzadku porzadek="termin" dozwolone={["termin", "otwarto"]} onZmien={onZmien} />);
 

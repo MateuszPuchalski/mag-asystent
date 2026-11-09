@@ -1,6 +1,6 @@
 import React from "react";
 
-/* ── JEDNO ZWINIĘCIE DLA OSI ROZMOWY (0.523.0) ──────────────────────────────
+/* ── JEDNO ZWINIĘCIE DLA OSI ROZMOWY ────────────────────────────────────────
    Oś miała trzy ręcznie pisane przełączniki: stopkę, autoodpowiedź i naszą
    długą wypowiedź. Każdy z innym wyglądem i innym progiem, a karta towaru
    powtarzała próg 320 znaków czwarty raz. Zgłoszenie agentów brzmiało
@@ -32,11 +32,9 @@ export const KLASA_PRZELACZNIKA = "text-xs font-semibold text-sky-800 underline 
 
 /**
  * Nasza wypowiedź: długa zwija się do czterech linii, stopka firmowa
- * chowa się cała — i obie wracają JEDNYM przełącznikiem (0.523.0).
+ * chowa się cała — i obie wracają JEDNYM przełącznikiem.
  *
- * Do tego wydania wiadomość długa i podpisana miała pod sobą dwa przyciski,
- * „Pokaż całą wiadomość" i „stopka firmowa". Oba odsłaniały tę samą rzecz:
- * resztę tego, co klient dostał. Zwinięte, nie skasowane — przy sporze
+ * Dwa przyciski odsłaniałyby tę samą rzecz: resztę tego, co klient dostał. Zwinięte, nie skasowane — przy sporze
  * całość musi dać się przeczytać w panelu.
  */
 export function DlugiTekst({ tresc, stopka, className = "" }: {

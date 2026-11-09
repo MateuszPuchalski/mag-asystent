@@ -21,7 +21,7 @@ import { logEvent } from "./events.js";
 const ZAPAS_MS = 5 * 60_000; // odświeżamy 5 min przed wygaśnięciem
 const TIMEOUT_MS = 10_000;
 
-/* ── Rytm parowania a anti-bot Allegro (0.106.0) ─────────────────────────────
+/* ── Rytm parowania a anti-bot Allegro ───────────────────────────────────────
    Endpointy OAuth stoją na APEKSIE `allegro.pl`, czyli za tym samym edge'em,
    co sklep — nie na `api.allegro.pl`. Odpytywanie stanu parowania jest więc
    jedynym ruchem tej aplikacji o dużej częstotliwości, który widzi anti-bot
@@ -249,7 +249,7 @@ export async function rozpocznijParowanie(): Promise<StartParowania> {
      jest wciąż ważny, a każde `POST /device` to kolejny strzał w apex
      allegro.pl i — po stronie przeglądarki — kolejna równoległa pętla
      odpytywania. Nowy kod DOPIERO po wygaśnięciu sesji: PRZERWIJ w panelu
-     jest wyłącznie frontowy (0.106.0) i tej sesji świadomie NIE czyści —
+     jest wyłącznie frontowy i tej sesji świadomie NIE czyści —
      dodatkowa trasa czyszcząca to dodatkowy ruch bez zysku, bo kod i tak
      wygasa sam. */
   const trwajace = parowanie;
@@ -334,7 +334,7 @@ const czekam = (p: Parowanie, zaMs: number): StanParowania => ({
 
 /**
  * Odpytanie stanu parowania. Throttling siedzi TUTAJ, żeby rytm nie zależał
- * od dyscypliny przeglądarki — a od 0.106.0 serwer sam mówi, kiedy wrócić
+ * od dyscypliny przeglądarki — a serwer sam mówi, kiedy wrócić
  * (`nastepnyPollMs`), i z czasem czekania zwalnia.
  */
 export async function sprawdzParowanie(autor: string): Promise<StanParowania> {
@@ -434,14 +434,11 @@ export function problemAllegro(): string | null {
   return null;
 }
 
-/* ── Dlaczego narzędzie z konsoli nie ma czego czytać (0.153.1) ──────────────
-   `npm run sonda` odmawiał jednym zdaniem dla wszystkich pięciu stanów:
-   „konto nie jest sparowane — sparuj w panelu". Dwa razy wprowadzało to
-   w błąd. Po pierwsze, `dev` NIE ZNACZY braku parowania: w trybie demo nie ma
-   czego parować i panel mówi to wprost, więc odesłanie do niego kończyło się
-   kartą bez przycisku POŁĄCZ. Po drugie, zdanie prowadziło do zakładki
-   REJESTRY, skasowanej w 0.140.0 razem z obsługą klienta — karta KONTO
-   ALLEGRO stoi od tamtej pory w STANIE SYSTEMU.
+/* ── Dlaczego narzędzie z konsoli nie ma czego czytać ────────────────────────
+   Każdy z pięciu stanów dostaje własne zdanie. `dev` NIE ZNACZY braku
+   parowania: w trybie demo nie ma czego parować, więc odesłanie do panelu
+   kończyłoby się kartą bez przycisku POŁĄCZ. Karta KONTO ALLEGRO stoi
+   w STANIE SYSTEMU.
 
    Prawdziwym powodem bywa przy tym coś trzeciego: proces konsoli nie znalazł
    `wertis.env` i pracuje na domyślnych wartościach, choć usługa obok czyta
@@ -503,7 +500,7 @@ export function powodBrakuKonta(
  * Nie doklejamy tego do `problemAllegro()`, bo tamto mówi o STANIE TOKENA,
  * a to o konfiguracji. Allegro wymaga nagłówka wygenerowanego przy
  * rejestracji aplikacji i ostrzega wprost, że jego brak grozi zablokowaniem
- * klucza — a dotąd aplikacja nie mówiła o tym ani słowa, aż do blokady.
+ * klucza.
  */
 export function problemUserAgenta(): string | null {
   if (allegroTryb() !== "http") return null;

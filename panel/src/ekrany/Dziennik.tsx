@@ -9,30 +9,29 @@ import { nazwaZdarzenia } from "../dziennik/nazwy";
 import { opisZdarzenia } from "../dziennik/opis";
 import { PrzyciskTowaru } from "../towar/Szuflada";
 
-/* ── DZIENNIK (0.440.0) ─────────────────────────────────────────────────
-   Przeniesiony z DZIENNIKA w `biuro.html`. Ślad audytowy: każdy skan, każda
+/* ── DZIENNIK ───────────────────────────────────────────────────────────
+   Ślad audytowy: każdy skan, każda
    decyzja i każdy błąd — z osobą, urządzeniem i czasem. Wgląd, nie praca:
    ekran nie zmienia niczego, a pobranie CSV sam serwer zapisuje do śladu.
 
-   FILTR DZIAŁA OD RAZU, BEZ „SZUKAJ" (dekalog pkt 1). W biurze filtry czekały
-   na przycisk, więc każda zmiana kosztowała dwa ruchy, a zapomniany przycisk
-   zostawiał pod nowym filtrem stare wiersze — tabela kłamała o tym, co
-   pokazuje. Tu pola tekstowe czekają ćwierć sekundy, jak szukanie w archiwum
+   FILTR DZIAŁA OD RAZU, BEZ „SZUKAJ" (dekalog pkt 1). Przycisk kosztowałby
+   dwa ruchy na zmianę, a zapomniany zostawiłby pod nowym filtrem stare
+   wiersze. Pola tekstowe czekają ćwierć sekundy, jak szukanie w archiwum
    dostaw, a listy i daty działają od razu.
 
    FILTRY W JEDNYM RZĘDZIE NAD TABELĄ, nie w karcie: rządzą całym ekranem,
-   a stojąc w środku karty wyglądały jak jeszcze jeden wiersz treści.
+   a w środku karty wyglądałyby jak jeszcze jeden wiersz treści.
 
-   TRZY FILTRY POD „WIĘCEJ FILTRÓW" (0.514.0). Siedem pól naraz przytłaczało,
-   a towar, urządzenie i liczbę wierszy ustawia się rzadko — zwykle szuka się
-   po dniu, typie i osobie. Ustawiony filtr nigdy się nie chowa: pola stoją
-   na widoku, dopóki któreś odbiega od domyślnego, bo schowany filtr to
-   tabela, która kłamie o tym, co pokazuje. */
+   TRZY FILTRY POD „WIĘCEJ FILTRÓW". Towar, urządzenie i liczbę wierszy
+   ustawia się rzadko — zwykle szuka się po dniu, typie i osobie. Ustawiony
+   filtr nigdy się nie chowa: pola stoją na widoku, dopóki któreś odbiega
+   od domyślnego, bo schowany filtr to tabela, która kłamie o tym, co
+   pokazuje. */
 
-/* ── PO POLSKU, WARIANT C Z MAKIET (0.540.0) ────────────────────────────
-   Decyzja właściciela z 27 września 2026. Tabela została tabelą — w śladzie
-   audytowym szuka się konkretu po kolumnach: kto, kiedy, który towar. Zmieniło
-   się to, czego nie dało się czytać bez ściągawki:
+/* ── PO POLSKU ──────────────────────────────────────────────────────────
+   Decyzja właściciela. Tabela zostaje tabelą — w śladzie audytowym szuka
+   się konkretu po kolumnach: kto, kiedy, który towar. Po polsku jest to,
+   czego nie dałoby się czytać bez ściągawki:
 
    - kolumna „Zdarzenie" niesie polską nazwę, a klucz serwera stoi w dymku
      (`dziennik/nazwy.ts`),
@@ -119,8 +118,8 @@ export function Dziennik() {
           <option value="">wszystkie</option>
           {(agenci.data?.users ?? []).map((u) => <option key={u.userId} value={String(u.userId)}>{u.name}</option>)}
         </select></Etykieta>
-      {/* „Towar", nie „Towar (tw_id)" (0.514.0): agent nie zna nazwy kolumny
-          w bazie, a numer kartoteki widzi w kolumnie „Towar" tej samej tabeli. */}
+      {/* „Towar", nie „Towar (tw_id)": agent nie zna nazwy kolumny w bazie,
+          a numer kartoteki widzi w kolumnie „Towar" tej samej tabeli. */}
       {widacWiecej && <>
         <Etykieta napis="Towar">
           <Pole className="w-28" inputMode="numeric" value={szkic.twId} onChange={(e) => zmien("twId", e.target.value)} /></Etykieta>

@@ -3,12 +3,11 @@ import { describe, expect, it } from "vitest";
 const ZRODLA = import.meta.glob(["./**/*.tsx", "!./**/*.test.tsx"],
   { query: "?raw", eager: true, import: "default" }) as Record<string, string>;
 
-/* ── KAŻDE OKNO IDZIE PRZEZ `useOkno` (0.546.0) ──────────────────────────────
-   Pomiar przed tym wydaniem: sześć okien z `role="dialog"` i dwie nakładki
-   bez tej roli. Fokus wchodził tylko do szukania i nie wracał z żadnego.
-   Skróty strony działały pod każdym, a w zwrotach `Z` pod historią klienta
-   oddawało pieniądze (`ekrany/Zwroty.test.tsx`). Każde okno pilnowało
-   Escape po swojemu, więc zasada żyła w ośmiu kopiach i w dwóch jej nie było.
+/* ── KAŻDE OKNO IDZIE PRZEZ `useOkno` ────────────────────────────────────────
+   Okno, które pilnuje fokusu i Escape po swojemu, to kopia zasady, w której
+   łatwo ją zgubić. Bez `useOkno` skróty strony działałyby pod oknem, a w
+   zwrotach `Z` pod historią klienta oddałoby pieniądze
+   (`ekrany/Zwroty.test.tsx`).
 
    Strażnik pilnuje dwóch rzeczy. Element z `role="dialog"` rozkłada wynik
    haka (`{...okno}`, nazwa z konwencji). Nakładka `fixed inset-0` jest

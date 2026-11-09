@@ -1,9 +1,8 @@
-import React from "react";
 import { FileText } from "lucide-react";
 import type { FakturaZwrotu, KandydatFaktury } from "../api/typy";
 import { Skopiuj } from "../ui";
 
-/* ── Dokument sprzedaży z Subiekta (0.174.0) ─────────────────────────────────
+/* ── Dokument sprzedaży z Subiekta ───────────────────────────────────────────
    Ostatnia pozycja z listy biura zwrotów: „widoczny numer paragonu". Bez niego
    pracownik szukał sprzedaży w Subiekcie ręcznie — po dacie i nazwisku, bo nic
    innego nie miał.
@@ -20,9 +19,8 @@ import { Skopiuj } from "../ui";
    znaczy korektę do cudzej sprzedaży.                                        */
 
 /**
- * Kandydat, którego ekran PODSUWA (0.479.0) — jedyny na liście albo jedyny
- * pewny. Przegląd zwrotów z 23 września: przy jednym kandydacie operator
- * i tak klikał ten jeden numer, szukając go wzrokiem w akapicie.
+ * Kandydat, którego ekran PODSUWA — jedyny na liście albo jedyny
+ * pewny. Przy jednym kandydacie operator i tak klika ten jeden numer.
  *
  * PODSUWA, NIE WIĄŻE. Wiązanie dalej robi człowiek — przyciskiem albo
  * Enterem — bo nagłówek wyżej mówi, czemu nakładka pozycji wiązać sama nie
@@ -46,7 +44,7 @@ export function Dokument({ faktura, kandydaci, trwa, blad, onWskaz, enter = fals
 }) {
   if (faktura.dokId !== null) {
     return <div className="text-xs">
-      {/* Numer do SCHOWKA (0.176.0). Kliknięcie nie otwiera dokumentu
+      {/* Numer do SCHOWKA. Kliknięcie nie otwiera dokumentu
           w Subiekcie i nie otworzy go z przeglądarki: okno wystawia program
           na stanowisku, nie serwer. Do czasu, aż taki program stanie
           (`docs/architektura.md` §4), schowek jest najkrótszą drogą — numer
@@ -86,13 +84,13 @@ export function Dokument({ faktura, kandydaci, trwa, blad, onWskaz, enter = fals
           numer zamówienia na dokument, a bez potwierdzonej kartoteki nie ma
           po czym dopasować towarów.</p>
       </details>
-      {/* ZDANIE KOŃCZY SIĘ RUCHEM (audyt, 15 września 2026). Trzy powody bez
+      {/* ZDANIE KOŃCZY SIĘ RUCHEM (audyt). Trzy powody bez
           czwartego zdania zostawiały operatora przy ścianie: ekran tłumaczył się
           i milkł. Wskazać dokumentu nie ma jak — kandydatów jest zero, a panel
           nie umie szukać po numerze — ale zwrot da się doprowadzić do końca bez
           dokumentu, i to jest ta informacja, której tu brakowało. */}
       <p className="mt-1">
-        {/* „Wyżej" kłamało (0.484.7): pole numeru stoi w kolumnie środkowej
+        {/* „Wyżej" kłamało: pole numeru stoi w kolumnie środkowej
             i tylko w kubełku DO KOREKTY. */}
         Zwrotu to nie zatrzymuje: korektę wystawiasz w Subiekcie, a jej numer
         wpisujesz w środkowej kolumnie, gdy zwrot stanie w „Do korekty”. To

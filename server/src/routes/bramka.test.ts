@@ -282,7 +282,7 @@ test("wysyłka z bufora offline przechodzi — inaczej praca znika", async () =>
    podgląd biura poznawały tryb, nie ma w odpowiedziach.                      */
 
 test("/api/health niesie etykietę środowiska — domyślnie „produkcja”", async () => {
-  /* Etykieta istnieje dla instancji dev obok produkcji (0.69.0): biuro
+  /* Etykieta istnieje dla instancji dev obok produkcji: biuro
      i kolektor rysują z niej ostrzeżenie, a trasa jest bez sesji ŚWIADOMIE —
      „to jest dev" musi być widoczne przed zalogowaniem, bo właśnie wtedy
      człowiek myli serwery. Test przybija też wartość domyślną: instalacja

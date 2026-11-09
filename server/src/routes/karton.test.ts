@@ -6,7 +6,7 @@ import path from "node:path";
 import type { FastifyInstance } from "fastify";
 import type { Rola } from "../services/users.js";
 
-/* ── KARTON: rozkładanie od zera (0.122.0) ───────────────────────────────────
+/* ── KARTON: rozkładanie od zera ───────────────────────────────────
    Karton to towar źle zebrany, odłożony przez pakujących do jednego pudła.
    Testy pilnują trzech rzeczy, z których każda jest osobną obietnicą:
 
@@ -341,7 +341,7 @@ test("kod anulowanego kartonu wraca do obiegu", async () => {
   });
   await app.inject({ method: "POST", url: `/api/kartony/${id}/anuluj`, headers: magazynier });
 
-  /* Indeks `ix_kosz_kod_aktywny` pomija anulowane od 0.123.0. Bez tego kosz
+  /* Indeks `ix_kosz_kod_aktywny` pomija anulowane. Bez tego kosz
      o tym kodzie rozbiłby się o unikalność — a kod nadaje aplikacja, nie
      etykieta na pudle, więc trzymanie go w rezerwie nikomu nie służy. */
   db()

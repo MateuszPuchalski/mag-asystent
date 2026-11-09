@@ -4,11 +4,9 @@ import { urlOferty, zapytajAllegro } from "../adapters/allegro.http.js";
 import { BladLimituAllegro } from "../adapters/allegro.js";
 import { odkodujEncje } from "../tekst.js";
 
-/* ── Treść oferty dla Copilota (0.253.0) ─────────────────────────────────────
-   Właściciel: „często oferta ma w sobie opis, do jakich wersji pasuje, wymiary
-   z oferty, dane techniczne". Copilot znał do 0.252.0 wyłącznie TYTUŁ oferty —
-   `offer_snapshot.nazwa` — i odpowiadał bez wiedzy, którą sprzedawca sam
-   zapisał kilka lat temu, klikając „wystaw".
+/* ── Treść oferty dla Copilota ───────────────────────────────────────────────
+   Oferta niesie opis, do jakich wersji pasuje, wymiary i dane techniczne —
+   wiedzę, którą sprzedawca już zapisał. Sam tytuł oferty to za mało.
 
    DLACZEGO OSOBNY PRZEBIEG, A NIE `allegro-oferty-sync.ts`. Tamten bierze
    tytuł, cenę, SKU i zdjęcie z `GET /sale/offers`, gdzie `offer.id` jest
@@ -80,9 +78,8 @@ export interface TrescOferty {
  * „skąd to wiem". Rozbiór jest CELOWO ubogi: łamania linii tam, gdzie HTML je
  * miał, myślnik przed pozycją listy, reszta znaczników znika.
  *
- * Encje schodzą `odkodujEncje` — tą samą tablicą, którą 0.250.0 poszerzył
- * o alfabety sąsiadów. Opis oferty na rynkach czeskim i węgierskim ma je
- * dokładnie tak samo jak wiadomość od klienta.
+ * Encje schodzą `odkodujEncje`, która zna też alfabety sąsiadów: opis oferty
+ * na rynkach czeskim i węgierskim ma je tak samo jak wiadomość od klienta.
  */
 export function naTekst(html: string): string {
   const zTagami = html
@@ -144,8 +141,8 @@ export interface TrescOfertyDeps {
  * Dwa powody i ani jednego więcej: nigdy nie pytaliśmy (`tresc_synced_at`
  * NULL) albo pytanie zestarzało się o tydzień. Pusty opis przy wypełnionym
  * `tresc_synced_at` znaczy „pytaliśmy, sprzedawca opisu nie napisał" — to samo
- * rozróżnienie, które `primary_image_url` kupiło blizną w 0.214.0. Bez niego
- * oferta bez opisu kosztowałaby żądanie przy KAŻDYM szkicu.
+ * rozróżnienie co przy `primary_image_url`. Bez niego oferta bez opisu
+ * kosztowałaby żądanie przy KAŻDYM szkicu.
  */
 export function trzebaTresci(
   database: Db, konto: number, ofertaId: string, teraz = new Date(),
@@ -169,9 +166,8 @@ export function trzebaTresci(
  * patrzeniu"). Miejsce jest jedno: `ulozSzkic`, czyli ścieżka na KLIKNIĘCIE
  * agenta, gdzie zapis i tak już jest.
  *
- * Odmowa Allegro nie wywraca szkicu. Szkic bez opisu jest wart dokładnie tyle,
- * ile był wart do 0.252.0 — a to jest wartość dodatnia. Wyjątkiem jest limit:
- * ten przerywa, bo kolejne żądanie pogłębiłoby przerwę.
+ * Odmowa Allegro nie wywraca szkicu, który zostaje wtedy bez opisu.
+ * Wyjątkiem jest limit: ten przerywa, bo kolejne żądanie pogłębiłoby przerwę.
  */
 export async function dociagnijTresc(
   konto: number, ofertaId: string, deps: TrescOfertyDeps = {},

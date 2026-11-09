@@ -12,7 +12,7 @@ import { reconcile, zapiszRaportRekoncyliacji } from "./services/reconcile.js";
    być czytany po tygodniu — a wtedy nie chroni już przed niczym. Kod wyjścia
    też o tym mówi: 0 = czysto, 2 = są rozjazdy.                              */
 
-/* Migracji NIE robimy (0.177.1) — schemat zakłada wyłącznie serwer API. Ten
+/* Migracji NIE robimy — schemat zakłada wyłącznie serwer API. Ten
    skrypt bywa uruchamiany przy żywej usłudze, a migracja z dwóch procesów
    naraz to blizna z 2 września. */
 bezMigracji();

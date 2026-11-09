@@ -24,7 +24,7 @@ import { listaRaportow, raportTygodnia } from "../services/raport-tygodnia.js";
    zapalnikiem, przed którym kod ostrzegał w trzech miejscach naraz. */
 const CZYTAJACY = ROLE_BIUROWE;
 
-/* RAPORT PER OSOBA TYLKO DLA ADMINISTRATORA (0.431.0, decyzja właściciela).
+/* RAPORT PER OSOBA TYLKO DLA ADMINISTRATORA (decyzja właściciela).
    Do tej wersji czytało go całe biuro, a `services/auth.ts` mówiło wprost, że
    admin nie ma nad biurem przewagi w raporcie o pracy ludzi. Audyt 0.427.0
    odwrócił tę kolejność: monitoring pracowniczy to decyzja kadrowa, nie
@@ -48,8 +48,7 @@ function dniZQuery(v: string | undefined): number {
  * przyjeżdża co kilka dni, więc tydzień bywa w niej pusty, a mediana czasu
  * rozłożenia z dwóch faktur nie mówi nic. Ta lista MUSI zgadzać się z
  * `OKNA.dostawy` w `panel/src/ekrany/Analiza.tsx` — czip spoza zbioru wyglądałby na
- * wybrany, a trasa liczyłaby po cichu swoje domyślne. Dokładnie tak rozjechało
- * się okno pytań w 0.96.0.
+ * wybrany, a trasa liczyłaby po cichu swoje domyślne.
  */
 function dniDostaw(v: string | undefined): number {
   const n = Number(v);
@@ -73,7 +72,7 @@ export async function analizaRoutes(app: FastifyInstance) {
   });
 
   /**
-   * Analiza dostaw (0.100.0) — czwarty zakres zakładki.
+   * Analiza dostaw — czwarty zakres zakładki.
    *
    * Ta sama bramka co ślad audytowy, choć dane nie są imienne. Karta odpowiada
    * na pytanie „u którego dostawcy jest problem", a to jest ocena kontrahenta:
@@ -88,7 +87,7 @@ export async function analizaRoutes(app: FastifyInstance) {
   });
 
   /**
-   * Czas odpowiedzi klientowi (23 września 2026) — zakres „Obsługa klienta".
+   * Czas odpowiedzi klientowi — zakres „Obsługa klienta".
    *
    * Ta sama bramka co ślad audytowy i to samo okno 7/30/90: to tempo pracy,
    * patrzy się na nie od tygodnia. Rozbicie na osoby tą samą regułą co raport
@@ -110,7 +109,7 @@ export async function analizaRoutes(app: FastifyInstance) {
     return wskazniki(dniZQuery(req.query.days));
   });
 
-  /* Pomiar tarcia w skrzynce (0.500.0) — cofnięcia, czas do wysyłki
+  /* Pomiar tarcia w skrzynce — cofnięcia, czas do wysyłki
      i szkice wysłane bez zmian. Ta sama bramka i okno co czas odpowiedzi;
      rozbicie na osoby wyłącznie dla administratora. Odczyt niczego nie
      zapisuje. Powód każdej liczby przy `services/tarcie.ts`. */
@@ -120,7 +119,7 @@ export async function analizaRoutes(app: FastifyInstance) {
     return pomiarTarcia(dniZQuery(req.query.days), mozeWidziecLudzi());
   });
 
-  /* Czego nikt nie używa (23 września 2026) — raport z dziennika zdarzeń,
+  /* Czego nikt nie używa — raport z dziennika zdarzeń,
      bez ludzi: liczy CZYNNOŚCI, nie osoby, więc bramka biura wystarcza.
      Odczyt niczego nie zapisuje. Powód i granice przy `services/uzycie.ts`. */
   app.get<{ Querystring: { days?: string } }>("/api/analiza/uzycie", async (req, reply) => {
@@ -144,7 +143,7 @@ export async function analizaRoutes(app: FastifyInstance) {
     return ergonomia(dniZQuery(req.query.days));
   });
 
-  /* Raporty tygodni (0.497.0). Ta sama bramka biura, bo raport nie niesie
+  /* Raporty tygodni. Ta sama bramka biura, bo raport nie niesie
      ludzi — patrz nagłówek `services/raport-tygodnia.ts`. Trasy tylko
      CZYTAJĄ: raport zapisuje takt w `main()`, a tydzień niepoliczony
      odpowiada 404, nie liczy się w locie. Inaczej pierwsze otwarcie ekranu

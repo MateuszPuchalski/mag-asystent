@@ -21,11 +21,9 @@ import { config } from "../config.js";
 import { BladFirmy, daneFirmy, zapiszDaneFirmy, type PoleFirmy } from "../services/firma.js";
 import { ROLE_BIUROWE } from "../services/users.js";
 
-/* ── Trasy biura (strona `/biuro` zniknęła w 0.446.0) ─────────────────────
-   Do 0.446.0 ten plik serwował też stronę biura: jeden HTML bez builda,
-   jej ikonę i fonty Barlow. Biuro przeszło do panelu widok po widoku
-   (`docs/obsluga-klienta.md` §7), a ostatnie wydanie zostawiło stronę jako
-   drogowskaz. Teraz zostały tu TRASY API biura — dostawy zdjęte poza WERTIS,
+/* ── Trasy biura ──────────────────────────────────────────────────────────
+   Strona biura mieszka w panelu (`docs/obsluga-klienta.md` §7). Tu stoją
+   TRASY API biura — dostawy zdjęte poza WERTIS,
    notatki, archiwum, DO DECYZJI, dane firmy — i przekierowanie starych adresów.
 
    Zapisy dostaw mieszkają dalej tutaj, a nie przy trasach kolektora: to
@@ -34,7 +32,7 @@ import { ROLE_BIUROWE } from "../services/users.js";
    siedzi w `services/delivery.ts` razem z resztą reguł dostaw.             */
 
 export async function biuroRoutes(app: FastifyInstance) {
-  /* ── STARE ADRESY PROWADZĄ DO PANELU (0.446.0) ─────────────────────────
+  /* ── STARE ADRESY PROWADZĄ DO PANELU ─────────────────────────
      Zakładka w przeglądarce, skrót na pulpicie i nawyk ręki prowadzą pod
      `/biuro` jeszcze długo po przeprowadzce. 404 wyglądałoby na awarię
      serwera; przekierowanie mówi „jesteś w dobrym miejscu, tylko pod nowym
@@ -153,7 +151,7 @@ export async function biuroRoutes(app: FastifyInstance) {
   );
 
   /**
-   * Notatka biura do dostawy (0.43.0) — pytanie, na które rozkładający MUSI
+   * Notatka biura do dostawy — pytanie, na które rozkładający MUSI
    * odpowiedzieć, zanim domknie fakturę.
    *
    * Bez bramki roli, w odróżnieniu od zamykania „poza WERTIS". Notatka niczego
@@ -171,11 +169,10 @@ export async function biuroRoutes(app: FastifyInstance) {
     }
   );
 
-  /* ── Odpowiedzi na notatki wracają do biura (0.57.0) ──────────────────────
+  /* ── Odpowiedzi na notatki wracają do biura ──────────────────────
      Bramka lekka (biuro|admin), bez `autoryzuj()`: to potwierdzenie odczytu,
      a nie orzeczenie o pracy. Wpis `privileged` przy każdym odświeżeniu paska
-     stanu byłby szumem w dzienniku — dokładnie tym, który 0.52.3 z niego
-     usuwało.
+     stanu byłby szumem w dzienniku.
 
      Licznik jedzie TĄ trasą, a nie przez `/api/health`: health stoi na liście
      `BEZ_SESJI`, więc dane biura wystawiłby każdemu bez logowania. */
@@ -190,7 +187,7 @@ export async function biuroRoutes(app: FastifyInstance) {
     return null;
   }
 
-  /* ── ILE TRWA WYMIANA Z HALĄ (0.361.0) ───────────────────────────────────
+  /* ── ILE TRWA WYMIANA Z HALĄ ───────────────────────────────────
      §22 wymienia „czas realizacji zadania magazynowego" wśród metryk i nie
      podaje przy nim ani progu, ani miejsca. W kodzie nie było go wcale:
      znaczniki obu końców leżą w bazie od lat, a różnicy nie liczył nikt.
@@ -204,7 +201,7 @@ export async function biuroRoutes(app: FastifyInstance) {
     return czasyWymiany(Number(req.query.dni) || 30);
   });
 
-  /* ── CO STOI DŁUŻEJ, NIŻ STOI ZWYKLE (0.364.0) ───────────────────────────
+  /* ── CO STOI DŁUŻEJ, NIŻ STOI ZWYKLE ───────────────────────────
      Tabela wyżej odpowiada na pytanie zadane — a żeby je zadać, trzeba wejść
      na STAN SYSTEMU i spojrzeć. Ta trasa odpowiada na pytanie NIEZADANE
      i dlatego chodzi w cyklu, na każdej zakładce: własność „Wiek" wymaga,
@@ -219,7 +216,7 @@ export async function biuroRoutes(app: FastifyInstance) {
     return alarmyWymiany();
   });
 
-  /* ── DO DECYZJI (0.435.0) ────────────────────────────────────────────────
+  /* ── DO DECYZJI ────────────────────────────────────────────────
      Ekran startowy panelu biura — wszystko, co czeka na rozstrzygnięcie
      biura, jedną listą. Całe uzasadnienie przy `services/do-decyzji.ts`.
 
@@ -236,7 +233,7 @@ export async function biuroRoutes(app: FastifyInstance) {
     return doDecyzji();
   });
 
-  /* ── Test na żywym Allegro (0.495.0) ────────────────────────────────────
+  /* ── Test na żywym Allegro ────────────────────────────────────
      Odczyt ostatniego przebiegu i przycisk „Przetestuj teraz”. Przebieg sam
      chodzi raz dziennie w `main()`; przycisk jest po to, żeby po wdrożeniu
      nie czekać doby na pierwszy wynik. Powód i kroki: serwis.
@@ -269,7 +266,7 @@ export async function biuroRoutes(app: FastifyInstance) {
     return sondujRzeczywistosc();
   });
 
-  /* ── Dane firmy na wydrukach (0.444.0) ─────────────────────────────────
+  /* ── Dane firmy na wydrukach ─────────────────────────────────
      Przeszły z localStorage przeglądarki na serwer: jedna firma, jedna kopia.
      Bramka lekka, jak reguły strefy — to zapis konfiguracji, który ludzie
      drukujący protokoły robią kilka razy w roku, a nie orzeczenie o pracy,
@@ -318,8 +315,4 @@ export async function biuroRoutes(app: FastifyInstance) {
       return { ok: true, zmienione: bylo };
     }
   );
-
-  /* Do 0.26.0 wisiała tu jeszcze trasa `/sw.js` — jednorazowy pogrzeb service
-     workera PWA usuniętej w 0.3.0. Komputery biura przeszły od tego czasu
-     przez sprzątający skrypt, więc trasa wyszła razem ze swoim powodem. */
 }

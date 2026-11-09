@@ -101,15 +101,10 @@ interface Kanal {
  * a wtedy tabela i alarm mówiłyby o dwóch różnych zbiorach spraw pod
  * jedną nazwą. To gorsze niż brak alarmu.
  *
- * NOTATKI DOSZŁY W 0.369.0, A ICH WYŁĄCZENIE BYŁO POMYŁKĄ. 0.361.0 zostawiło
- * je poza miarą z uzasadnieniem „odpowiedź na notatkę bywa rozmową na kilka
- * tur, więc czas wymiany znaczyłby tam co innego". To zdanie jest NIEPRAWDZIWE
- * o tej tabeli i mówi to sam kod: `odpowiedzNaNotatke` odmawia nadpisania,
- * bo „odpowiedź jest jedna i ostateczna", a nowe ustalenie to NOWA NOTATKA.
- * Rozmowa na kilka tur to kilka notatek, z których każda jest osobną wymianą
- * o dwóch końcach — czyli dokładnie tym, co ta funkcja mierzy. Uzasadnienie
- * przyszło z `conversation_event` w panelu obsługi, gdzie rzeczywiście jest
- * wątkiem, i zostało przeniesione na strukturę, która działa inaczej.
+ * NOTATKI SĄ KANAŁEM. `odpowiedzNaNotatke` odmawia nadpisania, bo „odpowiedź
+ * jest jedna i ostateczna", a nowe ustalenie to NOWA NOTATKA. Rozmowa na kilka
+ * tur to kilka notatek, każda osobną wymianą o dwóch końcach — czyli dokładnie
+ * tym, co ta funkcja mierzy.
  *
  * TEN KANAŁ JEST ZRESZTĄ JEDYNYM, W KTÓRYM BRAK ODPOWIEDZI WSTRZYMUJE PRACĘ:
  * `czekaNaOdpowiedz` nie pozwala domknąć dostawy, póki notatka wisi bez
@@ -176,7 +171,7 @@ function zbierzKanaly(dni: number, teraz: number): Kanal[] {
      Trzeci znacznik (`odp_widziana_at`, odczyt odpowiedzi przez biuro) do
      miary NIE wchodzi: wymiana kończy się, gdy hala odpowiedziała. Kiedy
      biuro odpowiedź przeczytało, jest osobnym pytaniem i ma własny licznik
-     w nagłówku panelu od 0.57.0. */
+     w nagłówku panelu. */
   const notatki = db().prepare(
     `SELECT created_at AS od, odp_at AS domkniete
        FROM delivery_note WHERE created_at >= ${granica}`
@@ -208,7 +203,7 @@ export function czasyWymiany(dni = 30, teraz = Date.now()): {
   };
 }
 
-/* ── ALARM: co stoi dłużej, niż stoi zwykle (0.364.0) ─────────────────────────
+/* ── ALARM: co stoi dłużej, niż stoi zwykle ───────────────────────────────────
  *
  * DLACZEGO PRÓG NIE JEST WPISANY RĘKĄ. Poprzednie wydanie zostawiło tę rzecz
  * otwartą z uzasadnieniem, które było SŁABSZE, niż wyglądało: „§22 nie podaje
