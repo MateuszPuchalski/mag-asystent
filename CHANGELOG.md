@@ -10,6 +10,11 @@ z wersją monorepo" — i właśnie tak przestał być zgodny: `0.3.0` przetrwa�
 sześć zmergowanych zmian, w tym takie, które wymagały nowego uprawnienia SQL.
 Komentarz nie jest mechanizmem.
 
+## 0.621.1 — 9 listopada 2026
+
+Usunięty martwy kod serwera i panelu, komentarze-historia w kodzie oraz
+dokumentacja funkcji, których już nie ma. Działanie bez zmian.
+
 ## 0.621.0 — 7 listopada 2026
 
 **Rozkładanie dostawy wymusza ważenie i mierzenie.** Gdy kartoteka zeskanowanego
