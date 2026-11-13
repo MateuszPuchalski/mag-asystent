@@ -4,7 +4,7 @@ import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router-dom";
 import type {
-  DokumentParagonu, DopasowanieKartoteki, ParagonReklamacji, PozycjaParagonu, Reklamacja, StanPrzesylki,
+  DokumentParagonu, ParagonReklamacji, PozycjaParagonu, Reklamacja, StanPrzesylki,
   SzczegolReklamacji, Zamowienie,
 } from "../api/typy";
 
@@ -59,7 +59,7 @@ const rek = (n: Partial<Reklamacja> = {}): Reklamacja => ({
   otwartoAt: "2026-09-28T10:11:00.000Z",
   kupionoAt: "2026-09-18T10:00:00.000Z", kupionoZrodlo: "zamowienie", dniOdZakupu: 21,
   zgloszonoPoDniach: 10, ilosc: 1,
-  prowadzi: null, prowadziId: null, prowadziAt: null, tagi: [],
+  prowadzi: null, prowadziId: null, prowadziAt: null,
   notatkaAt: null, notatkaPrzez: null, maPoprzedniaNotatke: false, notatka: null,
   wersja: 1, kubelek: "decyzja", sygnaly: [], link: null, linkZamowienia: "https://allegro.pl/z/5",
   linkOferty: "https://allegro.pl/o/1", ofertaNazwa: "NÓŻ do kosiarki 46 cm", ofertaZdjecie: "brak",
@@ -93,7 +93,7 @@ const paragon = (n: Partial<ParagonReklamacji> = {}): ParagonReklamacji => ({
 
 const szczegol = (n: Partial<SzczegolReklamacji> = {}, r: Partial<Reklamacja> = {}) => ({
   reklamacja: rek(r), czat: [], zalaczniki: [], zwroty: [], rozmowy: [], sprawy: [],
-  droga: [], kartoteka: null, karta: null, zamowienie: ZAMOWIENIE, przesylka: null,
+  droga: [], zamowienie: ZAMOWIENIE, przesylka: null,
   historia: { towar: null, klient: null }, paragon: paragon(), ...n,
 } as unknown as SzczegolReklamacji);
 
@@ -103,9 +103,6 @@ const wiersz = (symbol: string) => screen.getByText(symbol).closest("tr") as HTM
 const przesylka = (n: Partial<StanPrzesylki> = {}): StanPrzesylki => ({
   waybill: null, przewoznik: null, status: null, dostarczonoAt: null, sprawdzonoAt: null, ...n,
 });
-
-const dopasowanie = (pewnosc: string, twId: number | null): DopasowanieKartoteki =>
-  ({ twId, symbol: "X", pewnosc, zrodlo: "zdanie serwera o braku" } as unknown as DopasowanieKartoteki);
 
 beforeEach(() => {
   karta.mockReset();
@@ -196,17 +193,16 @@ describe("Kupiony towar: symbol tylko z paragonu albo faktury", () => {
     ["bez-zamowienia", "Reklamacja bez zamówienia."],
   ] as const)("bez dokumentu (%s): zdanie z powodem i ŻADNEGO symbolu z oferty", (brak, zdanie) => {
     karta.mockReturnValue({ data: undefined, isLoading: false, error: null });
-    /* Wiersz niesie symbol z oferty i mapowania, a kartoteka pewne SKU —
-       żadne z nich nie ma prawa wyjść na kartę. */
-    render(<Produkt szczegol={szczegol({ kartoteka: dopasowanie("sku", 42),
+    /* Wiersz niesie symbol z oferty i mapowania, a ten nie ma prawa wyjść
+       na kartę: oferta przepięta na inną dostawę wskazuje dziś inny towar. */
+    render(<Produkt szczegol={szczegol({
       paragon: paragon({ dokumenty: [], spornaTwId: null, brak }) }, { twId: 11, twSymbol: "14-31051" })} />);
     expect(within(kupiony()).getByText("Brak paragonu ani faktury w Subiekcie")).toBeInTheDocument();
     expect(within(kupiony()).getByText(zdanie)).toBeInTheDocument();
     expect(screen.queryByText("14-31051")).not.toBeInTheDocument();
-    expect(screen.queryByText("X")).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /Kopiuj symbol/ })).not.toBeInTheDocument();
     expect(karta).toHaveBeenCalledWith(null);
-    expect(karta).not.toHaveBeenCalledWith(42);
+    expect(karta).not.toHaveBeenCalledWith(11);
   });
 
   it("pole jeszcze niewczytane to nie brak dokumentu — karta o nim milczy", () => {
@@ -242,11 +238,10 @@ describe("Dostępność karty z dokumentem i bez niego", () => {
 
 describe("Oś cen i stan tylko dla spornej pozycji", () => {
   it("karta, stan i cennik pytają o `spornaTwId`, nie o kartotekę oferty", () => {
-    render(<Produkt szczegol={szczegol({ kartoteka: dopasowanie("sku", 42), paragon: paragon({ spornaTwId: 12,
+    render(<Produkt szczegol={szczegol({ paragon: paragon({ spornaTwId: 12,
       dokumenty: [dokument({ pozycje: [pozycja({ sporna: false }), pozycja({ twId: 12, symbol: "14-20007", sporna: true })] })] }) },
       { twId: 11 })} />);
     expect(karta).toHaveBeenCalledWith(12);
-    expect(karta).not.toHaveBeenCalledWith(42);
     expect(karta).not.toHaveBeenCalledWith(11);
   });
 

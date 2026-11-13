@@ -21,10 +21,7 @@ import { odpowiedzWSprawie } from "../services/reklamacje-wysylka.js";
 import {
   towarZCiala, wydajWerdyktZTowarem, zdecydujZwrotTowaru,
 } from "../services/reklamacja-werdykt.js";
-import { dodajDowod, usunDowod, zapiszUDostawcy } from "../services/reklamacja-dowody-zapis.js";
 import { autoryzuj } from "../services/auth.js";
-import { trasyTagowSprawy } from "./tagi.js";
-import { TAGI_REKLAMACJI } from "../services/tagi-spraw.js";
 import { bladPobrania, bladPodgladu, wyslijPodglad } from "./pobranie.js";
 import { ROLE_BIUROWE } from "../services/users.js";
 
@@ -78,10 +75,6 @@ const kto = () => {
 };
 
 export async function reklamacjeRoutes(app: FastifyInstance) {
-  /* Tagi sprawy: przypięcie i zdjęcie. Trasy wspólne dla obu ekranów,
-     bo klucz jest tym samym wierszem tej samej tabeli. */
-  trasyTagowSprawy(app, "/api/obsluga/reklamacje", TAGI_REKLAMACJI);
-
   /* Cała kolejka jednym strzałem razem z licznikami. Panel filtruje kubełkiem
      u siebie, więc przełączenie kubełka nie kosztuje żądania — ten sam wybór
      co przy zwrotach i z tego samego powodu. */
@@ -359,50 +352,6 @@ export async function reklamacjeRoutes(app: FastifyInstance) {
       if (!zdjety) return reply.code(404).send({ error: "Nie znaleziono załącznika" });
       return { ok: true };
     });
-
-  /* ── Dowody biura i reklamacja u dostawcy ──────────────────────────────────
-     Trzy zapisy WYŁĄCZNIE u nas: dowód dopisany, dowód usunięty i zgłoszenie
-     u dostawcy z jego wynikiem. Do Allegro nie idzie żadne pole, więc bez
-     `autoryzuj()`. Odpowiedź niesie świeżą listę albo rekord, żeby panel nie
-     musiał dociągać całego szczegółu po jednym zdaniu. */
-  app.post<{ Params: { id: string }; Body: { tresc?: unknown; zalacznikId?: number | null } }>(
-    "/api/obsluga/reklamacje/:id/dowody", async (req, reply) => {
-      const nie = odmowa(reply);
-      if (nie) return nie;
-      try {
-        return {
-          dowody: dodajDowod(db(), Number(req.params.id),
-            { tresc: req.body?.tresc, zalacznikId: req.body?.zalacznikId }, kto()),
-        };
-      } catch (e) { return blad(reply, e); }
-    });
-
-  app.delete<{ Params: { id: string; did: string } }>(
-    "/api/obsluga/reklamacje/:id/dowody/:did", async (req, reply) => {
-      const nie = odmowa(reply);
-      if (nie) return nie;
-      try {
-        return { dowody: usunDowod(db(), Number(req.params.id), Number(req.params.did), kto()) };
-      } catch (e) { return blad(reply, e); }
-    });
-
-  /* Każde pole ciała jawnie w typie, z tego samego powodu co przy odpowiedzi:
-     pole niezadeklarowane ginie po drodze bez słowa. Brak `nrUDostawcy` albo
-     `wynik` zostawia zapisaną wartość, `null` ją czyści. */
-  app.post<{ Params: { id: string }; Body: {
-    dostawca?: string; nrUDostawcy?: string | null; wynik?: string | null; wersja?: number;
-  } }>("/api/obsluga/reklamacje/:id/u-dostawcy", async (req, reply) => {
-    const nie = odmowa(reply);
-    if (nie) return nie;
-    try {
-      return {
-        uDostawcy: zapiszUDostawcy(db(), Number(req.params.id), {
-          dostawca: req.body?.dostawca, nrUDostawcy: req.body?.nrUDostawcy,
-          wynik: req.body?.wynik, wersja: req.body?.wersja,
-        }, kto()),
-      };
-    } catch (e) { return blad(reply, e); }
-  });
 
   /* Znacznik „prowadzę", nie zamek: ponowne kliknięcie go zdejmuje. Bez
      `autoryzuj()` — to zwykła praca biura, a nie operacja uprzywilejowana. */

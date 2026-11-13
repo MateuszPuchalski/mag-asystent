@@ -302,8 +302,7 @@ test("zwroty mają czterdzieści dwie trasy POST, każda z uzasadnieniem", async
      ostatni, a skasowane zdanie musi mieć drogę powrotną. */
   /* Dwudziesta siódma: znacznik „biorę to". JEDNA trasa na wzięcie
      i oddanie, bo to przełącznik — druga kazałaby panelowi wiedzieć, czyj jest
-     znacznik, zanim kliknie. Trasy TAGÓW tego licznika nie ruszają: rejestruje
-     je `trasyTagowSprawy` z `routes/tagi.ts`, wspólnie dla trzech ekranów. */
+     znacznik, zanim kliknie. */
   /* Dwudziesta ósma: ptaszek przy składniku kompletu. JEDNA trasa
      na oba kierunki, bo to przełącznik — ciało niesie stan docelowy, nie
      czynność. Dokładania pozycji dalej nie ma i to się NIE zmieniło: ptaszek
@@ -344,8 +343,8 @@ test("zwroty mają czterdzieści dwie trasy POST, każda z uzasadnieniem", async
      LICZNIK SCHODZI O JEDEN W 0.370.0 i to jest pierwszy raz, kiedy ta umowa
      idzie w dół. Zgłoszenie właściciela: „uprość panel zwrotów do wymaganego
      minimum", a po pytaniu o szczegóły wskazanie wprost na sito Moje/Niczyje.
-     Znika `/prowadzi`. Trasy tagów tego licznika nigdy nie ruszały (rejestruje
-     je `trasyTagowSprawy`), a eksport CSV był GET-em — obie rzeczy schodzą
+     Znika `/prowadzi`. Trasy tagów tego licznika nigdy nie ruszały,
+     a eksport CSV był GET-em — obie rzeczy schodzą
      razem z prowadzącym, ale nie tutaj widać ich odejście. */
   /* Trzydziesta trzecia: meldunek „ta sztuka stoi już na regale
      outletowym". Licznik rośnie o jeden, a do Subiekta nie idzie NIC — trasa

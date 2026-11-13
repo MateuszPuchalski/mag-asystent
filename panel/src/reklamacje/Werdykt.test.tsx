@@ -22,7 +22,7 @@ const rek = (n: Partial<Reklamacja> = {}): Reklamacja => ({
   dniDoTerminu: 13, poTerminie: false, zwrotWymagany: null, czatAktywny: true, czatUrwany: false,
   wiadomosciIle: 1, ostatniaWiadomoscStatus: null, ostatniaWiadomoscAt: null,
   otwartoAt: "2026-09-06T10:00:00.000Z", kupionoAt: null, kupionoZrodlo: null, dniOdZakupu: null,
-  prowadzi: null, prowadziId: null, tagi: [],
+  prowadzi: null, prowadziId: null,
   notatkaAt: null, notatkaPrzez: null, maPoprzedniaNotatke: false, prowadziAt: null, notatka: null,
   werdykt: null, werdyktNazwa: null, werdyktStatus: null, werdyktWiadomosc: null,
   werdyktKwotaGrosze: null, werdyktAt: null, werdyktPrzez: null, werdyktBlad: null,

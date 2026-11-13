@@ -1077,10 +1077,9 @@ export async function zwrotyRoutes(app: FastifyInstance) {
      Przy zwrocie prowadzącego NIE MA, bo zwroty prowadzi całe biuro. Bez
      tego zdania następna sesja „naprawi" to jeszcze raz.
 
-     Reklamacje ZOSTAJĄ z jednym i drugim: tam sprawę bierze
-     konkretna osoba, więc pytanie „czyje to" jest prawdziwe. Zniknęło
-     wiązanie zwrotów, nie maszyneria — `trasyTagowSprawy` i `stempelProwadzi*`
-     stoją nietknięte. */
+     Reklamacje ZOSTAJĄ z prowadzącym: tam sprawę bierze konkretna osoba,
+     więc pytanie „czyje to" jest prawdziwe. `stempelProwadzi*` stoi
+     nietknięty. */
 
   /* ── NOTATKA BIURA ────────────────────────────────────────────
      Bez `autoryzuj()`: to zdanie zostaje U NAS i niczego nie obiecuje

@@ -4,12 +4,10 @@ import { DatabaseSync } from "node:sqlite";
 import fs from "node:fs";
 import { migrate } from "../db/db.js";
 import {
-  BladTagu, MAKS_AKTYWNYCH, odepnijTag, przelaczTag, przypnijTag, slownikTagow,
-  tagiSprawy, tagiWszystkichSpraw, utworzTag, zmienNazweTagu,
-  TAGI_REKLAMACJI,
+  BladTagu, MAKS_AKTYWNYCH, przelaczTag, slownikTagow, utworzTag, zmienNazweTagu,
 } from "./tagi-spraw.js";
 
-/* ── Tagi spraw ──────────────────────────────────────────────────────────────
+/* ── Słownik tagów spraw ─────────────────────────────────────────────────────
    Słownik jest OTWARTY, bo właściciel wybrał „dodatkowo edytowalne". Cena tej
    swobody jest znana: pasek z czterdziestoma pigułkami przestaje filtrować.
    Płacą ją trzy ograniczenia i każde ma tu swój test:
@@ -18,10 +16,7 @@ import {
       tag w głowie i dwie pigułki w filtrze.
    2. SUFIT AKTYWNYCH, ze zdaniem, które mówi liczbę i drogę wyjścia.
    3. WYŁĄCZANIE ZAMIAST KASOWANIA. Skasowany tag zniknąłby ze spraw
-      historycznych, a wtedy „dlaczego to stało trzy tygodnie" traci odpowiedź.
-
-   Czwarta rzecz nie jest ograniczeniem, tylko granicą modułu: tag NIE
-   przestawia kolejki. Tego pilnuje test kolejki, nie ten plik.              */
+      historycznych, a wtedy „dlaczego to stało trzy tygodnie" traci odpowiedź. */
 
 const schema = fs.readFileSync(new URL("../db/schema.sql", import.meta.url), "utf8");
 
@@ -32,14 +27,7 @@ function stanowisko() {
   d.exec(schema);
   migrate(d);
   d.prepare("INSERT INTO app_user(user_id,login,name,role) VALUES (1,'ala','Ala','biuro')").run();
-  const konto = Number(d.prepare(
-    "INSERT INTO channel_account(channel,external_account_id) VALUES ('allegro','seller-a')")
-    .run().lastInsertRowid);
-  const sprawa = (ext: string, typ: "CLAIM" | "DISPUTE" = "CLAIM") => Number(d.prepare(
-    `INSERT INTO reklamacja_klienta (channel_account_id,external_id,typ,otwarto_at,synced_at)
-     VALUES (?,?,?,'2026-09-01T08:00:00Z','2026-09-11T09:00:00Z')`)
-    .run(konto, ext, typ).lastInsertRowid);
-  return { d, sprawa };
+  return { d };
 }
 
 const nazwy = (d: DatabaseSync) => slownikTagow(d).map((t) => t.nazwa);
@@ -62,7 +50,7 @@ test("„Gwarancja” po „gwarancja” to TEN SAM tag, a nie druga pigułka w 
   const { d } = stanowisko();
   const a = utworzTag(d, "gwarancja", ALA);
   const b = utworzTag(d, "  GWARANCJA  ", ALA);
-  assert.equal(b.id, a.id, "duplikat oddaje istniejący wiersz, bo agent chce go PRZYPIĄĆ");
+  assert.equal(b.id, a.id, "duplikat oddaje istniejący wiersz zamiast odmowy");
   assert.equal(slownikTagow(d).filter((t) => t.nazwa === "gwarancja").length, 1);
 
   /* Polskie znaki też: `COLLATE NOCASE` w SQLite ich nie zna, dlatego indeks
@@ -97,20 +85,13 @@ test("sufit aktywnych mówi LICZBĘ i drogę wyjścia, a wyłączenie zwalnia mi
   assert.ok(utworzTag(d, "jeszcze jeden", ALA).id > 0);
 });
 
-test("tag się WYŁĄCZA, nigdy nie kasuje — na starej sprawie zostaje", () => {
-  const { d, sprawa } = stanowisko();
-  const id = sprawa("i-1");
+test("tag się WYŁĄCZA, nigdy nie kasuje — zostaje w słowniku", () => {
+  const { d } = stanowisko();
   const tag = utworzTag(d, "u producenta", ALA);
-  przypnijTag(d, TAGI_REKLAMACJI, id, tag.id, ALA);
-
   przelaczTag(d, tag.id, false, ALA);
-  assert.deepEqual(tagiSprawy(d, TAGI_REKLAMACJI, id).map((t) => t.nazwa), ["u producenta"],
-    "historia sprawy nie ma prawa zniknąć razem z tagiem");
-
-  /* Ale NOWEJ sprawie wyłączonego już nie przypniemy — inaczej „wyłączony"
-     nie znaczyłoby nic. */
-  const druga = sprawa("i-2");
-  assert.throws(() => przypnijTag(d, TAGI_REKLAMACJI, druga, tag.id, ALA), /wyłączony/);
+  assert.deepEqual(slownikTagow(d).find((t) => t.id === tag.id),
+    { id: tag.id, nazwa: "u producenta", aktywny: false },
+    "ekran ustawień musi go pokazać, żeby dało się go włączyć z powrotem");
 });
 
 test("wpisanie nazwy tagu wyłączonego WRACA go do użytku", () => {
@@ -126,84 +107,15 @@ test("wpisanie nazwy tagu wyłączonego WRACA go do użytku", () => {
   assert.equal(znowu.aktywny, true);
 });
 
-test("drugie kliknięcie w ten sam tag nie jest drugim faktem ani drugim śladem", () => {
-  const { d, sprawa } = stanowisko();
-  const id = sprawa("i-1");
-  const tag = utworzTag(d, "czeka na część", ALA);
-
-  assert.equal(przypnijTag(d, TAGI_REKLAMACJI, id, tag.id, ALA), true);
-  assert.equal(przypnijTag(d, TAGI_REKLAMACJI, id, tag.id, ALA), false);
-  assert.equal(tagiSprawy(d, TAGI_REKLAMACJI, id).length, 1);
-
-  const sladow = d.prepare(
-    "SELECT count(*) n FROM events WHERE type='sprawa_tag_przypiety'").get() as { n: number };
-  assert.equal(Number(sladow.n), 1, "dziennik mówi, co się zmieniło, a nie ile razy kliknięto");
-});
-
-test("zdjęcie tagu jest całym cofnięciem, jakiego tag potrzebuje", () => {
-  const { d, sprawa } = stanowisko();
-  const id = sprawa("i-1");
-  const tag = utworzTag(d, "czeka na część", ALA);
-  przypnijTag(d, TAGI_REKLAMACJI, id, tag.id, ALA);
-
-  assert.equal(odepnijTag(d, TAGI_REKLAMACJI, id, tag.id, ALA), true);
-  assert.equal(tagiSprawy(d, TAGI_REKLAMACJI, id).length, 0);
-  assert.equal(odepnijTag(d, TAGI_REKLAMACJI, id, tag.id, ALA), false, "nie ma czego zdejmować drugi raz");
-
-  /* I z powrotem, tym samym ruchem — na tym stoi decyzja o braku `/cofnij`. */
-  assert.equal(przypnijTag(d, TAGI_REKLAMACJI, id, tag.id, ALA), true);
-});
-
-test("sprawy nieistniejącej nie da się otagować, a numer tagu nie jest przepustką", () => {
-  const { d, sprawa } = stanowisko();
-  const id = sprawa("i-1");
-  const tag = utworzTag(d, "czeka na część", ALA);
-
-  assert.throws(() => przypnijTag(d, TAGI_REKLAMACJI, 9999, tag.id, ALA), /Sprawa 9999 nie istnieje/);
-  assert.throws(() => przypnijTag(d, TAGI_REKLAMACJI, id, 9999, ALA), /Tag 9999 nie istnieje/);
-});
-
-test("wiersz dawnej dyskusji nie dostaje tagu: dla tej osi sprawy nie ma", () => {
-  const { d, sprawa } = stanowisko();
-  const dys = sprawa("d-1", "DISPUTE");
-  const a = utworzTag(d, "czeka na część", ALA);
-  assert.throws(() => przypnijTag(d, TAGI_REKLAMACJI, dys, a.id, ALA), /nie istnieje/);
-});
-
-test("tagi całej kolejki jadą JEDNYM zapytaniem, alfabetycznie", () => {
-  /* Zapytanie per sprawa dałoby przy pięćdziesięciu sprawach pięćdziesiąt
-     jeden zapytań na każde odświeżenie ekranu. */
-  const { d, sprawa } = stanowisko();
-  const jedna = sprawa("i-1");
-  const druga = sprawa("i-2");
-  const zet = utworzTag(d, "zebrać dowody", ALA);
-  const ce = utworzTag(d, "czeka na część", ALA);
-  przypnijTag(d, TAGI_REKLAMACJI, jedna, zet.id, ALA);
-  przypnijTag(d, TAGI_REKLAMACJI, jedna, ce.id, ALA);
-  przypnijTag(d, TAGI_REKLAMACJI, druga, ce.id, ALA);
-
-  const mapa = tagiWszystkichSpraw(d, TAGI_REKLAMACJI);
-  assert.deepEqual(mapa.get(jedna)?.map((t) => t.nazwa), ["czeka na część", "zebrać dowody"]);
-  assert.deepEqual(mapa.get(druga)?.map((t) => t.nazwa), ["czeka na część"]);
-  assert.equal(mapa.get(9999), undefined);
-});
-
-test("zmiana nazwy nie gubi przypięć, a kolizja nazw jest odmową", () => {
-  const { d, sprawa } = stanowisko();
-  const id = sprawa("i-1");
+test("zmiana nazwy zostawia ten sam wiersz, a kolizja nazw jest odmową", () => {
+  const { d } = stanowisko();
   const tag = utworzTag(d, "u producenta", ALA);
   const inny = utworzTag(d, "czeka na część", ALA);
-  przypnijTag(d, TAGI_REKLAMACJI, id, tag.id, ALA);
 
   zmienNazweTagu(d, tag.id, "u serwisu", ALA);
-  assert.deepEqual(tagiSprawy(d, TAGI_REKLAMACJI, id).map((t) => t.nazwa), ["u serwisu"],
+  assert.equal(slownikTagow(d).find((t) => t.id === tag.id)?.nazwa, "u serwisu",
     "to ten sam tag, inaczej nazwany");
 
   assert.throws(() => zmienNazweTagu(d, tag.id, "Czeka Na Część", ALA), /już jest w słowniku/);
   assert.equal(slownikTagow(d).find((t) => t.id === inny.id)?.nazwa, "czeka na część");
 });
-
-/* ── DRUGA OŚ: ZWROTY ────────────────────────────────────────────────────────
-   Słownik zostaje jeden, wiązania idą do własnej tabeli. Trzy rzeczy warte
-   testu: niezależność obu osi, sprzątanie po skasowanej sprawie i odmowa dla
-   zwrotu, którego nie ma.                                                   */

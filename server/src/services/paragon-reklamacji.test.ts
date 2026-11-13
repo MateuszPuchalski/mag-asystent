@@ -328,5 +328,4 @@ test("licznik „ten towar” i dostawa liczą się ze spornej pozycji, nie z ma
   const sb = szczegolReklamacji(d, bez, TERAZ);
   assert.equal(sb.paragon.brak, "bez-zamowienia");
   assert.equal(sb.historia.towar, null);
-  assert.equal(sb.dostawa, null);
 });

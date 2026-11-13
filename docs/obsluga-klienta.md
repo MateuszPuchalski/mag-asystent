@@ -475,17 +475,18 @@ a ulica rozstrzyga to w jednym spojrzeniu.
   Danych osobowych nie ma, ani klienta, ani człowieka po stronie dostawcy.
   Autor ma klucz do `app_user` z `SET NULL`, więc kasowanie kont działa.
   Dziennik dostaje wersję, wynik i to, czy numer jest, bez samego numeru.
-- **Od 0.575.0 panel ich nie pokazuje** (decyzja właściciela), ale rekordy
-  zostają i dalej jadą w szczegółach sprawy.
+- **Od 0.575.0 panel ich nie pokazuje** (decyzja właściciela). Od @wydanie
+  nie ma też kodu, który je czytał. Rekordy zostają w bazie, ale nie jadą
+  w szczegółach sprawy.
 - **Dowody i reklamacja u dostawcy zostają u nas.** Allegro, Copilot, CSV,
   migawka i raport tygodnia ich nie dostają. Retencja idzie za sprawą
   (kaskada). Ostatnia dostawa towaru w sprawie to odczyt dokumentów dostaw
   firmy, bez nowego zapisu.
 - **Od 0.564.0 ekran reklamacji nie woła modelu** (decyzja właściciela). Nie
   ma przycisku ani trasy rozpoznania, więc z reklamacji nic nie wychodzi do
-  dostawcy modelu. Zapisane karty zostają w `reklamacja_karta` i jadą
-  w szczegółach sprawy. Reguły niżej mówią, co wychodziło, i wrócą razem
-  z Copilotem.
+  dostawcy modelu. Od @wydanie nie ma też kodu karty. Zapisane karty zostają
+  w `reklamacja_karta`, ale nie jadą w szczegółach sprawy. Reguły niżej mówią,
+  co wychodziło, i wrócą razem z Copilotem.
 - **Do dostawcy modelu szła ZAMASKOWANA rozmowa** (§14.4 projektu panelu),
   z tym samym sufitem co w skrzynce. Login podmienia się po ZNANEJ wartości.
 - **Wychodziły FAKTY ZE SPRAWY**: temat, opis zgłoszenia (przycięty), powód,

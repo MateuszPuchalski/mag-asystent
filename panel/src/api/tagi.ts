@@ -1,16 +1,11 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "./klient";
 import type { Tag } from "./typy";
-import { kluczeReklamacji } from "./reklamacje";
-import { kluczeZwrotow } from "./zwroty";
 
 /* ── Słownik tagów ───────────────────────────────────────────────────────────
-   SŁOWNIK JEST JEDEN dla reklamacji i zwrotów, więc ma własny klucz cache
-   i własny plik.
-
-   Unieważniamy OBIE kolejki po każdej zmianie. Tag zmieniony przy reklamacji
-   bywa tym samym tagiem, który filtruje zwroty — a kolejka pokazująca starą
-   nazwę byłaby drugą wersją prawdy, nie opóźnieniem.                        */
+   Słownik ma własny klucz cache i własny plik, bo żyje za zębatką, a nie
+   przy żadnej kolejce. Wiersze kolejek tagów nie niosą, więc zmiana nazwy
+   unieważnia wyłącznie słownik. Odświeżona lista nie miałaby czego pokazać. */
 
 export const kluczeTagow = { slownik: ["tagi"] as const };
 
@@ -33,8 +28,6 @@ export function useZmienTag() {
       }),
     onSettled: () => {
       void qc.invalidateQueries({ queryKey: kluczeTagow.slownik });
-      void qc.invalidateQueries({ queryKey: kluczeReklamacji.kolejka });
-      void qc.invalidateQueries({ queryKey: kluczeZwrotow.kolejka });
     },
   });
 }

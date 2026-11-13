@@ -366,7 +366,6 @@ test("szczegół wiąże zwroty i rozmowy PO NUMERZE ZAMÓWIENIA, nie po loginie
   assert.equal(s.zwroty[0].externalId, "z-1");
   assert.equal(s.rozmowy.length, 1);
   assert.equal(s.rozmowy[0].id, rozmowa);
-  assert.equal(s.kartoteka, null, "reklamacja bez oferty nie udaje, że zna kartotekę");
 });
 
 test("czat wraca w kolejności czasu, z załącznikami przy właściwej wiadomości", () => {
@@ -828,8 +827,6 @@ test("historia łapie oferty powiązane SAMĄ sygnaturą, także przy spacji i w
 
   const s = szczegolReklamacji(d, ta, TERAZ);
   assert.equal(s.reklamacja.twId, null, "pamięci ani sygnatury z zamówienia ta sprawa nie ma");
-  assert.equal(s.kartoteka?.pewnosc, "sku");
-  assert.equal(s.kartoteka?.twId, 77);
   assert.deepEqual(s.historia.towar, { ile: 2, uznanych: 1, odrzuconych: 1 });
 });
 
@@ -939,16 +936,17 @@ test("kolejka i szczegół niosą cenę z PIERWSZEJ pozycji paragonu i tę samą
     [r.cenaParagonuGrosze, r.kwotaGrosze, r.kwotaZrodlo, r.zgloszonoPoDniach]);
 });
 
-test("szczegół bez dowodów, zgłoszenia u dostawcy i dostawy mówi „nie wiemy”, a kartę dalej niesie", () => {
+test("szczegół nie niesie pól, których żaden ekran nie czyta", () => {
+  /* Pole bez czytelnika to zapytanie przy każdym otwarciu sprawy i umowa
+     z panelem, której nikt nie pilnuje. Zapisane wiersze zostają w bazie. */
   const { d, dodaj } = stanowisko();
   const id = dodaj({ ext: "a" });
   const s = szczegolReklamacji(d, id, TERAZ);
-  assert.deepEqual(s.dowody, []);
-  assert.equal(s.uDostawcy, null);
-  assert.equal(s.dostawa, null, "brak kartoteki to brak dostawy, nie dostawa pusta");
-  /* Karta Copilota zostaje w odpowiedzi, choć ekran jej już nie czyta:
-     zapisane dane są własnością biura, nie ekranu. */
-  assert.ok("karta" in s);
+  for (const pole of ["karta", "dostawa", "dowody", "uDostawcy", "kartoteka"]) {
+    assert.equal(pole in s, false, pole);
+  }
+  assert.equal("tagi" in s.reklamacja, false, "tagów nie przypina już żaden ekran");
+  assert.equal("tagi" in listaReklamacji(d, TERAZ)[0], false);
 });
 
 /* ── Dzisiejsza cena oferty i kafle nad kolejką ──────────────────────────────

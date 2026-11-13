@@ -7,7 +7,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Konflikt } from "../api/klient";
 import { atrapaZapisow } from "../test/zapisy";
 import type {
-  KubelekReklamacji, OstatniaDostawaReklamacji, ParagonReklamacji, Reklamacja, StatystykiReklamacji,
+  KubelekReklamacji, ParagonReklamacji, Reklamacja, StatystykiReklamacji,
   WiadomoscReklamacji, WynikWerdyktu,
 } from "../api/typy";
 
@@ -33,7 +33,7 @@ const rek = (id: number, kubelek: KubelekReklamacji, numer: string): Reklamacja 
   zwrotWymagany: null, czatAktywny: true, wiadomosciIle: 1, czatUrwany: false,
   ostatniaWiadomoscStatus: null, ostatniaWiadomoscAt: null,
   otwartoAt: "2026-09-06T10:00:00.000Z", kupionoAt: null, kupionoZrodlo: null, dniOdZakupu: null,
-  prowadzi: null, prowadziId: null, tagi: [],
+  prowadzi: null, prowadziId: null,
   notatkaAt: null, notatkaPrzez: null, maPoprzedniaNotatke: false, prowadziAt: null,
   notatka: null, wersja: 1, kubelek, sygnaly: [],
   link: null, linkZamowienia: null, linkOferty: null,
@@ -53,8 +53,7 @@ const REKLAMACJE = [
      NUMERY BEZ TRÓJKI I BEZ JEDYNKI są tu celowe: sąsiedni test wpisuje
      w pole szukania samą cyfrę i sprawdza, że NIC nie pasuje. Sprawa
      „333/2026” cicho by mu to zabrała. */
-  { ...rek(4, "decyzja", "444/2026"), prowadzi: "A. Lewandowska", prowadziId: 7,
-    tagi: [{ id: 11, nazwa: "czeka na część" }] },
+  { ...rek(4, "decyzja", "444/2026"), prowadzi: "A. Lewandowska", prowadziId: 7 },
   { ...rek(5, "decyzja", "555/2026"), prowadzi: "A. Lewandowska", prowadziId: 9 },
   /* Sprawa z NUMEREM ALLEGRO W NOTATCE. Zgłoszenie paczki, która nie
      dotarła, wraca z numerem, dla którego nie mamy własnego pola — biuro pisze
@@ -72,8 +71,6 @@ const scena = vi.hoisted(() => ({
   wynikWysylki: null as unknown,
   /* Błąd ręcznej synchronizacji — `null` znaczy, że przycisk nie zawiódł. */
   bladSynchronizacji: null as Error | null,
-  /* Ostatnia dostawa w szczególe sprawy. */
-  dostawa: null as OstatniaDostawaReklamacji | null,
   /* Kafle w kolejce; `undefined` udaje starszy serwer. */
   statystyki: undefined as StatystykiReklamacji | undefined,
   /* Lista padła: `Error` zamiast danych, jak przy braku połączenia. */
@@ -134,9 +131,9 @@ vi.mock("../api/reklamacje", async () => {
       data: id === null ? undefined : {
         reklamacja: REKLAMACJE.find((r) => r.id === id) ?? REKLAMACJE[0],
         czat: scena.czat,
-        zalaczniki: [], zwroty: [], rozmowy: [], sprawy: [], droga: [], kartoteka: null,
+        zalaczniki: [], zwroty: [], rozmowy: [], sprawy: [], droga: [],
         zamowienie: null, przesylka: null, historia: { towar: null, klient: null },
-        dostawa: scena.dostawa, paragon: scena.paragon,
+        paragon: scena.paragon,
       },
     }),
     useOdpowiedz: zLosem("odpowiedz", () => scena.wynikWysylki),
@@ -221,7 +218,7 @@ function pokaz(adres = "/obsluga/reklamacje", czat: WiadomoscReklamacji[] = [wia
 afterEach(() => { try { localStorage.clear(); } catch { /* prywatne okno */ } });
 /* Scenę ustawia test PRZED renderem, więc sprząta się ją po nim. */
 afterEach(() => {
-  scena.dostawa = null; scena.poWerdykcie = null; scena.statystyki = undefined; scena.bladListy = null;
+  scena.poWerdykcie = null; scena.statystyki = undefined; scena.bladListy = null;
   scena.paragon = undefined;
 });
 
@@ -237,7 +234,7 @@ const kubelki = () => screen.getByRole("group", { name: "Kubełki kolejki" });
 
 /** Otwiera okno filtra przy tytule kolejki. */
 const otworzFiltr = async () => {
-  await userEvent.click(screen.getByRole("button", { name: /^Filtr tagów i sortowanie/ }));
+  await userEvent.click(screen.getByRole("button", { name: /^Filtr i sortowanie/ }));
   return screen.getByRole("dialog", { name: "Filtr i porządek kolejki" });
 };
 
@@ -483,38 +480,27 @@ describe("Kubełki i skróty", () => {
 });
 
 describe("Filtr za przyciskiem przy tytule", () => {
-  it("tytuł „Reklamacje”, a obok przycisk filtra; tagi i porządek nie stoją w osobnym rzędzie", () => {
+  it("tytuł „Reklamacje”, a obok przycisk filtra; porządek nie stoi w osobnym rzędzie", () => {
     pokaz();
     expect(screen.getByRole("heading", { level: 1, name: "Reklamacje" })).toBeInTheDocument();
-    expect(screen.queryByTitle(/^Sprawy z tagiem/)).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /^Termin$/ })).not.toBeInTheDocument();
     /* Domyślny porządek nie mówi o sobie: nagłówek „Po terminie” na górze
        listy mówi to samo. */
     expect(screen.queryByText("Najpilniejsze na górze")).not.toBeInTheDocument();
   });
 
-  it("okno filtra niesie porządek, tagi i zakres z progiem daty", async () => {
+  it("okno filtra niesie porządek i zakres z progiem daty, a tagów nie ma", async () => {
+    /* Tagów nie przypina już żaden ekran, a wiersz kolejki ich nie niesie.
+       Sekcja tagów obiecywałaby zawężenie, którego nie ma po czym zrobić. */
     pokaz();
     const okno = await otworzFiltr();
     expect(within(okno).getByTitle(/^Kolejność:/)).toBeInTheDocument();
-    expect(within(okno).getByTitle("Sprawy z tagiem „czeka na część”")).toHaveTextContent("1");
+    expect(within(okno).queryByText("Tagi")).not.toBeInTheDocument();
+    expect(within(okno).queryByTitle(/^Sprawy z tagiem/)).not.toBeInTheDocument();
     expect(within(okno).getByRole("button", { name: "pokaż starsze" })).toBeInTheDocument();
     await userEvent.keyboard("{Escape}");
     expect(screen.queryByRole("dialog", { name: "Filtr i porządek kolejki" })).not.toBeInTheDocument();
     expect(scena.mutacje).toEqual([]);
-  });
-
-  it("tag zawęża listę, a schowany filtr MÓWI o sobie nad wierszami", async () => {
-    pokaz();
-    const okno = await otworzFiltr();
-    await userEvent.click(within(okno).getByTitle("Sprawy z tagiem „czeka na część”"));
-    await userEvent.keyboard("{Escape}");
-    expect(screen.getByRole("button", { name: /444\/2026/ })).toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: /555\/2026/ })).not.toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Filtr tagów i sortowanie (włączony)" })).toBeInTheDocument();
-    expect(screen.getByText("Tylko sprawy z tagiem „czeka na część”.")).toBeInTheDocument();
-    await userEvent.click(screen.getByRole("button", { name: "pokaż wszystkie" }));
-    expect(screen.getByRole("button", { name: /555\/2026/ })).toBeInTheDocument();
   });
 
   it("porządek „kwota” idzie po kwocie serwera, choć wiersz kwoty nie pokazuje", async () => {
@@ -532,18 +518,9 @@ describe("Filtr za przyciskiem przy tytule", () => {
     });
   });
 
-  it("TAG NIE PRZESTAWIA KOLEJKI — kolejność liczy się z faktów o pilności", () => {
+  it("domyślna kolejność liczy się z faktów o pilności", () => {
     pokaz();
     expect(numeryWierszy()).toEqual(["111/2026", "444/2026", "555/2026", "666/2026"]);
-  });
-
-  it("tag NAKŁADA SIĘ na sito „Moje”, zamiast je zastępować", async () => {
-    pokaz();
-    await userEvent.click(screen.getByRole("button", { name: /^Moje/ }));
-    const okno = await otworzFiltr();
-    await userEvent.click(within(okno).getByTitle("Sprawy z tagiem „czeka na część”"));
-    expect(screen.getByRole("button", { name: /444\/2026/ })).toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: /111\/2026/ })).not.toBeInTheDocument();
   });
 });
 
@@ -654,10 +631,10 @@ describe("Wiersz kolejki", () => {
       .toBeInTheDocument();
   });
 
-  it("czip tagu i sygnały stoją na wierszu", async () => {
+  it("sygnały stoją na wierszu, a czipa tagu nie ma", async () => {
     await zmienionymi([[0, { sygnaly: ["klient_czeka"] }]], () => {
       pokaz();
-      expect(screen.getByTitle("Tag biura: czeka na część")).toBeInTheDocument();
+      expect(screen.queryByTitle(/^Tag biura/)).not.toBeInTheDocument();
       expect(screen.getByTitle("Ostatnie słowo było klienta — ruch należy do nas")).toBeInTheDocument();
     });
   });
@@ -725,7 +702,6 @@ describe("Środek: głowica, droga i rozmowa", () => {
   });
 
   it("kolumny dowodów, faktów i sztuki do dostawcy nie ma — zdjęcie stoi w rozmowie", () => {
-    scena.dostawa = { dostawca: "HURT-OGR", data: "2026-08-20T00:00:00.000Z", numer: "FV 12/08", przedZakupem: true };
     pokaz("/obsluga/reklamacje/1");
     expect(screen.queryByText("Dowody")).not.toBeInTheDocument();
     expect(screen.queryByText("Wysłaliśmy")).not.toBeInTheDocument();
@@ -1052,7 +1028,6 @@ describe("Werdykt z ekranu", () => {
   });
 
   it("sztuki do dostawcy nie ma na ekranie także po uznaniu z odesłaniem — otwarcie nie zapisuje", async () => {
-    scena.dostawa = { dostawca: "HURT-OGR", data: "2026-08-20T00:00:00.000Z", numer: "FV 12/08", przedZakupem: true };
     await zSprawa(uznana({ zwrotTowaru: "wymagany", kubelek: "decyzja" }), async () => {
       pokaz("/obsluga/reklamacje/1");
       expect(bezOdswiezenia()).toEqual([]);

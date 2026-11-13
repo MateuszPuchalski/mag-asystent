@@ -140,8 +140,8 @@ export type PozycjaFiltra<T> = {
   ikona?: React.ReactNode;
 };
 
-/* `number` w ograniczeniu: tagi identyfikuje NUMER wiersza, a nie nazwa —
-   nazwa jest edytowalna i zmiana literki nie ma prawa zgubić filtru. */
+/* `number` w ograniczeniu, bo okna w dniach (analiza, wymiana) wybiera się
+   liczbą, a nie napisem. Klucz Reacta i tak powstaje z `String(p.klucz)`. */
 export function FiltrSegmentowy<T extends string | number | null>({
   wybrany, onWybierz, pozycje, rowne = false, ton = TON_FILTRA, kafle = false,
 }: {

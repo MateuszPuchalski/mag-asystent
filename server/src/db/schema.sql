@@ -2561,6 +2561,9 @@ CREATE TABLE IF NOT EXISTS allegro_reklamacje_sync_state (
 -- i odrzucenie są nieodwracalne wobec kupującego i należą do człowieka.
 -- Każde pole niesie CYTAT (numer wiadomości), bo zdanie bez pokrycia w rozmowie
 -- jest zgadywaniem, a nie faktem.
+--
+-- KOD KARTY ZSZEDŁ, WIERSZE ZOSTAJĄ. Ekran reklamacji karty nie pokazuje, więc
+-- nic już jej nie zamawia, nie czyta ani nie ocenia rady przy werdykcie.
 CREATE TABLE IF NOT EXISTS reklamacja_karta (
   reklamacja_id      INTEGER PRIMARY KEY REFERENCES reklamacja_klienta(id) ON DELETE CASCADE,
   usterka            TEXT,
@@ -2577,9 +2580,7 @@ CREATE TABLE IF NOT EXISTS reklamacja_karta (
   -- Decyzja właściciela: „copilot powinien też radzić w reklamacji".
   -- BEZ `CHECK` na wartość, z tego samego powodu co przy `zadanie` w księdze:
   -- dwunasta wartość (`POPROSIC_O_DOWODY`) jest nasza, a lista Allegro może
-  -- urosnąć — strażnik stoi w `REKOMENDACJE` w `services/copilot-reklamacja.ts`
-  -- i w schemacie zod adaptera, czyli tam, gdzie da się go poszerzyć bez
-  -- przebudowy tabeli.
+  -- urosnąć, a listę w kodzie da się poszerzyć bez przebudowy tabeli.
   rekomendacja       TEXT,
   pewnosc            TEXT,
   uzasadnienie       TEXT,
@@ -2632,6 +2633,8 @@ CREATE TABLE IF NOT EXISTS reklamacja_tag (
 CREATE UNIQUE INDEX IF NOT EXISTS ux_reklamacja_tag_nazwa
   ON reklamacja_tag(lower(nazwa));
 
+-- Przypinania tagów do sprawy nie ma już na żadnym ekranie i jego kod zszedł.
+-- Słownik `reklamacja_tag` prowadzą dalej Ustawienia, a przypięcia zostają.
 CREATE TABLE IF NOT EXISTS reklamacja_tag_sprawy (
   reklamacja_id INTEGER NOT NULL REFERENCES reklamacja_klienta(id) ON DELETE CASCADE,
   tag_id        INTEGER NOT NULL REFERENCES reklamacja_tag(id) ON DELETE CASCADE,
@@ -2725,6 +2728,8 @@ CREATE INDEX IF NOT EXISTS ix_reklamacja_outbox_sprawa
 -- blokowałby kasowanie kont (pułapka z `klient_prowadzenie`). Wpis nie podbija
 -- wersji sprawy: kolega dopisujący dowód nie może zrobić 409 komuś, kto
 -- właśnie wysyła odpowiedź.
+--
+-- Ekranu dowodów nie ma, więc ich kod zszedł. Zapisane wiersze zostają.
 CREATE TABLE IF NOT EXISTS reklamacja_dowod (
   id            INTEGER PRIMARY KEY AUTOINCREMENT,
   reklamacja_id INTEGER NOT NULL REFERENCES reklamacja_klienta(id) ON DELETE CASCADE,
@@ -2746,6 +2751,8 @@ CREATE INDEX IF NOT EXISTS ix_reklamacja_dowod_sprawa
 -- Danych osobowych tu nie ma: ani klienta, ani człowieka po stronie dostawcy.
 -- `wersja` jest WŁASNA, z tego samego powodu co przy dowodach: zapis tutaj nie
 -- ma prawa unieważnić ekranu, na którym ktoś pisze do kupującego.
+--
+-- Ekranu reklamacji u dostawcy nie ma, więc jej kod zszedł. Wiersze zostają.
 CREATE TABLE IF NOT EXISTS reklamacja_u_dostawcy (
   reklamacja_id INTEGER PRIMARY KEY REFERENCES reklamacja_klienta(id) ON DELETE CASCADE,
   dostawca      TEXT NOT NULL,
