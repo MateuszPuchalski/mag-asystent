@@ -19,24 +19,22 @@ import {
 } from "./prowadzenie-klienta.js";
 import { przesylkiDosylkiSellasist } from "./sellasist-dosylka.js";
 
-/* ── Dosyłka ze śledzeniem (0.536.0, drugi przyrost S6) ─────────────────────
-   Fakty właściciela z 27 września 2026 — jedyne, które podał:
+/* ── Dosyłka ze śledzeniem (S6) ──────────────────────────────────────────────
+   Fakty właściciela — jedyne, które podał:
    - przy złym towarze biuro odmawia wypłaty za zwrot kodem „Wysłaliśmy nowy
      towar” (`NEW_ITEM_SENT`);
    - dosyłka to nowa etykieta w Sellasist;
    - numer dosyłki stoi zwykle przy tym samym zamówieniu w Allegro („Wydaje
      mi się że tak”) — niesprawdzone, `[WERYFIKUJ]` w `docs/allegro-ksztalt.md`;
    - dosyłka jedzie „prawie zawsze tym samym” przewoźnikiem co pierwsza paczka.
-   `MISSING_PART_SENT` („Wysłaliśmy brakującą część”) doszedł w 0.536.0:
-   brakująca część jedzie tak samo, drugą paczką. To do oceny właściciela.
-   Krok „dosłać” był dotąd samym zdaniem, a to, czy paczka doszła, sprawdzał
-   człowiek w Allegro.
+   `MISSING_PART_SENT` („Wysłaliśmy brakującą część”) traktujemy tak samo:
+   brakująca część jedzie drugą paczką. To do oceny właściciela.
 
-   GDZIE biuro odmawia — fakt właściciela z 27 września 2026: w PANELU
-   ALLEGRO, z nawyku. Obie drogi są obsłużone. Odmowa na naszym ekranie
+   GDZIE biuro odmawia — fakt właściciela: w PANELU ALLEGRO, z nawyku. Obie
+   drogi są obsłużone. Odmowa na naszym ekranie
    zakłada śledzenie tym samym kliknięciem. Kod zsynchronizowany z Allegro
    (`rejection_code`) staje wierszem „Śledzić dosyłkę?” w „Do decyzji” —
-   decyzja właściciela z tego samego dnia, zamiast automatu (0.541.0).
+   decyzja właściciela, zamiast automatu.
    Zostają też „Śledź dosyłkę” przy zwrocie i propozycja na profilu.
 
    START W TYM SAMYM RUCHU CO ODMOWA, nie propozycją na profilu. Agent
@@ -51,7 +49,7 @@ import { przesylkiDosylkiSellasist } from "./sellasist-dosylka.js";
    `droga-klienta.ts` i `profil-klienta.ts` nie importują tego pliku —
    czytają `klient_dosylka` własnym SQL-em i zdaniem z `dosylka-opis.ts`.
    Pętla importów przy stałej liczonej w chwili ładowania bywa pustym
-   zbiorem (blizna w `statusy-spraw.ts`).
+   zbiorem (`statusy-spraw.ts`).
 
    NUMER WYKRYWA AUTOMAT, WPISANY JEST DROGĄ ZAPASOWĄ. Wykrycie stoi na
    niesprawdzonym fakcie właściciela o numerze przy zamówieniu, więc woli

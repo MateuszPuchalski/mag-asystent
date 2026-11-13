@@ -6,11 +6,10 @@ import { WidokHistorii } from "../skrzynka/Klient";
 import { Blad, Pusto } from "../ui";
 import { useOkno } from "../nawigacja/fokus";
 
-/* ── Historia klienta jednym kliknięciem z każdej sprawy (23 września 2026) ──
-   Punkt 1 dekalogu obsługi: klient ma JEDNĄ drogę, a kolejki są nasze. Do tego
-   wydania całą historię kupującego widziała wyłącznie skrzynka, w zakładce
-   KLIENT. Agent przy zwrocie nie wiedział, że ten sam kupujący pisał tydzień
-   temu o tej samej części — chyba że poszedł jej szukać.
+/* ── Historia klienta jednym kliknięciem z każdej sprawy ─────────────────────
+   Punkt 1 dekalogu obsługi: klient ma JEDNĄ drogę, a kolejki są nasze. Agent
+   przy zwrocie ma wiedzieć, że ten sam kupujący pisał tydzień temu o tej
+   samej części, bez szukania.
 
    SZUFLADA, NIE ZAKŁADKA. Kolumny zwrotu i reklamacji są już pełne,
    a historia jest pytaniem zadawanym czasem, nie przy każdej sprawie.

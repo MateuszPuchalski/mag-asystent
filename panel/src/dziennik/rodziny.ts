@@ -1,9 +1,9 @@
-/* ── Rodzina zdarzenia (z `biuro.html` 0.427.0, w panelu od 0.440.0) ─────
-   Kolumna TYP była pogrubionym kluczem technicznym i przy dwustu wierszach
-   wszystkie wyglądały tak samo — „co się tu psuło" wymagało przeczytania
-   każdego klucza (dekalog pkt 2). Cztery rodziny na ISTNIEJĄCYCH żetonach
-   panelu, bez nowej barwy: błędy i urządzenia czerwienią, praca przy
-   dostawach bursztynem, zwroty obrysem, reszta szarością.
+/* ── Rodzina zdarzenia ───────────────────────────────────────────────────
+   Przy dwustu wierszach pogrubione klucze techniczne wyglądają tak samo,
+   a „co się tu psuło" wymagałoby przeczytania każdego (dekalog pkt 2).
+   Cztery rodziny na ISTNIEJĄCYCH żetonach panelu, bez nowej barwy: błędy
+   i urządzenia czerwienią, praca przy dostawach bursztynem, zwroty obrysem,
+   reszta szarością.
 
    KOLEJNOŚĆ MA ZNACZENIE: `queue_failed` jest najpierw błędem, dopiero potem
    czymkolwiek innym. Klucz zostaje tekstem pastylki, bo po nim filtruje się

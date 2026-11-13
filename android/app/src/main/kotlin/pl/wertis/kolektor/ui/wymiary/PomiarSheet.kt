@@ -84,6 +84,10 @@ private fun fokusNa(fokusy: Map<PolePomiaru, FocusRequester>, pole: PolePomiaru)
  *   i komunikat, wołający tylko decyduje, co dalej
  * @param onWylaczone serwer odpowiedział, że funkcja jest wyłączona (409);
  *   lista ma się przeładować i pokazać powód zamiast martwego formularza
+ * @param wymagane pola, bez których zapis nie przejdzie. Pusty zbiór to
+ *   zwykły pomiar. Niepusty to pomiar wymuszony przy rozkładaniu: arkusz
+ *   zamyka wtedy wyłącznie zapis albo „Anuluj", bo przypadkowy ruch palcem
+ *   zdejmowałby pozycję z ręki bez słowa o powodzie
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -93,7 +97,9 @@ fun PomiarSheet(
     onClose: () -> Unit,
     onZapisano: () -> Unit,
     onWylaczone: () -> Unit = {},
+    wymagane: Set<PolePomiaru> = emptySet(),
 ) {
+    val wymuszony = wymagane.isNotEmpty()
     var wpisy by remember(towar.twId) { mutableStateOf(PolePomiaru.entries.associateWith { "" }) }
     var blad by remember(towar.twId) { mutableStateOf<String?>(null) }
     var wysylka by remember(towar.twId) { mutableStateOf(false) }
@@ -111,7 +117,7 @@ fun PomiarSheet(
     val stanArkusza = rememberModalBottomSheetState(
         skipPartiallyExpanded = true,
         confirmValueChange = { cel ->
-            val wolno = cel != SheetValue.Hidden || !cokolwiekWpisane(wpisy)
+            val wolno = cel != SheetValue.Hidden || (!wymuszony && !cokolwiekWpisane(wpisy))
             if (!wolno) {
                 graph.feedback.beep(false)
                 graph.effects.toast("Zapisz pomiar albo dotknij „Anuluj”")
@@ -124,7 +130,7 @@ fun PomiarSheet(
 
     fun zapisz() {
         if (wysylka || !cokolwiekWpisane(wpisy)) return
-        val zle = bladPomiaru(wpisy, towar)
+        val zle = bladPomiaru(wpisy, towar, wymagane)
         if (zle != null) {
             blad = zle
             graph.feedback.beep(false)
@@ -160,7 +166,9 @@ fun PomiarSheet(
         containerColor = CardWhite,
         /* Wstecz chowa arkusz z pominięciem bramki wyżej, więc przy wpisanych
            liczbach wyłączamy go wprost. Zamyka wtedy „Zapisz" albo „Anuluj". */
-        properties = ModalBottomSheetProperties(shouldDismissOnBackPress = !cokolwiekWpisane(wpisy)),
+        properties = ModalBottomSheetProperties(
+            shouldDismissOnBackPress = !wymuszony && !cokolwiekWpisane(wpisy),
+        ),
     ) {
         Column(
             modifier = Modifier
@@ -170,7 +178,22 @@ fun PomiarSheet(
                 .padding(bottom = 24.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
-            Text("ZWAŻ I ZMIERZ", fontSize = 11.sp, color = InkMute, fontWeight = FontWeight.Bold)
+            if (wymuszony) {
+                // powód blokady na górze: bez niego arkusz wygląda jak przeszkoda bez celu
+                Text(
+                    "ZWAŻ I ZMIERZ PRZED ODŁOŻENIEM",
+                    fontSize = 11.sp,
+                    color = Destructive,
+                    fontWeight = FontWeight.Bold,
+                )
+                Text(
+                    "Kartoteka nie ma tych danych, a bez nich pozycji nie odłożysz",
+                    fontSize = 13.sp,
+                    color = InkSoft,
+                )
+            } else {
+                Text("ZWAŻ I ZMIERZ", fontSize = 11.sp, color = InkMute, fontWeight = FontWeight.Bold)
+            }
             Text(towar.symbol, fontWeight = FontWeight.Bold, fontSize = 18.sp, color = Ink)
             if (towar.nazwa.isNotBlank()) Text(towar.nazwa, fontSize = 13.sp, color = InkSoft)
             /* Adres przy symbolu: formularz zasłania listę, a pomyłka towaru
@@ -181,7 +204,7 @@ fun PomiarSheet(
                 val nastepne = nastepnePole(pole)
                 Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
                     Text(
-                        "${pole.etykieta} (${pole.jednostka})",
+                        "${pole.etykieta} (${pole.jednostka})" + if (pole in wymagane) " · wymagane" else "",
                         fontSize = 13.sp,
                         fontWeight = FontWeight.SemiBold,
                         color = Ink,
@@ -214,14 +237,16 @@ fun PomiarSheet(
             ) { zapisz() }
 
             Text(
-                "Puste pole zostaje w Subiekcie bez zmian",
+                if (wymuszony) "Pole z wartością w Subiekcie możesz zostawić puste"
+                else "Puste pole zostaje w Subiekcie bez zmian",
                 fontSize = 12.sp,
                 color = InkMute,
                 textAlign = TextAlign.Center,
                 modifier = Modifier.fillMaxWidth(),
             )
             Text(
-                "Anuluj",
+                // skutek przy przycisku: przy wymuszonym pomiarze „Anuluj" zdejmuje pozycję z ręki
+                if (wymuszony) "Anuluj — pozycja zostaje nieodłożona" else "Anuluj",
                 fontSize = 13.sp,
                 fontWeight = FontWeight.SemiBold,
                 color = InkMute,

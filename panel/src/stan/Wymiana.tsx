@@ -3,8 +3,8 @@ import { useAlarmWymiany, useWymiana, type KanalWymiany } from "../api/stan";
 import { Blad, FiltrSegmentowy, wiek } from "../ui";
 import { KartaWgladu, Tabela, Td } from "../ui/wglad";
 
-/* ── Ile trwa wymiana z halą (z `biuro.html` 0.361.0, 0.441.0) ───────────
-   Pierwsza w tym repo liczba mówiąca, ILE trwa sprawa między halą a biurem.
+/* ── Ile trwa wymiana z halą ─────────────────────────────────────────────
+   Liczba mówiąca, ILE trwa sprawa między halą a biurem.
    MEDIANA mówi, jak wygląda zwykły dzień, OGON (p90) — jak wygląda zły.
    Średniej nie ma celowo: jedna sprawa sprzed tygodnia utopiłaby sto
    załatwionych w kwadrans.
@@ -64,9 +64,9 @@ export function KartaWymiany() {
     </Tabela>
 
     {a && <div className="mt-5 border-t pt-4">
-      {/* Okno alarmu stoi W NAGŁÓWKU, krótko (0.509.0). Całe zdanie o tym,
-          skąd próg, zeszło do podpowiedzi: to przypis dla dociekliwych,
-          a dwie liczby z różnych okresów dalej mają podpis przy sobie. */}
+      {/* Okno alarmu stoi W NAGŁÓWKU, krótko. Całe zdanie o tym, skąd próg,
+          stoi w podpowiedzi: to przypis dla dociekliwych, a dwie liczby
+          z różnych okresów dalej mają podpis przy sobie. */}
       <h3 className={`text-sm font-bold ${spoznione.length ? "" : "text-slate-600"}`}
         title={`Próg liczony osobno dla każdego kanału z ostatnich ${a.dni} dni; nie zależy od okna wybranego przy tabeli.`}>
         Co stoi dłużej, niż stoi zwykle (ostatnie {a.dni} dni) — {spoznione.length ? a.spoznionychRazem : "nic"}</h3>
@@ -77,7 +77,7 @@ export function KartaWymiany() {
           {/* Próg nie jest niczyim werdyktem: to p90 spraw domkniętych w tym
               samym kanale. Liczba bez pochodzenia byłaby wyrocznią, więc
               pochodzenie zostaje — w podpowiedzi, nie w nawiasie ze słowem
-              „p90" albo „podłoga", którego biuro nie używa (0.509.0). */}
+              „p90" albo „podłoga", którego biuro nie używa. */}
           <span className="cursor-help text-slate-600 underline decoration-dotted" title={skadProg(k.podstawa, k.n)}>
             próg {minuty(k.progMin)}</span>
           <span>najdłuższa: {minuty(k.najstarszaSpoznionaMin)}</span>

@@ -1,15 +1,14 @@
 import React, { useState } from "react";
 import { Przycisk } from "./index";
 
-/* ── Potwierdzenie w miejscu (0.441.0) ──────────────────────────────────
-   Biuro pytało przy ANULUJ, RESYNC i ROZŁĄCZ własnym oknem dialogowym na
-   środku ekranu. Panel okien nie ma i nie dostaje ich dla trzech przycisków:
-   pytanie staje W MIEJSCU przycisku, obok rzeczy, której dotyczy (dekalog
-   pkt 5 — mniej ruchu oka). Drugi klik jest świadomy, bo przycisk zmienia
-   napis i barwę; przypadkowy podwójny klik trafia w pytanie, nie w zapis.
+/* ── Potwierdzenie w miejscu ────────────────────────────────────────────
+   Pytanie staje W MIEJSCU przycisku, obok rzeczy, której dotyczy (dekalog
+   pkt 5 — mniej ruchu oka), zamiast okna na środku ekranu. Drugi klik jest
+   świadomy, bo przycisk zmienia napis i barwę; przypadkowy podwójny klik
+   trafia w pytanie, nie w zapis.
 
-   W `ui/` od 0.444.0: ustawienia (konta, logo) pytają tak samo jak stan
-   systemu, a dwie kopie pytania rozjechałyby się przy pierwszej poprawce. */
+   Ustawienia (konta, logo) pytają tak samo jak stan systemu, a dwie kopie
+   pytania rozjechałyby się przy pierwszej poprawce. */
 
 const MALY = "!px-2.5 !py-1 !text-xs";
 

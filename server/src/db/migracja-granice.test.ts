@@ -5,7 +5,7 @@ import { DatabaseSync } from "node:sqlite";
 import { migrate } from "./db.js";
 import { config } from "../config.js";
 
-/* ── Granice czasu i encje w zastanych danych (0.152.0) ──────────────────────
+/* ── Granice czasu i encje w zastanych danych ──────────────────────
    Pierwsza udana synchronizacja wciągnęła całą historię konta, razem
    z encjami HTML w treści. Te dwie migracje sprowadzają bazę do tego, co
    właściciel chce widzieć — i muszą to zrobić OSTROŻNIE: granica stoi na

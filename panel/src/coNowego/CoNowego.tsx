@@ -3,7 +3,7 @@ import { Sparkles, X } from "lucide-react";
 import dane from "virtual:wertis-zmiany";
 import { doPokazania, type WydanieZmian } from "./zmiany";
 
-/* ── Pasek „Nowe w panelu" (0.500.0) ────────────────────────────────────────
+/* ── Pasek „Nowe w panelu" ──────────────────────────────────────────────────
    Jeden wiersz pod nagłówkiem przy pierwszym wejściu po wydaniu: nagłówki
    zmian, które agent jeszcze nie widział, i „Rozumiem". Powód i dobór wydań
    w `zmiany.ts`.
@@ -25,9 +25,9 @@ function czytaj(): string | null {
 }
 
 export function PasekZmian({ zmiany, onZamknij }: { zmiany: WydanieZmian[]; onZamknij: () => void }) {
-  /* JEDNO WYDANIE NARAZ, reszta za „+N" (0.515.0). Po tygodniu nieobecności
-     pasek wyrastał na trzy wiersze nagłówków nad pracą, a agent czyta
-     najnowsze albo nic. Starsze zostają o jedno kliknięcie. */
+  /* JEDNO WYDANIE NARAZ, reszta za „+N". Po tygodniu nieobecności pasek
+     wyrastałby na trzy wiersze nagłówków nad pracą, a agent czyta najnowsze
+     albo nic. Starsze zostają o jedno kliknięcie. */
   const [wszystkie, setWszystkie] = useState(false);
   if (!zmiany.length) return null;
   const [najnowsze, ...starsze] = zmiany;

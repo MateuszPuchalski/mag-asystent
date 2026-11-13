@@ -125,9 +125,8 @@ test("brak ilościowy staje się wyjątkiem „zła ilość” z obiema liczbami
 });
 
 test("nietknięte bez wyboru: zakończenie odmawia z kodem i niczego nie zapisuje", () => {
-  /* Decyzja właściciela po audycie z 22 września 2026: ZAKOŃCZ przy
-     nietkniętych wymaga jawnego wyboru. Dotąd szły po cichu do pominiętych,
-     więc 0 z 10 nie dawało zgłoszenia, a 1 z 10 dawało. */
+  /* Decyzja właściciela: ZAKOŃCZ przy nietkniętych wymaga jawnego wyboru.
+     Ciche pominięcie sprawiłoby, że 0 z 10 nie daje zgłoszenia, a 1 z 10 daje. */
   const id = dostawa([{ dok: 10, odlozone: 7 }, { dok: 5, odlozone: 0 }]);
   const r = D.zakonczDostawe(id, "Jan z hali");
   assert.ok("error" in r);

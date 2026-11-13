@@ -64,7 +64,7 @@ export interface RawZamPosition {
 }
 
 /**
- * Jeden poziom cenowy kartoteki (0.396.0).
+ * Jeden poziom cenowy kartoteki.
  *
  * Wszystkie poziomy, nie jeden wybrany — decyzja właściciela. Kwoty w GROSZACH
  * całkowitych, tak samo jak kwoty z Allegro: liczba zmiennoprzecinkowa w cenie

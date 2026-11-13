@@ -161,7 +161,7 @@ test("odświeżenie kasuje braki, a zdjęcia zostawia", async () => {
     )
     .run(teraz, teraz);
 
-  /* Konto biura, nie kolektora: od 0.431.0 odświeżenie wymaga uprawnienia
+  /* Konto biura, nie kolektora: odświeżenie wymaga uprawnienia
      `ratunek_serwera`, a odmowę magazynierowi pilnuje `bramka.test.ts`. */
   const biuro = createUser("Ola Biuro", "biuro");
   db().prepare("INSERT INTO device_session(token, user_id, device_id, created_at, last_seen) VALUES (?,?,?,?,?)")

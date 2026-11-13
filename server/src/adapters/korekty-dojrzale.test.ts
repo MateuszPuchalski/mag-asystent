@@ -2,7 +2,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { dojrzaleKorekty } from "./korekty-dojrzale.js";
 
-/* ── Korekta z wycofanego zapisu nie ma prawa zamknąć zwrotu (0.350.1) ──────
+/* ── Korekta z wycofanego zapisu nie ma prawa zamknąć zwrotu ──────
    Produkcja, 15 września 2026: import złapał ZW 463/MAG/09/2026 w trakcie
    zapisu, który Subiekt wycofał, i zwrot dostał numer nieistniejącego
    dokumentu. Te testy pilnują, że korekta potrzebuje DWÓCH odczytów. */

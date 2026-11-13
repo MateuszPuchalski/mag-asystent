@@ -2,10 +2,9 @@ import { db as defaultDb, transaction, type Db } from "../db/db.js";
 import { dopasujPozycjeZamowienia } from "./dopasowanie-sku.js";
 import { logEvent } from "./events.js";
 
-/* ── Rabat transakcyjny przy pozycji zwrotu (0.164.0) ────────────────────────
-   Zwrot prowizji od sprzedaży. Do tego wydania firma klikała po niego ręcznie
-   przy KAŻDYM zwrocie w panelu Allegro — nie dlatego, że tak trzeba, tylko
-   dlatego, że znikąd nie było widać, przy którym wniosek już jest.
+/* ── Rabat transakcyjny przy pozycji zwrotu ──────────────────────────────────
+   Zwrot prowizji od sprzedaży. Bez tego biuro klika po niego ręcznie przy
+   KAŻDYM zwrocie w panelu Allegro, bo nie widać, przy którym wniosek już jest.
 
    IDENTYFIKATOR DO ZŁOŻENIA WNIOSKU BIERZE SIĘ Z POZYCJI ZAMÓWIENIA i to jest
    najważniejsza decyzja tego pliku. `POST /order/refund-claims` żąda
@@ -42,15 +41,11 @@ const MARTWE = new Set(["CANCELLED"]);
 const PRZYZNANE = new Set(["GRANTED"]);
 const ODRZUCONE = new Set(["REJECTED", "REJECTED_AFTER_APPEAL"]);
 
-/* ── Wniosek złożony POZA panelem (0.176.0) ──────────────────────────────────
+/* ── Wniosek złożony POZA panelem ────────────────────────────────────────────
    Statusy zwrotu, przy których Allegro samo mówi, że prowizja jest już objęta
-   wnioskiem. `zlozWniosekORabat` PILNOWAŁO ich od 0.164.0 jako drugi strażnik,
-   ale `stanRabatu` ich nie czytał — i to jest cała usterka, którą zgłosił
-   właściciel. Wniosek złożony w panelu Allegro nie ma prawa trafić do naszego
-   lustra, dopóki nie przewinie się przez `GET /order/refund-claims`; ekran
-   pisał wtedy „brak wniosku" i podstawiał przycisk, który po kliknięciu
-   ZAWSZE kończył się konfliktem. Panel obiecywał pracę, której serwer nie
-   przyjmował — a to gorsze niż milczenie.
+   wnioskiem. Wniosek złożony w panelu Allegro trafia do naszego lustra
+   dopiero przez `GET /order/refund-claims`; bez statusu ekran pisałby „brak
+   wniosku" i podstawiał przycisk kończący się konfliktem.
 
    Zdanie ekranu ma więc dwa źródła, a nie jedno, i mówi wprost, z którego
    pochodzi (zasada 4.3 projektu panelu: wynik automatu nie udaje faktu).   */
@@ -156,8 +151,7 @@ export function stanRabatu(
 }
 
 /* ── Złożenie wniosku: PIERWSZY ZAPIS tego systemu do Allegro ────────────────
-   Dotąd wychodziła stąd wyłącznie wiadomość do klienta; wszystko inne było
-   odczytem. Dlatego dwie ostrożności, których nie ma przy odczycie.
+   Dwie ostrożności, których nie ma przy odczycie.
 
    PIERWSZA: końcówka NIE MA idempotencji. `commandId` jest przy zwrocie
    pieniędzy, nie tutaj — powtórzone żądanie zakłada DRUGI wniosek, a nie
@@ -184,11 +178,8 @@ export async function zlozWniosekORabat(
   }
   /* STRAŻNIK PIERWSZY: stan wniosku — obojgiem oczu naraz.
 
-     Do 0.175.0 stały tu DWA strażniki po kolei: lustro wniosków, a pod nim
-     status zwrotu. Od 0.176.0 `stanRabatu` czyta oba źródła, więc drugi
-     strażnik przeniósł się TAM, gdzie i tak trzeba było go postawić — do
-     zdania, które czyta panel. Tu zostaje jedno rozgałęzienie, bo powód
-     odmowy MA WYMIENIĆ ŹRÓDŁO: numer wniosku z lustra albo status zwrotu.
+     `stanRabatu` czyta oba źródła: lustro wniosków i status zwrotu. Tu
+     zostaje jedno rozgałęzienie, bo powód odmowy MA WYMIENIĆ ŹRÓDŁO: numer wniosku z lustra albo status zwrotu.
      „Wniosek już istnieje (null)" byłoby gorsze niż milczenie. */
   if (stan.stan !== "brak") {
     /* Wniosek spoza panelu: w panelu Allegro albo ich własnym automatem

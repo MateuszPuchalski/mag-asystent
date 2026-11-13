@@ -5,7 +5,7 @@ import { useStrefa, useZapiszStrefe, type RegulaStrefy as Regula } from "../api/
 import { Blad, Pole, Przycisk } from "../ui";
 import { KartaWgladu, NaglowekKolumny, type Naglowek } from "../ui/wglad";
 
-/* ── Reguły strefy złotej (z `biuro.html`, 0.444.0) ─────────────────────
+/* ── Reguły strefy złotej ───────────────────────────────────────────────
    Które poziomy regałów są „złote" (75–140 cm — bez schylania i bez
    drabiny). Reguła obejmuje całą alejkę ALBO zakres regałów; walidację
    robi serwer (`bladReguly`) i jego zdanie stoi pod tabelą bez przeróbek,

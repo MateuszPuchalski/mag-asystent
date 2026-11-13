@@ -5,12 +5,11 @@ import { describe, expect, it } from "vitest";
    w pozostałych strażnikach: panel jest aplikacją przeglądarki. */
 const PLIKI = Object.keys(import.meta.glob(["./**/*.ts", "./**/*.tsx", "./**/*.css"]));
 
-/* ── NAZWY RÓŻNE TYLKO WIELKOŚCIĄ LITER (0.482.12) ─────────────────────────────
-   Blizna 0.481.0: `zwroty/SzybkiZwrot.tsx` (przycisk) stał obok
-   `zwroty/szybkiZwrot.ts` (reguła). Na Linuksie, czyli w CI i w każdej sesji,
-   to dwa pliki i wszystko było zielone. Na Windowsie w biurze to JEDEN plik:
-   import bez rozszerzenia trafił w regułę, `tsc` odmówił, a instalator
-   zatrzymał usługi przy aktualizacji.
+/* ── NAZWY RÓŻNE TYLKO WIELKOŚCIĄ LITER ────────────────────────────────────────
+   Na Linuksie, czyli w CI i w każdej sesji, `SzybkiZwrot.tsx` i
+   `szybkiZwrot.ts` to dwa pliki. Na Windowsie w biurze to JEDEN plik:
+   import bez rozszerzenia trafia w zły, `tsc` odmawia, a instalator
+   zatrzymuje usługi przy aktualizacji.
 
    Porównanie idzie po ścieżce BEZ ostatniego rozszerzenia, bo tak rozwiązuje
    import — `./SzybkiZwrot` i `./szybkiZwrot` zderzają się mimo `.tsx` i `.ts`.

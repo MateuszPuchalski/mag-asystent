@@ -96,7 +96,6 @@ function zdarzenie(user: string) {
 }
 
 test("warianty tej samej osoby schodzą się w JEDNO konto", () => {
-  // to jest powód, dla którego audyt dotąd był bezużyteczny
   zdarzenie("Jan");
   zdarzenie("jan");
   zdarzenie(" Jan ");
@@ -134,7 +133,7 @@ test("zdarzenie bez nazwy zostaje NIEPRZYPISANE, nie zgadywane", () => {
   assert.equal(w.nieprzypisanych, 1, "puste zostaje z user_ref = NULL");
 });
 
-/* ── Konto demo admin/admin (0.53.2) ─────────────────────────────────────── */
+/* ── Konto demo admin/admin ─────────────────────────────────────── */
 
 test("seeded + pusta baza: powstaje admin/admin i da się nim zalogować", async () => {
   const { config } = await import("../config.js");

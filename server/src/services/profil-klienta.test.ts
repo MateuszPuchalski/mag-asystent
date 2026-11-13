@@ -7,7 +7,7 @@ import path from "node:path";
 process.env.DB_PATH = path.join(fs.mkdtempSync(path.join(os.tmpdir(), "wertis-profil-")), "t.db");
 process.env.SGT_MODE = "seeded";
 
-/* ── Profil klienta (24 września 2026) ───────────────────────────────────────
+/* ── Profil klienta ──────────────────────────────────────────────────────────
    Pilnujemy: login bez wielkości liter składa wszystko w jeden profil;
    anulowane zamówienie nie wchodzi do sumy; sygnały gasną z przyczyną;
    „niedoręczona” tylko wtedy, gdy pytaliśmy przewoźnika; notatka zapisuje się
@@ -123,7 +123,7 @@ test("profil jest odczytem — otwarcie niczego nie zapisuje", () => {
   assert.equal((db().prepare("SELECT total_changes() n").get() as { n: number }).n, przed);
 });
 
-/* ── Sprawa klienta na profilu (0.535.0, S6) ────────────────────────────────
+/* ── Sprawa klienta na profilu (S6) ─────────────────────────────────────────
    Profil niesie sprawę i podpowiedź „Zakończ sprawę?”. Podpowiedź stoi tylko
    wtedy, gdy trzy rzeczy zachodzą naraz: sprawa w toku, w kolejkach nic nie
    czeka, a termin kroku nadszedł. Każda z trzech osobno ją gasi. */
@@ -175,7 +175,7 @@ test("profil ze sprawą dalej jest odczytem", async () => {
   assert.equal((db().prepare("SELECT total_changes() n").get() as { n: number }).n, przed);
 });
 
-/* ── Dosyłka na profilu (0.536.0, S6) ──────────────────────────────────────
+/* ── Dosyłka na profilu (S6) ───────────────────────────────────────────────
    Trzy rzeczy: podpowiedź „Dosyłka doręczona. Zakończ sprawę?” mimo
    otwartego zwrotu wymiany, propozycja śledzenia odmowy z ostatnich
    trzydziestu dni i lista przewoźników do formularza numeru. */

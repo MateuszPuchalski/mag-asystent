@@ -10,10 +10,10 @@ process.env.SGT_MODE = "seeded";
 /* ── Droga klienta przez cztery kolejki (`docs/obsluga-klienta-calosc.md`) ───
    Testy pilnują trzech granic, nie kształtu wiersza.
 
-   PIERWSZA: mostkiem jest numer zamówienia, nigdy login kupującego
-   (blizna 0.56.6). DRUGA: konto jest w warunku — sprawa z cudzego konta nie ma
+   PIERWSZA: mostkiem jest numer zamówienia, nigdy login kupującego.
+   DRUGA: konto jest w warunku — sprawa z cudzego konta nie ma
    prawa pokazać się na naszym ekranie. TRZECIA: droga jest ODCZYTEM, więc
-   wyliczenie przeskoku nie zapisuje niczego (blizna 0.18.0).             */
+   wyliczenie przeskoku nie zapisuje niczego.             */
 
 let db: typeof import("../db/db.js").db;
 let sprawyZakupu: typeof import("./droga-klienta.js").sprawyZakupu;
@@ -254,7 +254,7 @@ test("sprawa zamknięta i rozmowa zamknięta schodzą z listy roboczej", () => {
 
 test("sprawa z terminem staje NAD sprawą ruszoną dawniej, bez terminu", () => {
   /* Jedno pole na oba zegary postawiłoby reklamację ruszoną 1 września nad
-     reklamacją z terminem 2 września. To jest blizna 0.121.0 w miniaturze. */
+     reklamacją z terminem 2 września. */
   const d = db();
   const pilna = sprawa("CLAIM", "2026-09-06T08:00:00Z");
   const luzna = sprawa("CLAIM", "2026-09-01T08:00:00Z");
@@ -289,10 +289,9 @@ test("moja lista niczego nie zapisuje", () => {
   assert.equal(Number(d.prepare("SELECT COUNT(*) AS n FROM events").get()!.n), przed);
 });
 
-/* ── Wiązanie obustronne przy ręcznie wskazanym zamówieniu (0.502.0) ───────
+/* ── Wiązanie obustronne przy ręcznie wskazanym zamówieniu ─────────────────
    Rozmowa bez numeru w wiadomościach, której zamówienie wskazał agent.
-   Skrzynka widziała jej zwrot od 0.397.0; zwrot, droga zakupu i szukanie
-   rozmowy nie widziały. Test chodzi mostkiem w OBIE strony, bo wiązanie
+   Test chodzi mostkiem w OBIE strony, bo wiązanie
    jednostronne to wiązanie, którego nie ma.                               */
 const wskaz = (numer: string, rozm = rozmowa) => db().prepare(`INSERT INTO conversation_event(
     conversation_id, event_type, payload) VALUES (?, 'order_linked_manually',

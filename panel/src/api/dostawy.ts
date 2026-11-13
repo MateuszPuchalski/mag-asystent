@@ -1,7 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "./klient";
 
-/* ── Dostawy w panelu (0.435.0) ────────────────────────────────────────────
+/* ── Dostawy w panelu ──────────────────────────────────────────────────────
    Pierwszy ekran magazynu przeniesiony z `biuro.html` (`docs/obsluga-klienta.md`
    §7). Trasy są TE SAME, którymi biuro jeździło od lat — przeprowadzka zmienia
    front, nie umowę z serwerem. Dzięki temu serwer nie ma okresu, w którym

@@ -1,24 +1,17 @@
 import { useFirma, type DaneFirmy } from "../api/ustawienia";
 import type { Firma } from "./szablony";
 
-/* ── Dane firmy do druków dostawców (0.435.0, serwer od 0.444.0) ──────────
+/* ── Dane firmy do druków dostawców ─────────────────────────────────────────
    Druki GEKO i PARTNER pytają o dane ZGŁASZAJĄCEGO — nazwę, NIP, adres,
-   osobę kontaktową. Przez lata mieszkały w `localStorage` przeglądarki biura
-   pod kluczem `wertis.firma`, więc każde biurko miało własny komplet, a nowe
-   drukowało protokół z pustym nagłówkiem. Od 0.444.0 stoją na serwerze
-   (`/api/biuro/firma`) i wpisuje je karta „Dane firmy" w Ustawieniach.
+   osobę kontaktową. Stoją na serwerze (`/api/biuro/firma`) i wpisuje je
+   karta „Dane firmy" w Ustawieniach.
 
-   KLUCZ PRZEGLĄDARKI ZOSTAJE JAKO ZAPAS NA JEDNO WYDANIE. Dzień wdrożenia
-   zastaje serwer pusty, a dane w przeglądarce; bez zapasu pierwszy protokół
-   po aktualizacji wyszedłby bez nagłówka. Zapas działa WYŁĄCZNIE, dopóki nikt
-   nie zapisał danych na serwerze — potem serwer wygrywa zawsze, także pustym
-   polem, bo puste pole zapisał człowiek.
-
-   ZAPAS PRZEŻYŁ PRZEŁĄCZENIE (0.446.0), choć plan kazał go zdjąć. Wydania
-   wchodzą na serwer przez `git pull`, więc biuro może przeskoczyć z wersji
-   sprzed 0.444.0 wprost na tę — i wtedy nikt jeszcze nie kliknął
-   „Przenieś na serwer". Zapas nic nie kosztuje, a jego brak to protokół bez
-   nagłówka. Zejdzie, gdy serwer ma dane na każdej instalacji.
+   KLUCZ PRZEGLĄDARKI `wertis.firma` ZOSTAJE JAKO ZAPAS. Biuro może
+   przeskoczyć na tę wersję z wersji, która trzymała dane tylko
+   w przeglądarce — wtedy serwer jest pusty i nikt jeszcze nie kliknął
+   „Przenieś na serwer". Bez zapasu protokół wyszedłby bez nagłówka. Zapas
+   działa WYŁĄCZNIE, dopóki nikt nie zapisał danych na serwerze — potem
+   serwer wygrywa zawsze, także pustym polem, bo puste pole zapisał człowiek.
 
    Automatycznego przepisania z przeglądarki na serwer nie ma: otwarcie druku
    nie może niczego zapisywać. Robi to przycisk w Ustawieniach. */

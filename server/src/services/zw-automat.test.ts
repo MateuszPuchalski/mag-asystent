@@ -6,7 +6,7 @@ import { migrate, type Db } from "../db/db.js";
 import { AUTOMAT_ZW, dokolejkujZalegleZw, wpiszNumeryZw, zakolejkujZw, type OpcjeZw } from "./zw-automat.js";
 import { cofnijKorekte, cofnijKwote, listaZwrotow, zapiszKorekte } from "./zwroty.js";
 
-/* ── Automatyczny ZW do paragonu (0.349.0) ──────────────────────────────────
+/* ── Automatyczny ZW do paragonu ────────────────────────────────────────────
    Dokument fiskalny ze skutkiem magazynowym, więc strażnicy pilnują trzech
    rzeczy: ZW niesie PEŁNĄ wartość towaru (potrącenie jest wyłącznie
    w Allegro), nie powstaje dwa razy, a człowiek zawsze może automat
@@ -232,9 +232,8 @@ test("lista zwrotów niesie stan ZW — panel mówi po nim, kto wystawia", () =>
     { status: "pending", numer: null, blad: null });
 });
 
-/* ── Paragon związany PO zapisie kwoty (0.476.0) ─────────────────────────
-   Przegląd zwrotów z 23 września: zapis kwoty trafiał czasem przed wiązaniem
-   paragonu i ZW nie powstawał nigdy. Przebieg po takcie ma to dociągnąć —
+/* ── Paragon związany PO zapisie kwoty ───────────────────────────────────
+   Zapis kwoty trafia czasem przed wiązaniem paragonu. Przebieg po takcie ma to dociągnąć —
    ale nigdy kosztem drugiego dokumentu fiskalnego. */
 
 const bezParagonu = (d: Db, id: number) =>

@@ -268,9 +268,7 @@ test("na pełnej kartotece parser znajduje setki zamienników, nie zero i nie ws
   /* Przedział, nie liczba dokładna: opis jest polem swobodnym, a `products.json`
      bywa odświeżany. Regres parsera (zero trafień) i rozjazd w drugą stronę
      (wzorzec przepuszczający numery OEM) wychodzą oba, a zmiana danych o 10%
-     nie psuje testu bez powodu. Pomiar z 2026-07-26: 393 kartoteki; po
-     dopuszczeniu list bez etykiety (0.61.0) jest ich 491, z czego 69 to
-     kartoteki, w których wcześniej sekcja była pusta. */
+     nie psuje testu bez powodu. Pomiar z listami bez etykiety: 491. */
   assert.ok(
     zKlikalnym > 250 && zKlikalnym < 600,
     `kartotek z klikalnym zamiennikiem: ${zKlikalnym} — poza spodziewanym przedziałem`

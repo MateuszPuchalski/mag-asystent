@@ -1,6 +1,6 @@
 import os from "node:os";
 
-/* ── Adresy serwera w sieci magazynu (0.496.0) ───────────────────────────────
+/* ── Adresy serwera w sieci magazynu ─────────────────────────────────────────
    Karta „Nowy kolektor" w panelu pokazuje kod do pobrania APK i adres do
    wpisania. Adresu z paska przeglądarki wziąć nie można: panel otwarty na
    samym serwerze to `localhost`, a z kolektora `localhost` jest kolektorem.

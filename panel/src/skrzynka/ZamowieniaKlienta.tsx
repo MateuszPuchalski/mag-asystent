@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import { useState } from "react";
 import { Link2, ShoppingBag } from "lucide-react";
 import type { KandydatZamowienia } from "../api/typy";
 import { useWskazZamowienie } from "../api/rozmowy";
@@ -7,7 +7,7 @@ import { NaglowekSekcji, czas } from "../ui";
 import { ODNOSNIK, ODNOSNIK_CICHY } from "./odnosniki";
 
 /**
- * Zakupy tego kupującego — kandydaci do powiązania z rozmową (0.397.0).
+ * Zakupy tego kupującego — kandydaci do powiązania z rozmową.
  *
  * Zgłoszenie właściciela ze zrzutem: klient napisał pod OFERTĄ „dzisiaj
  * otrzymałem paczkę, ale nie było w zestawie świecy", a rozmowa nie miała

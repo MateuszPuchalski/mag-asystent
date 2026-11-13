@@ -5,10 +5,10 @@ import { MemoryRouter } from "react-router-dom";
 import { Naglowek } from "./Naglowek";
 import type { Zwrot } from "../api/typy";
 
-/* Odnośniki wewnątrz panelu idą przez router (0.502.0), jak na ekranie. */
+/* Odnośniki wewnątrz panelu idą przez router, jak na ekranie. */
 const render = (ui: React.ReactElement) => renderRTL(ui, { wrapper: MemoryRouter });
 
-/* ── Tożsamość zwrotu w nagłówku (0.207.0) ───────────────────────────────────
+/* ── Tożsamość zwrotu w nagłówku ─────────────────────────────────────────────
    Numer i login przeprowadziły się tu z prawej kolumny, więc razem z nimi
    przeprowadziły się testy, które ich pilnowały. Intencja każdego zostaje ta
    sama: link nigdy nie prowadzi donikąd, a puste pole mówi, że to Allegro
@@ -66,8 +66,8 @@ describe("Nagłówek zwrotu", () => {
        Przepisuje się go do panelu Allegro, więc kopiowanie jest tu pracą,
        nie ozdobą.
 
-       Od 0.228.0 klika się SAM LOGIN, a nie ikonę obok: osobna ikona była
-       drugim celem dotyku dla tej samej czynności, i to mniejszym. */
+       Klika się SAM LOGIN, a nie ikonę obok: osobna ikona byłaby drugim,
+       mniejszym celem dotyku dla tej samej czynności. */
     render(<Naglowek zwrot={zwrot({ kupujacyLogin: "michael20177" })} />);
     const login = screen.getByRole("button", { name: /Kopiuj login/ });
     expect(login).toHaveTextContent("michael20177");
@@ -75,7 +75,7 @@ describe("Nagłówek zwrotu", () => {
   });
 
   it("pusty login mówi, że nie podało go Allegro — nie znika", () => {
-    /* Zgłoszenie właściciela z 0.177.0: „nie widzę nigdzie loginu klienta".
+    /* Zgłoszenie właściciela: „nie widzę nigdzie loginu klienta".
        Milczenie wygląda jak usterka panelu, nie jak brak danych. */
     render(<Naglowek zwrot={zwrot({ kupujacyLogin: null })} />);
     expect(screen.getByText(/kupujący: Allegro nie podało/)).toBeInTheDocument();
@@ -91,21 +91,19 @@ describe("Nagłówek zwrotu", () => {
     expect(screen.getByText("ABC-1")).toBeInTheDocument();
     expect(screen.getByText("nieodebrana paczka")).toBeInTheDocument();
     /* Zdanie o nieodebraniu stoi w podpowiedzi plakietki, nie drugim wierszem
-       pod nią (0.518.0) — ten sam fakt padał na ekranie trzy razy. */
+       pod nią — jeden fakt, jedno miejsce. */
     expect(screen.getByText("nieodebrana paczka"))
       .toHaveAttribute("title", "Klient nie zgłosił zwrotu — przesyłka wróciła nieodebrana.");
     expect(screen.queryByText(/przesyłka wróciła nieodebrana/)).toBeNull();
     expect(screen.queryByRole("link")).not.toBeInTheDocument();
-    /* NOTATKI TU JUŻ NIE MA (0.313.0): ma własną sekcję w kolumnie dowodów,
+    /* Notatka ma własną sekcję w kolumnie dowodów,
        z autorem, godziną i cofnięciem. Cytat w nagłówku byłby tym samym
        zdaniem po raz drugi na jednym ekranie. */
     expect(screen.queryByText(/kurier zwrócił po 14 dniach/)).toBeNull();
   });
 
-  /* Do 0.213.0 ten test pilnował, że nagłówek NIESIE pytanie kubełka. Decyzją
-     właściciela pytanie z nagłówka zeszło (0.214.0): stało nad przyciskami,
-     które pytają o to samo i od razu odpowiadają. Strażnik zostaje, tylko
-     odwrócony — żeby kopia nie wróciła tam przy następnej zmianie. */
+  /* Decyzją właściciela nagłówek NIE niesie pytania kubełka: stałoby nad
+     przyciskami, które pytają o to samo. */
   it("nagłówek NIE powtarza pytania kubełka — odpowiadają na nie przyciski pod nim", () => {
     render(<Naglowek zwrot={zwrot({ kubelek: "korekta" })} />);
     expect(screen.queryByText(/korekt/i)).toBeNull();
@@ -144,8 +142,8 @@ describe("Nagłówek zwrotu", () => {
   });
 
   it("rozmowa bez tematu dostaje nazwę, a nie pusty odnośnik", () => {
-    /* Test przeszedł tu z dowodów (0.518.0): lista wiadomości zeszła do drogi
-       zakupu, a nazwę rozmowy pisze już tylko nagłówek. */
+    /* Nazwę rozmowy pisze tylko nagłówek; lista wiadomości stoi w drodze
+       zakupu. */
     render(<Naglowek zwrot={zwrot({ rozmowy: [
       { id: 8, temat: "  ", status: "new", ostatniaAt: null }] })} />);
     expect(screen.getByRole("link", { name: /Rozmowa bez tematu/ })).toBeInTheDocument();

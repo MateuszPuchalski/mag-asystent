@@ -1,11 +1,8 @@
 import React, { useState } from "react";
 import { FiltrSegmentowy } from "../ui";
 
-/* ── Sito „Moje" dla reklamacji (0.278.0) ─────────────────────────
-   POWSTAŁO Z JEDNEGO ZDANIA WŁAŚCICIELA: „chodziło mi, abym łatwiej mógł
-   znaleźć reklamacje, którymi się zajmuję". Do tego wydania nie dało się tego
-   zrobić wcale — kolejka miała kubełki etapu i szukanie po numerze, a po
-   prowadzącym nie szukało nic.
+/* ── Sito „Moje" dla reklamacji ───────────────────────────────────
+   Właściciel chce łatwo znaleźć reklamacje, którymi się zajmuje.
 
    SITO, NIE KUBEŁEK, i to jest cała decyzja projektowa. Kubełek odpowiada na
    pytanie „na jakim to etapie", a właściciel pyta „czyje to". Wrzucenie obu
@@ -17,11 +14,11 @@ import { FiltrSegmentowy } from "../ui";
    Allegro, a stare dyskusje zostają w nim poza ekranami. Sito nie zna
    rodzaju sprawy i działa na każdej liście z prowadzącym. */
 
-/* ── DRUGA POŁOWA PYTANIA (0.281.0) ──────────────────────────────────────────
+/* ── DRUGA POŁOWA PYTANIA ────────────────────────────────────────────────────
    „Które sprawy są moje" ma bliźniacze pytanie, bez którego pierwsze nie
    domyka pracy: „które są NICZYJE". Sprawa nieprzypisana nie trafia do nikogo
-   sama — ktoś musi ją zobaczyć i wziąć. Sito pokazujące wyłącznie moje robiło
-   z tego ślepą plamkę, i to plamkę PAMIĘTANĄ między otwarciami ekranu.
+   sama — ktoś musi ją zobaczyć i wziąć. Sito pokazujące wyłącznie moje
+   robiłoby z tego ślepą plamkę, i to plamkę PAMIĘTANĄ między otwarciami.
 
    JEDNO SITO O TRZECH STANACH, nie dwa przełączniki. Dwie osobne pigułki dałyby
    stan „moje i niczyje naraz", który nie znaczy nic, oraz „ani moje, ani
@@ -125,8 +122,8 @@ export function PasekSita({ sito, mojeId, moich, niczyich, onPrzelacz }: {
  * Ile spraw sito właśnie chowa.
  *
  * TO NIE JEST OZDOBA. Sito pamięta wybór między otwarciami, więc bez tego
- * zdania sprawa spoza sita mogłaby nie pokazać się nikomu przez tydzień —
- * ta sama klasa błędu co rozmowa urwana bez znaku w 0.273.0. Dekalog p. 6:
+ * zdania sprawa spoza sita mogłaby nie pokazać się nikomu przez tydzień.
+ * Dekalog p. 6:
  * ograniczenie i uprzedzenie są tańsze od tłumaczenia po fakcie.
  */
 export function ZdanieOUkrytych({ ile, nazwa, onPokazWszystkie }: {

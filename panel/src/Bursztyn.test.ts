@@ -5,22 +5,11 @@ import { describe, expect, it } from "vitest";
 const ZRODLA = import.meta.glob(["./**/*.tsx", "!./**/*.test.tsx"],
   { query: "?raw", eager: true, import: "default" }) as Record<string, string>;
 
-/* ── BURSZTYN NIE JEST BARWĄ ZAZNACZENIA (0.265.0) ─────────────────────────────
-   Ustalenie 02 z audytu wizualnego. Bursztyn niósł w panelu SIEDEM ról naraz:
-   markę, akcję główną, ostrzeżenie, notatkę wewnętrzną, podpis klienta na osi,
-   kropkę nieprzeczytanego i ZAZNACZENIE. Kiedy jedna barwa znaczy „marka",
-   „wybrane" i „uwaga", nie znaczy już żadnego z tych trzech.
-
-   Najostrzejszy przypadek dało się pokazać na jednej wartości. `bg-amber-50`
-   (`#FFFBEB`) malowało jednocześnie:
-
-     wybrany wiersz    trzy kolejki: skrzynka, zwroty, reklamacje
-     ostrzeżenie       brak powiązania z ofertą, konflikt przejęcia, Copilot
-     notatkę wewnętrzną blok komentarza na osi rozmowy
-     formularz pomiaru pasmo pod osią
-
-   Pierwsze dwa znaczenia są PRZECIWSTAWNE: „to jest to, co wybrałeś" kontra
-   „tu coś jest nie tak". Agent nie ma jak ich rozróżnić, bo to ten sam piksel.
+/* ── BURSZTYN NIE JEST BARWĄ ZAZNACZENIA ───────────────────────────────────────
+   Bursztyn niesie markę, akcję główną i ostrzeżenia. Kiedy jedna barwa znaczy
+   „marka", „wybrane" i „uwaga", nie znaczy już żadnego z tych trzech.
+   Zaznaczenie i ostrzeżenie są PRZECIWSTAWNE: „to jest to, co wybrałeś"
+   kontra „tu coś jest nie tak". Ten sam piksel nie da się rozróżnić.
 
    CO PILNUJE. Jednej rzeczy: **bursztyn nie wraca jako TŁO zaznaczenia**.
    Reguła celuje w linię, która niesie naraz klasę `bg-amber-*` albo
@@ -35,7 +24,7 @@ const ZRODLA = import.meta.glob(["./**/*.tsx", "!./**/*.test.tsx"],
 
    ZWOLNIENIA SĄ JAWNE. Komentarz `bursztyn: <powód>` w linii albo do sześciu
    linii nad nią, powód co najmniej trzy wyrazy — ten sam mechanizm i próg co
-   `kontrast:`, `skala:`, `segment:` i `ergonomia:`. Dziś jest jedno i jest
+   `kontrast:`, `skala:`, `segment:` i `ergonomia:`. Jedyne zwolnienie jest
    prawdziwe: pasek nawigacji stoi na `#303030`, a tam bursztynowa zakładka
    jest MARKĄ na ciemnym tle, nie zaznaczeniem wiersza na bieli.            */
 
@@ -63,10 +52,8 @@ describe("Bursztyn nie jest barwą zaznaczenia", () => {
         if (!TLO_BURSZTYNU.test(l)) return;
         /* OKNO DWÓCH LINII, nie jedna. Warunek trójkowy łamie się przed
            gałęziami: `${aktywna` zostaje w linii wyżej, a `? "bg-amber-50"`
-           schodzi niżej. Pierwsza wersja tej reguły szukała obu w JEDNEJ
-           linii i przez to nie odmówiła, gdy wstawiłem usterkę z powrotem.
-           Ta sama pomyłka co w `ui/FiltrSegmentowy.test.tsx` — strażnik,
-           którego nie sprawdzono na odmowę, jest zielonym kwadratem. */
+           schodzi niżej. Strażnik, którego nie sprawdzono na odmowę, jest
+           zielonym kwadratem. */
         if (!ZAZNACZENIE.test(linie.slice(Math.max(0, i - 2), i + 1).join(" "))) return;
         /* Zwolnienie stoi w komentarzu, więc szukamy go w tekście ORYGINALNYM. */
         if (surowe.slice(Math.max(0, i - 6), i + 1).some((x) => ZWOLNIENIE.test(x))) return;

@@ -4,7 +4,7 @@ import type { StanPrzesylki } from "../api/typy";
 import { SWIEZOSC_PACZKI_MS, paczkaDoSprawdzenia, paczkaWSoczewce, podwojneZakupy, soczewka }
   from "./soczewki-reguly";
 
-/* ── Która soczewka staje (0.499.0) ─────────────────────────────────────────
+/* ── Która soczewka staje ───────────────────────────────────────────────────
    Soczewka stoi na domyśle klasyfikatora, więc testy pilnują przede wszystkim
    tego, kiedy NIE ma prawa stanąć: kategoria awaryjna, nieudane rozpoznanie,
    człowiek poprawił na kategorię bez soczewki.                             */
@@ -46,7 +46,7 @@ describe("soczewka", () => {
       .toBe("inny_towar");
   });
 
-  /* Paczka (0.531.0): „gdzie moja paczka" to najczęstsze pytanie skrzynki. */
+  /* Paczka: „gdzie moja paczka" to najczęstsze pytanie skrzynki. */
   it("każda kategoria dostawy i status zamówienia stawiają soczewkę paczki; inne — nie", () => {
     for (const kategoria of ["ORDER_STATUS", "DELIVERY_DELAY", "DELIVERY_LOST", "DELIVERY_DAMAGED"] as const) {
       expect(soczewka(dane(kopilot({ kategoria })))?.rodzaj).toBe("paczka");

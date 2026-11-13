@@ -22,11 +22,10 @@ describe("Status rozmowy", () => {
     expect(screen.getByLabelText("Status rozmowy")).toHaveTextContent("Nowa");
   });
 
-  /* ── Ręcznego statusu nie ma (22 września 2026) ──────────────────────────
+  /* ── Ręcznego statusu nie ma ─────────────────────────────────────────────
      Decyzja właściciela: stan wynika wyłącznie z faktów. Nagłówek nie ma
-     pola wyboru — test pilnuje, żeby nie wróciło. Odłożenie wróciło
-     26 września 2026 (0.533.0), ale jako werdykt Z DATĄ w menu „⋯", nie
-     jako pozycja listy statusów; bez `onOdloz` go nie ma — testy niżej. */
+     pola wyboru. Odłożenie to werdykt Z DATĄ w menu „⋯", nie pozycja listy
+     statusów; bez `onOdloz` go nie ma — testy niżej. */
   it("status jest odczytem: bez pola wyboru i bez odłożenia", () => {
     render(<Status rozmowa={rozmowa({ status: "waiting_for_us" })} blad=""
       onPriorytet={() => {}} zapisujePriorytet={false} />);
@@ -38,11 +37,11 @@ describe("Status rozmowy", () => {
   it("werdykt zapisany przed zmianą widać dalej, bo stoi w bazie", () => {
     render(<Status rozmowa={rozmowa({ status: "closed" })} blad=""
       onPriorytet={() => {}} zapisujePriorytet={false} />);
-    /* „Zamknięta" czyta się od 23 września 2026 jak „Zakończona" — jeden werdykt. */
+    /* „Zamknięta" czyta się jak „Zakończona" — jeden werdykt. */
     expect(screen.getByLabelText("Status rozmowy")).toHaveTextContent("Zakończona");
   });
 
-  /* ── Zakończ / Otwórz ponownie (23 września 2026) ────────────────────────
+  /* ── Zakończ / Otwórz ponownie ───────────────────────────────────────────
      Jeden werdykt; pytanie raz, gdy klient czeka na odpowiedź — to jedyna
      pomyłka przycisku, która kosztuje klienta. */
   it("Zakończ bez pytania, gdy piłka jest u klienta", async () => {
@@ -81,14 +80,14 @@ describe("Status rozmowy", () => {
   });
 });
 
-/* ── Priorytet (§10.2, 0.181.0) ──────────────────────────────────────────── */
+/* ── Priorytet (§10.2) ────────────────────────────────────────────────────── */
 
 describe("ręczna flaga „pilne”", () => {
   it("przełącznik pokazuje stan i podnosi flagę", async () => {
     const onPriorytet = vi.fn();
     render(<Status rozmowa={rozmowa()} blad=""
       onPriorytet={onPriorytet} zapisujePriorytet={false} />);
-    /* Przełącznik w spoczynku stoi w menu „⋯" od 0.506.0 — `MenuRozmowy.tsx`. */
+    /* Przełącznik w spoczynku stoi w menu „⋯" — `MenuRozmowy.tsx`. */
     await userEvent.click(screen.getByRole("button", { name: "Więcej czynności rozmowy" }));
     const p = screen.getByRole("button", { name: /Oznacz jako pilne/ });
     expect(p).toHaveAttribute("aria-pressed", "false");
@@ -106,15 +105,13 @@ describe("ręczna flaga „pilne”", () => {
   });
 });
 
-/* ── Stan raz, nie dwa (0.193.0) ─────────────────────────────────────────────
-   Do 0.192.0 pasek statusu rysował plakietkę ze stanem, a obok pole wyboru
-   z TĄ SAMĄ wartością: jedno pasmo nagłówka mówiło „OTWARTA" dwukrotnie.
+/* ── Stan raz, nie dwa ───────────────────────────────────────────────────────
    §7 żąda, żeby nagłówek pokazywał stan zawsze — pokazuje go jedna
    plakietka.                                                            */
 describe("Stan rozmowy stoi w nagłówku raz", () => {
   it("nazwa stanu bieżącego pada dokładnie jeden raz", () => {
     render(<Status rozmowa={rozmowa({ status: "open" })} blad="" onPriorytet={() => {}} zapisujePriorytet={false} />);
-    /* Jedyne wystąpienie to plakietka — pola wyboru obok już nie ma. */
+    /* Jedyne wystąpienie to plakietka. */
     expect(screen.getAllByText("Otwarta")).toHaveLength(1);
   });
 
@@ -124,7 +121,7 @@ describe("Stan rozmowy stoi w nagłówku raz", () => {
     expect(screen.getByLabelText("Status rozmowy").className).toMatch(/bg-stan-open/);
   });
 
-  /* ── ZNACZNIK REKLAMACYJNY (0.390.0) ───────────────────────────────────────
+  /* ── ZNACZNIK REKLAMACYJNY ─────────────────────────────────────────────────
      Właściciel: „chcę zaznaczyć, że to jest pytanie reklamacyjne i będzie
      traktowane jako reklamacja, ale nie będzie w allegrowych reklamacjach".
 
@@ -164,7 +161,7 @@ describe("Stan rozmowy stoi w nagłówku raz", () => {
   });
 });
 
-/* ── Klawiatura i odłożenie (0.533.0) ───────────────────────────────────────
+/* ── Klawiatura i odłożenie ─────────────────────────────────────────────────
    Drugie „Z" zatwierdza zakończenie bez odpowiedzi — pytanie zostaje jedno
    i w miejscu przycisku, tylko odpowiedź nie wymaga już myszy. „O" odkłada
    do następnego dnia roboczego, 8:00. Menu „⋯" ma trzy terminy i kalendarz. */

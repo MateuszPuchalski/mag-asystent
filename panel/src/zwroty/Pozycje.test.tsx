@@ -1,4 +1,3 @@
-import React from "react";
 import { describe, expect, it, vi } from "vitest";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { render, screen } from "@testing-library/react";
@@ -6,14 +5,14 @@ import userEvent from "@testing-library/user-event";
 import { Pozycje } from "./Pozycje";
 import type { PozycjaZwrotu, Zwrot } from "../api/typy";
 
-/* Ptaszek przy składniku woła serwer (0.335.0). Podstawiamy sam hook, a nie
+/* Ptaszek przy składniku woła serwer. Podstawiamy sam hook, a nie
    `fetch`: test pilnuje, CO panel wysyła, a nie jak wygląda żądanie — od tego
    jest `api/klient.test.ts`. */
 const zaznacz = vi.fn();
 const naOutlet = vi.fn();
 const wskaz = vi.fn();
 const potwierdz = vi.fn(async (_v: { pozycjaId: number; twId: number | null; zrodlo: string }) => ({}));
-/* Otwarte pudła — przy kilku ocena pyta, do którego (0.379.0). Stan jest
+/* Otwarte pudła — przy kilku ocena pyta, do którego. Stan jest
    zmienny, bo każdy test ustawia swoją liczbę kartonów przy biurku. */
 const pudla: { kosze: Array<{ id: number; kod: string; rodzaj: "zwroty" | "odpad" }> } = {
   kosze: [],
@@ -27,11 +26,9 @@ vi.mock("../api/zwroty", async (orig) => ({
   usePotwierdzKartoteke: () => ({ mutate: vi.fn(), mutateAsync: potwierdz, isPending: false, error: null }),
 }));
 
-/* ── Produkty ze zwrotu (0.167.0) ────────────────────────────────────────────
-   Do 0.165.0 pozycje stały w prawej kolumnie, a kubełki DO OCENY i DO ZWROTU
-   wypisywały te same nazwy drugi raz, jako gołe kontrolki. Operator oceniał
-   towar, patrząc na listę, która towaru nie pokazywała. Te testy pilnują, że
-   akcja i produkt są w JEDNYM wierszu. */
+/* ── Produkty ze zwrotu ──────────────────────────────────────────────────────
+   Te testy pilnują, że akcja i produkt są w JEDNYM wierszu: operator ocenia
+   towar, patrząc na towar. */
 
 const POZYCJA = (n: Partial<PozycjaZwrotu> = {}): PozycjaZwrotu => ({
   id: 11, zrodlo: "allegro", offerId: "of-1", ofertaZamowienia: null, ofertaZdjecie: "nieznane" as const, nazwa: "Szarpak", ilosc: 1, cenaGrosze: 4999,
@@ -81,7 +78,7 @@ describe("Produkty ze zwrotu", () => {
   it("brak adresu oferty mówi o sobie, zamiast milczeć", () => {
     /* Milczenie wygląda na usterkę panelu, a jest brakiem danych z Allegro. */
     lista(zwrot({ pozycje: [POZYCJA()] }));
-    /* Od 0.455.0 krótko na ekranie, całe zdanie w podpowiedzi — ale dalej
+    /* Krótko na ekranie, całe zdanie w podpowiedzi — ale dalej
        słowem, nie ciszą. */
     expect(screen.getByText("bez adresu oferty"))
       .toHaveAttribute("title", "Allegro nie podało adresu oferty");
@@ -95,8 +92,7 @@ describe("Produkty ze zwrotu", () => {
   });
 
   it("oceny są DWIE — przecena zeszła razem z martwą ścieżką", () => {
-    /* 0.209.0: „Na przecenę" zapisywała się i na tym się kończyła. Przycisk,
-       który wygląda jak decyzja, a nie jest żadną, kosztuje namysł przy każdej
+    /* Przycisk, który wygląda jak decyzja, a nie jest żadną, kosztuje namysł przy każdej
        pozycji — a to jest najczęściej naciskane miejsce tego ekranu. */
     lista(zwrot({ kubelek: "ocena", pozycje: [POZYCJA()] }));
     expect(screen.getByRole("button", { name: /Na stan/ })).toBeInTheDocument();
@@ -147,11 +143,9 @@ describe("Produkty ze zwrotu", () => {
   });
 
   it("PRZEŁĄCZENIE ZWROTU nie zabiera zaznaczenia ze starego", async () => {
-    /* Zgłoszenie z 4 września: zwrot 1MGJ/2026 pokazywał poprawne 36,00 PLN,
-       a serwer odbijał zapis („Pozycje 3742 nie należą do tego zwrotu").
-       Panel szedł z identyfikatorami POPRZEDNIO oglądanego zwrotu: podgląd
-       sumy filtruje po `zwrot.pozycje`, więc rozjazdu nie było na ekranie
-       widać. Ten test przełącza zwrot BEZ odmontowania listy — dokładnie tak,
+    /* Zapis nie może iść z identyfikatorami POPRZEDNIO oglądanego zwrotu:
+       podgląd sumy filtruje po `zwrot.pozycje`, więc rozjazdu nie widać na
+       ekranie. Ten test przełącza zwrot BEZ odmontowania listy — dokładnie tak,
        jak robi to kliknięcie w kolejce. */
     const onKwota = vi.fn();
     const { klient, rerender } = lista(zwrot({ kubelek: "zwrot" }), { onKwota });
@@ -203,9 +197,7 @@ describe("Produkty ze zwrotu", () => {
   });
 
   it("ocenę DA SIĘ COFNĄĆ — inaczej pomyłka zostaje na wierszu na zawsze", async () => {
-    /* §25a.5. Do 0.202.0 przyciski oceny znikały po pierwszym kliknięciu
-       (`ocenianie && !p.ocena`), a serwer cofnięcie przyjmował od 0.192.0 —
-       brakowało wyłącznie klawisza. */
+    /* §25a.5: ocenę da się cofnąć z ekranu. */
     const onOcena = vi.fn();
     lista(zwrot({ kubelek: "ocena", pozycje: [POZYCJA({ id: 11, ocena: "utylizacja" })] }),
       { onOcena });
@@ -311,7 +303,7 @@ describe("Produkty ze zwrotu", () => {
     const rzad = screen.getByRole("button", { name: /oddaj mniej/ }).parentElement!;
     expect(rzad).toContainElement(screen.getByRole("button", { name: /cofnij ocenę/ }));
     expect(rzad).toContainElement(screen.getByRole("button", { name: /wróciło mniej/ }));
-    /* Rodzic był kiedyś słupkiem; rząd poznaje się po zawijaniu. */
+    /* Rząd poznaje się po zawijaniu. */
     expect(rzad.className).toMatch(/\bflex-wrap\b/);
   });
 
@@ -347,8 +339,7 @@ describe("Produkty ze zwrotu", () => {
 
   it("propozycja z pamięci wskazań też czeka na JEDNO kliknięcie", () => {
     /* Warunek przycisku stoi na `twId`, nie na jednej wartości pewności.
-       Propozycja z pamięci jest tą najpewniejszą — stoi za nią człowiek —
-       a do 0.153.1 jako jedyna nie dostawała przycisku. */
+       Propozycja z pamięci jest tą najpewniejszą — stoi za nią człowiek. */
     lista(zwrot({ pozycje: [POZYCJA({ propozycja: { pewnosc: "pamiec", twId: 10,
       symbol: "SEK-46", zrodlo: "Wskazane wcześniej przez: Ala", powod: null,
       poKolumnie: null } })] }));
@@ -381,8 +372,8 @@ describe("Produkty ze zwrotu", () => {
   });
 
   it("brak kartoteki niesie POWÓD, a nie samo »Bez kartoteki«", () => {
-    /* Sześć różnych zerwań łańcucha wyglądało do 0.153.1 identycznie
-       i operator nie miał jak odróżnić braku danych od usterki kodu. */
+    /* Sześć różnych zerwań łańcucha wygląda różnie, żeby operator odróżnił
+       brak danych od usterki kodu. */
     lista(zwrot({ pozycje: [POZYCJA({ propozycja: { pewnosc: "brak", twId: null,
       symbol: null, zrodlo: "Oferta bez SKU w Allegro (pole „sygnatura”)",
       powod: "oferta_bez_sku", poKolumnie: null } })] }));
@@ -395,7 +386,7 @@ describe("Produkty ze zwrotu", () => {
     lista(zwrot({ pozycje: [POZYCJA({ ean: "5901234123457", sku: "SEK-46" })] }));
     expect(screen.getByText("5901234123457")).toBeInTheDocument();
     expect(screen.getByText("SEK-46")).toBeInTheDocument();
-    /* Od 0.455.0 etykietę zastępuje ikona, ale nazwa kodu nie ginie:
+    /* Etykietę zastępuje ikona, ale nazwa kodu nie ginie:
        stoi w podpowiedzi i w tekście dla czytnika ekranu. */
     expect(screen.getByTitle("EAN")).toHaveTextContent("EAN 5901234123457");
     expect(screen.getByTitle("SKU oferty")).toHaveTextContent("SKU SEK-46");
@@ -409,7 +400,7 @@ describe("Produkty ze zwrotu", () => {
 
   it("powód spoza jedenastu zaobserwowanych też ma polską nazwę", () => {
     /* Schemat Allegro wymienia siedemnaście wartości, sonda zaobserwowała
-       jedenaście — do 0.167.0 pozostałe sześć szło na ekran surowym kodem. */
+       jedenaście — pozostałe sześć też nie idzie na ekran surowym kodem. */
     lista(zwrot({ pozycje: [POZYCJA({ powod: "ORDERED_FOR_COMPARISON" })] }));
     expect(screen.getByText(/zamówiony na przymiarkę/)).toBeInTheDocument();
   });
@@ -513,7 +504,7 @@ describe("Pozycja dopisana przez biuro", () => {
 });
 
   it("pozycja „na stan\" BEZ KARTOTEKI mówi, że nie weszła do koszyka", () => {
-    /* Cicha strata jest tu najgorszym wyjściem (0.192.0). Ocena „na stan"
+    /* Cicha strata jest tu najgorszym wyjściem. Ocena „na stan"
        dokłada pozycję na dokument MM, ale MM przesuwa stany KARTOTEK — bez
        kartoteki nie ma czego wpisać. Bez tego zdania karton pojechałby na halę
        z towarem, którego nie ma na żadnym papierze. */
@@ -524,11 +515,11 @@ describe("Pozycja dopisana przez biuro", () => {
   });
 
   it("komplet PRZED koszykiem pokazuje, co do niego wejdzie", () => {
-    /* Oferta jest jedna, a na magazynie leżą trzy kartoteki (0.328.0).
+    /* Oferta jest jedna, a na magazynie leżą trzy kartoteki.
        Bez tego wiersza biuro nie ma skąd wiedzieć, że MM poniesie trzy
        pozycje zamiast jednej — dowiedziałoby się przy rozkładaniu.
 
-       BEZ PTASZKÓW, dopóki pozycja nie leży w koszyku (0.335.0): skład jest
+       BEZ PTASZKÓW, dopóki pozycja nie leży w koszyku: skład jest
        wtedy planem, a ptaszek obiecywałby wiersz, którego nie ma czego zdjąć. */
     lista(zwrot({ kubelek: "zwrot", pozycje: [
       POZYCJA({ id: 1, ocena: "stan", wKoszyku: false, twId: null }),
@@ -543,7 +534,7 @@ describe("Pozycja dopisana przez biuro", () => {
   });
 
   it("komplet W KOSZYKU dostaje ptaszki, wszystkie zaznaczone", async () => {
-    /* Zgłoszenie właściciela (0.335.0): „powinno rozbijać na komponenty do
+    /* Zgłoszenie właściciela: „powinno rozbijać na komponenty do
        zaznaczania, które idą do MM". Z kompletu wracają nieraz same części.
 
        ZAZNACZONE Z GÓRY: typowy zwrot kompletu jest kompletny, a ekran ma

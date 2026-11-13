@@ -7,13 +7,12 @@ import { SeriaWPolu } from "../skaner";
    aliasem — dwie różne rzeczy o tej samej nazwie czytałoby się gorzej. */
 import { ile as liczba } from "../ui";
 
-/* ── Szukanie zwrotu: czytnikiem albo ręką (0.163.0, rozszerzone w 0.165.0) ──
+/* ── Szukanie zwrotu: czytnikiem albo ręką ───────────────────────────────────
    Paczka wraca do biura wcześniej niż wiedza o tym, który to zwrot. Czytnik
    USB pisze prosto w ekran (`useSkaner`), więc typowe użycie NIE WYMAGA nawet
    kliknięcia w to pole.
 
-   Od 0.165.0 to samo pole SZUKA. Każdy wpisany znak zawęża kolejkę po
-   fragmencie — bez debounce'u, bo filtr liczy się w pamięci ekranu i czekanie
+   To samo pole SZUKA. Każdy wpisany znak zawęża kolejkę po fragmencie — bez debounce'u, bo filtr liczy się w pamięci ekranu i czekanie
    opóźniałoby to, co i tak jest natychmiastowe. Enter idzie na serwer, bo
    tylko ta droga zna numer listu przewozowego: w modelu pracy go nie ma
    i lista zwrotów w panelu też go nie niesie.
@@ -22,11 +21,10 @@ import { ile as liczba } from "../ui";
    CZEGO szukano — „nie znalazłem" bez tej informacji wygląda przy czytniku
    identycznie jak zepsuty czytnik.
 
-   SKAN W POLU ZASTĘPUJE, NIE DOPISUJE (0.329.0). Gdy kursor stoi w tym polu,
-   `useSkaner` milczy, a znaki czytnika lecą tu jak pisanie — więc druga
-   zeskanowana etykieta doklejała się do pierwszej i szukanie po sklejeniu nie
-   znajdowało nic. Rozpoznaje to `SeriaWPolu` tym samym podpisem czytnika,
-   którego używa hook: gęsta seria dłuższa niż `MIN_DLUGOSC`.                */
+   SKAN W POLU ZASTĘPUJE, NIE DOPISUJE. Gdy kursor stoi w tym polu,
+   `useSkaner` milczy, a znaki czytnika lecą tu jak pisanie — druga
+   zeskanowana etykieta dokleiłaby się do pierwszej. Rozpoznaje to
+   `SeriaWPolu` tym samym podpisem czytnika, którego używa hook: gęsta seria dłuższa niż `MIN_DLUGOSC`.                */
 
 export function Szukanie({
   wynik, kod, fraza, szuka, dociaga, blad, ile,
@@ -46,7 +44,7 @@ export function Szukanie({
   onFraza: (v: string) => void;
   onSzukaj: (kod: string) => void;
   /**
-   * Kod, który przyszedł SERIĄ CZYTNIKA, a nie ręką (0.468.0). Ekran sam
+   * Kod, który przyszedł SERIĄ CZYTNIKA, a nie ręką. Ekran sam
    * rozstrzyga, czy to etykieta, czy EAN towaru. Enter po wpisaniu ręką
    * dalej tylko szuka — człowiek, który przepisuje cyfry, pyta o zwrot.
    */
@@ -63,25 +61,22 @@ export function Szukanie({
    * znaku. Brak = ekran nie proponuje szukania paczek wcale.
    */
   onLogin?: (szukane: string) => void;
-  /** Allegro właśnie szuka zamówień tego loginu (0.450.0). */
+  /** Allegro właśnie szuka zamówień tego loginu. */
   pytaAllegro?: boolean;
   /** Odmowa Allegro całym zdaniem; lista z naszej bazy stoi mimo niej. */
   bladAllegro?: string;
   /**
-   * Synchronizacja z Allegro (0.370.0).
+   * Synchronizacja z Allegro.
    *
-   * Stała we własnym paśmie razem z filtrami przewoźnika i dat. Po ich zdjęciu
-   * zostałaby sama i kosztowała CAŁE PASMO na jeden przycisk — a pasmo nad
-   * listą to wiersze kolejki, bo to ona jest treścią tej kolumny (blizna
-   * 0.193.0 ze skrzynki). Wchodzi więc do rzędu pola, tą samą drogą, którą
-   * w audycie 15 września przeszedł przycisk NIEODEBRANA.
+   * Stoi w rzędzie pola, bo własne pasmo na jeden przycisk zabrałoby wiersze
+   * kolejce, a to ona jest treścią tej kolumny.
    */
   synchronizuje?: boolean;
   bladSync?: string;
   onSynchronizuj?: () => void;
   /**
-   * Przyjęcie paczki jako nieodebranej (0.493.0). Brak = wiersz zostaje
-   * samym odnośnikiem do Allegro, jak w 0.451.0.
+   * Przyjęcie paczki jako nieodebranej. Brak = wiersz zostaje
+   * samym odnośnikiem do Allegro.
    */
   onPrzyjmij?: (orderId: string) => void;
   /** Zamówienie, którego przyjęcie właśnie trwa. */
@@ -94,35 +89,29 @@ export function Szukanie({
      stanu przerysowuje ekran, a czytnik wysyła kolejny znak po kilku
      milisekundach. */
   const seria = useRef(new SeriaWPolu());
-  /* ── REJESTRACJI PACZKI JUŻ NIE MA (0.451.0) ─────────────────────────
+  /* ── SAMO SZUKANIE, BEZ REJESTRACJI PACZKI ──────────────────────────────
      Decyzja właściciela: „usuń opcję rejestracji paczki — ja tylko wyszukuję
-     ją w Allegro". Od 0.172.0 formularz zakładał tu zwrot od zera: numer
-     listu, zamówienie, przewoźnik, notatka. Biuro z niego nie korzystało,
-     a sześć pól zasłaniało jedno, po które przychodziło — login.
-
-     Zostaje SAMO SZUKANIE. Wynik prowadzi do zamówienia w panelu Allegro,
-     bo tam ta praca się kończy. Zwroty zarejestrowane wcześniej zostają
-     i dalej noszą znacznik „nieodebrana" — ich nikt nie wycofuje. */
+     ją w Allegro". Wynik prowadzi do zamówienia w panelu Allegro, bo tam ta
+     praca się kończy. Zarejestrowane zwroty noszą znacznik „nieodebrana". */
   const [szukaKlienta, setSzukaKlienta] = useState(false);
-  /* JEDNO POLE NA UCHWYT CZŁOWIEKA (0.367.0): login, nazwisko z naklejki albo
+  /* JEDNO POLE NA UCHWYT CZŁOWIEKA: login, nazwisko z naklejki albo
      telefon. Zasady dopasowania rozstrzyga serwer, nie operator. */
   const [kto, setKto] = useState("");
   const brak = wynik?.trafienie === null;
   const wiele = wynik?.trafienie === "wiele";
-  /* NIEZNANY KOD OTWIERA SZUKANIE PO KLIENCIE (0.479.0). Przegląd
-     zwrotów z 23 września: po chybionym skanie operator i tak klikał „Szukaj
-     po kliencie" — przy nieodebranej paczce numer z naklejki nie trafia
-     z definicji (0.367.0), a login albo nazwisko tak. Klik, który zawsze
+  /* NIEZNANY KOD OTWIERA SZUKANIE PO KLIENCIE. Po chybionym skanie
+     operator i tak klika „Szukaj po kliencie" — przy nieodebranej paczce
+     numer z naklejki nie trafia z definicji, a login albo nazwisko tak. Klik, który zawsze
      następuje, to klik do zdjęcia. Kluczem jest WYNIK, nie `brak`: każdy
      kolejny chybiony skan otwiera pole od nowa, także po Escape. Następny
-     skan etykiety w tym polu i tak rozpoznaje nasłuch ekranu (0.468.0). */
+     skan etykiety w tym polu i tak rozpoznaje nasłuch ekranu. */
   useEffect(() => {
     if (brak && onLogin) setSzukaKlienta(true);
   }, [wynik]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const panelKlienta = onLogin
     ? <div className="mt-2 rounded-lg border border-sky-200 bg-white p-2 text-xs">
-        {/* ── KTO TO: LOGIN, NAZWISKO Z NAKLEJKI ALBO TELEFON (0.367.0) ──────
+        {/* ── KTO TO: LOGIN, NAZWISKO Z NAKLEJKI ALBO TELEFON ────────────────
             Zgłoszenie właściciela: „szukanie nieodebranych paczek odbywa się
             głównie za pomocą loginu użytkownika i innych informacji na
             przesyłce". JEDNO POLE NA TRZY, bo człowiek przepisuje to, co widzi,
@@ -134,7 +123,7 @@ export function Szukanie({
           aria-label="Login, nazwisko albo telefon"
           placeholder="Login klienta, nazwisko z naklejki albo telefon"
           onChange={(e) => setKto(e.target.value)}
-          /* PYTAMY PO DOPISANIU UCHWYTU, nie po każdym znaku (0.365.0). Enter
+          /* PYTAMY PO DOPISANIU UCHWYTU, nie po każdym znaku. Enter
              i wyjście z pola to dwa ruchy, które operator i tak wykonuje —
              a zapytanie na znak byłoby dwunastoma odczytami na jedno nazwisko,
              i dwunastoma wpisami w dzienniku odczytów cudzych danych. */
@@ -162,10 +151,8 @@ export function Szukanie({
               w Allegro. Allegro szuka wyłącznie po pełnym loginie.</p>
           : <ul className="mt-2 space-y-1">
               {paczki.map((k) => {
-                /* CAŁY WIERSZ JEST ODNOŚNIKIEM do zamówienia w panelu Allegro
-                   (0.451.0). Do tego wydania klik wpisywał numer do
-                   rejestracji; rejestracja odeszła, a praca kończy się na
-                   stronie zamówienia. Bez skonfigurowanego adresu wiersz
+                /* CAŁY WIERSZ JEST ODNOŚNIKIEM do zamówienia w panelu Allegro,
+                   bo praca kończy się na stronie zamówienia. Bez skonfigurowanego adresu wiersz
                    zostaje samym opisem — link donikąd jest gorszy od braku. */
                 const tresc = <>
                     <span className="flex flex-wrap items-baseline gap-x-2">
@@ -184,7 +171,7 @@ export function Szukanie({
                       {k.odbiorcaNazwa &&
                         <span className="text-slate-600">{k.odbiorcaNazwa}</span>}
                     </span>
-                    {/* ── ADRES W WIERSZU (0.422.0) ──────────────────────────
+                    {/* ── ADRES W WIERSZU ────────────────────────────────────
                         Sama nazwa nie wystarczała: dwaj Kowalscy z jednego
                         miasta wyglądali w tej liście identycznie, a z tego
                         ekranu wychodzi się z czyimś numerem zamówienia w ręku.
@@ -200,14 +187,12 @@ export function Szukanie({
                     <span className="mt-0.5 block truncate text-slate-600">{k.zawartosc}</span>
                 </>;
                 const klasa = "block min-w-0 flex-1 rounded border border-slate-200 p-1.5 text-left text-xs";
-                /* ── PRZYJMIJ JAKO NIEODEBRANĄ (0.493.0) ──────────────────
+                /* ── PRZYJMIJ JAKO NIEODEBRANĄ ────────────────────────────
                    Decyzja właściciela: paczka, której klient nie odebrał,
                    ma iść tą samą drogą co zwrot — ocena, koszyk, ZW automatem,
-                   ślad oddanych pieniędzy. Do tego wydania kończyła się na
-                   stronie zamówienia w Allegro, a reszta działa się poza
-                   panelem.
+                   ślad oddanych pieniędzy — w panelu, nie w Allegro.
 
-                   OSOBNY PRZYCISK, nie klik w wiersz. Wiersz dalej otwiera
+                   OSOBNY PRZYCISK, nie klik w wiersz. Wiersz otwiera
                    Allegro: zajrzenie do zamówienia niczego nie może zakładać.
 
                    ZNIKA przy „ma już zwrot" — drugi zwrot to druga kwota za
@@ -241,7 +226,7 @@ export function Szukanie({
     <div className="flex items-center gap-2">
       <ScanLine size={16} className="shrink-0 text-slate-400" />
       <div className="relative flex min-w-0 flex-1 items-center">
-      {/* `data-skan-wlasny` (0.468.0): to pole czyta czytnik samo, przez
+      {/* `data-skan-wlasny`: to pole czyta czytnik samo, przez
           `SeriaWPolu`. Nasłuch ekranu je omija — dwie drogi naraz szukałyby
           tego samego kodu dwa razy. */}
       <input
@@ -251,7 +236,7 @@ export function Szukanie({
         value={fraza}
         onChange={(e) => onFraza(e.target.value)}
         onKeyDown={(e) => {
-          /* ESC ODDAJE KLAWISZE EKRANOWI (audyt zwrotów, 15 września 2026).
+          /* ESC ODDAJE KLAWISZE EKRANOWI (audyt zwrotów).
              Skróty milkną, gdy kursor stoi w polu — i słusznie — ale z pola
              nie było wyjścia bez myszy. Na nagraniu z biura `P` po skanie nie
              działało, a zwrot przyjmowało kliknięcie. Treść zostaje. */
@@ -281,12 +266,9 @@ export function Szukanie({
       </div>
       {szuka && <span className="shrink-0 text-xs text-slate-500">Szukam…</span>}
 
-      {/* DROGA PIERWSZOPLANOWA W RZĘDZIE POLA (0.338.0, przemianowana
-          w 0.451.0). Stał tu przycisk NIEODEBRANA otwierający
-          rejestrację paczki. Rejestracja odeszła decyzją właściciela, a z tego
-          formularza biuro brało tylko jedno — szukanie klienta po loginie.
-          Przycisk mówi więc wprost, co robi. */}
-      {/* IKONA, NIE NAPIS (0.454.0) — zgłoszenie właściciela „ulżyj
+      {/* DROGA PIERWSZOPLANOWA W RZĘDZIE POLA: szukanie klienta po loginie.
+          Przycisk mówi wprost, co robi. */}
+      {/* IKONA, NIE NAPIS — zgłoszenie właściciela „ulżyj
           przeładowaniu tekstem". Obie akcje tego rzędu są codzienne i stoją
           zawsze w tym samym miejscu, więc rozpoznaje się je po ikonie; nazwa
           zostaje w podpowiedzi i w nazwie dostępnej. Pole szukania zyskuje
@@ -334,20 +316,15 @@ export function Szukanie({
         naprawdę wpisał, gdy naklejka jest pomięta albo skan urwany. */}
     {brak && <div className="mt-2 rounded-lg bg-amber-50 p-2 text-xs text-amber-900">
       <p>Nie znam kodu <b className="break-all font-mono">{kod}</b>.</p>
-      {/* ── KOLEJNOŚĆ ODWRÓCONA W 0.367.0 ───────────────────────────────────
-          Do 0.366.0 pierwszym wyjściem było pytanie do Allegro, a rejestracja
-          stała za nim — na założeniu, że nietrafiony skan to zwykły wyścig
-          synchronizacji. Właściciel to założenie obalił: paczki nakleja klient
-          albo kurier i tych numerów w Allegro NIE MA. Numeru z wracającego
-          kartonu nasz system nie widział nigdy i nie zobaczy, więc pierwszy
-          skan takiej paczki chybia z definicji, a nie z opóźnienia.
+      {/* ── PYTANIE DO ALLEGRO NA DRUGIM MIEJSCU ────────────────────────────
+          Paczki nakleja klient albo kurier i tych numerów w Allegro NIE MA,
+          więc pierwszy skan takiej paczki chybia z definicji, a nie
+          z opóźnienia synchronizacji.
 
           Pytanie do Allegro zostaje, bo etykieta zwrotna ZGŁOSZONEGO zwrotu
-          wygląda tak samo i tamtą drogą się ją znajduje. Schodzi na drugie
-          miejsce, nie znika. */}
-      {/* JEDNA LINIJKA ZAMIAST AKAPITU (0.479.0). Lista pól, po których
-          szukałem, stała tu przy każdym chybionym skanie, a czytało się ją
-          raz. Zostaje w podpowiedzi; na ekranie zostaje to, co robić dalej. */}
+          wygląda tak samo i tamtą drogą się ją znajduje. */}
+      {/* JEDNA LINIJKA ZAMIAST AKAPITU. Listę pól, po których szukałem,
+          czyta się raz, więc stoi w podpowiedzi; na ekranie to, co robić dalej. */}
       <p className="mt-1 text-amber-800"
         title={"Szukałem po numerze listu, numerze i identyfikatorze zwrotu, numerze zamówienia, "
           + "numerze korekty, loginie i nazwisku — we wszystkich kubełkach. "
@@ -355,7 +332,7 @@ export function Szukanie({
         {onLogin ? "Nieodebrana paczka? Szukaj po kliencie." : "Szukałem we wszystkich kubełkach."}</p>
       {/* Drugie wyjście: szukanie po kliencie. Przy nieodebranej paczce
           numer listu nie trafi nigdy, a login albo nazwisko z naklejki tak.
-          Od 0.479.0 otwiera się samo; przycisk zostaje na powrót po Escape. */}
+          Otwiera się samo; przycisk zostaje na powrót po Escape. */}
       {onLogin && !szukaKlienta &&
         <button type="button" onClick={() => setSzukaKlienta(true)}
           className="btn-secondary mt-2 inline-flex items-center gap-1 text-xs">

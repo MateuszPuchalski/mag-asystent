@@ -6,7 +6,7 @@ import {
 import { Blad, Pole, Przycisk, czas } from "../ui";
 import { KartaWgladu } from "../ui/wglad";
 
-/* ── Aktualizacja serwera (0.492.0) ─────────────────────────────────────
+/* ── Aktualizacja serwera ───────────────────────────────────────────────
    Zamiast pulpitu zdalnego i `-Aktualizuj` w PowerShellu: wybór wydania,
    hasło, jeden przycisk. Serwer tylko ZLECA — wykonuje zadanie Harmonogramu
    (`instalator/zlecenie.ps1`), bo aktualizacja zatrzymuje usługę serwera,
@@ -40,9 +40,9 @@ function Ostatnia({ s }: { s: StanAktualizacji }) {
   return <p className="mb-3 text-sm">
     Ostatnia aktualizacja do <b>{o.wersja}</b>: <span className={e.klasa}>{e.zdanie}</span>
     {o.kto && <> · zlecił(a) {o.kto}</>} · {czas(o.do ?? o.od)}.
-    {/* Ścieżka pliku zeszła do dymka (0.521.0): czytającemu kartę mówi
-        tyle, że szczegóły są na serwerze, a adminowi przy pulpicie zdalnym
-        wystarczy najechać, żeby wiedzieć, który plik otworzyć. */}
+    {/* Ścieżka pliku stoi w dymku: czytającemu kartę wystarczy, że
+        szczegóły są na serwerze, a adminowi przy pulpicie zdalnym wystarczy
+        najechać, żeby wiedzieć, który plik otworzyć. */}
     {o.etap === "blad" && <> Szczegóły są w <span title="server\data\aktualizacja\ostatnia.log"
       className="underline decoration-dotted">dzienniku aktualizacji na serwerze</span>.</>}
   </p>;
@@ -50,8 +50,8 @@ function Ostatnia({ s }: { s: StanAktualizacji }) {
 
 /* Jedno zdanie o automacie: w jakim trybie jest i co zrobi. To samo zdanie
    kieruje taktem na serwerze, więc panel nie zgaduje. Zmiana trybu idzie
-   przez kartę „Serwer i kopie" tuż pod tą (od 0.529.0 klucze właściciela
-   stoją w grupie, na którą wpływają) — nie ma tu drugiego miejsca na tę decyzję. */
+   przez kartę „Serwer i kopie" tuż pod tą (klucze właściciela stoją
+   w grupie, na którą wpływają) — nie ma tu drugiego miejsca na tę decyzję. */
 const TRYB: Record<string, string> = {
   noc: "w nocy", zaraz: "gdy nikt nie pracuje", wylaczona: "wyłączona",
 };
@@ -62,14 +62,14 @@ function Automat({ a }: { a: NonNullable<StanAktualizacji["auto"]> }) {
     : `${a.tryb === "noc" ? ` ${a.okno.od}:00–${a.okno.do}:00` : ""}${wiek}${a.kanarek ? ", po kanarku" : ""}`;
   return <p className="mb-3 text-sm">
     <b>Automatycznie:</b> {TRYB[a.tryb] ?? a.tryb}{szczegoly}. {a.powod}
-    {/* Nazwa zmiennej zeszła do dymka (0.521.0) — na wierzchu mówimy, gdzie
-        to zmienić, a klucz dostaje ten, kto najedzie i go szuka. */}
+    {/* Nazwa zmiennej stoi w dymku — na wierzchu mówimy, gdzie to zmienić,
+        a klucz dostaje ten, kto najedzie i go szuka. */}
     {" "}<span className="text-slate-600">Tryb zmienisz niżej, w karcie <span title="Klucz AKTUALIZACJA_AUTO"
       className="underline decoration-dotted">„Serwer i kopie”</span>.</span>
   </p>;
 }
 
-/* ── Pasek postępu (0.504.0) ──────────────────────────────────────────
+/* ── Pasek postępu ────────────────────────────────────────────────────
    Kroki są PRAWDZIWE: zapisuje je instalator (`Set-WertisPostep`), a serwer
    podaje dalej. Żadnych procentów liczonych z zegara — pobieranie zależy od
    łącza, więc pasek z czasu kłamałby dokładnie wtedy, gdy ktoś na niego
@@ -167,7 +167,7 @@ export function Aktualizacja({ admin }: { admin: boolean }) {
           : "Serwer jeszcze nie sprawdzał wydań od startu — kliknij „Sprawdź teraz”."}</p>
       : <>
         <Zmiany zmiany={zmiany} />
-        {/* „CI" i „scalenie" to słowa z repozytorium, nie z biura (0.521.0). */}
+        {/* „CI" i „scalenie" to słowa z repozytorium, nie z biura. */}
         {!zPaczka.length && <p className="mb-3 text-sm text-slate-600">Nowsze wydanie nie ma jeszcze paczki
           do pobrania — zwykle pojawia się kilka minut później.</p>}
         {zPaczka.length > 0 && <form aria-label="Zlecenie aktualizacji" className="flex flex-wrap items-center gap-2"

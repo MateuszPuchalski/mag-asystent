@@ -3,9 +3,7 @@ import {
   CalendarClock, CalendarDays, CreditCard, NotebookPen, Package, Receipt,
   RefreshCw, ShoppingCart, Truck, Undo2, Wallet,
 } from "lucide-react";
-import type { Tag } from "../api/typy";
-import type { KandydatFaktury, PozycjaZwrotu, WpisOsiZwrotu, Zwrot }
-  from "../api/typy";
+import type { KandydatFaktury, WpisOsiZwrotu, Zwrot } from "../api/typy";
 import { PrzebiegZwrotu } from "./Os";
 import { Dokument, ikonaDokumentu } from "./Dokument";
 import { useDociagnijZamowienia, zlote } from "../api/zwroty";
@@ -20,13 +18,13 @@ import { etykietaKodu } from "./Pieniadze";
    gdzie coś się dzieje. Wyjątkiem są odnośniki: one nie zmieniają niczego
    u nas, tylko skracają drogę do Allegro, gdy naprawdę trzeba tam wejść.
 
-   Od 0.167.0 to kolumna o ZWROCIE, nie o towarze: zegar ustawowy, numery,
-   zamówienie klienta, fakt powrotu paczki. Produkty przeniosły się do
-   głównego okna (`Pozycje.tsx`), bo 340 px ucinało im nazwy w połowie. */
+   To kolumna o ZWROCIE, nie o towarze: zegar ustawowy, numery, zamówienie
+   klienta, fakt powrotu paczki. Produkty stoją w głównym oknie
+   (`Pozycje.tsx`), bo 340 px ucinałoby im nazwy w połowie. */
 
 /* Przewoźnicy i formy płatności po polsku. Kod nieznany pokazuje się SUROWY,
    bo Allegro nie publikuje zamkniętej listy przewoźników — sonda złapała
-   `UNKNOWN`, którego nie ma w żadnej specyfikacji. Eksport od 0.536.0:
+   `UNKNOWN`, którego nie ma w żadnej specyfikacji. Eksport, bo
    formularz numeru dosyłki na profilu nazywa przewoźników tymi samymi słowami.
    `OTHER` to identyfikator ze specyfikacji dla przewoźnika spoza Allegro
    (`swagger.yaml`, `OrdersShippingCarrier.id`). */
@@ -40,7 +38,7 @@ const PLATNOSCI: Record<string, string> = {
   SPLIT_PAYMENT: "podzielona", EXTENDED_TERM: "odroczona",
 };
 
-/* Statusy przesyłki z `/order/carriers/{id}/tracking` (0.187.0). Osiem kodów
+/* Statusy przesyłki z `/order/carriers/{id}/tracking`. Osiem kodów
    wymienia specyfikacja; nieznany pokazuje się SUROWY, jak przewoźnik. */
 const PRZESYLKA: Record<string, string> = {
   PENDING: "Przygotowana, czeka na nadanie.",
@@ -57,7 +55,7 @@ const STAN_KOSZA: Record<string, string> = {
   otwarty: "otwarty — zbiera towar", zamkniety: "na hali", rozlozony: "rozłożony", anulowany: "anulowany",
 };
 
-/* Tytuł jest OPCJONALNY (0.518.0): sekcja z jednym przyciskiem albo jednym
+/* Tytuł jest OPCJONALNY: sekcja z jednym przyciskiem albo jednym
    zdaniem nie potrzebuje nagłówka, który mówi to samo co jej treść. Ramka
    i odstęp zostają, żeby kolumna dalej czytała się blokami. */
 const Sekcja = ({ ikona, tytul, children }: {
@@ -89,7 +87,7 @@ function DociagnijZamowienia() {
     </button>
     {dociagnij.error && <p className="mt-1 text-xs text-red-700">
       {(dociagnij.error as Error).message}</p>}
-    {/* LICZBY, nie samo „gotowe" (0.220.0). Zero pobranych zamówień przy
+    {/* LICZBY, nie samo „gotowe". Zero pobranych zamówień przy
         dwunastu powiązanych kartotekach znaczy „zamówienia były, brakowało
         wiązania" — a to jest odpowiedź na pytanie, z którym się tu klika. */}
     {dociagnij.isSuccess && <p className="mt-1 text-xs text-slate-500">
@@ -101,7 +99,7 @@ function DociagnijZamowienia() {
 /**
  * Notatka biura — nasze ustalenia, których Allegro nie zna.
  *
- * STOI W TEJ SAMEJ KOLUMNIE CO PRZY REKLAMACJI (0.280.0) i to jest cała
+ * STOI W TEJ SAMEJ KOLUMNIE CO PRZY REKLAMACJI i to jest cała
  * decyzja o miejscu: dwa ekrany obsługi mają mieć jeden nawyk, nie dwa.
  *
  * Zapis JAWNYM przyciskiem, nie przy każdym znaku: notatka pisze się zdaniami,
@@ -129,7 +127,7 @@ function Notatka({ zwrot, trwa, blad, onZapisz, onCofnij }: {
       placeholder="Ustalenia, których Allegro nie zna"
       className="field resize-y text-sm" />
     {blad && <p className="text-xs text-red-700">{blad}</p>}
-    {/* PRZYCISK TYLKO PRZY ZMIANIE (0.518.0). Nieaktywny „Zapisz notatkę"
+    {/* PRZYCISK TYLKO PRZY ZMIANIE. Nieaktywny „Zapisz notatkę"
         stał pod każdym zwrotem jako główny przycisk kolumny — najmocniejszy
         kolor ekranu przy czynności, której właśnie nikt nie wykonuje. Pojawia
         się z pierwszą zmienioną literą, czyli tam, gdzie patrzy piszący. */}
@@ -153,7 +151,7 @@ function Notatka({ zwrot, trwa, blad, onZapisz, onCofnij }: {
 }
 
 /**
- * Etykieta wiersza zamówienia jako ikona (0.455.0).
+ * Etykieta wiersza zamówienia jako ikona.
  *
  * `<dt>` dalej NIESIE słowo — w `sr-only` i w podpowiedzi — więc lista opisów
  * zostaje listą opisów dla czytnika ekranu, a nie rzędem wartości bez pytań.
@@ -174,9 +172,9 @@ export function Dowody({ zwrot, kandydaciFaktury = [], fakturaTrwa = false,
   fakturaBlad?: string;
   /** Brak = kolumna nie proponuje wskazania (przycisk bez działania kłamie). */
   onFaktura?: (dokId: number | null) => void;
-  /** Przebieg sprawy (0.313.0); pusta lista nie rysuje sekcji. */
+  /** Przebieg sprawy; pusta lista nie rysuje sekcji. */
   os?: WpisOsiZwrotu[];
-  /** Kosze z towarem tego zwrotu (0.438.0) — druga strona wiązania kosz ↔ zwrot. */
+  /** Kosze z towarem tego zwrotu — druga strona wiązania kosz ↔ zwrot. */
   kosze?: Array<{ id: number; kod: string; status: string }>;
   trwaNotatka?: boolean;
   bladNotatki?: string;
@@ -191,24 +189,19 @@ export function Dowody({ zwrot, kandydaciFaktury = [], fakturaTrwa = false,
       <dl className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1">
         <dt className="text-slate-500">Zgłoszony</dt><dd>{czas(zwrot.utworzono)}</dd>
         <dt className="text-slate-500">Termin</dt>
-        {/* BRAK TERMINU TO ZDANIE, nie pusta komórka (0.339.0): pusta wygląda
+        {/* BRAK TERMINU TO ZDANIE, nie pusta komórka: pusta wygląda
             jak usterka panelu, a to jest stan — paczka jeszcze jedzie. */}
         <dd className={zwrot.dniDoTerminu !== null && zwrot.dniDoTerminu <= 3
           ? "font-bold text-ranga-zle" : ""}>
           {zwrot.terminAt ? czas(zwrot.terminAt) : "rusza, gdy paczka wróci"}</dd>
       </dl>
-      {/* DWÓCH ZDAŃ O TYM, JAK LICZY ALLEGRO, TU JUŻ NIE MA (0.370.0).
-          Powtarzały się przy KAŻDYM zwrocie, a mówiły o systemie, nie o tej
-          sprawie — po trzecim otwarciu ekranu nikt ich nie czyta, a miejsce
-          zajmują dalej. Zasada zegara stoi w `docs/panel-obslugi-klienta.md`
-          i w pastylce terminu, która mówi liczbę dla TEGO zwrotu. */}
+      {/* Bez zdań o tym, jak liczy Allegro: mówiłyby o systemie, nie o tej
+          sprawie. Liczbę dla TEGO zwrotu mówi pastylka terminu. */}
     </Sekcja>
 
-    {/* SEKCJI „ZWROT" TU JUŻ NIE MA (0.207.0). Numer i login kupującego stoją
-        w nagłówku sprawy, po lewej: tożsamość zwrotu czyta się jako pierwszą
-        i to ją się przepisuje, a numer stał dotąd w dwóch miejscach naraz.
-        Przewoźnik został — i przeniósł się do PACZKI ZWROTNEJ, bo mówi
-        o paczce, nie o zwrocie jako sprawie. */}
+    {/* Numer i login kupującego stoją w nagłówku sprawy, nie tutaj:
+        tożsamość zwrotu czyta się jako pierwszą, a jeden fakt ma jedno
+        miejsce. Przewoźnik stoi w PACZCE ZWROTNEJ, bo mówi o paczce. */}
     <Sekcja ikona={<ShoppingCart size={14} />} tytul="Zamówienie">
       {!zam
         ? <>
@@ -216,15 +209,13 @@ export function Dowody({ zwrot, kandydaciFaktury = [], fakturaTrwa = false,
               <span className="break-all font-mono text-xs">{zwrot.orderId ?? "—"}</span>
               {zwrot.orderId && <Skopiuj tekst={zwrot.orderId} />}
             </div>
-            {/* OBA ZDANIA KOŃCZĄ SIĘ RUCHEM (audyt, 15 września 2026). Pierwsze
-                odsyłało do CZEKANIA na synchronizację, choć przycisk „Dociągnij
-                teraz" stoi dwa wiersze niżej — operator czekał na coś, co miał pod
-                ręką. Drugie kończyło się ścianą: bez numeru zamówienia panel nie ma
-                czego dociągnąć, ale zwrot da się doprowadzić do końca i tak.
+            {/* OBA ZDANIA KOŃCZĄ SIĘ RUCHEM. Przycisk „Dociągnij teraz" stoi
+                dwa wiersze niżej, więc nie odsyłamy do czekania. Bez numeru
+                zamówienia panel nie ma czego dociągnąć, ale zwrot da się
+                doprowadzić do końca i tak.
 
-                PO JEDNYM ZDANIU NA GAŁĄŹ (0.518.0). Stały tu po dwa, a drugie
-                tłumaczyło system — skąd kartoteka, kiedy synchronizacja. Agent
-                potrzebuje tylko ruchu, który ma zrobić; powód stoi w tym komentarzu. */}
+                PO JEDNYM ZDANIU NA GAŁĄŹ: agent potrzebuje tylko ruchu, który
+                ma zrobić; powód stoi w tym komentarzu. */}
             <p className="mt-2 text-xs text-slate-500">
               {zwrot.orderId
                 ? "Zamówienia jeszcze nie pobrano — dociągnij je, żeby pozycje dostały kartotekę."
@@ -234,7 +225,7 @@ export function Dowody({ zwrot, kandydaciFaktury = [], fakturaTrwa = false,
             {/* NUMER ZAMÓWIENIA Z ODNOŚNIKIEM DO ALLEGRO I KOPIOWANIEM stoi na
                 pasku drogi klienta pod nagłówkiem (krok Zakup). Tu zostają
                 same fakty o zamówieniu. */}
-            {/* ── IKONA ZAMIAST ETYKIETY (0.455.0) ──────────────────────────
+            {/* ── IKONA ZAMIAST ETYKIETY ────────────────────────────────────
                 Zgłoszenie właściciela: „ulżyj przeładowaniu tekstem". Pięć
                 etykiet stało przy każdym zwrocie w tej samej kolejności, więc
                 po tygodniu czyta się je miejscem, nie słowem. Ikona trzyma
@@ -252,11 +243,9 @@ export function Dowody({ zwrot, kandydaciFaktury = [], fakturaTrwa = false,
                   nie ma karty, na którą oddać pieniądze. */}
               {zam.platnoscTyp && <><Etykieta ikona={<CreditCard size={15} />} nazwa="Płatność" />
                 <dd>{PLATNOSCI[zam.platnoscTyp] ?? zam.platnoscTyp}</dd></>}
-              {/* NAZWA WIERSZA, nie treść (0.176.0). Stało tu „Dokument" i to
-                  samo słowo tytułowało sekcję z numerem paragonu z Subiekta —
-                  więc „Dokument: nie wiadomo" czytało się jako „nie znaleziono
-                  dokumentu sprzedaży", stojąc obok znalezionego. To zdanie
-                  mówi o ŻYCZENIU KLIENTA i tylko o nim.
+              {/* NAZWA WIERSZA, nie treść. Nie „Dokument", bo to słowo tytułuje
+                  sekcję z numerem paragonu z Subiekta. To zdanie mówi
+                  o ŻYCZENIU KLIENTA i tylko o nim.
 
                   `null` znaczy „nie wiadomo" i tak się pokazuje — paragon
                   wpisany na ślepo kazałby wystawić niewłaściwą korektę. */}
@@ -271,7 +260,7 @@ export function Dowody({ zwrot, kandydaciFaktury = [], fakturaTrwa = false,
               {zam.pozycje.map((p, i) => <li key={`${p.offerId}-${i}`}
                 className={`flex items-start gap-2 rounded px-2 py-1 text-xs ${
                   p.zwracana ? "bg-amber-50 font-semibold" : "text-slate-600"}`}>
-                {/* ── ZDJĘCIE PRZY POZYCJI ZAMÓWIENIA (0.217.0) ─────────────
+                {/* ── ZDJĘCIE PRZY POZYCJI ZAMÓWIENIA ───────────────────────
                     Zgłoszenie właściciela: „wszędzie, gdzie jest odniesienie
                     do produktu, powinno być zdjęcie". Ta lista była ostatnim
                     miejscem w obsłudze, które wymieniało towary samym tekstem
@@ -301,12 +290,12 @@ export function Dowody({ zwrot, kandydaciFaktury = [], fakturaTrwa = false,
                         „EUR" w trzech wierszach. */}
                     <span className="whitespace-nowrap tabular-nums">
                       {p.ilosc} × {zlote(p.cenaGrosze, p.waluta)}</span>
-                {/* PLAKIETKA NIESIE SZTUKI (0.176.0). Samo „wraca" stało obok
+                {/* PLAKIETKA NIESIE SZTUKI. Samo „wraca" stało obok
                     liczby KUPIONYCH sztuk, więc „2 × 18,99 wraca" czytało się
                     jako „wracają dwie" przy zwrocie jednej. Przy zwrocie
                     całości „z 2" byłoby szumem — dlatego pada tylko wtedy,
                     gdy część zakupu zostaje u klienta. */}
-                    {/* STRZAŁKA POWROTU zamiast wersalików (0.455.0). Słowo
+                    {/* STRZAŁKA POWROTU zamiast wersalików. Słowo
                         „wraca" zostaje dla czytnika ekranu i w podpowiedzi,
                         a liczba — jedyne, co się tu zmienia — stoi obok ikony. */}
                     {p.zwracana && <span title="Wraca w tym zwrocie"
@@ -319,20 +308,17 @@ export function Dowody({ zwrot, kandydaciFaktury = [], fakturaTrwa = false,
             </ul>
           </>}
 
-      {/* PRZYCISK POD OBIEMA GAŁĘZIAMI (0.220.0). Do tego wydania stał tylko
-          przy zamówieniu NIEPOBRANYM — czyli znikał dokładnie tam, gdzie jest
+      {/* PRZYCISK POD OBIEMA GAŁĘZIAMI, bo przy zamówieniu pobranym bywa
           jedyną ręczną drogą do wiązania. Zamówienie bywa pobrane, a kartoteki
           i tak nie ma: wiąże ją przebieg, który ten przycisk uruchamia.
 
-          Bez numeru zamówienia przycisku dalej nie ma. Dociąganie nie zmieni
+          Bez numeru zamówienia przycisku nie ma. Dociąganie nie zmieni
           wtedy niczego, a obiecywałoby, że zmieni. */}
       {zwrot.orderId && <DociagnijZamowienia />}
 
-      {/* ── Dokument sprzedaży (0.174.0, wciągnięty do zamówienia w 0.176.0) ──
-          Do 0.175.0 stał osobną sekcją NA DNIE kolumny, pod wiadomościami —
-          czyli daleko od zamówienia, którego dotyczy, i pod wierszem
-          „Dokument", który mówił o czym innym. Właściciel powiedział wprost:
-          „dokument sprzedaży powinien być w zamówieniu". To jego druga strona:
+      {/* ── Dokument sprzedaży ──────────────────────────────────────────────
+          Właściciel: „dokument sprzedaży powinien być w zamówieniu". To jego
+          druga strona:
           zamówienie mówi, co klient kupił w Allegro, dokument — pod jakim
           numerem ta sprzedaż stoi w Subiekcie. Po tym numerze biuro wystawia
           korektę.
@@ -350,23 +336,18 @@ export function Dowody({ zwrot, kandydaciFaktury = [], fakturaTrwa = false,
     </Sekcja>
 
     <Sekcja ikona={<Package size={14} />} tytul="Paczka zwrotna">
-      {/* „Nadana", nie „wróciła" (0.169.0): przy paczce stoi data jej
-          UTWORZENIA przez klienta. Do 0.167.0 ekran nazywał ją powrotem
-          towaru i to było nieprawdą.
+      {/* „Nadana", nie „wróciła": przy paczce stoi data jej
+          UTWORZENIA przez klienta.
 
-          DRUGA NIEPRAWDA, zdjęta w 0.187.0: stało tu „Allegro nie podaje daty
-          doręczenia do nas". Podaje — tyle że nie w obiekcie zwrotu, lecz
+          Datę doręczenia do nas Allegro podaje nie w obiekcie zwrotu, lecz
           w `/order/carriers/{id}/tracking`, gdzie każda zmiana statusu ma
-          `occurredAt`. Zdanie wzięło się ze zbyt wąskiego czytania jednego
-          schematu i przez trzy wydania mówiło operatorowi, że czegoś nie da
-          się wiedzieć. */}
+          `occurredAt`. */}
       {zwrot.paczkaAt
         ? <>
             {/* Paczka nieodebrana nie została NADANA PRZEZ KLIENTA — wróciła
                 sama od przewoźnika, a `paczka_at` jest przy niej datą, w której
-                biuro wpisało ją do kolejki. Do 0.188.0 stało tu zdanie
-                o kliencie, który tej paczki właśnie nigdy nie nadał. */}
-            {/* „NIEODEBRANA" STOI RAZ, w plakietce nagłówka (0.518.0). Tu
+                biuro wpisało ją do kolejki. */}
+            {/* „NIEODEBRANA" STOI RAZ, w plakietce nagłówka. Tu
                 padała po raz trzeci — zostaje sama data, bo tylko ją ta
                 sekcja wie, a nagłówek nie. */}
             <p>{zwrot.zrodlo === "nieodebrana"
@@ -379,24 +360,18 @@ export function Dowody({ zwrot, kandydaciFaktury = [], fakturaTrwa = false,
                 ? <p className="mt-1 font-semibold text-ranga-uwaga">
                     {PRZESYLKA[zwrot.przesylkaStatus]
                       ?? `Przewoźnik mówi: ${zwrot.przesylkaStatus}.`}</p>
-                /* BRAK WIEDZY MÓWI O SOBIE, a nie udaje wiedzy (0.188.0).
-                   Stało tu „Jeszcze do nas nie dotarła" — zdanie twierdzące,
-                   którego nie mieliśmy z czego postawić, bo przewoźnik po
-                   prostu jeszcze nic nie powiedział. Ten sam błąd co dwa razy
-                   wcześniej w tej sekcji: ekran orzekał zamiast przyznać, że
-                   nie wie. */
+                /* BRAK WIEDZY MÓWI O SOBIE, a nie udaje wiedzy. Przewoźnik
+                   jeszcze nic nie powiedział, więc ekran nie orzeka, że
+                   paczka „nie dotarła". */
                 : <p className="mt-1 font-semibold text-ranga-uwaga">
                     Nie wiadomo, czy dotarła — przewoźnik nic jeszcze nie podał.</p>}
           </>
         : <p className="font-semibold text-ranga-uwaga">
             Klient nie nadał jeszcze paczki, a termin biegnie.</p>}
-      {/* Przewoźnik mówi o PACZCE, nie o zwrocie jako sprawie — do 0.206.0
-          stał w sekcji „Zwrot" razem z numerem i loginem. */}
+      {/* Przewoźnik mówi o PACZCE, nie o zwrocie jako sprawie. */}
       {zwrot.przewoznik && <p className="mt-1 text-slate-600">
         Przewoźnik: {PRZEWOZNICY[zwrot.przewoznik] ?? zwrot.przewoznik}</p>}
-      {/* NUMER LISTU OD 0.344.0. Do 0.343.0 panel go nie znał — polityka
-          0.163.0 trzymała numer wyłącznie w kopii odpowiedzi Allegro.
-          Decyzja właściciela: „zapisuj numery paczek". Stoi przy przewoźniku,
+      {/* NUMER LISTU. Decyzja właściciela: „zapisuj numery paczek". Stoi przy przewoźniku,
           bo razem odpowiadają na jedno pytanie: którą paczką to jechało.
           `font-mono`, bo czyta się go znak po znaku z naklejki. */}
       {zwrot.waybill && <p className="mt-1 text-slate-600">
@@ -405,12 +380,11 @@ export function Dowody({ zwrot, kandydaciFaktury = [], fakturaTrwa = false,
         Danych nadawcy i konta bankowego nie pobieramy.</p>
     </Sekcja>
 
-    {/* SEKCJI „TEN ZAKUP U NAS" TU JUŻ NIE MA. Inne sprawy tego zakupu
-        (rozmowy, reklamacje, drugi zwrot) mówi wyłącznie pasek drogi
-        klienta pod nagłówkiem, ze stanem, terminem i prowadzącym na przystanku.
-        Ten sam fakt w dwóch miejscach kazał sprawdzać, czy oba mówią to samo. */}
+    {/* Inne sprawy tego zakupu (rozmowy, reklamacje, drugi zwrot) mówi
+        wyłącznie pasek drogi klienta pod nagłówkiem. Ten sam fakt w dwóch
+        miejscach kazałby sprawdzać, czy oba mówią to samo. */}
 
-    {/* KOSZE Z TOWAREM TEGO ZWROTU (0.438.0). Pozycja pisała „w koszyku
+    {/* KOSZE Z TOWAREM TEGO ZWROTU. Pozycja pisała „w koszyku
         zwrotów" bez nazwy i bez drogi, a pytanie „gdzie jest towar z tego
         zwrotu" pada właśnie tutaj. Kosz wymieniał swoje zwroty od dawna —
         dopiero z tą sekcją wiązanie działa w obie strony. */}
@@ -425,28 +399,24 @@ export function Dowody({ zwrot, kandydaciFaktury = [], fakturaTrwa = false,
       </ul>
     </Sekcja>}
 
-    {/* ZLECENIE HALI ZE ZWROTU (0.502.0) — powód w `sprawy/ZlecHali.tsx`.
+    {/* ZLECENIE HALI ZE ZWROTU — powód w `sprawy/ZlecHali.tsx`.
         Towar jedzie z zadaniem tylko wtedy, gdy zwrot ma JEDNĄ znaną
         kartotekę: przy kilku zgadywanie wysłałoby magazyniera pod złą półkę.
-        Nagłówek „Hala" zszedł (0.518.0): stał nad jednym przyciskiem
-        „Zleć hali", który mówi to samo. */}
+        Bez nagłówka „Hala": przycisk „Zleć hali" mówi to samo. */}
     <Sekcja>
       <ZlecHali zrodlo="zwrot" zrodloRef={zwrot.id} tytul={`Zwrot ${zwrot.numer ?? zwrot.id}`}
         twId={jedynaKartoteka(zwrot.pozycje.map((p) => p.twId))} />
     </Sekcja>
 
     {zwrot.rejectionCode && <Sekcja ikona={<Receipt size={14} />} tytul="Rozstrzygnięte w Allegro">
-      {/* Brzmienie z `etykietaKodu` (0.536.1), to samo co w sekcji pieniędzy.
-          Do tego wydania stała tu osobna mapa i ta sama odmowa brzmiała na
-          jednym ekranie dwojako: „wysłano nowy towar” i „Wysłaliśmy nowy towar”. */}
+      {/* Brzmienie z `etykietaKodu`, to samo co w sekcji pieniędzy, żeby ta
+          sama odmowa nie brzmiała na jednym ekranie dwojako. */}
       <p className="font-semibold">{etykietaKodu(zwrot.rejectionCode)}</p>
     </Sekcja>}
 
-    {/* SEKCJI „PRACA BIURA" TU JUŻ NIE MA (0.370.0). Stała tu od 0.315.0 ze
-        znacznikiem prowadzącego i tagami sprawy; zgłoszenie właściciela
-        „uprość panel zwrotów do wymaganego minimum" zdjęło oba przy zwrotach.
-        Przy reklamacji zostają — tam prowadzący odpowiada na
-        prawdziwe pytanie, bo sprawę bierze konkretna osoba. */}
+    {/* Bez prowadzącego i tagów: właściciel kazał uprościć panel zwrotów
+        „do wymaganego minimum". Przy reklamacji zostają, bo tam sprawę
+        bierze konkretna osoba. */}
 
     {onNotatka && <Sekcja ikona={<NotebookPen size={14} />} tytul="Notatka biura">
       <Notatka zwrot={zwrot} trwa={trwaNotatka} blad={bladNotatki}
@@ -458,7 +428,7 @@ export function Dowody({ zwrot, kandydaciFaktury = [], fakturaTrwa = false,
         decyzją, drugie po fakcie — najczęściej przy zwrocie zamkniętym, gdy
         sprawa wraca pytaniem.
 
-        ZWINIĘTA DO ZDANIA I BEZ NAGŁÓWKA (0.518.0) — powód przy
+        ZWINIĘTA DO ZDANIA I BEZ NAGŁÓWKA — powód przy
         `PrzebiegZwrotu`. Zdanie zaczyna się od „Ostatnio:", więc nagłówek
         „Przebieg sprawy" nad nim byłby drugim tytułem jednego wiersza. */}
     {os.length > 0 && <Sekcja>

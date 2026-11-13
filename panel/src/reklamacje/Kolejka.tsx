@@ -37,12 +37,12 @@ export const KUBELKI: Array<{ id: KubelekReklamacji; etykieta: string; pytanie: 
   /* CZWARTY KUBEŁEK, nie ukrycie. Sprawa z zamkniętą rozmową i terminem sprzed
      miesiąca nie jest pracą — Allegro nie przyjmie już wiadomości, a zegar nic
      nie mierzy. Zniknięcie z kolejki musi mieć jednak widoczne uzasadnienie
-     i własny licznik; ta sama reguła co przy zwrotach rozliczonych (0.339.0). */
+     i własny licznik; ta sama reguła co przy zwrotach rozliczonych. */
   { id: "bez_ruchu", etykieta: "Bez ruchu", pytanie: "Nic tu nie zrobimy." },
 ];
 
-/* Etykieta stoi W MAPIE, nie w łańcuchu `?:` przy renderze — ta sama poprawka
-   co przy zwrotach w 0.209.0. Łańcuch milcząco podpisywałby każdy nowy sygnał
+/* Etykieta stoi W MAPIE, nie w łańcuchu `?:` przy renderze. Łańcuch
+   milcząco podpisywałby każdy nowy sygnał
    ostatnią gałęzią, czyli kłamałby na ekranie zamiast nie przejść kompilacji. */
 export const SYGNALY: Record<SygnalReklamacji,
   { tytul: string; krotko: string; ikona: React.ReactNode; klasa: string }> = {
@@ -76,10 +76,6 @@ export const SYGNALY: Record<SygnalReklamacji,
     krotko: "towar?", klasa: "bg-violet-100 text-violet-800", ikona: <PackageSearch size={13} /> },
 };
 
-/* `dniSlowo` mieszka w `ui/` od audytu z 15 września 2026 — stało w trzech
-   kolejkach przepisane znak w znak. Re-eksport zostaje, bo wołają je stąd
-   sąsiednie pliki i test tej kolejki. */
-export { dniSlowo } from "../ui";
 
 /**
  * Kwota w grze — oś porządku „kwota”.

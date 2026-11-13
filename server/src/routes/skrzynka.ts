@@ -67,13 +67,13 @@ export async function skrzynkaRoutes(app: FastifyInstance) {
      Tożsamość bierze z SESJI: `?userId=` pozwalałby czytać cudzą listę pracy,
      a to monitoring pracowniczy pod inną nazwą.
 
-     Od 0.535.0 lista niesie też SPRAWY KLIENTÓW prowadzone przez tę osobę
+     Lista niesie też SPRAWY KLIENTÓW prowadzone przez tę osobę
      (S6) — scala je `mojaLista`, bo `droga-klienta.ts` nie może znać serwisu
      sprawy. Ta sama zasada tożsamości: cudzych spraw klienta nie widać tu
      wcale, a ich listy per osoba nie ma nigdzie (art. 22² KP).
 
      DWA KLUCZE NA JEDNO WYDANIE. Scalona lista idzie pod `lista`, a `sprawy`
-     zostaje samymi kolejkami. Karta panelu sprzed 0.535.0 rozkłada
+     zostaje samymi kolejkami. Stara karta panelu rozkłada
      `KOLEJKI[s.kolejka]` bez zapasu i wiersz `klient` wywróciłby jej ekran
      przy najbliższym odświeżeniu, co 30 sekund, po nocnej aktualizacji.
      Panel nie ma granicy błędu ani sam się nie przeładowuje. `sprawy` może
@@ -103,7 +103,7 @@ export async function skrzynkaRoutes(app: FastifyInstance) {
     try { return osRozmowy(Number(req.params.id)); } catch (e) { return blad(reply, e); }
   });
 
-  /* ── Pobranie załącznika (0.155.0) ────────────────────────────────────────
+  /* ── Pobranie załącznika ────────────────────────────────────────
      ADRES ALLEGRO NIE IDZIE DO PRZEGLĄDARKI, i to jest cała treść tej trasy.
 
      `attachments[].url` wskazuje `upload.allegro.pl`. Czy ten adres otwiera
@@ -212,7 +212,7 @@ export async function skrzynkaRoutes(app: FastifyInstance) {
   });
 
   /**
-   * Zdjęcie listingowe oferty (0.213.0).
+   * Zdjęcie listingowe oferty.
    *
    * OSOBNA TRASA, nigdy pole `osRozmowy` — dokładnie z tego powodu, co przy
    * kartotece (`GET /api/products/:twId/zdjecie`). Oś rozmowy odświeża się przy
@@ -220,8 +220,8 @@ export async function skrzynkaRoutes(app: FastifyInstance) {
    * Osobny adres daje też 304, czyli „to samo, co masz" za cenę nagłówka.
    *
    * ADRES IDZIE Z NASZEGO SERWERA, nie z `a.allegroimg.com`, i to jest cała
-   * treść decyzji z 0.213.0: zakaz z 0.178.0 dotyczył wyjścia PRZEGLĄDARKI
-   * biura poza własną sieć, a nie zdjęcia. Wychodzi serwer, który i tak
+   * treść decyzji: zakaz dotyczy wyjścia PRZEGLĄDARKI biura poza własną
+   * sieć, a nie zdjęcia. Wychodzi serwer, który i tak
    * rozmawia z Allegro.
    *
    * 404 znaczy „nie ma czego pokazać" i jest ODPOWIEDZIĄ, nie awarią: oferta
@@ -292,7 +292,7 @@ export async function skrzynkaRoutes(app: FastifyInstance) {
         req.body?.body ?? "", req.body?.mentionedUserIds ?? []); } catch (e) { return blad(reply, e); }
     });
 
-  /* ── Obecność i uchwyt rozmowy (0.159.0) ──────────────────────────────────
+  /* ── Obecność i uchwyt rozmowy ──────────────────────────────────
      Ta trasa jest ZAPISEM tylko z nazwy: cały stan żyje w pamięci procesu
      i wygasa sam (§6.3). Do bazy nie idzie nic, więc „zero zapisu przy
      patrzeniu" obowiązuje mimo tego, że wejście na ekran ją woła.
@@ -339,7 +339,7 @@ export async function skrzynkaRoutes(app: FastifyInstance) {
     } catch (e) { return blad(reply, e); }
   });
 
-  /* DOKUMENTY SPRZEDAŻY ZAMÓWIENIA (0.499.0) — soczewka „Faktura". Osobna
+  /* DOKUMENTY SPRZEDAŻY ZAMÓWIENIA — soczewka „Faktura". Osobna
      trasa z tego samego powodu co historia klienta niżej: panel woła ją
      tylko przy pytaniu o fakturę, a oś przeładowuje się przy każdym
      zdarzeniu. Czysty odczyt; tylko dokumenty z numerem zamówienia. */
@@ -367,7 +367,7 @@ export async function skrzynkaRoutes(app: FastifyInstance) {
   app.get<{ Params: { id: string } }>("/api/obsluga/rozmowy/:id/klient",
     async (req, reply) => {
       const nie = odmowa(reply); if (nie) return nie;
-      /* Z doklejoną sprawą klienta (0.535.0) — powód przy `zeSprawa`.
+      /* Z doklejoną sprawą klienta — powód przy `zeSprawa`.
          Login sprawy osobno od loginu historii: rozmowa bez rozmówcy
          w wątku należy do sprawy kupującego z jej zamówienia. */
       const id = Number(req.params.id);
@@ -375,7 +375,7 @@ export async function skrzynkaRoutes(app: FastifyInstance) {
       catch (e) { return blad(reply, e); }
     });
 
-  /* Przekrój towaru (0.502.0) — trzeci mostek: zwroty, sprawy i rozmowy
+  /* Przekrój towaru — trzeci mostek: zwroty, sprawy i rozmowy
      o tej kartotece obok siebie. Ta sama bramka co historia klienta, bo
      niesie cudze zakupy. Odczyt niczego nie zapisuje; powód i granice
      w `services/przekroj-towaru.ts`. */
@@ -387,7 +387,7 @@ export async function skrzynkaRoutes(app: FastifyInstance) {
       return przekrojTowaru(twId);
     });
 
-  /* SKRZYNKA WZMIANEK (§6.4, 0.160.0). `userId` bierze się z SESJI, nigdy
+  /* SKRZYNKA WZMIANEK (§6.4). `userId` bierze się z SESJI, nigdy
      z parametru — wzmianka niesie fragment komentarza wewnętrznego, a cudzych
      notatek nikt tu oglądać nie ma. Trasa listy niczego nie odhacza. */
   app.get<{ Querystring: { tylkoNowe?: string } }>("/api/obsluga/wzmianki",
@@ -410,7 +410,7 @@ export async function skrzynkaRoutes(app: FastifyInstance) {
       } catch (e) { return blad(reply, e); }
     });
 
-  /* RĘCZNEGO STATUSU NIE MA (22 września 2026, decyzja właściciela). Trasa
+  /* RĘCZNEGO STATUSU NIE MA (decyzja właściciela). Trasa
      `/status` nadawała odłożenie, „Rozwiązana", „Zamknięta" i „Spam". Status
      rozmowy wynika odtąd wyłącznie z faktów: z kierunku ostatniej wiadomości
      i ze zlecenia pomiaru. Cenę opisuje `docs/panel-obslugi-klienta.md` §7:
@@ -418,7 +418,7 @@ export async function skrzynkaRoutes(app: FastifyInstance) {
      ktoś nie odpisze. Werdykty zapisane przed tą zmianą zostają w kolumnie,
      a nowa wiadomość klienta budzi je jak dotąd. */
 
-  /* Priorytet rozmowy (§10.2, 0.181.0). Ręczna flaga — automat nie ma z czego
+  /* Priorytet rozmowy (§10.2). Ręczna flaga — automat nie ma z czego
      jej wyliczyć, dopóki §26 nie rozstrzygnie terminu odpowiedzi. */
   app.post<{ Params: { id: string }; Body: { priorytet?: string } }>(
     "/api/obsluga/rozmowy/:id/priorytet", async (req, reply) => {
@@ -455,7 +455,7 @@ export async function skrzynkaRoutes(app: FastifyInstance) {
       }
     });
 
-  /* ZNACZNIK „SPRAWA REKLAMACYJNA" (0.390.0) — NASZ, nie Allegro.
+  /* ZNACZNIK „SPRAWA REKLAMACYJNA" — NASZ, nie Allegro.
      Sprawy posprzedażowej sprzedawca nie może założyć: `/sale/issues`
      w specyfikacji ma wyłącznie GET, otwiera ją kupujący. Ta trasa mówi
      wyłącznie, że biuro prowadzi tę rozmowę jak reklamację.
@@ -501,7 +501,7 @@ export async function skrzynkaRoutes(app: FastifyInstance) {
       } catch (e) { return blad(reply, e); }
     });
 
-  /* ── RĘCZNE WSKAZANIE ZAMÓWIENIA (0.397.0) ─────────────────────────────────
+  /* ── RĘCZNE WSKAZANIE ZAMÓWIENIA ─────────────────────────────────
      Zgłoszenie właściciela: klient napisał pod OFERTĄ o braku w paczce, a
      rozmowa nie miała zamówienia wcale — bo wątek z Centrum Wiadomości niesie
      JEDEN obiekt powiązany i przy pytaniu spod oferty jest nim oferta.
@@ -518,9 +518,9 @@ export async function skrzynkaRoutes(app: FastifyInstance) {
       } catch (e) { return blad(reply, e); }
     });
 
-  /* ── PACZKA ZAMÓWIENIA ROZMOWY NA KLIKNIĘCIE (23 września 2026) ─────────────
-     Bliźniak trasy reklamacji z 0.393.0. Rozmowa pod zamówieniem
-     pyta najczęściej „gdzie paczka", a blok zamówienia tego nie mówił.
+  /* ── PACZKA ZAMÓWIENIA ROZMOWY NA KLIKNIĘCIE ─────────────
+     Bliźniak trasy reklamacji. Rozmowa pod zamówieniem pyta najczęściej
+     „gdzie paczka".
      Dwa żądania do Allegro, więc na JAWNE kliknięcie: otwarcie rozmowy czyta
      wyłącznie stan zapisany wcześniej (zero zapisu przy patrzeniu). */
   app.post<{ Params: { id: string } }>(
@@ -545,7 +545,7 @@ export async function skrzynkaRoutes(app: FastifyInstance) {
       }
     });
 
-  /* Ręczne wskazanie KARTOTEKI dla oferty z rozmowy (0.179.0). SKU sprzedawcy
+  /* Ręczne wskazanie KARTOTEKI dla oferty z rozmowy. SKU sprzedawcy
      bywa puste albo trafia w dwie kartoteki naraz — wtedy rozstrzyga człowiek,
      a wybór podpisuje się jego imieniem. `twId: null` zdejmuje powiązanie. */
   app.post<{ Params: { id: string }; Body: { ofertaId?: string; twId?: number | null } }>(
@@ -562,9 +562,8 @@ export async function skrzynkaRoutes(app: FastifyInstance) {
      idempotencji i audytem — zajmuje się serwis.
 
      OBIE FLAGI JAWNEJ ZGODY MUSZĄ BYĆ WYMIENIONE Z NAZWY — w typie i niżej.
-     Pole, którego trasa nie deklaruje, ginie po cichu: `mimoObecnosci` jechał
-     tędy od 0.190.0 i nie dojeżdżał, więc miękka blokada obecności zachowywała
-     się jak twarda przez pełne TTL uchwytu (poprawione w 0.224.1). Zgoda
+     Pole, którego trasa nie deklaruje, ginie po cichu, a wtedy miękka blokada
+     obecności zachowuje się jak twarda przez pełne TTL uchwytu. Zgoda
      wyrażona przez człowieka i zgubiona przez kod jest gorsza niż brak
      przycisku. */
   app.post<{ Params: { id: string }; Body: {
@@ -588,11 +587,11 @@ export async function skrzynkaRoutes(app: FastifyInstance) {
     } catch (e) { return konflikt(reply, e); }
   });
 
-  /* Cofnięta wysyłka (0.500.0) — sam wpis do pomiaru tarcia. Czekanie
+  /* Cofnięta wysyłka — sam wpis do pomiaru tarcia. Czekanie
      dziesięciu sekund mieszka w przeglądarce, więc serwer inaczej by o tym
      nie wiedział. Powód i granice przy `services/tarcie.ts`.
 
-     `msOdKolejki` (0.532.0) jest opcjonalne i NIEZAUFANE: liczba spoza
+     `msOdKolejki` jest opcjonalne i NIEZAUFANE: liczba spoza
      0–60 s odpada po cichu, a cofnięcie i tak się liczy. Pomiar nie ma
      prawa odrzucić wpisu, który mówi o decyzji agenta już podjętej. */
   app.post<{ Params: { id: string }; Body: { msOdKolejki?: number } }>(
@@ -606,7 +605,7 @@ export async function skrzynkaRoutes(app: FastifyInstance) {
       return { ok: true };
     });
 
-  /* Pominięcie rozmowy (26 września 2026, 0.532.0) — sam licznik doby
+  /* Pominięcie rozmowy — sam licznik doby
      i klasy, bez autora i bez numeru rozmowy. Ta sama bramka co reszta
      skrzynki: licznik pisze tylko ten, kto rozmowy w ogóle widzi.
 
@@ -620,7 +619,7 @@ export async function skrzynkaRoutes(app: FastifyInstance) {
     return { ok: true };
   });
 
-  /* ── ZAKOŃCZ / OTWÓRZ PONOWNIE (23 września 2026) ──────────────────────────
+  /* ── ZAKOŃCZ / OTWÓRZ PONOWNIE ──────────────────────────
      Jeden werdykt zamiast menu statusów — powód w `conversations.ts` przy
      `wyliczStatus`. Zakończenie z pytaniem klienta bez odpowiedzi wymaga
      jawnej zgody (`mimoPytania`): bez niej 409, a ekran pyta raz. */
@@ -642,7 +641,7 @@ export async function skrzynkaRoutes(app: FastifyInstance) {
       } catch (e) { return konflikt(reply, e); }
     });
 
-  /* ── ODŁÓŻ DO TERMINU (0.533.0) ──────────────────────────────────────────
+  /* ── ODŁÓŻ DO TERMINU ──────────────────────────────────────────
      Powód i granice przy `odlozRozmowe`. `doKiedy: null` zdejmuje odłożenie —
      tą drogą chodzą „Cofnij" i „Wróć teraz". Brak pola to błąd, nie zdjęcie:
      puste ciało nie może po cichu budzić rozmowy. */
@@ -658,7 +657,7 @@ export async function skrzynkaRoutes(app: FastifyInstance) {
       } catch (e) { return konflikt(reply, e); }
     });
 
-  /* ── Załączniki do odpowiedzi (0.195.0) ────────────────────────────────────
+  /* ── Załączniki do odpowiedzi ────────────────────────────────────
      Plik jedzie base64 w JSON, jak zdjęcia dowodowe z kolektora — `bodyLimit`
      API stoi na 6 MiB i to on wyznacza nasz próg 4 MiB na plik (uzasadnienie
      przy `LIMIT_NASZ`). Multipart wymagałby wtyczki Fastify, czyli nowej

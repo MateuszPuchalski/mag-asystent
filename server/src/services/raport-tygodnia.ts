@@ -6,7 +6,7 @@ import { czasOdpowiedzi } from "./czas-odpowiedzi.js";
 import { kosztUsd } from "./copilot-koszt.js";
 import { migawki, zrobMigawke, type WpisMigawki } from "./migawka-dnia.js";
 
-/* ── Raport tygodnia (0.497.0) ──────────────────────────────────────────────
+/* ── Raport tygodnia ────────────────────────────────────────────────────────
    Zgłoszenie właściciela: „co śledzić automatycznie i dodać automatyczne
    raporty tygodniowe". Analiza liczyła wszystko, ale zawsze „ostatnie N dni
    od teraz" i tylko wtedy, gdy ktoś ją otworzył. Tydzień do tygodnia nie dało
@@ -28,7 +28,7 @@ import { migawki, zrobMigawke, type WpisMigawki } from "./migawka-dnia.js";
    który biuro patrzy na co dzień.
 
    ŻADNYCH LUDZI. Raport per osoba jest monitoringiem pracowniczym (Kodeks
-   pracy art. 22², podstawa przy `raportWydajnosci`) i od 0.431.0 czyta go
+   pracy art. 22², podstawa przy `raportWydajnosci`) i czyta go
    wyłącznie administrator, na żywo. Raport zapisywany co tydzień i czytany
    przez całe biuro byłby jego trwałą kopią, dostępną szerzej. Ludzi nie ma
    tu z zasady, nie z przeoczenia.
@@ -38,7 +38,7 @@ import { migawki, zrobMigawke, type WpisMigawki } from "./migawka-dnia.js";
    brak, a nie liczy go w locie.                                            */
 
 /** Podbij przy każdej zmianie reguły liczenia albo kształtu `RaportTygodnia`.
- *  2 (0.507.0): koszt Copilota dolicza wyszukiwania w sieci, płatne od sztuki. */
+ *  2: koszt Copilota dolicza wyszukiwania w sieci, płatne od sztuki. */
 export const WERSJA_RAPORTU = 2;
 
 /* Tyle tygodni wstecz automat nadrabia po przerwie. Cztery, bo miesiąc to
@@ -137,8 +137,8 @@ export function zbudujRaport(poniedzialek: string, database: Db = defaultDb()): 
   const praca = database.prepare(`SELECT created_at FROM events WHERE ${W_OKNIE_ZDARZEN}
       AND type IN (${PRACA.map(() => "?").join(",")}) AND ${bezDubli("")}`)
     .all(od, doChwili, ...PRACA) as Array<{ created_at: string }>;
-  /* Dzień po czasie LOKALNYM, nie `date(created_at)` — lekcja 0.31.1
-     przy `analiza()`: wieczorna zmiana należy do swojej doby, nie do UTC. */
+  /* Dzień po czasie LOKALNYM, nie `date(created_at)` — jak przy `analiza()`:
+     wieczorna zmiana należy do swojej doby, nie do UTC. */
   const pozycjeWgDnia = dni.map(() => 0);
   for (const z of praca) {
     const i = dni.indexOf(dataLokalna(z.created_at));

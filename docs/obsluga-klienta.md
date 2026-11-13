@@ -148,11 +148,7 @@ cache zapytań zamiast ręcznego odświeżania co dwadzieścia sekund. Walidacj�
 formularzy w jednym miejscu i testy frontu. Jeden zestaw nawyków, jedno
 logowanie, jeden nagłówek i jedną listę spraw do rozstrzygnięcia.
 
-**Przeprowadzka szła widok po widoku**, z makietami
-w `docs/projekt-widokow-jeden-front/`. F0 to decyzja, F1 fundament, F2 DO
-DECYZJI i dostawy, F3 kosze, F4 stan systemu, dziennik i analiza, F5
-ustawienia, F6 skasowanie `biuro.html`. Trasy API biura zostały te same.
-Odstępstwa od makiet:
+**Ustalenia ekranu biura:**
 
 - DO DECYZJI to ekran startowy, liczony w locie, bez tabeli i statusu.
 - Kosze mieszkają w zakładce Zwroty (przełącznik Zwroty · Kosze), bo kosz
@@ -164,7 +160,7 @@ Odstępstwa od makiet:
 
 ### 8. Kiedy nowa obsługa jest gotowa?
 
-Siedemnaście zdań sprawdzalnych okiem stoi w `panel-obslugi-klienta.md` §25.
+Kryteria sprawdzalne okiem stoją w `panel-obslugi-klienta.md` §25.
 Najkrótsze niesie sens całości: agent obsłuży typowe pytanie bez otwierania
 panelu Allegro. **Dopuszczalnej długości przerwy** w pracy biura nie nazwał
 ani ten plik, ani projekt docelowy.
@@ -529,15 +525,8 @@ a ulica rozstrzyga to w jednym spojrzeniu.
 
 ## Polityka danych dyskusji
 
-Dyskusja leży w tej samej tabeli co reklamacja i obowiązuje ją ta sama
-polityka. Różnice:
-
-- **Zapisujemy mniej, bo Allegro daje mniej.** Przy `type: "DISPUTE"` schemat
-  nie niesie numeru sprawy, terminu, tytułu prawnego, powodu, oczekiwania ani
-  kwoty. Prośba o zakończenie wysyła tekst agenta z inną wartością `type`.
-- **Załączników wychodzących nie ma.** Zdarzenia `dyskusja_odpowiedz`
-  i `dyskusja_zakonczenie` niosą długość, los próby i kody.
-- **Hala nie widzi dyskusji. Do dostawcy modelu nie idzie stąd nic.**
+Panel nie pobiera już dyskusji. Stare leżą w tabeli reklamacji i obowiązuje je
+ta sama polityka.
 
 ## Polityka danych sprawy klienta
 

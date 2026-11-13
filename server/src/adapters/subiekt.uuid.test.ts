@@ -2,7 +2,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { WZORZEC_UUID_TSQL, uuidZTekstu, wyrazenieUuid } from "./subiekt.uuid.js";
 
-/* ── UUID z uwag dokumentu (0.175.0) ─────────────────────────────────────────
+/* ── UUID z uwag dokumentu ─────────────────────────────────────────
    Wolny tekst z `dok_Uwagi` nie ma prawa trafić do naszej bazy. Przechodzi
    wyłącznie ciąg o kształcie UUID-a — i te testy pilnują obu zapór.        */
 

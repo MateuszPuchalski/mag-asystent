@@ -39,7 +39,7 @@ function NoweZadanie({ zamknij }: { zamknij: () => void }) {
     defaultValues: { rodzaj: "pomiar", priorytet: "normalny", tytul: "", instrukcja: "" },
   });
   const komunikat = Object.values(formState.errors)[0]?.message;
-  /* OKNO OD 0.546.0: bez roli, bez Escape i bez fokusu w środku. Fokus
+  /* OKNO: rola, Escape i fokus w środku. Fokus
      startuje w tytule, bo rodzaj i priorytet mają wartości domyślne.
      Escape zamyka tylko NIETKNIĘTY formularz. Wpisana instrukcja dla hali
      to praca, której Escape z rozpędu nie ma prawa wyrzucić; od tego jest
@@ -88,15 +88,13 @@ function NoweZadanie({ zamknij }: { zamknij: () => void }) {
   </div>;
 }
 
-/* ── ZDJĘCIE OD HALI (§13.3, 0.352.0) ────────────────────────────────────────
+/* ── ZDJĘCIE OD HALI (§13.3) ─────────────────────────────────────────────────
    Są pytania, na które tekst nie odpowiada: „czy to ta sama wtyczka", „co jest
-   na tabliczce", „jak wygląda pęknięcie". Agent przepisywał wtedy opis ze słów
-   magazyniera i wysyłał go kupującemu jako WŁASNE ustalenie.
+   na tabliczce", „jak wygląda pęknięcie". Bez obrazu agent przepisywałby opis
+   ze słów magazyniera i wysyłał go kupującemu jako WŁASNE ustalenie.
 
    Obraz ciągnie `useZdjecieZadania`, nie `<img src>`: trasa stoi za sesją,
-   więc goły `src` dostałby 401 i narysował ikonę zepsutego obrazu. Ta blizna
-   jest w nagłówku `useZdjecie.ts` kupiona trzy razy — czwarty raz byłby
-   świadomy.                                                                  */
+   więc goły `src` dostałby 401 (nagłówek `useZdjecie.ts`).                */
 function ZdjecieHali({ zadanieId, zalacznik }: { zadanieId: number; zalacznik: ZalacznikZadania }) {
   const { url, blad, ponow } = useZdjecieZadania(zadanieId, zalacznik.id);
   return <figure className="min-w-0">
@@ -128,12 +126,11 @@ const POWODY: Record<string, string> = {
   nie_da_sie: "Nie da się wykonać",
 };
 
-/* ── ODESŁANE WRACA DO BIURA (0.352.0) ───────────────────────────────────────
-   Hala do 0.351.0 miała jedno wyjście — wynik — więc magazynier przed pustą
-   półką albo wpisywał brak JAKO WYNIK, albo zostawiał zadanie w toku na
-   zawsze. Teraz odsyła je z powodem, a ruch wraca tutaj i MUSI mieć stąd
-   wyjście: ponowienie albo anulowanie. Bez tych dwóch przycisków odesłanie
-   byłoby tylko nową ślepą uliczką, tyle że lepiej opisaną.
+/* ── ODESŁANE WRACA DO BIURA ─────────────────────────────────────────────────
+   Hala odsyła zadanie z powodem, gdy nie da się go wykonać, a ruch wraca
+   tutaj i MUSI mieć stąd wyjście: ponowienie albo anulowanie. Bez tych dwóch
+   przycisków odesłanie byłoby tylko nową ślepą uliczką, tyle że lepiej
+   opisaną.
 
    Instrukcja jest edytowalna od razu, bez osobnego okna: reakcją na
    „nie da się" jest zwykle przeformułowanie zlecenia, a nie powtórzenie go
@@ -200,15 +197,14 @@ export function Zadania() {
       ? ["nowe", "w_toku", "odeslane"].includes(t.status) : t.status === filtr));
   const odeslanych = wszystkie.filter((t) => t.status === "odeslane").length;
 
-  /* Ekran ma własny scroller, bo rama panelu trzyma się okna (0.165.0)
+  /* Ekran ma własny scroller, bo rama panelu trzyma się okna
      i celowo nie przewija za ekrany. Poniżej `lg` klasa jest bezczynna:
      bez związanej wysokości nie ma czego przewijać. */
   return <div className="lg:h-full lg:overflow-y-auto">
-    {/* ── JEDEN RZĄD NAGŁÓWKA, BEZ TYTUŁU (0.524.0) ─────────────────────────
-        Tytuł „Zadania terenowe" powtarzał podświetloną zakładkę, a podpis pod
-        nim mówił, skąd wracają wyniki — rzecz wiadoma po pierwszym dniu.
-        Zostaje to, czym się tu pracuje: sito i akcja główna, w jednym rzędzie
-        jak na liście koszy i zwrotów. */}
+    {/* ── JEDEN RZĄD NAGŁÓWKA, BEZ TYTUŁU ─────────────────────────────────
+        Tytuł powtarzałby podświetloną zakładkę. Zostaje to, czym się tu
+        pracuje: sito i akcja główna, w jednym rzędzie jak na liście koszy
+        i zwrotów. */}
     <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
       {/* Filtr miał WŁASNĄ bieżnię — białą, w obwódce, z pigułką 14 px na
           `px-4 py-2` — i jako jedyny z sześciu nie miał `aria-pressed`.
@@ -226,8 +222,8 @@ export function Zadania() {
             etykieta: v === "odeslane" && odeslanych ? `${l} (${odeslanych})` : l,
           }))} />
       </div>
-      {/* Napisy przycisków zwykłą pisownią (0.524.0), jak w reszcie panelu:
-          wersaliki krzyczały głośniej niż karty zadań, które się tu czyta. */}
+      {/* Napisy przycisków zwykłą pisownią, jak w reszcie panelu:
+          wersaliki krzyczałyby głośniej niż karty zadań, które się tu czyta. */}
       <Przycisk wariant="glowny" onClick={() => setModal(true)}>
         <Plus size={18} />Zadanie dla magazynu</Przycisk>
     </div>
@@ -251,31 +247,26 @@ export function Zadania() {
                 <span className="rounded bg-red-100 px-2 py-0.5 text-xs font-bold text-red-700">PILNE</span>}
             </div>
             <p className="mt-2 whitespace-pre-wrap text-tresc text-slate-600">{t.instrukcja}</p>
-            {/* ── SKĄD TO ZADANIE (0.408.0) ───────────────────────────────
-                Do 0.407.0 kontekst rozmowy był doklejony do instrukcji, więc
-                jechał RAZEM z nią na kolektor. Zszedł tutaj, bo odpowiada na
-                pytanie biura („czego to dotyczyło"), a nie hali („co zrobić").
+            {/* ── SKĄD TO ZADANIE ─────────────────────────────────────────
+                Kontekst rozmowy stoi tutaj, a nie w instrukcji, bo odpowiada
+                na pytanie biura („czego to dotyczyło"), a nie hali („co
+                zrobić"). Na kolektor nie jedzie.
 
                 WYCISZONY I MNIEJSZY, nie zwinięty: karta zadania jest mała,
                 a kontekst to dwa, trzy wiersze — zwijka kosztowałaby
                 kliknięcie przy każdym powrocie po wynik. */}
             {t.kontekst && <p className="mt-2 whitespace-pre-wrap border-l-2 border-slate-200
               pl-2 text-podpis text-slate-500">{t.kontekst}</p>}
-            {/* ODNOŚNIK DO SPRAWY (0.502.0): kontekst mówił, skąd zadanie,
-                ale nie prowadził tam. Decyzja po wyniku zapada w sprawie. */}
+            {/* ODNOŚNIK DO SPRAWY: decyzja po wyniku zapada w sprawie. */}
             {t.cel && maEkran(t.cel) && <Link to={t.cel}
               className="mt-1 inline-flex items-center gap-1 text-podpis font-semibold text-sky-800 underline underline-offset-2">
               <ArrowUpRight size={12} aria-hidden="true" />{NAZWA_ZRODLA[t.cel.split("/")[2]] ?? "Otwórz sprawę"}</Link>}
           </div>
         </div>
-        {/* ── PASEK TOWARU ZE ZDJĘCIEM (0.203.0) ────────────────────────
-            Zadanie terenowe zleca się na konkretną kartotekę, a kafelek
-            mówił o niej symbolem i nazwą w jednej linijce. Biuro zleca
-            pomiary seriami i wraca do tego ekranu po wyniki — wtedy pytanie
-            brzmi „które to było", a odpowiada na nie kształt części.
-            Kolektor pokazuje zdjęcie przy zadaniu od dawna (§ zadania
-            terenowe); ekran zlecającego był jedynym końcem tej pary bez
-            obrazu.
+        {/* ── PASEK TOWARU ZE ZDJĘCIEM ──────────────────────────────────
+            Biuro zleca pomiary seriami i wraca do tego ekranu po wyniki —
+            wtedy pytanie brzmi „które to było", a odpowiada na nie kształt
+            części.
 
             Nazwa idzie przed symbolem, jak w wyszukiwarce: to ona wraca
             w rozmowie z magazynem. */}
@@ -300,17 +291,14 @@ export function Zadania() {
           {t.wynik && <div className="rounded-lg bg-os-wynik p-3">
             <div className="mb-1 text-xs font-bold uppercase text-ranga-ok">Wynik z magazynu</div>
             <p className="whitespace-pre-wrap text-tresc">{t.wynik}</p></div>}
-          {/* ── ZEGAR MÓWI, JAK STARE JEST PYTANIE (0.352.0) ───────────────
+          {/* ── ZEGAR MÓWI, JAK STARE JEST PYTANIE ─────────────────────────
               Sam znacznik „15.09.2026, 08:00" wymaga od czytelnika odjęcia
               w głowie, a kartę ogląda się między jedną rozmową a drugą.
-              Zadanie sprzed trzech dni wyglądało dokładnie tak samo jak
-              sprzed trzech minut — i tak samo się o nim zapominało.
 
-              „Zlecone ... temu", nie „czeka": blizna 0.251.0 mówi, że zegar
-              nazwany „czeka" musi być prawdziwy, a przy zadaniu W TOKU nikt
-              nie czeka — ktoś je właśnie robi. Wiek zlecenia jest prawdziwy
-              w każdym otwartym stanie, bo odpowiada na inne pytanie: jak
-              dawno biuro poprosiło. */}
+              „Zlecone ... temu", nie „czeka": zegar nazwany „czeka" musi być
+              prawdziwy, a przy zadaniu W TOKU nikt nie czeka — ktoś je
+              właśnie robi. Wiek zlecenia jest prawdziwy w każdym otwartym
+              stanie, bo odpowiada na pytanie: jak dawno biuro poprosiło. */}
           <p className="text-xs text-slate-500">
             {t.zleconeOdMs != null
               ? <>Zlecone <b className="text-slate-700">{wiek(t.zleconeOdMs)} temu</b> · {t.utworzonoPrzez}</>

@@ -7,7 +7,7 @@ import { policzZwroty, wyczyscZwroty } from "./zwroty-reset.js";
 import { ocenPozycje, rozstrzygnijZwrot } from "./zwroty.js";
 import { zamknijKosz } from "./kosze-zwrotow.js";
 
-/* ── Czyszczenie zwrotów przed ponownym pobraniem (0.199.0) ─────────────────
+/* ── Czyszczenie zwrotów przed ponownym pobraniem ───────────────────────────
    Cztery rzeczy, których pomyłka kosztuje najwięcej: kursor musi wrócić do
    zera, zamknięty koszyk musi PRZEŻYĆ, zadanie w kolejce musi przeżyć,
    a oddane pieniądze mają zatrzymać całość.                                */
@@ -75,7 +75,7 @@ test("ZAMKNIĘTY koszyk i jego zadanie mm zostają nietknięte", () => {
   const KTO = biuro(d);
   const { id, poz } = zwrotZTowarem(d, KTO);
   const koszId = ocenPozycje(d, poz, "stan", 2, KTO).koszyk!;
-  /* Korekta przed zamknięciem — od 0.200.0 bez niej MM nie wychodzi wcale,
+  /* Korekta przed zamknięciem — bez niej MM nie wychodzi wcale,
      a ten test pilnuje właśnie tego, że WYSTAWIONE zadanie przeżywa. */
   d.prepare("UPDATE zwrot_klienta SET korekta_numer='KFS 1/2026' WHERE id=?").run(id);
   zamknijKosz(d, koszId, KTO);

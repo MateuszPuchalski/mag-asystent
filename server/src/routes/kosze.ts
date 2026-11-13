@@ -73,7 +73,7 @@ export async function koszeRoutes(app: FastifyInstance) {
   });
 
   /**
-   * Przeliczenie zawartości zamkniętego koszyka ze zwrotów (0.334.0).
+   * Przeliczenie zawartości zamkniętego koszyka ze zwrotów.
    *
    * Zgłoszenie właściciela: „dodałem zestaw, a powinienem rozbić go przed
    * dodaniem do MM". Serwis odmawia, gdy dokument już wyszedł — trasa nie
@@ -95,7 +95,7 @@ export async function koszeRoutes(app: FastifyInstance) {
       }
     });
 
-  /* Ponowienie MM kosza stojących w błędzie (0.503.0). Bramka BIURA, bo to
+  /* Ponowienie MM kosza stojących w błędzie. Bramka BIURA, bo to
      drugi zapis do bazy firmy — uzasadnienie i wyjątek przerwanych przy
      `ponowMmKosza`. */
   app.post<{ Params: { id: string }; Body: { sprawdzono?: boolean } }>(
@@ -106,7 +106,7 @@ export async function koszeRoutes(app: FastifyInstance) {
         ponowMmKosza(db(), Number(req.params.id), autor(), req.body?.sprawdzono === true));
     });
 
-  /* Zdjęcie kartoteki z MM kosza, które nie weszło (0.530.0). Bramka BIURA:
+  /* Zdjęcie kartoteki z MM kosza, które nie weszło. Bramka BIURA:
      to zmiana treści dokumentu w bazie firmy. Uzasadnienie przy `usunZMmKosza`. */
   app.post<{ Params: { id: string }; Body: { twId?: number } }>(
     "/api/biuro/kosze/:id/mm-usun", async (req, reply) => {
@@ -166,7 +166,7 @@ export async function koszeRoutes(app: FastifyInstance) {
      zamiast id, bo id nie ma na fizycznej etykiecie. */
   app.get<{ Params: { kod: string } }>("/api/kosze/kod/:kod", async (req, reply) => {
     const kosz = koszPoKodzie(decodeURIComponent(req.params.kod));
-    /* Etykieta koszyka wirtualnego (0.350.0) odsyła do dokumentu MM, zamiast
+    /* Etykieta koszyka wirtualnego odsyła do dokumentu MM, zamiast
        otwierać drugi kosz na ten sam towar. */
     if (kosz && jestKoszemWirtualnym(kosz)) {
       return reply.code(404).send({ error: odmowaKoszaWirtualnego(kosz.kod) });
@@ -186,7 +186,7 @@ export async function koszeRoutes(app: FastifyInstance) {
     }
   );
 
-  /* `potwierdzenie` mówi, CZYM adres został potwierdzony (0.189.0). Starszy
+  /* `potwierdzenie` mówi, CZYM adres został potwierdzony. Starszy
      APK go nie zna i wysyła samo `recznie` — wtedy wyprowadzamy je z tamtej
      flagi, bo do 0.189.0 istniały tylko dwie drogi: skan półki i wpis.
 

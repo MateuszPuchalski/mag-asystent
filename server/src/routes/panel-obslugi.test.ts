@@ -12,16 +12,15 @@ process.env.SGT_MODE = "seeded";
 let app: FastifyInstance;
 before(async () => { app = await (await import("../index.js")).buildApp(); });
 
-/* Do 0.146.0 ścieżki ekranów panelu stały tu wypisane z ręki — dwie sztuki.
-   Rozmowa ma od tego wydania własny adres, więc lista rosłaby bez końca,
-   a każdy pominięty ekran dawał 404 po odświeżeniu strony.
+/* Ścieżki ekranów panelu nie są wypisane z ręki w trasie, bo każdy
+   pominięty ekran dawałby 404 po odświeżeniu strony.
 
    Test celowo NIE zakłada, że panel jest zbudowany: w CI `npm test` biegnie
    przed `npm run build`. Sprawdza więc rzecz, która nie zależy od builda —
    że głęboki link dostaje TO SAMO co korzeń. */
 const EKRANY = ["/obsluga/", "/obsluga/skrzynka", "/obsluga/skrzynka/4821",
   "/obsluga/reklamacje", "/obsluga/reklamacje/17",
-  /* 0.435.0: dostawa po numerze dokumentu, Zadania pod własnym adresem
+  /* Dostawa po numerze dokumentu, Zadania pod własnym adresem
      i druk protokołu — link do nich wklejony koledze ma otworzyć panel. */
   "/obsluga/zadania", "/obsluga/dostawy", "/obsluga/dostawy/802", "/obsluga/druk/protokol/802",
   "/obsluga/dziennik", "/obsluga/analiza", "/obsluga/stan"];
@@ -53,7 +52,7 @@ test("zasoby nie wychodzą poza katalog builda", async () => {
   }
 });
 
-/* ── Pieczątka wersji panelu (audyt, 15 września 2026) ──────────────────────
+/* ── Pieczątka wersji panelu (audyt) ──────────────────────
    `npm run build` w `server/` NIE przebudowuje panelu. Kto pomyli katalog,
    dostaje API z nowego kodu i ekran obsługi ze starego builda — a `/api/health`
    melduje przy tym nową wersję, więc wdrożenie wygląda na udane. Siedemnaście
@@ -99,7 +98,7 @@ test("zgodne wersje i brak panelu MILCZĄ, bo żadne z nich nie jest usterką", 
   assert.equal(problemZWersji(null, "0.355.0"), null);
 });
 
-/* ── Typ `.webp` na białej liście (0.419.0) ──────────────────────────────────
+/* ── Typ `.webp` na białej liście ──────────────────────────────────
    Ikona karty przeglądarki jedzie przez Vite do `assets/` razem z resztą
    builda. Bez wpisu w tabeli typów wyszłaby jako strumień bajtów i pasek
    przeglądarki zostałby pusty — czyli dokładnie tak, jak wyglądał przed tym

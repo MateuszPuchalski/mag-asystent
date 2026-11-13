@@ -1,11 +1,10 @@
-import React from "react";
 import { describe, expect, it, beforeEach, vi, afterEach } from "vitest";
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { Zwijka } from "./Zwijka";
 
-/* ── Zwijany blok (0.342.0, pamięć od 0.389.0) ───────────────────────────────
-   Testy pilnują trzech rzeczy, z których każda była powodem powstania:
+/* ── Zwijany blok ────────────────────────────────────────────────────────────
+   Testy pilnują trzech rzeczy:
 
    1. ZAMKNIĘTY NAPRAWDĘ CHOWA. Blok, który tylko udaje zwinięcie, nie oddaje
       ani piksela wysokości — a po to powstał.

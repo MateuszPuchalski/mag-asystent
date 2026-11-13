@@ -1,18 +1,17 @@
-import React, { useRef, useState } from "react";
+import { useRef, useState } from "react";
 import { Check, PackagePlus, ScanLine } from "lucide-react";
 import { useDolozTowar, useTowaryDoKosza } from "../api/zwroty";
 import { Blad } from "../ui";
 import { SeriaWPolu } from "../skaner";
 
-/* ── Towar do koszyka: skan albo kartoteka (0.365.0) ─────────────────────────
+/* ── Towar do koszyka: skan albo kartoteka ───────────────────────────────────
    Zgłoszenie właściciela: „dodaj możliwość dodawania produktów do koszyka
    zwrotowego poprzez zeskanowanie produktu lub wybranie go z kartoteki",
    a zaraz po nim granica: „tylko z poziomu obsługi zwrotów, jak jeszcze nie
    jest zamknięty".
 
    DLACZEGO TO STOI PRZY OTWARTYM ZWROCIE, a nie przy pasku koszyka. Pasek
-   pokazuje się dopiero z zawartością (0.192.0, punkt 2 dekalogu) i tej reguły
-   nie ruszamy — a pierwszą sztukę trzeba gdzieś zeskanować. Poza tym operator
+   pokazuje się dopiero z zawartością (punkt 2 dekalogu) — a pierwszą sztukę trzeba gdzieś zeskanować. Poza tym operator
    stoi wtedy nad OTWARTYM KARTONEM konkretnej paczki: ekran idzie za
    czynnością fizyczną (dekalog, punkt 1).
 
@@ -35,7 +34,7 @@ export function DolozTowar(
   { rodzaj = "zwroty", koszId, wiersz = false }: {
     rodzaj?: "zwroty" | "odpad"; koszId?: number;
     /**
-     * Tryb paska koszyka (0.453.0): pole stoi otwarte na stałe, wyniki
+     * Tryb paska koszyka: pole stoi otwarte na stałe, wyniki
      * rozwijają się POD nim, a zdanie „czego to nie robi" idzie do podpowiedzi.
      * Przy pudle ten skan jest jedyną czynnością — przycisk „otwórz pole"
      * byłby kliknięciem przed każdą serią skanów. W karcie zwrotu zostaje
@@ -56,7 +55,7 @@ export function DolozTowar(
 
   const dodaj = (twId: number, symbol: string) => {
     setBlad("");
-    /* KOSZYK WPROST, gdy pole stoi przy konkretnym pudle (0.379.0). Bez tego
+    /* KOSZYK WPROST, gdy pole stoi przy konkretnym pudle. Bez tego
        skan przy drugim kartonie wpadałby do pierwszego albo odbijałby się od
        pytania „do którego" — a pytanie zadane przy pudle, które człowiek ma
        przed sobą, byłoby pytaniem o to, co już powiedział. */
@@ -102,7 +101,7 @@ export function DolozTowar(
     </li>)}
   </ul>;
 
-  /* `data-skan-wlasny` (0.468.0): to pole samo czyta czytnik i dokłada towar.
+  /* `data-skan-wlasny`: to pole samo czyta czytnik i dokłada towar.
      Nasłuch ekranu zwrotów omija je, bo inaczej zabrałby mu skan EAN-u. */
   const pole = <input className="field h-8 min-w-0 flex-1 text-sm" autoFocus={!wiersz} value={fraza}
     data-skan-wlasny=""
@@ -119,7 +118,7 @@ export function DolozTowar(
       }
       const { podmien } = seria.current.klawisz(e, fraza);
       /* Podmiana zjada znak i wstawia SAMĄ serię — inaczej szósty znak
-         kodu doleciałby jeszcze do starej treści (blizna 0.329.0). */
+         kodu doleciałby jeszcze do starej treści. */
       if (podmien !== null) { e.preventDefault(); setFraza(podmien); return; }
       if (e.key !== "Enter") return;
       e.preventDefault();

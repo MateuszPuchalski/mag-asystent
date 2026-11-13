@@ -1,7 +1,7 @@
 import { config } from "../config.js";
 import { rozpoznajMime } from "./zdjecia.sgt.js";
 
-/* ── Usuwanie tła ze zdjęcia z kolektora (0.88.0) ────────────────────────────
+/* ── Usuwanie tła ze zdjęcia z kolektora ────────────────────────────
    CAŁY kontakt z usługą `wertis-tlo` żyje w TYM pliku — z tego samego powodu,
    dla którego cały kontakt ze źródłem zdjęć żyje w `zdjecia.sgt.ts`, a wszystkie
    wywołania COM w `SferaComAdapter.cs`. Gdy usługa zmieni protokół albo model,

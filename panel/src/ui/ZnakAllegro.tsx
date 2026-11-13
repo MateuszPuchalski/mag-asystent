@@ -1,6 +1,6 @@
 import React from "react";
 
-/* ── Znak słowny Allegro (0.252.0) ───────────────────────────────────────────
+/* ── Znak słowny Allegro ─────────────────────────────────────────────────────
    MATERIAŁ CUDZY, tak jak `docs/allegro/swagger.yaml`. Ścieżka pochodzi
    z pakietu `simple-icons` w wersji 16.30.0 (`icons/allegro.svg`), barwa marki
    `#FF5A00` z `data/simple-icons.json`, źródło podane tam jako `allegro.pl`.
@@ -8,8 +8,8 @@ import React from "react";
    a my używamy go wyłącznie po to, żeby wskazać, DOKĄD prowadzi odnośnik.
 
    ── DLACZEGO WKLEJONA, A NIE POBIERANA ────────────────────────────────────
-   Zakaz hotlinkowania do serwerów Allegro obowiązuje w tym panelu od 0.210.0
-   i dotyczy tak samo znaku, jak zdjęć ofert: `<img src="https://a.allegroimg…">`
+   Zakaz hotlinkowania do serwerów Allegro dotyczy tak samo znaku, jak zdjęć
+   ofert: `<img src="https://a.allegroimg…">`
    wyprowadziłby przeglądarkę biura poza własną sieć przy każdym otwarciu
    rozmowy. Zależność npm w panelu byłaby 3 000 ikon dla jednej; ścieżka wklejona
    waży 2,2 kB i nie ma czego aktualizować, dopóki Allegro nie zmieni znaku.
@@ -18,7 +18,7 @@ import React from "react";
    To jest LOGOTYP SŁOWNY — napis „allegro", nie symbol. Postawiony obok wyrazu
    „Allegro" czytałby się jako „allegro Otwórz w Allegro". Zastępuje więc ten
    wyraz w odnośniku, a nazwę oddaje czytnikowi ekranu przez `aria-label`:
-   dostępna nazwa odnośnika zostaje „Otwórz w Allegro", tak jak była.
+   dostępna nazwa odnośnika to „Otwórz w Allegro".
 
    ── DLACZEGO KADROWANY `viewBox` ──────────────────────────────────────────
    W kratce 24×24 znak zajmuje pasek 24 × 8,04 (zmierzone przez `getBBox`),

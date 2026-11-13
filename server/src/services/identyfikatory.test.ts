@@ -73,10 +73,10 @@ const TABELA: Array<{ opis: string; sym: string; oczekiwane: Array<[string, stri
     po: "`OME:` w środku prozy" },
   { opis: "OEM: 1234567 W zestawie uszczelka - W53-0501", sym: "Q", oczekiwane: [["oem", "1234567"]],
     po: "„W zestawie” bez dwukropka kończy sekcję OEM — symbol z kompletu nie jest numerem OEM" },
-  /* ── Rodzina „zamiennik" (0.234.0) ────────────────────────────────────────
+  /* ── Rodzina „zamiennik" ──────────────────────────────────────────────────
      Te same etykiety co w `zamienniki.ts`, bo mówią o tej samej liście. Tamten
      parser zostawia z niej wyłącznie NASZE kartoteki; ten zatrzymuje resztę,
-     czyli numery obcych katalogów — dotąd nie zapisywał ich nikt. */
+     czyli numery obcych katalogów. */
   { opis: "Zam: 76-041 // 06-01001 // 510037", sym: "W24-0502",
     oczekiwane: [["zamiennik", "76-041"], ["zamiennik", "06-01001"], ["zamiennik", "510037"]],
     po: "`Zam:` z dwukropkiem otwiera listę" },
@@ -96,10 +96,9 @@ test("parser identyfikatorów: kształty z prawdziwych opisów", () => {
 
 test("na pełnej kartotece przebudowa daje setki identyfikatorów, nie zero i nie tysiące", () => {
   const w = I.przebudujIdentyfikatory(db());
-  /* PROGI PODNIESIONE W 0.234.0, bo doszła rodzina „zamiennik": z 530 kartotek
-     zrobiło się 973, z 1742 numerów — 3443, z czego 1701 z sekcji zamienników.
-     To nie jest rozluźnienie strażnika: dolna granica pilnuje, że reguły
-     w ogóle trafiają w dane, a górna — że parser nie zaczął mielić prozy. */
+  /* Progi z rodziną „zamiennik": 973 kartoteki i 3443 numery, z czego 1701
+     z sekcji zamienników. Dolna granica pilnuje, że reguły w ogóle trafiają
+     w dane, a górna — że parser nie zaczął mielić prozy. */
   assert.ok(w.kartotek >= 800 && w.kartotek <= 1100, `kartotek z identyfikatorem: ${w.kartotek}`);
   assert.ok(w.identyfikatorow >= 3000 && w.identyfikatorow < 5000, `identyfikatorów: ${w.identyfikatorow}`);
   const zSekcjiZamiennikow = Number((db().prepare(

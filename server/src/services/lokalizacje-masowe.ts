@@ -5,11 +5,11 @@ import { parseLocs } from "../locs.js";
 import { validateLocationCode } from "./locations.js";
 import { enqueueSetLocation } from "./queue.js";
 
-/* ── Masowa podmiana adresów z arkusza (0.138.0) ─────────────────────────────
+/* ── Masowa podmiana adresów z arkusza ───────────────────────────────────────
    Właściciel eksportuje kartoteki z Subiekta, poprawia kolumnę adresu
    w Excelu i wgrywa plik z powrotem. Przestawienie jednego regału to 125
-   kartotek — dotąd jedyną drogą była karta towaru na kolektorze, jeden towar
-   na raz, czyli dzień pracy zamiast dwóch minut.
+   kartotek — kartą towaru na kolektorze, towar po towarze, to dzień pracy
+   zamiast dwóch minut.
 
    TA FUNKCJA NICZEGO NIE ZAPISUJE. Liczy raport i to samo liczenie obsługuje
    podgląd oraz wykonanie — bo podgląd, który pokazuje co innego, niż się
@@ -26,7 +26,7 @@ export interface WierszArkusza {
   symbol: string;
   lokalizacja: string;
   /**
-   * Obecne kody, które mają ZOSTAĆ mimo podmiany (0.139.0).
+   * Obecne kody, które mają ZOSTAĆ mimo podmiany.
    *
    * Puste albo pominięte = zachowanie sprzed tej wersji, czyli arkusz
    * podmienia CAŁE pole. Wybór dotyczy wyłącznie kodów, których w arkuszu nie
@@ -192,7 +192,7 @@ export function przeliczImport(wiersze: WierszArkusza[]): RaportImportu {
       continue;
     }
 
-    /* ── Wybór, co zostaje z obecnego pola (0.139.0) ──────────────────────
+    /* ── Wybór, co zostaje z obecnego pola ────────────────────────────────
        Kartoteka bywa w kilku miejscach naraz i nie wszystkie dotyczą regału,
        który właśnie przestawiamy: obok adresu regału stoi paleta, bufor albo
        kod spoza wzorca („KT1", „paleta64"), których arkusz nie zna. Podmiana

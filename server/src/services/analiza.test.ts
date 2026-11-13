@@ -10,7 +10,7 @@ import path from "node:path";
 
    1. BUCKETOWANIE PO DNIU LOKALNYM. Znaczniki w bazie są w UTC, a zdarzenie
       z 23:30 UTC należy do NASTĘPNEGO dnia polskiego. Liczone w SQL po dobie
-      UTC wieczorna zmiana lądowałaby w złym dniu — lekcja 0.31.1.
+      UTC wieczorna zmiana lądowałaby w złym dniu.
    2. REGUŁA bezDubli. Rozłożenie linii emituje dwa zdarzenia; policzone
       podwójnie zawyżałoby pracę całej hali.
    3. STARE ZDARZENIA `search` BEZ LICZBY WYNIKÓW. Potraktowane jako zero
@@ -146,7 +146,7 @@ test("zapytania zliczają się bez rozróżniania wielkości liter", () => {
 });
 
 test("stare zdarzenia bez liczby wyników NIE trafiają do listy braków", () => {
-  /* Zdarzenia sprzed 0.48.0 niosą samo `q`. Brak pola to „nieznane" —
+  /* Stare zdarzenia niosą samo `q`. Brak pola to „nieznane" —
      potraktowany jako zero zrobiłby z całej historii listę braków. */
   zdarzenie({ typ: "search", payload: { q: "stare zapytanie" } });
   zdarzenie({ typ: "search", payload: { q: "brakujacy towar", wynikow: 0 } });

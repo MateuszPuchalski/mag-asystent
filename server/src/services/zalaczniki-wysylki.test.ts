@@ -7,8 +7,7 @@ import {
   dodajZalacznik, LIMIT_NASZ, MAKS_ZALACZNIKOW, usunZalacznik, zalacznikiRozmowy,
 } from "./zalaczniki-wysylki.js";
 
-/* ── Załączniki do odpowiedzi (0.195.0) ──────────────────────────────────────
-   Odczyt załączników klienta działał od 0.155.0, wysyłka nie istniała wcale.
+/* ── Załączniki do odpowiedzi ────────────────────────────────────────────────
    Te testy pilnują dwóch rzeczy, na których stoi reszta:
 
    1. WALIDACJA IDZIE PRZED SIECIĄ. Odmowę typu i rozmiaru agent ma zobaczyć

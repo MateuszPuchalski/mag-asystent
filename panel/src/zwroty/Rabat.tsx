@@ -1,15 +1,14 @@
-import React, { useState } from "react";
+import { useState } from "react";
 import { BadgePercent } from "lucide-react";
 import type { StanRabatu } from "../api/typy";
 import { Przycisk } from "../ui";
 import { zlote } from "../api/zwroty";
 
-/* Rabat transakcyjny przy pozycji zwrotu (0.164.0).
+/* Rabat transakcyjny przy pozycji zwrotu.
 
-   Do tego wydania firma odzyskiwała prowizję klikając ręcznie przy KAŻDYM
-   zwrocie w panelu Allegro — nie dlatego, że tak trzeba, tylko dlatego, że
-   znikąd nie było widać, przy którym wniosek już jest. Obserwacja z 2 września
-   pokazuje skalę: 60 wniosków na 100 złożył człowiek, 40 Allegro samo.
+   Bez tego bloku nie widać, przy którym zwrocie wniosek już jest, i prowizję
+   odzyskuje się ręcznie przy KAŻDYM. Około 40 wniosków na 100 Allegro
+   składa samo.
 
    Cztery stany mają CZTERY różne zdania, bo każde każe co innego zrobić:
    złożyć, poczekać, nic (przyznany) albo pójść do Allegro po odwołanie. */
@@ -22,7 +21,7 @@ const ZDANIE: Record<StanRabatu["stan"], string> = {
 };
 
 /**
- * Krótki napis znacznika (0.455.0) — pełne zdanie z `ZDANIE` stoi w podpowiedzi.
+ * Krótki napis znacznika — pełne zdanie z `ZDANIE` stoi w podpowiedzi.
  *
  * „Rabat transakcyjny:" powtarzał się przy każdej pozycji każdego zwrotu. Ikona
  * procentu mówi „rabat", a znacznik zostawia samo to, co się zmienia: stan.
@@ -51,7 +50,7 @@ export function Rabat({ rabat, trwa, blad, onZglos }: {
   blad: string;
   onZglos: () => void;
 }) {
-  /* ── WNIOSEK PYTA „NA PEWNO" (audyt, 15 września 2026) ────────────────────
+  /* ── WNIOSEK PYTA „NA PEWNO" (audyt) ────────────────────
      §25a.5 daje cofnięcie wszędzie, gdzie da się cofnąć, a potwierdzenie tam,
      gdzie się nie da. Tu się nie da: wniosek idzie do Allegro, panel nie ma
      końcówki do jego wycofania, a drugiego na tę samą pozycję złożyć nie można
@@ -104,7 +103,7 @@ export function Rabat({ rabat, trwa, blad, onZglos }: {
     {rabat.stan === "nie_wiadomo" && rabat.powod &&
       <p className="w-full text-slate-500">{rabat.powod}</p>}
 
-    {/* WNIOSEK SPOZA PANELU (0.176.0). Złożony ręcznie w panelu Allegro albo
+    {/* WNIOSEK SPOZA PANELU. Złożony ręcznie w panelu Allegro albo
         przez ich automat nie ma prawa być w naszym lustrze, dopóki nie
         przewinie się przez listę wniosków. Zwrot niesie wtedy własny status
         i to on tu mówi — a ekran przyznaje się, ile z tego wie: numeru

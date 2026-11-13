@@ -6,8 +6,8 @@ import {
   _wyczyscPamiecZdjec, sciezkaLogo, useLogoDostawcy, useZdjecieZalacznika, useZdjecieZalacznikaReklamacji, zapomnijObraz,
 } from "./useZdjecie";
 
-/* Trzy lekcje z `biuro.html`, każda kupiona tam osobno. Ten plik pilnuje, żeby
-   panel obsługi nie kupił ich drugi raz. */
+/* Trzy reguły z nagłówka `useZdjecie.ts`: sesja w nagłówku, pamięć negatywu
+   i najwyżej trzy pobrania naraz. */
 
 let odpowiedzi: Array<{ url: string; init?: RequestInit;
   rozwiaz: (ok: boolean, status?: number, tresc?: unknown, typ?: string) => void }> = [];
@@ -133,9 +133,8 @@ describe("Załącznik wiadomości — zdanie i ponowienie", () => {
   });
 
   it("po minucie wygasła porażka pyta znowu przy PRZERYSOWANIU, nie tylko przy zamontowaniu", async () => {
-    /* Zrzut właściciela z 10 września: ramka „wczytuję…" na stałe obok zdania
-       błędu pobrania. Wpis wygasł, komponent przerysował się z innego powodu,
-       a serwera nikt nie zapytał. */
+    /* Ramka „wczytuję…" nie może stać na stałe obok zdania błędu, gdy wpis
+       wygasł, a komponent przerysował się z innego powodu. */
     const teraz = Date.now();
     const zegar = vi.spyOn(Date, "now").mockReturnValue(teraz);
     const { rerender } = render(<Zalacznik id={11} />);
@@ -217,7 +216,7 @@ describe("Załącznik reklamacji — zdanie i ponowienie", () => {
   });
 });
 
-/* ── Logo podmienione z ustawień (0.444.0) ─────────────────────────────────
+/* ── Logo podmienione z ustawień ───────────────────────────────────────────
    Pamięć trzyma obraz do przeładowania panelu, a serwer daje logo `max-age`
    na dobę. Bez tych dwóch rzeczy nowe logo pokazałoby się po F5, a w drugiej
    przeglądarce — po dobie. */

@@ -6,7 +6,7 @@ import { config } from "../config.js";
 import { rozpoznajMime } from "../adapters/zdjecia.sgt.js";
 import { typPodgladu } from "./typ-podgladu.js";
 
-/* ── Zdjęcia sprawy dla Copilota (0.283.0) ───────────────────────────────────
+/* ── Zdjęcia sprawy dla Copilota ─────────────────────────────────────────────
    Zlecenie właściciela brzmiało wprost: „copilot powinien czytać zdjęcia".
    Karta, którą wkleił, prosiła agenta o zdjęcia, które w sprawie JUŻ BYŁY —
    sama się do nich odwoływała, cytując wiadomość sprzedawcy.
@@ -66,7 +66,7 @@ export const SUFIT_ZDJEC = { naSztuke: 7_000_000, lacznie: 20_000_000 } as const
  *
  * Reklamacja sufitu sztuk nie ma i to jest decyzja właściciela zapisana wyżej:
  * tam o zdjęcia prosi CZŁOWIEK jednym kliknięciem i płaci za jedną sprawę.
- * Szkic w skrzynce chodzi od 0.317.0 TAKTEM, co kilka minut i bez kliknięcia.
+ * Szkic w skrzynce chodzi TAKTEM, co kilka minut i bez kliknięcia.
  * Ta sama hojność na ścieżce bez hamulca znaczy rachunek, którego nikt nie
  * zamawiał: rozmowa z trzydziestoma zdjęciami kosztowałaby przy każdym
  * nieświeżym szkicu od nowa.
@@ -325,15 +325,10 @@ export async function przygotujZdjecia(
 /**
  * Pobieracz zdjęć ROZMOWY — ta sama droga, którą idzie podgląd w panelu.
  *
- * ── BLIZNA 0.484.6 ───────────────────────────────────────────────────────────
- * Od 0.330.0 stał tu goły `pobierzZalacznik` z zapisanym adresem. Adres
- * Centrum Wiadomości leży na `upload.allegro.pl`, a ten odpowiada 403 na
- * brzegu (sonda właściciela z 10 września). Każde zdjęcie klienta odpadało
- * więc jako błąd pobrania, a szkic szedł bez niego — po cichu. Podgląd
- * w panelu działał, bo od 0.248.0 idzie końcówką API przez
- * `pobierzZalacznikWiadomosci`. Właściciel zgłosił: „copilot prawdopodobnie
- * nie czyta zdjęć". Testy tego modułu wstrzykują pobieracz, więc drogi
- * domyślnej nie widziały; pilnuje jej `allegro-zalacznik.test.ts`.
+ * Zapisany adres Centrum Wiadomości leży na `upload.allegro.pl`, który
+ * odpowiada 403 na brzegu. Dlatego końcówka API przez
+ * `pobierzZalacznikWiadomosci`. Testy tego modułu wstrzykują pobieracz,
+ * więc drogi domyślnej pilnuje `allegro-zalacznik.test.ts`.
  */
 export const pobierzZdjecieRozmowy: Pobieracz = async (url, opcje) =>
   (await pobierzZalacznikWiadomosci(config.allegro.apiUrl, url, opcje)).bajty;
@@ -346,8 +341,8 @@ export const pobierzZdjecieRozmowy: Pobieracz = async (url, opcje) =>
  * potrafi uruchomić takt bez udziału człowieka. Domyślny sufit jest więc
  * sufitem szkicu, a wyższy podaje tylko dopytanie (`SUFIT_SZTUK_DOPYTANIA`).
  *
- * Tak samo jak tam: potknięcie nie wywraca szkicu. Szkic bez zdjęć jest tym,
- * czym był do tego wydania, a szkicu nie ma dopiero wtedy, gdy padnie model.
+ * Tak samo jak tam: potknięcie nie wywraca szkicu, który idzie wtedy bez
+ * zdjęć. Szkicu nie ma dopiero wtedy, gdy padnie model.
  *
  * `sufitBajtow` pomniejsza dopytanie o bajty zdjęć agenta. Jego zdjęcia mają
  * pierwszeństwo (decyzja właściciela), bo agent dołączył je do TEGO pytania,
@@ -496,7 +491,7 @@ export function spisZdjec(w: WynikZdjec, odAgenta: readonly ZdjecieAgenta[] = []
   }
   if (w.pominieto) linie.push(`Nie pokazano z braku miejsca: ${w.pominieto}`);
   if (w.ponadLimit) linie.push(`Starszych zdjęć nie pokazano: ${w.ponadLimit}`);
-  /* Wiersz o nieudanym pobraniu (0.484.6). Bez niego model nie wie, że
+  /* Wiersz o nieudanym pobraniu. Bez niego model nie wie, że
      klient zdjęcie PRZYSŁAŁ, i prosi go o nie drugi raz. Klient, który
      zdjęcie już wysłał, czyta taką prośbę jako znak, że nikt go nie słucha. */
   if (w.bledow) linie.push(`Klient przysłał, ale nie udało się pobrać: ${w.bledow}`);

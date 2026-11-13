@@ -3,11 +3,11 @@ import rejestr from "../../../server/src/services/zdarzenia-rejestr.ts?raw";
 import { NAZWA_ZDARZENIA, TECHNICZNE, nazwaZdarzenia } from "./nazwy";
 import { opisZdarzenia } from "./opis";
 
-/* ── Każdy typ z rejestru serwera ma polską nazwę (0.540.0) ─────────────
+/* ── Każdy typ z rejestru serwera ma polską nazwę ───────────────────────
    Rejestr `services/zdarzenia-rejestr.ts` pilnuje na serwerze, że każdy
    `logEvent` jest w nim wpisany. Ten test domyka łańcuch po stronie panelu:
    typ dopisany do rejestru bez polskiej nazwy wróciłby na ekran surowym
-   kluczem, czyli dokładnie tym, co wariant C z makiet usunął. */
+   kluczem. */
 const typyRejestru = (() => {
   const lista = rejestr.slice(rejestr.indexOf("ZDARZENIA"), rejestr.indexOf("];", rejestr.indexOf("ZDARZENIA")));
   return [...lista.matchAll(/"([a-z_0-9.]+)"/g)].map((m) => m[1]);

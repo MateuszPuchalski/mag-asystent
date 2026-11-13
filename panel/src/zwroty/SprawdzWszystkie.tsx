@@ -1,4 +1,3 @@
-import React from "react";
 import type { WynikSprawdzeniaWszystkich } from "../api/zwroty";
 
 /* Hurtowe „Sprawdź wszystkie w Allegro” nad kolejką zwrotów.

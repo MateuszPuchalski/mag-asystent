@@ -56,10 +56,8 @@ test("lista bierze rozmowy z modelu kanonicznego, a podgląd to słowa klienta",
   assert.equal(r.length, 1);
   assert.equal(r[0].klient, "zielony_ogrod");
   assert.equal(r[0].nieprzeczytana, true);
-  /* Do 0.165.0 ta asercja oczekiwała „Sprawdzimy na hali." — czyli utrwalała
-     usterkę: podgląd brał ostatnią wiadomość JAKĄKOLWIEK, więc autoodpowiedź
-     konta Allegro zasłaniała pytanie. Data idzie z tej samej wiadomości,
-     nie z daty wątku (09:00). */
+  /* Autoodpowiedź konta Allegro nie zasłania pytania. Data idzie z tej samej
+     wiadomości, nie z daty wątku (09:00). */
   assert.equal(r[0].ostatniaWiadomosc, "Czy zmierzycie rozstaw otworów?");
   assert.equal(r[0].ostatniaWiadomoscAt, "2026-08-31T08:42:00.000Z");
   assert.equal(r[0].ostatniaOdKlienta, true);
@@ -97,8 +95,7 @@ test("rozmowa bez wiadomości klienta pokazuje ostatnią naszą i mówi, że to 
 });
 
 test("oś niesie zamówienie z relatesTo.order i nazwę towaru z zamówienia", () => {
-  /* Mail Allegro „Wiadomość dotyczy" pokazuje towar; panel do 0.165.0 pokazywał
-     goły numer oferty, a numer zamówienia wyrzucał przy mapowaniu. */
+  /* Mail Allegro „Wiadomość dotyczy" pokazuje towar, więc panel też. */
   const d = db();
   const konto = Number((d.prepare("SELECT id FROM channel_account LIMIT 1").get() as { id: number }).id);
   const r = Number(d.prepare(`INSERT INTO conversation(channel_account_id,external_conversation_id,
@@ -132,10 +129,8 @@ test("oś niesie zamówienie z relatesTo.order i nazwę towaru z zamówienia", (
 });
 
 test("pytanie pod ofertą niesie blok oferty: numer od razu, tytuł ze snapshotu", () => {
-  /* Skarga z 2 września 2026: „klient zadał pytanie pod ofertą, a nie wyświetla
-     mi się, pod jaką". Mail powiadamiający ma tytuł, cenę i zdjęcie; panel do
-     0.177.1 miał sam numer, bo tytuł znaliśmy WYŁĄCZNIE z pozycji zamówienia —
-     a pytanie sprzed zakupu zamówienia nie ma i mieć nie będzie. */
+  /* Skarga: „klient zadał pytanie pod ofertą, a nie wyświetla mi się, pod
+     jaką". Pytanie sprzed zakupu zamówienia nie ma, więc tytuł daje oferta. */
   const d = db();
   const konto = Number((d.prepare("SELECT id FROM channel_account LIMIT 1").get() as { id: number }).id);
   const r = Number(d.prepare(`INSERT INTO conversation(channel_account_id,external_conversation_id,
@@ -209,8 +204,8 @@ test("snapshot oferty WYGRYWA z nazwą z pozycji zamówienia", () => {
 });
 
 test("kartoteka przy rozmowie: SKU oferty prowadzi do towaru, a powód mówi o braku", () => {
-  /* SKU sprzedawcy leżało w `offer_snapshot` od 0.178.0 i nie prowadziło
-     donikąd — agent szedł po stan i półkę do Subiekta. */
+  /* SKU sprzedawcy z `offer_snapshot` prowadzi do towaru, żeby agent nie
+     szedł po stan i półkę do Subiekta. */
   const d = db();
   const konto = Number((d.prepare("SELECT id FROM channel_account LIMIT 1").get() as { id: number }).id);
   const r = Number(d.prepare(`INSERT INTO conversation(channel_account_id,external_conversation_id,
@@ -263,7 +258,7 @@ test("ręczne wskazanie kartoteki zapisuje pamięć, oś i audyt, a zdjęcie ją
   /* Puste `sku` znaczy „wskazał człowiek", wypełnione — „zatwierdził
      propozycję automatu". Ekran czyta z tego, co podpisać przy kartotece. */
   assert.equal(pamiec.sku, null);
-  /* Sygnatura z chwili wskazania (0.219.0): gdy sprzedawca ją przepnie, wskazanie ustąpi. */
+  /* Sygnatura z chwili wskazania: gdy sprzedawca ją przepnie, wskazanie ustąpi. */
   assert.equal(pamiec.sku_wtedy, "NOZ-STIGA-43");
   d.prepare("DELETE FROM offer_snapshot WHERE channel_account_id=?").run(konto);
   assert.equal(pamiec.wskazano_przez, "Biuro");
@@ -371,8 +366,7 @@ test("oś rozmowy pokazuje wiadomości i numer oferty", () => {
 test("podgląd załącznika: SAFE z adresem i obraz z pola ALBO z nazwy pliku", () => {
   /* `mimeType` jest w schemacie Allegro opcjonalne i bywa kłamliwe: telefony
      przysyłają `image/jpg` i `application/octet-stream` przy `IMG_….jpg`.
-     0.244.0 patrzyło na nazwę tylko przy PUSTYM polu, więc takie zdjęcie
-     zostawało samą nazwą. Nazwa decyduje o UKŁADZIE; o wydaniu rozstrzygają
+     Nazwa decyduje o UKŁADZIE; o wydaniu rozstrzygają
      bajty na trasie podglądu, a 415 panel zapamiętuje. */
   const msg = Number((db().prepare("SELECT id FROM message WHERE conversation_id=? ORDER BY id LIMIT 1")
     .get(rozmowaId) as { id: number }).id);
@@ -454,11 +448,9 @@ test("zlecony pomiar niesie pytanie klienta, ofertę i klucze rozmowy", () => {
   const z = zlecPomiar(rozmowaId, wiadomoscKlienta, "podaj w milimetrach", BIURO);
   assert.equal(z.conversationId, rozmowaId);
   assert.equal(z.messageId, wiadomoscKlienta);
-  /* ── DWÓCH ODBIORCÓW, DWA POLA (0.408.0) ────────────────────────────────
-     Do 0.407.0 wszystko to stało w `instrukcja`, czyli jechało na kolektor:
-     magazynier czytał reklamację kupującego, żeby znaleźć jedno zdanie
-     mówiące, co ma zmierzyć. Kontekst NIE ZNIKNĄŁ — zszedł do `kontekst`,
-     przy karcie zadania w biurze, bo ta nie ma odnośnika do rozmowy. */
+  /* ── DWÓCH ODBIORCÓW, DWA POLA ──────────────────────────────────────────
+     Na kolektor idzie samo polecenie. Kontekst stoi w `kontekst`, przy karcie
+     zadania w biurze, bo ta nie ma odnośnika do rozmowy. */
   assert.equal(z.instrukcja, "podaj w milimetrach", "na halę idzie samo polecenie");
   assert.match(z.kontekst ?? "", /Czy zmierzycie rozstaw otworów\?/);
   assert.match(z.kontekst ?? "", /oferta-9/);
@@ -468,10 +460,9 @@ test("zlecony pomiar niesie pytanie klienta, ofertę i klucze rozmowy", () => {
   assert.equal(z.twId, null);
 });
 
-/* ── Zlecenie i wynik to DWA wpisy (0.226.0) ─────────────────────────────────
+/* ── Zlecenie i wynik to DWA wpisy ───────────────────────────────────────────
    Zgłoszenie właściciela: „zlecenie zmierzenia też powinno zostać pokazane
-   jako blok w wiadomości". Do 0.224.0 oś niosła sam wynik, a prośba, która go
-   wywołała, nie zostawiała po sobie nic poza kreskami zmiany statusu.        */
+   jako blok w wiadomości".                                                   */
 
 test("zlecenie stoi na osi ZANIM wynik przyjdzie — bo wtedy właśnie się czeka", () => {
   const { os } = osRozmowy(rozmowaId);
@@ -481,9 +472,8 @@ test("zlecenie stoi na osi ZANIM wynik przyjdzie — bo wtedy właśnie się cze
   /* Treścią wpisu jest INSTRUKCJA: po niej widać, czy wynik odpowiada na
      zadane pytanie. Tytuł jedzie osobnym polem, bo jest etykietą.
 
-     Od 0.408.0 jest to samo POLECENIE, a nie sklejony kontekst — i na osi
-     rozmowy to jest zysk, nie strata: pytanie klienta stoi dwa wpisy wyżej,
-     więc przepisywanie go do wpisu o zleceniu było dublowaniem. */
+     Jest to samo POLECENIE: pytanie klienta stoi dwa wpisy wyżej, więc
+     przepisywanie go do wpisu o zleceniu byłoby dublowaniem. */
   assert.match(zlec.tresc, /podaj w milimetrach/);
   assert.doesNotMatch(zlec.tresc, /Czy zmierzycie rozstaw otworów\?/);
   assert.ok(zlec.zlecenie?.tytul, "tytuł jedzie osobno, nie sklejony z instrukcją");
@@ -529,7 +519,7 @@ test("wynik zadania z rozmowy zapisze tylko ten, kto je przejął", () => {
     /przejęte przez Ciebie/);
 });
 
-/* ── Kartoteka wskazana przez agenta (0.145.0) ─────────────────────────────
+/* ── Kartoteka wskazana przez agenta ───────────────────────────────────────
    Agent nie wpisuje `tw_id`, tylko wskazuje towar wyszukiwarką. Zadanie ma
    zapisać, że to JEGO wybór — bo wkrótce dojdzie kartoteka wywiedziona
    z oferty i te dwie rzeczy nie mogą wyglądać tak samo. */
@@ -540,7 +530,7 @@ test("wskazana kartoteka ląduje na zadaniu i jest podpisana jako wybór agenta"
   ).run();
   const z = zlecPomiar(rozmowaId, wiadomoscKlienta, "Zmierz rozstaw.", BIURO, 1042);
   assert.equal(z.twId, 1042);
-  /* Podpis o wyborze agenta stoi w kontekście dla BIURA (0.408.0) — to audyt
+  /* Podpis o wyborze agenta stoi w kontekście dla BIURA — to audyt
      pochodzenia, a nie polecenie dla hali. */
   assert.match(z.kontekst ?? "", /Kartotekę wskazał\(a\) Biuro, nie wynika z oferty/);
 });
@@ -559,7 +549,7 @@ test("bez wskazania kartoteki zadanie idzie jak dotąd, bez podpisu o wyborze", 
   assert.match(z.kontekst ?? "", /Oferta Allegro: oferta-9/);
 });
 
-/* ── Zadanie bez polecenia to zadanie nie do wykonania (0.408.0) ───────────
+/* ── Zadanie bez polecenia to zadanie nie do wykonania ─────────────────────
    Wskazówka była opcjonalna dokładnie dlatego, że kontekst służył za treść
    zastępczą: magazynier dostawał wtedy samo pytanie klienta i miał sam
    zgadnąć, co z nim zrobić. Skoro kontekst zszedł z kolektora, pustej
@@ -574,11 +564,8 @@ test("zlecenie BEZ polecenia dla hali jest odrzucane", () => {
     przed, "odrzucone zlecenie nie zostawia zadania");
 });
 
-/* ── Komentarze wewnętrzne na osi (0.157.0) ──────────────────────────────────
-   Do tego wydania `conversation_comment` miała w całym kodzie serwera JEDEN
-   INSERT i ZERO odczytów. Agent mógł dodać notatkę, wiersz wpadał do tabeli
-   i nie było drogi, którą wróciłby do kogokolwiek — funkcja do zapisu bez
-   odczytu. §10.3 wymienia komentarz wśród rzeczy, które ma nieść oś. */
+/* ── Komentarze wewnętrzne na osi ────────────────────────────────────────────
+   §10.3 wymienia komentarz wśród rzeczy, które ma nieść oś. */
 
 test("komentarz wewnętrzny wraca na oś, z autorem i wzmiankami", async () => {
   const { dodajKomentarz } = await import("./conversations.js");
@@ -598,9 +585,8 @@ test("komentarz wewnętrzny wraca na oś, z autorem i wzmiankami", async () => {
 });
 
 test("oś jest CHRONOLOGICZNA — komentarz z wczoraj nie ląduje na końcu", () => {
-  /* Do 0.157.0 wyniki zadań doklejały się za wszystkimi wiadomościami bez
-     względu na czas, bo oś nie miała wspólnego porządku. Przy dwóch źródłach
-     to było znośne; przy trzech oś przestawała opowiadać przebieg sprawy. */
+  /* Przy trzech źródłach wpisów oś bez wspólnego porządku nie opowiada
+     przebiegu sprawy. */
   const d = db();
   const rozmowa = Number(d.prepare(`INSERT INTO conversation(channel_account_id,
     external_conversation_id,subject,unread,updated_at)
@@ -625,13 +611,8 @@ test("treść komentarza NIE trafia do tabeli, z której czyta wysyłka", async 
   /* §6.4: komentarze „nie mogą przypadkiem trafić do klienta"; §25 stawia to
      wśród kryteriów gotowości. Granica jest STRUKTURALNA: wysyłka bierze tekst
      ze szkicu i zapisuje go do `message`, a komentarz mieszka w osobnej tabeli
-     i nigdy tam nie wchodzi.
-
-     Pierwsza wersja tego testu wołała `payloadAllegroWiadomosci` z numerem
-     komentarza i PRZECHODZIŁA PRZYPADKIEM. `conversation_comment.id`
-     i `message.id` to dwie niezależne sekwencje, więc oba bywają jedynką —
-     przy kolizji tamta funkcja oddałaby cudzą wiadomość zamiast rzucić. Test
-     mierzył szczęście w doborze danych, a nie granicę. */
+     i nigdy tam nie wchodzi. Test szuka TREŚCI, nie identyfikatora, bo
+     `conversation_comment.id` i `message.id` to niezależne sekwencje. */
   const { dodajKomentarz } = await import("./conversations.js");
   const tresc = "Klient bywa trudny — uważaj na ton.";
   dodajKomentarz(rozmowaId, BIURO.id, tresc, []);
@@ -650,13 +631,13 @@ test("odłożenie po terminie wraca do kolejki jako otwarte i widać, że termin
      przyszły tydzień — różnicę robi dopiero czas. Kolejka ma pokazać ją jako
      żywą, ale nie milczeć o tym, że nikt jej po terminie nie tknął.
 
-     Od 0.225.0 „żywa" znaczy KONKRETNIE, kto ma następny ruch: odłożenie
+     „Żywa" znaczy KONKRETNIE, kto ma następny ruch: odłożenie
      wygasa, a potem rozmowa sama mówi, czyja kolej. W tej rozmowie ostatnia
      jest NASZA odpowiedź, więc piłka stoi po stronie klienta. */
   const { ustawStatus } = await import("./conversations.js");
   const d = db();
   ustawStatus(d, rozmowaId, "snoozed", BIURO.id, "2026-08-31T06:00:00.000Z");
-  /* Nasza odpowiedź GODZINĘ temu: od 23 września 2026 dwa dni ciszy kończą
+  /* Nasza odpowiedź GODZINĘ temu: dwa dni ciszy kończą
      rozmowę same, a ten test pilnuje wygaśnięcia odłożenia, nie ciszy. */
   d.prepare("UPDATE message SET sent_at=? WHERE conversation_id=? AND direction='outgoing'")
     .run(new Date(Date.now() - 3_600_000).toISOString(), rozmowaId);
@@ -688,8 +669,8 @@ test("zmiana statusu ląduje na osi, a zmiana bez różnicy nie zostawia nic", (
 
   const statusy = wpisy.filter((w) => w.rodzaj === "status");
   /* Oś opowiada CAŁY przebieg, razem z pętlą przez halę: zlecony pomiar
-     przestawia rozmowę na „czeka na nas", a wynik z hali zdejmuje ten stan
-     (0.159.0). Oba przejścia są automatyczne i oba mają tu zostać — bez nich
+     przestawia rozmowę na „czeka na nas", a wynik z hali zdejmuje ten stan.
+     Oba przejścia są automatyczne i oba mają tu zostać — bez nich
      czytelnik nie wie, dlaczego sprawa stała.
 
      Czego NIE MA na tej liście: „open → open". Otwarcie rozmowy odłożonej,
@@ -710,10 +691,8 @@ test("zmiana statusu ląduje na osi, a zmiana bez różnicy nie zostawia nic", (
   assert.equal(statusy[2].autor, "hala");
 });
 
-/* ── Kolejka wysyłek mówi prawdę (0.173.0) ───────────────────────────────────
-   Do 0.172.0 `/api/health` twierdził „wysyłka wyłączona" — nieprawda od
-   0.148.0, czyli od wydania, w którym wysyłka zaczęła działać. Napis, który
-   każe NIE szukać, jest gorszy od braku wskaźnika.                         */
+/* ── Kolejka wysyłek mówi prawdę ─────────────────────────────────────────────
+   Napis, który każe NIE szukać, jest gorszy od braku wskaźnika.             */
 
 /** Wiersz kolejki w zadanym stanie; kasuje poprzednie, bo baza jest wspólna. */
 function outbox(stany: string[]) {
@@ -807,7 +786,7 @@ test("dopisek klienta czyni plakietkę nieaktualną — serwer mówi to sam", ()
 });
 
 test("rozmowa z samym zamówieniem: jedyna pozycja daje ofertę rozmowy, a pozycja niesie kartotekę", async () => {
-  /* Zrzut od właściciela (0.215.0): rozmowa bez oferty, z zamówieniem na jedną
+  /* Zrzut od właściciela: rozmowa bez oferty, z zamówieniem na jedną
      pozycję — a kolumna mówiła „nie ma z czego wywieść kartoteki". Zamówienie
      nazywa towar dokładniej niż oferta i ma SKU od razu, z formularza zakupu. */
   const { wskazOferte } = await import("./conversations.js");
@@ -849,7 +828,7 @@ test("rozmowa z samym zamówieniem: jedyna pozycja daje ofertę rozmowy, a pozyc
   assert.equal(os.zamowienie?.pobrane?.pozycje[1].twId, null);
   assert.equal(os.zamowienie?.pobrane?.pozycje[1].twZrodlo, null);
 
-  /* Wskazanie przy pozycji = to samo zdarzenie, co ręczny numer; blok oferty je CZYTA (do 0.213.0 nie czytał). */
+  /* Wskazanie przy pozycji = to samo zdarzenie, co ręczny numer; blok oferty je CZYTA. */
   wskazOferte(r, "9200000002", BIURO.id, d);
   os = osRozmowy(r);
   assert.equal(os.oferta?.externalId, "9200000002");
@@ -881,16 +860,12 @@ test("ręczne wskazanie oferty przebija numer z wiadomości — jak w doborze", 
   d.prepare("DELETE FROM conversation WHERE id=?").run(r);
 });
 
-/* ── Podpis rozmówcy (0.219.2) ───────────────────────────────────────────────
+/* ── Podpis rozmówcy ─────────────────────────────────────────────────────────
    NA KOŃCU PLIKU celowo: oba testy zakładają własne rozmowy, a testy listy
    wyżej liczą wiersze skrzynki. Dopisane przed nimi psuły trzy z nich. */
 test("podpis wiadomości klienta niesie LOGIN, nie temat wątku", () => {
-  /* ── Blizna 0.219.2 ────────────────────────────────────────────────────────
-     Do 0.219.1 podpis brał `c.subject`, czyli TEMAT wątku. Na koncie
-     właściciela temat bywa równy loginowi, więc ekran wyglądał poprawnie —
-     i dokładnie dlatego było groźnie: przy wątku o temacie „Zaworek zwrotny"
-     wiadomość klienta podpisywała się nazwą części, a nie tym, kto ją napisał.
-     Ten test rozdziela oba pola, żeby nie dało się ich znowu pomylić. */
+  /* Na koncie właściciela temat bywa równy loginowi, więc pomyłka wygląda
+     poprawnie. Ten test rozdziela oba pola, żeby nie dało się ich pomylić. */
   const d = db();
   const konto = Number(d.prepare(
     "INSERT INTO channel_account(channel,external_account_id) VALUES ('allegro','seller-login')")
@@ -909,9 +884,7 @@ test("podpis wiadomości klienta niesie LOGIN, nie temat wątku", () => {
 });
 
 test("kolejka i nagłówek też biorą LOGIN, nie temat (0.228.0)", () => {
-  /* 0.219.2 naprawiło to na OSI rozmowy i zatrzymało się w pół drogi: wiersz
-     kolejki i nagłówek dalej brały `c.subject`. Złapała to dopiero przeglądarka
-     — przycisk „kopiuj login" w nagłówku kopiował nazwę części. */
+  /* Przycisk „kopiuj login" w nagłówku nie ma prawa kopiować nazwy części. */
   const d = db();
   const konto = Number(d.prepare(
     "INSERT INTO channel_account(channel,external_account_id) VALUES ('allegro','naglowek')")
@@ -947,8 +920,7 @@ test("wątek bez loginu spada na temat, a potem na słowo „Klient”", () => {
 });
 
 /* ── Problem z zakupem (`POST_PURCHASE_ISSUE` z `beta.v1`) ─────────────────
-   Od 28 października 2026 nowe sprawy kupujących przychodzą do skrzynki jako
-   wątki tego typu. Agent ma to widzieć w kolejce i w nagłówku, a słowa
+   Nowe sprawy kupujących przychodzą do skrzynki jako wątki tego typu. Agent ma to widzieć w kolejce i w nagłówku, a słowa
    doradcy Allegro nie mogą podpisać się loginem klienta. */
 test("Problem z zakupem niesie powód i zamknięcie, a doradca podpisuje się „Allegro”", () => {
   const d = db();
@@ -1072,9 +1044,9 @@ test("„dziękuję” kupującego nie zamyka otwartego Problemu, w którym dora
 });
 
 test("zwrot tego zamówienia jedzie z rozmową — po numerze zamówienia, nigdy po loginie", () => {
-  /* Właściciel (0.221.0): klient pyta pod zamówieniem o zwrot, którego dokonał,
+  /* Właściciel: klient pyta pod zamówieniem o zwrot, którego dokonał,
      a agent szukał go ręcznie na ekranie Zwroty. Mostek jest ten sam, którym
-     zwrot znajduje swoje rozmowy od 0.169.0 — `related_order_id`. */
+     zwrot znajduje swoje rozmowy — `related_order_id`. */
   const d = db();
   const konto = Number((d.prepare("SELECT id FROM channel_account LIMIT 1").get() as { id: number }).id);
   const r = Number(d.prepare(`INSERT INTO conversation(channel_account_id,external_conversation_id,
@@ -1087,7 +1059,7 @@ test("zwrot tego zamówienia jedzie z rozmową — po numerze zamówienia, nigdy
   const zw1 = Number(d.prepare(`INSERT INTO zwrot_klienta(channel_account_id,external_id,order_id,created_at,synced_at,
     kupujacy_login,paczka_at) VALUES (?,'zwrot-1','zam-zw-1',?,'2026-09-06T11:00:00.000Z',
     'kupujacy_44','2026-09-03T08:00:00.000Z')`)
-    /* Zgłoszenie wczoraj (0.452.0): test sprawdza kubełek „decyzja", a stary
+    /* Zgłoszenie wczoraj: test sprawdza kubełek „decyzja", a stary
        zwrot bez decyzji wychodzi z kolejki po `ZWROT_WYGASA_DNI`. */
     .run(konto, new Date(Date.now() - 86_400_000).toISOString()).lastInsertRowid);
   d.prepare(`INSERT INTO zwrot_klienta_pozycja(zwrot_id,offer_id,nazwa,ilosc,cena_grosze,waluta,powod,klucz)
@@ -1112,7 +1084,7 @@ test("zwrot tego zamówienia jedzie z rozmową — po numerze zamówienia, nigdy
   d.prepare("DELETE FROM conversation WHERE id=?").run(r);
 });
 
-/* ── Kto ma następny ruch (0.225.0) ──────────────────────────────────────────
+/* ── Kto ma następny ruch ────────────────────────────────────────────────────
    Właściciel: „w większości nie powinienem był robić tego ręcznie — otwarta,
    czeka na klienta, czeka na nas powinno być odczytywane z wiadomości".
    Te testy pilnują, że reguła jest jedna i że werdykt człowieka ją przebija. */
@@ -1126,8 +1098,7 @@ function rozmowaZWiadomosciami(kierunki: Array<"incoming" | "outgoing">, status 
     external_conversation_id,subject,status,updated_at)
     VALUES (?,?,'Temat',?,'2026-09-01T10:00:00.000Z')`)
     .run(konto, `w-${Math.random()}`, status).lastInsertRowid);
-  /* Wiadomości sprzed GODZINY, nie z wczesnego września: od 23 września 2026
-     dwa dni ciszy po naszej odpowiedzi kończą rozmowę same, a te testy
+  /* Wiadomości sprzed GODZINY, nie z wczesnego września: dwa dni ciszy po naszej odpowiedzi kończą rozmowę same, a te testy
      pilnują kierunku, nie ciszy. */
   const godzineTemu = Date.now() - 3_600_000;
   kierunki.forEach((k, i) => d.prepare(`INSERT INTO message(conversation_id,channel_account_id,
@@ -1159,7 +1130,7 @@ test("kolejka i otwarta rozmowa mówią to samo", () => {
 test("werdykt człowieka przebija wyliczenie", () => {
   /* „Rozwiązana" i „Zamknięta" mają zostać mimo pytania klienta na końcu —
      inaczej nie dałoby się domknąć żadnej sprawy. */
-  /* „Zamknięta" czyta się od 23 września 2026 jak „Zakończona" — jeden
+  /* „Zamknięta" czyta się jak „Zakończona" — jeden
      werdykt, decyzja właściciela. */
   for (const [status, widac] of [["resolved", "resolved"], ["closed", "resolved"], ["spam", "spam"],
     ["snoozed", "snoozed"]]) {
@@ -1182,7 +1153,7 @@ test("wątek bez ani jednej wiadomości zostaje przy stanie zapisanym", () => {
   assert.equal(osRozmowy(r).rozmowa.status, "new");
 });
 
-/* ── Autoodpowiedź nie zamyka piłki (0.227.0) ────────────────────────────────
+/* ── Autoodpowiedź nie zamyka piłki ──────────────────────────────────────────
    „Dziękujemy za kontakt" wychodzi SAMO, w sekundę po pytaniu, i nie odpowiada
    na nic. Liczone jako nasza wiadomość przestawiało rozmowę na „czeka na
    klienta" i zdejmowało ją z listy tych, które czekają na odpowiedź — pytanie
@@ -1201,8 +1172,8 @@ function rozmowaZOdbiciem(poOdbiciu: Array<"incoming" | "outgoing"> = []) {
     .run(konto, `w-${Math.random()}`).lastInsertRowid);
   /* Przez `zapiszWiadomosc`, nie wprost do tabeli: to ta funkcja rozpoznaje
      odbicie przy zapisie i test ma przejść JEJ ścieżką. */
-  /* Godzinę temu, nie we wrześniu: dwa dni ciszy kończą rozmowę same
-     (23 września 2026), a ten test pilnuje odbicia, nie ciszy. */
+  /* Godzinę temu, nie we wrześniu: dwa dni ciszy kończą rozmowę same,
+     a ten test pilnuje odbicia, nie ciszy. */
   const godzineTemu = Date.now() - 3_600_000;
   const pisz = (dir: "incoming" | "outgoing", body: string, i: number) =>
     zapiszWiadomosc({ conversationId: rozmowa, channelAccountId: konto,
@@ -1262,7 +1233,7 @@ test("odbicie CYTOWANE przez klienta nie jest naszym odbiciem", () => {
   assert.equal(osRozmowy(r).rozmowa.status, "waiting_for_us");
 });
 
-/* ── Zdarzenie niesie KIERUNEK (0.228.0) ─────────────────────────────────────
+/* ── Zdarzenie niesie KIERUNEK ───────────────────────────────────────────────
    Panel zapalał pasek „Klient dopisał nową wiadomość" na każde
    `message.created` — także na naszą odpowiedź wracającą z synchronizacji
    i na autoodpowiedź. Bez kierunku w zdarzeniu odbiorca nie miał z czego
@@ -1298,7 +1269,7 @@ test("message.created mówi, czy pisał klient i czy to odbicie", async () => {
   ]);
 });
 
-/* ── ZDARZENIA OSI NIOSĄ KLUCZE, NIE TYLKO ZDANIE (0.243.0) ──────────────────
+/* ── ZDARZENIA OSI NIOSĄ KLUCZE, NIE TYLKO ZDANIE ────────────────────────────
    Pasek zdarzeń w panelu pokazuje krótką etykietę po polsku, a słownik
    polszczyzny stoi po tamtej stronie. Bez tych pól panel musiałby rozbierać
    `tresc` z powrotem na części — czyli traktować zdanie dla człowieka jak
@@ -1324,8 +1295,7 @@ test("oś podaje zdarzenia rozłożone na klucze, obok gotowego zdania", () => {
     JSON.stringify({ przed: "confirmed", po: "candidates_found", autor: "Biuro" }), "2026-09-01T09:32:00.000Z");
   zdarz.run(r, "dobor_wynik",
     JSON.stringify({ przed: null, po: "dopytac", autor: "Biuro" }), "2026-09-01T09:35:00.000Z");
-  /* Zdarzenie NAKŁADKI SPRAW zostaje w dzienniku, ale na oś już nie wchodzi
-     (0.388.0): klamry nie ma, a `conversation_event` nie ma retencji. */
+  /* Zdarzenie NAKŁADKI SPRAW zostaje w dzienniku, ale na oś nie wchodzi. */
   zdarz.run(r, "sprawa_dolaczona",
     JSON.stringify({ tytul: "Linka T375", autor: "Biuro" }), "2026-09-01T09:40:00.000Z");
 
@@ -1338,8 +1308,7 @@ test("oś podaje zdarzenia rozłożone na klucze, obok gotowego zdania", () => {
   assert.equal(wpisy.some((w) => String(w.rodzaj) === "dobor"), false);
   assert.equal(Number(d.prepare(`SELECT COUNT(*) AS n FROM conversation_event
     WHERE conversation_id=? AND event_type LIKE 'dobor%'`).get(r)!.n), 4);
-  /* Nakładka spraw odeszła w 0.388.0, więc oś jej nie rysuje — ale wiersz
-     w dzienniku audytu ZOSTAJE i ten test pilnuje obu połów naraz. */
+  /* Oś nakładki spraw nie rysuje, ale wiersz w dzienniku audytu ZOSTAJE. */
   assert.equal(zdarzenie("sprawa"), undefined);
   assert.equal(Number(d.prepare(`SELECT COUNT(*) AS n FROM conversation_event
     WHERE conversation_id=? AND event_type='sprawa_dolaczona'`).get(r)!.n), 1);
@@ -1350,10 +1319,9 @@ test("oś podaje zdarzenia rozłożone na klucze, obok gotowego zdania", () => {
   d.prepare("DELETE FROM conversation WHERE id=?").run(r);
 });
 
-/* ── Odesłanie z hali na osi rozmowy (0.352.0) ───────────────────────────────
-   Do 0.351.0 hala mogła odpowiedzieć wyłącznie wynikiem, więc rozmowa czekająca
-   na pomiar niemożliwy do wykonania zostawała w `waiting_for_internal`, dopóki
-   agent sam się nie zorientował. Oś kończyła się zleceniem i milczała.        */
+/* ── Odesłanie z hali na osi rozmowy ─────────────────────────────────────────
+   Pomiar niemożliwy do wykonania hala odsyła, a rozmowa nie zostaje
+   w `waiting_for_internal`, dopóki agent sam się nie zorientuje.           */
 test("odesłanie z hali staje na osi i ZDEJMUJE czekanie na wewnętrzne", () => {
   const d = db();
   const konto = (d.prepare(
@@ -1395,7 +1363,7 @@ test("odesłanie z hali staje na osi i ZDEJMUJE czekanie na wewnętrzne", () => 
     { n: number }).n, 1);
 });
 
-/* ── Ponowienie nie kasuje historii i wraca do czekania (0.352.0) ────────────
+/* ── Ponowienie nie kasuje historii i wraca do czekania ──────────────────────
    Dwie usterki złapane przy przeglądzie własnego diffu, obie tej samej rodziny:
    pierwsza wersja czytała odesłanie ze STANU zadania, a stan po ponowieniu
    wraca na `nowe`. Oś jest historią, nie stanem.                            */
@@ -1440,7 +1408,7 @@ test("po ponowieniu odesłanie ZOSTAJE na osi, a rozmowa znowu czeka na halę", 
 });
 
 test("podziękowanie po naszej odpowiedzi zdejmuje rozmowę z „Czeka na nas” i nosi znacznik", () => {
-  /* Decyzja właściciela z 22 września 2026. Kolejka i otwarta rozmowa liczą
+  /* Decyzja właściciela. Kolejka i otwarta rozmowa liczą
      to tą samą regułą (`klientPodziekowal`); tu pilnujemy wiersza listy. */
   const d = db();
   const konto = Number((d.prepare("SELECT id FROM channel_account LIMIT 1").get() as { id: number }).id);
@@ -1461,7 +1429,7 @@ test("podziękowanie po naszej odpowiedzi zdejmuje rozmowę z „Czeka na nas”
     taksonomia_wersja,polityka_wersja,at,przez)
     VALUES (?,?,1,1,'MODEL','SUCCESS','OTHER','NO_ACTION',0,0,0,'wysoka','v2','p1',?,'automat')`)
     .run(r, dzieki, "2026-09-01T09:01:00.000Z");
-  /* Od 23 września 2026 podziękowanie ZAKAŃCZA rozmowę, ze źródłem. */
+  /* Podziękowanie ZAKAŃCZA rozmowę, ze źródłem. */
   assert.equal(wiersz().status, "resolved");
   assert.equal(wiersz().zakonczenie, "podziekowanie");
   assert.equal(wiersz().podziekowal, true);

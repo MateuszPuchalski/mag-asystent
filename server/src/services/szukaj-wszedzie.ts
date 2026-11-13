@@ -2,7 +2,7 @@ import { db as defaultDb, type Db } from "../db/db.js";
 import { linkZamowienia } from "./allegro-linki.js";
 import { ROZMOWA_ZAMOWIENIA } from "./droga-klienta.js";
 
-/* ── Jedno szukanie ponad kolejkami, Ctrl+K (23 września 2026) ────────────────
+/* ── Jedno szukanie ponad kolejkami, Ctrl+K ───────────────────────────────────
    Każdy ekran panelu miał własne pole szukania i trzeba było wiedzieć, które
    wybrać. Agent z numerem przesyłki w ręku nie wie, czy to zwrot, czy dostawa.
    To jest ten sam punkt 1 dekalogu co droga klienta: podział na kolejki jest
@@ -12,15 +12,14 @@ import { ROZMOWA_ZAMOWIENIA } from "./droga-klienta.js";
    kartotek pisze zdarzenie `search`, ale to jest miara braków w kartotece,
    a tu szukamy spraw, nie towaru do zamówienia.
 
-   LOGIN SZUKA SIĘ PO KAWAŁKU, nie w całości (24 września 2026). Zgłoszenie
+   LOGIN SZUKA SIĘ PO KAWAŁKU, nie w całości. Zgłoszenie
    właściciela ze zrzutem: „chrzanowski" nie znajdowało „Chrzanowski1234".
    Agent pamięta nazwisko z loginu, nie cyfry dopisane przez Allegro. Pełny
    login stoi w wynikach pierwszy, reszta po nim.
 
-   LOGIN TRAFIA TEŻ W ROZMOWY od 24 września 2026. Login rozmówcy z wątku
-   to login kupującego — zweryfikował to właściciel (`docs/allegro-ksztalt.md`).
-   Do tej daty rozmowy dochodziły wyłącznie numerem zamówienia, więc pytanie
-   sprzed zakupu po loginie się nie znajdowało. Numer zamówienia zostaje
+   LOGIN TRAFIA TEŻ W ROZMOWY. Login rozmówcy z wątku to login kupującego —
+   zweryfikował to właściciel (`docs/allegro-ksztalt.md`). Inaczej pytanie
+   sprzed zakupu po loginie by się nie znalazło. Numer zamówienia zostaje
    drugim mostkiem, tym samym co w `droga-klienta.ts`. Login porównuje się
    bez wielkości liter. */
 
@@ -71,7 +70,7 @@ export function szukajWszedzie(
   const like = `%${naLike(q)}%`;
   const cyfry = q.replace(/\D/g, "");
   /* Telefon szuka się po KOŃCÓWCE, bo tak ją podaje klient i kurier; kolumna
-     z samymi cyframi istnieje od 0.422.0 właśnie po to. Sześć cyfr to próg,
+     z samymi cyframi istnieje właśnie po to. Sześć cyfr to próg,
      poniżej którego końcówka trafia w przypadkowe numery. */
   const jakTelefon = cyfry.length >= 6 && cyfry.length >= q.replace(/[\s+\-()]/g, "").length;
 
@@ -81,7 +80,7 @@ export function szukajWszedzie(
     if (!wynik.has(klucz)) wynik.set(klucz, t);
   };
 
-  /* KLIENCI na górze (24 września 2026): login pasujący do frazy prowadzi do
+  /* KLIENCI na górze: login pasujący do frazy prowadzi do
      profilu klienta, gdzie stoi wszystko naraz. Jeden wiersz na login, bez
      wielkości liter — „Chips20" i „chips20" to jeden klient. */
   for (const w of database.prepare(`
@@ -117,7 +116,7 @@ export function szukajWszedzie(
     q, `${naLike(q)}%`, q, like, like, jakTelefon ? 1 : 0, `%${cyfry}`, q, NA_RODZAJ,
   ) as Wiersz[];
 
-  /* KUPUJĄCY ZAMÓWIENIA jako klient (0.535.0, sprawa klienta). Brak w dostawie
+  /* KUPUJĄCY ZAMÓWIENIA jako klient (sprawa klienta). Brak w dostawie
      przychodzi z numerem zamówienia, a sprawę klienta zakłada się na profilu.
      Bez tego wiersza droga szła przez zamówienie w Allegro i z powrotem po
      login. Trafienie po loginie ma już swój wiersz wyżej (i jego limit), więc

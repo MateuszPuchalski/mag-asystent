@@ -6,7 +6,7 @@ import {
   PasekSita, ZdanieOUkrytych, mojaSprawa, sprawSlowo, useSito, wSicie,
 } from "./Moje";
 
-/* ── Sito spraw (0.278.0, „Niczyje" od 0.281.0) ──────────────────────────────
+/* ── Sito spraw ──────────────────────────────────────────────────────────────
    Pięć rzeczy warte testu, bo każda kosztowałaby to, o co właściciel prosił:
 
    1. SITO ZAWĘŻA PO TOŻSAMOŚCI, nie po imieniu. Imienniczka nie ma prawa

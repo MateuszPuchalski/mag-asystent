@@ -1,15 +1,6 @@
-import React from "react";
 import { AlertTriangle, RefreshCw } from "lucide-react";
 import type { Zdrowie } from "../api/typy";
 import { Przycisk, czas, wiek } from "../ui";
-
-/* Wiek danych po ludzku. „2 g 36 min" mówi agentowi to, czego nie mówi
-   znacznik czasu: ile pytań mogło przyjść, a on ich nie widzi.
-
-   Sama funkcja przeniosła się do `ui` w 0.352.0, bo dostała drugiego odbiorcę
-   (zegar zadań terenowych). Re-eksport zostaje, bo to TU jej się szuka —
-   alarm był jej jedynym domem przez dwieście wydań. */
-export { wiek };
 
 const POWOD: Record<string, string> = {
   rate_limited: "Allegro odpowiada 429 i prosi o przerwę.",
@@ -67,14 +58,13 @@ export function AlarmSynchronizacji({ zdrowie, synchronizuj, trwa, blad }: {
       {/* Ręczna synchronizacja NIE omija przerwy — skraca tylko czekanie po jej
           końcu. Bez tego zdania przycisk obiecuje coś, czego nie robi.
 
-          ZDANIE W DYMKU PRZYCISKU, NIE W STAŁYM AKAPICIE (0.517.0). Akapit
-          stał pod banerem zawsze, także przy niesparowanym koncie, gdzie
-          przycisku nie ma i zdanie nie miało czego prostować. Dymek stoi
-          tam, gdzie pada pytanie „czy to pomoże", czyli nad samym przyciskiem. */}
+          ZDANIE W DYMKU PRZYCISKU, NIE W STAŁYM AKAPICIE: przy niesparowanym
+          koncie przycisku nie ma i zdanie nie miałoby czego prostować. Dymek
+          stoi tam, gdzie pada pytanie „czy to pomoże". */}
       {!bezPolaczenia && <Przycisk onClick={synchronizuj} disabled={trwa}
         title={`Respektujemy Retry-After. Następna próba: ${czas(i.nastepnaProba)}. `
           + "Ręczna synchronizacja nie omija tej przerwy."}>
-        {/* Zdaniem, nie WERSALIKAMI (0.517.0): krzyk w banerze awarii
+        {/* Zdaniem, nie WERSALIKAMI: krzyk w banerze awarii
             dokładał paniki, a nie czytelności. */}
         <RefreshCw size={16} />{trwa ? "Próba w toku…" : "Synchronizuj teraz"}
       </Przycisk>}

@@ -10,9 +10,8 @@ import {
 } from "./cenyNaOsi";
 
 /* ── CENY KARTOTEKI NA JEDNEJ OSI ───────────────────────────────────────────
-   Zgłoszenie właściciela: blok „Ceny" zajmuje za dużo miejsca. Lista
-   poziomów, oś z kropkami i zdanie mówiły trzy razy to samo, a blok sześciu
-   poziomów miał prawie dwieście pikseli. Zostaje jedna oś z podpisami.
+   Zgłoszenie właściciela: blok „Ceny" zajmuje za dużo miejsca. Jedna oś
+   z podpisami mówi raz to, co lista, oś i zdanie mówiłyby trzy razy.
 
    POŁOŻENIE NA WSPÓLNEJ SKALI. To zadanie, które oko rozwiązuje najdokładniej
    (Cleveland i McGill), więc oferta stoi na tej samej osi co poziomy. Skala
@@ -37,7 +36,7 @@ import {
    decyzja na jedną rozmowę.
 
    BEZ OFERTY I BEZ ZAKUPU LISTA. Rozmowa bez pobranej oferty dostaje
-   dotychczasową listę, bo oś bez punktu odniesienia nie ma o co pytać.
+   listę, bo oś bez punktu odniesienia nie ma o co pytać.
    Reklamacja podaje cenę zakupu: zielony romb „Kupił za …” rysuje oś
    także bez oferty, bo tam pytanie brzmi „ile zapłacił wobec cennika”.
 

@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import fs from "node:fs";
 import path from "node:path";
 
-/* ── Każde narzędzie konsoli ma swój skrypt w `package.json` (0.342.1) ───────
+/* ── Każde narzędzie konsoli ma swój skrypt w `package.json` ───────
    Blizna z 15 września. `zwroty:sprzatnij` doszedł w 0.340.0 razem z całym
    narzędziem i został scalony — a potem ZNIKŁ przy scalaniu równoległej
    gałęzi, która podbijała wersję w tym samym pliku. Kod narzędzia został na

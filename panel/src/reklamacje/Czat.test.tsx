@@ -160,7 +160,7 @@ describe("Zdjęcia stoją w dymku", () => {
     const obraz = screen.getByRole("img", { name: "usterka.jpg" });
     expect(obraz).toHaveAttribute("src", "blob:obraz");
     expect(dymek("Kosiarka przestała ciąć").tlo).toContainElement(obraz);
-    /* Kafel 112×84 z makiety, nie zdjęcie do 256 px wysokości. */
+    /* Kafel 112×84, nie zdjęcie do 256 px wysokości. */
     expect(obraz.closest(".h-\\[84px\\]")).toHaveClass("w-28");
   });
 
@@ -448,7 +448,7 @@ describe("Kotwica przy najnowszej wiadomości", () => {
   });
 });
 
-/* ── AUTOMAT ALLEGRO TO WIERSZ ZDARZENIA (makieta właściciela) ───────────────
+/* ── AUTOMAT ALLEGRO TO WIERSZ ZDARZENIA ─────────────────────────────────────
    Automat nie jest rozmówcą, więc nie dostaje dymka. Stoi cienkim wierszem:
    ikona w kółku, krótka nazwa z faktem i czas po prawej. Kolejne automaty
    pod rząd składają się w jeden wiersz, a pełna treść stoi pod rozwinięciem. */
@@ -572,7 +572,7 @@ describe("Przesyłki na osi rozmowy", () => {
     expect(my).toHaveTextContent("bez numeru przesyłki");
   });
 
-  /* Makieta: automaty tej samej paczki i jej wiersz to JEDEN wiersz.
+  /* Automaty tej samej paczki i jej wiersz to JEDEN wiersz.
      Wiążemy po numerze listu, bo tylko on jest wspólny. */
   it("automaty z numerem znanej przesyłki scalają się z nią w jeden wiersz", async () => {
     render(<Czat sprawa={bezOpisu} zalaczniki={[]} zdarzenia={[odKlienta]} czat={[

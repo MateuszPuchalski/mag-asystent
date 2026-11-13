@@ -1,7 +1,6 @@
-/* ── Polskie nazwy zdarzeń dziennika (0.540.0) ─────────────────────────
-   Decyzja właściciela z 27 września 2026, wariant C z makiet. Kolumna
-   zdarzenia pokazywała klucz serwera — `putaway_line_done`, `queue_failed` —
-   a biuro miało go rozszyfrować samo. Dekalog p. 2: rozpoznanie tańsze od
+/* ── Polskie nazwy zdarzeń dziennika ───────────────────────────────────
+   Decyzja właściciela. Klucz serwera — `putaway_line_done`, `queue_failed`
+   — trzeba by rozszyfrowywać. Dekalog p. 2: rozpoznanie tańsze od
    pamiętania.
 
    JEDNA NAZWA NA KAŻDY TYP Z REJESTRU. Lista typów stoi na serwerze
@@ -241,8 +240,8 @@ export const NAZWA_ZDARZENIA: Record<string, string> = {
   reklamacja_zalacznik_bez_location: "Załącznik reklamacji bez adresu",
   reklamacje_synchronizacja_reczna: "Reklamacje odświeżone ręcznie",
 
-  /* Dyskusje: ekranu już nie ma, ale stare zdarzenia leżą w bazie, więc
-     dziennik dalej opisuje je po polsku zamiast surowym kluczem. */
+  /* Dyskusje: stare zdarzenia leżą w bazie, więc dziennik opisuje je po
+     polsku zamiast surowym kluczem. */
   dyskusja_prowadzi: "Dyskusja przejęta",
   dyskusja_odswiezenie: "Dyskusja odświeżona z Allegro",
   dyskusja_odpowiedz: "Odpowiedź w dyskusji",

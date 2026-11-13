@@ -5,14 +5,12 @@ import { BrakPolaczenia, POLACZENIE_ZERWANE } from "../api/klient";
 import { useZdrowie } from "../api/rozmowy";
 import { godzina } from "../ui";
 
-/* ── PASEK BRAKU POŁĄCZENIA (0.546.0) ───────────────────────────────────────
-   Serwer bierze wydanie sam, kilka razy dziennie, i na minutę znika. Pomiar
-   z zabitym serwerem pokazał trzy rzeczy naraz, każdą osobno mylącą:
-     - listy bez danych mówiły „nic nie czeka na biuro", a liczniki „0";
-     - ekran z pamięci pokazywał stare dane bez słowa, że są stare;
-     - błędy stały po kawałku przy każdej sekcji, jako „Błąd 502".
-   Agent brał brak połączenia za brak pracy. Pasek mówi to raz, w jednym
-   miejscu, z godziną ostatniego kontaktu i tym, co z tego wynika.
+/* ── PASEK BRAKU POŁĄCZENIA ─────────────────────────────────────────────────
+   Serwer bierze wydanie sam, kilka razy dziennie, i na minutę znika. Bez
+   paska agent brałby brak połączenia za brak pracy: listy mówiłyby „nic nie
+   czeka", ekran z pamięci pokazywałby stare dane bez słowa, a błędy stałyby
+   po kawałku przy każdej sekcji. Pasek mówi to raz, w jednym miejscu,
+   z godziną ostatniego kontaktu i tym, co z tego wynika.
 
    SKĄD WIE. Każde zapytanie i mutacja, które skończą się `BrakPolaczenia`,
    zgłaszają zdarzenie (`api/klient-zapytan.ts`). Pasek pojawia się od razu,

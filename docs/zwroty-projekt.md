@@ -1,10 +1,8 @@
-# Zwroty — projekt obiegu i lista rzeczy popsutych
+# Zwroty — projekt obiegu i otwarte sprawy
 
-Dokument z rozmowy z właścicielem (16 września 2026). Pytanie brzmiało: „jak
-zaprojektowałbyś obsługę zwrotów od początku, gdy celem jest w ogóle nie klikać
-w Subiekcie". Odpowiedź po czterech rundach ustaleń brzmi: **architektura, którą
-mamy, jest w większości słuszna**. Przeprojektowania nie ma. Jest sześć
-konkretnych rzeczy popsutych i jedna, która blokuje pięć pozostałych.
+Pytanie właściciela brzmiało: „jak zaprojektowałbyś obsługę zwrotów od
+początku, gdy celem jest w ogóle nie klikać w Subiekcie". Odpowiedź: **architektura,
+którą mamy, jest w większości słuszna**. Zostały konkretne luki, opisane w §4.
 
 Ten plik nie opisuje stanu kodu — to robi `docs/architektura.md`. Opisuje
 DECYZJE i ich uzasadnienia, żeby następna sesja nie zaczynała od zera.
@@ -23,7 +21,7 @@ Do czasu zmiany tej decyzji cel brzmi precyzyjnie: **zero kliknięć na ścieżc
 paragonowej**. Panel ma zwroty do faktur oznaczać jako ręczne, a nie udawać, że
 automat je pominął.
 
-## 2. Decyzje właściciela z tej rozmowy
+## 2. Decyzje właściciela
 
 Cztery, wszystkie wiążące dla kodu.
 
@@ -87,96 +85,15 @@ agregacji stoi przy `enqueueMM` w `server/src/services/queue.ts`: jeden koszyk t
 jeden dokument i jedna kartka dla magazyniera. Rozbicie na zadania jednopozycyjne
 dałoby N dokumentów, N koszy po stronie kolektora i N wpisów w rekoncyliacji.
 
-## 4. Co jest popsute
+## 4. Co zostaje otwarte
 
-Sześć rzeczy, w kolejności ważności. Pierwsza blokuje wszystkie automatyczne.
+### 4.1. ZW nie przechodzi na produkcji
 
-### 4.1. ZW nie przechodzi na produkcji — blokada wszystkiego
-
-`SuDokument.Zapisz()` odmówił dwa razy: 15 września (PA 745/MAG/09/2026)
-i 16 września (zadanie `#1075`). Sfera oddaje `COMException 0x80040F20`,
-`SzczegolyOstatniegoBledu` jest puste, a `SprawdzPoprawnosc()` przechodzi. Ten
-sam ZW wystawiony ręką w Subiekcie zapisuje się bez komunikatu.
-
-Główny podejrzany to konto usługi. `wertis-sfera` działa jako `LocalSystem`,
-a Sfera bywa wrażliwa na brak profilu użytkownika. Kolejność sprawdzania:
-
-1. Uruchomić usługę na dedykowanym koncie z prawami operatora Subiekta.
-   Powtórzyć zadanie `#1075` i zapisać wynik.
-2. Gdy dalej odmawia — uruchomić to samo `exe` ręcznie z sesji interaktywnej
-   tego operatora. Różnica wyniku rozstrzyga, czy przyczyną jest konto.
-3. Gdy i to odmawia — przyczyna siedzi w paragonie albo w uprawnieniach,
-   a nie w tym, co ustawia worker.
-
-**KONTO TO NIE BYŁO — rozstrzygnięte 17 września, na niekorzyść tej hipotezy.**
-Sesja Sfery wstaje dziś na koncie użytkownika (`WERTIS-MONIKA\mateu`), a nie
-`LocalSystem`. Punkt 1 z listy wyżej został wykonany i NIE pomógł: ZW dalej
-odmawia tym samym `0x80040F20` (zadanie `#1116`, PA 14781/MAG/08/2026).
-
-Ta sama zmiana konta dała jednak dowód, którego wcześniej nie było. **MM z tej
-samej sesji, tego samego procesu i tego samego operatora DOCHODZI do walidacji**
-— odmawia merytorycznie, zdaniem `Brak towaru w magazynie` (zadanie `#1119`).
-Dwa dokumenty, jedna sesja COM, dwa różne zachowania.
-
-Z tego wynika wniosek węższy i mocniejszy niż poprzedni: **przyczyna siedzi
-w samym dokumencie ZW albo w tym, czego ZW wymaga, a MM nie.** Sesja, proces,
-konto Windows i operator Subiekta są wspólne, więc żadne z nich nie tłumaczy
-różnicy.
-
-Czego ZW wymaga, a MM nie — lista do sprawdzenia po kolei, od najtańszego:
-
-1. **Kasa i forma płatności.** ZW oddaje pieniądze, MM nie rusza żadnych.
-   Sprawdź, czy operator `SFERA_OPERATOR` ma przypisaną kasę domyślną i prawo
-   do niej. Biuro wystawia ZW ręcznie NA INNYM operatorze — porównaj ustawienia
-   tych dwóch kont w Subiekcie, zaczynając od kasy.
-2. **Okres i paragon z sierpnia.** `#1116` dotyczy PA z 08/2026, a dziś jest
-   wrzesień. Sprawdź, czy miesiąc nie jest zamknięty i czy ten paragon nie
-   wszedł już do rozliczenia, którego ZW nie może ruszyć.
-3. **Ten sam ZW ręką, na koncie operatora workera.** Nie na koncie biura —
-   na tym, którego używa `wertis-sfera`. To jedyny test, który rozdziela
-   „dokument jest zły" od „operator nie ma prawa".
-
-**Punkt 3 wykonany 17 września: ZW PRZESZEDŁ ręką, na koncie workera.** Zdejmuje
-to z listy kasę, zamknięty sierpień i sam paragon. Dokument jest dobry, operator
-ma prawa. Zostaje jedno: różnica między tym, co ustawia okno Subiekta, a tym,
-co ustawia worker.
-
-Właściciel pokazał wzorzec poprawnego ZW. Płatność stoi tam na przelewie,
-100,0% wartości — dokładnie tak, jak ustawia ją worker. Podejrzenie o samą
-kwotę przelewu tym samym upada.
-
-Zostają dwie różnice, obie mierzalne sondą bez zapisu. Okno wypełnia wszystkie
-pięć form płatności i pilnuje ich sumy, worker ustawia jedną. Okno niesie
-nabywcę, worker nie ustawia go nigdy. Szczegóły i komenda sondy stoją
-w `docs/sfera-com.md` §2m.
-
-Dopóki to nie jest rozstrzygnięte, ZW zostaje ręczny. **Blokada nie dotyczy
-jednak całej automatyzacji**, i to jest zmiana wobec pierwszej wersji tego
-akapitu: MM przechodzi walidację, więc dokumenty magazynowe (RW, PW) nie mają
-powodu odbijać się od COM. Ryzyko zostaje przy dokumentach handlowych — KFS
-jest bliższy ZW niż MM.
-
-### 4.2. Ocena towaru ma dwie wartości, a rzeczywistość trzy
-
-`ocenPozycje` w `server/src/services/zwroty.ts` zna „na stan" i „utylizację".
-Towar używany, który w firmie jedzie na regał outletowy, nie ma swojej oceny.
-Obsługa naciśnie więc „na stan" — bo to jedyne, co nie jest utylizacją.
-
-Skutek jest konkretny, nie teoretyczny. Pudło jedzie na halę, magazynier odkłada
-używkę na normalną półkę pod adresem pickingowym, MM powrotne oddaje stan na
-magazyn główny. Egzemplarz otwarty staje się nie do odróżnienia od fabrycznego.
-Następny kompletujący weźmie ten, który stoi bliżej — i to jest mechanizm
-produkujący drugi zwrot, tym razem uzasadniony i droższy.
-
-Przy ręcznym outlecie (D3) obieg musi wyglądać tak: pozycja outletowa zostaje
-BEZ oceny, nie wchodzi do żadnego pudła, a człowiek przenosi ją do Subiekta
-własnym MM. Aplikacja o tym ruchu nie wie.
-
-Opcja tańsza od pełnej ścieżki: trzecia ocena, która nie tworzy dokumentu ani
-koszyka, tylko stawia znacznik i buduje listę „do przeniesienia na outlet ręką".
-**Warunek jest twardy: bez tej listy znacznika nie dodawać.** Ocena „przecena"
-stała w tym samym miejscu od 0.156.0 i zeszła w 0.209.0 właśnie dlatego, że
-kończyła się znacznikiem i niczym więcej. Repo zna cenę tego błędu.
+`SuDokument.Zapisz()` odmawia ZW kodem `COMException 0x80040F20`, a ten sam ZW
+wystawiony ręką przechodzi. Konto, operator, kasa i paragon są wykluczone. Stan
+dochodzenia i hipotezy stoją w `docs/sfera-com.md` §2m. Dopóki to nie jest
+rozstrzygnięte, ZW zostaje ręczny. MM przechodzi walidację, więc dokumenty
+magazynowe (RW, PW) nie mają powodu odbijać się od COM.
 
 ### 4.3. Utylizacja zostawia na stanie ducha
 
@@ -195,30 +112,15 @@ Koszyk przyjmuje każdą kartotekę, a MM ściąga ją z magazynu głównego. Ni
 zawsze jest co ściągać: klient odsyła rzeczy, których nie kupił, a kartoteki
 usługowe nie mają stanu w ogóle.
 
-Kosztowało to już raz. Do koszyka Z-8 wszedł skanem koszt przesyłki, kosz się
-zamknął, a Sfera odrzuciła MM zdaniem „Brak towaru" (0.371.0). Bramka pilnująca
-statusu koszyka nie pomogła, bo problem był w zawartości, nie w stanie.
-
 Projekt rozdziela to na wejściu, a nie przy wystawianiu dokumentu:
 
 * pozycja wskazana z dokumentu sprzedaży — wchodzi przez ZW,
 * pozycja bez pokrycia w dokumencie — wchodzi przez PW na magazyn zwrotów,
-* kartoteka usługowa — nie wchodzi do obiegu magazynowego wcale, blokada na
-  skanie z jednym zdaniem na ekranie.
+* kartoteka usługowa — nie wchodzi do obiegu magazynowego wcale. Ta blokada
+  już działa: bramka stoi na numerze `TW_ID_PRZESYLKA` i na braku wiersza stanu.
 
 Wtedy MM nie ma prawa paść na braku stanu, bo każda linia kosza ma udokumentowane
 wejście.
-
-### 4.5. Jeden karton nosi dwa imiona
-
-Obsługa napełnia koszyk „Z-7", a hala rozkłada kosz z jego dokumentu — „1209".
-Raport cyklu musi je zszywać heurystyką po czasie, bo numery MM powtarzają się
-co rok (`server/src/services/cykl-zwrotow.ts`). Przedrostek `Z-` istnieje po to,
-żeby te dwie przestrzenie nazw się nie zderzyły.
-
-Docelowo kod nadaje aplikacja i jest jeden przez całe życie pudła. Numer MM jest
-atrybutem kosza, nie jego nazwą. Etykieta drukuje kod kreskowy, więc magazynier
-skanuje zamiast przepisywać liczbę z kartki.
 
 ### 4.6. Brakujące dokumenty względem celu „zero kliknięć"
 
@@ -233,22 +135,14 @@ skanuje zamiast przepisywać liczbę z kartki.
 ## 5. Kolejność prac
 
 1. Rozstrzygnąć `0x80040F20` (4.1). Bez tego reszta automatyzacji nie ma sensu.
-2. ~~Blokada kartotek spoza magazynu przy dokładaniu do koszyka~~ — **zrobione
-   w 0.374.0**. Bramka stoi na numerze `TW_ID_PRZESYLKA` i na braku wiersza
-   stanu, bo tylko te dwie rzeczy wiemy na pewno.
-3. ~~Trzecia ocena z listą roboczą~~ — **zrobione w 0.375.0**. Ocena „na outlet"
-   nie tworzy dokumentu; kończy się paskiem „Na regał outletowy" i meldunkiem
-   o przeniesieniu.
-4. PW dla nadwyżek (4.4, druga połowa) — zostaje.
-5. RW dla utylizacji, po decyzji o bilansie (4.3) — zostaje.
-6. ~~Jeden numer kosza~~ — **zrobione w 0.376.0**: koszyk dostaje swój dokument
-   MM, a hala otwiera go z jego własnej etykiety. **Etykieta z kodem kreskowym
-   zostaje** i wymaga decyzji: nowa zależność (biblioteka kodów kreskowych) albo
-   własny koder Code128 z tablicą wziętą ze specyfikacji, nie z pamięci.
-7. KFS — tylko jeśli właściciel odwróci decyzję o ręcznych fakturach.
+2. PW dla nadwyżek (4.4).
+3. RW dla utylizacji, po decyzji o bilansie (4.3).
+4. Etykieta kosza z kodem kreskowym. Wymaga decyzji: nowa zależność albo własny
+   koder Code128 z tablicą wziętą ze specyfikacji, nie z pamięci.
+5. KFS — tylko jeśli właściciel odwróci decyzję o ręcznych fakturach.
 
-Punkty 4 i 5 są niezależne od Sfery po naszej stronie, ale ich wykonanie i tak
-zatrzyma się na punkcie 1: to worker Sfery wystawia dokumenty.
+Punkty 2 i 3 są niezależne od Sfery po naszej stronie. Ich wykonanie i tak
+zatrzyma się na punkcie 1, bo to worker Sfery wystawia dokumenty.
 
 ## 6. Czego ten projekt NIE rozstrzyga
 

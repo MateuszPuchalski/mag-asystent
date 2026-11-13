@@ -8,12 +8,10 @@ import {
 } from "./allegro-wyplaty.js";
 import { kubelekZwrotu } from "./zwroty.js";
 
-/* ── Czy pieniądze naprawdę wróciły do klienta (0.426.0) ─────────────────────
-   Zgłoszenie właściciela: 934 zwroty stały w DO DECYZJI, choć wypłata poszła
-   w sierpniu. Kubełek nie kłamał — nie miał skąd wiedzieć: jedyne pole zwrotu
-   mówiące o wypłacie (`status = FINISHED`) jest punktem na osi, która biegnie
-   dalej, na statusy PROWIZYJNE. Kto nie odpytał w tym oknie, nie dowie się
-   nigdy.
+/* ── Czy pieniądze naprawdę wróciły do klienta ───────────────────────────────
+   Jedyne pole zwrotu mówiące o wypłacie (`status = FINISHED`) jest punktem
+   na osi, która biegnie dalej, na statusy PROWIZYJNE. Kto nie odpytał w tym
+   oknie, nie dowie się nigdy.
 
    Te testy pilnują trzech rzeczy: co uznajemy za dowód wypłaty, kogo o nią
    pytamy i czy zatrzask naprawdę zdejmuje sprawę z kolejki.                 */
@@ -101,8 +99,8 @@ test("pytamy tylko o zwroty W PRACY, po zamówieniu z identyfikatorem płatnośc
 });
 
 test("zamknięty korektą, a niezapłacony też pytamy o wypłatę (0.505.0)", async () => {
-  /* Zgłoszenie właściciela, zwrot X5XY/2026: korekta ZW zamknęła zwrot, biuro
-     oddało pieniądze w Allegro, a panel dalej mówił „do zwrotu". */
+  /* Korekta ZW zamknęła zwrot, biuro oddało pieniądze w Allegro — panel nie
+     może dalej mówić „do zwrotu". */
   const d = stanowisko();
   const teraz = new Date("2026-09-25T12:00:00Z");
   const czeka = zwrotZPlatnoscia(d, "x", "pay-x", { zamkniety: "2026-09-20T08:00:00Z", werdykt: "przyjety" });
@@ -126,9 +124,8 @@ test("zamknięty korektą, a niezapłacony też pytamy o wypłatę (0.505.0)", a
 });
 
 test("kolejka pytań się kręci — stare nierozliczalne nie zasłaniają nowych (0.506.1)", async () => {
-  /* Zgłoszenie właściciela, zwrot 6016/2026: wypłata 23 września, a panel
-     dalej „do zwrotu". Setka najstarszych, które rozliczenia nie dostaną
-     nigdy, stała na czele listy na zawsze. */
+  /* Setka najstarszych, które rozliczenia nie dostaną nigdy, nie może stać
+     na czele listy na zawsze. */
   const d = stanowisko();
   const stare = [0, 1, 2].map((i) =>
     zwrotZPlatnoscia(d, `s${i}`, `pay-s${i}`, { utworzono: `2026-07-0${i + 1}T08:00:00Z` }));

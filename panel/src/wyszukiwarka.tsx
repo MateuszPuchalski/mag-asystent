@@ -6,24 +6,22 @@ import { Zdjecie } from "./towar/Zdjecie";
 
 /* Agent nie wpisuje `tw_id` z pamięci — wskazuje towar (projekt panelu §13.2).
    Techniczny identyfikator bazy nie jest wiedzą, którą ktokolwiek nosi w
-   głowie, a literówka w nim wysyłała na halę zadanie o cudzym towarze.
+   głowie, a literówka w nim wysłałaby na halę zadanie o cudzym towarze.
 
-   ── ZDJĘCIE PRZY WYNIKU (0.203.0) ────────────────────────────────────────
+   ── ZDJĘCIE PRZY WYNIKU ───────────────────────────────────────────────────
    To pole obsługuje kilka miejsc: kartotekę przy rozmowie, zlecenie pomiaru,
    zadania hali i pozycje zwrotu. Wszędzie kończy się tym
-   samym pytaniem — „który z tych dwudziestu wierszy to TA część" — a
-   odpowiadały na nie sam symbol i nazwa. Nazwy w kartotece tej firmy różnią
-   się końcówką („szarpak NAC LS46" i „szarpak NAC LS51"), więc wybór
-   wymagał otwarcia Subiekta albo strzału.
+   samym pytaniem — „który z tych dwudziestu wierszy to TA część". Nazwy
+   w kartotece tej firmy różnią się końcówką („szarpak NAC LS46" i „szarpak
+   NAC LS51"), więc bez obrazka wybór wymagałby otwarcia Subiekta albo
+   strzału.
 
    Kafel ma stały rozmiar, także pusty, żeby lista nie przesuwała się pod
    kursorem po doładowaniu obrazów. Wyników jest najwyżej dwadzieścia
    (`/api/products/search`), a pobrania i tak idą po trzy naraz.
 
    NAZWA PRZED SYMBOLEM. Symbol pozostaje potrzebny — jedzie na dokument
-   i na halę — ale rozpoznaje się część po nazwie i po obrazku. Do 0.202.0
-   wiersz zaczynał się od pogrubionego symbolu, czyli od tego, czego nikt
-   nie nosi w głowie. */
+   i na halę — ale rozpoznaje się część po nazwie i po obrazku. */
 
 export interface Towar { id: number; sym: string; name: string; locs: string[] }
 

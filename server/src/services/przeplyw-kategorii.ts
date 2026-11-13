@@ -5,7 +5,7 @@ import { publishConversationEvent } from "./conversation-realtime.js";
 import { CEL_KLASYFIKACJI } from "./copilot-klasyfikacja.js";
 import { KATEGORIE, TAKSONOMIA_WERSJA, czyKategoria, type Kategoria } from "./klasyfikacja-slownik.js";
 
-/* ── Przepływ automatyzacji dla każdej kategorii (6 października 2026) ───────
+/* ── Przepływ automatyzacji dla każdej kategorii ─────────────────────────────
    Decyzja właściciela: każda kategoria pytania dostaje przepływ zapisany
    w kodzie. Przepływ może wysłać odpowiedź bez człowieka, zlecić następny
    krok albo oznaczyć sprawę jako pilną.
@@ -26,7 +26,6 @@ import { KATEGORIE, TAKSONOMIA_WERSJA, czyKategoria, type Kategoria } from "./kl
    która używa tej stałej już przy ładowaniu. */
 
 export type RodzajPropozycji = "wyslij" | "krok" | "pilne";
-export const RODZAJE_PROPOZYCJI = ["wyslij", "krok", "pilne"] as const;
 
 export interface KrokPrzeplywu {
   /** Zadanie dla hali. Dziś jedyny wykonywalny krok — prośby o zdjęcie, model

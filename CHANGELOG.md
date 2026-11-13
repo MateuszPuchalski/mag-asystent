@@ -10,6 +10,30 @@ z wersją monorepo" — i właśnie tak przestał być zgodny: `0.3.0` przetrwa�
 sześć zmergowanych zmian, w tym takie, które wymagały nowego uprawnienia SQL.
 Komentarz nie jest mechanizmem.
 
+## 0.621.1 — 9 listopada 2026
+
+Usunięty martwy kod serwera i panelu, komentarze-historia w kodzie oraz
+dokumentacja funkcji, których już nie ma. Działanie bez zmian.
+
+## 0.621.0 — 7 listopada 2026
+
+**Rozkładanie dostawy wymusza ważenie i mierzenie.** Gdy kartoteka zeskanowanego
+towaru nie ma wagi brutto, netto, długości, szerokości albo wysokości, kolektor
+od razu otwiera arkusz pomiaru. Pozycji nie da się odłożyć, dopóki braki nie
+zostaną wpisane i zapisane. Pola, które kartoteka już ma, można zostawić puste.
+
+Blokada nie działa, gdy pomiar tego towaru czeka już w kolejce do Subiekta,
+gdy wymiary nie są skonfigurowane (DEPLOY §6j) i gdy kolektor nie może ich
+sprawdzić, bo nie ma sieci albo serwer nie odpowiada.
+
+## 0.620.1 — 6 listopada 2026
+
+**Szkic Copilota nie dopisuje drogi zapasowej.** Gdy szkic podaje ofertę
+z adresem, która odpowiada na prośbę klienta, kończy na niej. Nie streszcza
+opisu aukcji i nie proponuje innej drogi w rodzaju „jeśli wolą Państwo…”.
+Prośbę o zdjęcie albo tabliczkę dodaje tylko wtedy, gdy od niej zależy,
+co klient kupi. Komplet pasujący na każdy wariant jej nie potrzebuje.
+
 ## 0.620.0 — 5 listopada 2026
 
 **Uwaga albo pomysł z każdego ekranu.** W panelu i na kolektorze stoi

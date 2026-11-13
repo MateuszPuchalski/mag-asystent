@@ -20,45 +20,6 @@ import { czekajaNaSzkic } from "./copilot-szkic-po-rozpoznaniu.js";
 import { TAKSONOMIA_WERSJA } from "./klasyfikacja-slownik.js";
 import { glosAllegro } from "./glos-allegro.js";
 
-/* ── Szkice przed pracą (26 września 2026, decyzja właściciela) ──────────────
-   PROBLEM. Rozpoznanie i szkic z taktu mają sufity godzinowe: sześćdziesiąt
-   rozpoznań i trzydzieści szkiców. W zwykłej godzinie chronią portfel.
-   W poniedziałek rano zaległość z weekendu trafiała na ten sufit dokładnie
-   wtedy, gdy przychodzili agenci. Pierwsza godzina dostawała około trzydziestu
-   szkiców, a resztę kolejki agenci pisali od zera w największym ruchu.
-
-   ROZWIĄZANIE. Okno przed biurem (domyślnie 6–8 czasu magazynu), w którym ta
-   sama droga — rozpoznanie, potem szkic — biegnie z WŁASNYM limitem na
-   poranek. Najpierw rozmowy PILNE, potem najdłużej czekające: to jest
-   kolejność kolejki (`listaRozmow`), więc szkic stoi tam, gdzie agent
-   spojrzy najpierw. Przebieg kończy się z końcem okna, limitem albo zaległością.
-
-   NIE ZABIERA PIERWSZEJ GODZINY. Wywołania idą do księgi pod własnymi
-   zadaniami (`klasyfikacja_przed_praca`, `szkic_przed_praca`). Sufity dnia
-   liczą wyłącznie `klasyfikacja` i `szkic`, a liczą w oknie przesuwnym:
-   szkic z 7:50 ważyłby w suficie do 8:50. Gdyby poranek liczył się do
-   sufitu dnia, odebrałby agentom połowę pierwszej godziny — dokładnie to,
-   co ta funkcja ma naprawić. Koszt trzyma limit poranka, liczony z tej samej
-   księgi, razem z błędami, więc restart go nie zeruje.
-
-   OKNO NALEŻY DO TEGO PRZEBIEGU. Zwykłe takty rozpoznania i szkicu w oknie
-   odpuszczają (`przedPracaTrwa` w `main()`). Dwie drogi na tych samych
-   rozmowach naraz płaciłyby dwa razy za to samo pytanie, a zwykła droga
-   wydawałaby sufit dnia przed biurem. Wiadomość, która przyjdzie po
-   wyczerpaniu limitu, czeka do końca okna — nikt jej wtedy jeszcze nie czyta.
-
-   NIE PŁACI DWA RAZY. Szkic, który odpowiada już na bieżącą wiadomość pod
-   bieżącą decyzją, zostaje: świeżość mierzy `czekajaNaSzkic`
-   (`szkic_copilota.decyzja_id`), ta sama reguła co po rozpoznaniu. Szkic
-   nieudany z winy ROZMOWY (odmowa, sprawdzenie, maskowanie) nie wraca na
-   tę samą wiadomość tego ranka. Powtórka przy takcie co dwie minuty
-   zjadłaby limit na jedną rozmowę. Stan dostawcy (limit, przeciążenie,
-   łącze, klucz) rozmowy NIE skreśla: wraca w następnym takcie, jak przy
-   rozpoznaniu. Nowa wiadomość klienta dostaje nową próbę.
-
-   NIC NIE IDZIE DO KLIENTA. Szkic czeka na agenta z pustą oceną, jak każdy
-   szkic automatu. */
-
 /** Autor rozpoznań poranka: ten sam „automat", własne zadanie w księdze. */
 export const AUTOMAT_PRZED_PRACA_KLASYFIKACJA: Autor = {
   id: null, name: "automat", zadanie: "klasyfikacja_przed_praca", zrodlo: "przed_praca",

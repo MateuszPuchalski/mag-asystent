@@ -6,11 +6,6 @@ import { ile } from "../ui";
 /**
  * CO MODEL ODCZYTAŁ ZE ZDJĘĆ — jeden akapit na fotografię.
  *
- * Powstało z pytania właściciela o kosiarkę PARKSIDE: klient przysłał ostre
- * zdjęcie tabliczki znamionowej, a model „nie był w stanie wyciągnąć modelu".
- * Nie był, bo tego zdjęcia nigdy nie dostał — wątek szedł do dostawcy jako
- * goły tekst i nie wspominał nawet, że załącznik istnieje.
- *
  * DLACZEGO TO W OGÓLE STOI NA EKRANIE, skoro odczyt jest dla modelu, nie dla
  * agenta. Bo jest CENĄ za prawo powołania się na zdjęcie. Odsiew numerów
  * odrzuca szkic z numerem spoza faktów i wątku, a tabliczka to sama
@@ -19,13 +14,10 @@ import { ile } from "../ui";
  * z miniaturą na osi rozmowy i w jednym spojrzeniu wie, czy model przeczytał
  * tabliczkę, czy ją sobie wyobraził.
  *
- * ZWINIĘTE DOMYŚLNIE OD 0.342.0, i to jest zmiana zdania, nie przeoczenie.
- * Do 0.341.0 stało tu „zawsze otwarte, bo każdy wiersz jest do sprawdzenia
- * z definicji". Zdanie było prawdziwe i prowadziło do złego ekranu: odczyt
- * z czterech zdjęć wypychał szkic, po który agent tu przyszedł, poza
- * krawędź. Właściciel rozstrzygnął spór wprost — czytelność szkicu wygrywa.
+ * ZWINIĘTE DOMYŚLNIE: odczyt z czterech zdjęć wypychałby szkic, po który agent
+ * tu przyszedł, poza krawędź. Właściciel: czytelność szkicu wygrywa.
  *
- * Do sprawdzenia jest dalej każdy wiersz i nagłówek mówi to bez rozwijania:
+ * Do sprawdzenia jest każdy wiersz i nagłówek mówi to bez rozwijania:
  * niesie LICZBĘ zdjęć i zdanie „porównaj z miniaturą". Kto ma wątpliwość,
  * rozwija jednym kliknięciem; kto nie ma, nie płaci za nią wysokością.
  *

@@ -26,8 +26,8 @@ import os
 import re
 import sys
 
-# Trzy dokumenty są POZA zakresem, bo w całości są uzasadnieniami decyzji:
-# docs/architektura.md, docs/porownanie-asystent.md, CHANGELOG.md. Limit
+# Dwa dokumenty są POZA zakresem, bo w całości są uzasadnieniami decyzji:
+# docs/architektura.md i CHANGELOG.md. Limit
 # długości zdania wyciąłby z nich dokładnie tę treść, dla której powstały.
 DOCS = [
     "README.md",

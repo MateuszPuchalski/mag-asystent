@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import { useState } from "react";
 import { Lock, UserX } from "lucide-react";
 import type { SzczegolyKonfliktu } from "../api/typy";
 import { EtykietaWartosci, Przycisk } from "../ui";
@@ -6,10 +6,9 @@ import { EtykietaWartosci, Przycisk } from "../ui";
 /**
  * Odpowiedź odbita przez cudze prowadzenie (§6.2).
  *
- * Do 0.394.0 otwierał to przegrany wyścig o przycisk „PRZEJMIJ ROZMOWĘ".
- * Przycisk zszedł z ekranu w 0.395.0 (przejęcie dzieje się samo przy
- * odpowiedzi), więc dialog karmi teraz odbita WYSYŁKA — jedyny moment, w
- * którym cudze prowadzenie naprawdę staje agentowi na drodze.
+ * Przejęcie dzieje się samo przy odpowiedzi, więc dialog karmi odbita
+ * WYSYŁKA — jedyny moment, w którym cudze prowadzenie naprawdę staje
+ * agentowi na drodze.
  *
  * Ekran ma powiedzieć TRZY rzeczy, bo bez nich zostaje goły komunikat błędu —
  * kto prowadzi, od kiedy i na której wersji stoi rozmowa wobec tej, którą

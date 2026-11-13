@@ -8,7 +8,7 @@ import {
   zwiazKorekte, zwiazKorektyPewne,
 } from "./faktury.js";
 
-/* ── Dokument sprzedaży przy zwrocie (0.174.0) ───────────────────────────────
+/* ── Dokument sprzedaży przy zwrocie ─────────────────────────────────────────
    Te testy pilnują jednej granicy: co wolno automatowi, a co należy do
    człowieka. Automat wiąże wyłącznie dokument z numerem zamówienia; nakładka
    pozycji jest poszlaką i nie wiąże nigdy, bo firma ogrodnicza sprzedaje ten
@@ -209,10 +209,10 @@ test("numer zwrotu na dokumencie też wiąże", () => {
   assert.equal(fakturaZwrotu(id, d).dokId, 500);
 });
 
-/* ── Numer zamówienia w UWAGACH dokumentu (0.175.0) ─────────────────────────
+/* ── Numer zamówienia w UWAGACH dokumentu ───────────────────────────────────
    Zrzut z Subiekta firmy: Sellasist wpisuje UUID zamówienia w `dok_Uwagi`,
-   a `dok_NrPelnyOryg` zostawia pusty. Do 0.174.0 mocny sygnał — jedyny, który
-   wiąże automatycznie — nie miał więc prawa zadziałać ani razu.            */
+   a `dok_NrPelnyOryg` zostawia pusty. Bez uwag mocny sygnał — jedyny, który
+   wiąże automatycznie — nie zadziałałby ani razu.                          */
 
 test("numer zamówienia w UWAGACH wiąże tak samo pewnie jak w numerze obcym", () => {
   const d = stanowisko();
@@ -239,7 +239,7 @@ test("dwa dokumenty z tym samym numerem w uwagach to nadal spór", () => {
   assert.equal(zwiazFakture(id, d), false);
 });
 
-/* ── Dokument nie może być starszy niż zakup (0.175.0) ───────────────────────
+/* ── Dokument nie może być starszy niż zakup ─────────────────────────────────
    Na ekranie: zamówienie kupione 17.08, a wśród kandydatów paragony z 13.08
    i 23.07. Okno liczyło się wyłącznie od daty ZWROTU, sześćdziesiąt dni
    wstecz — data zakupu leżała w bazie obok i ekran ją pokazywał, tylko
@@ -271,7 +271,7 @@ test("bez pobranego zamówienia okno zostaje przy sześćdziesięciu dniach od z
   assert.equal(dolnaGranicaOkna("2026-09-01T10:00:00Z", "2026-01-05T10:00:00Z", 60), "2026-07-03");
 });
 
-/* ── Numer korekty czytany z Subiekta (0.201.0) ─────────────────────────────
+/* ── Numer korekty czytany z Subiekta ───────────────────────────────────────
    Automat robi to, co przycisk: zapisuje numer i zamyka zwrot. Bramki są te
    same co u człowieka, bo numer zapisany przed kwotą zamknąłby sprawę
    pieniędzy, o których nikt nie zdecydował.                                 */
@@ -355,7 +355,7 @@ test("korekta NIE jest kandydatem na dokument sprzedaży zwrotu", () => {
 });
 
 test("FAKTURA DO PARAGONU nie jest korektą, choć wskazuje ten paragon", () => {
-  /* Zrzut z bazy firmy (0.201.1) pokazał `dok_DoDokId` wypełnione na dwudziestu
+  /* Zrzut z bazy firmy pokazał `dok_DoDokId` wypełnione na dwudziestu
      tysiącach paragonów i dwudziestu pięciu tysiącach WZ — to ogólny odnośnik
      „do dokumentu", nie znacznik korygowania.
 
@@ -385,7 +385,7 @@ test("zwrot detaliczny (ZW) wiąże się tak samo jak korekta faktury", () => {
   assert.equal(zwiazKorekte(id, d), true);
   assert.equal(stanKorekty(d, id).korekta_numer, "ZW 4/2026");
 });
-/* ── Dokumenty sprzedaży zamówienia — soczewka „Faktura" (0.499.0) ───────────
+/* ── Dokumenty sprzedaży zamówienia — soczewka „Faktura" ─────────────────────
    Agent powie klientowi „wysyłamy fakturę FS …", więc lista zna WYŁĄCZNIE
    dokumenty z numerem zamówienia. Nakładka pozycji, która przy zwrocie jest
    poszlaką, tutaj nie wchodzi wcale. */

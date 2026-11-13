@@ -1,13 +1,12 @@
-import React, { useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import { Sigma } from "lucide-react";
 import type { PozycjaZwrotu } from "../api/typy";
 import { Przycisk, Pole } from "../ui";
 
-/* ── Ile sztuk naprawdę wróciło (0.212.0) ────────────────────────────────────
-   Klient zgłasza w Allegro dwie sztuki, w kartonie przyjeżdża jedna. Do
-   0.211.0 nie było tego gdzie zapisać: pozycji z Allegro nie da się poprawić,
-   a kwota liczyła się z DEKLARACJI. Zostawało odznaczyć całą pozycję albo
-   zapłacić za dwie — „wróciła jedna z dwóch" nie mieściło się w bazie.
+/* ── Ile sztuk naprawdę wróciło ──────────────────────────────────────────────
+   Klient zgłasza w Allegro dwie sztuki, w kartonie przyjeżdża jedna. Pozycji
+   z Allegro nie da się poprawić, a kwota liczy się z DEKLARACJI — stąd
+   osobna liczba sztuk, które wróciły.
 
    LICZY BIURO — decyzja właściciela: to ono otwiera i procesuje zwroty.
 
@@ -22,10 +21,10 @@ export function IloscZwrocona({ p, trwa, blad, onZapisz, otworz = 0, tylkoOdczyt
   trwa: boolean;
   blad: string;
   onZapisz: (ilosc: number | null) => void;
-  /** Zwrot z korektą (0.484.7): liczba zostaje widoczna, cofnięcie znika — serwer by odmówił. */
+  /** Zwrot z korektą: liczba zostaje widoczna, cofnięcie znika — serwer by odmówił. */
   tylkoOdczyt?: boolean;
   /**
-   * Znacznik klawisza `-` (0.479.0): każda nowa wartość otwiera pole. Liczba,
+   * Znacznik klawisza `-`: każda nowa wartość otwiera pole. Liczba,
    * nie `boolean` — drugi `-` po zamknięciu ma otworzyć pole jeszcze raz.
    */
   otworz?: number;
@@ -84,7 +83,7 @@ export function IloscZwrocona({ p, trwa, blad, onZapisz, otworz = 0, tylkoOdczyt
         onKeyDown={(e) => {
           if (e.key === "Enter" && gotowe) onZapisz(liczba);
           /* Escape oddaje klawisze ekranowi — pole otwarte klawiszem ma się
-             dać zamknąć bez myszy (0.479.0). */
+             dać zamknąć bez myszy. */
           if (e.key === "Escape") { e.preventDefault(); zamknij(); }
         }} />
       <Przycisk wariant="glowny" className="text-xs" disabled={trwa || !gotowe}

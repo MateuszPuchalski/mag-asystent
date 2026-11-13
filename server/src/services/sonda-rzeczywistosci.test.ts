@@ -4,7 +4,7 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 
-/* ── Test na żywym Allegro (24 września 2026) ────────────────────────────────
+/* ── Test na żywym Allegro ───────────────────────────────────────────────────
    Tu, i TYLKO tu, drogi są podstawione — w produkcji sonda woła te same
    funkcje co Copilot i synchronizacja, bez atrap. Pilnujemy czterech rzeczy:
    błąd drogi jest czerwony i ma powód bez adresu, limit 429 NIE jest błędem,

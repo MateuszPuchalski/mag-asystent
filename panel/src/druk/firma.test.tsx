@@ -4,7 +4,7 @@ import React from "react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { useFirmaDruku } from "./firma";
 
-/* ── Dane firmy dla druku (0.444.0) ────────────────────────────────────────
+/* ── Dane firmy dla druku ──────────────────────────────────────────────────
    Zapas z przeglądarki działa WYŁĄCZNIE, dopóki serwer jest pusty. Potem
    serwer wygrywa zawsze — także pustym polem, bo puste pole zapisał człowiek.
    Druk czeka na odpowiedź serwera, żeby nie wyjść raz tak, raz inaczej. */

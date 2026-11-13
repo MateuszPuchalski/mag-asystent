@@ -12,7 +12,7 @@ process.env.DB_PATH = path.join(fs.mkdtempSync(path.join(os.tmpdir(), "wertis-sp
 process.env.LOG_LEVEL = "silent";
 process.env.SGT_MODE = "seeded";
 
-/* ── Trasy ponad kolejkami (23 września 2026) ────────────────────────────────
+/* ── Trasy ponad kolejkami ────────────────────────────────
    Szukanie Ctrl+K i historia ze zwrotu albo sprawy: bramka biura także na
    odczycie, 401 przed 403, i ani jednego zapisu przy patrzeniu. */
 
@@ -78,7 +78,7 @@ test("nieistniejący zwrot to 404 z treścią, nie 500", async () => {
   assert.equal(r.statusCode, 404);
 });
 
-/* ── Profil klienta (24 września 2026) ─────────────────────────────────────── */
+/* ── Profil klienta ─────────────────────────────────────── */
 test("profil: odczyt bez zapisu, nieznany login 404, notatka tylko dla biura", async () => {
   const b = login("biuro", "Ola3");
   const zmiany = (db().prepare("SELECT total_changes() AS n").get() as { n: number }).n;
@@ -101,7 +101,7 @@ test("profil: odczyt bez zapisu, nieznany login 404, notatka tylko dla biura", a
   assert.equal(c.statusCode, 409, "nie było poprzedniej notatki");
 });
 
-/* ── Sprawa klienta (0.535.0, S6) ───────────────────────────────────────────
+/* ── Sprawa klienta (S6) ───────────────────────────────────────────
    Cztery zapisy: bramka osobno dla każdego (TRASY wyżej wysyłają tylko GET),
    każdy klucz ciała wymagany, konflikt to 409 ze świeżą sprawą, a login
    kupującego nie ląduje w `events` — ani z serwisu, ani z audytu odrzuceń. */
@@ -224,7 +224,7 @@ test("audyt odrzuceń pod profilem klienta pisze wzorzec trasy, nie login", asyn
   assert.deepEqual(zLoginem, [], "login kupującego nie ma prawa trafić do dziennika");
 });
 
-/* ── Dosyłka z profilu (0.536.0, S6) ───────────────────────────────────────
+/* ── Dosyłka z profilu (S6) ───────────────────────────────────────
    Dwa zapisy obok czterech wyżej, z tymi samymi strażnikami: bramka biura,
    każdy klucz wymagany, 409 ze świeżą sprawą. Numer przesyłki jedzie
    w ciele, więc nie trafia ani do adresu, ani do audytu odrzuceń. */

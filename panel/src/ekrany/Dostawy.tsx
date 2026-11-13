@@ -15,22 +15,14 @@ import { Dokument, WyjatkiLuzem } from "../dostawy/Dokument";
 import { Kontekst } from "../dostawy/Kontekst";
 import { useOkno } from "../nawigacja/fokus";
 
-/** Kubełki do przeglądania — stoją pod „Więcej”, nie na wierzchu (0.526.0). */
+/** Kubełki do przeglądania — stoją pod „Więcej”, nie na wierzchu. */
 const WIECEJ_DOSTAW: ReadonlyArray<KubelekDostaw> = ["zamkniete", "poza", "archiwum"];
 
-/* ── DOSTAWY W PANELU (0.435.0) ────────────────────────────────────────────
-   Pierwszy widok biura po przeprowadzce (`docs/obsluga-klienta.md` §7).
+/* ── DOSTAWY ───────────────────────────────────────────────────────────────
    Gramatyka ta sama co w Zwrotach i Reklamacjach — kolejka, sprawa, dowody —
    bo biuro przechodzi między tymi ekranami kilkadziesiąt razy dziennie,
-   a trzy układy to trzy nawyki (dekalog pkt 2 i 6).
-
-   Co przeszło z `biuro.html` i dokąd:
-   - lista DO ROZŁOŻENIA z czipami → kolejka z kubełkami, z DO DECYZJI na
-     początku, bo po to biuro tu wchodzi;
-   - karta ODPOWIEDZI NA NOTATKI → sygnał „odpowiedź z hali" w wierszu
-     i przycisk PRZECZYTANE w rozmowie z halą, przy dokumencie;
-   - karta REKLAMACJE → wyjątki w dokumencie, protokół w jego nagłówku;
-   - karta ROZŁOŻONE POZA WERTIS → kubełek, a PRZYWRÓĆ przy dokumencie.
+   a trzy układy to trzy nawyki (dekalog pkt 2 i 6). DO DECYZJI stoi na
+   początku kubełków, bo po to biuro tu wchodzi.
 
    ADRES NIESIE DOKUMENT. `dokId` z Subiekta, bo dokument nietknięty nie ma
    jeszcze `deliveryId`; `bez` to otwarte wyjątki towaru spoza dokumentu.
@@ -43,7 +35,7 @@ export function Dostawy() {
   const wybrany: number | "bez" | null = id === "bez" ? "bez" : id ? Number(id) : null;
   const dokId = typeof wybrany === "number" ? wybrany : null;
 
-  /* Kubełek i fraza z adresu (0.502.0): wiersz dostawcy w Analizie prowadzi
+  /* Kubełek i fraza z adresu: wiersz dostawcy w Analizie prowadzi
      tu z `?kubelek=archiwum&q=<dostawca>`. Adres czyta się RAZ, przy wejściu,
      jak w koszach — dalej to stan ekranu. */
   const [parametry] = useSearchParams();
@@ -54,8 +46,7 @@ export function Dostawy() {
   });
   const [fraza, setFraza] = useState(() => parametry.get("q") ?? "");
   /* Archiwum szuka SERWER, więc każde naciśnięcie klawisza byłoby żądaniem.
-     Ćwierć sekundy to próg, poniżej którego pisanie i tak trwa — wzięty
-     z biura, gdzie działa od 0.121.0. */
+     Ćwierć sekundy to próg, poniżej którego pisanie i tak trwa. */
   const [frazaArchiwum, setFrazaArchiwum] = useState("");
   useEffect(() => {
     const t = setTimeout(() => setFrazaArchiwum(fraza.trim()), 250);
@@ -73,8 +64,8 @@ export function Dostawy() {
   const zOdpowiedzia = useMemo(
     () => new Set((odpowiedzi.data?.odpowiedzi ?? []).map((o) => o.dokId)), [odpowiedzi.data]);
 
-  /* Otwarte wyjątki, których dokumentu lista nie zna — w biurze stały w karcie
-     REKLAMACJE, tu dostają wiersz w DO DECYZJI. Bez tego dokument, który
+  /* Otwarte wyjątki, których dokumentu lista nie zna, dostają wiersz
+     w DO DECYZJI. Bez tego dokument, który
      wypadł z okna importu, zabrałby swój wyjątek z ekranu. */
   const spozaOkna = useMemo(() => {
     const naLiscie = new Set(dokumenty.map((d) => d.dokId));
@@ -95,9 +86,8 @@ export function Dostawy() {
     !q || nr.toLowerCase().includes(q) || kto.toLowerCase().includes(q)
       || (nrDostawcy ?? "").toLowerCase().includes(q);
   const wKubelku = (k: KubelekDostaw) => dokumenty.filter((d) => kubelekDokumentu(d, zOdpowiedzia) === k);
-  /* Bez danych licznik nie zna liczby, więc jej nie pokazuje (0.546.0).
-     „0" przy zerwanym połączeniu mówiło „nic nie ma", a prawda brzmiała
-     „nie wiem". Przerwa w połączeniu trwa zwykle minutę aktualizacji. */
+  /* Bez danych licznik nie zna liczby, więc jej nie pokazuje. „0" przy
+     zerwanym połączeniu mówiłoby „nic nie ma", a prawda brzmi „nie wiem". */
   const znane = lista.data !== undefined;
   const liczniki: Record<KubelekDostaw, number | undefined> = {
     decyzja: znane ? wKubelku("decyzja").length + spozaOkna.length : undefined,
@@ -125,11 +115,10 @@ export function Dostawy() {
     return null;
   };
 
-  /* ZMIANA KUBEŁKA ZAMYKA SPRAWĘ SPOZA NIEGO (audyt 26.09.2026). Do tej pory
-     środek i prawa kolumna trzymały dokument, którego nowa lista nie
-     zawierała — bez podświetlenia, czasem z rozpoczętym formularzem
-     „Zamknij dostawę". Działało się wtedy na fakturze, o której człowiek
-     już nie myślał. Sprawa z tego samego kubełka zostaje otwarta. */
+  /* ZMIANA KUBEŁKA ZAMYKA SPRAWĘ SPOZA NIEGO. Inaczej środek i prawa kolumna
+     trzymałyby dokument, którego nowa lista nie zawiera, czasem
+     z rozpoczętym formularzem — działałoby się na fakturze, o której
+     człowiek już nie myśli. Sprawa z tego samego kubełka zostaje otwarta. */
   const wybierzKubelek = (k: KubelekDostaw) => {
     setKubelek(k);
     if (wybrany !== null && kubelekWybranego() !== k) nawiguj("/obsluga/dostawy");
@@ -172,7 +161,7 @@ export function Dostawy() {
   const lewa = (() => {
     if (lista.isLoading) return <Pusto waga="lista">Wczytuję dostawy…</Pusto>;
     /* Błąd BEZ danych zamiast listy: „nic nie czeka na biuro" przy zerwanym
-       połączeniu brzmiało jak koniec pracy (0.546.0). */
+       połączeniu brzmiałoby jak koniec pracy. */
     if (lista.error && !lista.data) return <Blad>{(lista.error as Error).message}</Blad>;
     if (kubelek === "poza") {
       return <KolejkaPozaWertis wybrany={dokId} onWybierz={idz}
@@ -201,8 +190,8 @@ export function Dostawy() {
      wygląda z ekranu jak pełne — a to jest dokładnie ta pomyłka, po której
      ktoś orzeka, że faktury nie ma. Stoi w paśmie nad listą, obok pytania. */
   /* „Poza WERTIS" nie ma okna importu: serwer oddaje każdą zdjętą dostawę,
-     także sprzed miesięcy. Zdanie o czternastu dniach nad taką listą mówiło
-     nieprawdę o jej granicy (audyt 26.09.2026). */
+     także sprzed miesięcy, więc zdanie o czternastu dniach mówiłoby
+     nieprawdę o granicy listy. */
   const stopka = kubelek === "poza"
     ? `${ile(poza.data?.documents.length ?? 0, "zdjęta", "zdjęte", "zdjętych")} z listy — bez granicy okna importu`
     : kubelek === "archiwum"
@@ -217,10 +206,10 @@ export function Dostawy() {
   return <div className="flex flex-col gap-4 lg:h-full lg:min-h-0">
     <div className={SIATKA_TRZECH_KOLUMN}>
       <Karta className="flex min-h-0 flex-col overflow-hidden">
-        {/* Tytuł „Dostawy" zszedł (0.525.0), bo powtarzał zakładkę nawigacji,
-            która stoi podświetlona nad ekranem — wiersz wraca do kolejki. */}
+        {/* Bez tytułu „Dostawy", bo powtarzałby podświetloną zakładkę
+            nawigacji nad ekranem. */}
         <nav className="flex shrink-0 flex-wrap gap-1 p-2">
-          {/* „Zamknięte", „Poza WERTIS" i „Archiwum" pod „Więcej" (0.526.0):
+          {/* „Zamknięte", „Poza WERTIS" i „Archiwum" pod „Więcej":
               to przeglądanie, nie praca. „Poza WERTIS" zostaje o jedno
               kliknięcie z licznikiem w opcji, bo ma wyłapać pomyłkowe
               zdjęcie dostawy. Ten sam komponent co na pozostałych kolejkach. */}
@@ -234,10 +223,10 @@ export function Dostawy() {
             placeholder={kubelek === "archiwum" ? "Szukaj w archiwum: numer albo dostawca" : "Numer FZ, faktury dostawcy albo dostawca"}
             aria-label="Szukaj dostawy" />
         </div>
-        {/* PYTANIE KUBEŁKA I STOPKA W JEDNYM PAŚMIE (0.525.0). Stały dwoma
-            cienkimi paskami, nad listą i pod nią, a mówiły o tej samej liście:
-            „co z nią zrobić" i „gdzie się kończy". Granica okna stoi teraz NAD
-            listą, więc ucięte archiwum widać, zanim zacznie się ją czytać. */}
+        {/* PYTANIE KUBEŁKA I STOPKA W JEDNYM PAŚMIE, bo mówią o tej samej
+            liście: „co z nią zrobić" i „gdzie się kończy". Granica okna stoi
+            NAD listą, więc ucięte archiwum widać, zanim zacznie się ją
+            czytać. */}
         <div className="flex shrink-0 flex-wrap items-baseline gap-x-3 border-y border-slate-200 bg-slate-50 px-2 py-1 text-xs text-slate-600">
           <span className="font-semibold">{opis?.pytanie}</span>
           <span className="ml-auto">{stopka}</span>
@@ -266,12 +255,9 @@ export function Dostawy() {
       <Karta className="flex min-h-0 flex-col overflow-hidden">
         <div className="min-h-0 flex-1 overflow-y-auto">
           {dokument.data && typeof wybrany === "number"
-            /* `key` NA DOKUMENCIE (audyt 26.09.2026). Bez niego pole notatki
-               i otwarty formularz „Zamknij dostawę" przechodziły na następnie
-               wybraną fakturę, gdy ta była już w pamięci podręcznej i kolumna
-               się nie przemontowała. Zmierzone: notatka wpisana przy FZ 9006
-               poszła do hali przy FZ 9005, a formularz zamknięcia z powodem
-               „dotyczy 9006" pytał już o 9005. Stan formularzy należy do
+            /* `key` NA DOKUMENCIE. Bez niego pole notatki i otwarty formularz
+               „Zamknij dostawę" przeszłyby na następnie wybraną fakturę, gdy
+               ta jest już w pamięci podręcznej. Stan formularzy należy do
                jednej faktury i ma umrzeć razem z jej wyborem. */
             ? <Kontekst key={dokument.data.dokId} d={dokument.data} onPowieksz={setLupa}
                 notatka={{ trwa: notatka.isPending, blad: bladNotatki,
@@ -290,15 +276,15 @@ export function Dostawy() {
     </div>
 
     {/* Powiększenie dowodu: „czy to TA część" przy kartotekach różniących się
-        końcówką nazwy nie rozstrzyga się na miniaturze (0.205.0). Zamyka
-        KAŻDE kliknięcie i Escape — tak jak w biurze. */}
+        końcówką nazwy nie rozstrzyga się na miniaturze. Zamyka KAŻDE
+        kliknięcie i Escape. */}
     {lupa && <Lupa src={lupa} onZamknij={() => setLupa(null)} />}
   </div>;
 }
 
-/* Lupa jest oknem od 0.546.0, nie gołym przyciskiem na cały ekran. Fokus
-   zostawał na miniaturze pod spodem, więc Tab szedł po niewidocznej stronie.
-   Przycisk zostaje w środku: zamyka KAŻDE kliknięcie, Enter i Escape. */
+/* Lupa jest oknem, nie gołym przyciskiem na cały ekran: fokus ma wejść do
+   środka, a Tab nie może iść po niewidocznej stronie. Przycisk zostaje
+   w środku: zamyka KAŻDE kliknięcie, Enter i Escape. */
 function Lupa({ src, onZamknij }: { src: string; onZamknij: () => void }) {
   const okno = useOkno<HTMLDivElement>({ onZamknij });
   return <div role="dialog" {...okno} aria-label="Zdjęcie z hali — powiększenie" className="fixed inset-0 z-30">

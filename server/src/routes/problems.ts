@@ -28,7 +28,7 @@ export async function problemRoutes(app: FastifyInstance) {
    */
   app.get("/api/problems/unresolved", async () => ({ problems: listUnresolved() }));
 
-  /* ── CO BIURO POSTANOWIŁO (0.357.0) ──────────────────────────────────────
+  /* ── CO BIURO POSTANOWIŁO ──────────────────────────────────────
      Druga połowa tej samej pętli. Do 0.356.0 kolektor pobierał wyłącznie
      nierozwiązane, więc zgłoszenie po zamknięciu po prostu znikało z ekranu —
      nie do odróżnienia od zignorowania. Zgłoszenie, które znika bez słowa,
@@ -142,7 +142,7 @@ export async function problemRoutes(app: FastifyInstance) {
   /** Raport kolizji EAN dla biura — lista kodów do naprawy w kartotece. */
   app.get("/api/ean-conflicts", async () => ({ conflicts: eanConflictReport() }));
 
-  /* ── BIURO ZAMYKA SPRAWĘ KODU (0.360.0) ──────────────────────────────────
+  /* ── BIURO ZAMYKA SPRAWĘ KODU ──────────────────────────────────
      Do 0.358.0 `ean_conflict` był dziennikiem bez wyjścia: kolizja wpadała
      tam i zostawała na zawsze w tej samej postaci co pierwszego dnia. Obie
      strony patrzyły na tę samą listę — biuro w `/biuro`, hala na ekranie

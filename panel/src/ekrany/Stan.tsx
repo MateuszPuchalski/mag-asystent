@@ -14,46 +14,39 @@ import { KartaSerwera } from "../stan/Serwer";
 import { KartaKolektorow } from "../stan/Kolektory";
 import { Kafelki, doUwagi, useObszary } from "../stan/Tablica";
 
-/* ── STAN SYSTEMU (0.441.0) ──────────────────────────────────────────────
-   Przeniesiony z NADZORU w `biuro.html` — ostatni widok wglądu, który tam
-   mieszkał. Tło pracy biura: to, co czeka na DECYZJĘ (zapis w błędzie,
-   kolizja kodu, rozłączone Allegro), stoi też w DO DECYZJI i prowadzi tutaj.
+/* ── STAN SYSTEMU ────────────────────────────────────────────────────────
+   Tło pracy biura: to, co czeka na DECYZJĘ (zapis w błędzie, kolizja kodu,
+   rozłączone Allegro), stoi też w DO DECYZJI i prowadzi tutaj.
 
-   KOLEJNOŚĆ Z 0.427.0 (dekalog pkt 1 i 5): najpierw karty z przyciskiem,
-   który ktoś musi nacisnąć, potem te, które się czyta. Arkusz lokalizacji
-   stoi tuż pod kolejką, bo to ona wykonuje jego skutek. Jedno przestawienie
-   względem biura: kolizje kodów idą PRZED rekoncyliacją. Kolizja czeka na
-   decyzję biura (stoi też w DO DECYZJI), a rekoncyliacja jest sprawdzeniem
-   uruchamianym na żądanie, którego wynik zwykle brzmi „bez rozjazdów".
+   KOLEJNOŚĆ (dekalog pkt 1 i 5): najpierw karty z przyciskiem, który ktoś
+   musi nacisnąć, potem te, które się czyta. Arkusz lokalizacji stoi tuż pod
+   kolejką, bo to ona wykonuje jego skutek. Kolizje kodów idą PRZED
+   rekoncyliacją: kolizja czeka na decyzję biura, a rekoncyliacja jest
+   sprawdzeniem na żądanie, którego wynik zwykle brzmi „bez rozjazdów".
    Zgubiony kolektor stoi zaraz za nią z tego samego powodu: to przycisk
    na żądanie, nie liczba do czytania.
 
-   JEDNO MIEJSCE STANU INTEGRACJI. Tabela z `/api/health` stała od 0.168.0 za
-   zębatką panelu, a stan serwera — w biurze. Człowiek szukający „czemu nie
-   działa" miał dwa miejsca i żadne nie mówiło o drugim. Obie są tutaj.
+   JEDNO MIEJSCE STANU INTEGRACJI i stanu serwera: człowiek szukający „czemu
+   nie działa" ma jedno miejsce.
 
    ADRES NIESIE KARTĘ (`?karta=kolejka|kody|allegro|wymiana|…`): wiersz
-   DO DECYZJI prowadzi wprost do karty, a nie na górę ekranu. Biuro robiło to
-   samo `data-cel`, a jego brak zgubił kiedyś licznik odpowiedzi na notatki.
+   DO DECYZJI prowadzi wprost do karty, a nie na górę ekranu.
 
-   MNIEJ NARAZ (0.509.0), ta sama zasada co w skrzynce z 0.506.0. Arkusz,
-   rekoncyliacja i test na żywym Allegro są zwinięte do nagłówka, bo sięga
-   się po nie rzadko. Adres z `?karta=` otwiera zwiniętą kartę, bo inaczej
-   wiersz DO DECYZJI prowadziłby do samego tytułu. Konto Allegro stoi teraz
-   PRZED stanem integracji: niesie przycisk, a wiersz o połączeniu zszedł
-   z tabeli integracji właśnie do tej karty. */
+   MNIEJ NARAZ. Arkusz, rekoncyliacja i test na żywym Allegro są zwinięte do
+   nagłówka, bo sięga się po nie rzadko. Adres z `?karta=` otwiera zwiniętą
+   kartę, bo inaczej wiersz DO DECYZJI prowadziłby do samego tytułu. Konto
+   Allegro stoi PRZED stanem integracji, bo niesie przycisk. */
 
-/* ── TABLICA ZAMIAST DZIESIĘCIU KART (0.538.0) ──────────────────────────
-   Decyzja właściciela z 27 września 2026, wariant A z makiet: na górze
-   kafelek na obszar, pod nim wyłącznie karty z czymś do zrobienia. Zdrowy
-   obszar mówi jednym zdaniem na kafelku, a jego karta czeka pod kliknięciem.
-   Powód i reguły tonu w `stan/Tablica.tsx`.
+/* ── TABLICA ZAMIAST DZIESIĘCIU KART ────────────────────────────────────
+   Decyzja właściciela: na górze kafelek na obszar, pod nim wyłącznie karty
+   z czymś do zrobienia. Zdrowy obszar mówi jednym zdaniem na kafelku, a jego
+   karta czeka pod kliknięciem. Powód i reguły tonu w `stan/Tablica.tsx`.
 
    KARTA RAZ POKAZANA ZOSTAJE, aż człowiek zamknie ją kafelkiem. Problem
    znikający w trakcie pracy — Allegro sparowane, kolizja rozstrzygnięta —
    zabrałby kartę spod kursora razem z wynikiem, który właśnie się pojawił.
 
-   KOLEJNOŚĆ KART W KODZIE JEST TA Z 0.427.0 i pilnuje jej test serwera.
+   KOLEJNOŚĆ KART W KODZIE pilnuje test serwera.
    Karty rysują się warunkowo, ale w tym samym porządku co kafelki. */
 export function Stan() {
   const zdrowie = useZdrowie();

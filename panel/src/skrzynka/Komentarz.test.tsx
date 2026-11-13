@@ -4,7 +4,7 @@ import userEvent from "@testing-library/user-event";
 import { Edytor } from "./Edytor";
 import { Os } from "./Os";
 
-/* ── Komentarz wewnętrzny w edytorze (0.157.0) ───────────────────────────────
+/* ── Komentarz wewnętrzny w edytorze ─────────────────────────────────────────
    §6.4: komentarze „nie mogą przypadkiem trafić do klienta". §25 stawia to
    wśród kryteriów gotowości, a §10.4 żąda, żeby przycisk komentarza i przycisk
    wysyłki były JEDNOZNACZNIE ROZDZIELONE.
@@ -69,9 +69,9 @@ describe("Edytor — tryb komentarza wewnętrznego", () => {
   });
 
   it("notatka nie liczy znaków i nie powtarza, że jest wewnętrzna", async () => {
-    /* 0.523.0: licznik nie miał limitu, przy którym by coś znaczył, a zdanie
-       „Widoczna tylko dla zespołu" mówiły już zakładka i pole. Zostaje
-       w podpowiedzi przycisku — tuż przed kliknięciem. */
+    /* Licznik nie ma limitu, przy którym by coś znaczył, a „Widoczna tylko
+       dla zespołu" mówią zakładka i pole. Zdanie stoi w podpowiedzi przycisku
+       — tuż przed kliknięciem. */
     edytor({ komentarz: "Zerknij proszę" });
     await userEvent.click(screen.getByRole("button", { name: /Notatka wewnętrzna/ }));
     expect(screen.queryByText(/znaków/)).toBeNull();
@@ -122,7 +122,7 @@ describe("Komentarz na osi rozmowy", () => {
   });
 });
 
-/* ── Ctrl+Enter wysyła (23 września 2026) ────────────────────────────────────
+/* ── Ctrl+Enter wysyła ───────────────────────────────────────────────────────
    Skrót ma ten sam warunek co przycisk: cudza rozmowa i pusty szkic nie
    wysyłają. Sam Enter zostaje nową linią — odpowiedź ma akapity. */
 describe("Ctrl+Enter w polu odpowiedzi", () => {
@@ -163,7 +163,7 @@ describe("Ctrl+Enter w polu odpowiedzi", () => {
   });
 });
 
-/* ── Wyślij i zakończ (23 września 2026) ─────────────────────────────────────
+/* ── Wyślij i zakończ ────────────────────────────────────────────────────────
    Większość spraw kończy się ostatnią odpowiedzią, więc werdykt jedzie z nią.
    Ctrl+Shift+Enter to ta sama droga co drugi przycisk — i ten sam warunek. */
 describe("Wyślij i zakończ", () => {
@@ -175,7 +175,7 @@ describe("Wyślij i zakończ", () => {
     await userEvent.keyboard("{Control>}{Shift>}{Enter}{/Shift}{/Control}");
     expect(onWyslijIZakoncz).toHaveBeenCalledTimes(1);
     expect(onWyslij).not.toHaveBeenCalled();
-    /* Od 0.506.0 „Wyślij i zakończ" stoi pod „▾" obok wysyłki. */
+    /* „Wyślij i zakończ" stoi pod „▾" obok wysyłki. */
     await userEvent.click(screen.getByRole("button", { name: "Inne sposoby wysłania" }));
     await userEvent.click(screen.getByRole("button", { name: /Wyślij i zakończ/ }));
     expect(onWyslijIZakoncz).toHaveBeenCalledTimes(2);

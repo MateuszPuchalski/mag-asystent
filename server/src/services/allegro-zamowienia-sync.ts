@@ -8,19 +8,18 @@ import { oczyscSurowy } from "./allegro-oczyszczanie.js";
 import { naGrosze } from "./allegro-zwroty-sync.js";
 import { chwilaUtc } from "../czas.js";
 
-/* ── Uzupełnianie zamówień do zwrotów (0.152.0) ──────────────────────────────
+/* ── Uzupełnianie zamówień do zwrotów ────────────────────────────────────────
    Zwrot niesie sam numer zamówienia. Decyzja potrzebuje jego treści i to
-   z trzech powodów naraz:
+   z czterech powodów naraz:
 
-     1. CO JESZCZE KLIENT KUPIŁ. Oddaje jedną rzecz z trzech — to jest
-        kontekst, którego ekran do 0.151.0 nie miał wcale.
-     2. KOSZT DOSTAWY. Bez niego wariant „bez wysyłki" był nieodróżnialny od
-        pełnej kwoty, więc panel proponował samą sumę pozycji i mówił o tym
-        wprost na ekranie.
+     1. CO JESZCZE KLIENT KUPIŁ. Oddaje jedną rzecz z trzech.
+     2. KOSZT DOSTAWY. Bez niego wariant „bez wysyłki" byłby nieodróżnialny
+        od pełnej kwoty.
      3. SKU SPRZEDAWCY. `lineItems[].offer.external.id` (schemat
         `OfferReference` w `docs/allegro/swagger.yaml`) to identyfikator
         oferty w systemie sprzedawcy — u tej firmy symbol z Subiekta. To jest
         mostek do kartoteki, a więc i do zdjęcia.
+     4. ADRES DOSTAWY — uzasadnienie i zakres przy `adresOdbiorcy` niżej.
 
    JEDNO WYWOŁANIE NA ZAMÓWIENIE, nie na ofertę. `/sale/product-offers/{id}`
    dałoby ten sam SKU po jednym strzale na pozycję i nie dałoby ani kosztu
@@ -29,11 +28,7 @@ import { chwilaUtc } from "../czas.js";
    Ten przebieg NIE chodzi po wszystkich zamówieniach konta — dociąga tylko
    te, do których prowadzi zwrot, i najwyżej `NA_PRZEBIEG` naraz. Zwrotów
    w pracy są dziesiątki, więc po kilku przebiegach nie zostaje nic do
-   pobrania, a ticker milczy.
-
-   CZWARTY POWÓD DOSZEDŁ W 0.367.0: NAZWA ODBIORCY z naklejki, a w 0.422.0
-   rozrósł się do CAŁEGO ADRESU DOSTAWY. Patrz `adresOdbiorcy` niżej — tam
-   stoi uzasadnienie i zakres.                                               */
+   pobrania, a ticker milczy.                                                */
 
 /**
  * Ile zamówień wolno dociągnąć w jednym przebiegu.
@@ -69,11 +64,10 @@ type Zamowienie = {
   status?: string;
   updatedAt?: string;
   buyer?: { login?: string } | null;
-  /* Z `delivery` bierzemy koszt, metodę i CAŁY adres odbiorcy. Do 0.421.1
-     stała tu sama nazwa, a reszta pól nie była nawet zadeklarowana — bo czego
-     typ nie zna, tego mapowanie nie zapisze przez pomyłkę. Blokadę zdjął
-     właściciel w 0.422.0; `countryCode` zostaje niezadeklarowane, bo firma
-     wysyła krajowo i kraj nie rozstrzyga niczego przy szukaniu paczki. */
+  /* Z `delivery` bierzemy koszt, metodę i CAŁY adres odbiorcy. Czego typ
+     nie zna, tego mapowanie nie zapisze przez pomyłkę, więc `countryCode`
+     zostaje niezadeklarowane: firma wysyła krajowo i kraj nie rozstrzyga
+     niczego przy szukaniu paczki. */
   delivery?: {
     cost?: Kwota; method?: { name?: string } | null;
     address?: {
@@ -88,7 +82,7 @@ type Zamowienie = {
      bez `required`). `shipmentSummary` mówi o numerach przesyłek, które
      i tak czytamy osobną końcówką, więc go nie deklarujemy. */
   fulfillment?: { status?: string } | null;
-  /* Płatność i żądanie faktury (0.169.0). Z `payment` bierzemy TYP i moment
+  /* Płatność i żądanie faktury. Z `payment` bierzemy TYP i moment
      zapłaty; identyfikatora ani kwoty nie — kwotę mamy już z `summary`.
      Z `invoice` bierzemy SAMĄ FLAGĘ `required`: `invoice.address` niesie
      ulicę i miasto, a adresy nie przechodzą przez mapowanie. */
@@ -123,29 +117,23 @@ export interface ZamowieniaSyncDeps {
 /**
  * Numery zamówień do pobrania: brakujące ORAZ te bez ani jednego SKU.
  *
- * Do 0.153.1 warunkiem było wyłącznie `k.id IS NULL`, więc zamówienie
- * zapisane raz z pustymi SKU nie było odpytywane NIGDY — także po naprawieniu
- * mapowania po naszej stronie. To zamieniało jedną złą synchronizację
- * w trwały stan, którego nie dało się odkręcić inaczej niż ręcznie w bazie.
+ * Zamówienie zapisane raz z pustymi SKU też jest odpytywane, inaczej jedna
+ * zła synchronizacja byłaby trwałym stanem. Ten warunek ma bezpiecznik
+ * czasowy: odświeżamy najwyżej raz na dobę, bo sprzedawca mógł po prostu
+ * nie opisać SKU.
  *
- * Drugi warunek ma bezpiecznik czasowy: odświeżamy najwyżej raz na dobę.
- * Zamówienie, którego sprzedawca po prostu nie opisał SKU, nie ma się
- * odpytywać w kółko co dziesięć minut do końca świata.
- *
- * Od 0.166.0 numer prowadzi tu także z WIADOMOŚCI (`message.related_order_id`,
+ * Numer prowadzi tu także z WIADOMOŚCI (`message.related_order_id`,
  * gałąź `relatesTo.order` z Allegro): rozmowa pokazuje zamówienie, którego
- * dotyczy, i bez tej unii pokazywałaby wyłącznie numer. Ten sam limit
- * i takt — zamówienia z rozmów są tak samo nieliczne jak te ze zwrotów.
+ * dotyczy. Ten sam limit i takt — zamówienia z rozmów są tak samo nieliczne
+ * jak te ze zwrotów.
  *
  * TRZECI warunek to pamięć negatywu (`zamowienie_klienta_brak`). Bez niego
- * numer, którego Allegro nie zna, nie dostawał wiersza NIGDY, więc `k.id IS
- * NULL` było prawdą na zawsze i ten sam zbiór ≤20 numerów wracał w KAŻDYM
- * przebiegu — 432 wywołania zakończone 404 w krótkim czasie, bez końca.
+ * numer, którego Allegro nie zna, nie dostawałby wiersza NIGDY, więc
+ * ten sam zbiór numerów wracałby w KAŻDYM przebiegu z 404.
  *
- * `konto` jest PARAMETREM, a nie odczytem z `z.channel_account_id`, i to jest
- * cała gwarancja tej poprawki: negatyw odsiewa się tym samym kluczem, którym
- * się go pisze. Klucz filtra wzięty skądinąd niż klucz zapisu nie trafiałby
- * w nic i wyglądałoby to dokładnie tak, jak ta awaria — czyli wcale.
+ * `konto` jest PARAMETREM, a nie odczytem z `z.channel_account_id`: negatyw
+ * odsiewa się tym samym kluczem, którym się go pisze. Klucz filtra wzięty
+ * skądinąd niż klucz zapisu nie trafiałby w nic.
  *
  * CZWARTE źródło to zamówienie Allegro, które w Sellasist stoi w braku
  * z kompletacji. Po godzinie granicznej trafia do „Do zrobienia” i prowadzi
@@ -219,9 +207,9 @@ export function brakujaceZamowienia(
  * dziewiętnastu. Limit z Allegro (429) przerywa jednak od razu — dalsze
  * żądania tylko pogłębiłyby przerwę.
  *
- * `blad404: true` jest tu NOWE i konieczne. Bez tej opcji adapter oddaje przy
- * 404 `null`, więc „Allegro nie zna tego numeru" było nieodróżnialne od pustej
- * odpowiedzi i nie zostawiało po sobie nic — ani wiersza, ani śladu.
+ * `blad404: true` jest konieczne. Bez tej opcji adapter oddaje przy 404
+ * `null`, więc „Allegro nie zna tego numeru" byłoby nieodróżnialne od pustej
+ * odpowiedzi.
  */
 export async function uzupelnijZamowienia(deps: ZamowieniaSyncDeps = {}): Promise<number> {
   const database = deps.database ?? defaultDb();
@@ -347,14 +335,10 @@ export function wygladaNaLogin(uchwyt: string): boolean {
 }
 
 /**
- * Login kupującego bez własnego pseudonimu: `client:124843816` (0.452.0).
+ * Login kupującego bez własnego pseudonimu: `client:124843816`.
  *
- * Zgłoszenie właściciela ze zrzutem Sales Center: kupujący stał tam jako
- * „Client:124843816", a nasz panel odpowiadał „nie mam paczek". Dwukropek
- * nie mieścił się w liście znaków wyżej, więc pytanie do Allegro nie wychodziło
- * wcale. Do tego wydania braliśmy ten kształt za MASKĘ — tak opisuje go
- * blizna 0.56.6 przy rozmówcy w wiadomościach. W zamówieniu to jest po prostu
- * login, bo Allegro nim go pokazuje i po nim go wyszukuje.
+ * W zamówieniu to nie maska, tylko login: Allegro nim go pokazuje i po nim
+ * go wyszukuje, więc pytanie do Allegro musi wyjść także z dwukropkiem.
  *
  * Wzór jest wąski — sam przedrostek i cyfry. Dwukropek w dowolnym miejscu
  * przepuściłby godzinę albo wklejony adres.
@@ -377,15 +361,11 @@ function wariantyLoginu(login: string): string[] {
 }
 
 /**
- * Zamówienia jednego kupującego prosto z Allegro (0.450.0).
+ * Zamówienia jednego kupującego prosto z Allegro.
  *
- * Zgłoszenie właściciela: „sporo paczek wraca bez zgłoszonego odstąpienia,
- * po prostu nieodebrane — do nich muszę korzystać ze strony Allegro, aby
- * znaleźć paczkę". Pole loginu w rejestracji nieodebranej istniało od
- * 0.365.0, ale czytało WYŁĄCZNIE naszą bazę. A ta zna tylko zamówienia,
- * do których prowadzi zwrot, wiadomość albo reklamacja
- * (`brakujaceZamowienia`). Paczka nieodebrana nie ma żadnego z tych trzech,
- * więc jej zamówienia u nas nie było z definicji i lista wychodziła pusta.
+ * Paczka nieodebrana wraca bez zgłoszonego odstąpienia, więc nie prowadzi
+ * do niej zwrot, wiadomość ani reklamacja (`brakujaceZamowienia`). Jej
+ * zamówienia nie ma u nas z definicji i trzeba je pobrać po loginie.
  *
  * ZAPISUJEMY, nie tylko pokazujemy. Rejestracja paczki bierze pozycje
  * z `zamowienie_klienta`, więc zamówienie pokazane, a niezapisane dałoby
@@ -431,11 +411,9 @@ export async function pobierzZamowieniaKupujacego(
  * `ON CONFLICT` nie policzyłby daty z kolumny, którą sam dopiero podbija.
  * To ≤20 odczytów po kluczu głównym raz na takt, czyli koszt, którego nie ma.
  *
- * Zdarzenie jest ZBIORCZE, jedno na przebieg. Nie dlatego, że tak taniej:
- * te 432 wywołania nie zostawiły w bazie ANI JEDNEGO śladu i właśnie dlatego
- * awarię widać było wyłącznie w portalu Allegro. Wiersz na numer zalewałby
- * `events` tym samym co `console.warn`, a jeden wiersz na takt wystarczy,
- * żeby odtworzyć przebieg.
+ * Zdarzenie jest ZBIORCZE, jedno na przebieg: bez niego seria 404 nie
+ * zostawia w bazie śladu. Wiersz na numer zalewałby `events`, a jeden
+ * wiersz na takt wystarczy, żeby odtworzyć przebieg.
  */
 function zapiszBraki(database: Db, konto: number, numery: string[], teraz: Date): void {
   const at = teraz.toISOString();
@@ -492,30 +470,24 @@ export function cyfryTelefonu(v: string | null | undefined): string | null {
 }
 
 /**
- * Adres dostawy odbiorcy (0.367.0 nazwa, 0.422.0 reszta).
+ * Adres dostawy odbiorcy.
  *
- * Decyzja właściciela i świadome zdjęcie polityki danych — najpierw fragmentu,
- * potem całości. Powód pierwszego zdjęcia: paczki nadaje klient albo kurier,
- * więc numeru listu z wracającego kartonu nasz system NIGDY nie widział,
- * a uchwytem zostawało to, co jeszcze jest na naklejce.
- *
- * Powód drugiego: agent dostaje od klienta SAM NUMER TELEFONU i nie miał
- * czym go zamienić na zamówienie — musiał wyjść do Allegro albo Sellasista,
- * wrócić z loginem i szukać po nim. Do tego dwaj klienci o tym samym
- * nazwisku byli w panelu nierozróżnialni, bo ekran nie pokazywał ani ulicy,
- * ani miasta. Zakres i uzasadnienie stoją w `docs/obsluga-klienta.md`.
+ * Decyzja właściciela. Paczki nadaje klient albo kurier, więc numeru listu
+ * z wracającego kartonu nasz system nie widzi, a uchwytem zostaje naklejka.
+ * Agent dostaje też od klienta SAM NUMER TELEFONU, a dwaj klienci o tym samym
+ * nazwisku różnią się adresem. Zakres i uzasadnienie stoją
+ * w `docs/obsluga-klienta.md`.
  *
  * FIRMA BIJE OSOBĘ w nazwie, bo paczka firmowa nosi na naklejce nazwę firmy
  * zamiast imienia i nazwiska — operator przepisze to, co widzi.
  *
- * CO DALEJ ZOSTAJE ZABLOKOWANE, i to nie przez zapomnienie:
+ * CO ZOSTAJE ZABLOKOWANE, i to nie przez zapomnienie:
  *   • lądowisko `surowe_json` wycina CAŁY `address` (`oczyscSurowy`). Model
  *     pracy mapuje się z ORYGINAŁU, więc nazwane kolumny dostają swoje, a
  *     prywatna kopia odpowiedzi nie dostaje nic. Właściciel wybrał adres
  *     w panelu, nie adres w kopii zapasowej na lata.
  *   • raport sondy kształtu (`ksztalt.ts`) dalej nie pokazuje tych pól.
- *     Raport wchodzi do REPO, a baza biura zostaje w biurze — to jest ta
- *     sama różnica, którą 0.155.0 zapisało przy numerze listu przewozowego.
+ *     Raport wchodzi do REPO, a baza biura zostaje w biurze.
  *   • `invoice.address` zostaje nietknięte. Właściciel odblokował adres
  *     DOSTAWY; adres z faktury to inne pole i innej decyzji nie było.
  */
@@ -584,7 +556,7 @@ function zapisz(database: Db, z: Zamowienie, konto: number, at: string): void {
     z.delivery?.cost?.amount == null ? null : naGrosze(z.delivery.cost.amount),
     z.delivery?.method?.name ?? null,
     z.payment?.type ?? null, z.payment?.finishedAt ?? null,
-    /* Identyfikator płatności (0.190.0) — bez niego `POST /payments/refunds`
+    /* Identyfikator płatności — bez niego `POST /payments/refunds`
        nie ma jak powstać, bo `payment.id` stoi w `required` schematu. */
     z.payment?.id ?? null,
     /* `null`, gdy Allegro nie przysłało `invoice` — to nie to samo, co

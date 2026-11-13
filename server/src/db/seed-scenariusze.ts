@@ -48,8 +48,6 @@ export const TW_OD = 900_001;
 export const DOK_OD = 9_001;
 /** Pierwszy `dok_id` dokumentów WZ z historią pobrań (raport przeslotowania). */
 export const DOK_WZ_OD = 20_001;
-/** Pierwszy `dok_id` dokumentów sprzedaży (FS/PA) pod zwroty Allegro. */
-export const DOK_SPRZ_OD = 30_001;
 /** Przyjęcia na regał zwrotów (MM z Subiekta) — kosze z kartką na hali. */
 export const DOK_MM_OD = 41_200;
 
@@ -252,12 +250,12 @@ interface TowarSc {
   /** `[mag_id, stan, rezerwacja?]` — bez wpisu magazyn nie ma wiersza wcale. */
   stany?: Array<[number, number, number?]>;
   /**
-   * `[poziom, nazwa, netto_grosze, brutto_grosze]` — ceny kartoteki (0.396.0).
+   * `[poziom, nazwa, netto_grosze, brutto_grosze]` — ceny kartoteki.
    *
    * SCENARIUSZ, NIE DEMO OGÓLNE, i to jest różnica wobec `seed.ts`. Eksport
    * `mag.xlsx` cen nie niesie, a import z MSSQL jeszcze ich nie pobiera, więc
    * wpisanie ich do głównego seeda pokazywałoby coś, czego produkcja dziś nie
-   * umie — dokładnie blizna z 0.7.0 przy kolumnie `ordered`. Tutaj wolno, bo
+   * umie. Tutaj wolno, bo
    * ten plik z definicji trzyma dane syntetyczne do oglądania przypadków
    * brzegowych i mówi o tym w `docs/scenariusze-testowe.md`.
    */
@@ -321,7 +319,7 @@ const TOWARY: TowarSc[] = [
     stany: [[MAG, 15]],
   },
   { twId: 900_020, symbol: "TEST-ZAMIENNIK-B", nazwa: "Sprzęgło odśrodkowe — zamiennik naszej kartoteki", ean: "5900000000020", lok: "E05-02-04", stany: [[MAG, 2]] },
-  /* S71 — lista bez nagłówka (0.61.0). Opis nie mówi „Zamiennik", niesie sam
+  /* S71 — lista bez nagłówka. Opis nie mówi „Zamiennik", niesie sam
      ciąg po `//`. Trzeci człon jest obcy i ma po cichu odpaść: bez nagłówka
      nie wiadomo, czy to zamiennik, czy numer modelu. */
   {
@@ -385,7 +383,7 @@ const TOWARY: TowarSc[] = [
   { twId: 900_041, symbol: "TEST-KONTENER-1", nazwa: "Pozycja kontenera importowego (1)", ean: "5900000000041", lok: "J02-03-02", stany: [[MGP, 120]] },
   { twId: 900_042, symbol: "TEST-KONTENER-2", nazwa: "Pozycja kontenera importowego (2)", ean: "5900000000042", stany: [[MGP, 60]] },
   { twId: 900_043, symbol: "TEST-KONTENER-3", nazwa: "Pozycja kontenera importowego (3)", ean: "5900000000043", lok: "J02-03-04", stany: [[MGP, 24]] },
-  // S80-S82 — ceny kartoteki (0.396.0). Trzy przypadki, bo każdy rysuje się
+  // S80-S82 — ceny kartoteki. Trzy przypadki, bo każdy rysuje się
   // inaczej: pełny cennik z nazwami, cennik bez nazw poziomów i towar zupełnie
   // bez cen. Ten ostatni jest najważniejszy — tak wygląda DZIŚ każdy towar na
   // produkcji, dopóki import nie dostanie nazw cennika (`tools/sonda-cen.sql`).
@@ -443,7 +441,7 @@ export interface Podsumowanie {
   dokumentyWz: number;
   pozycjeWz: number;
   przyjecia: number;
-  /** Domknięte dostawy historyczne pod zakres DOSTAWY w ANALIZIE (0.100.0). */
+  /** Domknięte dostawy historyczne pod zakres DOSTAWY w ANALIZIE. */
   historiaDostaw: number;
 }
 
@@ -490,9 +488,6 @@ export function zbudujScenariusze(): Podsumowanie {
     licz.historiaDostaw = historiaDostaw();
     logoDostawcow();
   })();
-
-  /* Obsługi klienta nie ma w ziarnie od 0.140.0 — razem z jej rejestrami.
-     Zostaje magazyn: dostawy, kartoteka, kolejka zapisów, kosze z przyjęć. */
 
   // Zdjęcia leżą POZA transakcją — to dysk, nie baza, i wycofanie transakcji
   // i tak by ich nie usunęło. Kolejność (baza, potem pliki) jest bezpieczniejsza:
@@ -546,7 +541,7 @@ function wyczysc(): void {
       `DELETE FROM device_session WHERE user_id IN
          (SELECT user_id FROM app_user WHERE login IN (${luki(LOGINY.length)}))`
     ).run(...LOGINY);
-    /* Sprawa klienta (0.535.0) wskazuje prowadzącego i kończącego kluczem
+    /* Sprawa klienta wskazuje prowadzącego i kończącego kluczem
        obcym bez kaskady. Sprawa założona na koncie ze scenariuszy (ktoś
        przeklikał profil na bazie pokazowej) wywracałaby kasowanie kont niżej
        i ponowny seed stawałby w pół drogi. Sprawy odchodzą z kontami: bez
@@ -873,16 +868,9 @@ function postepDostaw(): { dostaw: number; linii: number; idDostaw: Map<number, 
 }
 
 /* ── Historia domkniętych dostaw (S77) ──────────────────────────────────────
-   Ziarno miało JEDNĄ domkniętą dostawę, u jednego dostawcy, w jednym tygodniu.
-   Do 0.99.0 nikomu to nie przeszkadzało: panel pokazywał dostawy po jednej,
-   w kontekście otwartej faktury. Zakres DOSTAWY w ANALIZIE (0.100.0) zadaje
-   pytanie „u kogo się psuje" — a na to jedna dostawa nie odpowiada wcale:
-   tabela dostawców miała jeden wiersz, wykres tygodni jeden słupek, a udziału
-   wyjątków nie dało się z niczym porównać.
-
-   Ta sama luka, przez którą skrzynka pytań stała pusta do 0.96.0, a wykres
-   tygodni pokazywał jeden słupek do 0.99.0. Trzeci raz ta sama lekcja: ekran
-   zestawień trzeba zasiać INACZEJ niż ekran pojedynczej sprawy.
+   Zakres DOSTAWY w ANALIZIE zadaje pytanie „u kogo się psuje", a na to jedna
+   dostawa nie odpowiada wcale. Ekran zestawień trzeba zasiać INACZEJ niż
+   ekran pojedynczej sprawy.
 
    Jedna z dostaw ma status `external` — zdjęta z listy bez ani jednego skanu.
    Ma wejść do LICZBY dostaw i NIE wejść do mediany czasu, i to jest jedyny
@@ -972,7 +960,7 @@ function historiaDostaw(): number {
 
 /* ── Wyjątki ────────────────────────────────────────────────────────────────
    Pięć kategorii formularza + pięć kluczy historycznych. Te drugie są tu po to,
-   żeby protokół dla dostawcy dało się wydrukować z wierszem sprzed 0.21.0
+   żeby protokół dla dostawcy dało się wydrukować ze starym wierszem
    i sprawdzić, że pokazuje etykietę, a nie surowy klucz `qty_short`.         */
 function wyjatki(idDostaw: Map<number, number>): number {
   const d = db();
@@ -1033,7 +1021,7 @@ function wyjatki(idDostaw: Map<number, number>): number {
     { delivery: idWToku, line: null, typ: "damaged", ilosc: 1, foto: FOTO_BRAK_PLIKU,
       minut: -50, kto: "Ewa Bąk", opis: "Zdjęcie zrobione, plik przepadł przy synchronizacji" },
 
-    // S35 — klucze sprzed 0.21.0; kolektor ich nie oferuje, serwer je zna
+    // S35 — stare klucze; kolektor ich nie oferuje, serwer je zna
     { delivery: idZamknietej, line: null, typ: "qty_short", ilosc: 2, minut: -3 * 1440 + 40,
       kto: "Jan Kowalski", opis: "Wpis sprzed zmiany formularza",
       rozwiazany: "Dostawca dosłał 2 szt następną paczką" },
@@ -1108,7 +1096,7 @@ function konta(): number {
     ["jan.k", hash, "Jan Kowalski", "magazynier", 1],
     ["ewa.b", hash, "Ewa Bąk", "magazynier", 1],
     ["biuro.test", hash, "Biuro (scenariusze)", "biuro", 1],
-    /* Czwarta rola z 0.24.0. Login jest inny niż `admin`, bo tamten zakłada
+    /* Czwarta rola. Login jest inny niż `admin`, bo tamten zakłada
        `npm run seed` — dwa konta o jednym loginie nie przeszłyby przez UNIQUE,
        a podmiana cudzego hasła byłaby najgorszym możliwym skutkiem seedu. */
     ["admin.test", hash, "Administrator (scenariusze)", "admin", 1],
@@ -1266,7 +1254,7 @@ function kolejka(): number {
    których nikt nie wywoła ręcznie (`queue_failed`, `http_rejected`).
 
    Trzy wiersze są celowo zepsute albo niekompletne: uszkodzony payload, wpis
-   bez `locsPrzed` (historia sprzed sierpnia 2026) i zdarzenia bez konta.
+   bez `locsPrzed` (stara historia) i zdarzenia bez konta.
    Każdy z nich ma w kodzie gałąź, której nic innego nie sprawdza.            */
 function dziennik(): number {
   const ins = db().prepare(
@@ -1307,7 +1295,7 @@ function dziennik(): number {
   zdarzenie("queue_failed", "Jan Kowalski", idJana, 900_024, { queueId: 8, typ: "set_location", proby: 3, blad: "Kartoteka w edycji" }, -20, null);
   zdarzenie("http_rejected", "Jan Kowalski", idJana, null, { method: "POST", url: "/api/delivery/lines/6/putaway", status: 409 }, -35);
   zdarzenie("device_drop", "Jan Kowalski", idJana, null, { g: 5.8, bateria: 41 }, -30);
-  /* Trzy zdarzenia zarządzania kontami. Podpisuje je ADMIN, bo od 0.24.0 tylko
+  /* Trzy zdarzenia zarządzania kontami. Podpisuje je ADMIN, bo tylko
      ta rola może zakładać konta biurowe, odbierać hasło i wyłączać konto —
      i tylko na niej widać różnicę wobec biura. */
   zdarzenie("user_created", "Administrator (scenariusze)", idAdmina, null, { userId: idBiura, role: "biuro" }, -3 * 1440, null);
@@ -1507,17 +1495,6 @@ function przyjeciaDemo(): number {
   return kosze.length;
 }
 
-/* ── Skrzynka pytań klientów (S73, S74) ──────────────────────────────────────
- * Do 0.96.0 seed nie zakładał ANI JEDNEGO pytania, więc zakładka PYTANIA
- * KLIENTÓW pokazywała w demo pustą skrzynkę i trzech stref nie dało się na
- * niej obejrzeć — one włączają się dopiero przy otwartej sprawie. Ta sama
- * pustka zdarza się w biurze w spokojny dzień; różnica polega na tym, że tam
- * jest prawdą, a tu ukrywała pół zakładki przed każdym, kto ją sprawdzał.
- *
- * Trzy pytania pokrywają trzy stany, którymi szyna się różni: bez szkicu,
- * ze szkicem po poprawce człowieka i wysłane. Czwarte pyta o towar, którego
- * nie mamy — to jedyne źródło danych dla listy „pytali o towar spoza oferty".
- */
 function zdjecia(): void {
   const dir = path.resolve(path.dirname(config.dbPath), "photos");
   fs.mkdirSync(dir, { recursive: true });

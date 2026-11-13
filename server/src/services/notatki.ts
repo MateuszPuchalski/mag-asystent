@@ -4,9 +4,8 @@ import { logEvent } from "./events.js";
 /* ── Notatki biura do dostawy ────────────────────────────────────────────────
    Dostawca dosyła czasem brak, którego NIE MA na fakturze. Biuro wie o tym
    z rozmowy albo z maila; rozkładający przy palecie nie ma tego skąd wiedzieć
-   i musi sprawdzić, czy rzeczywiście dosłali. Do 0.43.0 jedyną drogą było
-   „powiedz Krzyśkowi, jak przyjdzie" — kanał, który gubi się przy zmianie
-   i nie zostawia po sobie ani śladu, ani odpowiedzi.
+   i musi sprawdzić, czy rzeczywiście dosłali. „Powiedz Krzyśkowi, jak
+   przyjdzie" to kanał, który gubi się przy zmianie i nie zostawia śladu.
 
    DWIE rzeczy odróżniają notatkę od zwykłego komunikatu na ekranie:
 
@@ -29,7 +28,7 @@ export interface Notatka {
   odpowiedz: string | null;
   odpAt: string | null;
   odpBy: string | null;
-  /** `null` = biuro jeszcze nie widziało odpowiedzi (0.57.0). */
+  /** `null` = biuro jeszcze nie widziało odpowiedzi. */
   odpWidzianaAt: string | null;
 }
 
@@ -123,7 +122,7 @@ export function odpowiedzNaNotatke(
   return { ok: true };
 }
 
-/* ── Odpowiedź wraca do biura (0.57.0) ───────────────────────────────────────
+/* ── Odpowiedź wraca do biura ────────────────────────────────────────────────
    Do tej wersji odpowiedź widać było WYŁĄCZNIE po wejściu w tę konkretną
    dostawę. Biuro zadawało pytanie i nie miało skąd wiedzieć, że przyszła
    odpowiedź — ani powodu wracać akurat do tego dokumentu. Notatka wymusza

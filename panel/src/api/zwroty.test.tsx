@@ -3,7 +3,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { act, renderHook, waitFor } from "@testing-library/react";
 import { QueryClient, QueryClientProvider, useQuery } from "@tanstack/react-query";
 
-/* ── Co odświeża zapis zwrotu (audyt zwrotów, 15 września 2026) ──────────────
+/* ── Co odświeża zapis zwrotu (audyt zwrotów) ──────────────
    Dwie usterki jednej linijki. `["zwroty"]` jest przedrostkiem koszyka
    i rozjazdów, więc każdy klawisz decyzji przeładowywał trzy listy — w tym
    rozjazdy liczone z całej bazy. A szczegół, który niesie blok pieniędzy, nie
@@ -59,7 +59,7 @@ describe("Odświeżenie po decyzji zwrotu", () => {
   });
 });
 
-/* ── Dosyłka przy zwrocie (0.536.0) ─────────────────────────────────────────
+/* ── Dosyłka przy zwrocie ───────────────────────────────────────────────────
    „Śledź dosyłkę” idzie BEZ CIAŁA — reguła klienta HTTP z `CLAUDE.md`: pusty
    JSON to „Bad Request” od Fastify. A zapis, który założył dosyłkę, zmienił
    też sprawę klienta, więc jej odczyty czytają się od nowa.                  */
@@ -115,7 +115,7 @@ describe("Dosyłka przy zwrocie", () => {
   });
 });
 
-/* ── Zapis czeka na świeży szczegół (0.536.1) ──────────────────────────────
+/* ── Zapis czeka na świeży szczegół ────────────────────────────────────────
    Lekcja `poZapisieSprawy` ze `spoiwo.ts`: bez obietnicy zwróconej
    z `onSettled` `isPending` gasło przed odświeżeniem, a sekcja pieniędzy
    rysowała przez chwilę stan sprzed zapisu z czynnymi przyciskami. Test

@@ -5,7 +5,7 @@ import fs from "node:fs";
 import { migrate } from "../db/db.js";
 import { BladReklamacji, ReklamacjaConflict, czatReklamacji } from "./reklamacje.js";
 import {
-  LIMIT_ZNAKOW, odpowiedzWSprawie, stanKolejkiOdpowiedzi,
+  LIMIT_ZNAKOW, odpowiedzWSprawie,
 } from "./reklamacje-wysylka.js";
 
 /* Ten plik pilnuje rzeczy, których na ekranie nie widać: że odrzucona treść
@@ -108,7 +108,7 @@ test("udana wysyłka dopisuje oś, podnosi licznik i stempluje prowadzącego", a
   assert.equal(r.wiadomosci_ile, 2);
   assert.equal(r.ostatnia_wiadomosc_status, "SELLER_REPLIED");
   assert.equal(r.prowadzi, "A. Lewandowska", "odpowiedź JEST prowadzeniem sprawy");
-  /* Znaczniki ISO z `T` i `Z` (0.497.1) — napis ze spacją przeglądarka
+  /* Znaczniki ISO z `T` i `Z` — napis ze spacją przeglądarka
      czyta jako czas lokalny, więc panel pokazywał godzinę o dwie za wcześnie. */
   const znaczniki = d.prepare(`SELECT r.prowadzi_at, o.finished_at FROM reklamacja_klienta r
     JOIN reklamacja_outbox o ON o.reklamacja_id = r.id WHERE r.id=?`).get(id) as
@@ -212,7 +212,7 @@ test("dopisek DORADCY zatrzymuje wysyłkę tak samo jak dopisek klienta", async 
   });
   assert.equal(strzalow, 0, "nic nie poszło do Allegro");
 
-  /* Jawna zgoda przepuszcza — blizna 0.110.0: nigdy po cichu. */
+  /* Jawna zgoda przepuszcza — nigdy po cichu. */
   const w = await odpowiedzWSprawie(zadanie(d, id, pytanie, {
     expectedLastMessageId: doradca, mimoNowejWiadomosci: true,
   }));
@@ -264,18 +264,6 @@ test("audyt niesie DŁUGOŚĆ, nigdy treść", async () => {
   }
 });
 
-test("stan kolejki liczy to, co wymaga oka człowieka", async () => {
-  const { d, id, pytanie } = stanowisko();
-  await odpowiedzWSprawie(zadanie(d, id, pytanie));
-  assert.deepEqual(stanKolejkiOdpowiedzi(d), { wyslane: 1, doSprawdzenia: 0 });
-
-  await assert.rejects(() => odpowiedzWSprawie(zadanie(d, id, pytanie, {
-    tresc: "Inna treść, inny klucz.",
-    wyslij: async () => { throw new Error("Allegro odpowiedziało 500: awaria"); },
-  })));
-  assert.deepEqual(stanKolejkiOdpowiedzi(d), { wyslane: 1, doSprawdzenia: 1 });
-});
-
 test("nieistniejąca reklamacja to 404, nie cicha porażka", async () => {
   const { d, pytanie } = stanowisko();
   await assert.rejects(() => odpowiedzWSprawie(zadanie(d, 999, pytanie)), (e: unknown) => {
@@ -287,7 +275,7 @@ test("nieistniejąca reklamacja to 404, nie cicha porażka", async () => {
 
 test("załączniki jadą z wiadomością i ZNIKAJĄ ze szkicu po wysłaniu", async () => {
   /* Wiersz, który by został, wisiałby przy NASTĘPNEJ odpowiedzi i dosłałby ten
-     sam plik drugi raz — cicho, bo nikt by go tam nie szukał (0.274.0). */
+     sam plik drugi raz — cicho, bo nikt by go tam nie szukał. */
   const { d, id, pytanie } = stanowisko();
   d.prepare("INSERT INTO app_user(user_id,login,name,role) VALUES (9,'ola','Ola','biuro')").run();
   for (const a of ["att-1", "att-2"]) {

@@ -6,10 +6,10 @@ import { Blad, NaglowekSekcji, Przycisk, czas, ile } from "../ui";
 import { CyklKosza } from "./Cykl";
 import { PrzyciskTowaru } from "../towar/Szuflada";
 
-/* ── Zawartość kosza — środkowa kolumna (0.438.0) ─────────────────────────
-   Biuro widziało kiedyś sam licznik „3/6 poz." i nie miało jak sprawdzić,
-   CO w koszu leży ani gdzie hala to odłożyła. Przy pominięciu było to już
-   mylące: kosz wracał niekompletny, a ekran pokazywał zwykły postęp.
+/* ── Zawartość kosza — środkowa kolumna ───────────────────────────────────
+   Biuro widzi, CO w koszu leży i gdzie hala to odłożyła. Sam licznik
+   „3/6 poz." przy pominięciu mylił: kosz wracał niekompletny, a ekran
+   pokazywał zwykły postęp.
 
    Ta sama trasa co karta kosza w biurze (`/api/biuro/kosze/:id`) — jedno
    źródło prawdy o zawartości. */
@@ -43,7 +43,7 @@ function StanPozycji({ p }: { p: PozycjaWKoszu }) {
   return <span className="text-xs text-slate-600">czeka na hali</span>;
 }
 
-/** Stan ponowienia MM kosza z kłopotem (0.503.0). */
+/** Stan ponowienia MM kosza z kłopotem. */
 export interface PonowienieMm {
   problem: NonNullable<WierszKosza["problemMm"]>;
   trwa: boolean;
@@ -52,11 +52,11 @@ export interface PonowienieMm {
   /** Odmowa „przerwano w trakcie zapisu" czeka na potwierdzenie człowieka. */
   czekaNaSprawdzenie: boolean;
   onPonow: (sprawdzono: boolean) => void;
-  /** Zdjęcie kartoteki z MM, które nie weszło (0.530.0). */
+  /** Zdjęcie kartoteki z MM, które nie weszło. */
   usun?: { trwa: boolean; blad: string; wynik: string; onUsun: (twId: number) => void };
 }
 
-/* Co zrobić, gdy MM powrotne nie powstało — zależnie od przyczyny (0.505.0).
+/* Co zrobić, gdy MM powrotne nie powstało — zależnie od przyczyny.
    Kosz bez znanego kierunku NIE czeka na adresy: tam jedynym ruchem jest
    dokument w Subiekcie, bo aplikacja powrotu nie wystawi nigdy. */
 const RUCH_BEZ_POWROTU: Record<PowodBezPowrotu, string> = {
@@ -74,10 +74,10 @@ export function Kosz({ k, przelicz, ponowMm = null, bezPowrotu = null }: {
   k: SzczegolKosza;
   przelicz: { trwa: boolean; blad: string; wynik: string; onPrzelicz: () => void };
   ponowMm?: PonowienieMm | null;
-  /** Rozłożony ponad dobę, a MM powrotne nie powstało (0.505.0) — i dlaczego. */
+  /** Rozłożony ponad dobę, a MM powrotne nie powstało — i dlaczego. */
   bezPowrotu?: PowodBezPowrotu | null;
 }) {
-  /* Potwierdzenie przy zdjęciu z MM (0.530.0): towar zostaje na magazynie
+  /* Potwierdzenie przy zdjęciu z MM: towar zostaje na magazynie
      źródłowym, a przesunięcie ręką to druga czynność — jeden klik za mało. */
   const [potwierdzUsun, setPotwierdzUsun] = useState<number | null>(null);
   const bezKorekty = k.zwroty.filter((z) => !z.korektaNumer);
@@ -101,9 +101,8 @@ export function Kosz({ k, przelicz, ponowMm = null, bezPowrotu = null }: {
         <CyklKosza status={k.status} />
         {k.rodzaj === "karton" && <span className="rounded bg-slate-200 px-1.5 py-0.5 text-xs font-bold text-slate-700">karton</span>}
         <span className="ml-auto" />
-        {/* Wyjaśnienie w podpowiedzi przycisku (0.525.0). Stało dwoma zdaniami
-            pod nagłówkiem przy każdym koszu do edycji, a czyta się je raz —
-            przy pierwszym przeliczeniu, czyli z myszą na przycisku. */}
+        {/* Wyjaśnienie w podpowiedzi przycisku: czyta się je raz — przy
+            pierwszym przeliczeniu, czyli z myszą na przycisku. */}
         {k.doEdycji && <Przycisk disabled={przelicz.trwa} onClick={przelicz.onPrzelicz}
           title={PODPOWIEDZ_PRZELICZENIA}>
           <RefreshCw size={16} />Przelicz ze zwrotów</Przycisk>}
@@ -114,20 +113,19 @@ export function Kosz({ k, przelicz, ponowMm = null, bezPowrotu = null }: {
       {etapy.length > 0 && <p className="mt-1 text-sm text-slate-600">{etapy.join(" → ")}</p>}
       {przelicz.wynik && <p className="mt-1 text-sm text-ranga-ok">{przelicz.wynik}</p>}
       <Blad>{przelicz.blad}</Blad>
-      {/* ── KŁOPOT Z MM I PONOWIENIE (0.503.0) ──────────────────────────────
-          Zgłoszenie właściciela: „dodaj, abym mógł wywołać ponownie". Przycisk
-          stoi tylko przy MM w błędzie TERAZ — MM, która weszła po odmowie, nie
-          ma czego ponawiać, tam zostaje samo sprawdzenie stanów. */}
+      {/* ── KŁOPOT Z MM I PONOWIENIE ──────────────────────────────────────
+          Przycisk stoi tylko przy MM w błędzie TERAZ — MM, która weszła po
+          odmowie, nie ma czego ponawiać, tam zostaje samo sprawdzenie stanów. */}
       {ponowMm && <div className={`mt-2 rounded-lg border p-2 text-sm ${ponowMm.problem.nierozwiazany
         ? "border-red-200 bg-red-50" : "border-amber-200 bg-amber-50"}`}>
         <p className={ponowMm.problem.nierozwiazany ? "text-ranga-zle" : "text-ranga-uwaga"}>
           <b>{ponowMm.problem.nierozwiazany ? "MM w błędzie"
-            /* PONAWIANE (0.530.0) — kosz 1205: karta mówiła „weszło", a powrót
-               czekał na kolejną próbę. Weszło to dopiero dokument z numerem. */
+            /* PONAWIANE: powrót czeka na kolejną próbę. Weszło to dopiero
+               dokument z numerem. */
             : ponowMm.problem.ponawiane ? "MM ponawiane po odmowie — jeszcze nie weszło"
               : "MM weszło po błędzie — sprawdź stany z Subiektem"}</b>
           {ponowMm.problem.ostatniBlad ? ` · ${ponowMm.problem.ostatniBlad}` : ""}</p>
-        {/* KTÓRY TOWAR (0.530.0). Sfera mówi „brak towaru" o całym dokumencie;
+        {/* KTÓRY TOWAR. Sfera mówi „brak towaru" o całym dokumencie;
             read-model stanów wskazuje linię. Pusta lista to też informacja:
             nasza kopia braku nie widzi, więc przyczyna leży poza nią. */}
         {(k.brakiMm?.length ?? 0) > 0 && <ul className="mt-1 space-y-0.5 text-ranga-zle">
@@ -135,7 +133,7 @@ export function Kosz({ k, przelicz, ponowMm = null, bezPowrotu = null }: {
             <b>{b.symbol ?? `kartoteka ${b.twId}`}</b>{b.nazwa ? ` · ${b.nazwa}` : ""}
             {` — MM chce ${b.potrzeba} szt. z ${b.magazyn}, a tam jest ${b.stan}`}
             {b.rezerwacja > 0 ? `, z czego ${b.rezerwacja} zarezerwowane` : ""}.
-            {/* ZDJĘCIE Z MM (0.530.0) — zgłoszenie właściciela przy 1205. */}
+            {/* ZDJĘCIE Z MM — decyzja właściciela. */}
             {ponowMm.usun && (potwierdzUsun === b.twId
               ? <span className="ml-2 inline-flex flex-wrap items-center gap-1 text-slate-700">
                   Zostanie na {b.magazyn} — przesuniesz go ręką w Subiekcie.
@@ -166,7 +164,7 @@ export function Kosz({ k, przelicz, ponowMm = null, bezPowrotu = null }: {
         {ponowMm.wynik && <p className="mt-1 text-ranga-ok">{ponowMm.wynik}</p>}
         <Blad>{ponowMm.blad}</Blad>
       </div>}
-      {/* ── BEZ MM POWROTNEGO (0.505.0) ──────────────────────────────────
+      {/* ── BEZ MM POWROTNEGO ────────────────────────────────────────────
           Zdanie kończy się RUCHEM, jak w rekoncyliacji, i zależy od przyczyny
           (`RUCH_BEZ_POWROTU`). Przycisku tu nie ma: powrót zamawia automat,
           gdy adresy wejdą, a ręczne zamówienie ominęłoby właśnie tę bramkę. */}
@@ -201,7 +199,7 @@ export function Kosz({ k, przelicz, ponowMm = null, bezPowrotu = null }: {
               ? <span className="rounded bg-emerald-100 px-1.5 py-0.5 text-xs font-bold text-ranga-ok">{p.lokFaktyczna}</span>
               : <span className="text-xs text-slate-600">{p.lokOczekiwana ?? "—"}</span>}</td>
             <td className="py-2"><StanPozycji p={p} />
-              {/* Wiersz, który blokuje MM, oznaczony przy sobie (0.530.0) —
+              {/* Wiersz, który blokuje MM, oznaczony przy sobie —
                   żeby nie szukać symbolu z ramki wśród dwudziestu pięciu. */}
               {k.brakiMm?.some((b) => b.twId === p.twId) &&
                 <span className="mt-1 block text-xs font-bold text-ranga-zle">blokuje MM — brak wolnego stanu</span>}

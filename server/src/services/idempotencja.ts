@@ -1,12 +1,11 @@
 import { createHash } from "node:crypto";
 
-/* ── Rdzeń idempotencji wysyłek (0.224.0) ────────────────────────────────────
-   Dwie funkcje wyjęte z `services/wysylka.ts`, gdzie stały od 0.148.0. Obie są
-   w całości niezależne od domeny — biorą liczby i łańcuchy, nie dotykają bazy
-   ani Allegro — a od tego wydania potrzebuje ich drugi moduł: odpowiedź
-   w reklamacji.
+/* ── Rdzeń idempotencji wysyłek ──────────────────────────────────────────────
+   Dwie funkcje niezależne od domeny — biorą liczby i łańcuchy, nie dotykają
+   bazy ani Allegro. Potrzebują ich dwa moduły: skrzynka (`wysylka.ts`)
+   i odpowiedź w reklamacji.
 
-   WYJĘTE, NIE SKOPIOWANE. Druga kopia rozjechałaby się z pierwszą przy
+   WSPÓLNE, NIE SKOPIOWANE. Druga kopia rozjechałaby się z pierwszą przy
    pierwszej poprawce, a objawem rozjazdu byłaby wysyłka wychodząca dwa razy
    w jednym z dwóch modułów — czyli dokładnie to, przed czym te funkcje mają
    chronić.
@@ -35,7 +34,7 @@ export function kluczWysylki(
   prefiks: string, rekordId: number, ostatniaId: number | null,
   tresc: string, zalaczniki: string[] = [],
 ): string {
-  /* ZAŁĄCZNIKI WCHODZĄ DO KLUCZA (0.195.0). Bez nich „ten sam tekst z innym
+  /* ZAŁĄCZNIKI WCHODZĄ DO KLUCZA. Bez nich „ten sam tekst z innym
      zdjęciem" miałby klucz identyczny z wysyłką sprzed chwili, a strażnik
      dubletu oddałby stan tamtej próby zamiast wysłać poprawiony komplet —
      czyli zdjęcie po cichu nie poszłoby do klienta. Kolejność sortowana, bo

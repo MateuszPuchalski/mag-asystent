@@ -1,12 +1,12 @@
-import React, { useState } from "react";
+import { useState } from "react";
 import { describe, expect, it, vi } from "vitest";
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { Edytor } from "./Edytor";
 import { useOkno } from "../nawigacja/fokus";
 
-/* ── Wątek pierwszy: pusty edytor to jedna linijka (0.548.0) ────────────────
-   Wariant C, decyzja właściciela z 28 września. Testy pilnują czterech rzeczy:
+/* ── Wątek pierwszy: pusty edytor to jedna linijka ──────────────────────────
+   Decyzja właściciela. Testy pilnują czterech rzeczy:
 
    1. Pusty edytor to jeden rząd: pole, „Notatka”, spinacz i martwe „Wyślij”.
       Bez zakładek i bez pływającego paska.
@@ -74,7 +74,7 @@ describe("pusty edytor to jedna linijka", () => {
   });
 
   it("błąd załącznika rozwija pusty edytor i staje zdaniem, nie ginie", () => {
-    /* Recenzja (0.548.0): zwinięty rząd nie rysował `ZalacznikiWysylki`, więc
+    /* Recenzja: zwinięty rząd nie rysował `ZalacznikiWysylki`, więc
        odmowa serwera przy pustym polu kończyła się ciszą. */
     render(<Edytor {...props} szkic="" onZmiana={() => {}} bladZalacznika="Plik ma więcej niż 4 MB" />);
     expect(zakladka()).toBeInTheDocument();

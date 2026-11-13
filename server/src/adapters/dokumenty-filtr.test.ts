@@ -75,7 +75,7 @@ test("identyfikatory otwartych dostaw też są obcinane", () => {
   assert.match(oknoFilter, /IN \(4821\)/);
 });
 
-/* ── Pozycje przesunięcia MM (0.76.1) ────────────────────────────────────────
+/* ── Pozycje przesunięcia MM ────────────────────────────────────────
    Test na jedną kolumnę, bo przez nią zakładka ZWROTY nie działała u klienta:
    pozycje MM wiszą na dokumencie MAGAZYNOWYM. Kolumna dokumentu handlowego
    zwraca pustkę — nie błąd, więc nic o sobie nie mówi.                       */
@@ -106,7 +106,7 @@ test("dokumenty bez pozycji mówią o sobie, zamiast wyglądać na spokojny dzie
   assert.equal(zdaniePrzyjecBezPozycji(6, 18), null);
 });
 
-/* ── Dokumenty sprzedaży (0.174.0) ───────────────────────────────────────────
+/* ── Dokumenty sprzedaży ───────────────────────────────────────────
    Okno jest DATĄ, nie listą identyfikatorów, i to nie jest kwestia gustu.
    Kilka tygodni sprzedaży to dziesiątki tysięcy dokumentów, a `IN (id,…)`
    tej długości położyło wdrożenie 0.53.0 błędem 8623 na przemian z timeoutem

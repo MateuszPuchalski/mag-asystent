@@ -1,11 +1,10 @@
-import React from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { act, fireEvent, render, screen } from "@testing-library/react";
 import { Os, dogonicDol } from "./Os";
 import { ustawKadr } from "../test/kadr";
 import type { WpisOsi } from "../api/typy";
 
-/* ── OŚ ZJEŻDŻA NA DÓŁ I PRZYPINA PYTANIE (0.260.0) ──────────────────────────
+/* ── OŚ ZJEŻDŻA NA DÓŁ I PRZYPINA PYTANIE ────────────────────────────────────
    Dwie usterki jednego ekranu, znalezione przy audycie wizualnym.
 
    PIERWSZA: oś nie przewijała się nigdy. Serwer oddaje wpisy od najstarszego
@@ -243,7 +242,7 @@ describe("Pytanie klienta przypięte nad edytorem", () => {
        załączniki i „Zleć z tej wiadomości" zostają na osi — przycisk ma tam
        zaprowadzić, bo inaczej pasek stałby się drugim miejscem do czytania. */
     const skok = vi.spyOn(Element.prototype, "scrollIntoView");
-    const { container } = os([pytanie()]);
+    os([pytanie()]);
     act(() => ustawKadr(false));
     skok.mockClear();
     fireEvent.click(screen.getByRole("button", { name: "Pokaż w rozmowie" }));

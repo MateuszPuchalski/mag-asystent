@@ -2,12 +2,9 @@ import React from "react";
 import type { WpisOsiZwrotu } from "../api/typy";
 import { czas } from "../ui";
 
-/* ── Oś zwrotu (0.313.0) ─────────────────────────────────────────────────────
-   Zwrot zapisywał ślad po każdej decyzji od 0.156.0 i serwer oddawał go przy
-   szczególe sprawy. Panel dostał na to nawet typ — i zostawił go nieużytym.
-   Biuro patrzące na zamknięty zwrot nie widziało więc ANI kto go przyjął, ANI
-   za co poszła ta kwota, ANI czy towar wrócił na półkę; odpowiedzi szukało się
-   w Subiekcie i w panelu Allegro, czyli tam, gdzie ich nie ma.
+/* ── Oś zwrotu ───────────────────────────────────────────────────────────────
+   Biuro patrzące na zamknięty zwrot widzi, kto go przyjął, za co poszła
+   kwota i czy towar wrócił na półkę — bez szukania w Subiekcie i Allegro.
 
    PIONOWO, NIE W PASKU. Skrzynka rysuje przebieg rozmowy jako rząd czipów
    (`skrzynka/Os.tsx`), bo tam zdarzeń bywa kilkanaście i konkurują z treścią
@@ -38,7 +35,7 @@ const BARWA: Record<string, string> = {
   rabat: "bg-amber-100 text-amber-900",
   rozlozenie: "bg-violet-100 text-violet-800",
   kosz_pominiety: "bg-violet-100 text-violet-800",
-  /* Zadanie zlecone hali ze zwrotu wraca tu wynikiem albo odesłaniem (0.502.0). */
+  /* Zadanie zlecone hali ze zwrotu wraca tu wynikiem albo odesłaniem. */
   zadanie_wynik: "bg-violet-100 text-violet-800",
   zadanie_odeslane: "bg-amber-100 text-amber-900",
   notatka: "bg-slate-100 text-slate-700",
@@ -47,7 +44,7 @@ const BARWA: Record<string, string> = {
 const SZARY = "bg-slate-100 text-slate-600";
 
 /** Krótkie nazwy rodzajów — czip ma się zmieścić obok godziny. Czyta je też
-    pasek zdarzeń rozmowy (0.502.0), żeby zwrot nazywał się tak samo w obu. */
+    pasek zdarzeń rozmowy, żeby zwrot nazywał się tak samo w obu. */
 export const NAZWA_ZDARZENIA_ZWROTU: Record<string, string> = {
   werdykt: "decyzja",
   ocena: "ocena",
@@ -86,16 +83,15 @@ function zrodlo(w: WpisOsiZwrotu): string | null {
 }
 
 /**
- * Przebieg zwrotu jednym zdaniem, całość na żądanie (0.518.0).
+ * Przebieg zwrotu jednym zdaniem, całość na żądanie.
  *
- * Zgłoszenie agentów: „aplikacja przytłacza". Pełna lista stała otwarta pod
- * każdym zwrotem, a przy decyzji liczy się ostatni ruch — reszta jest
+ * Zgłoszenie agentów: „aplikacja przytłacza". Przy decyzji liczy się ostatni ruch — reszta jest
  * historią, po którą sięga się przy sprawie wracającej pytaniem. Ten sam
- * kształt co pasek zdarzeń rozmowy (`skrzynka/Os.tsx`, 0.506.0), żeby dwa
+ * kształt co pasek zdarzeń rozmowy (`skrzynka/Os.tsx`), żeby dwa
  * ekrany obsługi miały jeden nawyk. Kopia wzorca, nie import: tamten pasek
  * nie jest eksportowany i czyta zdarzenia rozmowy, nie wpisy zwrotu.
  *
- * Rozwinięcie pokazuje DOTYCHCZASOWĄ listę pionową — powód pionu stoi wyżej.
+ * Rozwinięcie pokazuje pełną listę pionową — powód pionu stoi wyżej.
  */
 export function PrzebiegZwrotu({ wpisy }: { wpisy: WpisOsiZwrotu[] }) {
   const [cala, setCala] = React.useState(false);

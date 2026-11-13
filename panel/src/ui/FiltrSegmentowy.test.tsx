@@ -1,7 +1,7 @@
 import React from "react";
 import { describe, expect, it, vi } from "vitest";
 import { fireEvent, render, screen } from "@testing-library/react";
-import { FiltrSegmentowy, Zakladki } from "./index";
+import { FiltrSegmentowy } from "./index";
 
 /* Źródła przez `?raw`, jak w trzech pozostałych strażnikach — `tsconfig.json`
    zapisuje, że panel jest aplikacją przeglądarki, więc żadnego `node:fs`.
@@ -9,11 +9,9 @@ import { FiltrSegmentowy, Zakladki } from "./index";
 const ZRODLA = import.meta.glob(["../**/*.tsx", "!../**/*.test.tsx", "!../ui/index.tsx"],
   { query: "?raw", eager: true, import: "default" }) as Record<string, string>;
 
-/* ── JEDEN KSZTAŁT WYBORU (0.262.0) ────────────────────────────────────────────
-   Rząd pigułek, z których jedna jest wybrana, stał w panelu SZEŚĆ RAZY
-   w TRZECH kształtach: atrament na szarej bieżni, atrament bez tła na własnej
-   białej bieżni i bursztyn bez tła. Trzy z sześciu miejsc to był ten sam kod
-   przepisany znak w znak. Cztery z sześciu nie miały `aria-pressed`.
+/* ── JEDEN KSZTAŁT WYBORU ──────────────────────────────────────────────────────
+   Rząd pigułek, z których jedna jest wybrana, ma jeden kształt i zawsze
+   `aria-pressed` (`FiltrSegmentowy` w `ui/index.tsx`).
 
    CO PILNUJE — dwie rzeczy, obie wąskie:
 
@@ -21,7 +19,7 @@ const ZRODLA = import.meta.glob(["../**/*.tsx", "!../**/*.test.tsx", "!../ui/ind
         `ui/index.tsx`. To jest DOKŁADNIE łańcuch wybranej i niewybranej
         pigułki; nigdzie indziej te dwie klasy nie stoją obok siebie.
      2. Bursztyn jako stan wybrany, rozpoznany po sąsiedztwie z `text-slate-600`
-        — czyli po kształcie, który miały kubełki zwrotów i reklamacji.
+        — czyli po kształcie ręcznie sklejonych kubełków.
 
    CZEGO NIE PILNUJE. Nie wie, czy nowy filtr w ogóle powstał: da się dołożyć
    rząd przycisków w zupełnie nowych barwach i bramka tego nie zobaczy. Nie
@@ -97,7 +95,7 @@ describe("Filtr segmentowy: zachowanie pigułki", () => {
 
   it("licznik jest ODDZIELONY SPACJĄ, nie marginesem", () => {
     /* `ml-1` rysuje odstęp, ale nie wchodzi do nazwy dostępnej — czytnik
-       przeczytałby „Do decyzji3". Kubełki zwrotów robiły tak od 0.209.0. */
+       przeczytałby „Do decyzji3". */
     render(<FiltrSegmentowy wybrany="a" onWybierz={() => {}} pozycje={POZYCJE} />);
     expect(screen.getByRole("button", { name: "Do decyzji 3" })).toBeInTheDocument();
   });
@@ -106,8 +104,8 @@ describe("Filtr segmentowy: zachowanie pigułki", () => {
     /* Barlow ma cyfry proporcjonalne: bez tej klasy „11" mierzy 8,44 px,
        a „44" — 13,23 px przy 12 px pisma. Rząd kubełków przesuwałby się
        o prawie pięć pikseli przy samej zmianie liczby, nie jej długości.
-       Pomiar robi się w przeglądarce Z WCZYTANYM fontem. Od 0.431.0 font
-       jedzie z panelem, więc serwer deweloperski też go podaje. */
+       Pomiar robi się w przeglądarce Z WCZYTANYM fontem; font jedzie
+       z panelem, więc serwer deweloperski też go podaje. */
     const { container } = render(
       <FiltrSegmentowy wybrany="a" onWybierz={() => {}} pozycje={POZYCJE} />);
     expect(container.querySelector("span")?.className).toContain("tabular-nums");
@@ -165,29 +163,10 @@ describe("Filtr segmentowy: wyjątek barwy", () => {
   });
 });
 
-describe("Zakładki biorą pigułkę z filtra", () => {
-  it("różnią się JEDNYM: równą szerokością", () => {
-    const { container } = render(<Zakladki wybrana="of" onWybierz={() => {}} pozycje={[
-      { klucz: "of", etykieta: "Oferta" }, { klucz: "tw", etykieta: "Towar" },
-    ]} />);
-    const k = container.querySelector("button")!.className;
-    expect(k).toContain("flex-1");
-    expect(k).toContain("bg-wertis-ink");
-  });
-
-  it("dalej mówią czytnikowi ekranu, która jest wybrana", () => {
-    render(<Zakladki wybrana="of" onWybierz={() => {}} pozycje={[
-      { klucz: "of", etykieta: "Oferta" }, { klucz: "tw", etykieta: "Towar" },
-    ]} />);
-    expect(screen.getByRole("button", { name: "Oferta" }))
-      .toHaveAttribute("aria-pressed", "true");
-  });
-});
-
-/* ── Tryb kafli (0.454.0) ──────────────────────────────────────────────────────
+/* ── Tryb kafli ────────────────────────────────────────────────────────────────
    Kubełki zwrotów jako kafle: ikona, liczba na pierwszym planie, etykieta pod
-   nią. To TEN SAM wybór, więc pilnujemy tego, co reguła z 0.262.0 obiecuje:
-   `aria-pressed`, barwy wyboru i jedno kliknięcie na jedną pozycję. */
+   nią. To TEN SAM wybór, więc pilnujemy tego, co jeden kształt wyboru
+   obiecuje: `aria-pressed`, barwy wyboru i jedno kliknięcie na pozycję. */
 describe("FiltrSegmentowy w trybie kafli", () => {
   const pozycje = [
     { klucz: "decyzja", etykieta: "Do decyzji", ile: 743, ikona: <svg data-testid="ikona-decyzja" /> },

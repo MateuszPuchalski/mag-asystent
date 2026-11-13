@@ -12,16 +12,16 @@ export const USTAWIENIA = "/obsluga/ustawienia";
 /** Adres zgłoszeń pracowników — czyta go menu i trasa w `main.tsx`. */
 export const ZGLOSZENIA = "/obsluga/zgloszenia";
 
-/* ── MENU „WIĘCEJ" ZAMIAST DOLNEGO RZĘDU (0.538.0) ─────────────────────────
-   Decyzja właściciela z 27 września 2026: nagłówek ma jeden rząd. Dolny rząd
-   z 0.431.0 niósł wgląd, zębatkę i wyjście, czyli rzeczy otwierane kilka razy
-   w miesiącu, i płacił za nie ~50 px wysokości na KAŻDYM ekranie pracy.
-   Na laptopie obok Subiekta to dwa wiersze kolejki mniej przez cały dzień.
+/* ── MENU „WIĘCEJ" ZAMIAST DOLNEGO RZĘDU ───────────────────────────────────
+   Decyzja właściciela: nagłówek ma jeden rząd. Wgląd, zębatka i wyjście to
+   rzeczy otwierane kilka razy w miesiącu, a osobny rząd kosztowałby ~50 px
+   wysokości na KAŻDYM ekranie pracy — dwa wiersze kolejki mniej przez cały
+   dzień.
 
    Pod jednym przyciskiem stoi wszystko, co nie jest pracą na sprawach: wgląd,
    ustawienia i wyjście. Dekalog p. 1 — mniej decyzji — rozstrzyga na rzecz
    jednego wejścia zamiast trzech ikon, z których każdą trzeba rozpoznać.
-   Dostawy do menu NIE zeszły: to praca dzienna, więc stoją ósmą zakładką.
+   Dostawy nie stoją w menu: to praca dzienna, więc są ósmą zakładką.
 
    PRZYCISK ŚWIECI BURSZTYNEM, gdy bieżący ekran leży w menu. Bez tego agent
    w dzienniku widziałby pasek bez żadnej zaznaczonej zakładki i nie wiedziałby,

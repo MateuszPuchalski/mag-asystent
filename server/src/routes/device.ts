@@ -11,7 +11,7 @@ const ALLOWED = new Set([
   /* Skan → odpowiedź mierzone U CZŁOWIEKA (plan §10). Czas serwera pomijałby
      sieć i render, czyli akurat to, gdzie problem naprawdę siedzi. */
   "scan_timing",
-  /* Przerwa w łączności kolektora z serwerem (0.326.0).
+  /* Przerwa w łączności kolektora z serwerem.
 
      Zgłasza ją kolektor PO jej końcu — w trakcie nie ma czym. Niesie czas
      początku, czas trwania, liczbę prób, powód i drogę sieciową; kto pracował,
@@ -23,7 +23,7 @@ const ALLOWED = new Set([
      aplikacji. Biuro czyta to w zakładce DZIENNIK ZDARZEŃ, z filtrem
      po urządzeniu. */
   "siec_przerwa",
-  /* Czasy odpowiedzi każdego żądania, per ekran i trasa (0.482.0). Paczka
+  /* Czasy odpowiedzi każdego żądania, per ekran i trasa. Paczka
      z kubełkami co 5 minut — reguły w `android/core/.../net/CzasyZadan.kt`,
      odczyt w `services/ergonomia.ts`. */
   "czasy_zadan",
@@ -51,12 +51,6 @@ export async function deviceRoutes(app: FastifyInstance) {
    * przebieg, tylko liczone teraz. Read-only, jak `/api/metrics` wyżej.
    */
   app.get("/api/reconcile", async () => reconcile());
-
-  /* `GET /api/wydajnosc` ZNIKNĘŁO w 0.431.0. Raport per osoba wisiał tu za
-     samą sesją, więc czytał go każdy zalogowany — także magazynier z kolektora
-     (zmierzone: 200 z pełnym raportem). Nie wołał go żaden front: biuro bierze
-     raport z `/api/analiza`, za bramką roli. Trasa bez odbiorcy, która wynosi
-     dane o ludziach, jest wyłącznie ryzykiem. */
 
   app.post<{ Body: { type?: string; [k: string]: unknown } }>(
     "/api/device/event",

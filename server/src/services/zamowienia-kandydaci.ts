@@ -8,7 +8,7 @@ import { imieAutora } from "./conversations.js";
 import { linkZamowienia } from "./allegro-linki.js";
 import { publishConversationEvent } from "./conversation-realtime.js";
 
-/* ── KTÓRE ZAMÓWIENIE DOTYCZY TEJ ROZMOWY (0.397.0) ──────────────────────────
+/* ── KTÓRE ZAMÓWIENIE DOTYCZY TEJ ROZMOWY ────────────────────────────────────
    Zgłoszenie właściciela ze zrzutem: klient napisał pod OFERTĄ „dzisiaj
    otrzymałem paczkę, ale nie było w zestawie świecy" — i nigdzie nie było
    powiązania tej rozmowy z jego zamówieniem.
@@ -16,10 +16,8 @@ import { publishConversationEvent } from "./conversation-realtime.js";
    POWÓD JEST W ALLEGRO, nie u nas. Wątek z Centrum Wiadomości niesie JEDEN
    obiekt powiązany: `related.type` to `OFFER` albo `ORDER`. Pytanie zadane
    pod ofertą niesie numer OFERTY i nic więcej — numeru zamówienia w tym
-   ładunku nie ma i nie będzie. Do 0.396.0 zamówienie rozmowy brało się
-   WYŁĄCZNIE z wiadomości, która je niosła, więc cała reklamacja braku
-   w paczce zostawała bez zakupu: bez pozycji, bez kwot, bez przesyłki,
-   bez drogi zakupu.
+   ładunku nie ma i nie będzie. Reklamacja braku w paczce zostałaby wtedy bez
+   zakupu: bez pozycji, bez kwot, bez przesyłki, bez drogi zakupu.
 
    MOSTKIEM JEST LOGIN KUPUJĄCEGO. Trzyma go lądowisko wątku
    (`allegro_inbox_thread.interlocutor_login`) i ta sama kolumna stoi przy
@@ -124,7 +122,7 @@ export function kandydaciZamowien(
  * Zamówienie wskazane ręcznie przy tej rozmowie.
  *
  * Czytane z `conversation_event`, dokładnie tak jak ręczne wskazanie oferty
- * od 0.179.0 — jedna mechanika na oba wskazania, bo to ta sama czynność
+ * — jedna mechanika na oba wskazania, bo to ta sama czynność
  * człowieka. Ostatni wpis wygrywa: pomyłkę poprawia się wskazaniem innego
  * zamówienia, a historia zostaje w zdarzeniach.
  */
@@ -142,17 +140,17 @@ export function zamowienieWskazane(
 /**
  * Numer zamówienia, którego dotyczy rozmowa — JEDNA reguła dla ekranu i szkicu.
  *
- * „Najnowsza" znaczy PO CZASIE, nie po `id` (23 września 2026). Zrzut
+ * „Najnowsza" znaczy PO CZASIE, nie po `id`. Zrzut
  * właściciela: wątek z pytaniem o fakturę z lipca i drugim z września, każde
  * pod innym zamówieniem, a ekran pokazał lipcowe. Wątek wczytany w całości
  * jedną paczką dostawał `id` od najnowszej wiadomości, więc wrześniowa miała
- * NIŻSZE. Synchronizacja wpisuje już od najstarszej (0.447.0), ale stare
+ * NIŻSZE. Synchronizacja wpisuje już od najstarszej, ale stare
  * wiersze zostały — czas jest jedynym porządkiem, który ich nie myli.
  *
  * Numer z najnowszej wiadomości KLIENTA, która go niesie; gdy klient go nie
  * podał — z najnowszej naszej; gdy nie ma żadnej — wskazanie człowieka.
  * Wiadomość bije wskazanie, bo numer z Allegro jest faktem, a wskazanie
- * wnioskiem (0.397.0). Reguła mieszkała w `osRozmowy` i trafiła tutaj, gdy
+ * wnioskiem. Reguła mieszkała w `osRozmowy` i trafiła tutaj, gdy
  * szkic Copilota zaczął pytać o przesyłkę tego samego zamówienia: druga kopia
  * rozjechałaby się przy pierwszej poprawce i szkic mówiłby o innej paczce,
  * niż pokazuje ekran.
@@ -173,7 +171,7 @@ export function numerZamowieniaRozmowy(
 }
 
 /**
- * Ręczne wskazanie zamówienia dla rozmowy (0.397.0).
+ * Ręczne wskazanie zamówienia dla rozmowy.
  *
  * WOLNO WSKAZAĆ WYŁĄCZNIE ZAKUP TEGO KUPUJĄCEGO. Nie jest to formalność:
  * powiązanie otwiera w tej rozmowie pozycje, kwoty, adres przesyłki i drogę

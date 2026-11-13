@@ -7,7 +7,7 @@ import { Przycisk, Blad, ile } from "../ui";
 import { DolozTowar } from "./DolozTowar";
 import { DrogaKoszyka } from "./DrogaKoszyka";
 
-/* ── Pasek otwartego koszyka zwrotów (0.192.0) ──────────────────────────────
+/* ── Pasek otwartego koszyka zwrotów ────────────────────────────────────────
    Właściciel opisał obieg, który biuro robi od lat ręką: „gdy agent zasiada do
    zwrotów, to otwiera pustą MM i dodaje kolejno przedmioty ze zwrotów; gdy
    koszyk się zapełni, zamyka MM i tak w kółko".
@@ -37,7 +37,7 @@ function UsunKoszyk({ kod, pozycji, trwa, pytamy, onPytaj, onNie, onTak }: {
   kod: string; pozycji: number; trwa: boolean; pytamy: boolean;
   onPytaj: () => void; onNie: () => void; onTak: () => void;
 }) {
-  /* KOSZ ZAMIAST NAPISU (0.453.0). Usunięcie to najrzadsza czynność na
+  /* KOSZ ZAMIAST NAPISU. Usunięcie to najrzadsza czynność na
      pasku, a napis „Usuń koszyk" był drugim najdłuższym przyciskiem. Nazwa
      zostaje w `aria-label` i w podpowiedzi — czytnik ekranu i mysz mają ją
      dalej; pytanie przy napełnionym pudle zostaje zdaniem, bo mówi koszt. */
@@ -69,13 +69,11 @@ function UsunKoszyk({ kod, pozycji, trwa, pytamy, onPytaj, onNie, onTak }: {
 const MAKS_ZNACZNIKOW = 8;
 
 /**
- * Założenie pudła wprost (0.378.0) — osobny komponent od 0.484.3.
+ * Założenie pudła wprost — osobny komponent.
  *
- * WŁASNY WIERSZ BYŁ ZA DROGI. Zgłoszenie właściciela: „ten fragment zajmuje
- * za dużo miejsca". Nad listą zwrotów stały trzy pasma jedno pod drugim:
- * przełącznik Zwroty/Kosze, pasek kartotek i sam ten przycisk. Każde brało
- * pełną szerokość i odstęp, choć treści miało na kilka centymetrów. Ekran
- * stawia teraz przycisk w rzędzie przełącznika, więc koszyk go nie rysuje.
+ * WŁASNY WIERSZ BYŁBY ZA DROGI. Zgłoszenie właściciela: „ten fragment zajmuje
+ * za dużo miejsca". Ekran stawia przycisk w rzędzie przełącznika
+ * Zwroty/Kosze, więc koszyk go nie rysuje.
  *
  * KOSZYK ZAKŁADANY WPROST — zgłoszenie właściciela: „potrzebuję tworzenia
  * koszy zwrotowych i dodawania produktów do nich jako oddzielna opcja".
@@ -85,25 +83,20 @@ const MAKS_ZNACZNIKOW = 8;
 export function NowyKoszyk() {
   const kosze = useKosz().data?.kosze ?? [];
   const nowy = useNowyKoszyk();
-  /* ── ZAŁOŻENIE PUDŁA WPROST (0.378.0) ──────────────────────────────────
-      Do tego wydania koszyk powstawał wyłącznie jako SKUTEK UBOCZNY:
-      pierwszej oceny „na stan" albo skanu w karcie otwartego zwrotu. Agent,
-      który stawia przy biurku pusty karton, ZANIM otworzy pierwszą paczkę,
-      nie miał czym go zgłosić.
+  /* ── ZAŁOŻENIE PUDŁA WPROST ────────────────────────────────────────────
+      Agent stawia przy biurku pusty karton, ZANIM otworzy pierwszą paczkę,
+      więc koszyk powstaje nie tylko jako skutek oceny albo skanu.
 
       Rząd stoi tu, a nie w osobnym ekranie, bo to ta sama praca co reszta
       paska — i bo pudło dotyczy CAŁEJ sesji, nie otwartego zwrotu.
 
       Przycisk znika, gdy koszyk zwrotów już stoi: naciśnięcie oddałoby ten
-      sam kosz (jeden na operatora, decyzja z 3 września 2026), więc byłby to
+      sam kosz, więc byłby to
       przycisk bez skutku. */
-  /* PRZYCISK STOI ZAWSZE OD 0.379.0. Do 0.378.0 znikał przy otwartym pudle,
-      bo obowiązywała zasada „jeden koszyk na operatora" — właściciel ją
-      odwrócił i wtedy znikający przycisk stał się dokładnie tym, czego
-      brakowało na ekranie. */
-  /* Zdanie obok przycisku odeszło do podpowiedzi (0.453.0): mówiło to samo
-      przy każdym wejściu na ekran, a przycisk z ikoną pudła i plusem mówi
-      swoje sam. */
+  /* PRZYCISK STOI ZAWSZE, także przy otwartym pudle: operator może mieć
+      kilka koszyków naraz, decyzją właściciela. */
+  /* Zdanie stoi w podpowiedzi, nie obok przycisku: przycisk z ikoną pudła
+      i plusem mówi swoje sam. */
   return <div className="flex shrink-0 flex-wrap items-center gap-2">
         <button type="button" className="btn-secondary inline-flex items-center gap-1 text-xs"
           aria-label="Nowy koszyk zwrotów"
@@ -121,12 +114,12 @@ export function NowyKoszyk() {
 export function Koszyk() {
   const { data } = useKosz();
   const zamknij = useZamknijKosz();
-  /* Zdejmowanie dotyczy WYŁĄCZNIE wierszy dołożonych ręką (0.365.0). Wiersz
+  /* Zdejmowanie dotyczy WYŁĄCZNIE wierszy dołożonych ręką. Wiersz
      z oceny schodzi cofnięciem oceny na karcie zwrotu — jedna droga na oba
      kosztowałaby kasowanie cudzej oceny z drugiej strony ekranu. */
   const zdejmij = useZdejmijTowar();
-  /* WYMUSZENIE DOKUMENTU (0.368.0) — decyzja właściciela, wyjście awaryjne
-     obok bramki z 0.200.0. Osobna mutacja, bo osobna trasa: tę decyzję ma być
+  /* WYMUSZENIE DOKUMENTU — decyzja właściciela, wyjście awaryjne
+     obok bramki. Osobna mutacja, bo osobna trasa: tę decyzję ma być
      widać, a nie ukrywać w fladze przy zwykłym zamykaniu. */
   const mimo = useMmMimoKorekt();
   const usun = useUsunKoszyk();
@@ -135,9 +128,9 @@ export function Koszyk() {
      o usunięcie pudła. Jeden stan na dwa pytania dałby ekran, na którym
      kliknięcie „tak" odpowiada na cudze. */
   const [doUsuniecia, setDoUsuniecia] = React.useState<number | null>(null);
-  /* DWA KOSZYKI OD 0.211.0: zwroty i odpad. Pusty się nie pokazuje — pasek
+  /* DWA KOSZYKI: zwroty i odpad. Pusty się nie pokazuje — pasek
      rośnie wtedy, kiedy operator naprawdę coś w nim ma. */
-  /* PUSTY KOSZYK JEST WIDOCZNY OD 0.378.0, i to nie łamie punktu 2 dekalogu,
+  /* PUSTY KOSZYK JEST WIDOCZNY, i to nie łamie punktu 2 dekalogu,
      tylko go stosuje. Reguła mówi: pokazuj to, co potrzebne TERAZ. Pudło
      założone wprost JEST bieżącą pracą operatora — stoi przy biurku i czeka na
      pierwszą sztukę. Niewidoczne kazałoby zgadywać, czy przycisk zadziałał. */
@@ -151,7 +144,7 @@ export function Koszyk() {
     {/* Koszyki zamknięte BEZ DOKUMENTU. Stoją NAD otwartym, bo to praca
         zaległa: kosz jest już na hali, a dokumentu wciąż nie ma.
 
-        TRZY POWODY, JEDEN PASEK (0.371.0). Kosz czeka albo na korektę, albo na
+        TRZY POWODY, JEDEN PASEK. Kosz czeka albo na korektę, albo na
         poprawkę zawartości po odmowie Sfery, albo na samo wypuszczenie MM.
         Zdanie mówi, na który z nich — bo „czeka" bez powodu wygląda jak
         zacięta kolejka i wysyła człowieka do kolejki zadań w biurze. */}
@@ -160,10 +153,9 @@ export function Koszyk() {
         border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900">
       <PackageOpen size={14} aria-hidden="true" className="shrink-0" />
       <b><span className="sr-only">{nazwa(c.rodzaj)} </span>{c.kod}</b>
-      {/* ── DROGA ZAMIAST DWÓCH ZDAŃ (0.453.0) ─────────────────────────────
-          Do 0.452.0 pasek niósł stan i osobne zdanie „dlaczego czeka". Stan
-          został, ale krótszy; „dlaczego" poszło pod ikonę informacji obok,
-          bo powód jest ten sam przy każdym pudle w tym stanie. Odmowa Sfery
+      {/* ── DROGA ZAMIAST DWÓCH ZDAŃ ───────────────────────────────────────
+          Pasek niesie krótki stan, a „dlaczego czeka" stoi pod ikoną
+          informacji obok, bo powód jest ten sam przy każdym pudle w tym stanie. Odmowa Sfery
           zostaje w całości — to jedyne zdanie, które się tu zmienia. */}
       <DrogaKoszyka rodzaj={c.rodzaj} etap={c.blad || c.brakuje.length === 0 ? "mm" : "korekty"}
         brakuje={c.brakuje.length} blad={Boolean(c.blad)} />
@@ -175,15 +167,15 @@ export function Koszyk() {
                 c.brakuje.map((b) => b.numer).join(", ")}</>
             : <>komplet korekt</>}
       </span>
-      {/* DLACZEGO czeka — pod ikoną, nie w wierszu. Treść bez zmian: odmowa
-          Sfery mówi, CO z tym zrobić (blizna koszyka Z-8), korekta mówi, skąd
+      {/* DLACZEGO czeka — pod ikoną, nie w wierszu. Odmowa Sfery mówi, CO
+          z tym zrobić, korekta mówi, skąd
           bierze się czekanie, komplet mówi, że dokument wychodzi ręką. */}
       <span tabIndex={0} role="note" className="inline-flex shrink-0 items-center text-amber-800"
         aria-label="Dlaczego czeka"
         title={c.blad
           ? "Dokumentu nie ma, więc zawartość da się jeszcze poprawić: zdejmij wiersz, "
             + "który tam nie pasuje, i wystaw MM jeszcze raz."
-            /* Trzy odpowiedzi, nie dwie (0.486.5). Bez czerwonego wiersza
+            /* Trzy odpowiedzi, nie dwie. Bez czerwonego wiersza
                zdanie „cały koszyk schodzi przyciskiem" udawało, że brak
                towaru nie dotyczy żadnej kartoteki — a to nasza kopia stanów
                go nie widziała. */
@@ -200,13 +192,10 @@ export function Koszyk() {
             : "Zadanie MM zdjęto przy poprawce zawartości i nikt go nie ponawia sam — "
               + "dokument wychodzi po naciśnięciu."}>
         <Info size={14} aria-hidden="true" /></span>
-      {/* ── CAŁA ZAWARTOŚĆ, Z KRZYŻYKIEM PRZY KAŻDYM WIERSZU (0.379.0) ────
-          Do 0.378.0 stały tu wyłącznie wiersze ze SKANU, bo tylko one dawały
-          się zdjąć. Koszyk Z-8 na produkcji pokazał cenę tej reguły: odbił się
-          od Sfery na kartotece usługowej przyniesionej OCENĄ, więc nie miał
-          ani jednego krzyżyka — żeby go odetkać, trzeba było odnaleźć zwrot,
-          z którego przyszedł feralny wiersz. Zgłoszenie właściciela: „pozwól
-          edytować te koszyki".
+      {/* ── CAŁA ZAWARTOŚĆ, Z KRZYŻYKIEM PRZY KAŻDYM WIERSZU ──────────────
+          Kosz odbity od Sfery na wierszu przyniesionym OCENĄ trzeba móc
+          odetkać tutaj, bez szukania zwrotu, z którego przyszedł. Zgłoszenie
+          właściciela: „pozwól edytować te koszyki".
 
           Wiersz ze zwrotu jest OZNACZONY, bo jego zdjęcie cofa przy okazji
           ocenę i odsyła zwrot do kubełka DO OCENY. To ma być widać przed
@@ -221,7 +210,7 @@ export function Koszyk() {
               : p.brakWolnego ? "font-bold text-ranga-uwaga" : ""}`}>
               {p.symbol}</span>
             <span className="tabular-nums text-slate-500">×{p.ilosc}</span>
-            {/* ── TEN WIERSZ WYWRÓCIŁ DOKUMENT (0.381.0) ──────────────────
+            {/* ── TEN WIERSZ WYWRÓCIŁ DOKUMENT ────────────────────────────
                 Sfera odrzuca MM zdaniem „Brak towaru w magazynie" i NIE MÓWI,
                 którego. Zgłoszenie właściciela z produkcji: „dostaję brak
                 towaru w magazynie, ale nie mówi jakiego, abym mógł go usunąć
@@ -229,7 +218,7 @@ export function Koszyk() {
                 stoi — tyle wystarczy, żeby kosz ruszył dalej. */}
             {p.brakNaMag && <span className="text-ranga-zle">
               na magazynie {p.stanMag ?? 0} z {p.ilosc}</span>}
-            {/* Zarezerwowane to inna naprawa niż brak (0.486.5) — rezerwację
+            {/* Zarezerwowane to inna naprawa niż brak — rezerwację
                 zdejmuje się w Subiekcie, towaru nie trzeba wyjmować z pudła. */}
             {p.brakWolnego && <span className="font-semibold text-ranga-uwaga"
               title={`Na magazynie ${p.stanMag ?? 0}, zarezerwowane ${p.rezerwacja ?? 0}`}>
@@ -245,7 +234,7 @@ export function Koszyk() {
               <X size={12} /></button>
           </span>)}
         </span>}
-      {/* ── WYMUSZENIE (0.368.0) ──────────────────────────────────────────
+      {/* ── WYMUSZENIE ────────────────────────────────────────────────────
           Decyzja właściciela: „dodaj opcję sforsowania zamknięcia koszyka,
           nawet jeśli nie ma wszystkich ZW". Kosz stoi czasem tygodniami i
           blokuje pracę hali, a człowiek przy biurku wie to, czego baza nie wie
@@ -287,7 +276,7 @@ export function Koszyk() {
               onClick={() => mimo.mutate(c.id)}>
               {mimo.isPending ? "Wystawiam…" : "Wystaw MM"}
             </Przycisk>}
-      {/* USUNIĘCIE CAŁEGO PUDŁA (0.380.0) stoi także tutaj, bo to właśnie
+      {/* USUNIĘCIE CAŁEGO PUDŁA stoi także tutaj, bo to właśnie
           koszyki zaległe zajmowały pół ekranu. Zdejmowanie ich wiersz po
           wierszu było jedyną drogą i dlatego nikt tego nie robił. */}
       <UsunKoszyk kod={c.kod} pozycji={(c.pozycje ?? []).length} trwa={usun.isPending}
@@ -298,16 +287,11 @@ export function Koszyk() {
       {zdejmij.error && <div className="w-full"><Blad>{(zdejmij.error as Error).message}</Blad></div>}
     </div>)}
     {kosze.map((kosz) => {
-      /* ── JEDEN WIERSZ NA PUDŁO (0.453.0) ────────────────────────────────
-         Zgłoszenie właściciela: „ulżyj przeładowaniu tekstem". Do 0.452.0
-         otwarty koszyk zajmował pięć linii: nagłówek, pole skanu z własnym
-         przyciskiem „Zamknij", zdanie o tym, czego skan nie robi, zdanie
-         o MM i korektach oraz osobny rząd „dołożone ręką". Zostaje jedno
-         pasmo, a zdania idą do podpowiedzi drogi i pola.
+      /* ── JEDEN WIERSZ NA PUDŁO ──────────────────────────────────────────
+         Zgłoszenie właściciela: „ulżyj przeładowaniu tekstem". Jedno pasmo,
+         a zdania idą do podpowiedzi drogi i pola.
 
-         POZYCJE TO ZNACZNIKI, jedna lista zamiast dwóch. Do 0.452.0 symbol
-         dołożony ręką stał w pasku dwa razy — w linijce zawartości i niżej,
-         z krzyżykiem. Teraz stoi raz: ręczny z ikoną dłoni i krzyżykiem,
+         POZYCJE TO ZNACZNIKI, jedna lista zamiast dwóch. Symbol stoi raz: ręczny z ikoną dłoni i krzyżykiem,
          ze zwrotu bez niego, bo tamten schodzi cofnięciem oceny. Ręczne idą
          PIERWSZE, bo tylko przy nich jest co kliknąć. */
       const reczne = kosz.pozycje.filter((p) => !p.zeZwrotu);
@@ -336,7 +320,7 @@ export function Koszyk() {
         {!p.zeZwrotu && <Hand size={12} aria-label="dołożone ręką" className="shrink-0" />}
         <span className="font-mono">{p.symbol}</span>
         <span className="tabular-nums text-slate-600">×{p.ilosc}</span>
-        {/* Krzyżyk TYLKO przy ręcznych (0.365.0): wiersz z oceny schodzi
+        {/* Krzyżyk TYLKO przy ręcznych: wiersz z oceny schodzi
             cofnięciem oceny na karcie zwrotu. */}
         {!p.zeZwrotu && <button type="button" disabled={zdejmij.isPending}
           onClick={() => zdejmij.mutate(p.id)}
@@ -348,10 +332,10 @@ export function Koszyk() {
         title={kosz.pozycje.slice(widoczne.length).map((p) => `${p.symbol} × ${p.ilosc}`).join(", ")}>
         +{ukryte}</li>}
     </ul>}
-    {/* Skan do TEGO pudła (0.378.0) — w pasku stoi otwarty na stałe, bo
+    {/* Skan do TEGO pudła — w pasku stoi otwarty na stałe, bo
         przy pudle to jedyna czynność. */}
     <DolozTowar rodzaj={kosz.rodzaj} koszId={kosz.id} wiersz />
-    {/* KOSZYK WIRTUALNY (0.350.0): zamknięcie kończy jego życie, a na hali
+    {/* KOSZYK WIRTUALNY: zamknięcie kończy jego życie, a na hali
         rozkłada się kosz z numerem MM. Mówi to podpowiedź drogi — zdanie stało
         tu na stałe i przestało być czytane. */}
     <DrogaKoszyka rodzaj={kosz.rodzaj} etap="pakowanie" />

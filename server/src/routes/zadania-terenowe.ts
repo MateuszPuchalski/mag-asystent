@@ -9,7 +9,7 @@ export async function zadaniaTerenoweRoutes(app:FastifyInstance){
  app.post<{Body:{rodzaj:RodzajZadania;tytul:string;instrukcja:string;twId?:number|null;zrodlo?:string;zrodloRef?:string|null;priorytet?:PriorytetZadania}}>("/api/zadania-terenowe",async(req,reply)=>{const s=sesjaZadania()!;if(!ROLE_BIUROWE.includes(s.user.role))return reply.code(403).send({error:"Zadania dla magazynu tworzy biuro"});try{return{zadanie:utworzZadanie(req.body,{id:s.user.userId,name:s.user.name})};}catch(e){return blad(reply,e);}});
  app.post<{Params:{id:string}}>("/api/zadania-terenowe/:id/wez",async(req,reply)=>{const s=sesjaZadania()!;try{return{zadanie:wezZadanie(Number(req.params.id),{id:s.user.userId,name:s.user.name})};}catch(e){return blad(reply,e);}});
  app.post<{Params:{id:string};Body:{wynik?:string}}>("/api/zadania-terenowe/:id/wykonaj",async(req,reply)=>{const s=sesjaZadania()!;try{return{zadanie:wykonajZadanie(Number(req.params.id),req.body?.wynik??"",{id:s.user.userId,name:s.user.name})};}catch(e){return blad(reply,e);}});
- /* ── ZDJĘCIE OD HALI (§13.3, 0.352.0) ────────────────────────────────────
+ /* ── ZDJĘCIE OD HALI (§13.3) ────────────────────────────────────
     `bodyLimit` OSOBNY dla tej trasy, mimo globalnego 6 MiB: zdjęcie jedzie
     base64 w JSON, czyli rośnie o jedną trzecią, a 4 MiB ciała to ~3 MB
     obrazu — czyli DOKŁADNIE próg serwisu, ten sam wyrażony w jednostkach

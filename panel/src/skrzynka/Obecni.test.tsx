@@ -3,10 +3,8 @@ import { render, screen } from "@testing-library/react";
 import { Obecni } from "./Obecni";
 import type { Obecnosc } from "../api/zdarzenia";
 
-/* ── Obecność w otwartej rozmowie (§6.3, makieta `Main.dc.html`) ─────────────
-   Dane o obecności docierały do panelu od 0.144.0 i nie było ich na żadnym
-   ekranie poza wierszem kolejki, który pokazuje SAMEGO trzymającego. Ten
-   pasek odpowiada na pytanie zadawane w chwili pisania: „czy ktoś już to
+/* ── Obecność w otwartej rozmowie (§6.3) ─────────────────────────────────────
+   Wiersz kolejki pokazuje SAMEGO trzymającego. Ten pasek odpowiada na pytanie zadawane w chwili pisania: „czy ktoś już to
    robi". Dlatego testy pilnują trzech rzeczy — kogo pokazuje, kogo pomija
    i czy odróżnia patrzenie od pisania.                                      */
 

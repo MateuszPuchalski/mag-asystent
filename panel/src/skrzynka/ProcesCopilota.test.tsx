@@ -3,7 +3,7 @@ import { render, screen, fireEvent } from "@testing-library/react";
 import { ProcesCopilota } from "./ProcesCopilota";
 import type { TwierdzenieCopilota } from "../api/typy";
 
-/* ── Okno „Skąd to wiem" (0.253.0) ───────────────────────────────────────────
+/* ── Okno „Skąd to wiem" ─────────────────────────────────────────────────────
    Testy pilnują umowy, którą właściciel postawił, zdejmując zakaz wiedzy
    własnej: „pełna swoboda, ale niech przy tym załącza źródła".
 

@@ -10,10 +10,10 @@ import {
   zamknijKosz, zaznaczSkladnik, zdejmijZKosza,
 } from "./kosze-zwrotow.js";
 
-/* ── Komplet rozbity na paragonie (0.328.0) ─────────────────────────────────
-   Zgłoszenie właściciela: oferta sprzedaje się jako komplet, a na magazynie
-   leży osobno; do koszyka mają iść kartoteki Z PARAGONU, bo tam komplet jest
-   rozbity na wiersze. Reguła, zapisana dosłownie: „kartotekę tak, z paragonu,
+/* ── Komplet rozbity na paragonie ───────────────────────────────────────────
+   Oferta sprzedaje się jako komplet, a na magazynie leży osobno; do koszyka
+   mają iść kartoteki Z PARAGONU, bo tam komplet jest rozbity na wiersze.
+   Reguła właściciela, zapisana dosłownie: „kartotekę tak, z paragonu,
    ale ilość bierze ze zwrotu".
 
    Sześć rzeczy warte testu, bo każda kładzie towar na złej półce albo podnosi
@@ -45,7 +45,7 @@ function biuro(d: Db) {
 function towar(d: Db, twId: number) {
   d.prepare("INSERT OR IGNORE INTO sgt_towar(tw_id,symbol,nazwa) VALUES (?,?,?)")
     .run(twId, `SYM-${twId}`, `Towar ${twId}`);
-  /* Wiersz stanu, bo od 0.372.2 kartoteka bez niego nie wchodzi do pudła:
+  /* Wiersz stanu, bo kartoteka bez niego nie wchodzi do pudła:
      usługi dokument MM nie ruszy (`powodPozaMagazynem`). Składnik kompletu
      jest częścią, więc magazyn go zna. */
   d.prepare("INSERT OR IGNORE INTO sgt_stan(tw_id,mag_id,stan) VALUES (?,1,0)").run(twId);
@@ -124,10 +124,9 @@ test("zwykła pozycja bierze kartotekę z paragonu, a ILOŚĆ ze zwrotu", () => 
 });
 
 test("przesyłka z paragonu NIE jest składnikiem kompletu", () => {
-  /* 0.350.2, produkcja: paragon zwrotu 970W/2026 miał M83118, M831172
-     i PRZESYŁKĘ. Odejmowanie oddało kompletowi wszystko, czego nie zabrała
-     inna oferta — razem z przesyłką. Koszyk pokazał ją do odznaczenia,
-     a automatyczny ZW odmówił zlecenia. */
+  /* Paragon z PRZESYŁKĄ: odejmowanie oddaje kompletowi wszystko, czego nie
+     zabrała inna oferta, więc bez filtra przesyłka weszłaby do składu,
+     a automatyczny ZW odmówiłby zlecenia. */
   const d = stanowisko();
   d.prepare("INSERT INTO sgt_towar(tw_id,symbol,nazwa) VALUES (943,'PRZESYŁKA','Koszt transportu')").run();
   const dok = paragon(d, 950, [[21, 1], [22, 1], [943, 1]]);
@@ -252,7 +251,7 @@ test("dwa komplety kupione, jeden zwracany — sztuki dzielą się NA KOMPLET", 
 });
 
 test("liczy się to, co WRÓCIŁO, a nie deklaracja klienta", () => {
-  /* Ta sama reguła co przy kwocie (0.212.0): `ilosc_zwrocona` wypełnia biuro
+  /* Ta sama reguła co przy kwocie: `ilosc_zwrocona` wypełnia biuro
      po otwarciu kartonu i ona rozstrzyga. */
   const d = stanowisko();
   const dok = paragon(d, 906, [[21, 1], [23, 1]]);
@@ -332,12 +331,11 @@ test("pozycja bez składu NIE wchodzi do koszyka po cichu", () => {
   assert.equal(n, 0, "nic nie wchodzi, dopóki nie wiadomo CO wchodzi");
 });
 
-/* ── Przeliczenie zamkniętego kosza (0.334.0) ────────────────────────────────
-   Zgłoszenie właściciela: „dodałem zestaw, a powinienem rozbić go przed
-   dodaniem do MM — nie chce się zrobić". Kosze złożone przed 0.328.0 niosą
-   zestaw jako JEDEN wiersz, a takiej MM Sfera nie wystawi: na magazynie leżą
-   składniki osobno. Wyjmowanie i wkładanie pozycji po kolei byłoby drogą
-   ręczną przez kilkanaście kliknięć — i rozdzieliłoby papier od pudła.      */
+/* ── Przeliczenie zamkniętego kosza ──────────────────────────────────────────
+   Starszy kosz niesie zestaw jako JEDEN wiersz, a takiej MM Sfera nie
+   wystawi: na magazynie leżą składniki osobno. Wyjmowanie i wkładanie pozycji
+   po kolei byłoby drogą ręczną przez kilkanaście kliknięć — i rozdzieliłoby
+   papier od pudła.                                                          */
 
 test("zamknięty kosz z ZESTAWEM przelicza się na kartoteki paragonu", () => {
   const d = stanowisko();
@@ -347,7 +345,7 @@ test("zamknięty kosz z ZESTAWEM przelicza się na kartoteki paragonu", () => {
   const { poz } = zwrot(d, dok, [{ offerId: "of-KPL", twId: null, ilosc: 1 }]);
 
   const koszId = dolozDoKosza(d, poz[0], kto)!;
-  /* Tak wygląda kosz sprzed 0.328.0: jeden wiersz „zestaw" zamiast trzech
+  /* Tak wygląda stary kosz: jeden wiersz „zestaw" zamiast trzech
      kartotek. Odtwarzamy go wprost, bo dzisiejszy kod już go nie zrobi. */
   d.prepare("DELETE FROM kosz_pozycja WHERE kosz_id=?").run(koszId);
   towar(d, 99);
@@ -383,7 +381,7 @@ test("przeliczenie ODMAWIA, gdy dokument MM już wyszedł", () => {
 });
 
 test("przeliczenie UNIEWAŻNIA zadanie MM ułożone dla starej zawartości", () => {
-  /* Zadanie czeka w kolejce z wierszami sprzed poprawki. Zostawione wystawiłoby
+  /* Zadanie czeka w kolejce ze starymi wierszami. Zostawione wystawiłoby
      dokładnie ten papier, dla którego biuro sięgnęło po przeliczenie. */
   const d = stanowisko();
   const kto = biuro(d);
@@ -409,10 +407,8 @@ test("przeliczenie UNIEWAŻNIA zadanie MM ułożone dla starej zawartości", () 
   assert.notEqual(swieze, queueId);
 });
 
-/* ── Ptaszki przy składnikach kompletu (0.335.0) ─────────────────────────────
-   Zgłoszenie właściciela: „powinno rozbijać na komponenty do zaznaczania,
-   które idą do MM". Komplet wchodził dotąd w całości albo wcale, a wracają
-   z niego nieraz same części.
+/* ── Ptaszki przy składnikach kompletu ───────────────────────────────────────
+   Z kompletu wracają nieraz same części, więc składniki zaznacza się osobno.
 
    Ptaszek rusza WIERSZ KOSZYKA, bo `kosz_pozycja` jest prawdą o tym, co
    pojedzie na dokument. Osobna lista zaznaczeń znaczyłaby dwa źródła dla
@@ -510,7 +506,7 @@ test("po wystawieniu MM ptaszek ODMAWIA i nazywa koszyk", () => {
 });
 
 test("koszyk starszy niż dzisiejsze reguły też ma swoje ptaszki", () => {
-  /* Kosz złożony przed 0.328.0 niesie zestaw JEDNYM wierszem, którego
+  /* Stary kosz niesie zestaw JEDNYM wierszem, którego
      rozbicie z paragonu już nie zaproponuje. Pominięcie takiego wiersza
      znaczyłoby towar na dokumencie, o którym ekran milczy. */
   const d = stanowisko();
@@ -528,11 +524,9 @@ test("koszyk starszy niż dzisiejsze reguły też ma swoje ptaszki", () => {
   assert.deepEqual(wKoszyku(d, koszId), [21, 22, 23]);
 });
 
-/* ── Skład wskazany ręką biura (0.336.0) ─────────────────────────────────────
-   Zgłoszenie właściciela: „rozwiąż «nie weszła do koszyka» — nie wiem, gdzie
-   to wskazać". Automat odsyłał do ręcznej drogi zdaniem „wskaż skład ręcznie",
-   a drogi nie było: kolumna `zrodlo='biuro'` stała w schemacie od 0.328.0
-   i nie miał jej kto wypełnić.                                              */
+/* ── Skład wskazany ręką biura ───────────────────────────────────────────────
+   Automat przy „nie weszła do koszyka" odsyła do ręcznej drogi zdaniem
+   „wskaż skład ręcznie", więc ta droga musi istnieć (`zrodlo='biuro'`).     */
 
 test("biuro wskazuje skład i pozycja WCHODZI do koszyka bez powtarzania oceny", () => {
   /* Pozycja ma już ocenę „na stan" — odbiła się wyłącznie od braku rozbicia.
@@ -635,10 +629,9 @@ test("wiersze dokumentu to MATERIAŁ dla człowieka, a bez dokumentu jest pusto"
 });
 
 /* ── Składnik kompletu na outlet ─────────────────────────────────────────────
-   Zgłoszenie właściciela: z zestawu jedna część wraca w porządku i jedzie MM
-   na stan, druga jest używana i idzie na regał outletowy. Odznaczona
-   ptaszkiem znikała donikąd — nie było jej ani w pudle, ani na liście
-   outletu, więc nikt jej nie niósł.                                         */
+   Z zestawu jedna część wraca w porządku i jedzie MM na stan, druga jest
+   używana i idzie na regał outletowy. Odznaczona ptaszkiem nie trafiłaby
+   ani do pudła, ani na listę outletu.                                       */
 
 /** Komplet w koszyku z oceną „na stan", tak jak zostawia go ocena. */
 function kompletNaStan(d: Db, kto: { id: number; name: string }, dokId: number) {

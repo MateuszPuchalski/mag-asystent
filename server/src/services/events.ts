@@ -70,16 +70,15 @@ export function productHistory(twId: number, limit = 20): MovementEntry[] {
       /* Para „przed → po" mówi więcej niż sama nowa wartość: przy reklamacji
          pytanie brzmi, co z pola ZNIKNĘŁO, a nie co w nim jest teraz.
 
-         `locsPrzed` doszło w sierpniu 2026 i STARE WIERSZE GO NIE MAJĄ — dlatego
-         formatowanie schodzi wtedy do dotychczasowego. Historia sprzed zmiany
-         musi się dalej wyświetlać, a nie znikać ani wywracać ekranu. */
+         Stare wiersze nie mają `locsPrzed` — formatowanie schodzi wtedy do
+         samej nowej wartości, żeby historia dalej się wyświetlała. */
       if (p.locsPrzed != null && p.result) detail = `${p.locsPrzed || "(puste)"} → ${p.result}`;
       else if (p.result) detail = `→ ${p.result}`;
       else detail = `${p.action ?? ""} ${p.value ?? ""}`.trim();
       // źródło zmiany: bez tego wpis z rozkładania jest nieodróżnialny od karty
       if (p.zrodlo && p.zrodlo !== "karta") detail += ` (${p.zrodlo})`;
     } else if (r.type === "location_removed") detail = `usunięto ${p.value ?? ""}`.trim();
-    // mm_queued zostaje tylko dla historycznych wpisów (route /api/mm usunięty)
+    // mm_queued niosą stare wpisy dziennika; historia ma się dalej wyświetlać
     else if (r.type === "mm_queued") detail = "MM MGP→MAG";
     return { type: r.type, user: r.user_id, at: r.created_at, detail };
   });

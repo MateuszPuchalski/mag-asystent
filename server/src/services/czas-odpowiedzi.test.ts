@@ -5,7 +5,7 @@ import { DatabaseSync } from "node:sqlite";
 import { migrate } from "../db/db.js";
 import { czasOdpowiedzi, losOdpowiedzi, p90, probkiRozmowy } from "./czas-odpowiedzi.js";
 
-/* ── Czas odpowiedzi (23 września 2026) ──────────────────────────────────────
+/* ── Czas odpowiedzi ─────────────────────────────────────────────────────────
    Pilnujemy reguły próbki, bo od niej zależy, czy liczba mówi prawdę:
    czekanie od PIERWSZEJ wiadomości klienta, autoodpowiedź go nie kończy,
    a rozbicie na osoby dostaje wyłącznie ten, komu trasa je pozwoli. */
@@ -98,7 +98,7 @@ test("odczyt niczego nie zapisuje", () => {
   assert.equal((d.prepare("SELECT count(*) n FROM events").get() as { n: number }).n, przed);
 });
 
-/* ── Bez ponownego pytania (24 września 2026) ────────────────────────────────
+/* ── Bez ponownego pytania ───────────────────────────────────────────────────
    Pilnujemy trzech rzeczy, bo każda przekłamałaby wynik w inną stronę.
    Podziękowanie nie jest powrotem, ale „dziękuję” i zaraz nowe pytanie jest.
    Powrót bez rozpoznania liczy się jako powrót i jest wymieniony osobno.

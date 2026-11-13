@@ -122,7 +122,7 @@ test("najstarsze odblokowane mm wychodzi pierwsze (ORDER BY id)", () => {
   assert.equal(pickPending()?.id, pierwsze);
 });
 test("MM koszyka zwrotów też przechodzi obok guardu — i tak ma być", () => {
-  /* Od 0.201.3 koszyk zwrotów idzie przez `enqueueMM` jako JEDNO zadanie
+  /* Koszyk zwrotów idzie przez `enqueueMM` jako JEDNO zadanie
      wielopozycyjne, więc jak `korekta_zwrot` nie ma jednego `tw_id`. Guard go
      nie obejmuje i nie ma czego pilnować: MM koszyka idzie MAG→ZWROTY, czyli
      zabiera towar ZE sprzedaży. Pilnowania wymaga ruch w drugą stronę i ten
@@ -155,7 +155,7 @@ test("worker Sfery bierze też korektę zwrotu, a guard lokalizacji jej nie doty
 });
 
 test("ZW do paragonu bierze worker Sfery — bez tego wisiałby w kolejce", () => {
-  /* 0.349.0. Typ trzeba dopisać w czterech miejscach naraz (TYPY_SFERY, oba
+  /* Typ trzeba dopisać w czterech miejscach naraz (TYPY_SFERY, oba
      pliki SQL, odzysk po przerwaniu w Queue.cs). Ten test łapie brak w SQL:
      worker Node omija `zw` przy SFERA_WORKER=1, więc nikt inny go nie weźmie. */
   const zw = dodaj("zw", null);

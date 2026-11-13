@@ -1,4 +1,3 @@
-import React from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { render, waitFor } from "@testing-library/react";
 import { QueryClient, QueryClientProvider, useQuery } from "@tanstack/react-query";
@@ -6,12 +5,11 @@ import { useSzynaZdarzen } from "./zdarzenia";
 import { klucze } from "./rozmowy";
 import type { Rozmowa } from "./typy";
 
-/* ── Szyna zdarzeń a kolejka (0.196.0) ───────────────────────────────────────
+/* ── Szyna zdarzeń a kolejka ─────────────────────────────────────────────────
    Zdarzenie OBECNOŚCI (wejście, wyjście, „pisze") zmienia w kolejce jedną
-   rzecz: znacznik „ktoś tu siedzi". Do 0.195.0 ściągało po to CAŁĄ listę
-   rozmów, a `listaRozmow()` nie ma `LIMIT`-u: pomiar dał 537 kB przy tysiącu
-   rozmów i 2688 kB przy pięciu tysiącach. „Pisze" jest dławione co pięć
-   sekund, więc kolega redagujący odpowiedź ściągał to wszystkim co 5 s.
+   rzecz: znacznik „ktoś tu siedzi". `listaRozmow()` nie ma `LIMIT`-u (2688 kB
+   przy pięciu tysiącach rozmów), a „pisze" leci co 5 s — więc bez pobierania
+   listy.
 
    Te testy pilnują obu połów umowy naraz: obecność NIE pobiera listy,
    a znacznik i tak się zmienia. Sama pierwsza połowa dałaby się spełnić
@@ -58,7 +56,7 @@ function podstawSzyne() {
 function stanowisko(lista: Rozmowa[]) {
   const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   const pobran = { ile: 0 };
-  /* Alarm „Klient dopisał" liczymy, bo od 0.228.0 NIE zapala się na każdą
+  /* Alarm „Klient dopisał" liczymy, bo NIE zapala się na każdą
      wiadomość — a różnicę widać tylko po tym, ile razy go wywołano. */
   const alarm = { ile: 0 };
   const wyslij = podstawSzyne();
@@ -144,7 +142,7 @@ describe("Szyna zdarzeń a kolejka rozmów", () => {
   });
 });
 
-/* ── Alarm tylko o KLIENCIE (0.228.0) ────────────────────────────────────────
+/* ── Alarm tylko o KLIENCIE ──────────────────────────────────────────────────
    Pasek „Klient dopisał nową wiadomość" zapalał się na KAŻDE `message.created`:
    także na naszą własną odpowiedź wracającą z synchronizacji i na
    autoodpowiedź. Agent odpisywał i po chwili dostawał od panelu wiadomość, że
@@ -170,7 +168,7 @@ describe("Alarm o nowej wiadomości", () => {
 
   it("AUTOODPOWIEDŹ paska nie zapala", async () => {
     /* Odbicie „Dziękujemy za kontakt" jedzie jako wychodzące, ale przechodzi
-       tu drugą bramkę — na wypadek, gdyby kiedyś przyszło innym kierunkiem. */
+       tu drugą bramkę — na wypadek, gdyby przyszło innym kierunkiem. */
     const { alarm, pobran, wyslij } = stanowisko([rozmowa()]);
     await wyslij([{ id: 1, type: "message.created", conversationId: 1,
       odKlienta: true, automatyczna: true }]);

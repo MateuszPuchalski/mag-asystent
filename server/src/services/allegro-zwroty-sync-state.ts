@@ -5,7 +5,7 @@ import {
   type StatusSynchronizacji,
 } from "./allegro-inbox-sync-state.js";
 
-/* ── Stan synchronizatora zwrotów (0.150.0) ──────────────────────────────────
+/* ── Stan synchronizatora zwrotów ────────────────────────────────────────────
    Osobny wiersz od skrzynki, bo to osobna rodzina końcówek: własny limit
    Allegro, własny kursor i własny rytm. Wspólny zostaje SŁOWNIK statusów
    i próg alarmu — agent ma czytać „rate_limited" tak samo na obu ekranach,
@@ -91,7 +91,7 @@ export function stanZwrotowHealth(
     opoznienieMs: s.lastSuccessAt ? Math.max(0, teraz - Date.parse(s.lastSuccessAt)) : null,
     nastepnaProba: s.nextAttemptAt,
     interwalMs,
-    /* Ogon ostatniego przebiegu (0.209.0). Stoi obok błędów, bo znaczy to samo
+    /* Ogon ostatniego przebiegu. Stoi obok błędów, bo znaczy to samo
        co one — kolejka NIE JEST kompletna — tylko że synchronizacja o tym nie
        wie, bo skończyła się sukcesem. */
     pozostaloDoPobrania: s.pozostalo,

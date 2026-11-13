@@ -5,7 +5,7 @@ import { ExternalLink } from "lucide-react";
  * Odnośnik na zewnątrz — jedna definicja na cały ekran zwrotów.
  *
  * Bez adresu zostaje sam tekst: link donikąd kosztuje kliknięcie i zaufanie
- * do ekranu, więc jest gorszy od jego braku. Stoi w osobnym pliku od 0.167.0,
+ * do ekranu, więc jest gorszy od jego braku. Stoi w osobnym pliku,
  * bo używają go dwie kolumny — produkty w środku i dowody po prawej — a druga
  * kopia rozjechałaby się przy pierwszej poprawce jednej z nich.
  */

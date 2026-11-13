@@ -10,16 +10,9 @@ import { wazneBearer } from "../services/allegro-token.js";
    NotAcceptableException, a nie pusty wynik, więc `zapytajAllegro` próbuje
    obu i zapamiętuje działający dla danej rodziny końcówek.
 
-   DO 0.137.2 STAŁA TU CAŁA OBSŁUGA KLIENTA: klasa `HttpAllegroAdapter`
-   i komplet funkcji `mapuj*`, które przerabiały JSON Allegro na nasze typy.
-   Odeszły razem z rejestrami, bo to one były usterką: kształt, który
-   odwzorowywały, wymyśliliśmy w testach i nigdy nie sprawdziliśmy na żywym
-   koncie. Nowe mapowanie ma powstać dopiero po raporcie sondy
-   (`npm run sonda` → `docs/allegro-ksztalt.md`), pole po polu.
-
-   Zostaje samo połączenie: budowa URL-i dziewięciu rodzin końcówek, negocjacja
-   nagłówka `Accept` i jedno wyjście do sieci. Z tego korzysta dziś sonda,
-   a jutro nowa obsługa klienta.                                             */
+   Tu stoi samo połączenie: budowa URL-i rodzin końcówek, negocjacja
+   nagłówka `Accept` i jedno wyjście do sieci. Mapowanie na nasze typy
+   powstaje pole po polu z raportu sondy (`docs/allegro-ksztalt.md`).      */
 
 const TIMEOUT_MS = 10_000;
 
@@ -44,8 +37,7 @@ export function urlOstatnichZamowien(apiUrl: string, odKiedyIso: string, offset:
  * ostatnio widzianego zwrotu", a odpowiedź niesie zwroty utworzone po nim.
  * Kursor jest odporny na wstawkę w środku strony, a offset nie — przy
  * stronicowaniu offsetem nowy zwrot przesuwa całą resztę o jeden i jeden
- * rekord wypada bez śladu. To jest blizna 0.127.0 („rejestr widział pierwszą
- * setkę dyskusji i gubił resztę po cichu") załatwiona u źródła.
+ * rekord wypada bez śladu.
  */
 export function urlListyZwrotow(
   apiUrl: string,
@@ -56,7 +48,7 @@ export function urlListyZwrotow(
 ): string {
   const filtr = odKiedy ? `&createdAt.gte=${encodeURIComponent(odKiedy)}` : "";
   const kursor = odKursora ? `&from=${encodeURIComponent(odKursora)}` : "";
-  /* Filtr po numerze listu przewozowego (0.163.0). Allegro ma go gotowego —
+  /* Filtr po numerze listu przewozowego. Allegro ma go gotowego —
      `parcels.waybill` w `getCustomerReturns` — a my używamy go dokładnie raz:
      gdy skan etykiety nie trafił w nic, co już mamy u siebie. Pytamy wtedy
      o TEN JEDEN numer, nie o stronę zwrotów.
@@ -139,10 +131,8 @@ export function urlOfertSprzedawcy(apiUrl: string, ids: readonly string[]): stri
  *
  * Ta sama końcówka co wyżej, drugi filtr i odwrotny kierunek pytania. Tamta
  * odpowiada „co to za oferta o tym numerze"; ta — „którą z NASZYCH ofert
- * sprzedajemy tę kartotekę". Do 0.270.0 na drugie pytanie nie odpowiadał
- * nikt, bo `offer_snapshot` zna wyłącznie oferty, pod którymi ktoś napisał
- * (patrz nagłówek `allegro-oferty-sync.ts`), a odwrotnego wyszukania nie było
- * w całym repozytorium.
+ * sprzedajemy tę kartotekę". `offer_snapshot` zna wyłącznie oferty, pod
+ * którymi ktoś napisał (patrz nagłówek `allegro-oferty-sync.ts`).
  *
  * `external.id` w specyfikacji to „The ID from the client's external system"
  * i jest TABLICĄ, więc komplet kandydatów szkicu kosztuje jedno żądanie —
@@ -203,13 +193,11 @@ export function urlNaszychOfertStrona(
 }
 
 /**
- * Historia statusów przesyłki u przewoźnika (0.187.0).
+ * Historia statusów przesyłki u przewoźnika.
  *
  * `GET /order/carriers/{carrierId}/tracking?waybill=…`. To JEDYNE miejsce
  * w całym API, które podaje CZAS doręczenia: obiekt zwrotu go nie ma, a jego
- * `parcels[]` niesie tylko datę nadania. Do 0.186.0 panel twierdził wprost,
- * że „Allegro nie podaje daty doręczenia do nas" — nieprawda wzięta ze zbyt
- * wąskiego czytania jednego schematu.
+ * `parcels[]` niesie tylko datę nadania.
  *
  * Dwadzieścia numerów na żądanie, bo tyle dopuszcza `maxItems` w specyfikacji.
  * Limit jest tu regułą poprawności, nie oszczędnością: dłuższa lista wraca
@@ -229,7 +217,7 @@ export function urlTrackingu(
 }
 
 /**
- * Historia operacji płatniczych JEDNEJ płatności (0.426.0).
+ * Historia operacji płatniczych JEDNEJ płatności.
  *
  * `GET /payments/payment-operations?payment.id=…&group=REFUND`. To jedyne
  * miejsce w API, które mówi o WYPŁACIE DO KLIENTA faktem, a nie chwilowym
@@ -240,8 +228,8 @@ export function urlTrackingu(
  * dowie się o wypłacie nigdy.
  *
  * PYTAMY O KONKRETNĄ PŁATNOŚĆ, nie o historię konta. `payment.id` jest
- * parametrem zapytania, a my trzymamy ten identyfikator przy zamówieniu od
- * 0.190.0. Skan całej historii kosztowałby dziesiątki żądań na takt i wymagał
+ * parametrem zapytania, a my trzymamy ten identyfikator przy zamówieniu.
+ * Skan całej historii kosztowałby dziesiątki żądań na takt i wymagał
  * własnego kursora; pytanie punktowe kosztuje jedno i nie ma stanu.
  *
  * `wallet.type` ZOSTAJE WOŁAJĄCEMU. Schemat ma tam domyślne `AVAILABLE`
@@ -287,7 +275,7 @@ export function urlZwrotowPlatnosci(
 }
 
 /**
- * Numery przesyłek zamówienia (0.393.0).
+ * Numery przesyłek zamówienia.
  *
  * `GET /order/checkout-forms/{id}/shipments` — „list of parcel tracking
  * numbers currently assigned to the order". Ładunek samego zamówienia ich NIE
@@ -306,7 +294,7 @@ export function urlPrzesylekZamowienia(apiUrl: string, orderId: string): string 
 export const ODSWIEZENIE_NA_STRONE = 1000;
 
 /**
- * Strona ODŚWIEŻENIA zwrotów, które już mamy (audyt zwrotów, 15 września 2026).
+ * Strona ODŚWIEŻENIA zwrotów, które już mamy (audyt zwrotów).
  *
  * Kursor `from` oddaje wyłącznie zwroty utworzone po ostatnim widzianym, więc
  * raz pobrany zwrot nie wracał nigdy. Paczka nadana później, `FINISHED`
@@ -347,24 +335,12 @@ export function urlRoszczenProwizji(apiUrl: string, offset: number): string {
 }
 
 /**
- * Jeden wniosek o rabat (`/order/refund-claims/{claimId}`).
- *
- * Używane WYŁĄCZNIE do anulowania (`DELETE`). Specyfikacja pisze przy nim
- * „this cannot be undone" — anulowania nie da się cofnąć, ale sam wniosek
- * anulować można, i to dlatego złożenie dostaje w panelu cofnięcie zamiast
- * dialogu potwierdzenia (§25a.5).
- */
-export function urlWnioskuORabat(apiUrl: string, claimId: string): string {
-  return `${apiUrl}/order/refund-claims/${encodeURIComponent(claimId)}`;
-}
-
-/**
  * URL listy spraw posprzedażowych (`/sale/issues`, Accept beta.v1).
  *
  * Lista niesie też dyskusje, a specyfikacja nie ma filtra po `type`, więc
  * odsiewa je wołający.
  *
- * `statusy` zawężają przebieg do spraw, które jeszcze żyją (0.273.0).
+ * `statusy` zawężają przebieg do spraw, które jeszcze żyją.
  * Specyfikacja wymienia ten parametr przy `getListOfIssuesUsingGET` jako
  * tablicę `PostPurchaseIssueStatus`, a lista bez niego jedzie MALEJĄCO PO
  * DACIE OTWARCIA — więc bezpiecznik stron ucina najstarsze, czyli najbardziej
@@ -379,19 +355,18 @@ export function urlListySpraw(apiUrl: string, offset: number, statusy: readonly 
 }
 
 /**
- * Pojedyncza sprawa posprzedażowa (`GET /sale/issues/{issueId}`, 0.273.0).
+ * Pojedyncza sprawa posprzedażowa (`GET /sale/issues/{issueId}`).
  *
- * Do 0.272.0 tej końcówki nie wołaliśmy wcale, więc jedyną drogą do świeżego
- * stanu sprawy był PEŁNY przebieg listy — takt trzy minuty. Najgorzej wychodziło
- * to przy wysyłce niejednoznacznej: pasek kazał sprawdzić w Centrum Sprzedaży
- * coś, co jedno żądanie rozstrzyga w sekundę.
+ * Bez niej jedyną drogą do świeżego stanu sprawy jest PEŁNY przebieg listy —
+ * takt trzy minuty — a przy wysyłce niejednoznacznej jedno żądanie
+ * rozstrzyga sprawę w sekundę.
  */
 export function urlSprawy(apiUrl: string, id: string): string {
   return `${apiUrl}/sale/issues/${encodeURIComponent(id)}`;
 }
 
 /**
- * Opinie o sprzedawcy (0.135.0). `/sale/user-ratings` przyjmuje `offset`
+ * Opinie o sprzedawcy. `/sale/user-ratings` przyjmuje `offset`
  * i `limit`; filtra daty NIE dokumentuje, więc granicę tniemy po naszej
  * stronie ([WERYFIKUJ] na żywym koncie razem z kształtem pól).
  */
@@ -402,10 +377,7 @@ export function urlOpinii(apiUrl: string, offset: number): string {
 /**
  * Rozmowa w sprawie posprzedażowej (`/sale/issues/{issueId}/chat`).
  *
- * DO 0.155.0 STAŁ TU ADRES, KTÓREGO ALLEGRO NIE MA. Kod pukał do
- * `/sale/disputes/{id}/messages`, a w całej specyfikacji nie ma ani jednej
- * ścieżki `/sale/disputes` — sonda oddała przy tej końcówce zero rekordów,
- * choć `chat.messagesCount` na tych samych sprawach był większy od zera.
+ * W całej specyfikacji nie ma ani jednej ścieżki `/sale/disputes`.
  *
  * Komentarz obok prosił o sprawdzenie, „czy id spraw i dyskusji dzielą
  * przestrzeń". Dzielą: specyfikacja opisuje `issueId` jako „Dispute or claim
@@ -415,7 +387,7 @@ export function urlWiadomosciSprawy(apiUrl: string, id: string, offset = 0): str
   /* `limit` JAWNIE, bo specyfikacja daje przy tej końcówce domyślne 10 — a nie
      100 jak przy listach obok. Bez tego próbka sondy była cicho przycięta
      i nikt by się nie dowiedział, że rozmowa ma dalszy ciąg. */
-  /* `offset` dochodzi TYLKO wtedy, gdy jest niezerowy (0.222.0). Sto wiadomości
+  /* `offset` dochodzi TYLKO wtedy, gdy jest niezerowy. Sto wiadomości
      mieści całą rozmowę w każdej sprawie, jaką widziała sonda, więc pierwsza
      strona jest przypadkiem normalnym i jej adres zostaje taki, jaki był. */
   const dalej = offset > 0 ? `&offset=${Math.trunc(offset)}` : "";
@@ -428,9 +400,7 @@ export function urlWiadomosciSprawy(apiUrl: string, id: string, offset = 0): str
  * Adres z tej samej rodziny co odczyt czatu, więc `zapytajAllegro` użyje
  * zapamiętanej wersji zasobu (`beta.v1`) bez ponownej nauki.
  *
- * ADRESU NIE ZGADUJEMY — to jest ta sama rodzina, przy której projekt raz już
- * zgadł źle: do 0.155.0 kod pukał do `/sale/disputes/{id}/messages`, którego
- * w całej specyfikacji nie ma. Ten pochodzi z `addMessageToIssueUsingPOST`.
+ * ADRESU NIE ZGADUJEMY. Ten pochodzi z `addMessageToIssueUsingPOST`.
  */
 export function urlNowejWiadomosciSprawy(apiUrl: string, id: string): string {
   return `${apiUrl}/sale/issues/${encodeURIComponent(id)}/message`;
@@ -465,7 +435,7 @@ export function urlWatkowBeta(apiUrl: string, stronaId: string | null): string {
 
 /**
  * Jeden wątek (`GET /messaging/threads/{threadId}`). Czytany WYŁĄCZNIE w
- * `beta.v1` (klasyfikacja, 22 września 2026): tylko ta wersja niesie `type`,
+ * `beta.v1` (klasyfikacja): tylko ta wersja niesie `type`,
  * `subType` i `orders` — kształt w `docs/allegro-ksztalt.md`.
  */
 export function urlWatku(apiUrl: string, threadId: string): string {
@@ -477,7 +447,7 @@ export function urlWiadomosci(apiUrl: string, threadId: string): string {
 }
 
 /**
- * Znacznik „wątek przeczytany" (`PUT /messaging/threads/{id}/read`, 0.195.0).
+ * Znacznik „wątek przeczytany" (`PUT /messaging/threads/{id}/read`).
  *
  * Ciało to `{ read: true }` ze schematu `ThreadReadFlag` — pole jest
  * `required`, a specyfikacja wprost wymienia 422 „missing flag in the request
@@ -494,7 +464,7 @@ export function urlDeklaracjiZalacznika(apiUrl: string): string {
 }
 
 /**
- * Deklaracja załącznika WYCHODZĄCEGO w sprawie posprzedażowej (0.274.0).
+ * Deklaracja załącznika WYCHODZĄCEGO w sprawie posprzedażowej.
  *
  * INNY ZASÓB I INNY KSZTAŁT niż przy Centrum Wiadomości, choć robią to samo.
  * Ciało opisuje tu schemat `AttachmentDeclaration` z polem **`fileName`**,
@@ -518,7 +488,7 @@ export function urlWgraniaZalacznika(apiUrl: string, attachmentId: string): stri
 }
 
 /**
- * Wgranie załącznika sprawy — DROGA AWARYJNA (0.274.0).
+ * Wgranie załącznika sprawy — DROGA AWARYJNA.
  *
  * Normalnie adres bierze się z nagłówka `Location` deklaracji, bo tak każe
  * specyfikacja. Ten składany zostaje na wypadek, gdyby nagłówka zabrakło:
@@ -563,17 +533,12 @@ const dzialajacyAccept = new Map<string, string>();
  */
 export function scopeDlaUrl(url: string, metoda: string = "GET"): string {
   /* ZAPIS na zamówieniach żąda OSOBNEGO uprawnienia — `orders:write`, nie
-     `orders:read`. Do 0.164.0 ta funkcja patrzyła na sam adres, więc odmowa
-     przy składaniu wniosku o rabat kazałaby dodać uprawnienie, które konto
-     już ma. Dokładnie ta pomyłka kosztowała wydanie przy opiniach (0.155.0):
-     zła instrukcja jest gorsza niż jej brak, bo wysyła człowieka po coś,
-     co ma, i każe sparować konto ponownie bez skutku. */
+     `orders:read`. Sam adres nie wystarcza: odmowa przy składaniu wniosku
+     o rabat kazałaby dodać uprawnienie, które konto już ma. Zła instrukcja
+     jest gorsza niż jej brak, bo każe sparować konto ponownie bez skutku. */
   if (metoda !== "GET" && url.includes("/order/")) return "allegro:api:orders:write";
-  /* Płatności mają WŁASNE uprawnienie i to jest ta sama lekcja, co przy
-     opiniach w 0.155.0: bez tej gałęzi zwrot pieniędzy wpadał w domyślne
-     `orders:read`, a odmowa 403 kazałaby dodać uprawnienie, które konto już
-     ma. Zwrot pieniędzy żąda `payments:write` — innego niż cokolwiek, co ta
-     aplikacja miała do 0.190.0. */
+  /* Płatności mają WŁASNE uprawnienie: bez tej gałęzi zwrot pieniędzy
+     wpadałby w domyślne `orders:read`. Zwrot pieniędzy żąda `payments:write`. */
   if (url.includes("/payments/")) {
     return metoda === "GET" ? "allegro:api:payments:read" : "allegro:api:payments:write";
   }
@@ -588,10 +553,8 @@ export function scopeDlaUrl(url: string, metoda: string = "GET"): string {
   /* Cała rodzina spraw posprzedażowych — lista, rozmowa i załączniki — stoi
      na jednym uprawnieniu (specyfikacja przy `/sale/issues/{issueId}/chat`). */
   if (url.includes("/sale/issues")) return "allegro:api:disputes";
-  /* Opinie mają WŁASNE uprawnienie i to jest poprawka z 0.155.0. Bez tej
-     gałęzi adres wpadał w domyślne `orders:read` i odmowa 403 kazała dodać
-     uprawnienie, które sonda właśnie z powodzeniem WYKORZYSTAŁA do pobrania
-     stu zamówień. Zła instrukcja jest gorsza niż jej brak: wysyła człowieka
+  /* Opinie mają WŁASNE uprawnienie. Bez tej gałęzi adres wpadałby
+     w domyślne `orders:read`. Zła instrukcja jest gorsza niż jej brak: wysyła człowieka
      po coś, co już ma, i każe sparować konto ponownie bez skutku. */
   if (url.includes("/sale/user-ratings")) return "allegro:api:ratings";
   return "allegro:api:orders:read";
@@ -601,14 +564,13 @@ export function scopeDlaUrl(url: string, metoda: string = "GET"): string {
  * Jedno zapytanie do Allegro: token, nauka nagłówka `Accept`, tłumaczenie
  * 401/403/406/429 na zdania po ludzku. Surowy JSON, bez mapowania.
  *
- * Na poziomie MODUŁU, nie w klasie (0.137.2): sonda kształtu (`npm run sonda`)
+ * Na poziomie MODUŁU, nie w klasie: sonda kształtu (`npm run sonda`)
  * potrzebuje dokładnie tej obsługi błędów, a nie potrzebuje ani jednego
  * mapowania. Drugi klient HTTP obok tego znaczyłby drugie miejsce, w którym
  * trzeba pamiętać o User-Agencie i o wersjach zasobów.
  *
- * Do 0.80.0 ten klient tylko CZYTAŁ. Wysyłka odpowiedzi klientowi jest
- * pierwszym zapisem — te same nagłówki i ta sama nauka `Accept`, więc metoda
- * i ciało doszły jako opcje zamiast drugiej funkcji obok.
+ * Zapis idzie tymi samymi nagłówkami i tą samą nauką `Accept`, więc metoda
+ * i ciało są opcjami zamiast drugiej funkcji obok.
  */
 export async function zapytajAllegro(
   url: string,
@@ -616,7 +578,7 @@ export async function zapytajAllegro(
     metoda?: "POST" | "PUT" | "DELETE";
     body?: unknown;
     /**
-     * Ciało BINARNE — plik, nie JSON (0.195.0). `PUT /messaging/message-attachments/{id}`
+     * Ciało BINARNE — plik, nie JSON. `PUT /messaging/message-attachments/{id}`
      * jako jedyny nasz zapis nie przyjmuje wersji zasobu w `content-type`:
      * specyfikacja wymienia przy nim `image/png`, `image/jpeg`, `image/gif`,
      * `image/bmp`, `image/tiff` i `application/pdf`, i nic poza tym. Wersję
@@ -630,7 +592,7 @@ export async function zapytajAllegro(
      */
     blad404?: boolean;
     /**
-     * Oddaj też nagłówek `Location` (0.274.0).
+     * Oddaj też nagłówek `Location`.
      *
      * Potrzebne przy deklaracji załącznika sprawy: specyfikacja mówi wprost
      * „The URL is unique and one-time. As its format may change in time, you
@@ -642,7 +604,7 @@ export async function zapytajAllegro(
      */
     zLokalizacja?: boolean;
     /**
-     * Wersja zasobu WYMUSZONA, bez negocjacji (22 września 2026).
+     * Wersja zasobu WYMUSZONA, bez negocjacji.
      *
      * Wątek w `beta.v1` ma inny kształt niż w `public.v1` (`participants`
      * zamiast `interlocutor`, `role` zamiast `isInterlocutor`). Listę wątków
@@ -675,9 +637,8 @@ export async function zapytajAllegro(
           /* Obowiązkowy wg Allegro — brak prawidłowego User-Agenta grozi
              zablokowaniem klucza API (ekran po rejestracji aplikacji). */
           "user-agent": allegroUserAgent(),
-          /* JĘZYK, O KTÓRY PROSIMY (0.273.0). Do 0.272.0 nie było tego
-             nagłówka nigdzie w serwerze, więc pola zależne od języka
-             przychodziły w domyślnym Allegro — a specyfikacja wymienia
+          /* JĘZYK, O KTÓRY PROSIMY. Bez tego nagłówka pola zależne od
+             języka przychodzą w domyślnym Allegro — a specyfikacja wymienia
              `Accept-Language` wprost przy `GET /sale/issues` („Expected
              language of subject field") i przy `GET …/chat` („Expected
              language of messages", z przykładem `en-US`).
@@ -687,9 +648,8 @@ export async function zapytajAllegro(
              konsekwentna angielszczyzna. Sklep jest polski i biuro czyta
              po polsku. */
           "accept-language": "pl-PL",
-          /* CIAŁO IDZIE TĄ SAMĄ WERSJĄ ZASOBU, którą negocjujemy w `accept`
-             (0.173.0). Do 0.172.0 stało tu `application/json` — typ, którego
-             specyfikacja NIE WYMIENIA przy żadnym z naszych dwóch zapisów:
+          /* CIAŁO IDZIE TĄ SAMĄ WERSJĄ ZASOBU, którą negocjujemy w `accept`,
+             a nie `application/json` — typ, którego specyfikacja NIE WYMIENIA przy żadnym z naszych dwóch zapisów:
              `POST /messaging/threads/{id}/messages` deklaruje wyłącznie
              `application/vnd.allegro.public.v1+json` i `…beta.v1+json`,
              a `POST /order/refund-claims` — tylko pierwszy z nich.
@@ -719,7 +679,7 @@ export async function zapytajAllegro(
        drugie znaczy „nie ta wersja", więc obie odpowiedzi prowadzą do próby
        z następnym nagłówkiem — a nie do surowego błędu na ekranie biura.
 
-       WYJĄTEK: ciało binarne (0.195.0). Tam `content-type` NIE jest wersją
+       WYJĄTEK: ciało binarne. Tam `content-type` NIE jest wersją
        zasobu, tylko typem pliku, więc 415 znaczy „Allegro nie przyjmuje
        takiego pliku" i powtórzenie z innym `accept` nic nie zmieni — poleci
        drugi raz i skończy się komunikatem o wersji zasobu, czyli zdaniem
@@ -760,7 +720,7 @@ export async function zapytajAllegro(
         poIluMs
       );
     }
-    /* 409 przy sprawach posprzedażowych NIE JEST konfliktem wersji (0.224.0).
+    /* 409 przy sprawach posprzedażowych NIE JEST konfliktem wersji.
        Specyfikacja opisuje go przy `POST /sale/issues/{id}/message` jednym
        zdaniem: „Dispute is in a state that forbids adding new messages" —
        czyli to odpowiednik `currentState.chatActive: false`. Bez tego zdania
@@ -810,7 +770,7 @@ export async function zapytajAllegro(
 }
 
 /**
- * Pobranie załącznika wiadomości — jedyne wyjście do Allegro po BAJTY (0.155.0).
+ * Pobranie załącznika wiadomości — jedyne wyjście do Allegro po BAJTY.
  *
  * Osobno od `zapytajAllegro`, bo tamta funkcja negocjuje `Accept` wersją zasobu
  * i parsuje JSON. Tutaj obie te rzeczy są niepotrzebne, a jedna z nich szkodzi:
@@ -843,8 +803,7 @@ export async function pobierzZalacznik(
       headers: {
         authorization: `Bearer ${bearer}`, "user-agent": allegroUserAgent(),
         /* `Accept` TYLKO na życzenie (droga API przy Centrum Wiadomości).
-           Zapisany `url` idzie bez niego, jak od 0.155.0 — plik nie ma
-           wersji zasobu. */
+           Zapisany `url` idzie bez niego — plik nie ma wersji zasobu. */
         ...(opcje.akcept ? { accept: opcje.akcept } : {}),
       },
       signal: AbortSignal.timeout(TIMEOUT_MS),
@@ -856,7 +815,7 @@ export async function pobierzZalacznik(
     );
   }
   if (!odp.ok) {
-    /* ── TREŚĆ ODMOWY IDZIE NA EKRAN (0.219.2) ────────────────────────────
+    /* ── TREŚĆ ODMOWY IDZIE NA EKRAN ────────────────────────────
        Samo „(403)" nie mówi nic i nie da się z tego wyjść: pobierania
        załącznika NIE MA w `docs/allegro/swagger.yaml` — specyfikacja zna
        tylko deklarację (POST) i wysyłkę (PUT), a do odczytu daje wyłącznie
@@ -877,7 +836,7 @@ export async function pobierzZalacznik(
         (powod ? ` Odpowiedź Allegro: ${powod}` : ""),
       odp.status);
   }
-  /* ── SUFIT ROZMIARU (0.283.0) ──────────────────────────────────────────
+  /* ── SUFIT ROZMIARU ──────────────────────────────────────────
      Do tego wydania `arrayBuffer()` wciągał do pamięci WSZYSTKO, co Allegro
      odda — bez pytania o rozmiar. Przy pobraniu na żądanie agenta było to
      ryzyko teoretyczne: klika jeden człowiek, jeden plik naraz. Copilot
@@ -921,7 +880,7 @@ export class BladRozmiaruZalacznika extends Error {
    (`api.allegro.pl/sale/issues/attachments/{id}`) i odmawia 403 przy
    skrzynce (`upload.allegro.pl/message-center/message-attachments/{uuid}`
    z `MessageAttachmentInfo.url`). Token i uprawnienie są więc dobre —
-   odmawia HOST. 0.219.2 zapisało, że ten 403 „nie jest naprawiony".
+   odmawia HOST.
 
    Specyfikacja w repo nie ma GET do pobrania załącznika Centrum Wiadomości
    (tylko POST deklaracji i PUT wgrania). Tutorial Allegro, na który swagger
@@ -956,13 +915,11 @@ export function idZalacznikaZUrl(url: string): string | null {
  * ją bez sieci. Bez ogona UUID zostaje sam zapisany `url`.
  *
  * ── KSZTAŁT Z PLIKU, drugi raz ───────────────────────────────────────────────
- * 0.244.0 zapisało, że „w `swagger.yaml` tej operacji nie ma", i dało drodze
- * API nagłówek `Accept` z JSON-em z pamięci. Nieprawda: `docs/allegro/swagger.yaml`
- * ma `downloadAttachmentGET` na `/messaging/message-attachments/{attachmentId}`
+ * `docs/allegro/swagger.yaml` ma `downloadAttachmentGET` na `/messaging/message-attachments/{attachmentId}`
  * (scope `allegro:api:messaging`), a odpowiedź 200 deklaruje jako plik binarny
  * dowolnego typu (gwiazdka, ukośnik, gwiazdka), bez wersji zasobu, dokładnie jak `GET /sale/issues/attachments/{id}`,
- * który reklamacje wołają bez `Accept` od 0.223.0. Sonda właściciela
- * (10 września) potwierdziła: bez `Accept` 200 `image/jpeg`, z `public.v1`
+ * który reklamacje wołają bez `Accept`. Sonda właściciela potwierdziła:
+ * bez `Accept` 200 `image/jpeg`, z `public.v1`
  * i `beta.v1` 406, zapisany adres na `upload.allegro.pl` 403 na brzegu.
  * Droga API idzie więc BEZ `Accept`; zapisany `url` zostaje zapasem.
  */
@@ -1090,7 +1047,7 @@ export async function sondujZalacznik(apiUrl: string, url: string): Promise<Wyni
  * tego `scopeDlaUrl` z metodą, żeby odmowa 403 nazwała właściwe.
  */
 /**
- * Zwrot pieniędzy kupującemu — `POST /payments/refunds` (0.190.0).
+ * Zwrot pieniędzy kupującemu — `POST /payments/refunds`.
  *
  * Ciało układa `services/zwrot-pieniedzy.ts`; tutaj jest samo wyjście do
  * sieci. Cztery pola stoją w `required` schematu `InitializeRefund`:
@@ -1102,7 +1059,7 @@ export async function sondujZalacznik(apiUrl: string, url: string): Promise<Wyni
  * powtórzenia tego samego. Identyfikator żyje przy zwrocie w bazie.
  *
  * Uprawnienie: `allegro:api:payments:write` — inne niż `orders:write` przy
- * rabacie i inne niż wszystko, co ta aplikacja miała wcześniej.
+ * rabacie.
  */
 export async function zwrocPlatnosc(
   apiUrl: string, ciało: Record<string, unknown>,
@@ -1148,7 +1105,7 @@ export type TypWiadomosciSprawy =
   | "RETURN_REQUIRED_SELLER_LABEL" | "RETURN_REQUIRED_CUSTOM" | "RETURN_NOT_REQUIRED";
 
 /**
- * Odpowiedź w reklamacji (0.224.0) — PIERWSZY zapis tego modułu do Allegro.
+ * Odpowiedź w reklamacji — PIERWSZY zapis tego modułu do Allegro.
  *
  * `type` jest w `MessageRequest` jedynym polem, przy którym lista `required`
  * ma pokrycie w schemacie, więc jedzie ZAWSZE. `REGULAR` to zwykła wiadomość.
@@ -1170,9 +1127,8 @@ export async function wyslijWiadomoscSprawy(
     metoda: "POST",
     /* `attachments` to lista `{ id }` (`PostPurchaseIssueAttachmentId`).
        PUSTEJ NIE WYSYŁAMY: wiadomość bez plików ma wyglądać dokładnie tak, jak
-       wyglądała przez pięćdziesiąt wydań — nowa funkcja nie zmienia kształtu
-       żądań, które jej nie używają. Ta sama zasada co przy Centrum
-       Wiadomości w 0.195.0. */
+       wyglądała — nowa funkcja nie zmienia kształtu żądań, które jej nie
+       używają. Ta sama zasada co przy Centrum Wiadomości. */
     body: zalaczniki.length === 0
       ? { text: tekst, type: typ }
       : { text: tekst, type: typ, attachments: zalaczniki.map((id) => ({ id })) },

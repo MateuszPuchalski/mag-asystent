@@ -208,7 +208,7 @@ let ostatniePowroty = 0;
 export function powrotyPoDokumentachSfery(teraz = Date.now()): number {
   if (!config.sferaWorker || teraz - ostatniePowroty < ODSTEP_POWROTOW_MS) return 0;
   ostatniePowroty = teraz;
-  /* NUMERY ZW PRZED POWROTAMI (0.349.0). Numer wystawionego ZW wypuszcza MM
+  /* NUMERY ZW PRZED POWROTAMI. Numer wystawionego ZW wypuszcza MM
      koszyka na regał, a dopiero po nim ma sens pytać o powrót. Pod własnym
      parasolem: zepsuty zwrot nie ma prawa zatrzymać powrotów koszy. */
   try {

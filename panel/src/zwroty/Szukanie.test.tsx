@@ -17,7 +17,7 @@ const PACZKI: PaczkaKlienta[] = [
     waluta: "PLN", pozycji: 1, zawartosc: "Sekator ×1", maZwrot: false,
     odbiorcaNazwa: "Jan Kowalski", kupujacyLogin: "jan_k",
     /* Dwie paczki tego samego nazwiska z RÓŻNYCH ulic — tak wygląda przypadek,
-       dla którego adres wszedł do wiersza w 0.422.0. */
+       dla którego adres stoi w wierszu. */
     odbiorcaTelefon: "++48 663 509 353", odbiorcaUlica: "Polna 7",
     odbiorcaMiasto: "Poznań", odbiorcaKod: "61-001",
     link: "https://allegro.pl/moje-allegro/sprzedaz/zamowienia/ord-nowy" },
@@ -63,7 +63,7 @@ function zeskanuj(pole: HTMLElement, kod: string, fraza: string, onFraza: (v: st
 
 describe("Pole szukania zwrotu", () => {
   it("skan ZASTĘPUJE treść pola, zamiast dopisywać się na końcu", () => {
-    /* Zgłoszenie właściciela (0.329.0). Kursor stojący w polu ucisza
+    /* Zgłoszenie właściciela. Kursor stojący w polu ucisza
        `useSkaner`, więc znaki czytnika lecą tu jak pisanie — druga etykieta
        doklejała się do pierwszej i szukanie po sklejeniu nie znajdowało nic. */
     const p = pokaz(null, { fraza: "N4QZ/2026" });
@@ -77,7 +77,7 @@ describe("Pole szukania zwrotu", () => {
   });
 
   it("Enter po ręcznym wpisaniu szuka po CAŁEJ treści pola", () => {
-    /* Reguła ma nie ruszać drogi, którą biuro chodzi od 0.165.0. */
+    /* Reguła ma nie ruszać drogi, którą biuro chodzi na co dzień. */
     const p = pokaz(null, { fraza: "N4QZ/2026" });
     fireEvent.keyDown(screen.getByPlaceholderText(/Zeskanuj etykietę/), { key: "Enter" });
     expect(p.onSzukaj).toHaveBeenCalledWith("N4QZ/2026");
@@ -87,7 +87,7 @@ describe("Pole szukania zwrotu", () => {
     const p = pokaz({ trafienie: null, zwrotId: null, zwroty: [] });
     /* Kod na ekranie, bo naklejka bywa pomięta i skan urwany w połowie. */
     expect(screen.getByText(ETYKIETA)).toBeInTheDocument();
-    /* Lista przeszukanych pól zeszła do podpowiedzi (0.479.0) — na
+    /* Lista przeszukanych pól stoi w podpowiedzi — na
        ekranie zostaje zdanie, które mówi, co robić dalej. */
     expect(screen.getByTitle(/Szukałem po numerze listu/)).toHaveTextContent(/Szukaj po kliencie/);
 
@@ -130,7 +130,7 @@ describe("Pole szukania zwrotu", () => {
 
   it("Esc oddaje klawisze ekranowi — kursor wychodzi z pola, treść zostaje", async () => {
     /* Skróty milkną w polu tekstowym. Na nagraniu z biura `P` po skanie nie
-       działało i zwrot przyjmowało kliknięcie (audyt, 15 września 2026). */
+       działało i zwrot przyjmowało kliknięcie (audyt). */
     const p = pokaz(null, { fraza: "N4QZ/2026" });
     const pole = screen.getByPlaceholderText(/Zeskanuj etykietę/);
     pole.focus();
@@ -157,8 +157,7 @@ describe("Pole szukania zwrotu", () => {
   });
 
   it("brak pasujących odsyła do SPACJI i do Entera", () => {
-    /* Tytuł mówił „bo numeru listu filtr nie widzi" — nieprawda od 0.344.0.
-       Zero trafień jest teraz miejscem na dwie podpowiedzi: drugi człon frazy
+    /* Zero trafień jest miejscem na dwie podpowiedzi: drugi człon frazy
        zawęża dalej, a Enter pyta serwer o numery spoza modelu pracy. */
     pokaz(null, { fraza: "600000", ile: 0 });
     expect(screen.getByText(/Spacja zawęża dalej/)).toBeInTheDocument();
@@ -183,8 +182,8 @@ describe("Pole szukania zwrotu", () => {
        klient albo kurier. Login albo nazwisko z naklejki tak. */
     const p = pokaz({ trafienie: null, zwrotId: null, zwroty: [] });
     expect(screen.getByRole("button", { name: /Poszukaj w Allegro/ })).toBeInTheDocument();
-    /* Od 0.479.0 pole klienta otwiera się SAMO i ma fokus — klik, który
-       po chybionym skanie następował zawsze, zszedł z drogi. */
+    /* Pole klienta otwiera się SAMO i ma fokus — klik, który po chybionym
+       skanie następowałby zawsze, schodzi z drogi. */
     const pole = screen.getByLabelText("Login, nazwisko albo telefon");
     expect(pole).toHaveFocus();
     await userEvent.type(pole, "jan_k{Enter}");
@@ -203,11 +202,10 @@ describe("Pole szukania zwrotu", () => {
 
   it("rejestracji paczki NIE MA — decyzja właściciela (0.451.0)", async () => {
     /* „Usuń opcję rejestracji paczki — ja tylko wyszukuję ją w Allegro".
-       Z formularza zostaje jedno pole; numer listu, zamówienie, przewoźnik
-       i notatka odeszły razem z przyciskiem zapisu. */
+       Zostaje jedno pole szukania, bez przycisku zapisu. */
     pokaz({ trafienie: null, zwrotId: null, zwroty: [] }, { paczki: PACZKI });
     expect(screen.queryByRole("button", { name: /nieodebrana/i })).toBeNull();
-    /* Pole klienta stoi otwarte samo (0.479.0) — i dalej bez rejestracji. */
+    /* Pole klienta stoi otwarte samo — i dalej bez rejestracji. */
     expect(screen.getByLabelText("Login, nazwisko albo telefon")).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /Zarejestruj/ })).toBeNull();
     expect(screen.queryByLabelText("Numer listu przewozowego")).toBeNull();
@@ -216,8 +214,7 @@ describe("Pole szukania zwrotu", () => {
   });
 
   it("paczkę bez zwrotu przyjmuje się jednym kliknięciem, a wiersz dalej prowadzi do Allegro (0.493.0)", async () => {
-    /* Decyzja właściciela: nieodebrana paczka idzie drogą zwrotu. Formularz
-       z 0.451.0 nie wraca — przycisk nie pyta o nic, bierze zamówienie. */
+    /* Decyzja właściciela: nieodebrana paczka idzie drogą zwrotu. Przycisk nie pyta o nic, bierze zamówienie. */
     const onPrzyjmij = vi.fn();
     pokaz(null, { paczki: PACZKI, onPrzyjmij });
     await userEvent.click(screen.getByRole("button", { name: /Paczki klienta/ }));
@@ -238,7 +235,7 @@ describe("Pole szukania zwrotu", () => {
   });
 
   it("szukanie klienta otwiera się z rzędu pola, bez nieudanego skanu", async () => {
-    /* Zgłoszenie właściciela (0.338.0): droga szła przez ślepy zaułek —
+    /* Zgłoszenie właściciela: droga szła przez ślepy zaułek —
        najpierw zeskanuj, dostań „nie znam kodu", dopiero wtedy zobacz ją. */
     const p = pokaz(null);
     await userEvent.click(screen.getByRole("button", { name: /Paczki klienta/ }));
@@ -268,7 +265,7 @@ describe("Pole szukania zwrotu", () => {
 
   it("wiersz paczki niesie ULICĘ — bez niej dwaj Kowalscy są nierozróżnialni", async () => {
     /* Szukanie po fragmencie nazwiska świadomie pokazuje cudze zakupy przy
-       zbieżności nazwisk (0.367.0). Ulica rozstrzyga w jednym spojrzeniu. */
+       zbieżności nazwisk. Ulica rozstrzyga w jednym spojrzeniu. */
     pokaz(null, { paczki: PACZKI });
     await userEvent.click(screen.getByRole("button", { name: /Paczki klienta/ }));
     expect(screen.getByText(/Polna 7/)).toBeInTheDocument();

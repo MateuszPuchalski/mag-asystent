@@ -1,4 +1,4 @@
-import React, { useState, type MutableRefObject } from "react";
+import { useState, type MutableRefObject } from "react";
 import { Link } from "react-router-dom";
 import { Banknote, Ban, Check, Lock, Truck, Undo2, UserRound } from "lucide-react";
 import type { StanZwrotuPieniedzy, WynikDosylki, ZwrotPlatnosciAllegro } from "../api/typy";
@@ -6,18 +6,15 @@ import { Przycisk, barwaTonu, dataCyfrowa } from "../ui";
 import { zlote } from "../api/zwroty";
 import { useAkcjaKlawisza, type AkcjeKlawiszy } from "./klawisze";
 
-/* ── Oddanie pieniędzy i odmowa (§25a, 0.190.0) ──────────────────────────────
+/* ── Oddanie pieniędzy i odmowa (§25a) ───────────────────────────────────────
 
-   OSTATNI KROK, KTÓRY DOTĄD ROBIŁO SIĘ POZA PANELEM. Operator rozstrzygał
-   zwrot tutaj, dostawał policzoną kwotę tutaj — i szedł oddać pieniądze do
-   panelu Allegro. Kryterium gotowości z §25 mówi „bez otwierania panelu
-   Allegro"; przy zwrocie nie było spełnione ani razu.
+   OSTATNI KROK ZWROTU, W PANELU. Kryterium gotowości z §25 mówi „bez
+   otwierania panelu Allegro".
 
    PRZESZKODA JEST ZDANIEM, NIE WYŁĄCZONYM PRZYCISKIEM. Wyłączony przycisk bez
    powodu każe zgadywać, czego brakuje: werdyktu, kwoty, zamówienia czy formy
    płatności. Zdanie pisze serwer, bo to on zna regułę — panel powtarzający ją
-   u siebie rozjechałby się z nią przy pierwszej zmianie (blizna z 0.175.0:
-   ekran obiecywał pracę, której serwer nie przyjmował).
+   u siebie rozjechałby się z nią przy pierwszej zmianie.
 
    ODMOWA MA POTWIERDZENIE, ZWROT NIE. To wygląda na niekonsekwencję, a jest
    §25a.5: cofnięcie zamiast potwierdzenia wszędzie, gdzie da się cofnąć.
@@ -43,25 +40,21 @@ const KODY: Array<{ kod: string; etykieta: string;
 ];
 const WYMAGA_POWODU = "REFUND_REJECTED";
 /**
- * Kody, przy których do klienta jedzie druga paczka (0.536.0). Odmowa z nimi
+ * Kody, przy których do klienta jedzie druga paczka. Odmowa z nimi
  * zakłada śledzenie dosyłki i krok dosyłki w sprawie klienta — w tym samym
  * zapisie, bez nowego wyboru w formularzu (dekalog p. 5).
  *
- * `NEW_ITEM_SENT` nazwał właściciel 27 września 2026: zły towar wraca, a biuro
- * odmawia wypłaty kodem „Wysłaliśmy nowy towar”. `MISSING_PART_SENT` doszedł
- * w tym wydaniu, bo brakująca część też jedzie drugą paczką — do oceny
- * właściciela, nie z jego słów.
+ * `NEW_ITEM_SENT` nazwał właściciel: zły towar wraca, a biuro odmawia
+ * wypłaty kodem „Wysłaliśmy nowy towar”. `MISSING_PART_SENT`, bo brakująca
+ * część też jedzie drugą paczką — do oceny właściciela, nie z jego słów.
  */
 const KODY_DOSYLKI = new Set(["NEW_ITEM_SENT", "MISSING_PART_SENT"]);
 
 /**
- * Kod odmowy słowami operatora (0.536.0). Do tego wydania stał tu surowy
- * `NEW_ITEM_SENT`, czyli nazwa pola ze specyfikacji Allegro, nie zdanie.
+ * Kod odmowy słowami operatora, nie nazwą pola ze specyfikacji Allegro.
  *
  * JEDEN KOD, JEDNO BRZMIENIE. Czytają stąd: ta sekcja, kolumna dowodów
  * („Rozstrzygnięte w Allegro”) i propozycja dosyłki na profilu klienta.
- * Kolumna dowodów miała do tego wydania własną mapę z innymi słowami, więc
- * ta sama odmowa brzmiała na jednym ekranie dwojako.
  *
  * Kod spoza listy zostaje surowy. Kolumna dowodów pokazuje `rejection_code`
  * z synchronizacji, a Allegro może tam dołożyć kod, którego lista nie zna.
@@ -73,9 +66,8 @@ export const etykietaKodu = (kod: string) => {
 /**
  * Żadnego kodu nie ma wybranego z góry — i to jest decyzja, nie brak jednej.
  *
- * Do audytu z 15 września 2026 stał tu `KODY[0]`, czyli `REFUND_REJECTED`.
- * Wyglądało to na wybór bezpieczny, bo jako jedyny żąda uzasadnienia.
- * Jest odwrotnie. Operator rozwija odmowę, żeby powiedzieć „wysłaliśmy nowy
+ * `REFUND_REJECTED` wygląda na wybór bezpieczny, bo jako jedyny żąda
+ * uzasadnienia. Jest odwrotnie. Operator rozwija odmowę, żeby powiedzieć „wysłaliśmy nowy
  * towar", wpisuje to w uzasadnienie — i wysyła je pod kodem, którego nie
  * wybrał. Klient czyta ten kod w Allegro jako oświadczenie firmy, więc wybór
  * ma być świadomy: pole zaczyna puste, a przycisk czeka na wskazanie.
@@ -140,7 +132,7 @@ export function Pieniadze({ stan, trwa, blad, onZwroc, onOdmow, onPrzelew, onCof
   nazwyPozycji = {}, onSprawdz, sprawdzam = false, wynikSprawdzenia = null }: {
   stan: StanZwrotuPieniedzy;
   /**
-   * Zwrot czeka jeszcze na werdykt (0.453.0). Przeszkoda jest wtedy jedna
+   * Zwrot czeka jeszcze na werdykt. Przeszkoda jest wtedy jedna
    * i znana z góry, a oś etapów nad sekcją już ją pokazuje — więc zdanie
    * „Najpierw przyjmij zwrot…" schodzi do znacznika z kłódką. Inne przeszkody
    * zostają zdaniami: każda mówi co innego i każda każe coś zrobić.
@@ -150,21 +142,21 @@ export function Pieniadze({ stan, trwa, blad, onZwroc, onOdmow, onPrzelew, onCof
   blad: string;
   onZwroc: () => void;
   onOdmow: (kod: string, powod: string | null) => void;
-  /** Zapis przelewu oddanego poza Allegro (0.269.0) i jego cofnięcie. */
+  /** Zapis przelewu oddanego poza Allegro i jego cofnięcie. */
   onPrzelew?: (referencja: string | null) => void;
   onCofnijPrzelew?: () => void;
   /** Rejestr klawiszy ekranu — stąd bierze się `Z`. */
   akcje?: MutableRefObject<AkcjeKlawiszy>;
   /**
-   * Wynik założenia dosyłki z ODPOWIEDZI ostatniego zapisu (0.536.0). Zdanie
+   * Wynik założenia dosyłki z ODPOWIEDZI ostatniego zapisu. Zdanie
    * jednorazowe: stan trwały przychodzi odświeżonym `stan.dosylka`, a tego,
    * czy zapis podmienił krok sprawy, stan już nie mówi.
    */
   wynikDosylki?: WynikDosylki | null;
-  /** „Śledź dosyłkę” — gdy odmowa z kodem dosyłki nie ma śledzenia (0.536.0). */
+  /** „Śledź dosyłkę” — gdy odmowa z kodem dosyłki nie ma śledzenia. */
   onSledzDosylke?: () => void;
   /**
-   * Kod odmowy z synchronizacji Allegro (`Zwrot.rejectionCode`, 0.536.1).
+   * Kod odmowy z synchronizacji Allegro (`Zwrot.rejectionCode`).
    * Odmowa złożona w panelu Allegro nie ma `stan.odmowa` — to pole niesie
    * tylko naszą. Bez tego kodu linijka dosyłki wisiałaby bez powodu.
    */
@@ -199,10 +191,8 @@ export function Pieniadze({ stan, trwa, blad, onZwroc, onOdmow, onPrzelew, onCof
      żąda uzasadnienia, którego nie ma. */
   const niegotowe = kod === BEZ_KODU || (kod === WYMAGA_POWODU && powod.trim() === "");
 
-  /* KLAWISZ `Z` ODDAJE PIENIĄDZE (audyt z 15 września 2026). Tabela §25a.2
-     obiecuje, że typowy zwrot to jeden klawisz na kubełek — a ostatni krok,
-     jedyny, który rusza pieniędzmi, nie miał żadnego i wymuszał sięgnięcie po mysz
-     dokładnie tam, gdzie ręka już leżała na klawiaturze.
+  /* KLAWISZ `Z` ODDAJE PIENIĄDZE. Tabela §25a.2 obiecuje, że typowy zwrot
+     to jeden klawisz na kubełek — także ostatni krok, który rusza pieniędzmi.
 
      Rejestracja jest BEZWARUNKOWA, bo to hook; warunek siedzi w środku
      funkcji. Sprawdza dokładnie to samo, co decyduje o istnieniu przycisku
@@ -216,17 +206,16 @@ export function Pieniadze({ stan, trwa, blad, onZwroc, onOdmow, onPrzelew, onCof
     <div className="flex flex-wrap items-center gap-2">
       <Banknote size={15} className="shrink-0 text-slate-400" />
       <b className="text-naglowek">Pieniądze</b>
-      {/* JEDYNE MIEJSCE KWOTY NA EKRANIE (0.516.0, §26d). Stała też w pasku
-          decyzji i w stopce pozycji; zeszła stamtąd, więc tu zostaje także po
+      {/* JEDYNE MIEJSCE KWOTY NA EKRANIE (§26d), więc stoi także po
           oddaniu — inaczej zamknięty zwrot nie mówiłby, ile wyszło. */}
       {stan.kwotaGrosze !== null &&
         <span className="text-sm tabular-nums">{zlote(stan.kwotaGrosze, stan.waluta)}</span>}
 
       {/* Oddane: numer zwrotu płatności z Allegro, nie samo „zrobione".
           Bez numeru nie da się niczego znaleźć po drugiej stronie. */}
-      {/* DWA STANY, NIE JEDEN (0.209.0). Do tego wydania stało tu samo
-          „Oddano" — od chwili, w której Allegro PRZYJĘŁO polecenie. Przelew
-          odrzucony godzinę później wyglądał identycznie jak udany. Zieleń
+      {/* DWA STANY, NIE JEDEN. Samo „Oddano" od chwili, w której Allegro
+          PRZYJĘŁO polecenie, nie odróżniłoby przelewu odrzuconego godzinę
+          później od udanego. Zieleń
           należy się dopiero potwierdzeniu ze statusu zwrotu; do tego czasu
           ekran mówi, na co czeka, zamiast obiecywać przelew. */}
       {stan.oddane && (stan.oddane.potwierdzone
@@ -246,7 +235,7 @@ export function Pieniadze({ stan, trwa, blad, onZwroc, onOdmow, onPrzelew, onCof
 
       {stan.odmowa && <span className="flex items-center gap-1 text-sm font-semibold text-slate-600">
         <Ban size={14} />Odmówiono: „{etykietaKodu(stan.odmowa.kod)}”</span>}
-      {/* ODMOWA Z PANELU ALLEGRO (0.536.1) — tylko przy dosyłce, bo to ją
+      {/* ODMOWA Z PANELU ALLEGRO — tylko przy dosyłce, bo to ją
           ta linijka tłumaczy. Kod z synchronizacji stoi też w kolumnie
           dowodów; tutaj stoi obok dosyłki, której jest powodem. Inne kody
           z synchronizacji zostają tam, gdzie były. */}
@@ -257,8 +246,8 @@ export function Pieniadze({ stan, trwa, blad, onZwroc, onOdmow, onPrzelew, onCof
       {/* Klawisz STOI PRZY PRZYCISKU, tak jak przy werdykcie i korekcie:
           rozpoznanie jest tańsze od pamiętania, a pasek skrótów na dole ekranu
           czyta się dopiero wtedy, gdy się wie, że jest czego szukać. */}
-      {/* Etykiety zwykłą pisownią (0.516.0, §26d): wersaliki krzyczały przy
-          każdym przycisku naraz, więc żaden nie był głośniejszy od innych. */}
+      {/* Etykiety zwykłą pisownią (§26d): wersaliki krzyczałyby przy każdym
+          przycisku naraz, więc żaden nie byłby głośniejszy od innych. */}
       {stan.moznaZwrocic && <Przycisk wariant="glowny" className="ml-auto text-xs" disabled={trwa}
         onClick={onZwroc}>{trwa ? "Oddaję…"
           : <><kbd className="rounded border border-black/20 px-1 text-xs">Z</kbd>{" "}
@@ -293,15 +282,13 @@ export function Pieniadze({ stan, trwa, blad, onZwroc, onOdmow, onPrzelew, onCof
     {/* Przeszkoda mówi, CO zrobić — i stoi także wtedy, gdy odmowa jest
         możliwa, bo to dwie różne drogi, nie dwa warianty jednej. Przy odmowie
         z panelu Allegro z dosyłką przeszkodą jest sama odmowa, a jej fakt stoi
-        już wyżej (0.536.1). Trzecie zdanie o tym samym tylko zagłuszało dosyłkę. */}
+        już wyżej. Trzecie zdanie o tym samym zagłuszałoby dosyłkę. */}
     {stan.powod && !stan.oddane && !stan.odmowa && !przedWerdyktem && !odmowaZAllegro &&
       <p className="mt-2 text-xs text-slate-500">{stan.powod}</p>}
 
-    {/* ── DOSYŁKA POD ODMOWĄ (0.536.0) ───────────────────────────────────
+    {/* ── DOSYŁKA POD ODMOWĄ ─────────────────────────────────────────────
         Zła paczka wraca, biuro odmawia wypłaty kodem „Wysłaliśmy nowy towar”
-        i wysyła właściwy towar z nową etykietą w Sellasist. Do tego wydania
-        ekran zwrotu kończył się na odmowie, a aplikacja o drugiej paczce nie
-        wiedziała nic. Zdanie składa serwer, to samo co na profilu; odnośnik
+        i wysyła właściwy towar z nową etykietą w Sellasist. Zdanie składa serwer, to samo co na profilu; odnośnik
         prowadzi tam, gdzie stoi krok sprawy. Pracy tu nie ma, poza jednym
         ponowieniem.
 
@@ -334,7 +321,7 @@ export function Pieniadze({ stan, trwa, blad, onZwroc, onOdmow, onPrzelew, onCof
     {wynikDosylki?.zalozona && wynikDosylki.zastapil && <p className="mt-2 text-xs text-slate-600">
       Krok sprawy klienta: „{wynikDosylki.krok}” zamiast „{wynikDosylki.zastapil}”</p>}
 
-    {/* ── PRZELEW ODDANY POZA ALLEGRO (0.269.0) ────────────────────────────
+    {/* ── PRZELEW ODDANY POZA ALLEGRO ──────────────────────────────────────
         Przy pobraniu klient nigdy nie zapłacił Allegro, więc przycisk wyżej
         jest zamknięty z definicji, a zwrot zamykał się BEZ ŚLADU po wypłacie:
         jedynym dowodem był wyciąg bankowy poza aplikacją. Ten blok zapisuje

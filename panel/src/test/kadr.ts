@@ -1,5 +1,5 @@
 /**
- * Atrapa `IntersectionObserver` dla jsdomu (0.260.0).
+ * Atrapa `IntersectionObserver` dla jsdomu.
  *
  * jsdom nie liczy układu, więc nie ma i nie może mieć obserwatora przecięć —
  * a oś rozmowy trzyma na nim jedną decyzję: czy pytanie klienta wypadło

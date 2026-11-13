@@ -4,11 +4,10 @@ import userEvent from "@testing-library/user-event";
 import { kopiujDoSchowka } from "./kopiuj";
 import { LoginKlienta } from "./index";
 
-/* ── Kopiowanie po zwykłym HTTP (0.228.0) ────────────────────────────────────
+/* ── Kopiowanie po zwykłym HTTP ──────────────────────────────────────────────
    `navigator.clipboard` istnieje TYLKO w bezpiecznym kontekście. Biuro pracuje
    pod `http://serwer:3001` (DEPLOY.md), więc na jego przeglądarce tego obiektu
-   NIE MA — a do 0.227.0 przyciski kopiowania kończyły wtedy na `.catch(() => {})`
-   i mrugały „skopiowano" nad pustym schowkiem.
+   NIE MA.
 
    Te testy stawiają OBA światy: z `navigator.clipboard` i bez niego.        */
 
@@ -53,7 +52,7 @@ describe("kopiujDoSchowka", () => {
   });
 
   it("gdy NIC nie działa, mówi FAŁSZ — nie udaje sukcesu", async () => {
-    /* To jest cała różnica wobec wersji sprzed 0.228.0. */
+    /* Wołający musi wiedzieć, że się nie udało. */
     bezSchowka();
     (document as unknown as { execCommand: unknown }).execCommand = undefined;
 

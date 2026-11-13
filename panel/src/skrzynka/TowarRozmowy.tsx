@@ -1,4 +1,4 @@
-import React, { useLayoutEffect, useRef, useState } from "react";
+import { useLayoutEffect, useRef, useState } from "react";
 import { Check, Database, PackageSearch, X as Krzyzyk } from "lucide-react";
 import { NaglowekSekcji } from "../ui";
 import type { DopasowanieKartoteki, KartaTowaru, OfertaRozmowy } from "../api/typy";
@@ -17,22 +17,19 @@ export { CenyKartoteki } from "./OsCenKartoteki";
 export { grupujCeny, polozenieOferty } from "./cenyNaOsi";
 
 /**
- * Towar z Subiekta przy rozmowie (0.179.0).
+ * Towar z Subiekta przy rozmowie.
  *
- * SKU sprzedawcy leżało w `offer_snapshot` od 0.178.0 i nie prowadziło
- * donikąd: żeby sprawdzić stan i półkę, agent otwierał Subiekta — czyli robił
- * to, czego §25 zabrania („agent obsłuży typowe pytanie bez otwierania panelu
+ * Bez tego bloku agent otwierałby Subiekta, żeby sprawdzić stan i półkę —
+ * czyli robiłby to, czego §25 zabrania („agent obsłuży typowe pytanie bez otwierania panelu
  * Allegro" ma ten sam sens co „bez otwierania Subiekta").
  *
  * Blok ma trzy stany i każdy każe co innego zrobić: powiązana kartoteka
  * (widać stan i półkę), propozycja z automatu (jedno kliknięcie), brak
  * z POWODEM (wiadomo, które ogniwo pękło i czy naprawi się samo).
  *
- * ── JEDNO TRAFIENIE PO SYGNATURZE TO POWIĄZANIE (0.219.0) ──────────────────
- * Do 0.218.0 kartoteka z SKU była propozycją i czekała na „Zatwierdź", choć
- * ten sam wynik zwroty wiązały same od 0.169.0. Właściciel zapytał, po co klikać, skoro sygnatura trafia
- * jeden do jednego — i zdecydował: łączyć automatycznie. Kliknięcie było
- * zapisem pamięci wskazań; patrzenie na stan i półkę niczego nie zapisuje,
+ * ── JEDNO TRAFIENIE PO SYGNATURZE TO POWIĄZANIE ────────────────────────────
+ * Decyzja właściciela: gdy sygnatura trafia jeden do jednego, łączyć
+ * automatycznie, jak przy zwrotach. Kliknięcie jest zapisem pamięci wskazań; patrzenie na stan i półkę niczego nie zapisuje,
  * więc nie ma za co brać opłaty w kliknięciach. Pamięć zostaje dla wskazań
  * ręcznych i obowiązuje, dopóki sprzedawca nie przepnie sygnatury
  * (`pamiecAktualna` na serwerze).
@@ -52,7 +49,7 @@ export function TowarRozmowy({ oferta, rozmowaId, skuPozycji = null }: {
   const zapisz = useWskazKartoteke();
   const k = oferta.kartoteka;
   /* Powiązana: człowiek (pamięć wskazań) albo JEDNO trafienie po sygnaturze
-     (0.219.0). Pozostałe stopnie pewności zostają propozycją z przyciskiem. */
+     Pozostałe stopnie pewności zostają propozycją z przyciskiem. */
   const potwierdzona = k.pewnosc === "pamiec" || k.pewnosc === "sku" ? k.twId : null;
   const karta = useKartaTowaru(potwierdzona);
 
@@ -60,7 +57,7 @@ export function TowarRozmowy({ oferta, rozmowaId, skuPozycji = null }: {
     { id: rozmowaId, ofertaId: oferta.externalId, twId },
     { onSuccess: () => setSzukam(false) });
 
-  /* ── JEDEN RAZ KAŻDY FAKT (23 września 2026) ──────────────────────────────
+  /* ── JEDEN RAZ KAŻDY FAKT ─────────────────────────────────────────────────
      Zrzut właściciela: „prawa kolumna jest wciąż chaotyczna". Nazwa towaru
      stała na ekranie trzy razy, symbol cztery, stan i półka dwa. Pasmo
      odpowiedzi nad kolumną (`PasmoOdpowiedzi.tsx`) mówi już „to jest",
@@ -78,7 +75,7 @@ export function TowarRozmowy({ oferta, rozmowaId, skuPozycji = null }: {
      szesnaście pikseli i treść stała prawie dwa razy dalej od krawędzi. */
   return <div className="space-y-3">
     <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
-      {/* Ten sam kształt, co „Oferta" i „Zamówienie" wyżej (0.249.0): trzy
+      {/* Ten sam kształt, co „Oferta" i „Zamówienie" wyżej: trzy
           sekcje tej samej rangi miały trzy różne kształty, więc nie było jak
           odczytać, że stoją na jednym poziomie. */}
       <NaglowekSekcji ikona={<Database size={13} />}>Subiekt GT</NaglowekSekcji>
@@ -138,11 +135,8 @@ export function TowarRozmowy({ oferta, rozmowaId, skuPozycji = null }: {
             /* Propozycja nie udaje faktu — mówi, skąd się wzięła, i czeka na
                zatwierdzenie (§4.3, §11.3).
 
-               Zdjęcie przy PROPOZYCJI (0.203.0). Do 0.202.0 kafel dostawała
-               wyłącznie kartoteka potwierdzona — czyli ta, przy której nikt
-               już niczego nie rozstrzyga. Propozycja automatu jest dokładnie
-               tym miejscem, gdzie człowiek decyduje, i decydował po samym
-               symbolu: „FTC272" nie mówi, czy to podkładka, czy szarpak.
+               Zdjęcie przy PROPOZYCJI, bo tu człowiek decyduje, a sam symbol
+               „FTC272" nie mówi, czy to podkładka, czy szarpak.
                Zdjęcie zamienia zatwierdzenie w spojrzenie. */
             ? <div className="flex gap-3 rounded-lg border border-amber-300 bg-amber-50 p-2">
                 <Kafel twId={k.twId} rozmiar={56} nazwa={k.symbol ?? "Propozycja kartoteki"}
@@ -200,7 +194,7 @@ export function zrodloKartoteki(k: Pick<DopasowanieKartoteki, "pewnosc" | "zrodl
  * już czyjś.
  */
 /**
- * Opis kartoteki z Subiekta (0.198.0).
+ * Opis kartoteki z Subiekta.
  *
  * Pole `desc` jechało w odpowiedzi `/api/products/:twId` od dawna i panel NIE
  * pokazywał go nigdzie. A to w nim ta firma trzyma wymiary, gwinty, rozstawy
@@ -278,7 +272,7 @@ function StanTowaru({ karta }: { karta: KartaTowaru }) {
       : karta.zamienniki?.obce.length ? `brak naszych; ${karta.zamienniki.obce.length} numery obce w opisie` : "brak"],
   ];
   const braki = pozostale.filter(([, w]) => w === "brak").map(([nazwa]) => (nazwa === "EAN" ? nazwa : nazwa.toLowerCase()));
-  /* ── ODPOWIEDŹ WYCHODZI PRZED DANE (0.249.0) ────────────────────────────────
+  /* ── ODPOWIEDŹ WYCHODZI PRZED DANE ──────────────────────────────────────────
      Osiem wierszy stało w jednej wadze 12 px, a dwa z nich są odpowiedzią na
      pytanie, po które agent w ogóle otwiera tę kolumnę: CZY MAMY i GDZIE.
      „Identyfikatory brak" ważyło tyle samo co „Dostępny 1 szt." — a jedno jest
@@ -292,14 +286,12 @@ function StanTowaru({ karta }: { karta: KartaTowaru }) {
      Reszta zostaje w całości — §4.3 nie pozwala chować faktów — ale wartości
      „brak" gasną. Brak identyfikatorów jest normą, a norma nie ma prawa
      wyglądać jak ustalenie. */
-  /* ── LICZBA I PÓŁKA STOJĄ W PAŚMIE (23 września 2026) ──────────────────────
-     Od 0.249.0 „Dostępny" był tu liczbą widoczną z drugiego końca biurka,
-     a od 0.404.0 ta sama liczba i ta sama półka stoją w paśmie odpowiedzi nad
-     zakładkami. Dwa razy to samo w jednej kolumnie to był chaos ze zrzutu
-     właściciela. Zostaje pasek: pasmo mówi „ile", pasek — ile z tego jest
+  /* ── LICZBA I PÓŁKA STOJĄ W PAŚMIE ────────────────────────────────────────
+     Liczba i półka stoją w paśmie odpowiedzi nad zakładkami. Dwa razy to samo
+     w jednej kolumnie to chaos. Tu stoi pasek: pasmo mówi „ile", pasek — ile z tego jest
      już czyjeś. */
   return <div>
-    {/* ── STAN JAKO PASEK (23 września 2026, „za dużo tekstu") ─────────────
+    {/* ── STAN JAKO PASEK („za dużo tekstu") ─────────────
         „stan 342 · rezerwacje 6" było drugim zdaniem o tej samej liczbie.
         Pasek pokazuje proporcję jednym spojrzeniem: zieleń to wolne, bursztyn
         to zarezerwowane. Obie liczby stoją w dymku i dla czytnika ekranu,
@@ -327,7 +319,7 @@ function StanTowaru({ karta }: { karta: KartaTowaru }) {
 }
 
 /**
- * Wolne i zarezerwowane jako jeden pasek (23 września 2026).
+ * Wolne i zarezerwowane jako jeden pasek.
  *
  * Szerokości liczą się od STANU, nie od sumy wolnych i rezerwacji: Subiekt
  * bywa niespójny (rezerwacje ponad stan), a pasek dłuższy niż sto procent

@@ -1,5 +1,5 @@
 /**
- * Co wiadomo o zdjęciu oferty, zanim ktokolwiek pójdzie po plik (0.214.0).
+ * Co wiadomo o zdjęciu oferty, zanim ktokolwiek pójdzie po plik.
  *
  * Trzy stany, bo każdy każe co innego zrobić — a jeden napis „bez zdjęcia"
  * na wszystkie trzy kazał agentowi zgadywać, czy obraz dopiero przyjedzie.
@@ -25,7 +25,7 @@ export type Rozmowa = {
   klient: string;
   ostatniaWiadomosc: string;
   ostatniaWiadomoscAt: string;
-  /** Czy podgląd to słowa klienta (0.166.0). Fałsz = ostatnia NASZA, bo klient nic nie napisał. */
+  /** Czy podgląd to słowa klienta. Fałsz = ostatnia NASZA, bo klient nic nie napisał. */
   ostatniaOdKlienta: boolean;
   nieprzeczytana: boolean;
   wlascicielId: number | null;
@@ -33,10 +33,10 @@ export type Rozmowa = {
   wersja: number;
   /** Status WYLICZONY: odłożenie po terminie przyjeżdża już jako `open`. */
   status: StatusRozmowy;
-  /** Ręczna flaga „pilne" (§10.2, 0.181.0). */
+  /** Ręczna flaga „pilne" (§10.2). */
   priorytet: "normalny" | "pilny";
   /**
-   * Ręczny znacznik „to sprawa reklamacyjna" (0.390.0) — NASZ, nie Allegro.
+   * Ręczny znacznik „to sprawa reklamacyjna" — NASZ, nie Allegro.
    *
    * Sprawy posprzedażowej sprzedawca nie może założyć: `/sale/issues` ma
    * wyłącznie GET, otwiera ją kupujący. Znacznik mówi wyłącznie, że biuro
@@ -69,12 +69,12 @@ export type Rozmowa = {
   poTerminie: boolean;
   /**
    * Ostatnia wiadomość klienta to podziękowanie po naszej odpowiedzi
-   * (22 września 2026). Status jest wtedy „Czeka na klienta"; liczy SERWER
+   *. Status jest wtedy „Czeka na klienta"; liczy SERWER
    * z decyzji klasyfikatora, panel tej reguły nie powtarza.
    */
   podziekowal: boolean;
   /**
-   * Skąd zakończenie, gdy `status` to `resolved` (23 września 2026): ręka
+   * Skąd zakończenie, gdy `status` to `resolved`: ręka
    * agenta, podziękowanie, dwa dni ciszy albo wątek zamknięty w Allegro.
    * Liczy serwer (`wyliczStatus`); panel tylko je nazywa.
    */
@@ -87,7 +87,7 @@ export type Rozmowa = {
 };
 
 /* Słownik kategorii — LUSTRO `KATEGORIE` z `server/src/services/klasyfikacja-slownik.ts`
-   (specyfikacja z 20 września 2026). Wartości po angielsku, bo to kontrakt
+   Wartości po angielsku, bo to kontrakt
    niezależny od dostawcy; nazwy po polsku stoją w `skrzynka/statusy.ts`
    i `Record<Kategoria, string>` nie skompiluje się bez kompletu. */
 export type Kategoria =
@@ -141,7 +141,7 @@ export type StanCopilota = {
   autoKlasyfikacja: boolean;
   /** Takt sam układa szkic (`COPILOT_AUTO_SZKIC`). */
   autoSzkic: boolean;
-  /** Szkic układa się sam zaraz po rozpoznaniu (23 września 2026). Starszy serwer go nie zna. */
+  /** Szkic układa się sam zaraz po rozpoznaniu. Starszy serwer go nie zna. */
   szkicPoRozpoznaniu?: boolean;
 };
 
@@ -154,7 +154,7 @@ export type WynikPartii = {
   zuzycie: {
     wej: number; wyj: number; cacheZapis: number; cacheOdczyt: number; kosztUsd: number;
   };
-  /** Ile szkiców serwer zlecił w tle po tym rozpoznaniu (23 września 2026). */
+  /** Ile szkiców serwer zlecił w tle po tym rozpoznaniu. */
   szkicow?: number;
 };
 
@@ -182,7 +182,7 @@ export type PomiarKlasyfikacji = {
     oznaczonych: number; zgodnosc: Udzial | null }>;
 };
 
-/** Pomiar zza zębatki (0.168.0: diagnostyka nie stoi na ekranie pracy). */
+/** Pomiar zza zębatki, bo diagnostyka nie stoi na ekranie pracy. */
 export type PomiarCopilota = {
   wywolan: number;
   bledow: number;
@@ -191,9 +191,9 @@ export type PomiarCopilota = {
   udzialCache: number | null;
   /** Klasyfikacja w kształcie specyfikacji — precyzja i czułość per klasa. */
   klasyfikacja: PomiarKlasyfikacji;
-  /** Rozbicie księgi po zadaniu (0.231.0) — koszt szkiców osobno od klasyfikacji. */
+  /** Rozbicie księgi po zadaniu — koszt szkiców osobno od klasyfikacji. */
   wgZadania: Array<{ zadanie: string; wywolan: number; bledow: number; kosztUsd: number;
-    /** Czas czekania na model w ms (0.532.0); `null` bez zmierzonego wywołania. */
+    /** Czas czekania na model w ms; `null` bez zmierzonego wywołania. */
     medianaMs: number | null; p90Ms: number | null }>;
   szkice: {
     ile: number; odrzuconych: number;
@@ -244,7 +244,7 @@ export type WierszPomiaruPrzeplywu = {
 /** Załącznik wiadomości. `doPobrania` liczy serwer — panel go nie wylicza. */
 export type ZalacznikOsi = {
   id: number; nazwa: string; typ: string | null; status: string; doPobrania: boolean;
-  /* Czy obraz rysuje się WPROST na osi (0.218.0). Liczy SERWER — panel nie
+  /* Czy obraz rysuje się WPROST na osi. Liczy SERWER — panel nie
      zgaduje po `typ`, bo lista typów, które trasa podglądu odda, jest tam. */
   podglad: boolean;
   /* Czy rysować miniaturę PDF-a. Też liczy serwer, z nazwy i typu, tylko dla
@@ -254,13 +254,13 @@ export type ZalacznikOsi = {
 
 export type WpisOsi = {
   id: string;
-  /* `odeslanie_zadania` (0.352.0) — odpowiedź hali BEZ wyniku. Musi tu stać
+  /* `odeslanie_zadania` — odpowiedź hali BEZ wyniku. Musi tu stać
      jawnie: nieznany rodzaj wpada w `Os.tsx` do gałęzi domyślnej, czyli
      rysuje się jak wypowiedź w rozmowie z klientem. Odmowa hali udająca
      zdanie wysłane kupującemu to najgorszy możliwy wynik tej zmiany. */
   rodzaj: "wiadomosc" | "zlecenie" | "wynik_zadania" | "odeslanie_zadania"
     | "komentarz" | "status"
-    /* Kamień milowy zwrotu (0.502.0) — zdarzenie, nie wypowiedź; `Os.tsx` ZDARZENIE. */
+    /* Kamień milowy zwrotu — zdarzenie, nie wypowiedź; `Os.tsx` ZDARZENIE. */
     | "zwrot";
   autor: string;
   odKlienta: boolean;
@@ -271,11 +271,11 @@ export type WpisOsi = {
   adres?: string;
   /** Tytuł oferty ze snapshotu, a gdy go nie ma — nazwa z pozycji zamówienia. */
   nazwaOferty?: string | null;
-  /** Zamówienie, którego dotyczy wiadomość (`relatesTo.order`, 0.166.0). */
+  /** Zamówienie, którego dotyczy wiadomość (`relatesTo.order`). */
   zamowienieId?: string | null;
   zadanieId?: number;
   /**
-   * Szczegóły ZLECENIA dla hali (0.226.0) — tylko przy `rodzaj: "zlecenie"`.
+   * Szczegóły ZLECENIA dla hali — tylko przy `rodzaj: "zlecenie"`.
    * Lustro pola z `services/skrzynka.ts`; panel rysuje z tego blok, więc
    * części jadą osobno, a nie sklejone w jeden łańcuch.
    */
@@ -285,7 +285,7 @@ export type WpisOsi = {
     twId: number | null; symbol: string | null; nazwaTowaru: string | null;
   };
   /**
-   * Zdarzenie w postaci KLUCZY (0.243.0) — przy `status` i `zwrot`.
+   * Zdarzenie w postaci KLUCZY — przy `status` i `zwrot`.
    * `tresc` zostaje zdaniem dla podpowiedzi, a to pole niesie
    * to samo rozłożone na części, żeby pasek zdarzeń mógł pokazać krótką
    * etykietę po polsku. Słownik polszczyzny stoi w panelu — angielskie klucze
@@ -294,22 +294,22 @@ export type WpisOsi = {
    */
   zdarzenie?:
     | { rodzaj: "status"; po: string | null }
-    /* Kamień milowy zwrotu tego zamówienia (0.502.0) — `server/src/services/zwrot-na-osi.ts`. */
+    /* Kamień milowy zwrotu tego zamówienia — `server/src/services/zwrot-na-osi.ts`. */
     | { rodzaj: "zwrot"; co: string; zwrotId: number; numer: string | null };
   messageId?: number;
   zalaczniki?: ZalacznikOsi[];
   wzmianki?: Array<{ userId: number; name: string }>;
-  /* Nasze automatyczne „Dziękujemy za kontakt" (0.218.0) — wpis zwinięty. */
+  /* Nasze automatyczne „Dziękujemy za kontakt" — wpis zwinięty. */
   automatyczna?: boolean;
   /* Doradca albo komunikat Allegro w Problemie z zakupem. Przychodzi jak
      klient, ale szkic Copilota odpowiada kupującemu, więc jego świeżość
      liczy się bez tych wpisów. */
   odAllegro?: boolean;
-  /* Blok firmowy odcięty od treści (0.219.1) — `tresc` jest bez niego. */
+  /* Blok firmowy odcięty od treści — `tresc` jest bez niego. */
   stopka?: string;
 };
 
-/* Wzmianka w skrzynce „wspomniano o mnie" (§6.4, 0.160.0). Fragment liczy
+/* Wzmianka w skrzynce „wspomniano o mnie" (§6.4). Fragment liczy
    SERWER — panel nie skraca treści drugi raz po swojemu. */
 export type WpisWzmianki = {
   commentId: number;
@@ -349,7 +349,7 @@ export type StanSkrzynki = {
 
 export type OfertaWskazana = { ofertaId: string; autor: string };
 
-/* Zamówienie przy rozmowie (0.166.0). `pobrane` jest `null`, dopóki ticker
+/* Zamówienie przy rozmowie. `pobrane` jest `null`, dopóki ticker
    nie dociągnie treści — numer i odnośnik do panelu Allegro są od razu. */
 export type ZamowienieRozmowy = {
   externalId: string; link: string | null; pobrane: Zamowienie | null;
@@ -359,12 +359,12 @@ export type ZamowienieRozmowy = {
   przesylka: StanPrzesylki | null;
 };
 
-/* Oferta przy rozmowie (0.178.0). `pobrana` jest `null`, dopóki ticker nie
+/* Oferta przy rozmowie. `pobrana` jest `null`, dopóki ticker nie
    dociągnie snapshotu — numer i odnośnik są od razu. Cena opisuje CHWILĘ
    pytania (§15.2), nie dzisiejszy cennik. */
 export type OfertaRozmowy = {
   externalId: string; link: string | null;
-  /** Skąd numer (0.215.0): wskazanie agenta, wiadomość klienta albo jedyna pozycja zamówienia. */
+  /** Skąd numer: wskazanie agenta, wiadomość klienta albo jedyna pozycja zamówienia. */
   zrodlo: "wiadomosc" | "reczne" | "zamowienie";
   /**
    * Lista „Pasuje do" z treści oferty.
@@ -375,7 +375,7 @@ export type OfertaRozmowy = {
     nazwa: string; sku: string | null; cenaGrosze: number | null;
     waluta: string | null; status: string | null; syncedAt: string;
     /**
-     * Co wiadomo o zdjęciu listingowym (0.214.0; do 0.213.0 `maZdjecie`).
+     * Co wiadomo o zdjęciu listingowym.
      *
      * Sam adres do panelu NIE JEDZIE i to jest cała różnica: gdyby jechał,
      * front miałby w ręku `https://a.allegroimg.com/…` i prędzej czy później
@@ -384,7 +384,7 @@ export type OfertaRozmowy = {
      */
     zdjecie: StanZdjeciaOferty;
   } | null;
-  /** Kartoteka wywiedziona z SKU oferty (0.179.0) — PROPOZYCJA z powodem. */
+  /** Kartoteka wywiedziona z SKU oferty — PROPOZYCJA z powodem. */
   kartoteka: DopasowanieKartoteki;
 };
 
@@ -411,7 +411,7 @@ export type KartaTowaru = {
   identyfikatory?: Array<{ rodzaj: RodzajIdentyfikatora; wartosc: string; zrodlo: ZrodloIdentyfikatora }>;
   locs: string[];
   /**
-   * Ceny z kartoteki Subiekta — WSZYSTKIE poziomy (0.396.0, decyzja właściciela).
+   * Ceny z kartoteki Subiekta — WSZYSTKIE poziomy, decyzją właściciela.
    *
    * Pole ADDYTYWNE i opcjonalne, bo czyta tę odpowiedź także kolektor
    * (`ignoreUnknownKeys` w `Dtos.kt`), a ceny go nie dotyczą. Pusta lista
@@ -421,7 +421,7 @@ export type KartaTowaru = {
   mag: { stan: number; rez: number; avail: number };
   magazyny: Array<{ magId: number; kod: string; nazwa: string; stan: number; rez: number }>;
   /**
-   * Przyjechało, jeszcze nie na półce, i zamówione u dostawcy (0.502.0).
+   * Przyjechało, jeszcze nie na półce, i zamówione u dostawcy.
    * Serwer zwracał je od dawna, czytał tylko kolektor. Opcjonalne, bo starszy
    * serwer ich nie niesie, a brak pola ma znaczyć „nie wiemy", nie „nic".
    */
@@ -467,10 +467,10 @@ export interface SprawaZakupu {
 /**
  * Jedna pozycja listy „Moje" (S4 spoiwa) — z której kolejki i co to za sprawa.
  *
- * TRZY KOLEJKI, nie cztery: zwrot nie ma prowadzącego od 0.370.0, bo
+ * TRZY KOLEJKI, nie cztery: zwrot nie ma prowadzącego, bo
  * przechodzi przez biuro jako kolejka decyzji, a nie jako czyjaś sprawa.
  *
- * `klient` TO NIE CZWARTA KOLEJKA (S6, 0.535.0), tylko sprawa klienta, którą
+ * `klient` TO NIE CZWARTA KOLEJKA (S6), tylko sprawa klienta, którą
  * ta osoba prowadzi. Wchodzi do tej samej listy, bo „Moje" odpowiada na „co
  * teraz zrobić", a krok z terminem jest dokładnie taką odpowiedzią. Lustro
  * `MojaSprawa` z `services/droga-klienta.ts`.
@@ -496,7 +496,7 @@ export interface MojaSprawa {
   dzis?: boolean;
   /** Zdanie pierwszego zdarzenia od klienta po naszym ostatnim ruchu. */
   nowe?: string | null;
-  /** Zdanie najważniejszej dosyłki sprawy (0.536.0): kłopot, brak numeru, w drodze, doręczona. */
+  /** Zdanie najważniejszej dosyłki sprawy: kłopot, brak numeru, w drodze, doręczona. */
   dosylka?: string | null;
 }
 
@@ -510,7 +510,7 @@ export interface MiesiacEskalacji {
 }
 
 /**
- * Co wiemy o paczce do klienta (0.393.0).
+ * Co wiemy o paczce do klienta.
  *
  * `sprawdzonoAt === null` znaczy „jeszcze nie pytaliśmy Allegro", a nie „nie
  * ma przesyłki" — to dwa różne zdania i dwa różne następne ruchy agenta.
@@ -577,14 +577,14 @@ export type OsRozmowy = {
   zamowienie: ZamowienieRozmowy | null;
   oferta: OfertaRozmowy | null;
   /**
-   * Zakupy tego kupującego — kandydaci do powiązania (0.397.0).
+   * Zakupy tego kupującego — kandydaci do powiązania.
    *
    * Wątek z Allegro niesie JEDEN obiekt powiązany, więc pytanie zadane pod
    * ofertą numeru zakupu nie ma. Mostkiem jest login kupującego, ten sam,
    * którym chodzi zakładka „Klient".
    */
   kandydaciZamowien: KandydatZamowienia[];
-  /** Zwroty TEGO zamówienia (0.221.0) — ten sam wiersz, co w kolejce zwrotów. */
+  /** Zwroty TEGO zamówienia — ten sam wiersz, co w kolejce zwrotów. */
   zwroty: Zwrot[];
   /* Spoiwo kolejek (S1 i S3, `docs/obsluga-klienta-calosc.md`): reklamacje
      tego zakupu oraz jego droga przez kolejki. */
@@ -596,7 +596,7 @@ export type OsRozmowy = {
   przeplyw: PropozycjaPrzeplywu[];
 };
 
-/* ── Szkic odpowiedzi z Copilota (§14.6, 0.231.0) ────────────────────────────
+/* ── Szkic odpowiedzi z Copilota (§14.6) ────────────────────────────────────
    Serwer układa fakty, model pisze prozę, serwer sprawdza numery. Do szkicu
    agenta trafia WYŁĄCZNIE na kliknięcie — stąd `ocena`, która jest miernikiem. */
 export type OcenaSzkicu = "wstawiony" | "zastapiony" | "odrzucony";
@@ -612,10 +612,9 @@ export type SzkicCopilota = {
   przez: string;
   ocena: OcenaSzkicu | null;
   /**
-   * SKĄD MODEL TO WIE (0.253.0) — rachunek za tekst, który agent zaraz wyśle.
+   * SKĄD MODEL TO WIE — rachunek za tekst, który agent zaraz wyśle.
    *
-   * Do 0.252.0 model nie miał prawa użyć własnej wiedzy: numer spoza faktów
-   * wywracał cały szkic. Właściciel zdjął ten zakaz pod jednym warunkiem —
+   * Model może użyć własnej wiedzy pod jednym warunkiem właściciela:
    * „pełna swoboda, ale niech przy tym załącza źródła". Ta lista jest tym
    * warunkiem, a okno „Skąd to wiem" w panelu jest miejscem, w którym agent
    * ją czyta, ZANIM kliknie „Wstaw".
@@ -746,11 +745,9 @@ export type RodzajIdentyfikatora = "oem" | "nr_oryg" | "katalog_obcy" | "stare_s
    `login: null` znaczy „wątek bez rozmówcy", a nie „klient bez historii":
    ekran mówi wtedy, że nie wie, zamiast pokazywać pustą oś. */
 export type WpisHistorii = {
-  /* Trzy rodzaje doszły w S2 spoiwa (`docs/obsluga-klienta-calosc.md`).
-     Zakładka obiecywała historię klienta, a znała wyłącznie zakupy i rozmowy:
-     zwrot i reklamacja tego samego kupującego nie docierały tu
-     wcale, więc agent czytał „nic się nie działo" o kliencie, który miesiąc
-     wcześniej odesłał towar. */
+  /* Zwrot i reklamacja należą do historii klienta tak samo jak zakupy
+     i rozmowy. Bez nich agent czytałby „nic się nie działo" o kliencie,
+     który odesłał towar (`docs/obsluga-klienta-calosc.md`, S2). */
   rodzaj: "zakup" | "rozmowa" | "zwrot" | "reklamacja";
   at: string; tresc: string;
   zamowienieId: string | null; link: string | null; rozmowaId: number | null;
@@ -758,7 +755,7 @@ export type WpisHistorii = {
   sprawaId: number | null;
 };
 
-/** Dokumenty sprzedaży zamówienia rozmowy (0.499.0) — tylko z jego numerem. */
+/** Dokumenty sprzedaży zamówienia rozmowy — tylko z jego numerem. */
 export type DokumentySprzedazy = {
   /** Numer zamówienia rozmowy; `null`, gdy rozmowa go nie ma. */
   zamowienie: string | null;
@@ -767,7 +764,7 @@ export type DokumentySprzedazy = {
 
 export type HistoriaKlienta = {
   login: string | null; wpisy: WpisHistorii[];
-  /* Sprawa klienta przy historii źródła (S6, 0.535.0). Wiązanie po loginie
+  /* Sprawa klienta przy historii źródła (S6). Wiązanie po loginie
      musi działać w obie strony (`CLAUDE.md`): profil prowadzi do rozmowy, więc
      rozmowa, zwrot i reklamacja prowadzą do sprawy. Opcjonalne, bo profil
      składa historię sam i sprawę pokazuje własną kartą. */
@@ -780,7 +777,7 @@ export type HistoriaKlienta = {
  * na każdym ekranie to samo.
  */
 export interface NoweZdarzenie {
-  /* Dwa rodzaje dosyłki (0.536.0) nie przychodzą od klienta, tylko od
+  /* Dwa rodzaje dosyłki nie przychodzą od klienta, tylko od
      przewoźnika przez Allegro. Budzą sprawę, bo to na ten fakt czeka krok
      dosyłki — `cel` mają zawsze `null`, bo dosyłka nie ma własnego ekranu. */
   rodzaj: "rozmowa" | "zwrot_nowy" | "zwrot_nadany" | "zwrot_dotarl" | "reklamacja"
@@ -792,7 +789,7 @@ export interface NoweZdarzenie {
 }
 
 /**
- * Sprawa klienta (S6, 0.535.0) — lustro `SprawaKlienta`
+ * Sprawa klienta (S6) — lustro `SprawaKlienta`
  * z `services/prowadzenie-klienta.ts`.
  *
  * Stoi TUTAJ, a nie w `spoiwo.ts`, choć tam mieszkają jej hooki: niesie ją
@@ -818,12 +815,12 @@ export interface SprawaKlienta {
   nowe: NoweZdarzenie[];
   /** Odcisk faktów, które ekran narysował — zapis go odsyła (świeżość, dekalog 4). */
   odcisk: string;
-  /** Dosyłki tej sprawy, najnowsza pierwsza (0.536.0). Zawsze obecne, czasem puste. */
+  /** Dosyłki tej sprawy, najnowsza pierwsza. Zawsze obecne, czasem puste. */
   dosylki: DosylkaSprawy[];
 }
 
 /**
- * Dosyłka sprawy klienta (0.536.0) — lustro `DosylkaSprawy` z serwera.
+ * Dosyłka sprawy klienta — lustro `DosylkaSprawy` z serwera.
  *
  * `opis` SKŁADA SERWER, jak zdanie `NoweZdarzenie`. Ten sam stan dosyłki stoi
  * na profilu, na liście „Moje” i przy historii każdej kolejki; trzy ekrany
@@ -860,7 +857,7 @@ export interface DosylkaSprawy {
 }
 
 /**
- * Założone śledzenie dosyłki (0.536.1). Tyle oddaje „Śledź dosyłkę” przy
+ * Założone śledzenie dosyłki. Tyle oddaje „Śledź dosyłkę” przy
  * zwrocie — porażkę ta trasa mówi błędem 400, nie tym kształtem.
  */
 export type DosylkaZalozona = {
@@ -876,7 +873,7 @@ export type DosylkaZalozona = {
 };
 
 /**
- * Wynik założenia śledzenia dosyłki przy odmowie wypłaty (0.536.1).
+ * Wynik założenia śledzenia dosyłki przy odmowie wypłaty.
  *
  * DWA KSZTAŁTY, NIE JEDEN Z FLAGĄ. Odmowa w Allegro jest nieodwracalna, a
  * zapis u nas może się nie udać; ekran MUSI wtedy powiedzieć, że odmowa
@@ -887,13 +884,13 @@ export type WynikDosylki = DosylkaZalozona | { zalozona: false; blad: string };
 
 export type Zadanie = {
   id: number; rodzaj: string; tytul: string; instrukcja: string;
-  /* Skąd zadanie się wzięło (0.408.0) — pytanie klienta, numer oferty, podpis
+  /* Skąd zadanie się wzięło — pytanie klienta, numer oferty, podpis
      o wskazanej kartotece. WYŁĄCZNIE dla biura: kolektor dostaje towar
-     i polecenie. `null` przy zadaniach zakładanych ręcznie i sprzed 0.408.0. */
+     i polecenie. `null` przy zadaniach zakładanych ręcznie i starych. */
   kontekst: string | null;
   twId: number | null; symbol: string | null; nazwaTowaru: string | null;
   lokalizacja: string | null; priorytet: "normalny" | "pilny";
-  /* `odeslane` (0.352.0): hala odpowiedziała, ale bez wyniku. Ruch wraca do
+  /* `odeslane`: hala odpowiedziała, ale bez wyniku. Ruch wraca do
      biura, a nie do magazynu — dlatego to osobny status, nie `anulowane`
      (anuluje zlecający) ani `wykonane` (to byłby pomiar, którego nie ma). */
   status: "nowe" | "w_toku" | "wykonane" | "anulowane" | "odeslane";
@@ -906,7 +903,7 @@ export type Zadanie = {
   zleconeOdMs: number | null;
   /* Zdjęcia od hali (§13.3) — sama lista, treść ciągnie `useZdjecieZadania`. */
   zalaczniki: ZalacznikZadania[];
-  /* Adres sprawy, z której zlecono zadanie (0.502.0); `null` przy ręcznym.
+  /* Adres sprawy, z której zlecono zadanie; `null` przy ręcznym.
      Opcjonalne, bo starszy serwer go nie niesie. */
   cel?: string | null;
 }
@@ -947,7 +944,7 @@ export type Zdrowie = {
     wysylkiDoSprawdzenia: number;
   };
   worker?: { zyje: boolean; mode: string; widziany: string | null };
-  /* Pola karty SERWER w stanie systemu (0.441.0). Trasa oddawała je
+  /* Pola karty SERWER w stanie systemu. Trasa oddawała je
      zawsze; panel ich nie czytał, bo karta mieszkała w `biuro.html`. */
   wersja?: string;
   mode?: string;
@@ -955,8 +952,8 @@ export type Zdrowie = {
   configZPliku?: string | null;
   ok?: boolean;
   audyt?: { zdarzen?: number; najstarsze?: string | null; bazaBajtow?: number } | null;
-  /* Kopie bazy robione przez sam serwer (0.487.0). Brak pola to serwer
-     sprzed tego wydania — karta mówi wtedy „—", a nie „brak kopii". */
+  /* Kopie bazy robione przez sam serwer. Brak pola to starszy
+     serwer — karta mówi wtedy „—", a nie „brak kopii". */
   kopie?: {
     nocna: string | null;
     przedAktualizacja: string | null;
@@ -989,19 +986,19 @@ export type WynikWysylki = {
 /** Szczegóły 409 przy kontroli świeżości — z nich rysuje się dialog konfliktu. */
 export type SzczegolyWysylki = {
   lastMessageId?: number | null;
-  /* `rola` jedzie tylko przy reklamacji (0.224.0): rozmowa bywa trójstronna,
+  /* `rola` jedzie tylko przy reklamacji: rozmowa bywa trójstronna,
      więc dopisek bywa doradcy Allegro, a nie kupującego. Skrzynka jej nie
      podaje i nie potrzebuje — tam autor dopisku jest zawsze klientem. */
   nowaWiadomosc?: { id: number; tresc: string; at: string | null; rola?: string | null } | null;
   kluczIdempotencji?: string;
-  /* Drugi rodzaj konfliktu wysyłki (0.159.0): przy rozmowie siedzi kto inny.
+  /* Drugi rodzaj konfliktu wysyłki: przy rozmowie siedzi kto inny.
      Osobne pole, bo i pytanie do agenta jest inne — tam „klient dopisał",
      tu „kolega już przy tym siedzi". */
   trzymajacyName?: string;
   trzymajacyUserId?: number;
 };
 
-/* ── Zwroty klienckie (0.150.0) ──────────────────────────────────────────────
+/* ── Zwroty klienckie ────────────────────────────────────────────────────────
    Kształt lustrzany do `WierszZwrotu` w `server/src/services/zwroty.ts`.
    Kubełek i sygnały LICZY SERWER — panel ich nie wyprowadza po raz drugi,
    bo dwie kopie tej reguły rozjechałyby się przy pierwszej poprawce jednej
@@ -1011,7 +1008,7 @@ export type SzczegolyWysylki = {
 export type Kubelek = "decyzja" | "ocena" | "zwrot" | "korekta" | "zamkniety" | "odrzucony";
 
 /**
- * Ocena towaru ze zwrotu (0.375.0).
+ * Ocena towaru ze zwrotu.
  *
  * Trzy wartości, dwa zachowania. `stan` i `utylizacja` mają swój koszyk
  * i swój dokument MM; `outlet` nie ma żadnego, bo magazyn outletowy obsługuje
@@ -1019,7 +1016,7 @@ export type Kubelek = "decyzja" | "ocena" | "zwrot" | "korekta" | "zamkniety" | 
  */
 export type Ocena = "stan" | "utylizacja" | "outlet";
 
-/** Pozycja czekająca na przeniesienie na regał outletowy (0.375.0). */
+/** Pozycja czekająca na przeniesienie na regał outletowy. */
 export interface PozycjaNaOutlet {
   pozycjaId: number;
   zwrotId: number;
@@ -1051,7 +1048,7 @@ export interface Dopasowanie {
   poKolumnie: "offer_id" | "external_id" | null;
 }
 
-/* Rabat transakcyjny przy pozycji zwrotu (0.164.0). Stan LICZY SERWER —
+/* Rabat transakcyjny przy pozycji zwrotu. Stan LICZY SERWER —
    panel go nie wyprowadza, bo wiąże wniosek z pozycją zamówienia, a to
    złączenie ma jedno miejsce. */
 export type StanRabatu = {
@@ -1070,22 +1067,22 @@ export type StanRabatu = {
 
 export interface PozycjaZwrotu {
   /**
-   * Ile sztuk NAPRAWDĘ wróciło. `null` = nikt jeszcze nie liczył (0.212.0).
+   * Ile sztuk NAPRAWDĘ wróciło. `null` = nikt jeszcze nie liczył.
    *
    * `ilosc` obok niesie DEKLARACJĘ klienta i nadpisuje ją synchronizator.
    */
   iloscZwrocona: number | null;
   id: number;
-  /** `allegro` = ze zgłoszenia klienta, `biuro` = dopisana u nas (0.184.0). */
+  /** `allegro` = ze zgłoszenia klienta, `biuro` = dopisana u nas. */
   zrodlo: string;
   offerId: string | null;
   /**
-   * Numer oferty wzięty z POZYCJI ZAMÓWIENIA (0.213.0) — tym wolno pytać
+   * Numer oferty wzięty z POZYCJI ZAMÓWIENIA — tym wolno pytać
    * o zdjęcie listingowe. `offerId` wyżej należy do przestrzeni, której nie
    * znamy, więc do niczego poza wyświetleniem się nie nadaje.
    */
   ofertaZamowienia: string | null;
-  /** Co wiadomo o zdjęciu tej oferty (0.214.0) — liczy SERWER. */
+  /** Co wiadomo o zdjęciu tej oferty — liczy SERWER. */
   ofertaZdjecie: StanZdjeciaOferty;
   nazwa: string;
   ilosc: number;
@@ -1102,7 +1099,7 @@ export interface PozycjaZwrotu {
   twZrodlo: string | null;
   sku: string | null;
   ean: string | null;
-  /** Ile MNIEJ oddajemy za tę pozycję i dlaczego (0.170.0). */
+  /** Ile MNIEJ oddajemy za tę pozycję i dlaczego. */
   potracenieGrosze: number | null;
   potraceniePowod: string | null;
   propozycja: Dopasowanie | null;
@@ -1120,12 +1117,12 @@ export interface PozycjaZamowienia {
   zwracana: boolean;
   /** Ile sztuk WRACA — mniej niż `ilosc`, gdy klient oddaje część zakupu. */
   wracaIlosc: number;
-  /** Kartoteka Subiekta za pozycją (0.215.0): z pamięci wskazań albo po SKU. `null` = brak. */
+  /** Kartoteka Subiekta za pozycją: z pamięci wskazań albo po SKU. `null` = brak. */
   twId: number | null;
   twSymbol: string | null;
   /** Zdanie źródła pisze serwer (§4.3). */
   twZrodlo: string | null;
-  /** Co wiadomo o zdjęciu OFERTY tej pozycji (0.217.0) — liczy serwer. */
+  /** Co wiadomo o zdjęciu OFERTY tej pozycji — liczy serwer. */
   ofertaZdjecie: StanZdjeciaOferty;
 }
 
@@ -1160,21 +1157,18 @@ export interface Zwrot {
   konto?: number | null;
   utworzono: string;
   paczkaAt: string | null;
-  /** Kiedy paczka DOTARŁA do nas — z trackingu przewoźnika (0.187.0). */
+  /** Kiedy paczka DOTARŁA do nas — z trackingu przewoźnika. */
   dostarczonoAt: string | null;
   /** Ostatni kod przewoźnika: `NOTICE_LEFT`, `ISSUE`, `RETURNED`… */
   przesylkaStatus: string | null;
   /**
-   * Numer listu przewozowego paczki zwrotnej (0.344.0).
-   *
-   * Do 0.343.0 panel go nie znał: polityka 0.163.0 trzymała numer wyłącznie
-   * w kopii odpowiedzi Allegro, więc szukanie po nim wymagało Entera i pytania
-   * serwera. Decyzja właściciela zdjęła tę politykę.
+   * Numer listu przewozowego paczki zwrotnej. Panel go zna, więc szukanie
+   * po nim nie wymaga Entera i pytania serwera.
    */
   waybill: string | null;
   kubelek: Kubelek;
   /**
-   * Kwota ustalona, pieniądze jeszcze nie wyszły (0.476.0). Trzyma zwrot
+   * Kwota ustalona, pieniądze jeszcze nie wyszły. Trzyma zwrot
    * w DO ZWROTU także po korekcie — do dnia, w którym Allegro oddaje samo.
    */
   pieniadzeCzekaja?: boolean;
@@ -1185,18 +1179,17 @@ export interface Zwrot {
   zamknietyRecznie: { kiedy: string; przez: string | null; powod: string | null } | null;
   sygnaly: Sygnal[];
   /**
-   * Termin OBSŁUGI: siedem dni od paczki u nas (0.341.0).
+   * Termin OBSŁUGI: siedem dni od paczki u nas.
    *
    * `null` znaczy, że paczka jeszcze nie wróciła, więc zegar nie ruszył —
-   * a nie że termin minął. Do 0.338.0 było to czternaście dni od zgłoszenia
-   * klienta i pole nigdy nie bywało puste.
+   * a nie że termin minął.
    */
   terminAt: string | null;
   dniDoTerminu: number | null;
   /** Ostatni status zwrotu po stronie Allegro; `FINISHED` = pieniądze oddane. */
   statusAllegro: string | null;
   /**
-   * Kiedy Allegro PIERWSZY RAZ powiedziało, że pieniądze wróciły (0.345.0).
+   * Kiedy Allegro PIERWSZY RAZ powiedziało, że pieniądze wróciły.
    *
    * `statusAllegro` mówi, co jest TERAZ: rozliczony zwrot idzie dalej osią
    * czasu Allegro, choćby na `COMMISSION_REFUND_CLAIMED` — a ten dotyczy
@@ -1209,29 +1202,29 @@ export interface Zwrot {
   linkZwrotu: string | null;
   zamowienie: Zamowienie | null;
   werdykt: string | null;
-  /** Powód odmowy wpisany przez biuro (0.210.0). */
+  /** Powód odmowy wpisany przez biuro. */
   werdyktPowod: string | null;
   kwotaGrosze: number | null;
   kwotaWariant: string | null;
   korektaNumer: string | null;
   /**
    * `subiekt` = numer znaleziony w Subiekcie, `reczne` = przepisany ręką,
-   * `sfera` = ZW wystawił automat po zapisaniu kwoty (0.349.0).
+   * `sfera` = ZW wystawił automat po zapisaniu kwoty.
    */
   korektaZrodlo: string | null;
   /**
-   * Zadanie automatycznego ZW (0.349.0); `null`, gdy automat go nie zlecił.
-   * Opcjonalne, bo panel ma działać także z serwerem sprzed tego wydania.
+   * Zadanie automatycznego ZW; `null`, gdy automat go nie zlecił.
+   * Opcjonalne, bo panel ma działać także ze starszym serwerem.
    */
   zw?: ZadanieZw | null;
   rejectionCode: string | null;
   /** `allegro` albo `nieodebrana` — paczka, której klient nie odebrał. */
   zrodlo: string;
-  /* PROWADZĄCEGO I TAGÓW ZWROT JUŻ NIE NIESIE (0.370.0). Serwer ich nie
+  /* PROWADZĄCEGO I TAGÓW ZWROT JUŻ NIE NIESIE. Serwer ich nie
      wysyła, więc typ nie ma prawa ich obiecywać — pole zadeklarowane, a nigdy
      nieprzychodzące, jest `undefined` udającym `null`. Reklamacja
      ma jedno i drugie dalej. */
-  /** Notatka biura — od 0.313.0 przy KAŻDYM zwrocie, nie tylko przy paczce. */
+  /** Notatka biura — przy KAŻDYM zwrocie, nie tylko przy paczce. */
   notatka: string | null;
   notatkaAt: string | null;
   notatkaPrzez: string | null;
@@ -1239,7 +1232,7 @@ export interface Zwrot {
   maPoprzedniaNotatke: boolean;
   kupujacyLogin: string | null;
   /**
-   * Nazwa odbiorcy Z NAKLEJKI (0.367.0).
+   * Nazwa odbiorcy Z NAKLEJKI.
    *
    * Paczki nakleja klient albo kurier, więc numeru listu z wracającego
    * kartonu nasz system nie widział nigdy — pierwszy skan takiej paczki
@@ -1251,7 +1244,7 @@ export interface Zwrot {
   przewoznik: string | null;
   rozmowy: RozmowaZwrotu[];
   /**
-   * Zwrot tego zamówienia z DRUGIEGO źródła (0.493.0) — paczka nieodebrana
+   * Zwrot tego zamówienia z DRUGIEGO źródła — paczka nieodebrana
    * obok zwrotu z Allegro. Opcjonalne, bo starszy serwer go nie przysyła.
    */
   drugiZwrot?: { id: number; numer: string; zrodlo: string } | null;
@@ -1262,7 +1255,7 @@ export interface Zwrot {
 }
 
 /**
- * Automatyczny ZW w kolejce Sfery (0.349.0).
+ * Automatyczny ZW w kolejce Sfery.
  *
  * `status` to status wiersza kolejki: `pending`, `processing` i
  * `waiting_for_doc` znaczą „numer przyjdzie sam", `error` — „wystaw ręką".
@@ -1275,7 +1268,7 @@ export interface ZadanieZw {
 }
 
 /**
- * Dokument sprzedaży przy zwrocie (0.174.0).
+ * Dokument sprzedaży przy zwrocie.
  *
  * `zrodlo` mówi, KTO go wskazał: `numer` to automat po numerze zamówienia na
  * dokumencie, `reczne` to wybór człowieka. Ekran musi je rozróżniać — wybór
@@ -1291,15 +1284,15 @@ export interface FakturaZwrotu {
 }
 
 /** Dokument, którym MOŻE być ta sprzedaż — z jawnym uzasadnieniem. */
-/** Pozycja zamówienia, której NIE MA jeszcze w zwrocie (0.184.0). */
+/** Pozycja zamówienia, której NIE MA jeszcze w zwrocie. */
 /**
- * Co naprawdę wejdzie do koszyka za jedną pozycję zwrotu (0.328.0).
+ * Co naprawdę wejdzie do koszyka za jedną pozycję zwrotu.
  *
  * Komplet sprzedany jedną ofertą leży na magazynie osobno, a rozbicie ma
  * wyłącznie paragon. `skladniki` puste znaczy: NIE WEJDZIE, a `powod` mówi
  * dlaczego — zdanie pisze serwer, panel go nie układa.
  */
-/** Wiersz paragonu — materiał, z którego biuro składa komplet (0.336.0). */
+/** Wiersz paragonu — materiał, z którego biuro składa komplet. */
 export interface WierszDokumentu {
   twId: number;
   symbol: string;
@@ -1310,7 +1303,7 @@ export interface WierszDokumentu {
 
 export interface SkladPozycji {
   /**
-   * `wKoszyku` mówi, czy ten składnik NAPRAWDĘ leży dziś w koszyku (0.335.0).
+   * `wKoszyku` mówi, czy ten składnik NAPRAWDĘ leży dziś w koszyku.
    * To stan wiersza `kosz_pozycja`, a nie zamiar: ptaszek rysowany z samego
    * składu obiecywałby dokument, którego zawartość wygląda inaczej.
    */
@@ -1331,12 +1324,12 @@ export interface SkladPozycji {
 export interface DoDopisania {
   zamPozycjaId: number;
   offerId: string | null;
-  /** Co wiadomo o zdjęciu tej oferty (0.217.0). */
+  /** Co wiadomo o zdjęciu tej oferty. */
   ofertaZdjecie: StanZdjeciaOferty;
   nazwa: string;
-  /** Ile sztuk BRAKUJE w zwrocie — tyle wejdzie przy dopisaniu (0.484.7). */
+  /** Ile sztuk BRAKUJE w zwrocie — tyle wejdzie przy dopisaniu. */
   ilosc: number;
-  /** Ile kupiono w tej linii; większe od `ilosc`, gdy część już wraca. Brak = serwer sprzed 0.484.7. */
+  /** Ile kupiono w tej linii; większe od `ilosc`, gdy część już wraca. Brak = starszy serwer. */
   zamowiono?: number;
   cenaGrosze: number;
   waluta: string;
@@ -1358,7 +1351,7 @@ export interface RozmowaZwrotu {
   temat: string | null;
   status: string;
   ostatniaAt: string | null;
-  /** Ostatnia prawdziwa wiadomość, do 280 znaków (0.486.1). Brak pola = serwer sprzed tej wersji. */
+  /** Ostatnia prawdziwa wiadomość, do 280 znaków. Brak pola = serwer sprzed tej wersji. */
   ostatniaTresc?: string | null;
   /** Czy ostatnie słowo napisał klient — wątek czeka na nas. */
   odKlienta?: boolean;
@@ -1368,7 +1361,7 @@ export interface WpisOsiZwrotu {
   id: number;
   rodzaj: string;
   tresc: string | null;
-  /** ISO. Nazwa PO NASZEMU, nie kolumną bazy — od 0.313.0, gdy oś dostała ekran. */
+  /** ISO. Nazwa PO NASZEMU, nie kolumną bazy, bo oś ma własny ekran. */
   kiedy: string;
   kto: string | null;
   /** Rozpakowane przez serwer; `null` przy wierszu bez danych albo zepsutym. */
@@ -1410,7 +1403,7 @@ export interface KolejkaZwrotow {
   stan: StanZwrotow;
 }
 
-/* ── Tagi spraw posprzedażowych (0.279.0) ──────────────────────────────────
+/* ── Tagi spraw posprzedażowych ────────────────────────────────────────────
    Tag na wierszu niesie TYLE, ile mieści czip: numer do zdjęcia i nazwę do
    przeczytania. Stan „aktywny" należy do słownika w Ustawieniach, nie do
    wiersza — na starej sprawie wyłączony tag ma być widoczny tak samo. */
@@ -1445,13 +1438,12 @@ export interface PokrycieSygnatur {
 }
 
 /**
- * Stan zapisu do Allegro przy zwrocie (0.190.0).
+ * Stan zapisu do Allegro przy zwrocie.
  *
  * Liczy go SERWER i to jest celowe: przeszkody (brak identyfikatora
  * płatności, pobranie, brak kwoty) są regułą serwera, a panel powtarzający ją
  * u siebie rozjechałby się z nią przy pierwszej zmianie. Rozjazd znaczyłby
- * przycisk obiecujący pracę, której serwer nie przyjmie — dokładnie ta blizna,
- * którą przy rabacie zgłosił właściciel w 0.175.0.
+ * przycisk obiecujący pracę, której serwer nie przyjmie.
  */
 export type StanZwrotuPieniedzy = {
   moznaZwrocic: boolean;
@@ -1468,7 +1460,7 @@ export type StanZwrotuPieniedzy = {
   /** NASZA odmowa, złożona z tego panelu. Odmowa z panelu Allegro jej nie ma. */
   odmowa: { kod: string; powod: string | null; kiedy: string | null } | null;
   /**
-   * Dosyłka związana z tym zwrotem (0.536.1). Zła paczka wraca, biuro
+   * Dosyłka związana z tym zwrotem. Zła paczka wraca, biuro
    * odmawia wypłaty kodem „Wysłaliśmy nowy towar” i wysyła właściwy towar.
    * Bez tej linijki ekran zwrotu nie mówił, czy ta druga paczka doszła.
    *
@@ -1480,7 +1472,7 @@ export type StanZwrotuPieniedzy = {
   /** Kod dosyłki, zamówienie i login kupującego znane, a nikt jej nie śledzi — ekran daje „Śledź dosyłkę”. */
   sledzicDosylke: boolean;
   /**
-   * Ślad po przelewie oddanym POZA Allegro (0.269.0). Przy pobraniu jedyny,
+   * Ślad po przelewie oddanym POZA Allegro. Przy pobraniu jedyny,
    * jaki może istnieć — to notatka biura o ruchu pieniędzy, nie sam ruch.
    */
   przelew: { kiedy: string; przez: string | null; referencja: string | null } | null;
@@ -1525,7 +1517,7 @@ export type ZwrotPlatnosciAllegro = {
  * dokument na regał zwrotów.
  */
 export interface KoszZwrotow {
-  /** `zwroty` na regał zwrotów, `odpad` na magazyn odpadu (0.211.0). */
+  /** `zwroty` na regał zwrotów, `odpad` na magazyn odpadu. */
   rodzaj: "zwroty" | "odpad";
   id: number;
   /** Kod z przedrostkiem `Z-`; numery bez niego należą do koszy z Subiekta. */
@@ -1534,19 +1526,19 @@ export interface KoszZwrotow {
   sztuk: number;
   otwartyOd: string;
   pozycje: Array<{
-    /** Id wiersza — po nim zdejmuje się to, co dołożono ręką (0.365.0). */
+    /** Id wiersza — po nim zdejmuje się to, co dołożono ręką. */
     id: number;
     symbol: string;
     nazwa: string;
     ilosc: number;
     /** Wiersz przyszedł z oceny zwrotu; tamten schodzi cofnięciem oceny. */
     zeZwrotu: boolean;
-    /** Zwrot, z którego wiersz przyszedł; `null` przy dołożonym ręką (0.476.0). */
+    /** Zwrot, z którego wiersz przyszedł; `null` przy dołożonym ręką. */
     zwrotId?: number | null;
   }>;
 }
 
-/* ── Reklamacje klienckie (0.222.0) ──────────────────────────────────────────
+/* ── Reklamacje klienckie ────────────────────────────────────────────────────
    Panel prowadzi wyłącznie reklamacje (`type: "CLAIM"` z `/sale/issues`).
    Dyskusje odsiewa synchronizator, więc tu ich nie ma i nie ma ich w panelu. */
 
@@ -1620,30 +1612,30 @@ export interface Reklamacja {
   zwrotWymagany: boolean | null;
   czatAktywny: boolean;
   wiadomosciIle: number;
-  /** Czy rozmowę urwał NASZ bezpiecznik stron (0.273.0), a nie takt. */
+  /** Czy rozmowę urwał NASZ bezpiecznik stron, a nie takt. */
   czatUrwany: boolean;
   ostatniaWiadomoscStatus: string | null;
   ostatniaWiadomoscAt: string | null;
   otwartoAt: string;
-  /* ── Kiedy to kupiono (0.282.0) ──────────────────────────────────────────
+  /* ── Kiedy to kupiono ────────────────────────────────────────────────────
      Dwa zegary i dwie etykiety: `zamowienie` to `boughtAt` z pełnego
      zamówienia, `sprawa` to `checkoutForm.createdAt` z ładunku reklamacji,
-     czyli złożenie koszyka. Nazwanie jednego drugim to blizna 0.121.0. */
+     czyli złożenie koszyka. Nie nazywamy jednego drugim. */
   kupionoAt: string | null;
   kupionoZrodlo: "zamowienie" | "sprawa" | null;
-  /* ── Wiek zakupu (0.413.0) ───────────────────────────────────────────────
+  /* ── Wiek zakupu ─────────────────────────────────────────────────────────
      Liczy SERWER, z tej samej daty, którą nazywa `kupionoZrodlo`. Odjęcie
      w panelu brałoby zegar przeglądarki, a ten bywa przestawiony — a przy
      rękojmi (dwa lata od wydania rzeczy) liczba dni jest argumentem, nie
      ozdobą. `null` = nie mamy daty zakupu, nie „kupione dziś". */
   dniOdZakupu: number | null;
   prowadzi: string | null;
-  /** Tożsamość prowadzącego — po NIEJ liczy się sito „Moje" (0.278.0). */
+  /** Tożsamość prowadzącego — po NIEJ liczy się sito „Moje". */
   prowadziId: number | null;
   prowadziAt: string | null;
-  /** Tagi biura (0.279.0). Zawężają listę, NIGDY nie przestawiają kolejki. */
+  /** Tagi biura. Zawężają listę, NIGDY nie przestawiają kolejki. */
   tagi: TagSprawy[];
-  /* ── Droga powrotna z notatki (0.280.0) ──────────────────────────────────
+  /* ── Droga powrotna z notatki ────────────────────────────────────────────
      Poprzedniej TREŚCI panel nie dostaje i nie potrzebuje: cofnięcie jest
      zamianą, więc drugie kliknięcie przywraca stan sprzed pierwszego. */
   notatkaAt: string | null;
@@ -1674,14 +1666,14 @@ export interface Reklamacja {
   link: string | null;
   linkZamowienia: string | null;
   linkOferty: string | null;
-  /* Co widać na wierszu (0.223.0). Reklamacja dotyczy jednej oferty, więc
+  /* Co widać na wierszu. Reklamacja dotyczy jednej oferty, więc
      obraz jest tożsamością sprawy, a nie ozdobą. */
   ofertaNazwa: string | null;
   ofertaZdjecie: StanZdjeciaOferty;
   /** Kartoteka POTWIERDZONA; propozycję liczy dopiero szczegół sprawy. */
   twId: number | null;
   twSymbol: string | null;
-  /** Czy sygnatura przyszła Z PARAGONU (0.400.0), a nie z dzisiejszej półki. */
+  /** Czy sygnatura przyszła Z PARAGONU, a nie z dzisiejszej półki. */
   twZParagonu: boolean;
   /* ── Kwota w grze i odstęp zgłoszenia ────────────────────────────────────
      Serwer wysyła te pola zawsze, a typ trzyma je OPCJONALNIE: panel bywa
@@ -1778,17 +1770,17 @@ export interface SzczegolReklamacji {
      droga zakupu przez kolejki. */
   sprawy: SprawaZakupu[];
   droga: PrzystanekDrogi[];
-  /** Zamówienie z pozycjami i CENAMI (0.393.0); `null` = jeszcze niepobrane. */
+  /** Zamówienie z pozycjami i CENAMI; `null` = jeszcze niepobrane. */
   zamowienie: Zamowienie | null;
-  /** Gdzie jest paczka do klienta (0.393.0); `null` = nie ma zamówienia. */
+  /** Gdzie jest paczka do klienta; `null` = nie ma zamówienia. */
   przesylka: StanPrzesylki | null;
   /* Ten sam kształt, co kartoteka przy rozmowie: serwer liczy oba
      `kartotekaOferty`. Wąski typ pewności pozwala kolumnie dowodów odróżnić
      powiązanie od braku bez porównywania napisów z palca. */
   kartoteka: DopasowanieKartoteki | null;
-  /** Karta faktów Copilota (0.275.0); `null`, gdy nikt jeszcze nie prosił. */
+  /** Karta faktów Copilota; `null`, gdy nikt jeszcze nie prosił. */
   karta: KartaSprawy | null;
-  /** Ile razy TO SAMO już się zdarzyło (0.413.0). */
+  /** Ile razy TO SAMO już się zdarzyło. */
   historia: HistoriaSprawy;
   /* Pole opcjonalne z tego samego powodu co kwota na wierszu: starszy serwer
      go nie zna, a brak ma znaczyć „nie wiemy". */
@@ -1868,7 +1860,7 @@ export interface SladHistorii {
 }
 
 /**
- * Czy to się już zdarzało — przy TYM towarze i przy TYM kliencie (0.413.0).
+ * Czy to się już zdarzało — przy TYM towarze i przy TYM kliencie.
  *
  * `null` znaczy „nie mamy po czym liczyć", nigdy „zero": sprawa bez
  * potwierdzonej kartoteki nie ma towaru, po którym szukać. Zero przy towarze,
@@ -1896,11 +1888,11 @@ export interface KartaSprawy {
   oczekiwanie: PoleKarty | null;
   dowody: PoleKarty[];
   brakuje: string[];
-  /** Co maszyna RADZI zrobić (0.276.0); `null`, gdy nie miała z czego. */
+  /** Co maszyna RADZI zrobić; `null`, gdy nie miała z czego. */
   rada: RadaMaszyny | null;
   /** `trafna`/`nietrafna` — liczone z werdyktu, nie z ankiety; `null` przed nim. */
   ocena: string | null;
-  /* Które zdjęcie było którym `Z` (0.283.0). Bez tej mapy cytat `Z2` byłby
+  /* Które zdjęcie było którym `Z`. Bez tej mapy cytat `Z2` byłby
      numerem, którego agent nie ma jak sprawdzić. */
   zdjecia: ZdjecieKarty[];
   model: string;
@@ -1931,7 +1923,7 @@ export interface RadaMaszyny {
   czegoNieWiem: string[];
 }
 
-/** Wynik wysyłki odpowiedzi w reklamacji (0.224.0). */
+/** Wynik wysyłki odpowiedzi w reklamacji. */
 export interface WynikOdpowiedziReklamacji {
   status: "sending" | "sent" | "send_uncertain" | "send_failed";
   externalMessageId: string | null;

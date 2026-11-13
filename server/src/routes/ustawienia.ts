@@ -5,7 +5,7 @@ import { pokrycieSygnatur } from "../services/sygnatury.js";
 import { eskalacje } from "../services/droga-klienta.js";
 import { ROLE_BIUROWE } from "../services/users.js";
 
-/* ── Trasy ekranu ustawień obsługi (0.169.0) ─────────────────────────────────
+/* ── Trasy ekranu ustawień obsługi ─────────────────────────────────
    ZERO ZAPISÓW i to jest umowa, tak samo jak licznik `method:` w biurze.
    Ustawienia obsługi opisują TŁO pracy; gdy kiedyś dojdzie tu zapis, dojdzie
    razem ze zdaniem w uzasadnieniu, dlaczego musi.

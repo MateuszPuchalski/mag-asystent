@@ -1,9 +1,9 @@
 import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 
-/* ── PODPOWIEDŹ KLAWISZA TYLKO WTEDY, GDY KLAWISZ DZIAŁA (0.500.0) ─────────
+/* ── PODPOWIEDŹ KLAWISZA TYLKO WTEDY, GDY KLAWISZ DZIAŁA ───────────────────
    Jednoliterowe skróty skrzynki (E, R, Z) milczą w polu tekstowym — tam
-   człowiek pisze, nie steruje. Znaczek „E" przy przycisku świecił jednak dalej,
-   więc agent w trakcie pisania widział obietnicę, której klawisz nie spełniał.
+   człowiek pisze, nie steruje. Znaczek „E" przy przycisku świecący dalej
+   byłby obietnicą, której klawisz nie spełnia.
    Interfejs, który kłamie o swoim stanie, uczy nie wierzyć podpowiedziom
    w ogóle (Norman: widoczność stanu; Nielsen, heurystyka 1). Znaczek znika
    więc dokładnie wtedy, kiedy klawisz przestaje działać. */
@@ -15,22 +15,19 @@ export const polePisania = (t: EventTarget | null): boolean => {
     || el.isContentEditable));
 };
 
-/* ── OKNA DIALOGOWE: FOKUS WCHODZI, ZOSTAJE I WRACA (0.546.0) ──────────────
-   Pomiar przed zmianą: z sześciu okien panelu fokus wchodził tylko do
-   szukania, a nie wracał z żadnego. Tabulator szedł za nakładkę, w ekran,
-   którego nie widać. Najdroższy skutek był gdzie indziej. Skróty strony
-   słuchają na `window` i pytały tylko o pole pisania, więc pod otwartym
-   oknem działały dalej. W zwrotach `Z` pod historią klienta oddawało
-   pieniądze za zwrot, którego agent w tej chwili nie widział
-   (`ekrany/Zwroty.test.tsx`).
+/* ── OKNA DIALOGOWE: FOKUS WCHODZI, ZOSTAJE I WRACA ────────────────────────
+   Bez tego tabulator idzie za nakładkę, w ekran, którego nie widać. Skróty
+   strony słuchają na `window`, więc pod otwartym oknem działałyby dalej:
+   w zwrotach `Z` pod historią klienta oddałoby pieniądze za zwrot, którego
+   agent w tej chwili nie widzi (`ekrany/Zwroty.test.tsx`).
 
    Stąd rejestr otwartych okien. Okno modalne wycisza skróty strony
    (`klawiszZajety`), trzyma tabulator u siebie i oddaje fokus temu, kto
    je otworzył (WAI-ARIA APG, wzorzec „Dialog (Modal)"). Okno niemodalne,
    jak szuflada towaru obok pracy, tylko przyjmuje i oddaje fokus.
 
-   Skan czytnika NIE jest skrótem i przechodzi dalej (`skaner.ts`). Właściciel
-   chce, żeby zwroty słuchały etykiety cały czas (0.468.0). */
+   Skan czytnika NIE jest skrótem i przechodzi dalej (`skaner.ts`), bo
+   zwroty słuchają etykiety cały czas. */
 
 interface Okno { el: HTMLElement; modalne: boolean }
 const okna: Okno[] = [];
@@ -120,8 +117,8 @@ export function useOkno<T extends HTMLElement>(
 
          PO MIKROZADANIU i tylko wtedy, gdy okna już nie ma w dokumencie.
          `StrictMode` odmontowuje efekt na próbę, a okno zostaje na ekranie.
-         Oddanie fokusu od razu odbierało go polu z `autoFocus` w szukaniu —
-         zmierzone w Chromium na serwerze deweloperskim. */
+         Oddanie fokusu od razu odebrałoby go polu z `autoFocus`
+         w szukaniu. */
       queueMicrotask(() => {
         if (el.isConnected) return;
         const teraz = document.activeElement;

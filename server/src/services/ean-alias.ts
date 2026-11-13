@@ -2,11 +2,9 @@ import { db } from "../db/db.js";
 import { subiekt } from "../context.js";
 import { classifyScan } from "../scan.js";
 
-/* ── Kody kreskowe nadane w WERTIS (0.37.0) ──────────────────────────────────
-   POWSTAŁO Z SYTUACJI PRZY REGALE: magazynier trzyma karton, na kartonie jest
-   kod, a kartoteka go nie ma. Do 0.37.0 jedyną drogą było „zapamiętaj i powiedz
-   biuru", czyli w praktyce nic — a nazajutrz ten sam karton zatrzymywał pracę
-   drugi raz.
+/* ── Kody kreskowe nadane w WERTIS ───────────────────────────────────────────
+   Magazynier trzyma karton z kodem, którego kartoteka nie ma. Bez nadania
+   kodu na miejscu ten sam karton zatrzymywałby pracę przy każdym skanie.
 
    ZAPIS IDZIE DWIEMA DROGAMI I TO JEST DECYZJA, NIE DUBLOWANIE. Kod ląduje
    najpierw tutaj, w bazie WERTIS, a dopiero potem — przez kolejkę — w Subiekcie.
@@ -45,17 +43,6 @@ export function aliasKodu(ean: string): WpisAliasu | undefined {
     ? { ean: r.ean, twId: r.tw_id, eanPrzed: r.ean_przed, queueId: r.queue_id,
         createdAt: r.created_at, createdBy: r.created_by }
     : undefined;
-}
-
-/** Kody nadane w WERTIS dla tej kartoteki — karta towaru pokazuje je osobno. */
-export function aliasyTowaru(twId: number): WpisAliasu[] {
-  return (
-    // kluczem głównym jest `ean`, więc porządek daje czas nadania, nie rowid
-    db().prepare("SELECT * FROM ean_alias WHERE tw_id = ? ORDER BY created_at, ean").all(twId) as any[]
-  ).map((r) => ({
-    ean: r.ean, twId: r.tw_id, eanPrzed: r.ean_przed, queueId: r.queue_id,
-    createdAt: r.created_at, createdBy: r.created_by,
-  }));
 }
 
 /**

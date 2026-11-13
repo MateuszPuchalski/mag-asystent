@@ -7,7 +7,7 @@ import path from "node:path";
 process.env.DB_PATH = path.join(fs.mkdtempSync(path.join(os.tmpdir(), "wertis-kandyd-")), "t.db");
 process.env.SGT_MODE = "seeded";
 
-/* ── Które zamówienie dotyczy tej rozmowy (0.397.0) ──────────────────────────
+/* ── Które zamówienie dotyczy tej rozmowy ────────────────────────────────────
    Zgłoszenie właściciela ze zrzutem: klient napisał pod OFERTĄ „otrzymałem
    paczkę, ale nie było w zestawie świecy" — i nigdzie nie było powiązania
    rozmowy z jego zamówieniem. Wątek niesie JEDEN obiekt powiązany, a przy
@@ -88,7 +88,7 @@ beforeEach(() => {
 
 test("pytanie spod OFERTY dostaje zakupy tego kupującego", () => {
   /* Sedno zgłoszenia: rozmowa nie ma numeru zamówienia i mieć go nie będzie,
-     a zakup leży w bazie i dotąd nie docierał tu wcale. */
+     a zakup leży w bazie. */
   zakup("chips20", "ord-1", "2026-09-15T08:00:00.000Z", [["Filtr powietrza", "13187800218"]]);
 
   const k = kandydaciZamowien(rozmowaId);
@@ -179,7 +179,7 @@ test("wskazanie zostawia ślad w dzienniku", () => {
   assert.equal(e?.user_id, "A. Lewandowska");
 });
 
-/* ── Zamówienie rozmowy z najnowszej wiadomości PO CZASIE (23 września 2026) ──
+/* ── Zamówienie rozmowy z najnowszej wiadomości PO CZASIE ─────────────────────
    Zrzut właściciela: „proszę o fv" z lipca pod jednym zamówieniem i „PROSZĘ
    O FV" z września pod drugim — ekran pokazał lipcowe. Wątek wczytany w całości
    jedną paczką od najnowszej dał wrześniowej wiadomości NIŻSZE `id`. */

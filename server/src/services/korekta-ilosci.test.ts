@@ -6,9 +6,8 @@ import path from "node:path";
 
 /* ── Korekta ilości odłożonej ────────────────────────────────────────────────
    Sedno: to poprawka POMYŁKI W LICZENIU, a nie twierdzenie o dostawie. Nie
-   rusza Subiekta i nie tworzy zgłoszenia — bo do 0.45.0 jedyną drogą było
-   właśnie zgłoszenie wyjątku, czyli zamiana pomyłki magazyniera w reklamację
-   do dostawcy.
+   rusza Subiekta i nie tworzy zgłoszenia — zgłoszenie wyjątku zamieniłoby
+   pomyłkę magazyniera w reklamację do dostawcy.
 
    Druga połowa to granice: pozycja z wyjątkiem i dostawa zamknięta zostają
    nietknięte. Obie są już częścią dokumentu, którego ta funkcja nie widzi.   */
@@ -95,11 +94,9 @@ test("korekta ustawia wartość BEZWZGLĘDNĄ, nie różnicę", () => {
 /* ── granice ──────────────────────────────────────────────────────────────── */
 
 test("korekta PONAD dokument przechodzi — od 0.64.0 nadmiar jest dozwolony", () => {
-  /* Do 0.64.0 stała tu odmowa „więcej nie da się odłożyć". Zniknęła razem
-     z dopuszczeniem nadmiaru przy odkładaniu, i musiała: skoro `+` wolno
-     przekroczyć fakturę, to jedyną drogą wyjścia z omyłkowego nadmiaru byłoby
-     zgłoszenie wyjątku — czyli reklamacja wystawiona dostawcy za własną
-     pomyłkę w liczeniu.
+  /* Bez górnej granicy: skoro `+` wolno przekroczyć fakturę, jedyną drogą
+     wyjścia z omyłkowego nadmiaru byłoby inaczej zgłoszenie wyjątku — czyli
+     reklamacja wystawiona dostawcy za własną pomyłkę w liczeniu.
 
      Nadmiar nie ginie po cichu: zgłoszenie do biura powstaje przy zamknięciu
      dostawy (`zglosNadmiary`), a nie tutaj. */

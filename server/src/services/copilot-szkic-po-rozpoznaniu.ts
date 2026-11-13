@@ -16,11 +16,10 @@ import { zamknietyProblem } from "./glos-allegro.js";
 import { zapiszPropozycje } from "./przeplyw-kategorii.js";
 import { wyslijNaZywo, type NaZywoDeps } from "./przeplyw-na-zywo.js";
 
-/* ── Szkic zaraz po rozpoznaniu (23 września 2026) ───────────────────────────
-   Właściciel: „ułóż odpowiedź automatycznie po klasyfikacji, gotową do
-   zatwierdzenia przez agenta". Do tej wersji po „Rozpoznaj" agent klikał
-   jeszcze „Ułóż odpowiedź" i czekał — a rozpoznanie niosło już wszystko,
-   czego szkic potrzebuje: kategorię, następny krok i od 0.474.0 wzorzec.
+/* ── Szkic zaraz po rozpoznaniu ──────────────────────────────────────────────
+   Odpowiedź układa się sama po klasyfikacji, gotowa do zatwierdzenia przez
+   agenta. Rozpoznanie niesie wszystko, czego szkic potrzebuje: kategorię,
+   następny krok i wzorzec.
 
    TRZY WEJŚCIA, JEDNA FUNKCJA: przycisk „Rozpoznaj", takt rozpoznania
    i poprawka kategorii przez agenta. Poprawka tworzy NOWĄ decyzję, więc

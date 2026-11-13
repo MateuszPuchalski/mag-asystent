@@ -1,4 +1,3 @@
-import React from "react";
 import { describe, expect, it, vi } from "vitest";
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
@@ -11,7 +10,7 @@ vi.mock("../api/rozmowy", () => ({
 
 const { ZamowieniaKlienta } = await import("./ZamowieniaKlienta");
 
-/* ── Zakupy tego klienta przy rozmowie (0.397.0) ─────────────────────────────
+/* ── Zakupy tego klienta przy rozmowie ───────────────────────────────────────
    Zgłoszenie właściciela ze zrzutem: klient napisał pod OFERTĄ „otrzymałem
    paczkę, ale nie było w zestawie świecy" — a rozmowa nie miała zamówienia
    wcale, bo wątek Allegro niesie JEDEN obiekt powiązany.

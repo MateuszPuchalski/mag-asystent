@@ -49,7 +49,7 @@ const scena = vi.hoisted(() => ({
      dwupozycyjnego, a dokładanie go do stałej listy przestawiłoby liczniki
      w testach szukania („2 pasujących zwrotów"). */
   zwroty: null as unknown[] | null,
-  /* Rozjazdy rekoncyliacji (0.313.0). Domyślnie PUSTE, bo pasek ma milczeć
+  /* Rozjazdy rekoncyliacji. Domyślnie PUSTE, bo pasek ma milczeć
      przy zerze — a większość testów tego pliku sprawdza co innego. */
   rozjazdy: [] as Array<{ rodzaj: string; klucz: string; opis: string; odKiedy: string | null }>,
   /* Decyzje z klawiatury MUSZĄ mieć atrapę: prawdziwa mutacja strzela
@@ -61,10 +61,10 @@ const scena = vi.hoisted(() => ({
      wszystkich pozostałych testach tego pliku. */
   szczegol: undefined as { pieniadze?: Record<string, unknown>; zwrot?: { id: number };
     kandydaciFaktury?: unknown[] } | undefined,
-  /* Kartoteka dla skanu EAN-u (0.468.0): kod → towar. Pusta = kartoteka kodu
+  /* Kartoteka dla skanu EAN-u: kod → towar. Pusta = kartoteka kodu
      nie zna, więc skan wraca do szukania zwrotu. */
   kartoteka: {} as Record<string, { twId: number; symbol: string }>,
-  /* Odmowa zapisu kwoty dla szybkiej ścieżki (0.481.0); pusta = zapis przechodzi. */
+  /* Odmowa zapisu kwoty dla szybkiej ścieżki; pusta = zapis przechodzi. */
   odmowaKwoty: "",
   /* Pudło, do którego serwer dołożył ocenioną pozycję. `null` znaczy „nie
      dołożył” — szybka ścieżka musi się wtedy zatrzymać przed kwotą. */
@@ -75,7 +75,7 @@ const scena = vi.hoisted(() => ({
   /* Lista paczek klienta i identyfikator zwrotu założonego z nieodebranej. */
   paczki: null as unknown[] | null,
   przyjetyZwrot: 0,
-  /* Wynik założenia dosyłki w odpowiedzi odmowy wypłaty (0.536.0). `null` =
+  /* Wynik założenia dosyłki w odpowiedzi odmowy wypłaty. `null` =
      odmowa kodem bez dosyłki, więc odpowiedź tego pola nie niesie. */
   dosylkaOdmowy: null as Record<string, unknown> | null,
   /* Odpowiedź „Śledź dosyłkę” przy zwrocie. Porażkę ta trasa mówi błędem
@@ -221,29 +221,17 @@ describe("Ekran zwrotów", () => {
     expect(screen.getByText("Przyjąć czy odrzucić?")).toBeInTheDocument();
   });
 
-  /* ── BUDŻET PASM NAD LISTĄ (audyt, 15 września 2026) ──────────────────
-     Pomiar na żywym ekranie: siedem pasm zabierało 344 px z 803 px kolumny,
-     czyli 43%, i było ich stałe — przy oknie 800 px kolejka pokazywała DWA
-     zwroty. Pasma nie powstały naraz: dokładało je po jednym siedem wydań,
-     a każde z osobna kosztowało „tylko trzydzieści pikseli".
+  /* ── BUDŻET PASM NAD LISTĄ ─────────────────────────────────────────────
+     Każde pasmo nad kolejką kosztuje „tylko trzydzieści pikseli", a razem
+     potrafią zostawić przy oknie 800 px dwa widoczne zwroty.
 
      Ten test nie mierzy pikseli — jsdom ich nie ma. Liczy PASMA, bo to one
      narastają, i zmusza kolejne do rozmowy z właścicielem zamiast do cichego
      wejścia. Podniesienie progu jest wolne; ma tylko zostawić zdanie.
 
-     PRÓG SCHODZI Z PIĘCIU DO CZTERECH (0.370.0) i to jest pierwszy raz, kiedy
-     idzie w dół. Zgłoszenie właściciela: „uprość panel zwrotów do wymaganego
-     minimum". Zeszły dwa pasma: filtrów (przewoźnik, daty, CSV — Synchronizuj
-     wszedł do rzędu pola szukania) i sita z tagami. Zostają cztery: kubełki,
-     szukanie, pytanie kubełka i pasek klawiszy.
-
-     PASEK KLAWISZY ZOSTAJE, bo właściciel go nie wskazał, a dekalog p. 2 mówi
-     wprost, że rozpoznanie jest tańsze od pamiętania. Traci tylko `m` i `n`,
-     które prowadziły do zdjętego sita.
-
-     Audyt z 15 września zbijał chrom, ale jego kryterium brzmiało „żadna
-     zmiana nie kasuje funkcji" — to wydanie kryterium ZMIENIA, na wyraźną
-     prośbę. Dlatego próg jest niższy, a nie tylko dotrzymany.               */
+     Cztery pasma: kubełki, szukanie, pytanie kubełka i pasek klawiszy.
+     PASEK KLAWISZY ZOSTAJE, bo dekalog p. 2 mówi wprost, że rozpoznanie
+     jest tańsze od pamiętania.                                              */
   it("nad listą stoją najwyżej cztery pasma — piąte wydałoby się samo", async () => {
     scena.zwroty = null;
     pokaz();
@@ -257,8 +245,7 @@ describe("Ekran zwrotów", () => {
     await userEvent.click(screen.getByRole("button", { name: /Do zwrotu/ }));
     /* Nagłówek środkowej kolumny i klawisze mają opisywać TEN SAM zwrot. */
     expect(screen.getByRole("heading", { name: "ZW-2" })).toBeInTheDocument();
-    /* Etykieta zmieniła się w 0.156.0 razem z modelem: zamiast wyboru
-       wariantu jest zaznaczanie pozycji i jeden zapis. */
+    /* Zamiast wyboru wariantu jest zaznaczanie pozycji i jeden zapis. */
     expect(screen.getByRole("button", { name: /Zapisz kwotę/ })).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /Przyjmij/ })).not.toBeInTheDocument();
   });
@@ -277,9 +264,7 @@ describe("Ekran zwrotów", () => {
   });
 
   it("pasek decyzji DZIAŁA — zdanie o czytaniu zeszło razem z 0.156.0", () => {
-    /* Do 0.155.0 stało tu „To wydanie tylko czyta", bo przycisk wyglądający
-       na działający i niedziałający jest gorszy od jego braku. Teraz działa,
-       więc to zdanie byłoby kłamstwem w drugą stronę. */
+    /* Przycisk działa, więc zdanie „tylko czyta" byłoby kłamstwem. */
     pokaz("/obsluga/zwroty/1");
     expect(screen.queryByText(/To wydanie tylko czyta/)).toBeNull();
     expect(screen.getByRole("button", { name: /Przyjmij/ })).toBeEnabled();
@@ -323,7 +308,7 @@ describe("Ekran zwrotów", () => {
   });
 
   it("szuka po LOGINIE kupującego, bo to jedyny uchwyt w rozmowie (0.337.0)", async () => {
-    /* Zgłoszenie właściciela. Numery odpowiadają na pytanie „gdzie jest TA
+    /* Numery odpowiadają na pytanie „gdzie jest TA
        paczka"; login na inne — „co jeszcze mam od TEGO klienta". Pada przy
        każdej rozmowie, w której klient mówi o dwóch przesyłkach naraz. */
     scena.zwroty = [
@@ -359,9 +344,7 @@ describe("Ekran zwrotów", () => {
   });
 
   it("filtr widzi NUMER LISTU bez pytania serwera (0.344.0)", async () => {
-    /* Do 0.343.0 numer żył wyłącznie w kopii odpowiedzi Allegro, więc filtr go
-       nie widział i szukanie po naklejce wymagało Entera. Decyzja właściciela
-       zdjęła politykę 0.163.0: „zapisuj numery paczek". */
+    /* Numer listu wchodzi do filtra, bo szuka się po naklejce. */
     scena.zwroty = [
       { ...zwrot(1, "decyzja", "ZW-1"), waybill: "600000367616070023174201" },
       { ...zwrot(2, "zwrot", "ZW-2") },
@@ -376,11 +359,9 @@ describe("Ekran zwrotów", () => {
   });
 
   it("DWA CZŁONY zawężają, choć trafiają w różne pola (0.367.0)", async () => {
-    /* Zgłoszenie właściciela: „szukanie nieodebranych paczek odbywa się głównie
-       za pomocą loginu użytkownika i innych informacji na przesyłce". Do
-       0.366.0 fraza szła do porównania w całości, więc „kowalski inpost" nie
-       znajdowało nic — nie dlatego, że tych danych nie ma, tylko dlatego, że
-       nie stoją obok siebie w jednym polu. */
+    /* Nieodebrane paczki szuka się głównie po loginie i danych z przesyłki.
+       „kowalski inpost" musi trafić, choć te dane nie stoją obok siebie
+       w jednym polu. */
     scena.zwroty = [
       { ...zwrot(1, "decyzja", "ZW-1"), odbiorcaNazwa: "Jan Kowalski", przewoznik: "INPOST" },
       { ...zwrot(2, "zwrot", "ZW-2"), odbiorcaNazwa: "Jan Kowalski", przewoznik: "DPD" },
@@ -436,14 +417,14 @@ describe("Ekran zwrotów", () => {
     pokaz();
     /* Kolejność członów jest tu ISTOTNA: „ZW-2 dpd" przechodziłoby przez stan
        jednoczłonowy „ZW-2" w połowie pisania i otwarcie byłoby wtedy zgodne
-       z regułą 0.165.0 („otwarcie w pół pisania nie jest wpadką"). Pytanie
+       z regułą („otwarcie w pół pisania nie jest wpadką"). Pytanie
        brzmi inaczej: czy otwiera FRAZA WIELOCZŁONOWA jako taka. Kursor stoi
        na ZW-1 z kubełka domyślnego, więc rozstrzyga nagłówek ZW-2. */
     await userEvent.type(szukajka(), "dpd ZW-2");
     expect(screen.getByText(/1 zwrot pasuje/)).toBeInTheDocument();
     expect(screen.queryByRole("heading", { name: "ZW-2" })).toBeNull();
 
-    /* Sam numer, bez drugiego członu, dalej otwiera — reguła z 0.165.0 stoi. */
+    /* Sam numer, bez drugiego członu, dalej otwiera. */
     await userEvent.clear(szukajka());
     await userEvent.type(szukajka(), "ZW-2");
     expect(await screen.findByRole("heading", { name: "ZW-2" })).toBeInTheDocument();
@@ -480,22 +461,21 @@ describe("Ekran zwrotów", () => {
 
   it("zakładka WSZYSTKIE pokazuje oba kubełki naraz, z plakietką przy wierszu", async () => {
     /* To zakładka do SZUKANIA, nie siódmy kubełek: kubełki zostają silnikiem
-       pracy, bo rejestr mieszający jedno z drugim skasowaliśmy w 0.140.0. */
+       pracy. */
     pokaz();
     expect(screen.queryByText("ZW-2")).toBeNull();
     await userEvent.click(screen.getByRole("button", { name: /Wszystkie/ }));
     expect(screen.getAllByText("ZW-2").length).toBeGreaterThan(0);
     expect(screen.getAllByText("Do zwrotu").length).toBeGreaterThan(0);
-    /* Pytanie nad LISTĄ milczy — nie ma czyje zadać. Od 0.214.0 nie ma go też
-       w nagłówku środkowej kolumny: stało tam nad przyciskami PRZYJMIJ
-       i ODRZUĆ, czyli pytało o to, na co odpowiedź była pod spodem. */
+    /* Pytanie nad LISTĄ milczy — nie ma czyje zadać. Nie ma go też
+       w nagłówku środkowej kolumny: pytałoby o to, na co odpowiedź stoi
+       pod spodem. */
     expect(screen.queryByText("Przyjąć czy odrzucić?")).toBeNull();
   });
 
   it("kolejność liczy ZEGAR USTAWOWY i nie ma jak jej przestawić", async () => {
-    /* Blizna 0.121.0: termin steruje kolejnością pracy. Przełącznik „od daty
-       nadania" zszedł w 0.370.0 razem z pasmem filtrów — odpowiadał na inne
-       pytanie („co przyszło najdawniej") niż to, które prowadzi tę pracę. */
+    /* Termin steruje kolejnością pracy: odpowiada na pytanie „co się
+       najbardziej pali". */
     pokaz();
     await userEvent.click(screen.getByRole("button", { name: /Wszystkie/ }));
     const kolejnosc = screen.getAllByRole("button").map((b) => b.textContent ?? "")
@@ -513,8 +493,8 @@ describe("Ekran zwrotów", () => {
        się surowy — licznik, który cicho gubi część liczb, jest gorszy od
        jego braku. */
     pokaz();
-    /* Od 15 września 2026 pasy są zwinięte w jeden wiersz („schowaj to gdzieś"):
-       liczba stoi na wierzchu, zdania są o kliknięcie dalej. */
+    /* Pasy są zwinięte w jeden wiersz: liczba stoi na wierzchu, zdania są
+       o kliknięcie dalej. */
     expect(screen.queryByText(/oferta bez SKU/)).toBeNull();
     await userEvent.click(screen.getByRole("button", { name: /pokaż szczegóły/ }));
     expect(screen.getByText(/Bez kartoteki: 3 z 8 pozycji w pracy/)).toBeInTheDocument();
@@ -551,8 +531,8 @@ describe("Ekran zwrotów", () => {
 
   it("przycisk synchronizacji woła Allegro i pokazuje jego odmowę", async () => {
     /* Takt zwrotów chodzi rzadko, bo zwrot ma termin w dniach. Biuro, które
-       właśnie przyjęło paczkę, wie o zwrocie wcześniej niż panel — i do
-       0.231.0 nie miało jak go poprosić o pobranie.
+       właśnie przyjęło paczkę, wie o zwrocie wcześniej niż panel, więc musi
+       móc poprosić o pobranie.
 
        Odmowa Allegro jedzie na ekran CAŁYM zdaniem: mówi, co naprawić,
        a sam kod HTTP nie mówi nic. */
@@ -574,12 +554,9 @@ describe("Ekran zwrotów", () => {
   });
 });
 
-/* ── Klawisze kubełka (0.284.0) ──────────────────────────────────────────────
-   Do 0.283.0 ekran rysował te litery przy przyciskach jako `<kbd>`, a żadna
-   z nich nic nie robiła: nasłuch znał wyłącznie `j`/`k` i cyfry kubełków.
-   Doktryna §25a.2 wypisywała je w tabeli, a §25a.3 obiecywał, że „typowy zwrot
-   to jeden klawisz" — więc obietnicę składał ekran i dokument naraz, a
-   dotrzymywała jej mysz.                                                     */
+/* ── Klawisze kubełka ────────────────────────────────────────────────────────
+   Litery przy przyciskach mają działać: §25a.2 wypisuje je w tabeli, a §25a.3
+   obiecuje, że „typowy zwrot to jeden klawisz".                             */
 describe("Klawisze kubełka", () => {
   const dwiePozycje = (id: number) => {
     const z = zwrot(id, "ocena", `ZO-${id}`);
@@ -600,8 +577,8 @@ describe("Klawisze kubełka", () => {
   });
 
   it("`S` w DO DECYZJI przyjmuje i ocenia pierwszą pozycję — jednym klawiszem", async () => {
-    /* Przegląd zwrotów z 23 września: kto ocenia towar na stan, ten zwrot
-       przyjął. Ocena idzie z wersją ODDANĄ przez przyjęcie. */
+    /* Kto ocenia towar na stan, ten zwrot przyjął. Ocena idzie z wersją
+       ODDANĄ przez przyjęcie. */
     scena.wolano = [];
     pokaz("/obsluga/zwroty/1");
     await userEvent.keyboard("s");
@@ -637,7 +614,7 @@ describe("Klawisze kubełka", () => {
       const otworz = vi.spyOn(window, "open").mockReturnValue(karta as unknown as Window);
       try {
         pokaz("/obsluga/zwroty/8");
-        /* Bez dostawy (0.484.5), choć wraca całe zamówienie — decyzja właściciela. */
+        /* Bez dostawy, choć wraca całe zamówienie — decyzja właściciela. */
         expect(screen.getByRole("button", { name: /Wszystko OK/ })).toHaveTextContent("99,98");
         await userEvent.keyboard("w");
         await waitFor(() => expect(karta.location.href).toContain("salescenter"));
@@ -751,7 +728,7 @@ describe("Klawisze kubełka", () => {
   });
 
   it("`Enter` w DO ZWROTU zapisuje kwotę z zaznaczenia", async () => {
-    /* Zaznaczenie mieszka w `Pozycje.tsx` i ma tam zostać (0.216.0), więc
+    /* Zaznaczenie mieszka w `Pozycje.tsx` i ma tam zostać, więc
        klawisz sięga po nie rejestrem z `zwroty/klawisze.ts`. */
     scena.wolano = [];
     pokaz("/obsluga/zwroty/2");
@@ -770,21 +747,18 @@ describe("Klawisze kubełka", () => {
 
   it("pomoc pokazuje klawisze OGLĄDANEGO kubełka", async () => {
     pokaz("/obsluga/zwroty/1");
-    /* Skróty siedzą pod „?" od 0.402.0 — reguła została ta sama: pokazane
-       klawisze mają być TYMI, które naprawdę działają. */
+    /* Skróty siedzą pod „?": pokazane klawisze mają być TYMI, które
+       naprawdę działają. */
     await userEvent.click(screen.getByRole("button", { name: /Skróty klawiszowe/ }));
     expect(screen.getByText("przyjmij")).toBeInTheDocument();
     expect(screen.queryByText("zapisz kwotę")).toBeNull();
-    /* SITA ZESZŁY W 0.370.0 razem z klawiszami `m` i `n` (komentarz przy
-       `useSkaner` w `Zwroty.tsx`). Pomoc obiecywała `n` jeszcze do 0.476.0,
-       a klawisz nie robił nic — przegląd zwrotów z 23 września. Asercja wraca
-       więc do postaci sprzed 0.315.0: pomoc nie ma prawa obiecywać `n`. */
+    /* Sita tu nie ma, więc pomoc nie ma prawa obiecywać `n`. */
     expect(screen.queryByText(/niczyje/)).toBeNull();
   });
 
   it("`Enter` w DO KOREKTY stawia kursor w polu numeru, niczego nie zapisując", async () => {
-    /* Audyt zwrotów, 15 września 2026: pasek obiecywał tu Enter, a klawisz
-       milczał. Numer wpisuje człowiek, więc pierwszy Enter nie ma czego zapisać. */
+    /* Numer wpisuje człowiek, więc pierwszy Enter nie ma czego zapisać —
+       stawia kursor w polu. */
     scena.wolano = [];
     scena.zwroty = [{ ...zwrot(6, "korekta", "ZK-6"), werdykt: "przyjety", kwotaGrosze: 4999 }];
     try {
@@ -795,10 +769,9 @@ describe("Klawisze kubełka", () => {
     } finally { scena.zwroty = null; }
   });
 
-  /* ── Korekta a pieniądze (audyt, 15 września 2026) ──────────────────────
-     Ekran przeczył sam sobie: `Decyzje.tsx` pisało „pieniądze oddajesz
-     przyciskiem niżej — także po zapisaniu korekty", a zapis numeru zabierał
-     ten zwrot z oczu. Biuro wystawia korektę zwykle PRZED wypłatą.          */
+  /* ── Korekta a pieniądze ─────────────────────────────────────────────────
+     Zapis numeru korekty nie zabiera zwrotu z oczu, dopóki wiszą pieniądze.
+     Biuro wystawia korektę zwykle PRZED wypłatą.                            */
   const kursor = () => document.querySelector("[aria-current]")?.textContent ?? "";
 
   const dwieKorekty = () => [
@@ -859,8 +832,7 @@ describe("Klawisze kubełka", () => {
 
   it("klawisz `Z` oddaje pieniądze także na zwrocie w DO KOREKTY", async () => {
     /* Należność nie siedzi w jednym kubełku, więc klawisz stoi PRZED gałęziami
-       kubełków. Ten zwrot jest ZAMKNIĘTY korektą, a pieniądze wiszą — do tego
-       audytu żaden klawisz nie robił tu nic. */
+       kubełków. Ten zwrot jest ZAMKNIĘTY korektą, a pieniądze wiszą. */
     scena.wolano = [];
     scena.zwroty = dwieKorekty();
     scena.szczegol = pieniadze({ moznaZwrocic: true });
@@ -940,9 +912,9 @@ describe("Klawisze kubełka", () => {
   });
 
   it("`j` po przyjęciu zwrotu idzie do NASTĘPNEGO, a nie przez niego przeskakuje", async () => {
-    /* Przyjęty zwrot znika z listy DO DECYZJI, a kursor zostaje na nim. Do
-       audytu z 15 września 2026 `j` liczyło wtedy od zera i gubiło co drugi
-       zwrot — praca kubełkiem z klawiatury omijała połowę kolejki. */
+    /* Przyjęty zwrot znika z listy DO DECYZJI, a kursor zostaje na nim.
+       `j` liczone od zera gubiłoby co drugi zwrot — praca kubełkiem
+       z klawiatury omijałaby połowę kolejki. */
     scena.zwroty = [zwrot(21, "decyzja", "ZD-21"), zwrot(22, "decyzja", "ZD-22"),
       zwrot(23, "decyzja", "ZD-23")];
     const klient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
@@ -967,11 +939,9 @@ describe("Klawisze kubełka", () => {
 });
 
 /* ── Przejście do następnego zwrotu nie zostawia pozycji poprzedniego ───────
-   Zgłoszenie właściciela z 24 września: po skanie kolejnego zwrotu na ekranie
-   został gaźnik z poprzedniego. Przyczyna: `Pozycje` i `Wiadomosc` stały obok
-   siebie z tym samym `key={zwrot.id}` (od 0.476.0). Dwa rodzeństwa z jednym
-   kluczem to dla Reacta błąd, po którym stary element potrafi zostać
-   w drzewie — i został, razem z sumą i przyciskiem cudzego zwrotu. */
+   `Pozycje` i `Wiadomosc` stoją obok siebie, kluczowane zwrotem. Dwa
+   rodzeństwa z jednym kluczem to dla Reacta błąd, po którym stary element
+   potrafi zostać w drzewie — razem z sumą i przyciskiem cudzego zwrotu. */
 describe("Zmiana zwrotu (0.484.4)", () => {
   it("po przejściu do następnego zwrotu nie ma pozycji poprzedniego", async () => {
     const z = (id: number, nazwa: string) => {
@@ -993,10 +963,9 @@ describe("Zmiana zwrotu (0.484.4)", () => {
   });
 });
 
-/* ── Rozjazdy nad kolejką (0.313.0) ──────────────────────────────────────────
-   Cztery kontrole rekoncyliacji dotyczące zwrotów liczyły się od dawna
-   i rysowały wyłącznie w `/biuro`. Obsługa pracuje na tym ekranie, więc raport
-   chroniący jej pracę wisiał tam, gdzie ona nie zagląda.                    */
+/* ── Rozjazdy nad kolejką ────────────────────────────────────────────────────
+   Cztery kontrole rekoncyliacji dotyczące zwrotów. Obsługa pracuje na tym
+   ekranie, więc raport chroniący jej pracę stoi tutaj.                      */
 describe("Pasek rozjazdów", () => {
   it("milczy, gdy nie ma czego zgłosić", () => {
     /* Pas z napisem „wszystko w porządku" uczy przewijać wzrokiem to miejsce
@@ -1006,10 +975,9 @@ describe("Pasek rozjazdów", () => {
   });
 
   it("liczy RODZAJAMI, a numery pokazuje dopiero po kliknięciu", async () => {
-    /* NAPRAWA Z 0.319.0. Pierwsza wersja rysowała każdy wiersz z osobna;
-       na żywej bazie wyszło ich czterysta trzydzieści trzy i pasek zjadł cały
-       ekran — kolejki nie było widać wcale. Czterysta razy to samo zdanie to
-       nie informacja, tylko szum: rozstrzyga LICZBA i RODZAJ. */
+    /* Na żywej bazie wierszy bywa kilkaset i rozwinięty pasek zjada cały
+       ekran. Czterysta razy to samo zdanie to nie informacja, tylko szum:
+       rozstrzyga LICZBA i RODZAJ. */
     scena.rozjazdy = [
       { rodzaj: "zwrot_po_terminie", klucz: "ZW-1",
         opis: "Zwrot ZW-1 po terminie ustawowym", odKiedy: "2026-09-01T09:00:00Z" },
@@ -1020,8 +988,8 @@ describe("Pasek rozjazdów", () => {
     ];
     try {
       pokaz();
-      /* Zwinięty wiersz mówi samą liczbę; pasek rodzajów jest pod kliknięciem
-         (15 września 2026, „schowaj to gdzieś"). */
+      /* Zwinięty wiersz mówi samą liczbę; pasek rodzajów jest pod
+         kliknięciem. */
       expect(screen.queryByLabelText("Rozjazdy zwrotów")).toBeNull();
       expect(screen.getByRole("button", { name: /Do sprawdzenia 3/ })).toBeInTheDocument();
       await userEvent.click(screen.getByRole("button", { name: /pokaż szczegóły/ }));
@@ -1037,8 +1005,8 @@ describe("Pasek rozjazdów", () => {
   });
 
   it("grupa rozjazdów zawęża listę przez kubełki, a grupa koszy prowadzi do koszy (0.537.0)", async () => {
-    /* Zgłoszenie właściciela: „co to właściwie oznacza w zakładce zwroty",
-       potem „zrób oba". ZW-2 stoi w DO ZWROTU, a otwarty kubełek to DECYZJA. */
+    /* Grupa zawęża listę ze wszystkich kubełków. ZW-2 stoi w DO ZWROTU,
+       a otwarty kubełek to DECYZJA. */
     scena.rozjazdy = [
       { rodzaj: "zwrot_rozliczony_bez_korekty", klucz: "ZW-2",
         opis: "Zwrot ZW-2: Allegro oddało pieniądze", odKiedy: "2026-09-01T09:00:00Z" },
@@ -1061,8 +1029,8 @@ describe("Pasek rozjazdów", () => {
   });
 
   it("DO DECYZJI dzieli się na cztery sita z licznikami, a sito zawęża listę (0.539.0)", async () => {
-    /* Zgłoszenie właściciela: „jak sprawdzić te 645?", potem „rozbij Do
-       decyzji na 4 sita". Po jednym zwrocie na sito i drugi w drodze. */
+    /* Do decyzji dzieli się na cztery sita. Po jednym zwrocie na sito
+       i drugi w drodze. */
     scena.zwroty = [
       { ...zwrot(21, "decyzja", "SD-21"), dostarczonoAt: "2026-09-01T09:00:00.000Z" },
       { ...zwrot(22, "decyzja", "SD-22"), przesylkaStatus: "IN_TRANSIT", dniDoTerminu: null, terminAt: null },
@@ -1093,19 +1061,10 @@ describe("Pasek rozjazdów", () => {
   });
 });
 
-/* ── Sito i tagi (0.315.0) ───────────────────────────────────────────────────
-   Reklamacje mają je od 0.278.0 i 0.279.0. Zwroty dostały je
-   decyzją właściciela z 13 września — razem z prowadzącym, którego ta sama
-   rozmowa najpierw odrzuciła, a potem przywróciła.                          */
+/* ── Bez sita i tagów ────────────────────────────────────────────────────────
+   Zwroty prowadzi całe biuro, więc sita Moje/Niczyje i tagów tu nie ma. */
 describe("Czego w kolejce zwrotów JUŻ NIE MA (0.370.0)", () => {
-  /* Zgłoszenie właściciela: „uprość panel zwrotów do wymaganego minimum",
-     a po pytaniu o szczegóły wskazanie wprost: sito Moje/Niczyje, tagi
-     spraw, filtry przewoźnika i dat, Pobierz CSV — i „usunąć zupełnie".
-
-     Ten test stoi w miejscu trzech, które pilnowały sita i tagów. Pilnuje
-     rzeczy odwrotnej i jest tu potrzebny z tego samego powodu, dla którego
-     one były: sito przy zwrotach wracało już raz tego samego dnia, w którym
-     zeszło (0.315.0). Bez tej asercji trzeci powrót przeszedłby po cichu. */
+  /* Ten test pilnuje, żeby sito nie wróciło po cichu. */
   it("sita, tagów i filtrów nie ma na ekranie", async () => {
     scena.zwroty = [{ ...zwrot(11, "decyzja", "ZT-11"), przewoznik: "DPD" }];
     try {
@@ -1115,15 +1074,14 @@ describe("Czego w kolejce zwrotów JUŻ NIE MA (0.370.0)", () => {
       }
       expect(screen.queryByLabelText(/Przewoźnik/)).toBeNull();
       expect(screen.queryByLabelText(/Paczka u nas/)).toBeNull();
-      /* Sam wiersz zostaje nietknięty — zeszły sita, nie kolejka. */
+      /* Sam wiersz zostaje nietknięty. */
       expect(screen.getAllByRole("listitem").length).toBe(1);
     } finally { scena.zwroty = null; }
   });
 
-  /* ── ETYKIETA CZY TOWAR (0.468.0) ──────────────────────────────────────
-     Zgłoszenie właściciela: „zakładka zwrotów powinna cały czas nasłuchiwać
-     skanu etykiety zwrotowej oraz odróżniać ją od skanu EAN-u produktu".
-     Decyzja: EAN znany kartotece idzie do koszyka. */
+  /* ── ETYKIETA CZY TOWAR ─────────────────────────────────────────────────
+     Zakładka cały czas nasłuchuje skanu etykiety zwrotowej i odróżnia ją od
+     EAN-u towaru. EAN znany kartotece idzie do koszyka. */
 
   /** Czytnik poza polem: seria znaków bez przerwy, na końcu Enter. */
   const czytnik = (kod: string) => {
@@ -1190,7 +1148,7 @@ describe("Czego w kolejce zwrotów JUŻ NIE MA (0.370.0)", () => {
   });
 
   it("nie odesłał: N odmawia w Allegro, potem odrzuca u nas — z gotowym powodem (0.505.0)", async () => {
-    /* Zgłoszenie właściciela przy 5ZRQ/2026, decyzja „zrób obie". */
+    /* Decyzja właściciela: obie drogi. */
     scena.wolano.length = 0;
     scena.zwroty = [{ ...zwrot(1, "decyzja", "5ZRQ/2026"), sygnaly: ["nie_odeslany"] }];
     pokaz("/obsluga/zwroty/1");
@@ -1240,7 +1198,7 @@ describe("Czego w kolejce zwrotów JUŻ NIE MA (0.370.0)", () => {
   });
 });
 
-/* ── Dosyłka pod odmową wypłaty (0.536.0) ──────────────────────────────────
+/* ── Dosyłka pod odmową wypłaty ─────────────────────────────────────────────
    Zła paczka wraca, biuro odmawia wypłaty kodem „Wysłaliśmy nowy towar”
    i wysyła właściwy towar. Ekran pilnuje: otwarcie zwrotu ze stanem dosyłki
    niczego nie zapisuje (liczy żądania inne niż GET, jak `DoDecyzji.test.tsx`);

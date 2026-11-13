@@ -1,11 +1,8 @@
-/* ── Logo dostawcy: dowolny obraz → mały PNG przycięty do treści (0.444.0) ──
-   Przeniesione z `naPng` w `biuro.html` (0.87.0) razem z uzasadnieniami.
-
-   PRZYCIĘCIE JEST TU NAJWAŻNIEJSZE i powstało ze zgłoszenia „logo za małe na
-   liście dostaw". Do 0.87.0 każde logo stało wyśrodkowane w KWADRACIE, a
-   logotypy to szerokie paski z nazwą firmy — więc dwie trzecie obrazu było
-   przezroczystym powietrzem. Kolektor skalował slot do wysokości kwadratu,
-   razem z tym powietrzem, i poszerzanie slotu nic nie dawało.
+/* ── Logo dostawcy: dowolny obraz → mały PNG przycięty do treści ────────────
+   PRZYCIĘCIE JEST TU NAJWAŻNIEJSZE. Logotypy to szerokie paski z nazwą
+   firmy, więc wyśrodkowane w KWADRACIE byłyby w dwóch trzecich
+   przezroczystym powietrzem. Kolektor skaluje slot do wysokości obrazu,
+   razem z tym powietrzem, i logo wyszłoby za małe na liście dostaw.
 
    TŁA NIE WYPEŁNIAMY. Logo bywa przezroczyste, a biały prostokąt pod nim
    wyglądałby na kolektorze jak naklejka na jasnym wierszu.

@@ -13,22 +13,18 @@ import {
 } from "./delivery.js";
 
 /* ── Cofanie pomyłek przy rozkładaniu dostawy ────────────────────────────────
-   ZGŁOSZENIE WŁAŚCICIELA: „jak już zaznaczyłem, że wszystko jest, a się
-   pomyliłem, to nie mogę tego cofnąć".
-
-   Do tego wydania pomyłka przy dostawie była w czterech miejscach nieodwracalna:
-   - dostawa zamykała się sama po ostatniej pozycji, a korekta ilości na
-     zamkniętej odmawiała — ostatniej pozycji nie dało się więc poprawić NIGDY;
-   - zła półka nie miała drogi powrotnej wcale, bo korekta rusza tylko liczbę;
-   - ZAKOŃCZ zamieniało nietknięte pozycje w pominięte na zawsze;
-   - zgłoszony wyjątek trzymał pozycję w stanie `problem` bez wyjścia.
+   Bez tego pomyłka przy dostawie byłaby w czterech miejscach nieodwracalna:
+   - dostawa zamyka się sama po ostatniej pozycji, a korekta ilości na
+     zamkniętej odmawia;
+   - zła półka nie ma innej drogi powrotnej, bo korekta rusza tylko liczbę;
+   - ZAKOŃCZ zamienia nietknięte pozycje w pominięte;
+   - zgłoszony wyjątek trzyma pozycję w stanie `problem`.
 
    Odłożenie kosztuje jeden skan i tak ma zostać (dekalog, punkt 3). Tani zapis
-   jest jednak do przyjęcia tylko przy tanim odwróceniu. Pasek COFNIJ usunięty
-   w 0.41.0 odwracał przez ZWŁOKĘ zapisu; tu zapis idzie od razu, a cofnięcie
-   jest osobną operacją, więc ścieżka główna nie płaci za nie nic.
+   jest jednak do przyjęcia tylko przy tanim odwróceniu. Zapis idzie od razu,
+   a cofnięcie jest osobną operacją, więc ścieżka główna nie płaci za nie nic.
 
-   Granica przez Subiekta jest ta sama co przy koszu (0.79.0): czekające
+   Granica przez Subiekta jest ta sama co przy koszu: czekające
    zadanie adresu się anuluje. Inaczej niż przy koszu wykonanego nie zostawiamy
    — dostaje zapis odwrotny wprzód, z pełnym śladem w kolejce. Przy dostawie
    pomyłka adresowa jest częstsza niż przy koszu, a „popraw na karcie towaru"
@@ -287,8 +283,8 @@ function przeliczStatus(lineId: number): string {
     .get(lineId) as { qty: number; dok: number } | undefined;
   if (!l) return "todo";
   /* `nadmiar` nie ustawia pozycji na `problem` (towar leży na półce), więc go
-     tu nie liczymy. Rozwiązany wyjątek człowieka trzyma pozycję tak jak
-     dotąd — rozwiązanie znaczy „biuro to załatwiło", nie „wraca do roboty". */
+     tu nie liczymy. Rozwiązany wyjątek człowieka dalej trzyma pozycję
+     — rozwiązanie znaczy „biuro to załatwiło", nie „wraca do roboty". */
   const wyjatki = db()
     .prepare(
       `SELECT COUNT(*) AS n FROM problem
@@ -484,8 +480,8 @@ export function cofnijOdlozenie(
 /**
  * Cofnij WSZYSTKIE odłożenia pozycji — dla korekty ilości do zera.
  *
- * `brak_przepisu`, gdy stos nie pokrywa całej odłożonej ilości (odłożenia
- * sprzed tego wydania, korekta po drodze). Wtedy nie wiadomo, do jakiego
+ * `brak_przepisu`, gdy stos nie pokrywa całej odłożonej ilości (odłożenie
+ * bez przepisu, korekta po drodze). Wtedy nie wiadomo, do jakiego
  * adresu wrócić, i korekta zostawia adres z jawnym zdaniem dla człowieka.
  */
 export function cofnijWszystkieOdlozenia(lineId: number, user: string): "cofniete" | "brak_przepisu" | Blad {
@@ -581,9 +577,8 @@ export function zmienPolke(
  * Wycofaj WŁASNE, nierozstrzygnięte zgłoszenie — np. „zła ilość", a brakujący
  * karton stał za paletą.
  *
- * Do tego wydania pozycja z wyjątkiem nie miała wyjścia ze stanu `problem`.
- * Nawet rozwiązanie wyjątku przez biuro zostawiało ją tam, a korekta ilości
- * odsyłała do „rozwiąż w wyjątkach" — czyli w pętlę.
+ * Rozwiązanie wyjątku przez biuro nie zdejmuje z pozycji stanu `problem`,
+ * a korekta ilości go nie przepuszcza, więc to jedyne wyjście z pomyłki.
  *
  * TYLKO ZGŁASZAJĄCY. Zgłoszenie jest twierdzeniem konkretnej osoby wobec
  * dostawcy. Cudze zdejmuje biuro, rozwiązując je z notatką.

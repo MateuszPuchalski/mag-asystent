@@ -2,11 +2,8 @@ import { db } from "../db/db.js";
 import { czasLokalny, dataLokalna } from "../czas.js";
 
 /* ── Raporty liczone ze zdarzeń: metryki systemu i wydajność osób ───────────
-   Do 0.26.0 były to dwa moduły (`metrics.ts`, `wydajnosc.ts`), które
-   dublowały okno czasowe i — groźniej — regułę odsiewu podwójnego liczenia,
-   każdy w innej formie. Rozjazd tych kopii zawyżałby raport mierzący ludzi,
-   więc reguła mieszka teraz w JEDNYM miejscu (`bezDubli`), a oba raporty
-   z niej korzystają.
+   Reguła odsiewu podwójnego liczenia mieszka w JEDNYM miejscu (`bezDubli`):
+   rozjazd dwóch kopii zawyżałby raport mierzący ludzi.
 
    Dwa raporty pozostają OSOBNYMI funkcjami z osobnymi trasami, bo opisują
    co innego: `metrics()` mówi o SYSTEMIE (etykiety, czasy odpowiedzi),
@@ -33,10 +30,7 @@ export const OKNO = (days: number) => `-${Math.max(1, Math.min(365, Math.trunc(d
  * choć 00:05 jest wcześniej niż 19:59. Okno z `>=` było więc do doby
  * SZERSZE, niż deklaruje, a z `<` — do doby WĘŻSZE.
  *
- * Mieszkała w raporcie doboru od 0.267.0, a `problems.ts` miał
- * własną kopię. Reszta raportów dalej porównywała z `datetime()`, więc
- * „7 dni" w Analizie liczyło do ośmiu, także w raporcie per osoba
- * (0.494.1). Jedna definicja tutaj, bo trzecia kopia by się rozjechała.
+ * Jedna definicja tutaj, bo kolejna kopia by się rozjechała.
  */
 export const GRANICA_OKNA = "strftime('%Y-%m-%dT%H:%M:%fZ','now',?)";
 
@@ -366,7 +360,7 @@ export function raportWydajnosci(days = 7): RaportWydajnosci {
   };
 }
 
-/* ── Analiza śladu audytowego (0.48.0) ──────────────────────────────────────
+/* ── Analiza śladu audytowego ───────────────────────────────────────────────
    Zakładka ANALIZA w podglądzie biura. Jedna funkcja, jeden fetch strony —
    sześć sekcji liczonych z tego, co ślad audytowy i tabele operacyjne
    zbierają od pierwszego dnia.
@@ -402,8 +396,7 @@ export interface AnalizaAudytu {
   };
   szukania: {
     top: Array<{ q: string; ile: number }>;
-    /** Zapytania bez ani jednego wyniku — liczone od 0.48.0 (starsze
-        zdarzenia nie niosą liczby wyników i tu nie wchodzą). */
+    /** Zapytania bez ani jednego wyniku (zdarzenia bez liczby wyników tu nie wchodzą). */
     bezWynikow: Array<{ q: string; ile: number }>;
   };
   urzadzenia: Array<{
@@ -416,7 +409,7 @@ export interface AnalizaAudytu {
   }>;
   /**
    * Raport per osoba — patrz obowiązek formalny przy `raportWydajnosci`.
-   * `null` dla każdego poza administratorem (0.431.0, decyzja właściciela):
+   * `null` dla każdego poza administratorem (decyzja właściciela):
    * tego raportu nie liczymy wcale, zamiast liczyć i chować w przeglądarce.
    */
   wydajnosc: RaportWydajnosci | null;
@@ -444,7 +437,7 @@ export function mediana(liczby: number[]): number | null {
 /**
  * Oś dni i rozkład godzin — bucketowanie w JS po czasie LOKALNYM.
  *
- * Nie w SQL, i to jest lekcja 0.31.1: znaczniki w bazie są w UTC, a zdarzenie
+ * Nie w SQL: znaczniki w bazie są w UTC, a zdarzenie
  * z 23:30 UTC należy do NASTĘPNEGO dnia lokalnego. `date(created_at)` w SQLite
  * przypisałoby wieczorną zmianę do złej doby, zimą inaczej niż latem.
  */

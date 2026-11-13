@@ -6,19 +6,17 @@ import path from "node:path";
 
 /* ── Odłożenie PO zgłoszeniu wyjątku ─────────────────────────────────────────
    Pozycja z wyjątkiem zostaje `problem`, choćby odłożono na niej resztę sztuk
-   (decyzja właściciela z 27 września 2026). Do 0.538.2 `putawayLine` liczył
-   status wyłącznie z ilości i nadpisywał wyjątek po cichu. Na statusie
-   `problem` stoją trzy reguły, które wtedy milkły:
+   (decyzja właściciela). Status liczony z samej ilości nadpisałby wyjątek po
+   cichu. Na statusie `problem` stoją trzy reguły, które by wtedy milkły:
 
-   1. „Wyjątek czeka na ZAKOŃCZ" (`closeIfComplete`, decyzja z 22 września
-      2026) — dostawa z otwartym zgłoszeniem zamykała się sama.
-   2. Licznik wyjątków w postępie dostawy (`progress.problems`) spadał do zera.
-   3. ZAKOŃCZ brał zgłoszony brak za nowy, bo `otwarteLinie` pomija pozycję
-      wyłącznie po statusie `problem`. Szło drugie zgłoszenie i drugie MM.
+   1. „Wyjątek czeka na ZAKOŃCZ" (`closeIfComplete`) — dostawa z otwartym
+      zgłoszeniem nie zamyka się sama.
+   2. Licznik wyjątków w postępie dostawy (`progress.problems`).
+   3. ZAKOŃCZ nie bierze zgłoszonego braku za nowy, bo `otwarteLinie` pomija
+      pozycję po statusie `problem`. Inaczej szłoby drugie zgłoszenie i MM.
 
    Drugą drogą było liczenie otwartych zgłoszeń w każdej z tych reguł.
    Odpadła, bo status czyta siedem miejsc, z kolektorem i panelem włącznie.
-   Każde pominięte powtórzyłoby ten sam błąd.
 
    Scenariusze są z hali. Uszkodzone sztuki leżą na półce (`brakujaceSztuki`
    daje dla nich zero), więc magazynier odkłada całość. Przy braku odkłada

@@ -1,11 +1,9 @@
 import { BladLimitu } from "../adapters/limit.js";
 
 /* ── Takt tickerów Allegro — jeden rytm, trzy pętle ──────────────────────────
-   Zapowiedzi, pytania i kolejne zadania tykały dotąd trzema `setInterval` o wspólnej
-   bazie: startowały w tej samej sekundzie i biły w Allegro równym, zegarowym
-   rytmem z jednego adresu. Dokładnie taka sygnatura maszyny skończyła się
-   w sierpniu 2026 blokadą IP przy parowaniu — anti-bot nie pyta, czy ruch
-   jest grzeczny, tylko czy wygląda jak człowiek.
+   Trzy `setInterval` o wspólnej bazie startują w tej samej sekundzie i biją
+   w Allegro równym, zegarowym rytmem z jednego adresu. Taka sygnatura maszyny
+   kończy się blokadą IP — anti-bot nie pyta, czy ruch jest grzeczny.
 
    Ten moduł daje trzem pętlom wspólny takt z dwiema poprawkami:
    1. ROZRZUT ±10% na każdym odstępie i losowe opóźnienie startu — pętle

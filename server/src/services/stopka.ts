@@ -1,5 +1,5 @@
 /**
- * Odcięcie stopki firmowej od treści odpowiedzi (0.219.1).
+ * Odcięcie stopki firmowej od treści odpowiedzi.
  *
  * ── PO CO ─────────────────────────────────────────────────────────────────
  * Każda odpowiedź biura kończy się blokiem: nazwa spółki, adres, NIP, KRS,

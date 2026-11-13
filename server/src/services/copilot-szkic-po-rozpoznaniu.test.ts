@@ -8,7 +8,7 @@ process.env.DB_PATH = path.join(fs.mkdtempSync(path.join(os.tmpdir(), "wertis-sz
 process.env.SGT_MODE = "seeded";
 process.env.LOG_LEVEL = "silent";
 
-/* ── Szkic zaraz po rozpoznaniu (23 września 2026) ───────────────────────────
+/* ── Szkic zaraz po rozpoznaniu ──────────────────────────────────────────────
    Pilnujemy: rozpoznanie, które każe coś zrobić, daje szkic podpisany przez
    automat i czekający na agenta; drugi przebieg nie płaci drugi raz; poprawka
    kategorii (nowa decyzja) układa szkic od nowa; „nic do zrobienia" i awaria

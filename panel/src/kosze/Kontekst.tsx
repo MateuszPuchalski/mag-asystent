@@ -4,15 +4,15 @@ import { PackageX, Undo2 } from "lucide-react";
 import type { SzczegolKosza } from "../api/kosze";
 import { Blad, NaglowekSekcji, Pole, Przycisk } from "../ui";
 
-/* ── Kontekst kosza — prawa kolumna (0.438.0) ─────────────────────────────
+/* ── Kontekst kosza — prawa kolumna ───────────────────────────────────────
    Dwie rzeczy, po które biuro wchodzi w kosz, i obie są DROGĄ DALEJ:
 
    - ZWROTY W KOSZU prowadzą do swoich kart. Druga strona tego wiązania stoi
      na karcie zwrotu („Towar w koszach"); razem dają wiązanie w obie strony,
      bo jednostronne to wiązanie, którego nie ma (`CLAUDE.md`).
-   - POMINIĘTE czekają na ZAŁATWIONE. W biurze stały na osobnej karcie pod
-     listą koszy; tu stoją przy swoim koszu, obok reszty jego zawartości —
-     a lista wszystkich pominiętych jest kubełkiem w kolejce po lewej. */
+   - POMINIĘTE czekają na ZAŁATWIONE. Stoją przy swoim koszu, obok reszty
+     jego zawartości — a lista wszystkich pominiętych jest kubełkiem
+     w kolejce po lewej. */
 
 function Zalatw({ pozycjaId, trwa, onZalatw }: {
   pozycjaId: number; trwa: boolean; onZalatw: (pozycjaId: number, notatka: string) => void;

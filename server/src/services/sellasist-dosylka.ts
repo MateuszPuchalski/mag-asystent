@@ -6,7 +6,7 @@ import { stempelLokalny } from "../czas.js";
 import type { PrzesylkaZamowienia } from "./dosylka.js";
 
 /* ── Numer dosyłki z Sellasist ───────────────────────────────────────────────
-   Dosyłka to nowa etykieta w Sellasist (fakt właściciela z 27 września 2026).
+   Dosyłka to nowa etykieta w Sellasist (fakt właściciela).
    Allegro pokazuje jej numer przy zamówieniu po godzinach albo wcale, gdy
    etykieta poszła na kopię zamówienia. Sellasist ma numer od chwili wydruku.
 

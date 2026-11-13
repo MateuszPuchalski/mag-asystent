@@ -43,7 +43,7 @@ describe("pasek Copilota nad kolejką", () => {
       rozmowa({ id: 5, kopilot: kopilot({ kategoria: "OTHER", status: "FAILED", zrodlo: "FALLBACK" }) }),
     ];
     expect(doRozpoznania(lista).map((r) => r.id)).toEqual([1, 3, 5]);
-    /* PRZY WŁĄCZONYM TAKCIE zostaje samo ponowienie (22 września 2026):
+    /* PRZY WŁĄCZONYM TAKCIE zostaje samo ponowienie:
        nierozpoznaną i nieaktualną bierze takt, a przycisk nad nimi kazałby
        zapłacić drugi raz za tę samą etykietę. */
     expect(doRozpoznania(lista, { ...WLACZONY, autoKlasyfikacja: true }).map((r) => r.id))
@@ -64,10 +64,9 @@ describe("pasek Copilota nad kolejką", () => {
     expect(onRozpoznaj).toHaveBeenCalledWith([7, 9]);
   });
 
-  /* ── STAN SPOCZYNKU NIE DOSTAJE PASMA (0.251.0) ────────────────────────────
-     Do 0.249.1 oba stany „nic się nie dzieje" — Copilot wyłączony i kubełek
-     rozpoznany — zajmowały pełne pasmo nad listą pytań. Przycisku bez mocy nie
-     ma dalej i to zostaje; zmienia się miejsce, w którym stoi POWÓD.        */
+  /* ── STAN SPOCZYNKU NIE DOSTAJE PASMA ──────────────────────────────────────
+     Oba stany „nic się nie dzieje" — Copilot wyłączony i kubełek rozpoznany —
+     nie zajmują pasma nad listą pytań. POWÓD stoi w znaku w nagłówku.       */
 
   it("wyłączony Copilot nie zajmuje pasma nad kolejką", () => {
     const onRozpoznaj = vi.fn();
@@ -80,8 +79,8 @@ describe("pasek Copilota nad kolejką", () => {
   });
 
   it("powód wyłączenia NIE GINIE — niesie go znak w nagłówku", () => {
-    /* §4.3: fakt wolno wyciszyć, nie wolno schować. Zdanie zeszło z pasma do
-       podpowiedzi, ale dalej stoi na ekranie i dalej mówi PRZYCZYNĘ. */
+    /* §4.3: fakt wolno wyciszyć, nie wolno schować. Zdanie stoi w podpowiedzi,
+       ale stoi na ekranie i mówi PRZYCZYNĘ. */
     render(<ZnakCopilota kandydaci={[rozmowa()]}
       stan={{ ...WLACZONY, wlaczony: false, powod: "Copilot nie ma klucza." }} />);
     expect(screen.getByLabelText("Copilot nie ma klucza.")).toBeTruthy();
@@ -117,7 +116,7 @@ describe("pasek Copilota nad kolejką", () => {
         zuzycie: { wej: 1, wyj: 1, cacheZapis: 0, cacheOdczyt: 0, kosztUsd: 0 },
       }} />);
     expect(screen.getByText("Dostawca poprosił o przerwę.")).toBeTruthy();
-    /* Do 0.191.0 zdanie o przerwie wypierało podsumowanie. Człowiek, który nie
+    /* Zdanie o przerwie nie wypiera podsumowania. Człowiek, który nie
        wie, że osiem jest już rozpoznanych, kliknie ponownie i zapłaci drugi
        raz — a właśnie po to trasa oddaje 200, a nie błąd. */
     expect(screen.getByText(/Rozpoznano 8/)).toBeTruthy();
@@ -142,9 +141,8 @@ describe("pasek Copilota nad kolejką", () => {
           + "Nic nie zostało policzone ani opłacone — spróbuj za chwilę.",
         zuzycie: { wej: 0, wyj: 0, cacheZapis: 0, cacheOdczyt: 0, kosztUsd: 0 },
       }} />);
-    /* Żywe trafienie na 0.191.0: 529 lądowało w `bledy` bez `przerwane`, więc
-       jedyne, co ekran mówił, to „1 bez rozstrzygnięcia" — zdanie o modelu,
-       który się nie zdecydował. Model nie został nawet zapytany. */
+    /* 529 to przerwa, nie „bez rozstrzygnięcia": model nie został nawet
+       zapytany. */
     expect(screen.getByText(/przeciążone/)).toBeTruthy();
     expect(screen.getByText(/spróbuj za chwilę/)).toBeTruthy();
   });
@@ -156,7 +154,7 @@ describe("plakietka i etykieta człowieka", () => {
       kopilot={kopilot({ nieaktualna: true })} />);
     const plakietka = container.querySelector("[title]") as HTMLElement;
     expect(plakietka.getAttribute("title")).toMatch(/starszą wiadomość/);
-    /* slate-600 od 0.255.0: na `bg-slate-100` nawet slate-500 daje 4.34:1
+    /* slate-600: na `bg-slate-100` nawet slate-500 daje 4.34:1
        przy progu 4.5. Świeża etykieta jest fioletowa — pilnuje test niżej. */
     expect(plakietka.className).toContain("text-slate-600");
     expect(screen.queryByRole("combobox")).toBeNull();
@@ -223,11 +221,10 @@ describe("plakietka i etykieta człowieka", () => {
   });
 });
 
-/* ── Znak kategorii (23 września 2026, bez kafla od 0.548.0) ────────────────
+/* ── Znak kategorii, bez kafla ───────────────────────────────────────────────
    Znak zamiast słowa na wierszu kolejki. Pilnujemy trzech rzeczy, które łatwo
    zgubić przy zamianie tekstu na ikonę: nazwy dla czytnika, prośby
-   o człowieka i tego, że nieudane rozpoznanie nie udaje kategorii „Inne".
-   Zdjęcie kafla (wariant C) zmieniło kształt, a te trzy gwarancje zostają. */
+   o człowieka i tego, że nieudane rozpoznanie nie udaje kategorii „Inne". */
 describe("znak kategorii", () => {
   it("niesie nazwę i prośbę o człowieka dla czytnika ekranu", () => {
     render(<ZnakKategorii kopilot={kopilot({ kategoria: "PRODUCT_COMPATIBILITY", wymagaCzlowieka: true })} />);

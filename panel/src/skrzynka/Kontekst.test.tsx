@@ -1,5 +1,4 @@
 import { afterEach, describe, it, expect, vi } from "vitest";
-import React from "react";
 import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router-dom";
@@ -146,7 +145,7 @@ describe("kolumna kontekstu", () => {
   });
 
   /* ── Brak oferty mówi się RAZ ─────────────────────────────────────────────
-     Decyzja właściciela z 28 września 2026. Baner nad rozmową mówi o braku
+     Decyzja właściciela. Baner nad rozmową mówi o braku
      z czynnościami, więc kolumna nie powtarza go dwoma akapitami. Gwarancja
      „nie milczy" zostaje: wiersz stoi i mówi brak streszczeniem. */
   it("bez oferty kolumna mówi brak streszczeniem, bez powtórzenia banera", () => {
@@ -212,8 +211,8 @@ describe("kolumna kontekstu", () => {
     expect(wiersz(/^Zamówienie/)).toHaveAttribute("aria-expanded", "false");
   });
 
-  /* Zakładka z zerem kosztowała klik, żeby usłyszeć „tu nic nie ma". Pusty
-     wiersz nie staje wcale (decyzja właściciela z 26 września) — ani przed
+  /* Zakładka z zerem kosztowałaby klik, żeby usłyszeć „tu nic nie ma". Pusty
+     wiersz nie staje wcale (decyzja właściciela) — ani przed
      odczytem, ani po pustym wyniku. Z treścią mówi to, czego karta nie ma. */
   it("Klient staje tylko z treścią i mówi ostatni kontakt, nie liczniki", () => {
     const { rerender } = rysuj(dane());
@@ -231,7 +230,7 @@ describe("kolumna kontekstu", () => {
   });
 
   /* „Nowy klient" i „Wcześniej u nas" mają jeden dom: kartę zakupu, także
-     zwiniętą i w pasku nad osią. Linijka pod pasmem była drugim. */
+     zwiniętą i w pasku nad osią. Linijka pod pasmem byłaby drugim. */
   it("pusta historia nie stawia ani wiersza, ani linijki „Nowy klient” — mówi to karta zakupu", () => {
     historia.data = { login: "pasikonik5", wpisy: [] };
     const { rerender } = rysuj(dane());

@@ -6,10 +6,9 @@ import { Decyzje } from "./Decyzje";
 import { kluczeZwrotow } from "../api/zwroty";
 import type { Zwrot } from "../api/typy";
 
-/* ── Pasek decyzji (0.156.0) ─────────────────────────────────────────────────
-   Do tego wydania kolejka bramek była DEKORACJĄ: klawisze stały jako podpisy,
-   a kolumny, po których routuje `kubelekZwrotu`, nie miały ani jednego
-   zapisu. Każdy zwrot stał w DO DECYZJI na zawsze. */
+/* ── Pasek decyzji ───────────────────────────────────────────────────────────
+   Klawisze zapisują kolumny, po których routuje `kubelekZwrotu`. Bez tego
+   każdy zwrot stałby w DO DECYZJI na zawsze. */
 
 const zwrot = (n: Partial<Zwrot> = {}): Zwrot => ({
   id: 1, externalId: "z-1", numer: "REF-1", orderId: "ord-1",
@@ -69,7 +68,7 @@ describe("Decyzje zwrotu", () => {
   });
 
   it("Enter w polu powodu potwierdza odmowę, a pusty powód dalej nie", async () => {
-    /* Audyt zwrotów, 15 września 2026: wpisany powód JEST potwierdzeniem
+    /* Wpisany powód JEST potwierdzeniem
        z §25a.5 — sięganie po mysz po nim nie dodaje namysłu. */
     const onWerdykt = vi.fn();
     pasek(zwrot(), { onWerdykt });
@@ -122,7 +121,7 @@ describe("Decyzje zwrotu", () => {
   });
 
   it("ocena i wycena nie mają paska — ich pytanie zadaje wiersz produktu", () => {
-    /* Od 0.167.0 pasek dotyczy CAŁEGO zwrotu. Gdyby został przy pozycjach,
+    /* Pasek dotyczy CAŁEGO zwrotu. Gdyby stał przy pozycjach,
        te same nazwy stałyby na ekranie dwa razy: raz jako kontrolka, raz
        jako produkt ze zdjęciem. */
     const { container } = pasek(zwrot({ kubelek: "ocena" }));
@@ -220,24 +219,21 @@ describe("Korekta zwrotu (0.162.0)", () => {
   });
 
   it("NIE odsyła po pieniądze do panelu Allegro — przycisk jest niżej", () => {
-    /* Audyt zwrotów, 15 września 2026. Zdanie „oddajesz w panelu Allegro" stało
-       tu od 0.162.0 i po 0.190.0 było już nieprawdą. Na nagraniu z pracy
-       operator oddawał pieniądze w Sales Center, obok gotowego przycisku. */
+    /* Zdanie „oddajesz w panelu Allegro" byłoby nieprawdą: pieniądze oddaje
+       gotowy przycisk w panelu. */
     pasek(doKorekty());
     expect(screen.queryByText(/w panelu Allegro/i)).toBeNull();
-    /* Zdanie o przycisku ODDAJ PIENIĄDZE zeszło w 0.479.0: od 0.476.0
-       zwrot z korektą, a bez wypłaty, wraca do DO ZWROTU z paskiem
-       pieniędzy. Pudełko korekty nie mówi już o pieniądzach wcale. */
+    /* Zwrot z korektą, a bez wypłaty, wraca do DO ZWROTU z paskiem
+       pieniędzy. Pudełko korekty nie mówi o pieniądzach wcale. */
     expect(screen.queryByText(/ODDAJ PIENIĄDZE/)).toBeNull();
   });
 
   it("kwota ma tu DROGĘ WYJŚCIA — to ostatni ekran przed korektą", async () => {
     /* §25a.5 obiecuje cofnięcie wszędzie poza oddaniem pieniędzy i odmową.
-       Do 0.202.0 kwota była z tej obietnicy wyjęta: pasek wyceny znika razem
-       z kubełkiem DO ZWROTU, więc pomyłka w zaznaczeniu zostawała na zawsze. */
+       Pasek wyceny znika razem z kubełkiem DO ZWROTU, więc kwotę cofa się tu. */
     const onCofnijKwote = vi.fn();
     pasek(doKorekty(), { onCofnijKwote });
-    /* Samą kwotę pokazują „Pieniądze" (0.516.0) — tu zostaje droga wyjścia. */
+    /* Samą kwotę pokazują „Pieniądze" — tu zostaje droga wyjścia. */
     expect(screen.queryByText("99,98 PLN")).toBeNull();
 
     await userEvent.click(screen.getByRole("button", { name: /popraw kwotę/i }));
@@ -272,7 +268,7 @@ describe("Korekta zwrotu (0.162.0)", () => {
   });
 
   it("zwrot odrzucony nie ma czego cofać — to stan końcowy bez korekty", () => {
-    /* Od 0.516.0 bez zdania „Stan końcowy" — oś etapów mówi „Odrzucony". */
+    /* Bez zdania „Stan końcowy" — oś etapów mówi „Odrzucony". */
     const { container } = pasek(zwrot({ kubelek: "odrzucony", werdykt: "odrzucony" }));
     expect(container).toBeEmptyDOMElement();
     expect(screen.queryByRole("button", { name: /Cofnij korektę/ })).toBeNull();
@@ -283,7 +279,7 @@ describe("Korekta zwrotu (0.162.0)", () => {
        ma udawać czyjejś decyzji, a decyzja nie ma udawać faktu. */
     pasek(zwrot({ kubelek: "zamkniety", korektaNumer: "KFS 12/2026",
       korektaZrodlo: "subiekt" }), { onCofnijKorekte: vi.fn() });
-    /* Od 0.516.0 w podpowiedzi przy numerze — czyta się ją raz. */
+    /* W podpowiedzi przy numerze — czyta się ją raz. */
     expect(screen.getByText("KFS 12/2026"))
       .toHaveAttribute("title", expect.stringMatching(/Znaleziona w Subiekcie/));
   });
@@ -296,7 +292,7 @@ describe("Korekta zwrotu (0.162.0)", () => {
   });
 
   it("zlecony automat mówi, że numer przyjdzie sam — bez zachęty do ręcznego ZW", () => {
-    /* 0.349.0. „Wystawiasz w Subiekcie" przy czekającym automacie kończyłoby się
+    /* „Wystawiasz w Subiekcie" przy czekającym automacie kończyłoby się
        drugim dokumentem obok tego, który właśnie powstaje. */
     pasek(doKorekty({ zw: { status: "pending", numer: null, blad: null } }));
     expect(screen.getByText(/Automat wystawia ZW/)).toBeInTheDocument();
@@ -310,7 +306,7 @@ describe("Korekta zwrotu (0.162.0)", () => {
   });
 
   it("długi błąd automatu pokazuje pierwsze zdanie, a zrzut pól chowa (0.479.0)", () => {
-    /* Błąd Sfery niesie od 0.456.0 zrzut kilkudziesięciu pól. Na ekranie
+    /* Błąd Sfery niesie zrzut kilkudziesięciu pól. Na ekranie
        ma stać, co się stało; zrzut jest dla serwisu i czeka pod rozwinięciem. */
     const zrzut = "Subiekt nie zapisał ZW. Zrzut pól: " + "Pole=wartość; ".repeat(40);
     pasek(doKorekty({ zw: { status: "error", numer: null, blad: zrzut } }));
@@ -349,9 +345,8 @@ describe("DO ZWROTU z kwotą — droga do poprawki (0.484.7)", () => {
   });
 
   it("kwoty nie powtarza — stoi raz, w „Pieniądzach” (0.516.0)", () => {
-    /* Ta sama liczba stała w pasku, w sekcji pieniędzy i w stopce pozycji.
-       Zdanie o klawiszu Z też zeszło: przycisk z klawiszem stoi niżej. */
-    pasek(czeka(), { moznaZwrocic: true });
+    /* Kwota stoi raz, w „Pieniądzach"; przycisk z klawiszem Z stoi niżej. */
+    pasek(czeka());
     expect(screen.queryByText(/99,98/)).toBeNull();
     expect(screen.queryByText(/Do oddania/)).toBeNull();
     expect(screen.queryByText(/klawiszem/)).toBeNull();

@@ -3,14 +3,13 @@ import { fireEvent, render, screen, within } from "@testing-library/react";
 import { Os, rozdziel } from "./Os";
 import type { WpisOsi } from "../api/typy";
 
-/* ── Zdarzenia sprawy: pasek pod oknem wiadomości (0.243.0) ──────────────────
-   Do 0.242.0 zmiana statusu (§10.3, 0.158.0) i sklejenie sprawy (0.161.0)
-   stały na osi jako kreski między wypowiedziami. Zgłoszenie
-   właściciela: przenieść je do jednego poziomego rzędu pod oknem wiadomości,
+/* ── Zdarzenia sprawy: pasek pod oknem wiadomości ────────────────────────────
+   Zmiana statusu (§10.3) i sklejenie sprawy nie stoją na osi jako kreski
+   między wypowiedziami. Zgłoszenie właściciela: jeden poziomy rząd pod oknem wiadomości,
    a kliknięcie ma prowadzić do tego miejsca w rozmowie.
 
    Testy pilnują trzech rzeczy i każda odpowiada na inne pytanie: czy przebieg
-   sprawy dalej widać, czy oś przestała nim być zaśmiecona, i czy kliknięcie
+   sprawy widać, czy oś nie jest nim zaśmiecona, i czy kliknięcie
    naprawdę wraca na oś — bo bez tego rozdzielenie gubiłoby miejsce, w którym
    stan się zmienił.                                                         */
 
@@ -28,7 +27,7 @@ const pokaz = (wpisy: WpisOsi[]) => render(
   <Os rozmowaId={1} wpisy={wpisy} zrodloPomiaru={null} mozeZlecac={false}
     onZrodlo={() => {}} onWstawDoSzkicu={() => {}} />);
 
-/* Od 0.506.0 pasek mówi jedno zdanie, a czipy otwiera „przebieg (n)". */
+/* Pasek mówi jedno zdanie, a czipy otwiera „przebieg (n)". */
 const rozwin = () => fireEvent.click(screen.getByRole("button", { name: /przebieg \(/ }));
 
 describe("Zdarzenia sprawy stoją w pasku, nie na osi", () => {
@@ -87,7 +86,7 @@ describe("Zdarzenia sprawy stoją w pasku, nie na osi", () => {
   });
 });
 
-/* ── Zwrot na osi rozmowy (0.502.0) ────────────────────────────────────────
+/* ── Zwrot na osi rozmowy ──────────────────────────────────────────────────
    Decyzja i pieniądze zwrotu stoją w pasku jako zdarzenie. Najgorszy wynik
    tej zmiany to wpis zwrotu narysowany jak wypowiedź — test pilnuje, że
    rodzaj „zwrot" nie trafia do rozmowy. */
@@ -110,7 +109,7 @@ describe("zwrot na osi rozmowy", () => {
   });
 });
 
-/* ── Spokojniejsza oś (0.506.0) ────────────────────────────────────────────
+/* ── Spokojniejsza oś ──────────────────────────────────────────────────────
    Pasek zdarzeń mówi jedno zdanie o ostatniej zmianie; nasza długa
    wypowiedź zwija się do początku, a puste wiersze ściskają się tylko na
    ekranie; pytanie klienta bez odpowiedzi ma ramkę. */

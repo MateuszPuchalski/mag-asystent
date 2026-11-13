@@ -13,17 +13,14 @@ import { zwiazKoszykZDokumentem } from "./kosze-zwrotow.js";
      2. Numer tego dokumentu — SAMĄ LICZBĘ — pisze odręcznie na kartce
         przypiętej do kosza: „1209".
      3. Kosz jedzie na halę, magazynier rozkłada zawartość na regały.
-     4. Dokument powrotny (ZWR→MAG) wystawia BIURO, nie kolektor.
+     4. Dokument powrotny (ZWROTY→magazyn źródłowy) zamawia aplikacja.
 
    Aplikacja wchodzi w ten obieg, zamiast zapraszać do nowego: jednostką pracy
    jest dokument, a listę towarów bierzemy z jego pozycji.
 
-   PUNKT 4 ODSZEDŁ DO APLIKACJI W 0.277.0 (decyzja właściciela). Powrót jest
-   odwrotnością tego dokumentu, więc ZAKOŃCZ na kolektorze zamawia MM
-   ZWROTY→magazyn źródłowy — tak samo jak przy koszu z panelu i z tych samych
-   powodów (`services/kosze.ts`). Biuro nie wystawia już niczego ręką, a gdyby
-   wystawiło, stan zjechałby dwa razy: to jest jedyna rzecz, którą przy tym
-   wydaniu trzeba odwołać w nawyku, nie w ustawieniu.
+   Powrót jest odwrotnością tego dokumentu, więc ZAKOŃCZ na kolektorze zamawia
+   MM — tak samo jak przy koszu z panelu (`services/kosze.ts`). Biuro nie
+   wystawia niczego ręką, bo stan zjechałby dwa razy.
 
    Magazyn źródłowy zapisujemy SNAPSHOTEM w `kosz.mm_mag_z`, bo lustro
    `sgt_mm_zwrot` czyści się przy każdym imporcie i sięga tyle dni wstecz, ile
@@ -71,8 +68,8 @@ const ZROBIONE = new Set(["rozlozony", "poza_aplikacja"]);
  * Przyjęcia z okna importu wraz ze stanem pracy po naszej stronie.
  *
  * Rozłożone i zdjęte ręką zostają na liście — magazynier ma widzieć, że
- * dokument jest znany i zrobiony, zamiast szukać go w nieskończoność. Od
- * 0.81.0 stoją POD resztą: lista jest pracą do wykonania, a nie archiwum,
+ * dokument jest znany i zrobiony, zamiast szukać go w nieskończoność. Stoją
+ * POD resztą: lista jest pracą do wykonania, a nie archiwum,
  * i zrobiony kosz sprzed tygodnia nie ma prawa stać nad tym, który dziś
  * przyjechał na halę. Wewnątrz obu grup zostaje kolejność z zapytania
  * (najnowsze na górze), więc nic poza tą jedną rzeczą się nie przesuwa.
@@ -128,7 +125,7 @@ export function listaPrzyjec(): WierszPrzyjecia[] {
  * ustalił dokument.
  */
 export function otworzPrzyjecie(raw: string, autor: string): SzczegolKosza {
-  /* KOD KOSZYKA WIRTUALNEGO NIE OTWIERA NICZEGO (0.350.0). Zakładka ZWROTY
+  /* KOD KOSZYKA WIRTUALNEGO NIE OTWIERA NICZEGO. Zakładka ZWROTY
      kieruje tu każdy skan, a `numerZKartki` zostawia same cyfry — więc `Z-7`
      otwierałby MM numer 7. Od audytu zwrotów otwierał SAM Z-7, a to był drugi
      kosz na towar, który hala rozkłada z dokumentu MM tego koszyka. Teraz
@@ -260,10 +257,5 @@ export function oznaczRozlozonePozaAplikacja(dokId: number, autor: string): void
     "INSERT OR IGNORE INTO przyjecie_pominiete(dok_id, at, przez) VALUES (?,?,?)"
   ).run(dokId, nowIso(), autor);
   logEvent("przyjecie_poza_aplikacja", autor, null, { dokId, numer: dok.numer });
-}
-
-/** Ile przyjęć czeka na rozłożenie — liczba na kafel raportu i do diagnozy. */
-export function liczbaPrzyjecDoRozlozenia(): number {
-  return listaPrzyjec().filter((p) => p.stan === "nietkniety" || p.stan === "w_rozkladaniu").length;
 }
 

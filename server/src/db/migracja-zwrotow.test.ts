@@ -4,7 +4,7 @@ import fs from "node:fs";
 import { DatabaseSync } from "node:sqlite";
 import { migrate } from "./db.js";
 
-/* ── Zwroty przeżywają własną migrację (0.150.0) ─────────────────────────────
+/* ── Zwroty przeżywają własną migrację ─────────────────────────────
    `bezObslugiKlienta()` kasuje `zwrot`, `zwrot_pozycja`, `sgt_sprzedaz`
    i `sgt_sprzedaz_pozycja` przy KAŻDYM `migrate()`, a nie raz za znacznikiem.
    Bazy klientów wciąż mają tamte tabele i każda musi je stracić — więc lista
@@ -54,7 +54,7 @@ test("stare nazwy zwrotów nadal znikają — lista kasowania jest nietknięta",
 });
 
 test("read-model sprzedaży wraca pod NOWĄ nazwą i migrację przeżywa", () => {
-  /* Trzecia połowa tej samej umowy (0.174.0). `sgt_sprzedaz` jest na liście
+  /* Trzecia połowa tej samej umowy. `sgt_sprzedaz` jest na liście
      kasowania, która chodzi przy KAŻDEJ migracji — tabela nazwana tak samo
      powstałaby ze `schema.sql` i znikała sekundę później, po cichu i bez
      błędu, bo `migrate()` chodzi PO schemacie. Dlatego `sgt_faktura`. */
@@ -98,10 +98,9 @@ test("adresu ani konta bankowego nie ma gdzie zapisać", () => {
 
 
 test("potwierdzona kartoteka PRZEŻYWA import z Subiekta", () => {
-  /* USTERKA 0.152.0, naprawiona w 0.154.0. `tw_id` miało klucz obcy do
-     `sgt_towar`, a import kasuje CAŁY read-model i wstawia go od nowa co
-     `MSSQL_SYNC_MS` — czyli co minutę zerował każdą kartotekę potwierdzoną
-     przez człowieka. Cicho, bez błędu, z „Bez kartoteki" jako objawem.
+  /* Import kasuje CAŁY read-model i wstawia go od nowa co `MSSQL_SYNC_MS`,
+     więc klucz obcy `tw_id` do `sgt_towar` zerowałby każdą kartotekę
+     potwierdzoną przez człowieka.
 
      Ten test odtwarza dokładnie to, co robi import. Na schemacie sprzed
      poprawki musi paść. */
@@ -162,11 +161,11 @@ test("klucz naturalny pozycji nie przepuszcza duplikatu, także bez `offer_id`",
 });
 
 test("przebudowa przepisuje dane starej tabeli, nie kasuje ich", () => {
-  /* Baza klienta ma już pozycje zwrotów z 0.150.0-0.153.1. Migracja ma je
+  /* Baza klienta ma już pozycje zwrotów. Migracja ma je
      przenieść w komplecie i dorobić `klucz`, a nie zacząć od pustej. */
   const d = new DatabaseSync(":memory:");
   d.exec(schema);
-  /* Kształt sprzed 0.154.0: z kluczem obcym i bez `klucz`. */
+  /* Stary kształt: z kluczem obcym i bez `klucz`. */
   d.exec("DROP TABLE zwrot_klienta_pozycja");
   d.exec(`CREATE TABLE zwrot_klienta_pozycja (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -199,21 +198,13 @@ test("przebudowa przepisuje dane starej tabeli, nie kasuje ich", () => {
 });
 
 test("przebudowa przeżywa DUPLIKAT klucza naturalnego z zastanej bazy", () => {
-  /* Ta awaria położyła całą instalację przy skoku 0.153.1 → 0.162.0.
-     `wertis-api`, `wertis-worker` i `npm run sonda` padały tym samym:
-     `UNIQUE constraint failed: zwrot_klienta_pozycja.zwrot_id, …klucz`.
-
-     Do 0.153.1 synchronizator kasował pozycje i wstawiał od nowa BEZ żadnego
-     ograniczenia, więc dwie pozycje jednego zwrotu o tej samej ofercie
-     i nazwie były legalne — i w bazach klientów SĄ. Przebudowa liczyła im
-     identyczny klucz, a zaraz potem zakładała na niego indeks UNIQUE. Wyjątek
-     wycofywał transakcję, `db()` rzucał i tak przy KAŻDYM starcie.
-
-     Poprzedni test przepisania wstawiał JEDEN wiersz i dlatego to przepuścił. */
+  /* Dwie pozycje jednego zwrotu o tej samej ofercie i nazwie są w starych
+     bazach legalne. Ten sam klucz pod indeksem UNIQUE kończyłby się
+     `UNIQUE constraint failed` przy KAŻDYM starcie. */
   const d = new DatabaseSync(":memory:");
   d.exec(schema);
   d.exec("DROP TABLE zwrot_klienta_pozycja");
-  /* Kształt sprzed 0.154.0: klucz obcy do read-modelu, bez `klucz`
+  /* Stary kształt: klucz obcy do read-modelu, bez `klucz`
      i bez `w_zwrocie` — ta druga kolumna dochodzi dopiero `addColumn`. */
   d.exec(`CREATE TABLE zwrot_klienta_pozycja (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -272,14 +263,7 @@ test("przebudowa przeżywa DUPLIKAT klucza naturalnego z zastanej bazy", () => {
 
 
 test("przebudowa przeżywa nazwę, która NIESIE JUŻ przyrostek duplikatu", () => {
-  /* Awaria produkcyjna 0.174.2 — druga z tej samej rodziny co 0.162.1 i z tym
-     samym objawem: `UNIQUE constraint failed: zwrot_klienta_pozycja.zwrot_id,
-     …klucz` przy starcie, w kółko, bo `db()` woła migrację w KAŻDYM procesie.
-     API i worker wpadały w pętlę restartów NSSM, a w logu workera zostawało
-     „database is locked" — objaw, nie przyczyna.
-
-     0.162.1 dołożyło duplikatowi przyrostek `|#n` i to załatwiło duplikaty
-     wprost. Nie załatwiło ZDERZENIA: pozycja, której nazwa niesie już tekst
+  /* Przyrostek `|#n` załatwia duplikaty wprost, ale nie ZDERZENIE: pozycja, której nazwa niesie już tekst
      `|#2`, dostaje klucz identyczny z drugim wystąpieniem sąsiada. */
   const d = new DatabaseSync(":memory:");
   d.exec(schema);
@@ -340,7 +324,7 @@ test("duplikat zastany BEZ przebudowy też nie kładzie startu", () => {
 });
 
 test("migracja zostawia bez powrotu kosze rozłożone przed 0.266.0", () => {
-  /* Od 0.266.0 aplikacja sama zamawia MM ZWROTY→MAG po rozłożeniu kosza.
+  /* Aplikacja sama zamawia MM ZWROTY→MAG po rozłożeniu kosza.
      Zastane kosze rozliczyło biuro ręką — stempel odróżnia jedne od drugich,
      a idzie WYŁĄCZNIE w przebiegu dokładającym kolumnę. */
   const d = new DatabaseSync(":memory:");
@@ -368,15 +352,15 @@ test("migracja zostawia bez powrotu kosze rozłożone przed 0.266.0", () => {
 });
 
 test("migracja stempluje kosze z dokumentu rozłożone przed 0.277.0", () => {
-  /* Od 0.277.0 powrót z regału zamawia aplikacja także dla koszy z dokumentu
-     MM. Bez stempla pierwszy przebieg wypuściłby dokumenty na WSZYSTKIE takie
-     kosze rozłożone od 0.266.0 — stan zjechałby drugi raz z regału, po
+  /* Powrót z regału zamawia aplikacja także dla koszy z dokumentu MM. Bez
+     stempla pierwszy przebieg wypuściłby dokumenty na WSZYSTKIE takie
+     kosze rozłożone wcześniej — stan zjechałby drugi raz z regału, po
      miesiącach, a rekoncyliacja wypisałaby historię jako pracę. */
   const d = new DatabaseSync(":memory:");
   d.exec(schema);
-  /* Baza w kształcie 0.276.x: pełna migracja, z której zdejmujemy jedną
-     kolumnę. Wstawić kosz z `mm_dok_id` przed migracją się nie da — tamtej
-     kolumny też nie ma w `schema.sql`, bo tabela stoi na produkcji od 0.59.0. */
+  /* Stara baza: pełna migracja, z której zdejmujemy jedną kolumnę. Wstawić
+     kosz z `mm_dok_id` przed migracją się nie da — tamtej kolumny też nie ma
+     w `schema.sql`. */
   migrate(d);
   d.exec("ALTER TABLE kosz DROP COLUMN mm_mag_z");
 
@@ -409,7 +393,7 @@ test("migracja stempluje kosze z dokumentu rozłożone przed 0.277.0", () => {
   d.close();
 });
 
-/* ── Trzecia ocena wchodzi do bazy, która stoi u klienta (0.375.0) ──────────
+/* ── Trzecia ocena wchodzi do bazy, która stoi u klienta ──────────
    `CHECK` wpisuje się w SQLite w definicję tabeli, a `ALTER TABLE` go nie
    zmieni — poszerzenie listy ocen znaczy przebudowę. Ten test pilnuje trzech
    rzeczy naraz: że nowa wartość przechodzi, że dane zostają i że wracają OBA
@@ -417,7 +401,7 @@ test("migracja stempluje kosze z dokumentu rozłożone przed 0.277.0", () => {
    czyli blizna 0.153.1 — praca człowieka przywiązana do klucza. */
 
 /**
- * Baza sprzed 0.375.0: pełny schemat, ale pozycja zwrotu z DWIEMA ocenami.
+ * Stara baza: pełny schemat, ale pozycja zwrotu z DWIEMA ocenami.
  *
  * Schemat kładziemy w całości, a cofamy WYŁĄCZNIE tę jedną tabelę. Ręcznie
  * zbudowana atrapa nie miałaby kolumn, których szukają inne kroki `migrate()`

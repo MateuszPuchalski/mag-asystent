@@ -3,7 +3,6 @@ import assert from "node:assert/strict";
 import {
   rodzinaKoncowki,
   scopeDlaUrl,
-  urlWnioskuORabat,
   urlListySpraw,
   urlListyZwrotow,
   urlOdswiezeniaZwrotow,
@@ -32,7 +31,7 @@ import {
   problemUserAgenta,
 } from "../services/allegro-token.js";
 
-/* ── Allegro HTTP — połączenie, bez mapowania (0.140.0) ──────────────────────
+/* ── Allegro HTTP — połączenie, bez mapowania ──────────────────────
    Do 0.137.2 ten plik testował KSZTAŁT odpowiedzi na fixturach pisanych ręką.
    To był dokładnie ten kształt, który nigdy nie został sprawdzony na żywym
    koncie — testy zieleniły się na naszym własnym wyobrażeniu. Zniknęły razem
@@ -147,9 +146,8 @@ test("komunikat 403 wskazuje uprawnienie właściwe dla końcówki", () => {
   );
   assert.equal(scopeDlaUrl("https://api.allegro.pl/sale/issues"), "allegro:api:disputes");
   assert.equal(scopeDlaUrl("https://api.allegro.pl/sale/issues/1/chat"), "allegro:api:disputes");
-  /* Opinie mają WŁASNE uprawnienie. Do 0.155.0 ten adres wpadał w domyślne
-     `orders:read`, więc odmowa kazała dodać uprawnienie, którym sonda w tym
-     samym przebiegu pobrała sto zamówień. */
+  /* Opinie mają WŁASNE uprawnienie; domyślne `orders:read` kazałoby dodać
+     uprawnienie, które konto już ma. */
   assert.equal(
     scopeDlaUrl("https://api.allegro.pl/sale/user-ratings"),
     "allegro:api:ratings"
@@ -178,14 +176,12 @@ test("każda rodzina końcówek sondy ma nazwane uprawnienie, nie domyślne", ()
 });
 
 test("adres rozmowy w sprawie istnieje w specyfikacji Allegro", () => {
-  /* Do 0.155.0 kod pukał do `/sale/disputes/{id}/messages`, a w całym
-     `docs/allegro/swagger.yaml` nie ma ani jednej ścieżki `/sale/disputes`.
-     Sonda oddawała zero rekordów przy sprawach, które miały `messagesCount`
-     większy od zera. */
+  /* W całym `docs/allegro/swagger.yaml` nie ma ani jednej ścieżki
+     `/sale/disputes`. */
   const url = urlWiadomosciSprawy("https://api.allegro.pl", "abc-1");
   assert.equal(url, "https://api.allegro.pl/sale/issues/abc-1/chat?limit=100");
   assert.equal(url.includes("/sale/disputes"), false);
-  /* `limit` JAWNIE (0.164.0): przy tej jednej końcówce specyfikacja daje
+  /* `limit` JAWNIE: przy tej jednej końcówce specyfikacja daje
      domyślne 10, nie 100 jak przy listach obok. Bez tego próbka sondy była
      cicho przycięta do dziesięciu wiadomości na sprawę. */
   assert.match(url, /limit=100$/);
@@ -222,7 +218,7 @@ test("odświeżenie tokena: 5 minut zapasu i odporność na śmieci w dacie", ()
   assert.equal(czyOdswiezyc("nie-data", teraz), true); // uszkodzony wiersz → odśwież
 });
 
-/* ── Rytm parowania i anti-bot Allegro (0.106.0) ────────────────────────────
+/* ── Rytm parowania i anti-bot Allegro ────────────────────────────
    Endpointy OAuth stoją na apeksie `allegro.pl`, za tym samym edge'em co
    sklep. Odpytywanie stanu parowania jest więc jedynym ruchem aplikacji,
    który widzi anti-bot — i to on wygenerował blokadę adresu IP.            */
@@ -274,7 +270,7 @@ test("brak ALLEGRO_USER_AGENT to zdanie w /api/health, nie cisza", () => {
   }
 });
 
-/* ── Powód odmowy dla narzędzia z konsoli (0.153.1) ─────────────────────────
+/* ── Powód odmowy dla narzędzia z konsoli ─────────────────────────
    Sonda odmawiała jednym zdaniem dla wszystkich stanów: „konto nie jest
    sparowane — sparuj w panelu". Trafiało to obok dwa razy. Tryb `dev` nie
    ma czego parować (panel mówi to wprost), a zdanie prowadziło w dodatku do
@@ -325,7 +321,7 @@ test("pobranie załącznika nie idzie poza Allegro", async () => {
 });
 
 test("ZAPIS na zamówieniach żąda innego uprawnienia niż odczyt", () => {
-  /* Blizna 0.155.0 w nowym miejscu. Odmowa 403 niesie NAZWĘ uprawnienia i to
+  /* Odmowa 403 niesie NAZWĘ uprawnienia i to
      jedyna rzecz, od której da się zacząć naprawę — a nazwa wskazująca
      uprawnienie, które konto już ma, wysyła człowieka po nic i każe mu
      sparować konto ponownie bez skutku. */
@@ -338,13 +334,6 @@ test("ZAPIS na zamówieniach żąda innego uprawnienia niż odczyt", () => {
   /* Rodziny spoza zamówień zachowują swoje uprawnienia niezależnie od metody. */
   assert.equal(scopeDlaUrl("https://api.allegro.pl/messaging/threads/1/messages", "POST"),
     "allegro:api:messaging");
-});
-
-test("adres pojedynczego wniosku koduje identyfikator", () => {
-  assert.equal(
-    urlWnioskuORabat("https://api.allegro.pl", "rc/1"),
-    "https://api.allegro.pl/order/refund-claims/rc%2F1"
-  );
 });
 
 test("werdykt reklamacji: adres ze specyfikacji, ciało ze schematu, kwota tylko przy częściowym", () => {

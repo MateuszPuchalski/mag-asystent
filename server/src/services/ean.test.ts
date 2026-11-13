@@ -7,11 +7,9 @@ import path from "node:path";
 process.env.DB_PATH = path.join(fs.mkdtempSync(path.join(os.tmpdir(), "wertis-ean-")), "t.db");
 process.env.SGT_MODE = "seeded";
 
-/* ── Kolizje kodów przestają być dziennikiem bez wyjścia (0.360.0) ───────────
-   `ean_conflict` zapisuje każde spotkanie kodu w alejce od 0.37.0 i do 0.358.0
-   nie miał ANI JEDNEJ kolumny mówiącej, czy ktokolwiek się tym zajął. Obie
-   strony patrzyły na tę samą listę — biuro w `/biuro`, hala na ekranie
-   wyjątków — i żadna nie mogła drugiej nic powiedzieć.
+/* ── Kolizje kodów nie są dziennikiem bez wyjścia ────────────────────────────
+   `ean_conflict` zapisuje każde spotkanie kodu w alejce. Biuro i hala patrzą
+   na tę samą listę i każda strona musi widzieć, czy ktoś się tym zajął.
 
    Rozstrzygnięcie dotyczy KODU, nie pojedynczego trafienia, więc mieszka
    w osobnej tabeli. Dziennik zostaje dziennikiem.                           */
@@ -92,9 +90,7 @@ test("druga decyzja NADPISUJE pierwszą, a licznik liczy się od nowej", () => {
      zamieniono na `dopuszczone`, bo poprawka nie zadziałała. */
   trafienie("5901111111111", 300);
   E.rozstrzygnijKolizje("5901111111111", "poprawione", undefined, autor());
-  /* Trafienie PO decyzji. Pierwsza wersja tego testu podstawiała mu „120
-     sekund temu" i oczekiwała jedynki — czyli żądała, żeby trafienie sprzed
-     decyzji ją podważało; zły był test, nie kod. */
+  /* Trafienie PO decyzji. Trafienie sprzed decyzji jej nie podważa. */
   trafienie("5901111111111");
   assert.equal(wiersz("5901111111111").trafienPoDecyzji, 1);
 
@@ -111,15 +107,10 @@ test("druga decyzja NADPISUJE pierwszą, a licznik liczy się od nowej", () => {
 });
 
 test("REMIS MILISEKUNDY nie przekłamuje licznika — rozstrzyga `id`, nie znacznik", () => {
-  /* Ten test istnieje, bo pierwsza wersja 0.360.0 liczyła „po decyzji"
-     porównaniem `seen_at > at`. Oba znaczniki mają rozdzielczość milisekundy,
-     więc trafienie zapisane w tej samej milisekundzie co decyzja wpadało po
-     złej stronie — a padało to RAZ NA KILKA przebiegów całego zestawu, czyli
-     najgorszym możliwym sposobem.
-
-     To dokładnie ta blizna, którą 0.352.0 wyjęło z raportu skuteczności
-     doboru, i to samo lekarstwo: `id` dziennika jest AUTOINCREMENT-em, więc
-     rozstrzyga remis bez zgadywania.
+  /* Porównanie `seen_at > at` przy rozdzielczości milisekundy stawiałoby
+     trafienie z tej samej milisekundy co decyzja po złej stronie — i padałoby
+     raz na kilka przebiegów zestawu. `id` dziennika jest AUTOINCREMENT-em,
+     więc rozstrzyga remis bez zgadywania.
 
      Remis WYMUSZAMY, zamiast na niego czekać: wszystkie znaczniki idą na tę
      samą wartość, wziętą z bazy, nie z zaszytej daty. */

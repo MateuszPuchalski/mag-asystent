@@ -167,7 +167,7 @@ test("CSV bez kolumny Lokalizacja odmawia i wypisuje znalezione nagłówki", asy
   assert.match(r.json().error, /nazwa/i);
 });
 
-/* ── Wybór, co zostaje z obecnego pola (0.139.0) ─────────────────────────── */
+/* ── Wybór, co zostaje z obecnego pola ─────────────────────────── */
 
 test("mapa `zachowaj` działa tak samo dla arkusza i dla CSV", async () => {
   /* Mapa stoi OBOK wierszy właśnie po to: CSV rozbiera serwer, więc

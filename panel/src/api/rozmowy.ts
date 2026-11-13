@@ -88,8 +88,8 @@ export function useEskalacja() {
 export function useMojeSprawy() {
   return useQuery({
     queryKey: klucze.moje,
-    /* `lista` (0.535.0) to kolejki razem ze sprawami klientów; `sprawy`
-       zostaje samymi kolejkami dla kart sprzed tego wydania. */
+    /* `lista` to kolejki razem ze sprawami klientów; `sprawy`
+       zostaje samymi kolejkami dla starszych kart. */
     queryFn: () => api<{ sprawy: MojaSprawa[]; lista?: MojaSprawa[] }>("/api/obsluga/moje"),
     refetchInterval: 30_000,
   });
@@ -112,16 +112,10 @@ export function useZadania() {
   });
 }
 
-/* PRZEJĘCIA Z PANELU NIE MA OD 0.395.0. Hak `usePrzejmij` wołał
-   `POST /api/conversations/:id/claim` dla jedynego przycisku „PRZEJMIJ
-   ROZMOWĘ"; przycisk zszedł na zgłoszenie właściciela, bo wysyłka odpowiedzi
-   przypisuje rozmowę niczyją sama od 0.159.0. Trasa na serwerze ZOSTAJE
-   z własnymi testami — niesie też przejście `new` → `open` — ale panel jej
-   już nie woła. Wracając do niej, przywróć hak, a nie wołaj `api()` z ekranu. */
 
 /* Szkic jest współdzielony, więc zapis jest jawny i niesie wersję. Cicha
    autozapisywarka gubiłaby cudzą pracę przy dwóch agentach na jednej sprawie. */
-/* ── Załączniki do odpowiedzi (0.195.0) ──────────────────────────────────────
+/* ── Załączniki do odpowiedzi ────────────────────────────────────────────────
    Plik idzie do Allegro OD RAZU przy dodaniu, nie przy wysyłce: odmowę typu
    albo rozmiaru agent ma zobaczyć, gdy jeszcze da się wybrać inny plik.
    Serwer trzyma potem sam numer deklaracji, bajtów u siebie nie zostawia.
@@ -196,7 +190,7 @@ export function useZlecPomiar() {
 }
 
 /**
- * Dwie odpowiedzi biura na zadanie odesłane przez halę (0.352.0).
+ * Dwie odpowiedzi biura na zadanie odesłane przez halę.
  *
  * `ponow` i `anuluj` — trzeciej nie ma i to jest celowe. Zadanie odesłane
  * leży po stronie biura i musi z tej strony zejść, bo inaczej odesłanie
@@ -230,7 +224,7 @@ export function useNoweZadanie() {
   const qc = useQueryClient();
   return useMutation({
     /* Źródło domyślnie „panel" (ręczne z ekranu Zadań). Zlecenie ze sprawy
-       podaje własne `zrodlo` i `zrodloRef` (0.502.0) — `sprawy/ZlecHali.tsx`. */
+       podaje własne `zrodlo` i `zrodloRef` — `sprawy/ZlecHali.tsx`. */
     mutationFn: (v: Record<string, unknown>) =>
       api<{ zadanie: Zadanie }>("/api/zadania-terenowe",
         { method: "POST", body: JSON.stringify({ zrodlo: "panel", ...v }) }),
@@ -282,7 +276,7 @@ export function usePrzekaz() {
 }
 
 /**
- * Karta towaru z Subiekta — OSOBNO od rozmowy (0.179.0).
+ * Karta towaru z Subiekta — OSOBNO od rozmowy.
  *
  * Nie doklejamy jej do `useRozmowa`, bo tamten odczyt odświeża się przy każdym
  * zdarzeniu szyny, a karta ciągnie kolejkę MM, zamienniki i wszystkie
@@ -325,7 +319,7 @@ export function useUstawPriorytet() {
 }
 
 /**
- * Znacznik „sprawa reklamacyjna" (0.390.0) — NASZ, nie Allegro.
+ * Znacznik „sprawa reklamacyjna" — NASZ, nie Allegro.
  *
  * Sprawy posprzedażowej sprzedawca nie może założyć: `/sale/issues` ma
  * wyłącznie GET. Ta mutacja mówi wyłącznie, jak biuro prowadzi rozmowę.
@@ -359,7 +353,7 @@ export function useWskazOferte() {
 }
 
 /**
- * Gdzie jest paczka zamówienia tej rozmowy (23 września 2026).
+ * Gdzie jest paczka zamówienia tej rozmowy.
  *
  * Bliźniak `useSprawdzPrzesylke` z reklamacji: dwa żądania u Allegro, więc
  * na jawne kliknięcie. Unieważniamy samą rozmowę — stan paczki jest częścią
@@ -376,7 +370,7 @@ export function useSprawdzPrzesylkeRozmowy() {
 }
 
 /**
- * Ręczne wskazanie ZAMÓWIENIA dla rozmowy (0.397.0).
+ * Ręczne wskazanie ZAMÓWIENIA dla rozmowy.
  *
  * Bliźniak `useWskazOferte` i z tego samego powodu: numeru, którego Allegro
  * nie przysłało, panel nie zgaduje. Unieważniamy samą rozmowę — powiązanie
@@ -403,7 +397,7 @@ export function useWskazZamowienie() {
  * ma pokazać dopisek klienta obok szkicu i poprosić o jawną zgodę.
  */
 /**
- * Zakończ / Otwórz ponownie (23 września 2026). Jeden werdykt zamiast menu
+ * Zakończ / Otwórz ponownie. Jeden werdykt zamiast menu
  * statusów. Zakończenie przy pytaniu bez odpowiedzi serwer odbija 409
  * (`pytanieBezOdpowiedzi`), dopóki nie przyjdzie `mimoPytania`.
  */
@@ -422,7 +416,7 @@ export function useZakoncz() {
 }
 
 /**
- * Odłóż do terminu (0.533.0) — powód przy `odlozRozmowe` na serwerze.
+ * Odłóż do terminu — powód przy `odlozRozmowe` na serwerze.
  * `doKiedy: null` zdejmuje odłożenie („Cofnij", „Wróć teraz"). Pole idzie
  * zawsze, także jako `null`: serwer odbija ciało bez niego, żeby literówka
  * nie budziła rozmowy po cichu.
@@ -442,9 +436,9 @@ export function useOdloz() {
 }
 
 /**
- * Następna rozmowa czeka w pamięci, zanim agent do niej przejdzie (0.533.0).
+ * Następna rozmowa czeka w pamięci, zanim agent do niej przejdzie.
  *
- * Po wysyłce ekran sam przechodzi dalej (0.443.0), ale do tej pory dopiero
+ * Po wysyłce ekran sam przechodzi dalej, ale do tej pory dopiero
  * wtedy pytał serwer o treść — środek kolumny mówił przez tę chwilę „Wybierz
  * rozmowę z listy", a prawa kolumna znikała. Czekanie na każdą rozmowę to
  * czekanie pomnożone przez całą kolejkę.
@@ -466,7 +460,7 @@ export function useOtworz() {
   const qc = useQueryClient();
   return useMutation({
     /* Bez ciała — i dlatego bez `body`: pusty JSON to `FST_ERR_CTP_EMPTY_JSON_BODY`.
-       Ciało idzie WYŁĄCZNIE z paska „Cofnij" (0.500.0): serwer liczy to
+       Ciało idzie WYŁĄCZNIE z paska „Cofnij": serwer liczy to
        otwarcie jako cofnięte zakończenie w pomiarze tarcia. */
     mutationFn: (v: { id: number; zCofniecia?: boolean }) => api(`/api/conversations/${v.id}/otworz`, {
       method: "POST", ...(v.zCofniecia ? { body: JSON.stringify({ zCofniecia: true }) } : {}),
@@ -485,9 +479,9 @@ export function useWyslij() {
       id: number; body: string; expectedVersion: number;
       expectedLastMessageId: number | null;
       mimoNowejWiadomosci?: boolean; mimoObecnosci?: boolean;
-      /** „Wyślij i zakończ" (23 września 2026) — werdykt w tej samej transakcji co wiadomość. */
+      /** „Wyślij i zakończ" — werdykt w tej samej transakcji co wiadomość. */
       zakoncz?: boolean;
-      /** Ms od otwarcia rozmowy do kliknięcia „Wyślij" — pomiar tarcia (0.500.0). */
+      /** Ms od otwarcia rozmowy do kliknięcia „Wyślij" — pomiar tarcia. */
       msOdOtwarcia?: number;
     }) => api<WynikWysylki>(`/api/conversations/${v.id}/send`, {
       method: "POST",
@@ -511,14 +505,14 @@ export function useWyslij() {
 }
 
 /**
- * Cofnięta wysyłka (0.500.0) — sam wpis do pomiaru tarcia. Czekanie
+ * Cofnięta wysyłka — sam wpis do pomiaru tarcia. Czekanie
  * dziesięciu sekund mieszka w przeglądarce, więc bez tego serwer nie wie,
  * że agent zawrócił odpowiedź. Porażka wpisu nie ma prawa zatrzymać
  * cofnięcia — agent już zdecydował, a pomiar to nie jego sprawa.
  */
 export function zglosCofnietaWysylke(id: number, msOdKolejki?: number): void {
   /* Bez czasu — bez ciała, bo pusty JSON to `FST_ERR_CTP_EMPTY_JSON_BODY`.
-     Z czasem (0.532.0) — ms od odłożenia wysyłki do „Cofnij", do pytania
+     Z czasem — ms od odłożenia wysyłki do „Cofnij", do pytania
      właściciela, czy dziesięć sekund to za długo. Serwer przycina liczbę. */
   /* `method` jako pierwsze pole literału, nie w gałęzi warunku: strażnik
      tras w `routes/skrzynka.test.ts` czyta metodę ze źródła tego pliku. */
@@ -527,15 +521,7 @@ export function zglosCofnietaWysylke(id: number, msOdKolejki?: number): void {
 }
 
 /**
- * Komentarz wewnętrzny (0.157.0).
- *
- * Do tego wydania `conversation_comment` miała w kodzie serwera jeden INSERT
- * i zero odczytów — notatka agenta przepadała. Trasa istniała, ekranu nie było.
- *
- * Od 0.157.0 do 0.181.0 hook wołał `/api/obsluga/rozmowy/:id/komentarz`,
- * którego serwer nigdy nie wystawił — komentarz ze skrzynki dostawał 404.
- * Testy tras pilnowały tras, które istnieją, a nie tego, że panel woła te same
- * adresy; od 0.181.1 pilnuje tego strażnik w `routes/skrzynka.test.ts`.
+ * Komentarz wewnętrzny. Adres pilnuje strażnik w `routes/skrzynka.test.ts`.
  */
 export function useDodajKomentarz() {
   const qc = useQueryClient();
@@ -568,7 +554,7 @@ export function useAgenci() {
   });
 }
 
-/* ── Uchwyt rozmowy (0.159.0) ────────────────────────────────────────────────
+/* ── Uchwyt rozmowy ──────────────────────────────────────────────────────────
    Samo wejście w pytanie przydziela je agentowi NA CZAS SIEDZENIA; odpowiedź
    przydziela na stałe. Uchwyt żyje w pamięci serwera i wygasa bez znaku
    życia, więc panel musi bić sercem i musi się wymeldować przy wyjściu.
@@ -602,11 +588,8 @@ export function useUchwytRozmowy(id: number | null) {
   }, [id]);
 }
 
-/* ── „Pisze" (§6.3, makieta `Main.dc.html`) ──────────────────────────────────
-
-   Serwer obsługuje ten sygnał od 0.159.0 i nikt go dotąd nie wysyłał: trasa
-   `presence` przyjmowała `typing`, a panel meldował wyłącznie obecność. Znak
-   „pisze" nie mógł się więc pojawić na żadnym ekranie, bo nie powstawał.
+/* ── „Pisze" (§6.3) ──────────────────────────────────────────────────────────
+   Trasa `presence` przyjmuje `typing` obok obecności.
 
    RYTM JEST INNY NIŻ BICIE SERCA UCHWYTU. Serwer gasi „pisze" po 12 s
    (`TYPING_TTL_MS`), więc odświeżamy co 5 s. Po 3 s ciszy mówimy WPROST, że
@@ -680,7 +663,7 @@ export function useHistoriaKlienta(id: number | null) {
 }
 
 /**
- * Faktura i paragon zamówienia rozmowy (0.499.0) — tylko dokumenty z jego
+ * Faktura i paragon zamówienia rozmowy — tylko dokumenty z jego
  * numerem. `wlaczone`, bo woła to wyłącznie soczewka „Faktura": pytanie
  * o dokumenty przy każdej rozmowie byłoby pracą, której nikt nie ogląda.
  */

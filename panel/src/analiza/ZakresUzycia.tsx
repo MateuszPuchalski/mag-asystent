@@ -5,7 +5,7 @@ import { Liczba, PasekUdzialu } from "../ui/wykres";
 import { czas } from "../ui";
 import { nazwaZdarzenia } from "../dziennik/nazwy";
 
-/* ── Zakres UŻYCIE (23 września 2026) ────────────────────────────────────────
+/* ── Zakres UŻYCIE ───────────────────────────────────────────────────────────
    Odpowiedź na „co można zdjąć z ekranu" z danych, nie ze sporu. Serwer liczy
    ją z dziennika zdarzeń (`services/uzycie.ts`) — każda czynność w panelu i na
    kolektorze zostawia tam wpis.
@@ -15,15 +15,12 @@ import { nazwaZdarzenia } from "../dziennik/nazwy";
    się tylko patrzy, zawsze wyjdzie tu „nieużywany". Opis karty mówi to wprost,
    bo bez tego raport doradziłby zdjęcie Analizy.
 
-   UŻYWANE SĄ ZWINIĘTE. Pytanie brzmi „czego nikt nie nacisnął", a l/* ── OBSZARY JEDNĄ LINIĄ, CZYNNOŚCI PO POLSKU (0.542.0) ─────────────────
-   Decyzja właściciela z 27 września 2026, wariant C Analizy. Zakres był
-   najdłuższym ekranem panelu: 10 700 px przy 1180, bo każdy obszar stał
-   otwartą kartą z listą kluczy w rodzaju `zwrot_faktura_cofnieta`.
-
-   Obszar jest teraz wierszem z dwiema liczbami i paskiem udziału nieużytych,
-   a jego czynności otwiera klik. Czynności mają polskie nazwy ze słownika
-   dziennika (`dziennik/nazwy.ts`), klucz stoi w dymku — po nim szuka się
-   w kodzie, zanim się coś zdejmie. */
+   OBSZARY JEDNĄ LINIĄ, CZYNNOŚCI PO POLSKU, decyzją właściciela. Obszar jest
+   wierszem z dwiema liczbami i paskiem udziału nieużytych, a jego czynności
+   otwiera klik; otwarta karta na każdy obszar dałaby ekran na dziesięć
+   tysięcy pikseli. Czynności mają polskie nazwy ze słownika dziennika
+   (`dziennik/nazwy.ts`), klucz stoi w dymku — po nim szuka się w kodzie,
+   zanim się coś zdejmie. */
 
 export function ZakresUzycia({ r }: { r: RaportUzycia }) {
   const martwe = r.obszary.reduce((s, o) => s + o.nieuzywane.length, 0);

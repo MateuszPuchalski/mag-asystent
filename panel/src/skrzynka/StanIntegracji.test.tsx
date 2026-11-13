@@ -3,7 +3,7 @@ import { render, screen } from "@testing-library/react";
 import { StanIntegracji } from "./StanIntegracji";
 import type { Zdrowie } from "../api/typy";
 
-/* ── Ekran ma nazwać powód, a nie tylko go ocenić (0.152.0) ──────────────────
+/* ── Ekran ma nazwać powód, a nie tylko go ocenić ────────────────────────────
    Skrzynka stała 62 przebiegi, bo konto nie było sparowane. Serwer znał to
    zdanie i wysyłał je w tej samej odpowiedzi `/api/health`, którą ten panel
    już czytał. Na ekranie stało `failed` — słowo, które nie mówi ani co jest
@@ -27,11 +27,8 @@ const wiersz = (nazwa: string) => screen.getByText(nazwa).parentElement?.textCon
 
 describe("StanIntegracji", () => {
   it("tabela mówi o SYNCHRONIZACJI, a połączenie zostawia karcie konta", () => {
-    /* Do 0.152.0 etykieta „Połączenie Allegro" była podpięta pod
-       `allegroInbox.status`. Ekran nazywał rzecz, której nie pokazywał —
-       i dlatego niesparowane konto wyglądało jak awaria synchronizacji.
-       Od 0.509.0 wiersza o połączeniu tu nie ma: ten sam fakt niesie karta
-       „Konto Allegro" tuż obok, a jeden fakt stoi w jednym miejscu. */
+    /* `allegroInbox.status` to synchronizacja, nie połączenie. Połączenie
+       niesie karta „Konto Allegro" tuż obok — jeden fakt, jedno miejsce. */
     render(<StanIntegracji zdrowie={zdrowie({
       allegro: { stan: "niepolaczone" },
       allegroInbox: { ...zdrowie().allegroInbox, status: "failed" },

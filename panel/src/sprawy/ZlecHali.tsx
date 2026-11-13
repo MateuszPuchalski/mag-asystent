@@ -4,14 +4,13 @@ import { ClipboardList } from "lucide-react";
 import { useNoweZadanie } from "../api/rozmowy";
 import { Przycisk } from "../ui";
 
-/* ── „ZLEĆ HALI" ZE SPRAWY (0.502.0) ────────────────────────────────────────
-   Do tego wydania zlecić hali dało się tylko z rozmowy (pomiar). Zwrot
-   i reklamacja kazały przejść do Zadań, przepisać sprawę
-   w tytuł i wrócić — a zadanie nie wiedziało, skąd przyszło. Tu zlecenie
-   niesie `zrodlo` i numer sprawy: karta zadania prowadzi z powrotem, wynik
-   ze zwrotu staje na jego osi, a odesłanie — w Do zrobienia.
+/* ── „ZLEĆ HALI" ZE SPRAWY ─────────────────────────────────────────────────
+   Zwrot i reklamacja zlecają hali wprost, bez przepisywania sprawy w tytuł
+   na ekranie Zadań. Zlecenie niesie `zrodlo` i numer sprawy: karta zadania
+   prowadzi z powrotem, wynik ze zwrotu staje na jego osi, a odesłanie —
+   w Do zrobienia.
 
-   HALA DOSTAJE ZDANIE, NIE DOSSIER (0.408.0): pole „co ma zrobić hala" jest
+   HALA DOSTAJE ZDANIE, NIE DOSSIER: pole „co ma zrobić hala" jest
    obowiązkowe, a numer sprawy idzie w tytuł dla biura. Towar, gdy sprawa
    ma jeden znany, jedzie z zadaniem — magazynier szuka po półce, nie po
    numerze zwrotu.

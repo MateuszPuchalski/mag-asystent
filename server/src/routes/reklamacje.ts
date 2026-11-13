@@ -28,7 +28,7 @@ import { TAGI_REKLAMACJI } from "../services/tagi-spraw.js";
 import { bladPobrania, bladPodgladu, wyslijPodglad } from "./pobranie.js";
 import { ROLE_BIUROWE } from "../services/users.js";
 
-/* ── Trasy reklamacji klienckich (0.222.0) ───────────────────────────────────
+/* ── Trasy reklamacji klienckich ───────────────────────────────────
    PRZYROST PIERWSZY: odczyt, kolejka z zegarem, czat do czytania. Do Allegro
    NIE WYCHODZI STĄD ŻADEN ZAPIS — odpowiedź w czacie i formalny werdykt to
    dwa następne przyrosty, a każdy z nich jest nieodwracalny wobec kupującego
@@ -131,7 +131,7 @@ export async function reklamacjeRoutes(app: FastifyInstance) {
     }
   });
 
-  /* ── GDZIE JEST PACZKA DO KLIENTA (0.393.0) ────────────────────────────────
+  /* ── GDZIE JEST PACZKA DO KLIENTA ────────────────────────────────
      Zgłoszenie właściciela: „dodaj status przesyłki". Przy reklamacji to jest
      pytanie pierwsze — „czy on to w ogóle dostał".
 
@@ -172,7 +172,7 @@ export async function reklamacjeRoutes(app: FastifyInstance) {
   });
 
   /**
-   * Odświeżenie JEDNEJ sprawy z Allegro (0.273.0).
+   * Odświeżenie JEDNEJ sprawy z Allegro.
    *
    * ZAPIS, który u nas niczego nie postanawia: dociąga cudzy stan i tyle.
    * Stoi tu, bo `GET` z takim skutkiem ubocznym łamałby regułę „zero zapisu
@@ -210,7 +210,7 @@ export async function reklamacjeRoutes(app: FastifyInstance) {
    * serwer stałby się bramką pod dowolny adres w internecie. Bearer firmy nie
    * wychodzi do przeglądarki, a pobranie zostawia ślad w audycie.
    *
-   * DWA ADRESY, DWIE ODPOWIEDZI (0.223.0). Ta trasa oddaje PLIK: zawsze
+   * DWA ADRESY, DWIE ODPOWIEDZI. Ta trasa oddaje PLIK: zawsze
    * `application/octet-stream` i `content-disposition: attachment`, bo cudzy
    * plik nie ma się otwierać w naszym origin, gdy agent wejdzie tu paskiem
    * przeglądarki. Podgląd na osi ma własną trasę niżej, węższą bramkę i inne
@@ -312,7 +312,7 @@ export async function reklamacjeRoutes(app: FastifyInstance) {
       } catch (e) { return bladPodgladu(reply, e, z.nazwa); }
     });
 
-  /* ── Załączniki WYCHODZĄCE przy odpowiedzi (0.274.0) ───────────────────────
+  /* ── Załączniki WYCHODZĄCE przy odpowiedzi ───────────────────────
      Plik jedzie base64 w JSON, jak w skrzynce i jak zdjęcia z kolektora —
      `bodyLimit` API stoi na 6 MiB i to on wyznacza próg 4 MiB na plik.
      Multipart wymagałby wtyczki Fastify dla jednej trasy.
@@ -411,7 +411,7 @@ export async function reklamacjeRoutes(app: FastifyInstance) {
       const nie = odmowa(reply);
       if (nie) return nie;
       try {
-        /* Znacznik bierze TOŻSAMOŚĆ, nie samo imię (0.278.0): po niej
+        /* Znacznik bierze TOŻSAMOŚĆ, nie samo imię: po niej
            rozstrzyga się zdjęcie własnego znacznika i filtr „Moje". */
         const s = sesjaZadania()!;
         return {
@@ -422,7 +422,7 @@ export async function reklamacjeRoutes(app: FastifyInstance) {
     });
 
   /**
-   * Odpowiedź w rozmowie reklamacyjnej (0.224.0).
+   * Odpowiedź w rozmowie reklamacyjnej.
    *
    * Bez `autoryzuj()`: to zwykła praca biura, tak samo jak wysyłka w skrzynce.
    * Uprawnienie dostanie dopiero werdykt, bo tamten jest nieodwracalny wobec
@@ -463,7 +463,7 @@ export async function reklamacjeRoutes(app: FastifyInstance) {
    * w module. Potwierdzenie stoi w PANELU (zgoda przed przyciskiem); serwer
    * strzela raz i drugiego werdyktu w tej samej sprawie nie wyśle (409).
    *
-   * Każde pole ciała jawnie w typie (blizna 0.224.1). Wersja z ekranu jest
+   * Każde pole ciała jawnie w typie, bo pole nieopisane ginie po cichu. Wersja z ekranu jest
    * OBOWIĄZKOWA: werdykt bez wiedzy, na co agent patrzył, to werdykt w ciemno.
    *
    * `towar` to opcjonalne stanowisko o towarze przy uznaniu, wysyłane po

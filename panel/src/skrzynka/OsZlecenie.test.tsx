@@ -3,10 +3,9 @@ import { render, screen } from "@testing-library/react";
 import type { WpisOsi } from "../api/typy";
 import { czas } from "../ui";
 
-/* ── Zlecenie dla hali na osi (0.226.0) ──────────────────────────────────────
+/* ── Zlecenie dla hali na osi ────────────────────────────────────────────────
    Zgłoszenie właściciela: „zlecenie zmierzenia też powinno zostać pokazane
-   jako blok w wiadomości". Do 0.224.0 oś pokazywała sam WYNIK, a prośba, która
-   go wywołała, nie zostawiała po sobie nic poza kreskami zmiany statusu.
+   jako blok w wiadomości".
 
    Testy pilnują czterech rzeczy, i każda odpowiada na inne pytanie agenta:
    co zlecono, czy jeszcze czekamy, od kiedy, i czy zlecenie nie udaje
@@ -94,7 +93,7 @@ describe("Zlecenie dla hali na osi", () => {
   });
 });
 
-/* ── Odesłanie z hali na osi (0.352.0) ───────────────────────────────────────
+/* ── Odesłanie z hali na osi ─────────────────────────────────────────────────
    Usterka złapana przy przeglądzie własnego diffu: `STAN_ZLECENIA` nie znało
    piątego stanu, więc kafelek wypisywał surowy klucz „odeslane" w szarości,
    a karta zostawała bursztynowa — czyli mówiła „hala pracuje" dokładnie
@@ -120,7 +119,7 @@ describe("Zlecenie odesłane przez halę", () => {
     /* Najgorszy możliwy wynik tej zmiany: `Os.tsx` rysuje nieznany rodzaj
        w gałęzi domyślnej, czyli jak wiadomość w rozmowie. Notatka wewnętrzna
        „brak towaru, półka pusta" wyglądałaby wtedy na zdanie wysłane
-       kupującemu. Pierwsza wersja 0.352.0 miała dokładnie tę usterkę. */
+       kupującemu. */
     pokaz([{
       id: "odeslanie-9", rodzaj: "odeslanie_zadania", autor: "Halina", odKlienta: false,
       tresc: "brak towaru: Półka A01 pusta.", at: "2026-09-07T11:02:00Z",

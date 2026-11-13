@@ -10,7 +10,7 @@ import { LIMIT_ZNAKOW } from "./Edytor";
 import { DlugaTresc, scisle, zawieraOpis } from "./tresc";
 import { UZNANIE_ZYCZENIA } from "./slownik";
 
-/* ── KARTA „DECYZJA” (makiety właściciela: Main, Werdykt, Stany) ─────────────
+/* ── KARTA „DECYZJA” ─────────────────────────────────────────────────────────
    Pierwszy element prawej kolumny i jedyne miejsce nieodwracalnego kroku.
    Karta rysuje się sama, z ramą, bo ekran stawia ją bez opakowania.
 
@@ -23,12 +23,12 @@ import { UZNANIE_ZYCZENIA } from "./slownik";
    „Uznaję” i „Odrzucam, bo”. Lista radiowa pokazuje wszystkie naraz, więc
    pomyłkę pozycji widać bez otwierania listy rozwijanej.
 
-   ZGODA ZOSTAJE, decyzją właściciela, choć makieta jej nie rysuje. Allegro
+   ZGODA ZOSTAJE, decyzją właściciela. Allegro
    drugiego werdyktu nie przyjmie, więc zamiast cofnięcia jest kliknięcie
    w zdanie „Allegro dostanie: …”. Zmiana werdyktu, kwoty albo towaru zdejmuje
    ptaszek, bo zgoda dotyczy konkretnej decyzji, a nie formularza.
 
-   TOWAR: JAWNY WYBÓR BEZ DOMYŚLNEGO, a nie pole wyboru z makiety. Pole
+   TOWAR: JAWNY WYBÓR BEZ DOMYŚLNEGO, a nie pole wyboru. Pole
    wyboru ma tylko dwa stany, więc „nie odhaczone” czytałoby się jak „towar
    zostaje”, choć agent o towarze nie pomyślał. Obie odpowiedzi kosztują:
    jedna oddaje sztukę, druga każe klientowi pakować paczkę. Stanowisko
@@ -58,7 +58,7 @@ export interface ZadanieWerdyktu {
   towar?: { decyzja: DecyzjaOTowarze; tresc: string };
 }
 
-/* Kolejność i krótkie nazwy z makiety właściciela. Pełne zdania serwera
+/* Kolejność i krótkie nazwy dla biura. Pełne zdania serwera
    (`werdyktNazwa`) zostają dla stanu po werdykcie, który pisze serwer. */
 const UZNAJE: Array<[KodWerdyktu, string]> = [
   ["ACCEPTED_REPAIR", "Naprawa"],
@@ -90,7 +90,7 @@ const TOWAR_SLOWEM: Record<DecyzjaOTowarze, string> = {
 
 const uznanie = (kod: string | null) => (kod ?? "").startsWith("ACCEPTED");
 
-/* Barwy gałęzi: tło, pismo i przycisk. Tokeny rangi, nie hexy z makiety. */
+/* Barwy gałęzi: tło, pismo i przycisk. Tokeny rangi, nie hexy. */
 const TON = {
   ok: { tlo: "bg-emerald-50", pismo: "text-ranga-ok", przycisk: "bg-ranga-ok text-white", radio: "accent-ranga-ok" },
   zle: { tlo: "bg-red-50", pismo: "text-ranga-zle", przycisk: "bg-ranga-zle text-white", radio: "accent-ranga-zle" },
@@ -298,7 +298,7 @@ export function Werdykt({
     </Karta>;
   }
 
-  /* ── Rozwinięta: formularz z makiety „Werdykt” ──────────────────────────── */
+  /* ── Rozwinięta: formularz werdyktu ──────────────────────────────────────── */
   const zatwierdz = uznanie(kod);
   const ton = kod === null ? null : TON[zatwierdz ? "ok" : "zle"];
   const czesciowy = kod === "ACCEPTED_PARTIAL_REFUND";

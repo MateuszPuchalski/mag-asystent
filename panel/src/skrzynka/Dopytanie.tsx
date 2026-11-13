@@ -23,7 +23,7 @@ const NAZWY: Record<string, string> = {
 };
 
 /**
- * CO COPILOT SPRAWDZIŁ W BAZIE (0.507.0). Jedna linijka pod odpowiedzią.
+ * CO COPILOT SPRAWDZIŁ W BAZIE. Jedna linijka pod odpowiedzią.
  * Odpowiedź „nie mamy” po sprawdzeniu kartoteki waży co innego niż ta sama
  * odpowiedź z pamięci modelu — i agent ma to widzieć, zanim uwierzy.
  * Brak linijki znaczy „nie sięgał”, więc pusta lista nie rysuje nic.
@@ -346,7 +346,7 @@ export function Dopytanie(p: {
           className="ml-auto text-xs"
           wariant="glowny"
           disabled={!gotowe}
-          /* Zdjęcia schodzą z listy razem z tekstem, tak jak dotąd pole.
+          /* Zdjęcia schodzą z listy razem z tekstem pola.
              Zostawione wisiałyby pod następnym pytaniem i poszłyby z nim drugi raz. */
           onClick={() => {
             p.onPytaj(tekst.trim(), zdjecia.map((z) => z.plik));

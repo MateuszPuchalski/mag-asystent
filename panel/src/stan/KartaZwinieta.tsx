@@ -2,11 +2,10 @@ import React, { useEffect, useState } from "react";
 import { ChevronDown, ChevronRight } from "lucide-react";
 import { Karta } from "../ui";
 
-/* ── Karta stanu zwinięta do nagłówka (0.509.0) ─────────────────────────
-   Agenci mówili, że aplikacja przytłacza. Na stanie systemu stało dziesięć
-   kart naraz, a trzy z nich — test na żywym Allegro, rekoncyliacja i arkusz
-   lokalizacji — otwiera się rzadko, na żądanie. Zwinięte zostawiają sam
-   nagłówek, więc każda jest jedno kliknięcie dalej.
+/* ── Karta stanu zwinięta do nagłówka ───────────────────────────────────
+   Test na żywym Allegro, rekoncyliacja i arkusz lokalizacji otwiera się
+   rzadko, na żądanie. Zwinięte zostawiają sam nagłówek, więc każda jest
+   jedno kliknięcie dalej, a ekran nie przytłacza.
 
    KSZTAŁT JAK `KartaWgladu`, nie `Zwijka`. Zwijka to blok w środku karty,
    drobnym pismem; tu zwija się cała karta, więc nagłówek ma tę samą rangę
@@ -16,8 +15,8 @@ import { Karta } from "../ui";
    `otworz` PRZYCHODZI Z ZEWNĄTRZ: głęboki link `?karta=` i błąd, który ma
    być widać. Zwinięta karta nie może schować celu wiersza DO DECYZJI.
    Otwiera ją zmiana na `true`; zamknięcia ręką nie cofa kolejne
-   odświeżenie. Pamięci w przeglądarce nie ma celowo — karta Allegro opisuje,
-   ile kosztowało jej utrzymanie w biurze. */
+   odświeżenie. Pamięci w przeglądarce nie ma celowo — powód przy karcie
+   Allegro. */
 
 export function KartaZwinieta({ id, tytul, opis, akcje, otworz = false, children }: {
   id: string; tytul: string; opis?: React.ReactNode; akcje?: React.ReactNode;

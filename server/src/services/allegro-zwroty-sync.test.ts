@@ -10,11 +10,10 @@ import { stanZwrotow } from "./allegro-zwroty-sync-state.js";
 import { BladLimituAllegro, BladOdpowiedziAllegro } from "../adapters/allegro.js";
 import { zostalyWrazliwe } from "./allegro-oczyszczanie.js";
 
-/* ── Strażnicy synchronizatora zwrotów (0.150.0) ─────────────────────────────
-   Cztery rzeczy, z których każda kosztowała już wydanie w innym rejestrze:
-   paginacja do bezpiecznika (0.127.0), idempotencja po identyfikatorze
-   (0.128.0), respekt dla 429 (takt.ts) oraz — nowa — NIETYKALNOŚĆ pracy
-   człowieka przy odświeżeniu listy.                                        */
+/* ── Strażnicy synchronizatora zwrotów ───────────────────────────────────────
+   Cztery rzeczy: paginacja do bezpiecznika, idempotencja po identyfikatorze,
+   respekt dla 429 (takt.ts) oraz NIETYKALNOŚĆ pracy człowieka przy
+   odświeżeniu listy.                                                        */
 
 const schema = fs.readFileSync(new URL("../db/schema.sql", import.meta.url), "utf8");
 
@@ -45,9 +44,8 @@ test("kwotę liczymy na tekście — Allegro oddaje ją stringiem nie bez powodu
 });
 
 test("pierwszy przebieg bierze filtr dat, kolejny idzie kursorem", async () => {
-  /* Do 0.152.0 filtrem było OKNO WZGLĘDNE (90 dni wstecz od teraz); dziś jest
-     nim próg bezwzględny. Dla adresu zapytania różnica jest żadna — liczy się
-     to, że dwa filtry nigdy nie jadą razem. */
+  /* Filtrem jest próg bezwzględny. Dla adresu zapytania liczy się to, że dwa
+     filtry nigdy nie jadą razem. */
   const d = stanowisko();
   const url: string[] = [];
   await synchronizujAllegroZwroty({
@@ -100,11 +98,10 @@ test("paginacja idzie dalej niż pierwsza strona i staje na bezpieczniku", async
 });
 
 test("urwanie na bezpieczniku ZOSTAWIA ŚLAD, zamiast gubić resztę po cichu", async () => {
-  /* Do 0.209.0 przebieg urwany na dziesiątej stronie kończył się SUKCESEM:
-     kursor szedł naprzód, błędu nie było, a zwroty spoza granicy nie wracały
-     już nigdy. Kolejka ustawia się według terminu ustawowego, więc niewidoczne
-     wiersze były w większości tymi najbardziej spóźnionymi — czyli dokładnie
-     tymi, dla których ten ekran istnieje. */
+  /* Przebieg urwany na dziesiątej stronie nie może skończyć się SUKCESEM:
+     kursor poszedłby naprzód, a zwroty spoza granicy nie wróciłyby już nigdy.
+     Kolejka ustawia się według terminu ustawowego, więc niewidoczne byłyby
+     właśnie te najbardziej spóźnione. */
   const d = stanowisko();
   let strony = 0;
   await synchronizujAllegroZwroty({
@@ -187,8 +184,8 @@ test("429 przesuwa następną próbę o tyle, ile prosi Allegro", async () => {
 });
 
 test("kod porażki bierze się z klasy błędu, nie z jego zdania", async () => {
-  /* Blizna 0.149.0: wyrażenie szukające kodu w nawiasie milczało akurat przy
-     odmowach, które status ma nazywać. */
+  /* Kod z klasy błędu, nie z nawiasu w zdaniu: inaczej status milczałby
+     akurat przy odmowach, które ma nazywać. */
   const d = stanowisko();
   await assert.rejects(() => synchronizujAllegroZwroty({
     database: d, apiUrl: "https://api",
@@ -198,9 +195,8 @@ test("kod porażki bierze się z klasy błędu, nie z jego zdania", async () => 
 });
 
 test("konto bankowe i telefon nadawcy nie mają gdzie wylądować", async () => {
-  /* Do 0.151.0 ten test sprawdzał WYŁĄCZNIE model pracy, a lądowisko trzymało
-     odpowiedź dosłownie — więc IBAN jednak był w bazie, wbrew zdaniu
-     z polityki danych. Od 0.152.0 sprawdzamy obie tabele. */
+  /* Sprawdzamy obie tabele: model pracy i lądowisko. Samo lądowisko
+     trzymane dosłownie miałoby IBAN, wbrew polityce danych. */
   const d = stanowisko();
   await synchronizujAllegroZwroty({
     database: d, apiUrl: "https://api",
@@ -224,11 +220,9 @@ test("konto bankowe i telefon nadawcy nie mają gdzie wylądować", async () => 
   assert.equal(ladowisko.includes("WB1"), true, "list przewozowy to nie dane osobowe");
 });
 
-/* ── Próg bezwzględny (0.152.0) ──────────────────────────────────────────────
-   Decyzja właściciela: zwroty od 20 lipca 2026. Okno względne
-   `ALLEGRO_ZWROTY_DNI_WSTECZ` znika, a to jest zmiana NATURY, nie jednostki:
-   tamto liczyło się wyłącznie przy pierwszym przebiegu, bo dalej rządził
-   kursor. Próg obowiązuje zawsze. */
+/* ── Próg bezwzględny ────────────────────────────────────────────────────────
+   Decyzja właściciela: zwroty od 20 lipca 2026. Próg obowiązuje zawsze,
+   także gdy rządzi kursor. */
 const PROG = "2026-07-19T22:00:00Z";
 
 test("próg wchodzi do pierwszego zapytania zamiast okna dni", async () => {
@@ -277,10 +271,9 @@ test("bez progu nic się nie zmienia", async () => {
 
 
 test("identyfikator pozycji NIE zmienia się między przebiegami", () => {
-  /* Do 0.153.1 pozycje kasowało się i wstawiało od nowa, więc `id` rosło przy
-     każdym przebiegu. Panel otwarty w trakcie synchronizacji wysyłał
-     potwierdzenie kartoteki na nieaktualny numer — trafiało w cudzy wiersz
-     albo w „Nie znaleziono pozycji zwrotu". */
+  /* `id` pozycji nie może rosnąć przy każdym przebiegu. Panel otwarty
+     w trakcie synchronizacji wysłałby potwierdzenie kartoteki na nieaktualny
+     numer — w cudzy wiersz albo w „Nie znaleziono pozycji zwrotu". */
   const d = stanowisko();
   const partia = [zwrot("z1", "2026-08-30T08:00:00Z")];
   const przebieg = () => synchronizujAllegroZwroty({
@@ -296,10 +289,8 @@ test("identyfikator pozycji NIE zmienia się między przebiegami", () => {
 });
 
 test("dwie pozycje o tej samej nazwie bez numeru oferty nie zlewają się", () => {
-  /* Nazwa tego testu mówiła prawdę od 0.153.1, ale jego asercja jej przeczyła:
-     utrwalała, że druga pozycja NADPISUJE pierwszą. Do 0.162.1 tak właśnie
-     było — zwrot cicho gubił wiersz, a kwota liczyła się z jednej sztuki
-     zamiast dwóch.
+  /* Druga pozycja nie może NADPISAĆ pierwszej: zwrot zgubiłby wiersz,
+     a kwota liczyłaby się z jednej sztuki zamiast dwóch.
 
      `CustomerReturnItem` w specyfikacji Allegro nie ma identyfikatora pozycji,
      więc rozróżnia je wyłącznie kolejność w tablicy. Numer wystąpienia w kluczu
@@ -347,14 +338,14 @@ test("pozycja wycofana przez klienta znika, reszta zostaje", () => {
   });
 });
 
-/* ── Dociągnięcie po numerze listu (0.163.0) ─────────────────────────────── */
+/* ── Dociągnięcie po numerze listu ───────────────────────────────────────── */
 
 const ETYKIETA = "600000367616070023174201";
 
 test("skan pyta Allegro o TEN numer listu i nie rusza kursora", async () => {
   /* Zapytanie punktowe, nie przebieg. Przesunięcie kursora na zwrocie
      wyłowionym ze środka historii kazałoby synchronizatorowi przeskoczyć
-     wszystko, czego jeszcze nie widział — blizna 0.127.0. */
+     wszystko, czego jeszcze nie widział. */
   const d = stanowisko();
   d.prepare("INSERT INTO channel_account(channel,external_account_id) VALUES ('allegro','k')").run();
   await synchronizujAllegroZwroty({
@@ -409,11 +400,10 @@ test("pusty kod nie strzela do Allegro", async () => {
 
 
 test("takt NIE kasuje pozycji dopisanej przez biuro", async () => {
-  /* Blizna świeża i cicha (0.184.0). Kasowanie „pozycji, których Allegro już
-     nie oddaje" brało też te, których Allegro nie zna i nigdy nie odda —
-     dopisane u nas, bo klient przysłał więcej, niż zgłosił. Znikały przy
-     najbliższym takcie razem z oceną hali i zaznaczeniem do kwoty. Nic nie
-     wygląda na zepsute, dopóki ktoś nie policzy pieniędzy. */
+  /* Kasowanie „pozycji, których Allegro już nie oddaje" nie może brać tych,
+     których Allegro nie zna — dopisanych u nas, bo klient przysłał więcej,
+     niż zgłosił. Znikałyby po cichu razem z oceną hali i zaznaczeniem do
+     kwoty. */
   const d = stanowisko();
   const przebieg = () => synchronizujAllegroZwroty({
     database: d, zwrotyOd: null, now: () => new Date("2026-09-01T10:00:00Z"),
@@ -469,15 +459,11 @@ test("pozycja WYCOFANA przez klienta nadal znika", async () => {
   assert.deepEqual(zostaly, ["Sekator"], "wycofana przez klienta znika");
 });
 
-/* ── Doręczenie paczki zwrotnej (0.187.0, naprawione w 0.188.0) ─────────────
-   Te dwa testy pilnują poprawki, której 0.187.0 nie miało, choć twierdziło,
-   że pokazuje datę doręczenia. Lista paczek do odpytania powstawała wtedy
-   z tego, co WŁAŚNIE przyszło z Allegro — a synchronizacja chodzi kursorem
-   i raz zobaczony zwrot nigdy nie wraca na listę. Pytaliśmy więc o tracking
-   wyłącznie zwrotów zgłoszonych przed chwilą, czyli nigdy nie doręczonych.
-   Kolumna nie zapełniła się ani razu i właściciel zobaczył to pierwszego dnia.
-
-   Oba testy MUSZĄ padać na kodzie sprzed poprawki — sprawdzone.            */
+/* ── Doręczenie paczki zwrotnej ──────────────────────────────────────────────
+   Lista paczek do odpytania nie może powstawać z tego, co WŁAŚNIE przyszło
+   z Allegro: synchronizacja chodzi kursorem i raz zobaczony zwrot nigdy nie
+   wraca na listę. Pytalibyśmy wyłącznie o zwroty zgłoszone przed chwilą,
+   czyli nigdy nie doręczone.                                                */
 
 const paczkaZ1 = { createdAt: "2026-08-30T09:00:00Z", waybill: "WB-1", carrierId: "INPOST" };
 
@@ -539,11 +525,7 @@ test("numer listu STOI w modelu pracy, a tracking dalej czyta lądowisko", async
       : odpowiedz([zwrot("z1", "2026-08-30T08:00:00Z", { parcels: [paczkaZ1] })])),
   });
 
-  /* ZDJĘTA POLITYKA 0.163.0 (0.344.0). Do 0.343.0 stała tu odwrotna asercja
-     i była wtedy prawdziwa: kolumny na numer listu przy zwrocie z Allegro nie
-     wypełnialiśmy świadomie, a numer żył wyłącznie w kopii odpowiedzi.
-
-     Decyzja właściciela: „zapisuj numery paczek". Numer z naklejki jest tym,
+  /* Decyzja właściciela: „zapisuj numery paczek". Numer z naklejki jest tym,
      co operator ma w ręku przy kartonie, więc ma stać tam, gdzie się na niego
      patrzy — na zwrocie, a nie w surowym JSON-ie pod spodem. */
   const w = d.prepare("SELECT waybill FROM zwrot_klienta WHERE external_id='z1'")
@@ -631,11 +613,10 @@ test("odświeżenie bez paczek NIE KASUJE zapisanego numeru listu", async () => 
     .get() as { waybill: string | null }).waybill, "WB-1", "numer przeżywa odświeżenie");
 });
 
-/* ── Odświeżenie znanych zwrotów (audyt zwrotów, 15 września 2026) ───────────
+/* ── Odświeżenie znanych zwrotów ─────────────────────────────────────────────
    Kursor `from` oddaje wyłącznie zwroty utworzone po ostatnim widzianym. Zwrot
-   pobrany przed nadaniem paczki nie dostawał potem listu, terminu ani
-   `FINISHED`, więc kolejka rosła o zwroty dawno rozliczone w Allegro. Testy
-   wyżej musiały kasować stan synchronizacji, żeby zwrot wrócił na listę.   */
+   pobrany przed nadaniem paczki nie dostałby potem listu, terminu ani
+   `FINISHED`. */
 
 const ODSWIEZENIE = "limit=1000";
 
@@ -674,7 +655,7 @@ test("zwrot, który minął kursor, dostaje paczkę i FINISHED w następnym prze
 });
 
 test("odświeżenie NIE przywraca zwrotu, którego w bazie nie ma", async () => {
-  /* `zwroty:sprzatnij` kasuje zwroty rozliczone poza aplikacją (0.340.0),
+  /* `zwroty:sprzatnij` kasuje zwroty rozliczone poza aplikacją,
      a lista w oknie dat nadal je oddaje. Wstawienie ich z powrotem cofnęłoby
      sprzątanie po cichu, przy każdym takcie. */
   const d = stanowisko();

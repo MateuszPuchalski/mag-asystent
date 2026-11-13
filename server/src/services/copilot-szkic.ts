@@ -42,14 +42,10 @@ import {
   zestawNarzedzi, type UzycieNarzedzia, type WynikWywolania, type ZestawNarzedzi,
 } from "./copilot-narzedzia.js";
 
-/* ── Copilot: szkic odpowiedzi z faktów (§14.6, etap F, przyrost drugi) ──────
+/* ── Copilot: szkic odpowiedzi z faktów (§14.6, etap F) ──────────────────────
 
-   Decyzja właściciela z 7 września 2026: „w oknie odpowiedzi powinien być
-   guzik, który konstruuje odpowiedź z pomocą AI, kartotek etc." Każde
-   twierdzenie ma podpisane źródło, brak trafienia to puste pole, a nie
-   zgadywanie.
-
-   Stąd podział ról, który jest całą treścią tego pliku:
+   Każde twierdzenie szkicu ma podpisane źródło, a brak trafienia to puste
+   pole, nie zgadywanie. Stąd podział ról, który jest całą treścią tego pliku:
    - SERWER układa FAKTY (F1, F2, …) z kartoteki, oferty, rozpoznania,
      przesyłki i zwrotu, czyli z danych, które już ma.
    - MODEL pisze prozę z faktów i cytuje ich identyfikatory.
@@ -59,30 +55,30 @@ import {
      kod nie przepuszcza niezależnie od tego, jak dobry jest prompt.
 
    Propozycja NIE trafia do `conversation_draft`: tam mieszka szkic agenta
-   pilnowany przez `conversation.version` (blizna 409 w trakcie pisania). Wraca
+   pilnowany przez `conversation.version` (409 w trakcie pisania). Wraca
    jako osobny wiersz i do szkicu wchodzi na jawne kliknięcie — polityka
    danych skrzynki: „wynik nie staje się odpowiedzią sam".                    */
 
 export type RodzajFaktu =
   | "oferta" | "kartoteka" | "intake"
-  /* Treść oferty (0.253.0). TRZY rodzaje, nie jeden, bo mają różną wagę:
+  /* Treść oferty. TRZY rodzaje, nie jeden, bo mają różną wagę:
      parametr stoi w polu formularza, zgodność na liście Allegro, a opis to
      proza sprzedawcy, w której wymiar bywa sprzed dwóch wersji towaru. */
   | "oferta_opis" | "oferta_parametry" | "oferta_zgodnosc"
-  /* Adres NASZEJ aktywnej aukcji na daną kartotekę (0.270.0). Osobny rodzaj,
+  /* Adres NASZEJ aktywnej aukcji na daną kartotekę. Osobny rodzaj,
      bo to jedyny fakt, który model ma prawo przepisać klientowi DOSŁOWNIE —
      reszta jest materiałem na zdanie, a link jest linkiem albo niczym. */
   | "oferta_link"
-  /* Rozpoznanie klasyfikatora (22 września 2026): o co klient prosi i jaki
+  /* Rozpoznanie klasyfikatora: o co klient prosi i jaki
      jest następny krok. Osobny rodzaj, bo to jedyny fakt, który jest
      PRZYPUSZCZENIEM automatu, a nie danymi firmy — model ma go użyć do
      wyboru tematu odpowiedzi, nie cytować jako prawdy. */
   | "rozpoznanie"
-  /* Stan paczki zamówienia rozmowy (23 września 2026). Osobny rodzaj, bo
+  /* Stan paczki zamówienia rozmowy. Osobny rodzaj, bo
      niesie datę sprawdzenia: to stan z chwili pytania Allegro, nie z chwili
      czytania szkicu, i model ma go podać jako taki. */
   | "przesylka"
-  /* Kamienie milowe zwrotu tego zamówienia (0.502.0) — `zwrot-na-osi.ts`.
+  /* Kamienie milowe zwrotu tego zamówienia — `zwrot-na-osi.ts`.
      Osobny rodzaj z tego samego powodu co przesyłka: to stan z naszego
      systemu z datą, a nie obietnica, i model ma go podać jako taki. */
   | "zwrot"
@@ -113,7 +109,7 @@ const KATEGORIE_Z_INTAKE = new Set<string>([
  * cytować. Bezpieczeństwo bierze się z KONSTRUKCJI: fakty składa TEN PLIK z własnych
  * danych firmy, bez tekstu klienta, bez półki, bez nazwiska pracownika.
  * Składają je dwa miejsca i oba są tutaj: `kontekstSzkicu()` (czysty odczyt)
- * oraz `dopiszLinkiOfert()` (0.270.0), które dokłada adresy naszych aktywnych
+ * oraz `dopiszLinkiOfert()`, które dokłada adresy naszych aktywnych
  * aukcji — jedyny fakt wymagający sieci, więc jedyny, którego czysty odczyt
  * nie mógł zebrać. Producentem tego typu jest ten jeden plik.
  */
@@ -139,15 +135,10 @@ export interface KontekstSzkicu {
 /** Kartoteka w faktach: tyle, ile trzeba, żeby ją nazwać i znaleźć jej aukcję. */
 export interface Kartoteka { twId: number; symbol: string; nazwa: string }
 
-/* ── SKĄD MODEL TO WIE (0.253.0) ─────────────────────────────────────────────
-   Do 0.252.0 reguła brzmiała „nie znasz dopasowań z pamięci", a `numery
-   SpozaFaktow` odrzucał CAŁY szkic za jeden numer spoza faktów. Właściciel
-   zdjął ten zakaz i postawił w jego miejsce warunek: „pełna swoboda, ale niech
-   przy tym załącza źródła, sztywno oceniany poziom pewności".
-
-   Zamiana zakazu na RACHUNEK. Model wolno korzysta z własnej wiedzy, ale
-   każde twierdzenie techniczne musi stanąć na liście z podpisem, skąd je ma.
-   Zdanie bez wpisu dalej wywraca szkic — bo szkic, którego nie da się
+/* ── SKĄD MODEL TO WIE ───────────────────────────────────────────────────────
+   Model wolno korzysta z własnej wiedzy, ale każde twierdzenie techniczne
+   musi stanąć na liście z podpisem, skąd je ma, i sztywno ocenioną pewnością.
+   Zdanie bez wpisu wywraca szkic — bo szkic, którego nie da się
    sprawdzić, kosztuje dokładnie tyle, co szkic zmyślony.                    */
 
 /** Skąd wzięło się twierdzenie. Kolejność ma znaczenie: od najmocniejszego. */
@@ -211,7 +202,7 @@ export function ustalPewnosc(t: TwierdzenieSurowe): Twierdzenie {
 
 /**
  * Twierdzenie oparte na fakcie „rozpoznanie" schodzi do „niepewne" ze
- * źródłem `model` (22 września 2026). Rozpoznanie jest przypuszczeniem
+ * źródłem `model`. Rozpoznanie jest przypuszczeniem
  * klasyfikatora — model, który powoła się na nie jak na bazę sklepu,
  * dostałby sufit „pewne" za zgadywanie automatu. Instrukcja zabrania takiego
  * powołania, ale sufit pewności stoi w kodzie, nie w dyscyplinie modelu.
@@ -259,7 +250,7 @@ export interface OdpowiedzSzkicu {
   uzyteFakty: string[];
   zastrzezenia: string[];
   /**
-   * Skąd model wie to, co napisał (0.253.0). Surowe — pewność obcina do sufitu
+   * Skąd model wie to, co napisał. Surowe — pewność obcina do sufitu
    * źródła `ocenTwierdzenia`, nie adapter. Pusta lista przy nadawcy-atrapie.
    */
   twierdzenia: TwierdzenieSurowe[];
@@ -312,10 +303,10 @@ export interface SzkicCopilota {
   przez: string;
   ocena: OcenaSzkicu | null;
   /**
-   * SKĄD MODEL TO WIE (0.253.0) — po ocenie serwera, czyli z pewnością już
+   * SKĄD MODEL TO WIE — po ocenie serwera, czyli z pewnością już
    * obciętą do sufitu źródła. Panel pokazuje tę listę agentowi OBOK szkicu:
    * tekst dla klienta ma być gładki, a rachunek za niego stoi osobno.
-   * Pusta lista przy szkicach sprzed tego wydania — i to o nich prawda.
+   * Pusta lista przy starych szkicach bez twierdzeń — i to o nich prawda.
    */
   twierdzenia: Twierdzenie[];
   /**
@@ -372,8 +363,7 @@ export function pytaniaIntake(nazwaCzesci: string | null): { typ: string; pytani
 /**
  * Odwołania do faktów „(F3)", „(F1, F2)" znikają z treści PO sprawdzeniu.
  * Model ma je pisać — to na nich stoi kontrola pokrycia — ale klient nie ma
- * ich czytać. Na zrzucie właściciela (8.09.2026) stały w szkicu gotowym do
- * wstawienia. `uzyteFakty` zostaje w wierszu jako ślad dla pomiaru.
+ * ich czytać. `uzyteFakty` zostaje w wierszu jako ślad dla pomiaru.
  */
 export function bezZnacznikow(tresc: string): string {
   return tresc
@@ -400,13 +390,11 @@ export function numerySpozaFaktow(tresc: string, dozwolone: string): string[] {
 }
 
 /**
- * Numery, których model użył NIE DEKLARUJĄC, skąd je ma (0.253.0).
+ * Numery, których model użył NIE DEKLARUJĄC, skąd je ma.
  *
- * Następca zakazu z 0.252.0. Tamten odrzucał szkic za każdy numer spoza
- * faktów; ten odrzuca za numer, którego nie pokrywa żadne twierdzenie ze
- * źródłem `model`. Różnica jest cała: model wolno powiedzieć „to zwykle
- * ma numer 503 28 32-08", ale musi się pod tym podpisać, a agent musi to
- * zobaczyć w oknie „skąd to wiem", zanim wyśle.
+ * Odrzuca za numer, którego nie pokrywa żadne twierdzenie ze źródłem `model`.
+ * Model wolno powiedzieć „to zwykle ma numer 503 28 32-08", ale musi się pod
+ * tym podpisać, a agent musi to zobaczyć w oknie „skąd to wiem", zanim wyśle.
  *
  * Porównanie po `zwin`: „503 28 32-08" w szkicu i „503283208" w tezie to
  * ten sam numer, a różnica w spacjach nie jest powodem do odrzucenia
@@ -477,11 +465,8 @@ const LIMIT_OPISU_W_FAKTACH = 1200;
 const LIMIT_ZGODNOSCI = 30;
 
 /**
- * Fakty z TREŚCI oferty (0.253.0): opis, parametry, lista zgodności.
- *
- * Właściciel: „często oferta ma w sobie opis, do jakich wersji pasuje, wymiary
- * z oferty, dane techniczne". To jest wiedza, którą sprzedawca już zapisał,
- * a Copilot do 0.252.0 odpowiadał bez niej.
+ * Fakty z TREŚCI oferty: opis, parametry, lista zgodności — wiedza, którą
+ * sprzedawca już zapisał, np. do jakich wersji część pasuje.
  *
  * KAŻDY z tych faktów mówi o sobie, że pochodzi z OFERTY, a nie z kartoteki
  * — i to nie jest ozdoba zdania. Kartoteka Subiekta jest stanem magazynu
@@ -539,11 +524,10 @@ const dostepnosc = (ile: number | null, jednostka: string | null) =>
   ile != null && ile > 0 ? `dostępne dziś: ${ile} ${jednostka ?? "szt."}` : "dziś brak na stanie";
 
 /**
- * „Kiedy będzie" przy braku na stanie (0.502.0) — z zamówień u dostawcy.
+ * „Kiedy będzie" przy braku na stanie — z zamówień u dostawcy.
  *
- * Serwer liczył to od dawna (`zamowioneUDostawcy`), ale widział to tylko
- * kolektor. Szkic przy braku towaru nie miał więc czego powiedzieć poza
- * „brak", a agent szedł po termin do Subiekta. Fakt stoi WYŁĄCZNIE przy braku:
+ * Liczy to `zamowioneUDostawcy`. Bez tego szkic przy braku towaru nie ma
+ * czego powiedzieć poza „brak". Fakt stoi WYŁĄCZNIE przy braku:
  * przy towarze na półce pytanie o termin nie pada.
  *
  * Nazwy dostawcy i numeru dokumentu NIE ma — to nasza kuchnia, nie odpowiedź
@@ -672,10 +656,9 @@ export function kontekstSzkicu(
     dodaj("pozycja", zdanie);
   });
 
-  /* ROZPOZNANIE BIEŻĄCEJ PROŚBY (22 września 2026). Specyfikacja: szkic
-     dostaje znormalizowaną decyzję klasyfikatora. Do tej wersji szkic był
-     szyty pod dobór części i prosił o tabliczkę znamionową także klienta,
-     który pytał, gdzie jest paczka. Decyzja NIEAKTUALNA (klient dopisał po
+  /* ROZPOZNANIE BIEŻĄCEJ PROŚBY: szkic dostaje znormalizowaną decyzję
+     klasyfikatora, żeby nie prosił o tabliczkę znamionową klienta, który
+     pyta, gdzie jest paczka. Decyzja NIEAKTUALNA (klient dopisał po
      rozpoznaniu) nie wchodzi — opisywałaby pytanie, którego już nie zadaje. */
   const rozpoznanie = ostatniaKlienta ? db().prepare(`SELECT id, kategoria, akcja, wymaga_czlowieka,
       brak_danych_zamowienia, brak_danych_produktu FROM decyzja_klasyfikacji
@@ -690,14 +673,14 @@ export function kontekstSzkicu(
       + (Number(rozpoznanie.brak_danych_produktu) ? "; w rozmowie brakuje danych towaru lub maszyny" : "")
       + (Number(rozpoznanie.wymaga_czlowieka)
         ? "; sprawa wymaga decyzji człowieka — nie obiecuj rozstrzygnięcia" : "")
-      /* Wzorzec odpowiedzi dla TEJ kategorii (23 września 2026) — powód
+      /* Wzorzec odpowiedzi dla TEJ kategorii — powód
          i treść w `wzorce-odpowiedzi.ts`. Stoi w tym samym fakcie, bo jest
          tak samo przypuszczeniem jak kategoria, z której wynika. */
       + (wzorzecOdpowiedzi(rozpoznanie.kategoria)
         ? `; jak odpowiedzieć: ${wzorzecOdpowiedzi(rozpoznanie.kategoria)}` : ""));
   }
 
-  /* PRZESYŁKA, GDY KLIENT PISZE POD ZAMÓWIENIEM (23 września 2026). Fakt
+  /* PRZESYŁKA, GDY KLIENT PISZE POD ZAMÓWIENIEM. Fakt
      stoi przy każdej rozmowie z zamówieniem, nie tylko przy rozpoznaniu
      „gdzie paczka": pytanie o fakturę czy zwrot też bywa odpowiadane
      zdaniem „paczka jest jeszcze w drodze". Czytamy ZAPISANY stan — świeży
@@ -723,7 +706,7 @@ export function kontekstSzkicu(
   const zdanieZ = faktZwrotu(zdarzeniaZwrotowRozmowy(db(), conversationId));
   if (zdanieZ) dodaj("zwrot", zdanieZ);
 
-  /* Intake tylko przy prośbie o TOWAR (22 września 2026): pytania o maszynę
+  /* Intake tylko przy prośbie o TOWAR: pytania o maszynę
      przy „gdzie paczka" odpowiadają na pytanie, którego klient nie zadał.
      Bez rozpoznania intake zostaje, bo szkic pod ofertą to najczęściej
      pytanie o część. Typ części czytamy z tytułu oferty: to jedyna nazwa
@@ -732,7 +715,7 @@ export function kontekstSzkicu(
   if (oTowar) {
     const i = pytaniaIntake(nazwaOferty);
     /* „TYLKO o to, czego jeszcze nie podał" stoi w FAKCIE, nie tylko w
-       instrukcji (0.232.2): klientka podała komplet danych z tabliczki,
+       instrukcji: klientka podała komplet danych z tabliczki,
        a szkic poprosił o tabliczkę raz jeszcze, bo fakt brzmiał „zapytaj o…". */
     dodaj("intake", `Gdy fakty nie rozstrzygają, zapytaj klienta TYLKO o to, czego w rozmowie jeszcze nie podał`
       + ` (${i.typ}): ${i.pytania.join("; ")}; to, co już podał, potwierdź jednym zdaniem`);
@@ -749,10 +732,10 @@ export function kontekstSzkicu(
 }
 
 /**
- * Dokłada do faktów adresy NASZYCH aktywnych aukcji (0.270.0).
+ * Dokłada do faktów adresy NASZYCH aktywnych aukcji.
  *
  * Osobno od `kontekstSzkicu`, bo wymaga SIECI, a tamten ma zostać czystym
- * odczytem (blizna 0.18.0: otwarcie rozmowy nie strzela do Allegro). Osobno
+ * odczytem: otwarcie rozmowy nie strzela do Allegro. Osobno
  * też dlatego, że numeracja faktów musi biec dalej, a nie od nowa — `F12`
  * w odwołaniu modelu ma znaczyć jedno zdanie, nie dwa.
  *
@@ -928,7 +911,7 @@ function zdanieOdrzucenia(w: { kod: KodSita; lista: string[] }, znakow: number):
  * płatne i ląduje w księdze jako `blad`.
  */
 /**
- * KTO POPROSIŁ O SZKIC. `id: null` znaczy „nikt, zrobił to takt" (0.317.0)
+ * KTO POPROSIŁ O SZKIC. `id: null` znaczy „nikt, zrobił to takt"
  * i jest to decyzja o źródle wyrażona w danych, nie luka: `przez_user_id`
  * zostaje wtedy puste, a `przez` niesie słowo „automat". Podpisanie
  * automatycznego szkicu kontem agenta, który akurat był zalogowany,
@@ -938,7 +921,7 @@ export type AutorSzkicu = {
   id: number | null; name: string;
   /**
    * Pod jakim zadaniem wywołanie staje w księdze; brak = `szkic`. Szkice przed
-   * pracą (26 września 2026) mają własną etykietę, bo liczą własny limit, a sufit
+   * pracą mają własną etykietę, bo liczą własny limit, a sufit
    * godzinowy dnia liczy wyłącznie `szkic` — inaczej poranek zjadałby pierwszą
    * godzinę biura. Karta pomiaru pokazuje je dzięki temu osobno.
    */
@@ -957,21 +940,22 @@ export async function ulozSzkic(
   pobierzZdjecie?: Pobieracz, przesylka?: PrzesylkaDeps,
 ): Promise<SzkicCopilota> {
   /* ZAMÓWIENIE I STAN PACZKI PRZED KONTEKSTEM, bo żądania do Allegro wolno
-     wysłać tylko stąd, a nie z otwarcia rozmowy. Zamówienie idzie pierwsze, bo płatność i termin nadania stoją
-     pod werdyktem „wyślemy dziś". Odmowa Allegro nie przerywa szkicu:
-     zostaje stan zapisany wcześniej albo milczenie. */
+     wysłać tylko stąd, a nie z otwarcia rozmowy. Zamówienie idzie pierwsze,
+     bo płatność i termin nadania stoją pod werdyktem „wyślemy dziś". Odmowa
+     Allegro nie przerywa szkicu: zostaje stan zapisany wcześniej albo
+     milczenie. */
   await odswiezZamowienieRozmowy(conversationId, przesylka, teraz.getTime());
   await odswiezPrzesylke(conversationId, przesylka);
   await odswiezSellasistRozmowy(conversationId, teraz);
 
-  /* TREŚĆ OFERTY PRZED KONTEKSTEM (0.253.0). Opis, parametry i lista
+  /* TREŚĆ OFERTY PRZED KONTEKSTEM. Opis, parametry i lista
      zgodności kosztują żądanie NA OFERTĘ, więc idą po nie wyłącznie stąd:
      z kliknięcia „Ułóż odpowiedź", gdzie zapis i tak już jest. `kontekstSzkicu`
      zostaje czystym odczytem — inaczej samo otwarcie rozmowy strzelałoby do
-     Allegro, a to jest ta reguła, którą 0.18.0 kupiło blizną.
+     Allegro.
 
-     Odmowa nie przerywa szkicu: bez opisu jest on wart tyle, ile był wart
-     do 0.252.0. Limit z Allegro przerywa, bo drugie żądanie pogłębia przerwę. */
+     Odmowa nie przerywa szkicu, który zostaje wtedy bez opisu. Limit
+     z Allegro przerywa, bo drugie żądanie pogłębia przerwę. */
   /* Oferta tą samą regułą co fakty niżej, więc także jedyna pozycja
      zamówienia. Stoi PO odświeżeniu zamówienia, bo zamówienie dociągnięte
      przed chwilą też ma pozycje. Przy kilku pozycjach oferty nie ma, więc
@@ -983,18 +967,16 @@ export async function ulozSzkic(
     /* Bez kopii oferty treść nie ma gdzie się zapisać, a pierwszy szkic
        przychodzi zwykle przed taktem ofert. Kopię zakładamy więc stąd, jednym
        żądaniem i tylko przy jej braku. Każdy błąd, także limit, kończy się
-       szkicem bez treści: tyle był on wart, zanim kopię zakładaliśmy. */
+       szkicem bez treści. */
     await zapewnijSnapshotOferty(oferta.konto, oferta.ofertaId, allegro).catch(() => false);
     await dociagnijTresc(oferta.konto, oferta.ofertaId, allegro);
   }
 
   const kontekst = kontekstSzkicu(conversationId, subiekt, teraz);
 
-  /* LINKI DO NASZYCH AKTYWNYCH AUKCJI (0.270.0). Do 0.269.0 model nie dostawał
-     ani jednego adresu, więc zamiast wskazać ofertę pisał klientowi, żeby
-     poszukał po nazwie albo po EAN-ie — czyli zadawał mu pracę, którą mamy
-     zrobioną. Powód nie był w instrukcji: `offer_snapshot` zna wyłącznie
-     aukcje, pod którymi ktoś napisał, a odwrotnego wyszukania nie było wcale.
+  /* LINKI DO NASZYCH AKTYWNYCH AUKCJI. Bez nich model zamiast wskazać
+     ofertę każe klientowi szukać po nazwie albo EAN-ie. `offer_snapshot`
+     zna wyłącznie aukcje, pod którymi ktoś napisał, stąd odwrotne wyszukanie.
 
      JEDNO żądanie na komplet kartotek (`external.id` jest tablicą) i dopiero
      TU, nie w `kontekstSzkicu` — tamten zostaje czystym odczytem. Błąd, także
@@ -1009,11 +991,11 @@ export async function ulozSzkic(
 
      PIKSELI ZAMASKOWAĆ SIĘ NIE DA i asercja niżej ich nie dotyczy — to nie
      jest przeoczenie, tylko cena zapisana wprost w nagłówku `copilot-zdjecia`
-     i w polityce danych. Zdjęcie klienta idzie do dostawcy w całości.
-     Właściciel zgodził się na to także dla TAKTU, pytany wprost.
+     i w polityce danych. Zdjęcie klienta idzie do dostawcy w całości, także
+     z TAKTU, za zgodą właściciela.
 
      Awaria pobrania NIE wywraca szkicu: `przygotujZdjeciaRozmowy` liczy błędy
-     i oddaje, co się udało. Szkic bez zdjęć jest tym, czym był wczoraj. */
+     i oddaje, co się udało. */
   const zdjecia: WynikZdjec = await przygotujZdjeciaRozmowy(db(), conversationId, pobierzZdjecie);
   const spis = spisZdjec(zdjecia);
   /* Spis dopinamy do FAKTÓW, nie do wątku: wątek jest tekstem klienta i po to
@@ -1049,7 +1031,7 @@ export async function ulozSzkic(
     throw new Error("Maskowanie nie oczyściło rozmowy — nic nie wyszło do dostawcy");
   }
 
-  /* NARZĘDZIA KARTOTEKI (decyzja właściciela z 19 października 2026): szkic
+  /* NARZĘDZIA KARTOTEKI: szkic
      sięga do bazy jak dopytanie. Bez zapisu do sprawy, a jedyny odczyt
      sieciowy to link oferty po sygnaturze; granica stoi w `copilot-narzedzia`.
      Przełącznik zostaje, bo każda runda to żądanie. */
@@ -1063,7 +1045,7 @@ export async function ulozSzkic(
     const slad = (e as { slad?: string }).slad || (e as Error).message;
     /* Rundy narzędzi zapłacone przed błędem. Bez nich porażka po trzech
        rundach ważyłaby w pomiarze zero, a kosztowała trzy żądania. Model
-       pusty przy błędzie bez rund, jak dotąd: pomiar go pomija. */
+       pusty przy błędzie bez rund: pomiar go pomija. */
     const p = sladPorazki(e);
     const t = p.zuzycie && (p.zuzycie.wej || p.zuzycie.wyj) ? p.zuzycie : null;
     const model = t ? config.copilot.model : "";
@@ -1135,9 +1117,8 @@ export async function ulozSzkic(
          z rozmowy, a treść to kartoteka, której dziennik nie potrzebuje. */
       rund: odp.rund ?? 1, narzedzi: (odp.narzedzia ?? []).length,
       narzedziaNazwy: (odp.narzedzia ?? []).map((n) => n.nazwa),
-      /* Zdjęcia LICZBAMI, jak przy reklamacji (0.484.6). Od 0.330.0 żadne
-         zdjęcie rozmowy nie doszło do modelu, a dziennik tego nie pokazał,
-         bo liczby błędów nikt nie zapisywał. */
+      /* Zdjęcia LICZBAMI, jak przy reklamacji: bez liczby błędów dziennik
+         nie pokaże, że żadne zdjęcie nie doszło do modelu. */
       zdjec: zdjecia.zdjecia.length, zdjecBledow: zdjecia.bledow,
       zdjecNieObraz: zdjecia.nieObrazy.length,
     }, kto.id, db());

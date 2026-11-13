@@ -6,7 +6,7 @@ import { sciezkaZdjecia, zapiszZdjecie } from "./foto.js";
 export type RodzajZadania = "pomiar" | "zdjecie" | "weryfikacja" | "inne";
 export type PriorytetZadania = "normalny" | "pilny";
 /**
- * Powód odesłania zadania z hali do biura (0.352.0).
+ * Powód odesłania zadania z hali do biura.
  *
  * DWA kody, nie pięć. Biuro reaguje na nie inaczej: przy `brak_towaru` idzie
  * do Subiekta albo do dostawcy, przy `nie_da_sie` przeformułowuje zlecenie.
@@ -17,7 +17,7 @@ export const POWODY_ODESLANIA = ["brak_towaru", "nie_da_sie"] as const;
 export type PowodOdeslania = (typeof POWODY_ODESLANIA)[number];
 export interface ZadanieTerenowe {
   id: number; rodzaj: RodzajZadania; tytul: string; instrukcja: string;
-  /* Kontekst zlecenia DLA BIURA (0.408.0) — skąd zadanie się wzięło. Na halę
+  /* Kontekst zlecenia DLA BIURA — skąd zadanie się wzięło. Na halę
      NIE jedzie: magazynier dostaje produkt i zdanie mówiące, co zrobić.
      `null` przy zadaniach sprzed tego wydania i przy zakładanych ręcznie. */
   kontekst: string | null;
@@ -39,23 +39,20 @@ export interface ZadanieTerenowe {
   *
   * Mierzy od `utworzono_at` w KAŻDYM stanie otwartym — także w `w_toku`
   * i `odeslane`. Pytanie brzmi „jak dawno biuro poprosiło", a na nie
-  * odpowiedź nie zmienia się przez to, że ktoś zadanie przejął. Blizna
-  * 0.251.0 mówi o czym innym: tam zegar nazywał się „czeka" i kłamał przy
-  * statusie, w którym nikt nie czekał. Tu nazwa jest „zlecone ... temu"
-  * i jest prawdziwa zawsze.
+  * odpowiedź nie zmienia się przez to, że ktoś zadanie przejął. Dlatego
+  * nazwa brzmi „zlecone ... temu", a nie „czeka".
   */
  zleconeOdMs: number | null;
  /** Zdjęcia od hali — bez treści plików, sama lista (§13.3). */
  zalaczniki: ZalacznikZadania[];
- /** Adres sprawy, z której zlecono zadanie (0.502.0); `null` przy ręcznym. */
+ /** Adres sprawy, z której zlecono zadanie; `null` przy ręcznym. */
  cel: string | null;
 }
 
-/* ── SKĄD ZADANIE I DOKĄD WRACA (0.502.0) ───────────────────────────────────
-   Do tego wydania zlecić hali dało się tylko z rozmowy, a karta zadania nie
-   miała odnośnika z powrotem — źródło stało zdaniem w `kontekst`. Zwrot
-   („sprawdź stan towaru z kosza") i reklamacja („zdjęcie towaru z półki")
-   musiały zlecać ręcznie w Zadaniach, bez śladu, skąd. Dostawa zostaje
+/* ── SKĄD ZADANIE I DOKĄD WRACA ─────────────────────────────────────────────
+   Zlecić hali da się z rozmowy, zwrotu („sprawdź stan towaru z kosza")
+   i reklamacji („zdjęcie towaru z półki"), a karta zadania ma odnośnik
+   z powrotem. Dostawa zostaje
    przy swojej „notatce do hali": drugi kanał do hali o tym samym dokumencie
    rozdzieliłby jedną rozmowę na dwie.
 
@@ -80,7 +77,7 @@ function sprawdzZrodlo(zrodlo: string, ref: string | null): void {
  if (!jest) throw new Error("Nie znaleziono sprawy, z której zlecasz zadanie");
 }
 /**
- * Wynik albo odesłanie wraca na oś ZWROTU tak jak na oś rozmowy (0.142.0).
+ * Wynik albo odesłanie wraca na oś ZWROTU tak jak na oś rozmowy.
  * Reklamacja nie ma własnej osi zdarzeń biura — tam
  * wynik czyta się z karty zadania, do której prowadzi odnośnik.
  */
@@ -149,7 +146,7 @@ export function wezZadanie(id:number,autor:{id:number;name:string}){
 export function wykonajZadanie(id:number,wynik:string,autor:{id:number;name:string}){
  const w=tekst(wynik,"Wynik",4000);const r=db().prepare("UPDATE zadanie_terenowe SET status='wykonane',wynik=?,wykonano_at=?,wykonano_przez=?,wykonano_user_id=? WHERE id=? AND status='w_toku' AND przypisano_user_id=?").run(w,teraz(),autor.name,autor.id,id,autor.id);
  if(!r.changes)throw new Error("Zadanie musi być przejęte przez Ciebie przed zapisaniem wyniku");const z=zadanie(id)!;
- /* Zadanie z rozmowy oddaje wynik na jej oś (0.142.0). Zdarzenie, nie edycja
+ /* Zadanie z rozmowy oddaje wynik na jej oś. Zdarzenie, nie edycja
     wiadomości: treść napisana przez klienta ma zostać tym, czym była. */
  const rozmowa=db().prepare("SELECT conversation_id FROM zadanie_terenowe WHERE id=?").get(id) as {conversation_id:number|null};
  if(rozmowa?.conversation_id!=null)dopiszZdarzenieWyniku(rozmowa.conversation_id,id,w);
@@ -159,12 +156,10 @@ export function wykonajZadanie(id:number,wynik:string,autor:{id:number;name:stri
 export function anulujZadanie(id:number,autor:{id:number;name:string}){const r=db().prepare("UPDATE zadanie_terenowe SET status='anulowane',anulowano_at=?,anulowano_przez=? WHERE id=? AND status IN ('nowe','w_toku','odeslane')").run(teraz(),autor.name,id);if(!r.changes)throw new Error("Zadania nie można anulować");const z=zadanie(id)!;logEvent("zadanie_terenowe_anulowane",autor.name,z.twId,{zadanieId:id});return z;}
 
 /**
- * Hala ODSYŁA zadanie do biura — projekt panelu §13.3 (0.352.0).
+ * Hala ODSYŁA zadanie do biura — projekt panelu §13.3.
  *
- * Do 0.351.0 jedynym wyjściem z zadania był wynik, więc magazynier przed pustą
- * półką albo wpisywał brak JAKO WYNIK i zadanie szło do biura oznaczone jako
- * wykonane, albo zostawiał je w `w_toku`, gdzie nie widział go już nikt.
- * Pierwsze kłamie w metryce „czas realizacji zadania magazynowego" (§22),
+ * Bez tej drogi magazynier przed pustą półką wpisałby brak JAKO WYNIK albo
+ * zostawiłby zadanie w `w_toku`, gdzie nie widzi go nikt. Pierwsze kłamie w metryce „czas realizacji zadania magazynowego" (§22),
  * drugie kłamie ciszą.
  *
  * Wolno z `nowe` (nie przejmuję, bo wiem, że się nie da) i z WŁASNEGO
@@ -183,7 +178,7 @@ export function odeslijZadanie(id:number,powodKod:PowodOdeslania,powod:string|nu
  const r=db().prepare("UPDATE zadanie_terenowe SET status='odeslane',odeslano_at=?,odeslano_przez=?,odeslano_user_id=?,powod_kod=?,powod=? WHERE id=? AND (status='nowe' OR (status='w_toku' AND przypisano_user_id=?))").run(teraz(),autor.name,autor.id,powodKod,tresc,id,autor.id);
  if(!r.changes){const z=zadanie(id);if(!z)throw new Error("Nie znaleziono zadania");throw new Error(z.status==="w_toku"?`Zadanie realizuje ${z.przypisanoPrzez} i tylko ta osoba może je odesłać`:"Zadanie nie czeka na realizację");}
  const z=zadanie(id)!;
- /* Rozmowa czekająca na halę MA SIĘ DOWIEDZIEĆ, że nie doczeka (0.352.0).
+ /* Rozmowa czekająca na halę MA SIĘ DOWIEDZIEĆ, że nie doczeka.
     Bez tego wpisu `waiting_for_internal` trzymałby ją do ręcznego kliknięcia,
     a agent czekałby na pomiar, którego nikt nie zrobi. */
  const rozmowa=db().prepare("SELECT conversation_id FROM zadanie_terenowe WHERE id=?").get(id) as {conversation_id:number|null};
@@ -193,7 +188,7 @@ export function odeslijZadanie(id:number,powodKod:PowodOdeslania,powod:string|nu
 }
 
 /**
- * Magazynier ODDAJE zadanie z powrotem do puli (0.352.0).
+ * Magazynier ODDAJE zadanie z powrotem do puli.
  *
  * To NIE jest odesłanie: nie ma werdyktu, nie ma powodu i biuro nie ma tu nic
  * do zrobienia. Zadanie wraca na `nowe` i weźmie je ktokolwiek inny.
@@ -212,7 +207,7 @@ export function oddajZadanie(id:number,autor:{id:number;name:string}){
 }
 
 /**
- * Biuro ZLECA ODESŁANE ZADANIE PONOWNIE (0.352.0).
+ * Biuro ZLECA ODESŁANE ZADANIE PONOWNIE.
  *
  * Druga z dwóch odpowiedzi biura na odesłanie; pierwszą jest `anulujZadanie`.
  * Zadanie wraca na `nowe` z czystym przypisaniem, a ślad odesłania ZOSTAJE
@@ -224,12 +219,11 @@ export function oddajZadanie(id:number,autor:{id:number;name:string}){
  * drugiego zadania zrywałoby powiązanie z rozmową.
  */
 /**
- * Zdjęcie od hali przy zadaniu — projekt panelu §13.3 (0.352.0).
+ * Zdjęcie od hali przy zadaniu — projekt panelu §13.3.
  *
  * Są pytania, na które tekst nie odpowiada: „czy to ta sama wtyczka", „co jest
- * na tabliczce", „jak wygląda pęknięcie". Do 0.351.0 agent przepisywał opis ze
- * słów magazyniera i wysyłał go kupującemu jako WŁASNE ustalenie — a przy
- * sporze nie miał się o co oprzeć.
+ * na tabliczce", „jak wygląda pęknięcie". Opis przepisany ze słów
+ * magazyniera nie daje agentowi przy sporze niczego, o co mógłby się oprzeć.
  *
  * Bramka własności ta sama co przy odesłaniu: `nowe` albo WŁASNE `w_toku`.
  * Zamknięte odpada świadomie — dowód dokładany do zadania rozliczonego tydzień
@@ -274,7 +268,7 @@ export function ponowZadanie(id:number,instrukcja:string|undefined,autor:{id:num
  const r=db().prepare(`UPDATE zadanie_terenowe SET status='nowe',przypisano_at=NULL,przypisano_przez=NULL,przypisano_user_id=NULL,odeslano_at=NULL,odeslano_przez=NULL,odeslano_user_id=NULL,powod_kod=NULL,powod=NULL,instrukcja=COALESCE(?,instrukcja) WHERE id=? AND status='odeslane'`).run(nowa,id);
  if(!r.changes){const z=zadanie(id);if(!z)throw new Error("Nie znaleziono zadania");throw new Error("Ponowić można wyłącznie zadanie odesłane przez halę");}
  const z=zadanie(id)!;
- /* Rozmowa ZNOWU czeka na halę — symetrycznie do `zlecPomiar` (0.159.0).
+ /* Rozmowa ZNOWU czeka na halę — symetrycznie do `zlecPomiar`.
     Bez tego odesłanie zdejmowało `waiting_for_internal` (słusznie: hala
     odpowiedziała), a ponowienie zostawiało rozmowę jako `open`, czyli
     z ruchem po stronie agenta — który nie ma co napisać, bo czeka na pomiar. */

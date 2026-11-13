@@ -27,7 +27,7 @@ function stanowisko() {
   const d = new DatabaseSync(":memory:");
   d.exec(schema);
   migrate(d);
-  /* Konta PRZED sprawami: od 0.278.0 znacznik „prowadzę" niesie `user_id`,
+  /* Konta PRZED sprawami: znacznik „prowadzę" niesie `user_id`,
      a klucz obcy nie wybacza. Dwie Ale stoją tu celowo — to jest scenariusz,
      dla którego kolumna w ogóle powstała. */
   for (const [uid, login, imie] of [
@@ -110,7 +110,7 @@ test("DO DECYZJI trzyma wszystko przed werdyktem, także sprawy z nową wiadomo�
 });
 
 test("„klient czeka” WYGASA w sprawie rozstrzygniętej — zegar, nie treść", () => {
-  /* ── Zgłoszenie właściciela ze zrzutem (0.407.0) ─────────────────────────
+  /* ── Zgłoszenie właściciela ze zrzutem ───────────────────────────────────
      „Widzę sporo reklamacji, które w naszej aplikacji pokazuje, że klient
      czeka, a w Allegro są już dawno rozwiązane."
 
@@ -132,8 +132,8 @@ test("„klient czeka” WYGASA w sprawie rozstrzygniętej — zegar, nie treś�
   assert.equal(kubelek({ ...sprawa, ostatniaWiadomoscAt: "2026-09-17T09:00:00Z" }, TERAZ),
     "odpowiedz", "dopisek sprzed dwóch dni to nadal dług biura");
 
-  /* PLAKIETKA IDZIE ZA KUBEŁKIEM. Do 0.406.0 liczyły to osobno i obie kłamały
-     tak samo; gdyby poprawić jedno, drugie kłamałoby dalej. */
+  /* PLAKIETKA IDZIE ZA KUBEŁKIEM: gdyby liczyły osobno, poprawka jednego
+     zostawiłaby drugie kłamiące dalej. */
   assert.ok(!sygnaly({ ...sprawa, ostatniaWiadomoscAt: "2026-08-01T09:49:00Z",
     zwrotWymagany: null }, TERAZ).includes("klient_czeka"));
   assert.ok(sygnaly({ ...sprawa, ostatniaWiadomoscAt: "2026-09-17T09:00:00Z",
@@ -216,15 +216,13 @@ test("„prowadzę” jest ZNACZNIKIEM: drugie kliknięcie tej samej osoby je zd
   assert.equal(kolega.prowadzi, "M. Wójcik");
 
   const slad = zdarzenia(d, "reklamacja_prowadzi");
-  assert.equal(slad.length, 3, "każda mutacja zostawia ślad (blizna 0.137.1)");
+  assert.equal(slad.length, 3, "każda mutacja zostawia ślad");
   assert.equal(slad[0].user_id, "A. Lewandowska");
 });
 
 test("imienniczka NIE zdejmuje cudzego znacznika — cała racja bytu kolumny", () => {
-  /* To jest błąd, którego do 0.278.0 nie dało się zauważyć. Przełącznik
-     porównywał IMIONA, więc druga A. Lewandowska klikała „prowadzę" i zamiast
-     wziąć sprawę — zdejmowała znacznik pierwszej. Bez komunikatu, bez śladu
-     w oczach obu, a objawem była sprawa znikająca z cudzego kubełka. */
+  /* Przełącznik porównujący IMIONA kazałby drugiej A. Lewandowskiej zdjąć
+     znacznik pierwszej — bez komunikatu i bez śladu w oczach obu. */
   const { d, dodaj } = stanowisko();
   const id = dodaj({ ext: "a" });
 
@@ -273,8 +271,8 @@ test("notatka zapisuje się, a do dziennika idzie DŁUGOŚĆ, nie treść", () =
 
 test("zmianę notatki da się COFNĄĆ, a drugie kliknięcie wraca tam, gdzie było", () => {
   /* Notatka jest polem swobodnym, które nadpisuje ten, kto pisze ostatni.
-     Do 0.280.0 skasowanego zdania nie dało się odzyskać niczym: do dziennika
-     idzie świadomie sama DŁUGOŚĆ. Cofnięcie jest ZAMIANĄ, nie tabelą historii —
+     Do dziennika idzie świadomie sama DŁUGOŚĆ, więc treść trzyma wiersz.
+     Cofnięcie jest ZAMIANĄ, nie tabelą historii —
      jeden szczebel, bo drugi szczebel to drugie miejsce na te same dane. */
   const { d, dodaj } = stanowisko();
   const id = dodaj({ ext: "a" });
@@ -318,8 +316,8 @@ test("cofnięcie NIE WYNOSI treści do dziennika, ani przed, ani po", () => {
 });
 
 test("notatka bez poprzedniej wersji odmawia cofnięcia zdaniem, nie ciszą", () => {
-  /* Wiersz zastany sprzed 0.280.0 nie zna swojej poprzedniej treści, bo nikt
-     jej nie zapisywał. Przycisk ma być wtedy martwy, a trasa — mówić dlaczego. */
+  /* Wiersz bez poprzedniej treści: przycisk ma być martwy, a trasa — mówić
+     dlaczego. */
   const { d, dodaj } = stanowisko();
   const id = dodaj({ ext: "a" });
   assert.throws(() => cofnijNotatke(d, id, ALA), /poprzedniej wersji/);
@@ -344,7 +342,7 @@ test("szczegół wiąże zwroty i rozmowy PO NUMERZE ZAMÓWIENIA, nie po loginie
   const { d, konto, dodaj } = stanowisko();
   const id = dodaj({ ext: "a", order: "zam-7" });
 
-  /* Zwrot tego samego zamówienia — mostek z 0.221.0. */
+  /* Zwrot tego samego zamówienia. */
   d.prepare(`INSERT INTO zwrot_klienta(channel_account_id,external_id,order_id,
     created_at,synced_at) VALUES (?,'z-1','zam-7','2026-09-02T08:00:00Z','2026-09-07T08:00:00Z')`)
     .run(konto);
@@ -459,8 +457,7 @@ test("trzy stany zdjęcia oferty, nie dwa", () => {
   assert.equal(listaReklamacji(d, TERAZ)[0].ofertaZdjecie, "nieznane");
 
   /* Dopiero PUSTY ŁAŃCUCH znaczy „Allegro zdjęcia tej oferty nie ma" — i tego
-     nie naprawi żadna synchronizacja. Blizna 0.214.0: te trzy stany znaczyły
-     wcześniej jedno „bez zdjęcia". */
+     nie naprawi żadna synchronizacja. */
   d.prepare("UPDATE offer_snapshot SET primary_image_url='' WHERE external_id='of-2'").run();
   assert.equal(listaReklamacji(d, TERAZ)[0].ofertaZdjecie, "brak");
 });
@@ -497,10 +494,7 @@ test("flaga podglądu jedzie przy KAŻDYM załączniku, w rozmowie i przy sprawi
 });
 
 test("odnośnik do sprawy niesie UUID, a nie numer czytelny", () => {
-  /* Blizna 0.226.1. Do 0.226.0 pierwszeństwo miał `reference_number`, bo
-     zgadnięty wzorzec prowadził na LISTĘ z wyszukiwaniem. Sprawa ma własną
-     stronę i adresuje się identyfikatorem zasobu — kliknięcie właściciela
-     kończyło się na „Ups, nic tu nie ma".
+  /* Sprawa ma własną stronę i adresuje się identyfikatorem zasobu.
 
      Numer czytelny zostaje na ekranie jako ETYKIETA odnośnika i to jest cała
      jego rola: dla adresu jest bezużyteczny, dla człowieka niezastąpiony. */
@@ -615,7 +609,7 @@ test("`DISPUTE_CLOSED` zamyka sprawę, ale NIE potwierdza naszego werdyktu", () 
 });
 
 test("symbol towaru bierze się Z PARAGONU, nie z dzisiejszego mapowania oferty", () => {
-  /* Zgłoszenie właściciela (0.400.0): „symbol towaru w reklamacji powinno
+  /* Zgłoszenie właściciela: „symbol towaru w reklamacji powinno
      ściągać z paragonu do danego zamówienia".
 
      Scenariusz jest ten, który się naprawdę zdarza: sprzedawca przepiął
@@ -644,7 +638,7 @@ test("symbol towaru bierze się Z PARAGONU, nie z dzisiejszego mapowania oferty"
   const [r] = listaReklamacji(d, TERAZ);
   assert.equal(r.twSymbol, "STARY-DOSTAWCA", "kolejka pyta paragonu");
   assert.equal(r.twId, 11);
-  /* Panel pisze przy sygnaturze, SKĄD ona jest (0.403.0). Bez tej flagi
+  /* Panel pisze przy sygnaturze, SKĄD ona jest. Bez tej flagi
      wiersz towaru kazałby ufać jednakowo paragonowi i dzisiejszej półce,
      a cała ta funkcja bierze się z tego, że to bywają dwie różne rzeczy. */
   assert.equal(r.twZParagonu, true, "panel ma czym podpisać sygnaturę");
@@ -688,7 +682,7 @@ test("sygnatura trafiająca w DWIE kartoteki nie rozstrzyga za człowieka", () =
   assert.equal(listaReklamacji(d, TERAZ)[0].twSymbol, "Z-MAPOWANIA");
 });
 
-/* ── WIEK ZAKUPU I HISTORIA (0.413.0) ────────────────────────────────────────
+/* ── WIEK ZAKUPU I HISTORIA ──────────────────────────────────────────────────
    Cel z `/goal`: ekran reklamacji ma przyspieszać DECYZJĘ. Trzy liczby, które
    ją przyspieszają, leżały w naszej bazie i nikt o nie nie pytał — wiek
    zakupu, historia towaru i historia klienta. Te testy pilnują reguł, których
@@ -707,8 +701,8 @@ test("wiek zakupu liczy się W PRZÓD, a data z przyszłości daje zero", () => 
 test("wiek zakupu jedzie NA WIERSZU, licząc od daty, którą ekran nazywa", () => {
   const { d, konto } = stanowisko();
   /* Bez zamówienia zegarem jest `zamowienie_at` z ładunku sprawy — ten sam,
-     który `kupionoZrodlo` nazywa „sprawa". Dwie daty pod jedną etykietą to
-     blizna 0.121.0, więc wiek ma się liczyć z TEJ, którą ekran pokazuje. */
+     który `kupionoZrodlo` nazywa „sprawa". Wiek ma się liczyć z TEJ daty,
+     którą ekran pokazuje. */
   const id = Number(d.prepare(`INSERT INTO reklamacja_klienta
     (channel_account_id,external_id,zamowienie_at,otwarto_at,synced_at)
     VALUES (?,'w-1','2025-03-07T12:00:00Z','2026-09-01T08:00:00Z','2026-09-07T11:00:00Z')`)

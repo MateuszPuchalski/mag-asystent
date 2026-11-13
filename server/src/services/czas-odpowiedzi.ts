@@ -4,11 +4,9 @@ import { mediana } from "./raporty.js";
 import { TAKSONOMIA_WERSJA } from "./klasyfikacja-slownik.js";
 import { klientPodziekowal } from "./conversations.js";
 
-/* ── Czas odpowiedzi klientowi (23 września 2026) ────────────────────────────
-   Zgłoszenie właściciela: „how we can improve the ui/ux even further". Dwa
-   wydania z rzędu przebudowały skrzynkę bez jednej liczby, która powie, czy
-   agent odpisuje szybciej. Zakres „Obsługa klienta" w Analizie stał pusty,
-   bo — jak pisze `ekrany/Analiza.tsx` — nie było dla niego źródła danych.
+/* ── Czas odpowiedzi klientowi ───────────────────────────────────────────────
+   Liczba, która mówi, czy agent odpisuje szybciej — zakres „Obsługa klienta"
+   w Analizie.
 
    ŹRÓDŁEM SĄ WIADOMOŚCI, KTÓRE I TAK STOJĄ W BAZIE. Nic tu nie zapisuje
    zdarzeń ani znaczników czasu: odczyt liczy się z `message`, `outbox`
@@ -16,7 +14,7 @@ import { klientPodziekowal } from "./conversations.js";
 
    CO JEST PRÓBKĄ. Czekanie klienta zaczyna PIERWSZA jego wiadomość po naszej
    ostatniej odpowiedzi, a kończy NASZA następna prawdziwa odpowiedź.
-   Autoodpowiedź „Dziękujemy za kontakt" nie kończy czekania (blizna 0.227.0):
+   Autoodpowiedź „Dziękujemy za kontakt" nie kończy czekania:
    liczona jako odpowiedź dawałaby medianę kilku sekund i fałszywy spokój.
    Klient, który pisze trzy razy przed odpowiedzią, czeka od pierwszej
    wiadomości, nie od trzeciej — tak to czuje po swojej stronie.
@@ -28,7 +26,7 @@ import { klientPodziekowal } from "./conversations.js";
    OSOBA to autor wysyłki z `outbox`. Odpowiedź wysłana z panelu Allegro nie
    ma go wcale i dostaje wiersz „z Allegro" — ukrycie jej zaniżyłoby czas
    tych, którzy odpisują poza WERTIS. Rozbicie na osoby czyta WYŁĄCZNIE
-   administrator (0.431.0, decyzja właściciela) — pilnuje tego trasa. */
+   administrator (decyzja właściciela) — pilnuje tego trasa. */
 
 export interface WierszCzasu {
   klucz: string;
@@ -37,10 +35,9 @@ export interface WierszCzasu {
   medianaMin: number | null;
 }
 
-/* ── BEZ PONOWNEGO PYTANIA (24 września 2026) ────────────────────────────────
-   Zgłoszenie właściciela po rozmowie o metodzie Feynmana: „build it”. Czas
-   odpowiedzi mierzy SZYBKOŚĆ i nagradza szybką złą odpowiedź tak samo jak
-   szybką dobrą. Ta liczba mierzy SKUTEK: czy klient po naszej odpowiedzi
+/* ── BEZ PONOWNEGO PYTANIA ───────────────────────────────────────────────────
+   Czas odpowiedzi mierzy SZYBKOŚĆ i nagradza szybką złą odpowiedź tak samo
+   jak szybką dobrą. Ta liczba mierzy SKUTEK: czy klient po naszej odpowiedzi
    musiał pisać jeszcze raz.
 
    REGUŁA, jedna i sprawdzalna. Po każdej naszej prawdziwej odpowiedzi
@@ -185,7 +182,7 @@ export function czasOdpowiedzi(
      jest próbką TEGO okna. Bez zapasu takie czekanie byłoby liczone od
      pierwszej wiadomości w oknie, czyli krócej, niż trwało naprawdę. */
   const zapas = new Date(teraz - (dni + 7) * 86_400_000).toISOString();
-  /* Górna granica okna (0.497.0). Na żywo `teraz` to zegar i nic za nim
+  /* Górna granica okna. Na żywo `teraz` to zegar i nic za nim
      nie leży. Raport tygodnia liczy jednak tydzień, który już minął, a bez
      granicy odpowiedź z poniedziałku rana weszłaby do niedzieli, a „klient
      czeka" mówiłby o dziś zamiast o końcu tygodnia. */

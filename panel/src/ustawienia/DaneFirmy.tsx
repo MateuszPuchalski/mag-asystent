@@ -5,10 +5,9 @@ import { firmaZPrzegladarki, przegladarkaMaFirme, zDruku } from "../druk/firma";
 import { Blad, Pole, Przycisk, czas } from "../ui";
 import { KartaWgladu } from "../ui/wglad";
 
-/* ── Dane firmy do protokołów (z `biuro.html`, 0.444.0) ──────────────────
-   W biurze karta mówiła „drugie biurko ma własny komplet" — i to była wada,
-   nie cecha: nowe biurko drukowało protokół bez nagłówka. Teraz dane są na
-   serwerze i jednakowe na każdym biurku.
+/* ── Dane firmy do protokołów ────────────────────────────────────────────
+   Dane są na serwerze i jednakowe na każdym biurku, żeby nowe biurko nie
+   drukowało protokołu bez nagłówka.
 
    PRZENIESIENIE Z PRZEGLĄDARKI JEST PRZYCISKIEM. Ekran mógłby sam wysłać
    komplet z `localStorage` przy pierwszym wejściu, ale wtedy otwarcie
@@ -20,8 +19,8 @@ import { KartaWgladu } from "../ui/wglad";
    klikać drugi raz, a różnicy między „przenieś" a „przenieś i zapisz" nikt
    nie szuka (dekalog pkt 1).
 
-   PODGLĄD, NIE FORMULARZ (0.521.0). Sześć otwartych pól na ekranie
-   „rzadko zmieniane" zapraszało do pisania przy każdym wejściu, a dane firmy
+   PODGLĄD, NIE FORMULARZ. Sześć otwartych pól na ekranie
+   „rzadko zmieniane" zapraszałoby do pisania przy każdym wejściu, a dane firmy
    zmieniają się raz na lata. Na wierzchu stoi odczyt; ten sam formularz
    otwiera „Zmień", jedno kliknięcie dalej. */
 

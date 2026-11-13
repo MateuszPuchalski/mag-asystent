@@ -1,11 +1,10 @@
 import { describe, expect, it, vi } from "vitest";
-import React from "react";
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type { DokumentySprzedazy, KandydatZamowienia, Kopilot, OsRozmowy, PozycjaZamowienia, StanPrzesylki }
   from "../api/typy";
 
-/* ── Soczewki na górze kolumny kontekstu (0.499.0) ──────────────────────────
+/* ── Soczewki na górze kolumny kontekstu ────────────────────────────────────
    Pilnujemy odpowiedzi, nie wyglądu: podwójny zakup jest nazwany ze statusem
    słowem, „inny towar" pokazuje, co miało przyjść, a zdanie do szkicu idzie
    tylko kliknięciem, faktura mówi, co jest w Subiekcie pod numerem
@@ -56,7 +55,7 @@ describe("soczewka w kolumnie kontekstu", () => {
     /* Nagłówek tym samym kształtem co każda etykieta bloku kolumny, a dla
        czytnika ekranu dalej nagłówkiem. */
     expect(screen.getByRole("heading", { name: /Pytanie klienta · Faktura/ })).toBeInTheDocument();
-    /* Źródło stoi słowem; „gdzie poprawić" czeka w dymku (0.513.0), bo nad
+    /* Źródło stoi słowem; „gdzie poprawić" czeka w dymku, bo nad
        każdą soczewką czytało się jak instrukcja obsługi ekranu. */
     const zrodlo = screen.getByText(/kategoria wg Copilota/);
     expect(zrodlo).toBeInTheDocument();
@@ -123,7 +122,7 @@ describe("soczewka w kolumnie kontekstu", () => {
     dokumenty.data = undefined;
   });
 
-  /* Zwrot (0.506.0): soczewka mówi, że zwrotu w Allegro jeszcze nie ma;
+  /* Zwrot: soczewka mówi, że zwrotu w Allegro jeszcze nie ma;
      gdy zwrot jest, jego karta stoi w „Wymaga Ciebie" i soczewka milczy. */
   it("zwrot: bez zgłoszenia w Allegro mówi to wprost, ze zgłoszeniem milczy", () => {
     const { unmount } = rysuj(dane({ kategoria: "RETURN" }));
@@ -141,7 +140,7 @@ describe("soczewka w kolumnie kontekstu", () => {
     expect(screen.queryByText(/doręczona/)).toBeNull();
   });
 
-  /* ── Paczka (0.531.0) ────────────────────────────────────────────────────
+  /* ── Paczka ──────────────────────────────────────────────────────────────
      Status słowem, przewoźnik i numer bez kliknięcia; „Sprawdź" tylko przy
      stanie nieznanym albo starym, i tylko kliknięciem. */
   const zPaczka = (kategoria: Kopilot["kategoria"], p: Partial<StanPrzesylki> | null) =>

@@ -161,7 +161,7 @@ test("towar bez adresu w kartotece i bez kolejki zostaje bez adresu", () => {
 });
 
 test("linia niesie godzinę odłożenia — po niej kolektor układa zrobione", () => {
-  /* Kolektor stawia ostatnio odłożoną na górze grupy zrobionych (0.113.0),
+  /* Kolektor stawia ostatnio odłożoną na górze grupy zrobionych,
      więc bez tego pola cała ta kolejność wraca po cichu do alejkowej —
      wygląda poprawnie i jest nie ta. */
   const a = D.openDelivery(DOK_A, "jan");

@@ -1,7 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "./klient";
 
-/* ── Kosze w zakładce Zwroty (0.438.0) ─────────────────────────────────────
+/* ── Kosze w zakładce Zwroty ───────────────────────────────────────────────
    Przeniesione z MAGAZYNU ZWROTÓW w `biuro.html`. Decyzja właściciela: kosze
    mieszkają w Zwrotach, bo tam powstają — ocena „na stan" dokłada towar do
    koszyka, a zamknięcie wysyła go na halę. Osobny ekran w drugim rzędzie
@@ -39,16 +39,16 @@ export interface WierszKosza {
   mmStan: StanMm;
   wirtualny: boolean;
   /**
-   * Kłopot z MM tego kosza (0.501.0): odmowa Sfery, nawet przepuszczona potem
+   * Kłopot z MM tego kosza: odmowa Sfery, nawet przepuszczona potem
    * PONÓW-em. `null` = każda MM weszła za pierwszym razem. Opcjonalne, bo
    * starszy serwer pola nie przysyła.
    */
   problemMm?: { prob: number; ostatniBlad: string | null; ostatnioAt: string;
     nierozwiazany: boolean;
-    /** Po odmowie czeka na kolejną próbę (0.530.0) — jeszcze NIE weszło. */
+    /** Po odmowie czeka na kolejną próbę — jeszcze NIE weszło. */
     ponawiane?: boolean } | null;
   /**
-   * Rozłożony ponad dobę, a MM powrotne nie powstało (0.505.0) — i dlaczego.
+   * Rozłożony ponad dobę, a MM powrotne nie powstało — i dlaczego.
    * `adresy`: czeka na zapis adresu; `kierunek`: powrót robi biuro w Subiekcie.
    * Starszy serwer pola nie przysyła.
    */
@@ -90,7 +90,7 @@ export interface SzczegolKosza {
   powrot: { status: string; numer: string | null } | null;
   /**
    * Kartoteki, których brakuje na magazynie źródłowym MM jeszcze niewykonanego
-   * (0.530.0) — stan i rezerwacja z read-modelu. Starszy serwer go nie przysyła.
+   * — stan i rezerwacja z read-modelu. Starszy serwer go nie przysyła.
    */
   brakiMm?: Array<{ twId: number; symbol: string | null; nazwa: string | null; magazyn: string;
     potrzeba: number; stan: number; rezerwacja: number }>;
@@ -204,7 +204,7 @@ export function useZalatwPominiecie() {
  * Nieodwracalny jest dopiero dokument, a tego tu jeszcze nie ma.
  */
 /**
- * Ponowienie MM kosza stojących w błędzie (0.503.0). `sprawdzono` wysyła się
+ * Ponowienie MM kosza stojących w błędzie. `sprawdzono` wysyła się
  * dopiero po odmowie „przerwano w trakcie zapisu" — powód przy `ponowMmKosza`.
  */
 export function usePonowMmKosza() {
@@ -218,7 +218,7 @@ export function usePonowMmKosza() {
 }
 
 /**
- * Zdjęcie kartoteki z MM kosza, które jeszcze nie weszło (0.530.0). Towar
+ * Zdjęcie kartoteki z MM kosza, które jeszcze nie weszło. Towar
  * zostaje na magazynie źródłowym — powód przy `usunZMmKosza` na serwerze.
  */
 export function useUsunZMm() {

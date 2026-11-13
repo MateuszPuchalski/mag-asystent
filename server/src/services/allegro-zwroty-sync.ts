@@ -13,10 +13,10 @@ import { uzupelnijDoreczenia, type DoSprawdzenia } from "./allegro-tracking.js";
 import { uzupelnijWyplaty, zwrotyDoSprawdzeniaWyplaty } from "./allegro-wyplaty.js";
 import { synchronizujZwrotyPlatnosci } from "./allegro-zwroty-platnosci.js";
 
-/* ── Synchronizator zwrotów klienckich (0.150.0) ─────────────────────────────
+/* ── Synchronizator zwrotów klienckich ───────────────────────────────────────
    Kształt pól pochodzi z OFICJALNEJ specyfikacji OpenAPI Allegro (modele
    `CustomerReturn`, `CustomerReturnItem`, `CustomerReturnReturnParcel`,
-   `CustomerReturnRejection`), nie z pamięci i nie z kodu sprzed 0.138.0.
+   `CustomerReturnRejection`), nie z pamięci.
    Spis pól z uzasadnieniem stoi w `docs/allegro-ksztalt.md`; §8.2 projektu
    panelu każe traktować TAMTEN dokument jako kontrakt, a ten plik jako jego
    wykonanie.
@@ -29,11 +29,8 @@ import { synchronizujZwrotyPlatnosci } from "./allegro-zwroty-platnosci.js";
    wywali się na SQL-u zamiast wyciec po cichu (pilnuje
    `db/migracja-zwrotow.test.ts`).
 
-   OD 0.152.0 DOTYCZY TO TAKŻE LĄDOWISKA. Do 0.151.0 `surowe_json` trzymało
-   odpowiedź dosłownie, więc IBAN i telefon nadawcy jednak lądowały w bazie —
-   wbrew zdaniu z polityki danych, które mówiło „nie pobieramy". Teraz
-   przechodzą przez `oczyscSurowy`: wartość znika, klucz zostaje, kształt
-   nadal da się obejrzeć.
+   DOTYCZY TO TAKŻE LĄDOWISKA. `surowe_json` przechodzi przez `oczyscSurowy`:
+   wartość znika, klucz zostaje, kształt nadal da się obejrzeć.
 
    Rytm i respekt dla 429 bierze `services/takt.ts`; ponowień w środku
    przebiegu nie ma.                                                         */
@@ -56,26 +53,23 @@ type Zwrot = {
   items?: Pozycja[];
   parcels?: Paczka[];
   rejection?: { code?: string; reason?: string; createdAt?: string } | null;
-  /* Oś czasu zwrotu po stronie Allegro (0.164.0). Zwykły `string`, bo schemat
+  /* Oś czasu zwrotu po stronie Allegro. Zwykły `string`, bo schemat
      wymienia jedenaście wartości słownie i nie zamyka ich enumem — nieznana
      wartość ma przejść dalej, a nie wywrócić przebieg. */
   status?: string;
 };
 
-/* Kod bierze się z KLASY błędu, nie z jego zdania — ta sama poprawka co
-   w skrzynce w 0.149.0. */
+/* Kod bierze się z KLASY błędu, nie z jego zdania — jak w skrzynce. */
 const kodHttp = (error: unknown): number | null =>
   error instanceof BladOdpowiedziAllegro ? error.status : null;
 
 /**
  * Ile stron wolno przejść w jednym przebiegu.
  *
- * BEZPIECZNIK, nie limit poprawnościowy: to jest blizna 0.127.0 postawiona
- * na głowie. Tam rejestr czytał PIERWSZĄ stronę i gubił resztę po cichu;
- * tu chodzimy dalej, dopóki Allegro oddaje pełne strony, ale nie w
- * nieskończoność — zapętlona paginacja biłaby w konto aż do blokady.
- * Dziesięć stron to tysiąc zwrotów na przebieg, czyli więcej, niż firma
- * dostaje w kwartale.
+ * BEZPIECZNIK, nie limit poprawnościowy: chodzimy dalej, dopóki Allegro
+ * oddaje pełne strony, ale nie w nieskończoność — zapętlona paginacja biłaby
+ * w konto aż do blokady. Dziesięć stron to tysiąc zwrotów na przebieg,
+ * czyli więcej, niż firma dostaje w kwartale.
  */
 const MAKS_STRON = 10;
 
@@ -116,7 +110,7 @@ function liczba(value: unknown): number | null {
 /**
  * Tekst od klienta z odkodowanymi encjami HTML.
  *
- * Ta sama decyzja i ten sam powód co w `allegro-reklamacje-sync.ts` (0.250.0):
+ * Ta sama decyzja i ten sam powód co w `allegro-reklamacje-sync.ts`:
  * Allegro koduje niekonsekwentnie, więc dekodujemy każde pole niosące słowa
  * człowieka. Komentarz do zwrotu jest jedynym takim polem w tym pliku —
  * reszta to kody z enumów, w których encji nie ma i być nie może.
@@ -141,7 +135,7 @@ export function naGrosze(amount: string | undefined): number {
 }
 
 /**
- * Najwcześniejsza paczka: jej data, przewoźnik i NUMER LISTU (0.344.0).
+ * Najwcześniejsza paczka: jej data, przewoźnik i NUMER LISTU.
  *
  * `data` na NULL znaczy „towar jeszcze nie wrócił". Wszystkie trzy pola idą
  * z TEJ SAMEJ paczki — inaczej zwrot w dwóch przesyłkach pokazywałby datę
@@ -173,9 +167,8 @@ export async function synchronizujAllegroZwroty(deps: ZwrotySyncDeps = {}): Prom
      przebiegu. Trzymanie obu naraz zawężałoby wynik dwa razy i cicho przestałoby
      oddawać cokolwiek nowego.
 
-     Ale PRÓG to nie to samo co dawne okno względne (0.152.0). Okno było
-     wyłącznie oszczędnością pierwszego pobrania; próg jest granicą tego, co
-     firma w ogóle chce widzieć, więc obowiązuje ZAWSZE — także wtedy, gdy
+     PRÓG jest granicą tego, co firma w ogóle chce widzieć, więc obowiązuje
+     ZAWSZE — także wtedy, gdy
      kursor już stoi i zapytanie nie niesie żadnej daty. Dlatego oprócz filtra
      w adresie tnie się jeszcze wynik, niżej. */
   const odKiedy = start.cursorId ? null : od;
@@ -202,7 +195,7 @@ export async function synchronizujAllegroZwroty(deps: ZwrotySyncDeps = {}): Prom
       if (partia.length < NA_STRONE) { komplet = true; break; }
     }
 
-    /* OGON, czyli czego ten przebieg NIE wziął (0.209.0).
+    /* OGON, czyli czego ten przebieg NIE wziął.
        Bezpiecznik `MAKS_STRON` chronił konto przed zapętloną paginacją i robił
        to dobrze — ale robił to CICHO. Przebieg urwany na dziesiątej stronie
        kończył się sukcesem, kursor szedł naprzód i zwroty spoza tamtej granicy
@@ -228,9 +221,8 @@ export async function synchronizujAllegroZwroty(deps: ZwrotySyncDeps = {}): Prom
       konto = kontoKanalu(database, deps.accountId ?? config.allegro.clientId);
       for (const zwrot of zebrane) zapisz(database, zwrot, konto, at);
 
-      /* `error_count` ZERUJE SIĘ na sukcesie — ta sama poprawka co w skrzynce
-         w 0.147.0. Licznik, który tylko rośnie, po tygodniu mówi wyłącznie
-         „kiedyś było źle". */
+      /* `error_count` ZERUJE SIĘ na sukcesie, jak w skrzynce. Licznik, który
+         tylko rośnie, po tygodniu mówi wyłącznie „kiedyś było źle". */
       database.prepare(`INSERT INTO allegro_zwroty_sync_state
         (id,cursor_id,cursor_at,last_success_at,last_attempt_at,last_error_code,
          error_count,next_attempt_at,pozostalo)
@@ -263,11 +255,10 @@ export async function synchronizujAllegroZwroty(deps: ZwrotySyncDeps = {}): Prom
     await uzupelnijDoreczenia(database, paczkiDoSprawdzenia(database, konto),
       { query: deps.query, apiUrl });
 
-    /* WYPŁATY W TYM SAMYM TAKCIE, nie w osobnym (0.426.0). Kusi szósty ticker,
-       ale to jest to samo pytanie co wyżej — „co się stało z tą sprawą po
-       stronie Allegro" — zadane innej końcówce. Osobny rytm dokładałby szósty
-       chór na jednym adresie IP, a tego rodzaju sygnatura skończyła się
-       w sierpniu 2026 blokadą (nagłówek `services/takt.ts`).
+    /* WYPŁATY W TYM SAMYM TAKCIE, nie w osobnym. To jest to samo pytanie co
+       wyżej — „co się stało z tą sprawą po stronie Allegro" — zadane innej
+       końcówce. Osobny rytm dokładałby kolejny chór na jednym adresie IP
+       (nagłówek `services/takt.ts`).
 
        Własny parasol, jak przy odświeżaniu znanych: brak uprawnienia
        `allegro:api:payments:read` albo zepsuta końcówka płatności nie ma prawa
@@ -324,19 +315,17 @@ export async function synchronizujAllegroZwroty(deps: ZwrotySyncDeps = {}): Prom
 const MAKS_STRON_ODSWIEZENIA = 3;
 
 /**
- * Odświeża zwroty, które już mamy i które nie są zamknięte (15 września 2026).
+ * Odświeża zwroty, które już mamy i które nie są zamknięte.
  *
- * KURSOR ODDAJE TYLKO NOWE. Zwrot pobrany przed nadaniem paczki nie dostawał
- * potem ani listu, ani terminu, ani `FINISHED`. W kolejce stało przez to
- * kilkaset zwrotów dawno rozliczonych w Allegro, a jedynymi drogami wyjścia
- * były skan etykiety i reset z konsoli.
+ * KURSOR ODDAJE TYLKO NOWE. Zwrot pobrany przed nadaniem paczki nie
+ * dostałby potem ani listu, ani terminu, ani `FINISHED`.
  *
  * OKNO OD NAJSTARSZEGO OTWARTEGO. Zwrot zamknięty u nas albo rozliczony
  * w Allegro nie ma już czego się dowiedzieć, a ciągnąłby okno w przeszłość.
  * Zwroty pobrane w tym samym przebiegu pomijamy — są świeże z definicji.
  *
  * ZAPISUJE WYŁĄCZNIE ZNANE. Lista w oknie oddaje też zwroty skasowane z bazy
- * przez `zwroty:sprzatnij` (0.340.0). Wstawienie ich z powrotem cofnęłoby
+ * przez `zwroty:sprzatnij`. Wstawienie ich z powrotem cofnęłoby
  * tamto sprzątanie po cichu, przy każdym takcie. Nowe zwroty przynosi kursor
  * i tylko on.
  */
@@ -344,7 +333,7 @@ async function odswiezZnane(
   database: Db, konto: number, query: (url: string) => Promise<unknown | null>,
   apiUrl: string, od: string | null, pobraneTeraz: Set<string>, at: string,
 ): Promise<number> {
-  /* ZAMKNIĘTY, ALE NIEZAPŁACONY TEŻ SIĘ ODŚWIEŻA (0.476.0). Zwrot po
+  /* ZAMKNIĘTY, ALE NIEZAPŁACONY TEŻ SIĘ ODŚWIEŻA. Zwrot po
      korekcie czeka w DO ZWROTU na wyjście pieniędzy (`pieniadzeCzekaja`),
      a jedynym śladem pieniędzy oddanych ręką w Allegro jest status zwrotu.
      Bez odświeżania taki zwrot stałby w pracy do dnia automatu Allegro.
@@ -395,23 +384,16 @@ async function odswiezZnane(
 export const TRACKING_NA_PRZEBIEG = 200;
 
 /**
- * Które paczki warto odpytać u przewoźnika (0.187.0, naprawione w 0.188.0).
+ * Które paczki warto odpytać u przewoźnika.
  *
  * ── Dlaczego to czyta BAZĘ, a nie świeżo pobranej strony ──────────────────
- * Do 0.188.0 ta lista powstawała z `zebrane`, czyli z tego, co właśnie
- * przyszło z Allegro. To nie mogło działać i nie działało ani razu.
  * Synchronizacja chodzi po KURSORZE: `from` w `getCustomerReturns` znaczy
  * „zwroty utworzone PO tym zwrocie", więc raz zobaczony zwrot nigdy nie
- * wraca na listę. Pytaliśmy zatem o tracking wyłącznie tych zwrotów, które
- * powstały przed chwilą — a zwrot zgłoszony przed chwilą nie jest doręczony.
- * Kolumna `dostarczono_at` nie zapełniła się więc nigdy i panel przy każdej
- * paczce mówił, że nie dotarła. Właściciel zobaczył to od razu.
+ * wraca na listę. Świeża strona niesie tylko zwroty zgłoszone przed chwilą,
+ * a takie nie są jeszcze doręczone.
  *
- * ── Numer listu STOI OD 0.344.0 w modelu pracy ────────────────────────────
- * Decyzja właściciela zdjęła politykę 0.163.0: „zapisuj numery paczek".
- * Ta lista czyta go jednak dalej Z LĄDOWISKA i to zostaje bez zmian — tu
- * potrzebna jest para numer+przewoźnik z KAŻDEJ paczki zwrotu, a model pracy
- * trzyma tylko tę pierwszą. Dwa źródła, dwa różne pytania.
+ * Lista czyta numer listu Z LĄDOWISKA: potrzebna jest para numer+przewoźnik
+ * z KAŻDEJ paczki zwrotu, a model pracy trzyma tylko pierwszą.
  *
  * TYLKO TE W DRODZE — decyzja właściciela. Zwrot z zapisaną datą doręczenia
  * nie jest pytany drugi raz: data się nie zmieni, a każde żądanie to koszt
@@ -440,9 +422,8 @@ export function paczkiDoSprawdzenia(
      ORDER BY z.created_at DESC, z.id DESC, p.key ASC`)
     .all(konto) as Array<{ zwrot_id: number; carrier_id: string; waybill: string }>;
 
-  /* Jedna paczka na zwrot — PIERWSZA z kompletem danych, jak przed zmianą.
-     `ORDER BY p.key` daje porządek tablicy z odpowiedzi Allegro, więc „pierwsza"
-     znaczy to samo, co znaczyło przy czytaniu `parcels[]` w pamięci. */
+  /* Jedna paczka na zwrot — PIERWSZA z kompletem danych.
+     `ORDER BY p.key` daje porządek tablicy z odpowiedzi Allegro. */
   const wynik: DoSprawdzenia[] = [];
   const juz = new Set<number>();
   for (const w of wiersze) {
@@ -459,13 +440,11 @@ export function paczkiDoSprawdzenia(
  *
  * DECYZJE BIURA SĄ NIETYKALNE. Ponowne pobranie uzupełnia pola z Allegro
  * i podnosi `synced_at`, ale nie rusza `werdykt*`, `kwota*`, `korekta*` ani
- * `wersja` — to jest blizna 0.128.0 („drugi przebieg nie robi duplikatów")
- * rozszerzona o pracę człowieka. Pozycje przepisujemy w całości, bo są
- * odbiciem Allegro; ocena hali wisi jednak na pozycji, więc wraca po
- * kluczu naturalnym zamiast zginąć razem z wierszem.
+ * `wersja`. Pozycje są odbiciem Allegro; ocena hali wisi jednak na pozycji,
+ * więc zostaje po kluczu naturalnym.
  */
 /**
- * Jeden zwrot spod numeru listu przewozowego (0.163.0).
+ * Jeden zwrot spod numeru listu przewozowego.
  *
  * Wołane WYŁĄCZNIE ze skanu etykiety, gdy lokalne szukanie nic nie znalazło:
  * paczka bywa u nas szybciej, niż zwrot doleci synchronizacją. Pytamy Allegro
@@ -474,7 +453,7 @@ export function paczkiDoSprawdzenia(
  * KURSORA I STANU SYNCHRONIZACJI NIE RUSZA. To jest zapytanie punktowe, a nie
  * przebieg: przesunięcie kursora na podstawie zwrotu wyłowionego ze środka
  * historii kazałoby synchronizatorowi przeskoczyć wszystko, czego jeszcze nie
- * widział. Blizna 0.127.0 mówi o tym samym gatunku cichej straty.
+ * widział.
  *
  * Próg `zwrotyOd` obowiązuje tak samo jak w przebiegu — firma nie chce widzieć
  * zwrotów sprzed granicy, choćby przyjechały punktowo.
@@ -546,17 +525,11 @@ function zapisz(database: Db, zwrot: Zwrot, konto: number, at: string): void {
     "SELECT id FROM zwrot_klienta WHERE channel_account_id=? AND external_id=?",
   ).get(konto, zwrot.id) as { id: number }).id);
 
-  /* UPSERT PO KLUCZU NATURALNYM, nie `DELETE` + `INSERT`.
-     Do 0.153.1 pozycje kasowało się i wstawiało od nowa, a pracę człowieka
-     odtwarzało z mapy po `offer_id|nazwa`. Kosztowało to dwie rzeczy naraz:
-     `id` pozycji zmieniało się przy każdym przebiegu, więc potwierdzenie
-     wysłane z otwartego panelu trafiało w cudzy wiersz albo w „nie
-     znaleziono"; a dwie pozycje o tej samej nazwie bez `offer_id` sklejały
-     się w jeden klucz mapy i jedna traciła ocenę.
-
-     Teraz klucz jest kolumną, a praca człowieka po prostu ZOSTAJE — nie
-     trzeba jej nigdzie odkładać ani oddawać. */
-  /* NUMER WYSTĄPIENIA (0.162.1). `CustomerReturnItem` w specyfikacji Allegro
+  /* UPSERT PO KLUCZU NATURALNYM, nie `DELETE` + `INSERT`. Kasowanie
+     zmieniałoby `id` pozycji przy każdym przebiegu, więc potwierdzenie
+     z otwartego panelu trafiałoby w cudzy wiersz. Z kluczem w kolumnie
+     praca człowieka po prostu ZOSTAJE. */
+  /* NUMER WYSTĄPIENIA. `CustomerReturnItem` w specyfikacji Allegro
      nie ma ŻADNEGO identyfikatora pozycji — są `offerId`, `quantity`, `name`,
      `price`, `url`, `reason` i `serialNumbers`. Ta sama oferta potrafi więc
      wystąpić w zwrocie dwa razy, a sam `offer_id|nazwa` sklejał je w jeden
@@ -594,11 +567,10 @@ function zapisz(database: Db, zwrot: Zwrot, konto: number, at: string): void {
   /* Pozycja, której Allegro już nie oddaje, znika — ale dopiero teraz i tylko
      ona. Zwrot potrafi stracić pozycję, gdy klient wycofa część zgłoszenia.
 
-     `zrodlo='allegro'` jest tu WARUNKIEM POPRAWNOŚCI, nie filtrem na zapas
-     (0.184.0). Pozycji dopisanej przez biuro Allegro nie zna i nigdy nie
+     `zrodlo='allegro'` jest tu WARUNKIEM POPRAWNOŚCI, nie filtrem na zapas.
+     Pozycji dopisanej przez biuro Allegro nie zna i nigdy nie
      odda, więc bez tego warunku każdy takt kasowałby ją razem z oceną hali
-     i zaznaczeniem do kwoty. Po cichu: nic nie wygląda na zepsute, dopóki
-     ktoś nie policzy pieniędzy. */
+     i zaznaczeniem do kwoty. */
   const zostaja = widziane.length
     ? ` AND klucz NOT IN (${widziane.map(() => "?").join(",")})`
     : "";

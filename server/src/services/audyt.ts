@@ -2,11 +2,9 @@ import { db } from "../db/db.js";
 import { wierszCsv, zbudujCsv } from "./csv.js";
 
 /* ── Odczyt śladu audytowego ─────────────────────────────────────────────────
-   `events` zbiera 27 typów zdarzeń od pierwszego dnia instalacji i nic ich nie
-   kasuje — tyle że do sierpnia 2026 jedynym sposobem, żeby cokolwiek stamtąd
-   wyjąć, było `sqlite3` na serwerze. Reklamacja „aplikacja zjadła mi 30 sztuk"
-   miała więc odpowiedź w bazie i nie miała jej w rękach człowieka, który
-   odpowiada klientowi.
+   `events` zbiera zdarzenia od pierwszego dnia instalacji i nic ich nie
+   kasuje. Reklamacja „aplikacja zjadła mi 30 sztuk" ma odpowiedź w bazie
+   i ma ją mieć w rękach człowieka, który odpowiada klientowi.
 
    Ten moduł jest WYŁĄCZNIE odczytem. Nie liczy wskaźników (to `raporty.ts`)
    i niczego nie interpretuje — zwraca wiersze takie, jakie są, bo audyt,
@@ -20,7 +18,7 @@ export interface FiltrAudytu {
   od?: string | null;
   do?: string | null;
   typy?: string[] | null;
-  /** Typy do POMINIĘCIA — panel chowa nimi pomiary techniczne (0.540.0). */
+  /** Typy do POMINIĘCIA — panel chowa nimi pomiary techniczne. */
   bezTypow?: string[] | null;
   userRef?: number | null;
   twId?: number | null;
@@ -70,7 +68,7 @@ function warunki(f: FiltrAudytu): Warunki {
     w.push(`type IN (${f.typy.map(() => "?").join(",")})`);
     p.push(...f.typy);
   }
-  /* WYKLUCZENIE PO STRONIE SERWERA, nie filtr w przeglądarce (0.540.0).
+  /* WYKLUCZENIE PO STRONIE SERWERA, nie filtr w przeglądarce.
      Dziennik chowa pomiary czasu skanów, które potrafią być co trzecim
      wierszem. Odsiane w przeglądarce dawałyby stronę krótszą niż limit
      i licznik „razem" liczący wiersze, których nie widać. */

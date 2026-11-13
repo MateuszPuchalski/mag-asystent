@@ -8,7 +8,7 @@ import {
   licznikiKubelkow as kubelkiReklamacji, listaReklamacji, type Kubelek as KubelekReklamacji,
 } from "./reklamacje.js";
 
-/* ── Migawka stanu raz na dobę (0.497.0, raport tygodnia) ───────────────────
+/* ── Migawka stanu raz na dobę (raport tygodnia) ────────────────────────────
    Pytanie właściciela: „co śledzić automatycznie". Czynności śledzi dziennik
    `events` od pierwszego dnia — ponad dwieście typów. Nie śledzi go nic, co
    jest STANEM: ile spraw czeka DO DECYZJI, od kiedy najstarsza, ile zwrotów
@@ -26,7 +26,7 @@ import {
    pozostałych — migawka bez reklamacji jest lepsza niż żadna.
 
    ŻADNYCH LUDZI. Rozbicie czasu odpowiedzi na osoby liczy się tylko dla
-   administratora i tylko na żywo (0.431.0). Zapisane co dobę zrobiłoby
+   administratora i tylko na żywo. Zapisane co dobę zrobiłoby
    z bazy teczkę monitoringu pracowniczego, na którą nikt nie dał zgody. */
 
 export interface Migawka {

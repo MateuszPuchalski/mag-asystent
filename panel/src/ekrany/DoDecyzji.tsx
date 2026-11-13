@@ -15,10 +15,10 @@ import { Blad, FiltrSegmentowy, Karta, NaglowekSekcji, Przycisk, Pusto, wiek } f
 import { Moje, widoczneSprawy } from "./Moje";
 import { Wzmianki } from "./Wzmianki";
 
-/* ── DO DECYZJI — ekran startowy biura (0.435.0) ───────────────────────────
+/* ── DO DECYZJI — ekran startowy biura ─────────────────────────────────────
    Cel biura z `docs/obsluga-klienta.md` §7: rozstrzyga to, czego hala nie
    rozstrzygnie sama. Ten ekran jest tym celem w jednym widoku — dlatego
-   stoi pod `/obsluga/`, a Zadania poszły pod `/obsluga/zadania`.
+   stoi pod `/obsluga/`, a Zadania pod `/obsluga/zadania`.
 
    WIERSZ PROWADZI TAM, GDZIE SPRAWĘ SIĘ ROZSTRZYGA. Tu nie ma przycisków
    decyzji: wyjątek dostawy rozstrzyga się przy fakturze i jej zdjęciach,
@@ -26,7 +26,7 @@ import { Wzmianki } from "./Wzmianki";
    kazałby decydować bez dowodów — a to jest dokładnie to, czego biuro
    robić nie powinno. Ta sama zasada co w „Moje".
 
-   DWA WYJĄTKI. Pierwszy (0.541.0, decyzja właściciela z 27 września 2026):
+   DWA WYJĄTKI, decyzją właściciela. Pierwszy:
    „Śledź dosyłkę” przy odmowie złożonej w panelu Allegro. Decyzja już zapadła —
    biuro odmówiło kodem „Wysłaliśmy nowy towar” — a przycisk ją rejestruje
    w sprawie klienta. Dowodów do tego nie trzeba, a wiersz prowadzący na
@@ -43,7 +43,7 @@ const IKONY: Record<ZrodloDecyzji, React.ComponentType<{ size?: number; classNam
   dostawy: Truck, odpowiedzi: MessageSquareReply, kosze: Package, zapisy: AlertTriangle,
   kody: Barcode, allegro: PlugZap, reklamacje: ShieldQuestion, zwroty: Undo2,
   skrzynka: Inbox, sonda: FlaskConical,
-  /* Zadanie odesłane przez halę (0.502.0) — `odeslaneZadania` w `do-decyzji.ts`. */
+  /* Zadanie odesłane przez halę — `odeslaneZadania` w `do-decyzji.ts`. */
   zadania: ClipboardList,
   dosylki: PackageSearch,
   braki: PackageX,
@@ -87,18 +87,16 @@ function Wiek({ p }: { p: PozycjaDecyzji }) {
     title={p.pilne ? "Termin minął albo mija" : "Od kiedy czeka"}>{napis}</span>;
 }
 
-/* ── PYTANIE RAZ, SPRAWY POD NIM (0.545.0) ─────────────────────────────
-   Decyzja właściciela z 27 września 2026, wariant B z makiet. Każdy wiersz
-   powtarzał pytanie i źródło: sześć wierszy niosło trzy pytania, a nazwa
-   źródła stała obok ikony, która mówiła to samo. Pytanie stoi teraz raz,
-   w nagłówku grupy, a wiersz niesie tylko sprawę i jej wiek.
+/* ── PYTANIE RAZ, SPRAWY POD NIM ───────────────────────────────────────
+   Decyzja właściciela. Pytanie stoi raz, w nagłówku grupy, a wiersz niesie
+   tylko sprawę i jej wiek — powtarzane w każdym wierszu byłoby szumem.
 
    PANEL NICZEGO NIE SORTUJE. Grupy stają tam, gdzie serwer postawił
    pierwszą sprawę z danym pytaniem, a w grupie zostaje kolejność serwera.
-   Powód reguły z `do-decyzji.ts` — dwie reguły sortowania rozjechałyby się
-   — dalej trzyma: tu nie ma drugiej reguły, jest podział listy serwera.
-   Ceną jest to, że młodsza sprawa znanego pytania staje nad starszą
-   sprawą innego. Biuro i tak rozstrzyga pytanie naraz dla całej grupy. */
+   Dwie reguły sortowania rozjechałyby się, więc tu jest tylko podział
+   listy serwera. Ceną jest to, że młodsza sprawa znanego pytania staje nad
+   starszą sprawą innego. Biuro i tak rozstrzyga pytanie naraz dla całej
+   grupy. */
 export function grupujPoPytaniu(pozycje: PozycjaDecyzji[]): PozycjaDecyzji[][] {
   const grupy = new Map<string, PozycjaDecyzji[]>();
   for (const p of pozycje) {
@@ -152,7 +150,7 @@ function Wiersz({ p, onZalozona }: { p: PozycjaDecyzji; onZalozona: (w: DosylkaZ
 }
 
 /**
- * Wiersz odmowy z panelu Allegro z przyciskiem „Śledź dosyłkę” (0.541.0).
+ * Wiersz odmowy z panelu Allegro z przyciskiem „Śledź dosyłkę”.
  *
  * Przycisk stoi OBOK odnośnika, nie w nim: przycisk w `<a>` to niepoprawny
  * HTML, a kliknięcie łapałyby oba. Wiersz dalej prowadzi na zwrot — kto chce
@@ -220,10 +218,9 @@ function WierszBraku({ p, akcja, onZalozona }: {
   </li>;
 }
 
-/* ── JEDNA LISTA „DO ZROBIENIA" (23 września 2026) ──────────────────────────
-   „Do decyzji", „Moje" i „Wzmianki" odpowiadały na to samo pytanie — co mam
-   teraz zrobić — i stały w trzech zakładkach. Agent obchodził je po kolei, a
-   prośba kolegi czekała, aż ktoś zajrzy do trzeciej. Tu stoją jedna pod drugą:
+/* ── JEDNA LISTA „DO ZROBIENIA" ─────────────────────────────────────────────
+   „Do decyzji", „Moje" i „Wzmianki" odpowiadają na to samo pytanie — co mam
+   teraz zrobić — więc stoją jedna pod drugą, nie w trzech zakładkach:
    najpierw to, o co prosi człowiek, potem moje sprawy, na końcu decyzje biura.
 
    TO DALEJ SĄ TRZY ODCZYTY, nie piąta kolejka. Każda sekcja czyta swoją trasę
@@ -232,7 +229,7 @@ function WierszBraku({ p, akcja, onZalozona }: {
 export function DoDecyzji() {
   const dane = useDoDecyzji();
   const [filtr, setFiltr] = useState<Filtr>("wszystko");
-  /* Kroki zastąpione kliknięciem „Śledź dosyłkę” (0.541.0). Sprawa klienta
+  /* Kroki zastąpione kliknięciem „Śledź dosyłkę”. Sprawa klienta
      mogła mieć krok, który ktoś ustawił sam — np. „Oddzwonić w sprawie
      faktury” — a dosyłka go zastępuje. Wiersz znika po kliknięciu, więc bez
      tego zdania stary krok przepadłby po cichu: dziennik niesie tylko jego
@@ -248,11 +245,10 @@ export function DoDecyzji() {
     .filter((p) => filtr === "wszystko" || p.obszar === filtr);
   const l = dane.data?.liczniki;
 
-  /* ── PUSTE SEKCJE JEDNĄ LINIJKĄ (0.545.0) ─────────────────────────────
-     Wariant B, ta sama decyzja. „Wspomniano o mnie · 0" i „Moje sprawy · 0"
-     stały jako dwie karty z nagłówkiem nad listą decyzji i zabierały
-     170 px tylko po to, żeby powiedzieć „nic". Pusta sekcja schodzi do
-     jednej linijki nad decyzjami; pełna wraca w swoim kształcie.
+  /* ── PUSTE SEKCJE JEDNĄ LINIJKĄ ───────────────────────────────────────
+     Dwie puste karty z nagłówkiem zabierałyby 170 px tylko po to, żeby
+     powiedzieć „nic". Pusta sekcja schodzi do jednej linijki nad decyzjami;
+     pełna wraca w swoim kształcie.
 
      Te same zapytania co w sekcjach, więc żadnego żądania więcej. Sekcja
      wczytywana albo z błędem zostaje pełna: błąd ma być widać, a „pusto"
@@ -267,14 +263,12 @@ export function DoDecyzji() {
 
   /* Własny scroller — jak w Zadaniach; rama panelu nie przewija za ekrany.
 
-     TYTUŁ „Do zrobienia" ZESZEDŁ (0.524.0), bo powtarzał podświetloną
-     zakładkę tuż nad nim. Zeszedł też podpis „najpilniejsze pierwsze": opisywał
-     kolejkę, którą widać po plakietkach wieku, a nie mówił, co zrobić.
+     BEZ TYTUŁU „Do zrobienia", bo powtarzałby podświetloną zakładkę tuż
+     nad nim.
 
-     TRZY SEKCJE, JEDEN NAGŁÓWEK (0.524.0). Każda miała inny kształt licznika:
-     „1 do zajęcia się", „3 w pracy" i liczba w pigułce sita. Teraz wszystkie
-     trzy biorą `NaglowekSekcji` i licznik po kropce, jak „Zawartość · 4"
-     w koszu. Oko czyta jeden wzór zamiast trzech. */
+     TRZY SEKCJE, JEDEN NAGŁÓWEK. Wszystkie trzy biorą `NaglowekSekcji`
+     i licznik po kropce, jak „Zawartość · 4" w koszu. Oko czyta jeden wzór
+     zamiast trzech. */
   return <div className="space-y-4 lg:h-full lg:overflow-y-auto">
     {(wzmiankiPuste || mojePuste) && <div data-puste-sekcje=""
       className="flex flex-wrap items-center gap-x-5 gap-y-1 px-1 text-sm text-slate-600">
@@ -297,7 +291,7 @@ export function DoDecyzji() {
       <div className="flex flex-wrap items-center gap-3 border-b border-slate-200 bg-slate-50 px-4 py-2">
         <NaglowekSekcji jako="h3" ikona={<ListChecks size={14} />} className="mr-auto">
           Do decyzji biura{l ? ` · ${l.wszystko}` : ""}</NaglowekSekcji>
-        {/* „Wszystko" bez licznika (0.524.0): tę samą liczbę niesie już
+        {/* „Wszystko" bez licznika: tę samą liczbę niesie już
             nagłówek, a dwie kopie jednego faktu to jedna za dużo. */}
         <FiltrSegmentowy<Filtr> wybrany={filtr} onWybierz={setFiltr} pozycje={[
           { klucz: "wszystko", etykieta: "Wszystko" },

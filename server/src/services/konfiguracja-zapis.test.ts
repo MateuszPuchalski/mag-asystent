@@ -11,7 +11,7 @@ import {
 } from "./konfiguracja-zapis.js";
 import { podNssm } from "./restart.js";
 
-/* Zapis `wertis.env` z panelu (0.491.0). Najważniejsza gwarancja: plik,
+/* Zapis `wertis.env` z panelu. Najważniejsza gwarancja: plik,
    z którym serwer by nie wstał, NIE trafia na dysk. Reszta to rzemiosło
    tekstu, które ma zostawić plik instalatora w stanie czytelnym dla obu
    parserów — serwera i `source` w bashu. */

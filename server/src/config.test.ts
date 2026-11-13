@@ -63,7 +63,7 @@ test("SFERA_WORKER=1 przy seeded to blad — zadania mm nie mialyby wykonawcy", 
 });
 
 test("SFERA_ZW bez workera Sfery albo bez kartoteki przesyłki nie przechodzi startu", () => {
-  /* 0.349.0. Bez workera zadania zw nie mają wykonawcy; bez TW_ID_PRZESYLKA
+  /* Bez workera zadania zw nie mają wykonawcy; bez TW_ID_PRZESYLKA
      ZW nie umie zdecydować o wierszu przesyłki. Filtr po nazwie przełącznika,
      bo tryb mssql dokłada własne wymagania, o które ten test nie pyta. */
   const zw = (b: string[]) => b.filter((x) => /SFERA_ZW/.test(x));
@@ -255,9 +255,7 @@ test("długa wartość spoza listy prefiksów też schodzi pod maskę", () => {
 });
 
 test("komunikat o złym trybie nie wynosi tego, co człowiek wkleił", () => {
-  /* Do 0.140.1 pilnował tego przypadek AI_PROVIDER, bo tam najłatwiej było
-     wkleić klucz w pole trybu. Dostawcy AI nie ma, ale pomyłka jest ta sama
-     i dotyczy każdego pola trybu: wartość idzie do komunikatu, komunikat do
+  /* Klucz wklejony w pole trybu: wartość idzie do komunikatu, komunikat do
      logu, a log bywa wysyłany dalej. Maskowanie ma działać na całej drodze
      przez `bledyKonfiguracji`, nie tylko w samej `bezpiecznaWartosc`. */
   const zly = structuredClone(config) as typeof config;
@@ -312,7 +310,7 @@ test("brak klucza nie jest błędem konfiguracji, gdy Copilot jest wyłączony",
   assert.match(o, /Serwer działa dalej/, "człowiek ma wiedzieć, że to nie jest awaria startu");
 });
 
-/* ── Osobny model klasyfikacji (22 września 2026) ────────────────────────────
+/* ── Osobny model klasyfikacji ────────────────────────────
    Pole puste dziedziczy `COPILOT_MODEL` — instalacja bez nowej zmiennej ma
    się zachowywać dokładnie tak jak dotąd. Wklejka klucza w nowe pole dostaje
    tę samą bramkę co w starym, bo oba sąsiadują z kluczem w wertis.env. */
@@ -362,7 +360,7 @@ test("bez COPILOT_MODEL_KLASYFIKACJA klasyfikacja idzie modelem z COPILOT_MODEL"
   assert.equal(config.copilot.modelKlasyfikacji, config.copilot.model);
 });
 
-/* ── Szkice przed pracą (26 września 2026) ───────────────────────────────────
+/* ── Szkice przed pracą ───────────────────────────────────
    Okno przechodzi przez tę samą bramkę co zmiana z panelu: zły zapis ma
    zatrzymać zapis pliku, a nie zamienić się po cichu w „nigdy". Okno przez
    północ odpada, bo limit poranka liczy się po dacie lokalnej. */

@@ -659,9 +659,8 @@ razem z treścią odpowiedzi, a do klienta nic nie wyjdzie po cichu.
 
 Rodzina `/sale/issues` („Post Purchase Issues") niesie DWA byty pod jednym
 zasobem: dyskusje (`type: "DISPUTE"`) i reklamacje (`type: "CLAIM"`). Obie
-gałęzie lądują w bazie, a rozróżnia je kolumna `typ`; dyskusje mają własny
-ekran (§25c projektu panelu). Licznik dyskusji w przebiegu jest kontrolą
-krzyżową dla licznika kolejki.
+gałęzie lądowały w bazie, a rozróżnia je kolumna `typ`. Dyskusji panel już
+nie pobiera (§25c projektu panelu).
 
 Dyskusja nie ma terminu w schemacie: `decisionDueDate` i `currentState.statusDueDate`
 są opisane jako `Null for disputes`. Okna odpowiedzi, po którym Allegro nakłada

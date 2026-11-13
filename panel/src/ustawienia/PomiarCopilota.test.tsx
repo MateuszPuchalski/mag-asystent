@@ -4,7 +4,7 @@ import { render, screen, within } from "@testing-library/react";
 import { PomiarCopilota, zgodnoscPrzeplywu } from "./PomiarCopilota";
 import type { PomiarCopilota as Pomiar } from "../api/typy";
 
-/* ── Pomiar Copilota (uproszczony 0.519.0) ──────────────────────────────────
+/* ── Pomiar Copilota ────────────────────────────────────────────────────────
    Na wierzchu zostaje to, na czym zapada decyzja o modelu: wywołania,
    nieudane i rachunek. Tokeny i prefiks instrukcji to głos programisty —
    nie wracają na ekran. Objaw ciszy cache zostaje, tylko w szczegółach.    */
@@ -71,7 +71,7 @@ describe("PomiarCopilota", () => {
     expect(within(tabela).getByText("claude-opus-5 (k4)")).toBeInTheDocument();
   });
 
-  /* Szkice przed pracą (26 września 2026): własny wiersz, bo poranek ma
+  /* Szkice przed pracą: własny wiersz, bo poranek ma
      własny limit, a zlany z dniem nie powiedziałby, ile kosztuje. */
   it("szkice przed pracą mają własny wiersz z rachunkiem; bez wywołań wiersza nie ma", () => {
     const { unmount } = render(<PomiarCopilota dane={dane()} />);
@@ -90,7 +90,7 @@ describe("PomiarCopilota", () => {
     expect(screen.getByLabelText("Szkice odpowiedzi").textContent).toContain("30 wywołań");
   });
 
-  /* Czas czekania na Copilota (0.532.0): jedno zdanie o szkicu na wierzchu,
+  /* Czas czekania na Copilota: jedno zdanie o szkicu na wierzchu,
      tabela po zadaniu w szczegółach, nazwy zadań po ludzku. */
   it("podaje czas czekania: zdanie o szkicu na wierzchu, mediana i p90 zadań w szczegółach", () => {
     render(<PomiarCopilota dane={dane({ wgZadania: [

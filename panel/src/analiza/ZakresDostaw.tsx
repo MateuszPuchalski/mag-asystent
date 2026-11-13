@@ -6,10 +6,9 @@ import { Liczba, PasekUdzialu, Slupki } from "../ui/wykres";
 import { dniPl, liczbaPl, zdanieOSzczycie } from "./liczby";
 import { KartaWgladu, Tabela, Td } from "../ui/wglad";
 
-/* ── Zakres DOSTAWY (z `biuro.html`, w panelu od 0.440.0) ────────────────
-   Pytanie brzmi „U KOGO SĄ PROBLEMY". Do 0.100.0 biuro odpowiadało na nie
-   tylko otwieraniem faktur po kolei — jedyne liczby o dostawcy stały
-   w kontekście otwartej faktury, po jednym dostawcy naraz. */
+/* ── Zakres DOSTAWY ──────────────────────────────────────────────────────
+   Pytanie brzmi „U KOGO SĄ PROBLEMY", a odpowiedź ma nie wymagać
+   otwierania faktur po kolei. */
 
 export function ZakresDostaw({ a }: { a: AnalizaDostaw }) {
   const maxUdzial = Math.max(...a.dostawcy.map((x) => x.udzialWyjatkow ?? 0), 0);
@@ -20,8 +19,8 @@ export function ZakresDostaw({ a }: { a: AnalizaDostaw }) {
   return <>
     <KartaWgladu tytul="Dostawy w oknie">
       <div className="flex flex-wrap gap-8">
-        {/* Bez „w N dniach" (0.512.0): okno stoi w nagłówku Analizy
-            i na wybranym czipie, a trzecie powtórzenie tylko wydłużało etykietę. */}
+        {/* Bez „w N dniach": okno stoi w nagłówku Analizy i na wybranym
+            czipie, a trzecie powtórzenie tylko wydłużałoby etykietę. */}
         <Liczba ile={a.zamknietych}
           etykieta={odmien(a.zamknietych, "dostawa domknięta", "dostawy domknięte", "dostaw domkniętych")} />
         <Liczba ile={a.pozycjiRozlozonych}
@@ -52,7 +51,7 @@ export function ZakresDostaw({ a }: { a: AnalizaDostaw }) {
       <Tabela naglowki={["Dostawca", "Dostaw", "Pozycji", "Z wyjątkiem", "Mediana"]}
         pusto="Żadna dostawa nie domknęła się w tym oknie.">
         {a.dostawcy.map((x) => <tr key={x.dostawca}>
-          {/* Dostawca prowadzi do ARCHIWUM jego dokumentów (0.502.0): wiersz
+          {/* Dostawca prowadzi do ARCHIWUM jego dokumentów: wiersz
               liczy dostawy z okna, a archiwum szuka po nazwie dostawcy. */}
           <Td className="font-semibold"><Link className="underline decoration-dotted underline-offset-2 hover:decoration-solid"
             to={`/obsluga/dostawy?kubelek=archiwum&q=${encodeURIComponent(x.dostawca)}`}>{x.dostawca}</Link></Td>

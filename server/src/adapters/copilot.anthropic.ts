@@ -146,7 +146,7 @@ export function wspieraWysilek(model: string): boolean {
  */
 export const nadawcaAnthropic: NadawcaKlasyfikacji = async (tresc): Promise<OdpowiedzModelu> => {
   const start = Date.now();
-  /* WŁASNY MODEL KLASYFIKACJI (22 września 2026), nie `config.copilot.model`:
+  /* WŁASNY MODEL KLASYFIKACJI, nie `config.copilot.model`:
      etykieta ma zejść na tańszy model bez ciągnięcia w dół szkicu. Pole puste
      dziedziczy `COPILOT_MODEL`, więc bez zmiany w wertis.env nic się nie rusza. */
   const model = config.copilot.modelKlasyfikacji;
@@ -208,7 +208,7 @@ export const nadawcaAnthropic: NadawcaKlasyfikacji = async (tresc): Promise<Odpo
    Osobna instrukcja, bo klasyfikator i redaktor to dwie różne role, a wspólny
    prefiks „jesteś klasyfikatorem" psułby jedną z nich.                       */
 
-/* Skąd model wie to, co napisał (0.253.0). Enumy biorą się z serwisu — jedna
+/* Skąd model wie to, co napisał. Enumy biorą się z serwisu — jedna
    lista, bez trzeciej kopii. `odwolanie` jest `nullable`, bo przy źródle
    `model` nie ma czego wskazać, a wyjście strukturalne wymaga wszystkich
    kluczy. Pewność deklaruje model, ale sufit narzuca `ustalPewnosc`. */
@@ -261,6 +261,18 @@ const Szkic = z.object({
    Hamulec na listy: dwie listy po trzy pozycje, każda z dopowiedzeniem
    w nawiasie, powstały z posłuszeństwa regule z 0.253.0 („zrób z tego listę").
    Reguła zostaje, dostaje warunek.
+
+   ── REGUŁA 3c I WARUNEK W REGULE 4: SPRAWA ZAMKNIĘTA TO KONIEC ────────────
+   Klient szukał klucza do regulacji gaźnika. Szkic podał komplet dziesięciu
+   kluczy z linkiem i ceną, czyli sprawę zamknął. Potem dopisał wyliczankę
+   końcówek z opisu aukcji i drogę zapasową: „jeśli wolą Państwo jeden klucz,
+   proszę o zdjęcie śrub". Właściciel: odpowiedź dobra, ale nadto pomocna.
+
+   Oba dopiski mają źródło tutaj. Reguła 4 kazała przy „prawdopodobnie"
+   zawsze proponować sprawdzenie, choć przy komplecie pasującym na każdy
+   wariant sprawdzenie niczego nie rozstrzyga. Reguła 3b zakazywała porady
+   na końcu, ale nie nowej oferty. Droga zapasowa to drugie zadanie dla
+   klienta i druga sprawa dla agenta, gdy klient na nią odpowie.
 
    ── REGUŁA 2c: KARTOTEKA NIE MÓWI, CO JEST W PACZCE (0.261.0) ─────────────
    Szkic o filtr powietrza do Craftsmana LT2000 NAPISAŁ KLIENTOWI SPROSTOWANIE:
@@ -426,8 +438,15 @@ export const INSTRUKCJA_SZKICU = [
   "   to nie jest odpowiedź. Nie dopisuj na koniec porady ani uogólnienia,",
   "   o które nikt nie prosił. Zdania w rodzaju „to najczęstsza przyczyna”",
   "   agent nie ma jak sprawdzić, a klient o nie nie pytał.",
+  "3c. GDY ODPOWIEDŹ ZAMYKA SPRAWĘ, NIE OTWIERAJ NOWEJ. Klient szuka towaru,",
+  "   a ty masz ofertę z adresem: podaj ją i skończ. Nie streszczaj opisu aukcji,",
+  "   którą klient zaraz otworzy. Nie dopisuj drogi zapasowej („jeśli wolą",
+  "   Państwo…”, „gdyby jednak…”), o którą nie prosił. Każde takie zdanie to",
+  "   nowe zadanie dla klienta, a on już dostał to, po co przyszedł.",
   "4. Pewność „prawdopodobne” oddaj słowem „prawdopodobnie” i zaproponuj",
-  "   sprawdzenie (tabliczka, zdjęcie starej części).",
+  "   sprawdzenie (tabliczka, zdjęcie starej części), ale tylko wtedy, gdy od",
+  "   wyniku zależy, co klient kupi. Komplet albo zestaw, który pokrywa każdy",
+  "   wariant, sprawdzenia nie potrzebuje.",
   "5. Nie obiecuj terminu dostawy ani przyszłej dostępności. Jedyny wyjątek to",
   "   fakt „Realizacja zamówienia”: zrób to, co mówi jego WERDYKT. Gdy klient pyta",
   "   o wysyłkę, a paczka wychodzi dziś, napisz wprost, że wyślemy ją dziś. Gdy werdykt podaje termin",
@@ -537,7 +556,7 @@ export const INSTRUKCJA_SZKICU = [
  * pomiar oddzielił szkice starej instrukcji od nowej. Zmieniasz tekst
  * albo opis narzędzia, podnosisz numer. Pilnuje skrót w `wersje-instrukcji.test.ts`.
  */
-export const PROMPT_SZKICU = "s1";
+export const PROMPT_SZKICU = "s2";
 
 /* Ile rund narzędzi na jeden szkic. Mniej niż przy dopytaniu, bo szkic
    ma już fakty, a sięga po bazę tylko o towar spoza nich: znajdź symbol,
@@ -578,7 +597,7 @@ export const nadawcaSzkicuAnthropic: NadawcaSzkicu =
     wersja: PROMPT_SZKICU,
     numerujWyniki: true,
     /* ── OBRAZY PRZED TEKSTEM ───────────────────────────────────────────────
-       Ten sam kształt, co przy karcie reklamacyjnej (0.283.0), i z tego
+       Ten sam kształt, co przy karcie reklamacyjnej, i z tego
        samego powodu: bez spisu na końcu tekstu model widzi obrazy, ale nie
        wie, który jest którym `Z`, a wtedy odczyt przestaje być sprawdzalny.
        Spis dokleja serwis do FAKTÓW, nie adapter — tu jest tylko kolejność.
@@ -764,7 +783,7 @@ export const INSTRUKCJA_DOPYTANIA = [
  * szkicu zmienia też tę, bo wchodzi do niej bajt w bajt, więc podnosisz
  * oba numery. Powód i strażnik jak przy `PROMPT_SZKICU`.
  */
-export const PROMPT_DOPYTANIA = "d1";
+export const PROMPT_DOPYTANIA = "d2";
 
 /* Ile rund narzędzi na jedno dopytanie. Pytanie o towar to zwykle dwie:
    znajdź symbol, otwórz kartę. Sufit zatrzymuje pętlę, w której model
@@ -1009,10 +1028,8 @@ function naNasz(e: unknown): Error {
       "Anthropic odrzuciło klucz (401) — sprawdź ANTHROPIC_API_KEY w wertis.env " +
       "i zrestartuj usługę.");
   }
-  /* PRZED `APIError`, bo `APIConnectionError` PO NIEJ DZIEDZICZY. Do 0.191.0
-     gałąź o braku internetu stała na końcu funkcji i była nieosiągalna: zerwana
-     sieć meldowała się jako „Anthropic odpowiedziało ?", czyli twierdziła, że
-     dostawca odpowiedział — a on nie został nawet zapytany. Kolejność
+  /* PRZED `APIError`, bo `APIConnectionError` PO NIEJ DZIEDZICZY. Inaczej
+     zerwana sieć meldowałaby się jako „Anthropic odpowiedziało ?". Kolejność
      `instanceof` jest tu logiką, nie stylem. */
   if (e instanceof Anthropic.APIConnectionError) {
     return new BladLacznosciCopilota(
@@ -1067,8 +1084,8 @@ function naNasz(e: unknown): Error {
         + "Nic nie zostało policzone ani opłacone — spróbuj za chwilę.",
         e.status ?? 0, slad);
     }
-    /* Surowej odpowiedzi dostawcy na ekran NIE PUSZCZAMY. Do 0.191.0 szło tam
-       `529 {"type":"error",…}` — agent czytał zrzut JSON-a zamiast zdania. */
+    /* Surowej odpowiedzi dostawcy na ekran NIE PUSZCZAMY — agent ma czytać
+       zdanie, nie zrzut JSON-a. */
     return new BladOdpowiedziCopilota(
       `Anthropic odrzuciło żądanie (${e.status ?? "?"}). To nie jest wina tej `
       + "rozmowy — zajrzyj do pomiaru Copilota za zębatką.",
@@ -1093,7 +1110,7 @@ function czytajNaglowek(e: unknown, nazwa: string): string | null {
   return rec[nazwa] ?? rec[nazwa.toLowerCase()] ?? null;
 }
 
-/* ── Copilot reklamacyjny: karta faktów ze sprawy (0.275.0) ──────────────────
+/* ── Copilot reklamacyjny: karta faktów ze sprawy ─────────────────────────
    Zadanie jest CELOWO WĄSKIE: wyciągnij z rozmowy to, co w niej stoi, i nazwij
    to, czego w niej NIE MA. Model nie rozstrzyga sprawy — instrukcja mówi to
    wprost, a serwis sprawdza deterministycznie i odrzuca kartę, w której padnie
@@ -1111,7 +1128,7 @@ const Karta = z.object({
   oczekiwanie: PoleKartyZ.nullable(),
   dowody: z.array(PoleKartyZ),
   brakuje: z.array(z.string()),
-  /* RADA JEST TYPOWANA (0.276.0). Prozą byłoby ładniej i nie dałoby się tego
+  /* RADA JEST TYPOWANA. Prozą byłoby ładniej i nie dałoby się tego
      zmierzyć — a rada bez pomiaru to nie rada. Enum trzyma te same wartości,
      co werdykt wysyłany do Allegro, więc trafność liczy się porównaniem
      dwóch napisów, bez ankiety dla agenta. */
@@ -1193,7 +1210,7 @@ export const nadawcaRozpoznaniaAnthropic: NadawcaRozpoznania =
           ...(wspieraWysilek(config.copilot.model) ? { effort: "medium" as const } : {}),
           format: zodOutputFormat(Karta),
         },
-        /* ── OBRAZY PRZED TEKSTEM (0.283.0) ──────────────────────────────
+        /* ── OBRAZY PRZED TEKSTEM ─────────── ──────────────────────────────
            `content` przestaje być gołym łańcuchem. Obrazy idą PIERWSZE, a spis
            na końcu tekstu mówi, który jest którym `Z` — bez tego cytat `Z2`
            w karcie byłby niesprawdzalny, a sprawdzalny cytat to cała doktryna

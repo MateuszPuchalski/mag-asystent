@@ -11,10 +11,8 @@ import { odkodujEncje } from "../tekst.js";
    Dwie pozycje o tej samej nazwie w jednej wiadomości zlewamy — dla agenta
    i tak byłyby nierozróżnialne, ostatnia wygrywa.
 
-   UPSERT, nie „tylko z nową wiadomością" (blizna tego wydania): do 0.242.0
-   załączniki wchodziły wyłącznie razem z pierwszym wstawieniem wiadomości,
-   więc `NEW` („Allegro jeszcze sprawdza") zostawało zamrożone na zawsze,
-   a wiadomości sprzed 0.155.0 nigdy nie dostały swoich zdjęć.              */
+   UPSERT, nie „tylko z nową wiadomością": inaczej `NEW` („Allegro jeszcze
+   sprawdza") zostałoby zamrożone na zawsze.                                */
 
 export interface ZalacznikAllegro {
   fileName: string;

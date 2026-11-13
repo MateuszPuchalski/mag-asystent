@@ -3,37 +3,15 @@ import { describe, expect, it, vi } from "vitest";
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type { ProgKolejki } from "../api/typy";
-import { PasekTla, tloAlarmuje } from "./PasekTla";
+import { PasekTla } from "./PasekTla";
 
-/* ── Tło pracy: cisza jest cicha, alarm zostaje głośny (0.392.0) ─────────────
+/* ── Tło pracy: cisza jest cicha, alarm zostaje głośny ───────────────────────
    Cała wartość tego pliku jest w drugiej połowie zdania. Zwinięcie paska do
    jednej linii kupuje piksele; zwinięcie ALARMU kupowałoby je za pracę,
-   której nikt nie zobaczy — a dokładnie za to zapłacił próg w 0.385.0.     */
+   której nikt nie zobaczy.                                                  */
 
 const prog = (n: Partial<ProgKolejki> = {}): ProgKolejki => ({
   od: "2026-06-30T22:00:00Z", ukrytych: 391, ukrytychZTerminem: 0, zdjety: false, ...n,
-});
-
-describe("kiedy tło alarmuje", () => {
-  it("spokój: próg chowa samo archiwum, kanał działa, lista kompletna", () => {
-    expect(tloAlarmuje({ prog: prog(), zlaSynchronizacja: false, pozostaloDoPobrania: 0 }))
-      .toBe(false);
-  });
-
-  it("ALARM, gdy próg chowa sprawę z żywym terminem", () => {
-    /* Zwykle to zero. Dzień, w którym nie jest, jest dokładnie tym dniem,
-       dla którego tę liczbę liczymy. */
-    expect(tloAlarmuje({ prog: prog({ ukrytychZTerminem: 2 }) })).toBe(true);
-  });
-
-  it("ALARM, gdy synchronizacja stoi albo lista jest niekompletna", () => {
-    expect(tloAlarmuje({ zlaSynchronizacja: true })).toBe(true);
-    expect(tloAlarmuje({ pozostaloDoPobrania: 12 })).toBe(true);
-  });
-
-  it("próg ZDJĘTY ręką nie jest alarmem — to świadomy wybór agenta", () => {
-    expect(tloAlarmuje({ prog: prog({ zdjety: true, ukrytychZTerminem: 5 }) })).toBe(false);
-  });
 });
 
 describe("cichy wiersz tła", () => {

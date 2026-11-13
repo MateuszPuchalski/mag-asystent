@@ -1,18 +1,18 @@
-/* ── Słownik decyzji klasyfikatora (specyfikacja z 20 września 2026) ────────
+/* ── Słownik decyzji klasyfikatora ───────────────────────────────────────────
 
    Jedno źródło dla kategorii, następnych kroków i kodów polityki. Czyta go
    serwis, adapter dostawcy i test; panel trzyma LUSTRO w `api/typy.ts`, a
    `Record<Kategoria, string>` z nazwami po polsku nie skompiluje się bez
-   kompletu (ta sama zasada co przy ośmiu kategoriach 0.191.0).
+   kompletu.
 
    WARTOŚCI SĄ PO ANGIELSKU I TO JEST WYJĄTEK OD JĘZYKA REPO. Specyfikacja
    nazywa je kontraktem niezależnym od dostawcy: te same wartości ma oddać
    każdy dostawca, a raport porównawczy zestawi je znak w znak.
    Polska nazwa dla człowieka mieszka na ekranie, nie w danych.
 
-   Priorytetu 1–5 ze specyfikacji NIE MA — decyzja właściciela z 22 września
-   2026. Kolejność kolejki stoi na faktach (flaga „pilne", czas czekania,
-   terminy), a przypuszczenie maszyny jej nie przestawia (§14.5).            */
+   Priorytetu 1–5 ze specyfikacji NIE MA — decyzja właściciela. Kolejność
+   kolejki stoi na faktach (flaga „pilne", czas czekania, terminy),
+   a przypuszczenie maszyny jej nie przestawia (§14.5).                      */
 
 /**
  * Wersja słownika. Zapisuje się przy KAŻDEJ decyzji, bo pomiar trafności
@@ -90,9 +90,9 @@ export const PEWNOSCI = ["wysoka", "srednia", "niska"] as const;
 export type Pewnosc = (typeof PEWNOSCI)[number];
 
 /**
- * Powód kategorii `OTHER`, podawany przez model. Dwa różne kosze z 0.191.0
- * przeżywają tu jako kod: „słownik za krótki" i „za mało treści" wołają
- * o dwie różne naprawy, a zlane w jedno `OTHER` zabrałyby pomiarowi połowę.
+ * Powód kategorii `OTHER`, podawany przez model: „słownik za krótki" i „za
+ * mało treści" wołają o dwie różne naprawy, a zlane w jedno `OTHER`
+ * zabrałyby pomiarowi połowę.
  */
 export const POWODY_INNE = ["poza_slownikiem", "za_malo_tresci"] as const;
 export type PowodInne = (typeof POWODY_INNE)[number];

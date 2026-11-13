@@ -13,16 +13,13 @@ import { KluczeWlasciciela, Konfiguracja } from "../ustawienia/Konfiguracja";
 import { Aktualizacja } from "../ustawienia/Aktualizacja";
 import { NowyKolektor } from "../ustawienia/NowyKolektor";
 
-/* ── USTAWIENIA (0.168.0, ustawienia biura od 0.444.0) ────────────────────
+/* ── USTAWIENIA ─────────────────────────────────────────────────────────────
    Za zębatką, bo zmienia się tu rzadko — cel biura z §7: praca na górnym
    rzędzie, wgląd na dolnym, ustawienia za zębatką.
 
-   PIĘĆ GRUP ZAMIAST JEDNEGO ZWOJU (0.529.0). Osiem kart stało jedna pod
-   drugą, a trzydzieści pięć decyzji właściciela — termin zwrotu, sufit
-   szkiców Copilota, magazyn odpadu — mieszkało na dnie, w karcie
-   „Konfiguracja serwera", pod nazwą klucza w pliku. Szukało się ich tam,
-   gdzie się o nich myśli: termin zwrotu przy zwrotach. Grupy układają
-   ustawienia według tego, NA CO wpływają:
+   PIĘĆ GRUP ZAMIAST JEDNEGO ZWOJU. Ustawienie szuka się tam, gdzie się
+   o nim myśli: termin zwrotu przy zwrotach, a nie pod nazwą klucza w pliku.
+   Grupy układają ustawienia według tego, NA CO wpływają:
 
      Firma                — to, co wychodzi na papier do dostawcy
      Magazyn              — strefa złota, magazyny, dokumenty, zdjęcia
@@ -43,9 +40,8 @@ import { NowyKolektor } from "../ustawienia/NowyKolektor";
    Otwarcie ekranu i zmiana grupy nic nie zapisują — każda zmiana stoi za
    przyciskiem.
 
-   BEZ KARTY-NAGŁÓWKA (0.543.0). Nad grupami stała cała biała karta z
-   jednym słowem „Ustawienia", które mówi już menu „Więcej". Tytuł ekranu
-   stoi teraz nad listą grup, a treść zaczyna się na wysokości paska. */
+   BEZ KARTY-NAGŁÓWKA: słowo „Ustawienia" mówi już menu „Więcej". Tytuł
+   ekranu stoi nad listą grup, a treść zaczyna się na wysokości paska. */
 
 type IdGrupy = "firma" | "magazyn" | "ludzie" | "obsluga" | "serwer";
 

@@ -55,8 +55,6 @@ export interface ProductCard {
   zwroty: StockView;
   /**
    * Pozostałe magazyny firmy — bez trójki z rolami i bez ukrytych w ustawieniach.
-   * Do lipca 2026 karta znała wyłącznie MAG/MGP/Zwroty, więc „gdzie ten towar
-   * jeszcze leży" było pytaniem bez odpowiedzi.
    */
   magazyny: MagazynStan[];
   /**
@@ -78,7 +76,7 @@ export interface ProductCard {
    */
   zamowione: ZamowioneUDostawcy[];
   /**
-   * Ceny z kartoteki Subiekta — WSZYSTKIE poziomy (0.396.0, decyzja właściciela).
+   * Ceny z kartoteki Subiekta — WSZYSTKIE poziomy (decyzja właściciela).
    *
    * Pusta lista znaczy „nie wiemy", nigdy „za darmo". Na produkcji jest pusta,
    * dopóki import z MSSQL nie dostanie nazw tabeli cennikowej i nowego
@@ -92,8 +90,7 @@ export interface ProductCard {
    * z opisu po imporcie, wpisane ręcznie przez biuro albo odzyskane z opisu
    * naszej oferty Allegro (E3, `services/identyfikatory.ts`). Pole ADDYTYWNE
    * obok `zamienniki.obce`: kolektor renderuje `obce` i nie ma prawa stracić
-   * tej sekcji. Trzecia wartość `zrodlo` doszła w 0.264.0, czwarta
-   * (`dostawca`) z importem odsyłaczy — obie bezpieczne dla zastanych APK:
+   * tej sekcji. Nowe wartości `zrodlo` są bezpieczne dla zastanych APK:
    * kolektor tego pola nie czyta wcale.
    */
   identyfikatory: Array<{ rodzaj: string; wartosc: string; zrodlo: "opis" | "reczne" | "oferta" | "dostawca" }>;
@@ -105,7 +102,7 @@ export interface ProductCard {
    */
   zlotaStrefa?: ZlotaStrefa;
   /**
-   * Czy ta instalacja przyjmuje zdjęcia kartotek z kolektora (0.88.0).
+   * Czy ta instalacja przyjmuje zdjęcia kartotek z kolektora.
    *
    * Na karcie, a nie w osobnej trasie konfiguracji: przycisk „+" ma się
    * pojawiać tam, gdzie kolektor już i tak pyta o dane. Pole addytywne —
@@ -119,7 +116,7 @@ export interface ProductCard {
  * Podpowiedź przeslotowania — ile razy dziennie towar jest zbierany i na które
  * poziomy regału powinien zjechać.
  *
- * Nazwany typ, a nie kształt wpisany w dwóch miejscach: od 0.71.0 czyta go
+ * Nazwany typ, a nie kształt wpisany w dwóch miejscach: czyta go
  * także pozycja dostawy (`DeliveryLineView`), a rozjazd między kopiami
  * znaczyłby, że kolektor mówi to samo dwoma różnymi zdaniami.
  */
@@ -177,7 +174,7 @@ export interface DeliveryDocument {
   /** Identyfikator kontrahenta z Subiekta; `null`, gdy dokument nie ma płatnika. */
   khId: number | null;
   /**
-   * Ile NIEROZWIĄZANYCH wyjątków wisi na tym dokumencie (0.57.0).
+   * Ile NIEROZWIĄZANYCH wyjątków wisi na tym dokumencie.
    *
    * Pasek postępu tego nie powie i powiedzieć nie może: wyjątek liczy się jako
    * pozycja domknięta (D8). Bez tej liczby dostawa z trzema reklamacjami
@@ -185,7 +182,7 @@ export interface DeliveryDocument {
    */
   wyjatkiOtwarte: number;
   /**
-   * Czy ten dostawca ma wgrane logo (0.56.0).
+   * Czy ten dostawca ma wgrane logo.
    *
    * Flaga, a nie „spróbuj i zobacz": lista dwudziestu dokumentów pytałaby
    * inaczej o dwadzieścia obrazów, z których większość nie istnieje. Ten sam
@@ -220,9 +217,6 @@ export interface DeliveryLineView {
   /**
    * Jednostka z kartoteki (`szt.`, `kpl.`, `par`). Pusta = kartoteka jej nie
    * ma; kolektor podstawia wtedy „szt.".
-   *
-   * Do 0.51.0 tego pola nie było i kolektor wpisywał „szt" na sztywno
-   * w dwunastu miejscach — komplet z dokumentu czytało się więc jako sztuki.
    */
   unit: string;
   locExpected: string | null;
@@ -233,7 +227,7 @@ export interface DeliveryLineView {
    *
    * Kolektor układa po tym wykonaną robotę: ostatnio odłożona stoi na górze
    * grupy zrobionych, bo to jej dotyczy pytanie „czy na pewno na tę półkę".
-   * Panel biura czyta to samo pole od 0.36.0 (`podgladDokumentu`).
+   * Panel biura czyta to samo pole (`podgladDokumentu`).
    */
   doneAt: string | null;
   /**
@@ -249,7 +243,7 @@ export interface DeliveryLineView {
   /** Litera alejki (nagłówek sekcji listy) albo null przy braku lokalizacji. */
   aisle: string | null;
   /**
-   * Ta sama podpowiedź przeslotowania, którą niesie karta towaru (0.71.0).
+   * Ta sama podpowiedź przeslotowania, którą niesie karta towaru.
    *
    * Przy odkładaniu jest bardziej na miejscu niż na karcie: człowiek stoi
    * z towarem w ręce i WŁAŚNIE wybiera półkę, więc „ten jedzie do strefy
@@ -303,7 +297,7 @@ export interface DeliveryView {
   /** `tak` / `nie` / null (nie pytano) — trzy stany, nie dwa. */
   kurierProtokol: string | null;
   /**
-   * Notatki biura do tego dokumentu (0.43.0), od najstarszej.
+   * Notatki biura do tego dokumentu, od najstarszej.
    *
    * Jadą z widokiem dostawy, a nie osobnym żądaniem: pytanie o dosłany brak
    * ma stać przed oczami TAM, gdzie rozkłada się towar, i od pierwszej klatki.
@@ -350,7 +344,7 @@ export type ScanResolution =
 /**
  * Kategoria niezgodności. Pięć pierwszych to lista z firmowego formularza
  * „Niezgodność w dostawie" — tylko je wolno zgłosić. Pięć kolejnych zostało po
- * wyjątkach sprzed 0.21.0: są w bazie, więc muszą mieć nazwę, ale formularz
+ * starych wyjątkach: są w bazie, więc muszą mieć nazwę, ale formularz
  * ich nie zna.
  */
 export type ProblemType =
@@ -385,12 +379,12 @@ export interface ProblemView {
   createdBy: string | null;
   resolvedAt: string | null;
   resolvedNote: string | null;
-  /** Kto zamknął wyjątek; `null` dla zamkniętych przed 0.357.0. */
+  /** Kto zamknął wyjątek; `null`, gdy nie zapisano. */
   resolvedBy: string | null;
   /** Kontekst do listy „nierozwiązane" — bez wchodzenia w dostawę. */
   docNumber: string | null;
   /**
-   * Numer dokumentu w Subiekcie (0.435.0) — adres dokumentu w panelu biura.
+   * Numer dokumentu w Subiekcie — adres dokumentu w panelu biura.
    *
    * Sam `docNumber` nie wystarcza: dokument, który wypadł z okna importu, nie
    * ma wiersza na liście dostaw, a jego otwarty wyjątek dalej czeka na biuro.

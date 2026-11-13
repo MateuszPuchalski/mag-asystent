@@ -1,6 +1,6 @@
 import { config } from "../config.js";
 
-/* ── Odnośniki do panelu sprzedawcy Allegro (0.152.0) ────────────────────────
+/* ── Odnośniki do panelu sprzedawcy Allegro ──────────────────────────────────
    Zwrot rozstrzyga się w WERTIS, ale bywa moment, w którym trzeba wejść do
    Allegro: sprawdzić korespondencję, dopiąć coś, czego API nie oddaje.
    Wtedy operator nie ma szukać zamówienia po numerze — ma kliknąć.
@@ -61,10 +61,9 @@ export const linkOferty = (id: string | null | undefined) =>
   zWzorca(config.allegro.panelOferta, id);
 
 /**
- * Reklamacja w Centrum Sprzedaży — adres ZWERYFIKOWANY kliknięciem (0.226.1).
+ * Reklamacja w Centrum Sprzedaży — adres ZWERYFIKOWANY kliknięciem.
  *
- * Wzorzec z 0.222.0 był zgadnięty z analogii do zwrotu i mylił się w obu
- * członach: sprawa ma WŁASNĄ stronę `/claims/{uuid}`, nie wiersz na liście
+ * Sprawa ma WŁASNĄ stronę `/claims/{uuid}`, nie wiersz na liście
  * z wyszukiwaniem, a adresuje się identyfikatorem zasobu, nie numerem
  * czytelnym. `{id}` to więc `external_id` sprawy, nigdy `reference_number`.
  *

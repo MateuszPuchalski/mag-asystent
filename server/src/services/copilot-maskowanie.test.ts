@@ -126,7 +126,7 @@ test("asercja końcowa nie znajduje niczego w zamaskowanym tekście", () => {
   assert.equal(zostalyDaneOsobowe(bez(brudny)), false, "po maskowaniu ma być czysto");
 });
 
-/* ── Cały wątek (0.231.0, szkic odpowiedzi) ─────────────────────────────────
+/* ── Cały wątek (szkic odpowiedzi) ──────────────────────────────────────────
    Decyzja właściciela: do dostawcy idzie cały wątek, nie jedna wiadomość.
    Pilnujemy trzech rzeczy: maskowanie obejmuje TAKŻE nasze wychodzące (agent
    bywa cytuje klienta), sufit tnie od najstarszej z JEDNYM znacznikiem,

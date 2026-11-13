@@ -407,7 +407,7 @@ function ulozPasy(punkty: PunktOsi[], W: number, linie: Linie, mierz: Mierz): Pa
 }
 
 /* ── CENA ZAKUPU NA TEJ SAMEJ OSI ────────────────────────────────────────────
-   Makieta właściciela dla reklamacji: zielony romb „Kupił za …” między
+   Reklamacja dostaje zielony romb „Kupił za …” między
    poziomami. Agent widzi jednym spojrzeniem, ile klient zapłacił wobec
    cennika i dzisiejszej oferty, a to rozstrzyga o kwocie zwrotu.
 

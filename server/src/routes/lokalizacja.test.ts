@@ -169,7 +169,7 @@ test("usunięcie ma własny typ zdarzenia — audyt musi je odróżniać", async
   assert.equal(ev.type, "location_removed");
 });
 
-/* ── Ustawienie lokalizacji podstawowej (0.38.0) ─────────────────────────────
+/* ── Ustawienie lokalizacji podstawowej ─────────────────────────────
    Pickingową jest PIERWSZA lokalizacja z pola. Towar leżący w dwóch miejscach
    zmienia „główne" wraz z rotacją, a do 0.38.0 jedyną drogą było skasowanie
    adresu i nadanie go od nowa — czyli utrata informacji, że drugie miejsce

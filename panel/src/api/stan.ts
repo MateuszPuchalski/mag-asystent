@@ -2,7 +2,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "./klient";
 import type { ProblemyZakupu } from "./typy";
 
-/* ── Stan systemu (0.441.0) ─────────────────────────────────────────────
+/* ── Stan systemu ───────────────────────────────────────────────────────
    Przeniesiony z NADZORU w `biuro.html`. Trasy są TE SAME, którymi jeździło
    biuro — przeprowadzka zmienia front, nie umowę z serwerem. Wzory typów
    leżą na serwerze obok funkcji, które je liczą: `routes/queue.ts`,
@@ -136,7 +136,7 @@ export const useWymiana = (dni: number) => useQuery({
 /* Okno alarmu jest STAŁE (30 dni, bez parametru) — suwak przy tabeli rządzi
    tabelą, a sygnał, który zmienia treść przy przestawieniu listy, przestaje
    być sygnałem. Powód stoi przy trasie w `routes/biuro.ts`. */
-/* Rytm 30 s od 0.446.0: plakietka w nagłówku ma urosnąć sama, jak w cyklu
+/* Rytm 30 s: plakietka w nagłówku ma urosnąć sama, jak w cyklu
    biura, a nie dopiero po wejściu na stan systemu. Odczyt jest tani (GET po
    jednym zapytaniu na kanał) i nic nie zapisuje. */
 export const useAlarmWymiany = () => useQuery({
@@ -218,7 +218,7 @@ export function useArkuszLokalizacji() {
   });
 }
 
-/* ── Test na żywym Allegro (0.495.0) ─────────────────────────────────────
+/* ── Test na żywym Allegro ───────────────────────────────────────────────
    Wzór typu obok serwisu: `services/sonda-rzeczywistosci.ts`. Otwarcie
    karty CZYTA ostatni przebieg; nowy biegnie wyłącznie na kliknięcie albo
    raz dziennie w takcie serwera. */

@@ -6,7 +6,7 @@ import { Edytor } from "./Edytor";
 import type { PropsSzkicuCopilota } from "./SzkicCopilota";
 import type { SzkicCopilota } from "../api/typy";
 
-/* ── Szkic z Copilota w edytorze (§14.6, 0.231.0) ────────────────────────────
+/* ── Szkic z Copilota w edytorze (§14.6) ─────────────────────────────────────
    Pilnujemy granic, nie wyglądu: propozycja NIE wchodzi do pola sama;
    „Wstaw" dopisuje, „Zastąp" istnieje tylko, gdy jest co nadpisać; wyłączony
    Copilot daje zdanie zamiast martwego przycisku; w trybie komentarza nic
@@ -50,7 +50,7 @@ describe("Szkic Copilota w edytorze", () => {
     const wylaczony = copilot({ stan: { wlaczony: false, powod: "Copilot jest wyłączony. Włącz go w wertis.env (COPILOT_MODE=anthropic).",
       model: "claude-opus-5", modelKlasyfikacji: "claude-opus-5", maxPartia: 20,
     autoKlasyfikacja: false, autoSzkic: false } });
-    /* Zwinięty rząd pustego edytora (0.548.0) zdania nie niesie: nic się
+    /* Zwinięty rząd pustego edytora zdania nie niesie: nic się
        z nim nie zrobi, a zjadłoby pole. Staje po rozwinięciu. */
     const { unmount: odmontuj } = edytor(wylaczony);
     expect(screen.queryByText(/COPILOT_MODE=anthropic/)).toBeNull();
@@ -65,7 +65,7 @@ describe("Szkic Copilota w edytorze", () => {
     expect(screen.getByRole("button", { name: /Układam szkic z faktów/ })).toBeDisabled();
   });
 
-  /* ── SZKIC W POLU JAKO ZWYKŁY TEKST (0.499.0) ────────────────────────────
+  /* ── SZKIC W POLU JAKO ZWYKŁY TEKST ──────────────────────────────────────
      Zgłoszenie właściciela z nagraniem: „edycja powinna być w tym samym oknie,
      z opcją wyczyszczenia wszystkiego". Szkic stoi w polu jako tekst agenta —
      bez podpowiedzi, bez Taba, bez karty „Zastąp mój szkic" pod spodem. */
@@ -74,8 +74,7 @@ describe("Szkic Copilota w edytorze", () => {
     edytor(c, { szkic: szkic().tresc });
     expect(screen.getByLabelText("Szkic odpowiedzi")).toHaveValue(szkic().tresc);
     expect(screen.getByText(/Szkic Copilota w polu/)).toBeInTheDocument();
-    /* „— poprawiaj wprost w polu" zeszło (0.517.0): tekst stoi w polu
-       z kursorem, zdanie powtarzało to, co widać. */
+    /* Bez „— poprawiaj wprost w polu": tekst stoi w polu z kursorem. */
     expect(screen.queryByText(/poprawiaj wprost w polu/)).toBeNull();
     for (const n of [/Przyjmij/, /Wstaw do odpowiedzi/, /Zastąp mój szkic/]) {
       expect(screen.queryByRole("button", { name: n })).toBeNull();
@@ -88,7 +87,7 @@ describe("Szkic Copilota w edytorze", () => {
     expect(c.onOdrzuc).toHaveBeenCalledTimes(1);
   });
 
-  /* ── Tarcie przy nietkniętym szkicu (0.500.0) ────────────────────────────
+  /* ── Tarcie przy nietkniętym szkicu ──────────────────────────────────────
      Wąskie z rozmysłem: tylko szkic bez zmian i tylko z twierdzeniami spoza
      naszej bazy. Bez okna dialogowego — przycisk mówi, co się stanie. */
   it("nietknięty szkic z twierdzeniami spoza bazy: „Wyślij bez zmian” i lista obok", async () => {
@@ -192,7 +191,7 @@ describe("Szkic Copilota w edytorze", () => {
     expect(screen.queryByLabelText("Czego model nie znalazł w faktach")).toBeNull();
   });
 
-  /* ── „Ułóż" tylko przy braku albo starości szkicu (22 września 2026) ─────
+  /* ── „Ułóż" tylko przy braku albo starości szkicu ────────────────────────
      Takt układa szkic sam; przycisk przy świeżej karcie kazałby zapłacić
      drugi raz za to samo. */
   it("świeża karta chowa „Ułóż”, stara i odrzucona przywraca go jako „ponownie”", () => {
@@ -208,17 +207,10 @@ describe("Szkic Copilota w edytorze", () => {
     expect(screen.getByRole("button", { name: "Ułóż ponownie" })).toBeInTheDocument();
   });
 
-  /* Zrzut właściciela z 8.09.2026: długi szkic rozpychał edytor, oś rozmowy
-     zwijała się do jednej linii, a przyciski ginęły pod krawędzią kolumny.
-     Z tamtego wydania zostaje POŁOWA, która naprawdę leczyła przyczynę:
-     przyciski stoją NAD treścią, więc dół nie zabiera niczego do kliknięcia.
-
-     Druga połowa — własny przewijany pojemnik na tekst — zeszła w 0.342.0
-     decyzją właściciela („czytelność szkicu"). Okienko wysokości 224 px
-     kazało czytać pięćset znaków przez szparę, w trzecim zagnieżdżonym pasku
-     przewijania, a oś chroni `max-h-[60vh]` na edytorze — siatka założona
-     dokładnie po to, żeby wewnętrzne nie były potrzebne. */
-  /* Od 0.495.0 karta z treścią zostaje tylko POZA polem — tu nieświeża. */
+  /* Przyciski stoją NAD treścią, więc dół nie zabiera niczego do kliknięcia.
+     Treść nie ma własnego przewijanego pojemnika — decyzja właściciela
+     („czytelność szkicu"). */
+  /* Karta z treścią zostaje tylko POZA polem — tu nieświeża. */
   it("przyciski stoją PRZED treścią, a treść PŁYNIE bez własnego przewijania", () => {
     edytor(copilot({ szkic: szkic({ tresc: "linia\n".repeat(60) }), nieswiezy: true }));
     const wstaw = screen.getByRole("button", { name: "Wstaw do odpowiedzi" });
@@ -275,7 +267,7 @@ describe("Szkic Copilota w edytorze", () => {
   it("licznik znaków siedzi w nagłówku, a nie w osobnym wierszu pod kartą", () => {
     edytor(copilot({ szkic: szkic({ tresc: "abcde" }) }));
     expect(screen.queryByText(/każde twierdzenie ma podpisane źródło/)).toBeNull();
-    /* Od 0.517.0 liczba stoi widoczna w podpisie zwiniętej treści, a cała
+    /* Liczba stoi widoczna w podpisie zwiniętej treści, a cała
        metryka — model, czas, kto — w dymku nazwy szkicu. */
     expect(screen.getByText(/Treść szkicu · 5 znaków/)).toBeVisible();
     expect(screen.getByText(/Szkic Copilota/).closest("[title]"))

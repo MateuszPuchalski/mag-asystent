@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import { useState } from "react";
 import {
   Ban, Bandage, Check, CircleDashed, CircleHelp, HeartHandshake, MapPinOff, MessageCircle,
   PackageMinus, PackageOpen, PackageSearch, Puzzle, ReceiptText, ShieldAlert, Shuffle, Sparkles,
@@ -38,11 +38,11 @@ import { odmien } from "../ui";
  * co przebieg na koszt firmy) — ponowienie jest decyzją człowieka, więc stoi
  * pod przyciskiem nad kolejką.
  *
- * ── PRZY WŁĄCZONYM TAKCIE ZOSTAJE SAMO PONOWIENIE (22 września 2026) ──────
+ * ── PRZY WŁĄCZONYM TAKCIE ZOSTAJE SAMO PONOWIENIE ─────────────────────────
  * Takt rozpoznaje każdą nową wiadomość sam, więc nierozpoznana i nieaktualna
  * to rozmowy, po które on właśnie idzie. Przycisk nad nimi kazałby zapłacić
  * drugi raz za tę samą etykietę. Zostaje FAILED — jedyne, czego takt nie
- * ponowi. Wyłączony takt oddaje przyciskowi całą listę, jak dotąd.
+ * ponowi. Wyłączony takt oddaje przyciskowi całą listę.
  */
 export const doRozpoznania = (rozmowy: Rozmowa[], stan?: StanCopilota): Rozmowa[] =>
   rozmowy.filter((r) => r.kopilot?.status === "FAILED"
@@ -55,7 +55,7 @@ function podsumowanie(w: WynikPartii): string {
      człowiekowi jedyną informację, po której pozna, czy dopłacił za nic. */
   if (w.pominiete.length) czesci.push(`${w.pominiete.length} pominięto`);
   if (w.bledy.length) czesci.push(`${w.bledy.length} bez rozstrzygnięcia`);
-  /* Szkice po rozpoznaniu (23 września 2026) układa serwer w tle — zdanie
+  /* Szkice po rozpoznaniu układa serwer w tle — zdanie
      mówi, że przyjdą, bo inaczej agent kliknąłby „Ułóż odpowiedź" i zapłacił
      drugi raz za to samo. */
   if (w.szkicow) czesci.push(`układam ${w.szkicow} ${odmien(w.szkicow, "szkic", "szkice", "szkiców")} do zatwierdzenia`);
@@ -83,17 +83,12 @@ export function PasekCopilota({ stan, kandydaci, trwa = false, wynik = null, bla
 }) {
   const [pyta, setPyta] = useState(false);
 
-  /* ── PASMO POJAWIA SIĘ, GDY MA CO POWIEDZIEĆ (0.251.0) ────────────────────
-     Do 0.249.1 pasek stał ZAWSZE. Wyłączony Copilot zajmował pełne pasmo
-     zdaniem o pliku konfiguracyjnym — przy każdym otwarciu skrzynki, na
-     zawsze, bo to fakt wdrożenia, nie treść kolejki. Rozpoznany kubełek
-     zajmował drugie tyle martwym przyciskiem „Wszystkie rozmowy w tym
-     kubełku są rozpoznane", czyli pasmem na donos o BRAKU roboty.
-
-     Dwa pasma na dwa niezdarzenia, w kolumnie, która istnieje po to, żeby
+  /* ── PASMO POJAWIA SIĘ, GDY MA CO POWIEDZIEĆ ──────────────────────────────
+     Wyłączony Copilot to fakt wdrożenia, a rozpoznany kubełek to BRAK roboty.
+     Pasmo na niezdarzenie nie ma miejsca w kolumnie, która istnieje po to, żeby
      pokazywać PYTANIA (dekalog ergonomii, punkt 2: pierwszeństwo ma to, co
      rozstrzyga bieżącą czynność). Fakt nie ginie — niesie go `ZnakCopilota`
-     w nagłówku kolejki, w tym samym miejscu co zawsze i za darmo. */
+     w nagłówku kolejki, za darmo. */
   if (!stan || !stan.wlaczony) return null;
 
   const partia = kandydaci.slice(0, stan.maxPartia).map((r) => r.id);
@@ -136,9 +131,8 @@ export function PasekCopilota({ stan, kandydaci, trwa = false, wynik = null, bla
     {nadmiar > 0 && <span className="text-slate-500">
       pozostanie {nadmiar} — limit partii to {stan.maxPartia}</span>}
     {/* PRZERWANA PARTIA POKAZUJE OBIE POŁOWY, i to jest cała racja zwracania
-        200 zamiast błędu. Do 0.191.0 zdanie o przerwie WYPIERAŁO podsumowanie,
-        więc po limicie w połowie czternastu agent nie wiedział, że osiem jest
-        już rozpoznanych — a to za nie zapłaciliśmy. Człowiek, który nie wie,
+        200 zamiast błędu. Po limicie w połowie czternastu agent ma wiedzieć,
+        że osiem jest już rozpoznanych — a za nie zapłaciliśmy. Człowiek, który nie wie,
         co się udało, klika jeszcze raz i płaci drugi raz. */}
     {wynik?.przerwane && <span className="font-semibold text-amber-800">{wynik.przerwane}</span>}
     {wynik && <span className="text-slate-600">{podsumowanie(wynik)}</span>}
@@ -147,16 +141,16 @@ export function PasekCopilota({ stan, kandydaci, trwa = false, wynik = null, bla
 }
 
 /**
- * Znak Copilota w NAGŁÓWKU kolejki (0.251.0).
+ * Znak Copilota w NAGŁÓWKU kolejki.
  *
- * Przejmuje to, co do 0.249.1 zajmowało całe pasmo nad listą: powód, dla
+ * Niesie powód, dla
  * którego Copilot nie działa, oraz wiadomość, że w kubełku nie ma już czego
  * rozpoznawać. Obie rzeczy są STANAMI SPOCZYNKU — mówią, że nic się nie
  * dzieje — a stan spoczynku nie ma prawa zajmować pasma w kolumnie, która
  * pokazuje pytania klientów.
  *
  * Nie jest przyciskiem, bo nie ma czego wywołać. Klikalny znak, który nic nie
- * robi, uczy nie klikać — tę naukę plik nosi od 0.191.1 i ona zostaje.
+ * robi, uczy nie klikać.
  *
  * Milczy, gdy JEST co rozpoznawać: wtedy mówi pasmo, i to głośniej, bo tam
  * stoi liczba i przycisk.
@@ -217,7 +211,7 @@ export function PlakietkaKategorii({ kopilot }: { kopilot: Kopilot }) {
 /**
  * Nazwa na plakietce i w dymku znaku kategorii.
  *
- * NIEUDANE ROZPOZNANIE NIE UDAJE KATEGORII (23 września 2026). Decyzja
+ * NIEUDANE ROZPOZNANIE NIE UDAJE KATEGORII. Decyzja
  * zastępcza przy awarii dostawcy zapisuje `OTHER`, bo kolumna kategorii nie
  * zna pustki. Na wierszu czytało się to jako „model uznał, że to inne" —
  * pierwsza noc z błędnym identyfikatorem modelu oznaczyła tak trzynaście
@@ -228,14 +222,12 @@ export function nazwaNaPlakietce(k: Kopilot): string {
   return NAZWA_KATEGORII[k.kategoria] ?? k.kategoria;
 }
 
-/* ── ZNAK KATEGORII (23 września 2026) ────────────────────────────────────────
-   Zgłoszenie właściciela ze zrzutem skrzynki: „za dużo tekstu". Wiersz kolejki
-   niósł kategorię SŁOWEM w trzecim rzędzie, pod treścią i podpisem. Znak
-   z ikoną stoi teraz na początku wiersza, gdzie wzrok wchodzi pierwszy
-   (od 0.548.0 bez kafla — powód przy `ZnakKategorii`).
+/* ── ZNAK KATEGORII ──────────────────────────────────────────────────────────
+   Zgłoszenie właściciela ze zrzutem skrzynki: „za dużo tekstu". Znak z ikoną
+   stoi na początku wiersza, gdzie wzrok wchodzi pierwszy.
 
-   Fiolet zostaje barwą KAŻDEGO znaku, bo kategoria dalej jest przypuszczeniem
-   maszyny (0.261.0) — kształt ikony niesie rodzaj, barwa niesie pewność. Nazwę
+   Fiolet jest barwą KAŻDEGO znaku, bo kategoria jest przypuszczeniem
+   maszyny — kształt ikony niesie rodzaj, barwa niesie pewność. Nazwę
    niesie `title` i tekst dla czytnika, a pełną listę słownik pod „?".
 
    Rzadkie kategorie dostają słowo obok znaku na wierszu. Ikonę, którą agent
@@ -273,12 +265,11 @@ export const CZESTE: ReadonlySet<Kategoria> = new Set<Kategoria>([
  * rozpoznanie i brak rozpoznania mają szary przerywany okrąg — „nie wiem"
  * wygląda inaczej niż każda odpowiedź.
  *
- * ── BEZ KAFLA (0.548.0, wariant C skrzynki) ─────────────────────────────
- * Decyzja właściciela z 28 września 2026. Kafel 36 × 36 px stał w wierszu
- * jak awatar i zabierał kolumnie szerokość, którą wariant C oddaje dwóm
- * liniom pytania. Znak zostaje, bo niesie te same trzy fakty: rodzaj
- * (kształt), pewność (fiolet przypuszczenia albo szarość „nie wiem")
- * i prośbę o człowieka (kropka). Schodzi tylko obrys i tło.
+ * ── BEZ KAFLA ────────────────────────────────────────────────────────────
+ * Decyzja właściciela. Kafel jak awatar zabierałby szerokość, którą wiersz
+ * oddaje dwóm liniom pytania. Znak niesie trzy fakty: rodzaj (kształt),
+ * pewność (fiolet przypuszczenia albo szarość „nie wiem") i prośbę
+ * o człowieka (kropka).
  */
 export function ZnakKategorii({ kopilot, podziekowal = false }: {
   kopilot: Kopilot | null;
@@ -303,9 +294,8 @@ export function ZnakKategorii({ kopilot, podziekowal = false }: {
 /**
  * Etykieta człowieka przy otwartej rozmowie: potwierdź albo popraw.
  *
- * Zastępuje dwa kciuki z 0.191.0. „Nietrafna" mówiła, że model się pomylił,
- * ale nie JAK powinno być — więc czułości żadnej kategorii nie dało się z tych
- * ocen policzyć. Poprawka jest jednym wyborem z listy, potwierdzenie jednym
+ * Sama ocena „nietrafna" nie mówi, JAK powinno być, więc czułości kategorii
+ * nie dałoby się policzyć. Poprawka jest jednym wyborem z listy, potwierdzenie jednym
  * kliknięciem; obie drogi to ta sama trasa.
  *
  * Wybór zostaje PO etykiecie: pomyłkę w kliknięciu naprawia się tym samym

@@ -162,15 +162,11 @@ let reczneNastepne: {
 /**
  * Odświeżenie read-modelu, którego awaria NIE kładzie serwera.
  *
- * Do 0.149.0 import przy starcie był twardym błędem: `main()` czekał na
- * `importFromMssql()` przed `app.listen()`, a wyjątek kończył proces. Decyzja
- * była świadoma („twardy błąd, gdy baza nieosiągalna") i okazała się kosztowna:
- * 1 września 2026 jeden zerwany klucz obcy w imporcie położył CAŁE API
- * w pętli restartów NSSM — razem z kolektorami, które o Subiekta nie pytają,
- * i z panelem biura, który czyta własne tabele. To ta sama awaria co 0.53.1,
- * tylko z inną przyczyną pod spodem.
+ * Twardy błąd importu przed `app.listen()` kładzie CAŁE API w pętli restartów
+ * NSSM — razem z kolektorami, które o Subiekta nie pytają, i z panelem biura,
+ * który czyta własne tabele.
  *
- * Nowa reguła: read-model ma prawo być nieświeży, API nie ma prawa nie wstać.
+ * Reguła: read-model ma prawo być nieświeży, API nie ma prawa nie wstać.
  * Stan sprzed ostatniego udanego importu zostaje w SQLite (transakcja się
  * wycofuje), więc kolektor pracuje na danych sprzed awarii zamiast na niczym,
  * a `/api/health` mówi zdaniem, że tak jest.
@@ -179,7 +175,7 @@ export function odswiezReadModel(
   etap: EtapOdswiezenia,
   /* Import wstrzykiwany, żeby dało się sprawdzić NIEBLOKUJĄCOŚĆ bez serwera
      MSSQL. Bez tego jedyną drogą do tego zachowania byłoby wywrócenie
-     produkcji — a właśnie tak się o nim dowiedzieliśmy. */
+     produkcji. */
   imp: () => Promise<ImportStats> = importFromMssql,
 ): Promise<WynikOdswiezenia> {
   if (!odswiezanieWToku) return uruchom(etap, imp);
@@ -233,8 +229,7 @@ async function odswiezRaz(
     const stats = await imp();
     bladImportuStartowego = null;
     /* KOREKTA WCHODZI Z SUBIEKTA, więc wiąże się ZARAZ PO imporcie (audyt
-       zwrotów, 15 września 2026). Do tego wydania czekała na takt Allegro, a
-       operator przepisywał numer ręką. Po udanym imporcie, nie w `finally`:
+       zwrotów). Po udanym imporcie, nie w `finally`:
        nieudany zostawia stare dokumenty i nie ma czego wiązać. Każdy krok ma
        własny parasol w `wiazania.ts`, więc wiązanie nie udaje awarii importu. */
     powiazPoImporcieSubiekta(db());
@@ -259,7 +254,7 @@ export async function buildApp(opcje: {
     // zdjęcia dowodowe lecą jako base64 w JSON (~300 KB → ~400 KB po kodowaniu)
     bodyLimit: 6 * 1024 * 1024,
   });
-  /* PUSTY JSON TO BRAK CIAŁA (0.544.0). Domyślny parser Fastify odrzuca
+  /* PUSTY JSON TO BRAK CIAŁA. Domyślny parser Fastify odrzuca
      żądanie z `content-type: application/json` i pustą treścią błędem
      FST_ERR_CTP_EMPTY_JSON_BODY, a ekran pokazuje wtedy gołe „Bad Request".
      Do tego wydania pilnował tego każdy front z osobna i dwa razy któryś
@@ -312,16 +307,9 @@ export async function buildApp(opcje: {
        dlaczego jest pusta — czyli dokładnie tę ciszę, którą ta trasa ma łamać. */
     const allegro = bez("połączenie Allegro", stanPolaczenia);
     const allegroInbox = bez("synchronizacja Allegro", () => stanSynchronizacjiHealth(db()));
-    /* ── STAN SYNCHRONIZACJI SPRAW POSPRZEDAŻOWYCH (0.409.0) ─────────────────
-       Zgłoszenie właściciela: „reklamacje w aplikacji mają nieaktualny stan".
-
-       `stanReklamacjiHealth` istniał od 0.222.0 i ta trasa go NIE WOŁAŁA —
-       przez trzy kwartały `/api/health` mówił o skrzynce i milczał o sprawach
-       posprzedażowych. Właściciel przysłał wynik tej trasy, żeby pokazać
-       problem z reklamacjami, a odpowiedzi na to pytanie w nim nie było.
-
-       Sam blok panel czyta od dawna (pasek tła na kolejce reklamacji), ale to
-       jest ekran pracy, a nie miejsce, do którego się zagląda, gdy coś jest
+    /* ── STAN SYNCHRONIZACJI SPRAW POSPRZEDAŻOWYCH ─────────────────
+       Panel czyta ten blok na pasku tła kolejki reklamacji, ale to jest
+       ekran pracy, a nie miejsce, do którego się zagląda, gdy coś jest
        nie tak. Zdrowie ma odpowiadać na pytanie „co się dzieje" bez logowania
        się do panelu. */
     const allegroReklamacje = bez("synchronizacja spraw", () => stanReklamacjiHealth(db()));
@@ -338,22 +326,19 @@ export async function buildApp(opcje: {
          wszystko, co niżej. Aplikacja czyta wtedy inną bazę, niż mówi plik,
          więc każdy kolejny objaw jest skutkiem, nie przyczyną. */
       bez("konfiguracja", () => problemPrzykrytejKonfiguracji(envFile, config.sgtMode)),
-      /* Literówka w nazwie klucza (0.488.0). Nieczytany klucz dawał cichą
+      /* Literówka w nazwie klucza. Nieczytany klucz dawał cichą
          wartość domyślną, a objaw — funkcja „nie działa" — nie prowadził do
          pliku. Rejestr zna wszystko, co czytają trzy programy. */
       bez("klucze konfiguracji", () =>
         problemNieznanychKluczy([...envFile.applied, ...envFile.overridden], envFile.path)),
-      /* ── OGON SPRAW, KTÓREGO PRZEBIEG NIE WZIĄŁ (0.409.0) ─────────────────
+      /* ── OGON SPRAW, KTÓREGO PRZEBIEG NIE WZIĄŁ ─────────────────
          Bezpiecznik stron czyta najwyżej tysiąc spraw na przebieg. Konto
          z dłuższym archiwum zostawia resztę po tamtej stronie — i to są
          sprawy, których STATUS u nas się nie odświeża, choć w Allegro dawno
-         się zmienił. Dokładnie to zgłosił właściciel: „reklamacje mają
-         nieaktualny stan".
+         się zmienił.
 
-         Liczba stała w bazie od 0.222.0 i widział ją wyłącznie pasek nad
-         kolejką reklamacji. Tutaj wchodzi jako ZDANIE, bo `problemy` są tym,
-         co człowiek czyta, gdy coś nie działa — i to stąd wziął odpowiedź
-         o cenach dwie godziny wcześniej. */
+         Tutaj wchodzi jako ZDANIE, bo `problemy` są tym, co człowiek czyta,
+         gdy coś nie działa. */
       bez("ogon spraw posprzedażowych", () => {
         const p = allegroReklamacje?.pozostaloDoPobrania ?? null;
         return p && p > 0
@@ -368,15 +353,13 @@ export async function buildApp(opcje: {
       brakKolumnyZrealizowano,
       /* Sprzedaż bez kolumny numeru obcego wiąże dokument tylko ręką: zwrot
          dopasuje się po pozycjach, ale wskazać musi człowiek. Na ekranie
-         wygląda to jak „numer paragonu się nie pokazuje". Te dwa zdania
-         osierociały w 0.140.0 razem z read-modelem i wracają tu z nim
-         w 0.174.0. */
+         wygląda to jak „numer paragonu się nie pokazuje". */
       brakKolumnyNrOryg,
       /* Uwagi dokumentu niedostępne — a to w nich Sellasist wpisuje numer
-         zamówienia (0.175.0). Bez nich automat nie zwiąże ani jednego zwrotu,
+         zamówienia. Bez nich automat nie zwiąże ani jednego zwrotu,
          choć wszystko inne działa; ktoś ma się o tym dowiedzieć. */
       brakKolumnyUwag,
-      /* Kolumna dokumentu korygowanego niedostępna (0.201.0) — numery korekt
+      /* Kolumna dokumentu korygowanego niedostępna — numery korekt
          przepisuje wtedy człowiek, jak przed tym wydaniem. Bez tego zdania
          brak automatu wyglądałby na zepsuty automat. */
       brakKolumnyKorekty,
@@ -384,10 +367,9 @@ export async function buildApp(opcje: {
          dokument z ostatniej udanej synchronizacji, ktoś ma o tym wiedzieć. */
       bladImportuFaktur,
       /* Przyjęcia na regał zwrotów. Odczyt padł w całości — zakładka ZWROTY
-         pracuje na danych sprzed awarii. Do 0.76.1 tego zdania na liście
-         brakowało, więc awaria nie miała jak wypłynąć. */
+         pracuje na danych sprzed awarii. */
       bladImportuMm,
-      /* Cennik kartotek (0.405.0). Objaw braku uprawnienia jest NIEMY: karta
+      /* Cennik kartotek. Objaw braku uprawnienia jest NIEMY: karta
          towaru bez cen wygląda dokładnie tak, jak wyglądała przed tym
          wydaniem. Bez tego zdania nikt nie skojarzyłby, że brakuje
          `GRANT SELECT ON dbo.tw_Cena`, a nie danych w Subiekcie. */
@@ -416,18 +398,18 @@ export async function buildApp(opcje: {
       /* Read-model Subiekta bywa nieświeży i to jest stan do zameldowania,
          a nie powód, żeby nie wstać — patrz `odswiezReadModel`. */
       bladImportuStartowego,
-      /* PANEL ZOSTAŁ NA STARYM BUILDZIE (audyt, 15 września 2026). Najcichsza
+      /* PANEL ZOSTAŁ NA STARYM BUILDZIE (audyt). Najcichsza
          pomyłka wdrożenia, jaką zna to repo: `npm run build` w `server/` nie
          przebudowuje panelu, więc API melduje nową wersję, a ekran obsługi
          zostaje na starej. Wygląda to na wydanie, które „nie działa".
          Recepta w `DEPLOY.md` istniała przez siedemnaście wydań panelu i nie
          została uruchomiona ani razu — więc pyta o to teraz sama trasa. */
       bez("panel obsługi", () => problemPaneluObslugi(WERSJA)),
-      /* Kopie i rekoncyliacja robi serwer sam (0.487.0). Zdanie pada, gdy
+      /* Kopie i rekoncyliacja robi serwer sam. Zdanie pada, gdy
          nocna kopia zaległa dwie doby, padła, albo noc znalazła rozjazdy.
          To jest cały alarm: panel czyta te zdania na ekranie stanu. */
       ...(bez("kopie bazy", () => problemyKopii(kopie ?? {}, config.sgtMode)) ?? []),
-      /* Nieudana aktualizacja z panelu (0.492.0). Po wycofaniu serwer stoi na
+      /* Nieudana aktualizacja z panelu. Po wycofaniu serwer stoi na
          starej wersji i wygląda zdrowo — bez tego zdania nikt by nie wiedział. */
       bez("aktualizacja", () => problemAktualizacji(stanZadania())),
       ...awarie,
@@ -441,10 +423,10 @@ export async function buildApp(opcje: {
       wersja: WERSJA,
       /* Wersja ZBUDOWANEGO panelu obsługi, obok wersji serwera i z tego samego
          powodu co ona: rozjazd jest pytaniem numer jeden po aktualizacji.
-         `null` znaczy „panelu tu nie ma albo jest sprzed 0.355.0" — to nie
+         `null` znaczy „panelu tu nie ma albo jest za stary" — to nie
          jest to samo co rozjazd i nie robi wdrożenia czerwonym. */
       panelObslugi: wersjaPaneluObslugi(),
-      /* Etykieta instancji (0.69.0). Trasa jest bez sesji i tak ma być:
+      /* Etykieta instancji. Trasa jest bez sesji i tak ma być:
          etykieta nie jest daną biura, a ostrzeżenie „to jest dev" musi być
          widoczne PRZED zalogowaniem — właśnie wtedy człowiek myli serwery. */
       srodowisko: config.srodowisko,
@@ -460,7 +442,7 @@ export async function buildApp(opcje: {
         mode: worker.sgtMode,
         widziany: worker.widziany,
       },
-      /* Stan konta Allegro dla ikony w pasku (0.114.0) — panel ma go widzieć
+      /* Stan konta Allegro dla ikony w pasku — panel ma go widzieć
          z każdej zakładki, a nie dopiero po odczycie listy zwrotów. Trasa jest
          publiczna i to jest w porządku: payload to stan/środowisko/data
          wygaśnięcia — bez loginu konta i bez tokenów. */
@@ -510,7 +492,7 @@ export async function buildApp(opcje: {
     };
   });
 
-  /* Bramka operacji ratunkowych (0.431.0). Do tej wersji obie trasy niżej
+  /* Bramka operacji ratunkowych. Do tej wersji obie trasy niżej
      stały za samą sesją, więc pełny import z Subiekta mógł wywołać każdy
      zalogowany — także kolektor. `autoryzuj` zostawia w dzienniku ślad
      `privileged`, bo resync na produkcji to zdarzenie, o które ktoś zapyta. */
@@ -623,17 +605,15 @@ async function main() {
        tylko przesunięty. `uruchomTakt` daje rozrzut i losowy start, a bazowy
        odstęp zwrotów jest pięć razy dłuższy od skrzynki: zwrot ma termin
        w dniach, pytanie klienta czeka na odpowiedź. Równy chór dwóch pętli
-       to ta sygnatura maszyny, która w sierpniu 2026 skończyła się blokadą
-       (patrz nagłówek `services/takt.ts`). */
+       to sygnatura maszyny, która kończy się blokadą (patrz nagłówek
+       `services/takt.ts`). */
     /* Wiązanie po sygnaturze idzie ZARAZ PO synchronizacji, w takcie, nigdy
        przy otwarciu ekranu. Nowy zwrot bywa gotowy do powiązania od razu —
        gdy zamówienie stoi już w bazie.
 
-       `finally`, a nie ciąg dalszy (0.220.0). Wiązanie nie potrzebuje Allegro
-       do niczego: czyta i pisze własną bazę. Gdy stało po `await`, wyjątek
-       z pobierania zabierał je ze sobą przy KAŻDYM przebiegu — a zwroty
-       zapisane wcześniej zostawały, więc kolejka wyglądała zdrowo i tylko
-       kartotek nie było. Co robią te cztery kroki i w jakiej kolejności,
+       `finally`, a nie ciąg dalszy. Wiązanie nie potrzebuje Allegro do
+       niczego: czyta i pisze własną bazę, więc wyjątek z pobierania nie ma
+       prawa zabrać go ze sobą. Co robią te cztery kroki i w jakiej kolejności,
        mówi `services/wiazania.ts`. */
     uruchomTakt("allegro-zwroty", config.allegro.zwrotySyncMs, async () => {
       try {
@@ -643,10 +623,9 @@ async function main() {
       }
     });
     /* Wnioski o rabat idą OSOBNYM taktem, nie doklejone do zwrotów: jedna
-       końcówka nie ma prawa zabrać drugiej ze sobą, gdy odpowie błędem
-       (blizna 0.149.2 — jeden zepsuty wątek zatrzymywał całą synchronizację).
+       końcówka nie ma prawa zabrać drugiej ze sobą, gdy odpowie błędem.
 
-       DWA KROKI W JEDNYM TAKCIE, w tej kolejności (0.320.0): najpierw lustro
+       DWA KROKI W JEDNYM TAKCIE, w tej kolejności: najpierw lustro
        wniosków, potem składanie brakujących. Odwrotnie automat pytałby o stan
        sprzed kwadransa i składał drugi wniosek do pozycji, która pierwszy
        dostała w panelu Allegro. Składanie pod parasolem, bo odmowa jednego
@@ -663,7 +642,7 @@ async function main() {
         console.error("[rabat] automat:", e instanceof Error ? e.message : e);
       }
     });
-    /* Reklamacje (0.222.0) — piąty ticker i piąty rytm. Gęstszy niż zwroty,
+    /* Reklamacje — piąty ticker i piąty rytm. Gęstszy niż zwroty,
        rzadszy niż skrzynka: reklamacja niesie CZAT, więc klient czeka na
        odpowiedź jak w skrzynce, ale `decisionDueDate` liczy się w dniach.
        Osobny takt z tego samego powodu co rabaty — jedna końcówka nie ma
@@ -687,15 +666,14 @@ async function main() {
           powiazZaleglosci(db());
         }
       });
-    /* Czwarty ticker: tytuły ofert do rozmów (0.178.0). Osobno od zamówień,
+    /* Czwarty ticker: tytuły ofert do rozmów. Osobno od zamówień,
        bo dotyczy pytań SPRZED zakupu — tam zamówienia nie ma i nigdy nie
        będzie, a agent i tak potrzebuje wiedzieć, o czym rozmawia. Partia
        mieści się w jednym żądaniu, więc ten takt to jedno wywołanie na cykl. */
     uruchomTakt("allegro-oferty", config.allegro.ofertySyncMs, async () => { await uzupelnijOferty(); });
-    /* Dosyłka (0.536.0): wykrycie numeru przy zamówieniu i śledzenie paczki
+    /* Dosyłka: wykrycie numeru przy zamówieniu i śledzenie paczki
        dla spraw klienta w toku. Osobny takt, nie doklejony do zwrotów —
-       jedna końcówka nie ma prawa zabrać drugiej, gdy odpowie błędem (blizna
-       0.149.2). Rytm i jego powód przy `dosylkiSyncMs` w `config.ts`. Przebieg
+       jedna końcówka nie ma prawa zabrać drugiej, gdy odpowie błędem. Rytm i jego powód przy `dosylkiSyncMs` w `config.ts`. Przebieg
        bez dosyłek w toku nie wysyła ani jednego żądania. */
     uruchomTakt("dosylki", config.allegro.dosylkiSyncMs, async () => {
       const w = await sledzDosylki();
@@ -703,7 +681,7 @@ async function main() {
         console.log(`[dosylki] numerów: ${w.wykryte}, doręczonych: ${w.doreczone}, z kłopotem: ${w.problemy}`);
       }
     });
-    /* TEST NA ŻYWYM ALLEGRO RAZ DZIENNIE (0.495.0). Te same drogi co
+    /* TEST NA ŻYWYM ALLEGRO RAZ DZIENNIE. Te same drogi co
        produkcja, bez atrap; wynik na ekranie Stan i w DO DECYZJI przy
        błędzie. Powód: `services/sonda-rzeczywistosci.ts`. */
     uruchomTakt("sonda-rzeczywistosci", 24 * 60 * 60_000, async () => {
@@ -723,7 +701,7 @@ async function main() {
     });
   }
 
-  /* SZKIC SAM DLA NOWEGO PYTANIA POD OFERTĄ (0.317.0).
+  /* SZKIC SAM DLA NOWEGO PYTANIA POD OFERTĄ.
      Osobny warunek od tickerów Allegro, bo to inna zależność: te potrzebują
      konta Allegro, ten potrzebuje klucza dostawcy modelu. Wyłączony domyślnie
      i włączany JEDNĄ zmienną w `wertis.env` — rzecz, która wydaje pieniądze
@@ -734,7 +712,7 @@ async function main() {
      o długość partii szkiców. */
   if (config.copilot.autoSzkic && config.copilot.mode === "anthropic" && config.copilot.klucz) {
     uruchomTakt("copilot-auto-szkic", config.copilot.autoMs, async () => {
-      /* Okno przed pracą należy do przebiegu poranka (26 września 2026) —
+      /* Okno przed pracą należy do przebiegu poranka —
          powód w `services/copilot-przed-praca.ts`. */
       if (przedPracaTrwa()) return;
       const w = await ulozZalegleSzkice();
@@ -744,7 +722,7 @@ async function main() {
     });
   }
 
-  /* ROZPOZNANIE KAŻDEJ NOWEJ WIADOMOŚCI KLIENTA (22 września 2026). Ten sam
+  /* ROZPOZNANIE KAŻDEJ NOWEJ WIADOMOŚCI KLIENTA. Ten sam
      warunek co szkic z taktu — klucz dostawcy, nie konto Allegro — i ta sama
      zasada: włącza się jedną zmienną w `wertis.env`, bo wydaje pieniądze bez
      kliknięcia. Rytm własny, żeby nie opóźniać pobierania wiadomości.
@@ -757,7 +735,7 @@ async function main() {
       if (przedPracaTrwa()) return;
       const w = await sklasyfikujNowe();
       if (w.przerwane) console.warn(`[copilot-auto-klasyfikacja] przebieg przerwany: ${w.przerwane}`);
-      /* Szkic zaraz po rozpoznaniu (23 września 2026) — w TYM SAMYM takcie,
+      /* Szkic zaraz po rozpoznaniu — w TYM SAMYM takcie,
          więc w `main()`, jak każde wywołanie modelu bez kliknięcia. Powód
          i sufit w `services/copilot-szkic-po-rozpoznaniu.ts`. */
       if (config.copilot.szkicPoRozpoznaniu && w.rozmowy.length > 0) {
@@ -771,7 +749,7 @@ async function main() {
     });
   }
 
-  /* SZKICE PRZED PRACĄ (26 września 2026, decyzja właściciela). Ten sam
+  /* SZKICE PRZED PRACĄ (decyzja właściciela). Ten sam
      warunek co każde wywołanie modelu bez kliknięcia: przełącznik w
      `wertis.env` i klucz dostawcy. Poza oknem takt wychodzi od razu; limit
      poranka liczy się z księgi. Powód i rachunek w serwisie. */
@@ -784,7 +762,7 @@ async function main() {
     });
   }
 
-  /* KOPIA BAZY I REKONCYLIACJA CO NOC (0.487.0) — bez warunku, bo dotyczą
+  /* KOPIA BAZY I REKONCYLIACJA CO NOC — bez warunku, bo dotyczą
      każdej instalacji. Dotąd były wpisami w Harmonogramie zadań, których
      instalator nie zakładał. Powód i okno nocne: `services/przebieg-nocny.ts`. */
   uruchomTakt("noc", TAKT_NOCNY_MS, async () => { przebiegNocny(); });
@@ -803,7 +781,7 @@ async function main() {
   probkaPamieci();
   setInterval(probkaPamieci, 60 * 60_000).unref();
 
-  /* MIGAWKA DOBY I RAPORT TYGODNIA (0.497.0) — bez warunku, jak noc: każda
+  /* MIGAWKA DOBY I RAPORT TYGODNIA — bez warunku, jak noc: każda
      instalacja ma stan, który jutro zniknie, i tydzień do porównania. Poza
      oknem nocnym, bo to odczyt bez `VACUUM` — serwer włączany rano też
      dostaje migawkę. Powód i reguły: `services/raport-tygodnia.ts`. */
@@ -812,16 +790,16 @@ async function main() {
     if (w.raporty.length) console.log(`[raporty] tygodnie: ${w.raporty.join(", ")}`);
   });
 
-  /* Restart po zmianie ustawienia z panelu (0.491.0). Tu, nie w buildApp():
+  /* Restart po zmianie ustawienia z panelu. Tu, nie w buildApp():
      test trasy zapisu nie ma prawa zakończyć procesu testów. Poza usługą NSSM
      nikt serwera nie podniesie, więc tam restart zostaje człowiekowi. */
-  /* AKTUALIZACJA Z PANELU (0.492.0). Zadanie Harmonogramu tylko pod NSSM —
+  /* AKTUALIZACJA Z PANELU. Zadanie Harmonogramu tylko pod NSSM —
      z tego samego powodu co restart niżej. Lista wydań co godzinę, w takcie:
      otwarcie karty w panelu nie wychodzi do sieci. Wynik ostatniej
      aktualizacji trafia do dziennika raz, przy pierwszym starcie po niej. */
   if (podNssm()) ustawUruchamiacz(uruchomSchtasks);
   uruchomTakt("wydania", 60 * 60_000, () => sprawdzWydania());
-  /* Automat (0.494.0) co pięć minut: okno nocne ma dwie godziny, a czekanie
+  /* Automat co pięć minut: okno nocne ma dwie godziny, a czekanie
      na dziesięć minut ciszy przy takcie godzinnym zjadłoby je całe. */
   uruchomTakt("autoaktualizacja", 5 * 60_000, async () => { await taktAuto(); });
   try {

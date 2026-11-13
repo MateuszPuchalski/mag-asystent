@@ -4,12 +4,10 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 
-/* ── Jednostka miary na ścieżce dostawy (0.51.0) ─────────────────────────────
-   Do 0.51.0 kolektor wpisywał „szt" na sztywno w dwunastu miejscach, bo żadne
-   DTO dostawy jednostki nie niosło. W kartotece 18 pozycji na 3415 mierzy się
-   inaczej (`kpl.`, `par`) — dla nich „3 szt" na liście rozkładania znaczyło
-   trzy sztuki tam, gdzie na dokumencie stały trzy KOMPLETY, czyli trzydzieści
-   sześć sztuk towaru.
+/* ── Jednostka miary na ścieżce dostawy ──────────────────────────────────────
+   W kartotece 18 pozycji na 3415 mierzy się inaczej (`kpl.`, `par`). Dla nich
+   „3 szt" na liście rozkładania znaczyłoby trzy sztuki tam, gdzie na
+   dokumencie stoją trzy KOMPLETY, czyli trzydzieści sześć sztuk towaru.
 
    Ten plik pilnuje, że jednostka DOJEŻDŻA wszystkimi czterema drogami, którymi
    ilość trafia na ekran kolektora. Każda ma osobne zapytanie i osobny moment
@@ -120,14 +118,9 @@ test("wyjątek na liście nierozwiązanych podpisuje swoją ilość", () => {
 test("wyjątek bez pozycji dostawy nie wywraca zapytania", () => {
   // złączenia są LEWE: zgłoszenie luzem nie ma pozycji ani kartoteki
   const id = dostawa();
-  /* Nośnikiem jest `extra_item`, bo od 0.57.0 to JEDYNA kategoria o zakresie
-     całej dostawy. Wcześniej stał tu `missing_item` z uzasadnieniem, że „nie
-     ma wiersza dostawy do wskazania" — a to było nieporozumienie: pozycja,
-     która nie przyjechała, ma swój wiersz z dokumentu i ilością odłożoną zero.
-     Bez wskazania jej protokół dla dostawcy nie mówił, CZEGO brakuje.
-
-     Sam cel testu zostaje bez zmian: sprawdzamy, że wyjątek bez pozycji nie
-     wywraca lewych złączeń i że jednostka wraca pusta. */
+  /* Nośnikiem jest `extra_item`, bo to JEDYNA kategoria o zakresie
+     całej dostawy. Sprawdzamy, że wyjątek bez pozycji nie wywraca lewych
+     złączeń i że jednostka wraca pusta. */
   const r = P.raiseProblem(
     { deliveryId: id, typ: "extra_item", qty: 1, symObcy: "K-9999", opis: "doszło luzem" },
     "Jan"

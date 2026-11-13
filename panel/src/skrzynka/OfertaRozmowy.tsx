@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import { useState } from "react";
 import { ChevronRight, Package, Tag } from "lucide-react";
 import type { OfertaRozmowy as Dane, ZgodnoscOferty } from "../api/typy";
 import { zlote } from "../api/zwroty";
@@ -7,25 +7,21 @@ import { NaglowekSekcji, czas } from "../ui";
 import { OdnosnikAllegro } from "./odnosniki";
 
 /**
- * Oferta, pod którą padło pytanie (0.178.0).
+ * Oferta, pod którą padło pytanie.
  *
- * Do 0.177.1 panel pokazywał przy wiadomości SAM NUMER oferty, a mail
- * powiadamiający z Allegro miał w bloku „Wiadomość dotyczy” tytuł, cenę
- * i zdjęcie. Panel miał więc mniej niż powiadomienie, od którego wszystko się
- * zaczyna — i agent szedł po tytuł do panelu Allegro, czyli tam, gdzie §25
- * obiecuje nie zaglądać.
+ * Mail powiadamiający z Allegro ma w bloku „Wiadomość dotyczy” tytuł, cenę
+ * i zdjęcie. Panel nie może mieć mniej, bo agent szedłby po tytuł do panelu
+ * Allegro, czyli tam, gdzie §25 obiecuje nie zaglądać.
  *
  * Blok ma dwa stany i każdy mówi co innego: tytuł z ceną (gdy ticker
  * dociągnął snapshot) albo zdanie, że tytuł dopiero przyjedzie. Milczenie
  * w drugim stanie wyglądałoby jak usterka.
  *
- * ── ZDJĘCIE OFERTY JEST OD 0.213.0 ─────────────────────────────────────────
- * Do 0.210.0 stało tu zdanie „zdjęcia z Allegro nie ma świadomie", bo obrazek
- * z ich serwera znaczyłby wyjście przeglądarki biura poza własną sieć. Zakaz
- * dotyczył HOTLINKA i obowiązuje dalej — `<img src="https://a.allegroimg.com/…">`
+ * ── ZDJĘCIE OFERTY ──────────────────────────────────────────────────────────
+ * Bez HOTLINKA: obrazek z serwera Allegro znaczyłby wyjście przeglądarki
+ * biura poza własną sieć, więc `<img src="https://a.allegroimg.com/…">`
  * w tym pliku nie stanie. Plik ciągnie SERWER i podaje go z naszej trasy
- * `/api/obsluga/oferta/:externalId/zdjecie`, dokładnie tak, jak od 0.30.0
- * podaje zdjęcia kartotek.
+ * `/api/obsluga/oferta/:externalId/zdjecie`, tak jak zdjęcia kartotek.
  *
  * DWA ZDJĘCIA W JEDNEJ ZAKŁADCE I OBA SĄ POTRZEBNE. Tutaj stoi to, co klient
  * WIDZIAŁ, kupując; w bloku towaru niżej — to, co mamy na półce. Zbieżność
@@ -63,10 +59,10 @@ export function OfertaRozmowy({ oferta, zTytulem = true, cenaZakupuGrosze = null
       {/* Status oferty („aktywna", „zakończona") mówi streszczenie wiersza,
           słowem po polsku. Surowy kod z Allegro obok numeru był drugim
           zapisem tego samego faktu. */}
-      {/* Skąd numer (0.215.0). Numer z wiadomości klienta jest faktem z Allegro
+      {/* Skąd numer. Numer z wiadomości klienta jest faktem z Allegro
           i nie potrzebuje podpisu; dwa pozostałe to wnioski — agenta albo
           serwera z jedynej pozycji zamówienia — i §4.3 każe je podpisać. */}
-      {/* Plakietka PODPISUJE wniosek, nie ogłasza go (0.249.0). W bursztynie
+      {/* Plakietka PODPISUJE wniosek, nie ogłasza go. W bursztynie
           i półgrubej ważyła więcej niż numer oferty obok, choć mówi tylko,
           skąd ten numer wiemy. Bursztyn zostaje przy wskazaniu człowieka —
           tam jest decyzją; wywód serwera z jedynej pozycji jest rutyną. */}
@@ -127,11 +123,10 @@ export function OfertaRozmowy({ oferta, zTytulem = true, cenaZakupuGrosze = null
 }
 
 /**
- * Lista „Pasuje do" z oferty (23 września 2026).
+ * Lista „Pasuje do" z oferty.
  *
  * Decyzja właściciela po zrzucie sekcji „Pasuje do kosiarek" z Allegro.
- * Listę mieliśmy od 0.253.0 i czytał ją wyłącznie model; agent szedł po nią
- * do Allegro. Tamto wyjście zabrania §25.
+ * Bez niej agent szedłby po listę do Allegro, a tamto wyjście zabrania §25.
  *
  * ZWINIĘTA, BO BYWA NA DWIEŚCIE POZYCJI. Na wierzchu stoi sama liczba
  * pozycji, a lista otwiera się kliknięciem.

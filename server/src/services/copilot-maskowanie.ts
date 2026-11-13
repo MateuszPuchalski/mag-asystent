@@ -21,8 +21,8 @@
    GDZIE KOŃCZY SIĘ GWARANCJA. „Kowalskiego 5, Wrocław" bez markera `ul.`
    i bez kodu pocztowego przejdzie. Rozpoznawanie adresów w wolnym tekście
    wyrażeniami regularnymi nie jest zadaniem rozwiązywalnym — wycinamy markery
-   pewne i zapisujemy granicę. Brak takiego zdania kosztował 0.151.0, gdzie
-   dokumentacja mówiła „nie pobieramy", a pobieraliśmy.                       */
+   pewne i zapisujemy granicę, żeby dokumentacja nie obiecywała więcej,
+   niż kod robi.                                                              */
 
 /**
  * Tekst, który wolno wysłać dostawcy.
@@ -72,10 +72,9 @@ const WZORCE: Array<{ nazwa: string; re: RegExp; znacznik: string }> = [
      i myślnikami. Granice po obu stronach, żeby nie wyjadać środka
      dłuższego ciągu — ten i tak zniknął wyżej jako konto.
 
-     ZAWĘŻENIE PO KONTEKŚCIE (decyzja właściciela z 8.09.2026, przyrost
-     ekstrakcji). Numer OEM Husqvarny „532 19 93-77" ma dokładnie kształt
-     telefonu i do tego wydania znikał jako `[telefon]` — klasyfikacji
-     wystarczał ślad, ale rozpoznanie danych doboru ma ten numer ODDAĆ.
+     ZAWĘŻENIE PO KONTEKŚCIE (decyzja właściciela). Numer OEM Husqvarny
+     „532 19 93-77" ma dokładnie kształt telefonu, a rozpoznanie danych
+     doboru ma ten numer ODDAĆ.
      Dziewięć cyfr tuż po słowie OEM / nr / numer / symbol / kod nie jest
      telefonem. Cena zapisana świadomie: „nr 532199377" podany jako telefon
      bez słowa „tel" przejdzie do dostawcy; „nr tel. 532…" znika dalej, bo
@@ -216,7 +215,7 @@ export function zamaskujOdwracalnie(tresc: string, login: string | null): MaskaO
 export interface WiadomoscWatku { odKlienta: boolean; tresc: string; odAllegro?: boolean }
 
 /**
- * Sufit wątku wysyłanego dostawcy (polityka danych skrzynki, 0.231.0).
+ * Sufit wątku wysyłanego dostawcy (polityka danych skrzynki).
  * Liczony od NAJNOWSZEJ wiadomości: to ona niesie pytanie, na które szkic ma
  * odpowiedzieć, a dwunasta wstecz bywa już inną sprawą tego samego klienta.
  */
@@ -225,8 +224,7 @@ export const SUFIT_WATKU = { wiadomosci: 12, znakow: 6000 } as const;
 export const ZNACZNIK_POMINIETYCH = "[wcześniejsze wiadomości pominięte]";
 
 /**
- * Cały wątek jako jeden bezpieczny tekst — decyzja właściciela z 7 września
- * 2026 dla szkicu odpowiedzi (klasyfikacja dalej bierze jedną wiadomość).
+ * Cały wątek jako jeden bezpieczny tekst — dla szkicu odpowiedzi.
  *
  * Nasze wychodzące też przechodzą przez maskowanie: agent bywa cytuje klienta
  * („proszę o adres — Polna 7, tak?"), a `zamaskuj()` nie wie, kto napisał
@@ -238,8 +236,8 @@ export function zamaskujWatek(wiadomosci: WiadomoscWatku[], login: string | null
 }
 
 /**
- * To samo co `zamaskujWatek`, plus ŚLAD tego, co weszło (klasyfikacja, 22
- * września 2026). Specyfikacja każe zapisać przy decyzji, na czym ją liczono
+ * To samo co `zamaskujWatek`, plus ŚLAD tego, co weszło (klasyfikacja).
+ * Specyfikacja każe zapisać przy decyzji, na czym ją liczono
  * i czy kontekst był ucięty — liczone z tekstu po fakcie myliłoby się przy
  * wiadomościach wielowierszowych, więc liczy to pętla, która tnie.
  *
@@ -267,7 +265,7 @@ export function zamaskujWatekZeSladem(
 }
 
 /**
- * Blok z nagłówkiem jako jeden bezpieczny tekst (0.282.0).
+ * Blok z nagłówkiem jako jeden bezpieczny tekst.
  *
  * Fakty ze sprawy idą tą samą drogą co wątek i to nie jest formalność: tytuł
  * aukcji bywa wklejony z nazwiskiem, a opis zgłoszenia z adresem, pod który

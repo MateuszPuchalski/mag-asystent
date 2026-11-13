@@ -7,16 +7,16 @@ describe("BrakOferty", () => {
   it("mówi o braku wprost, zamiast go ukrywać", () => {
     render(<BrakOferty zapisuje={false} blad="" onWskaz={() => {}} onDopytaj={() => {}} />);
     expect(screen.getByText("Brak powiązania z ofertą")).toBeInTheDocument();
-    /* Zdanie mówi o KLIENCIE, nie o ekranie (0.506.0) — agent ma wiedzieć,
-       czego brakuje, a nie jak ekran został zaprojektowany. Od 0.548.0
-       stoi w dymku: tytuł i dwie czynności mówią już to samo. */
+    /* Zdanie mówi o KLIENCIE, nie o ekranie — agent ma wiedzieć,
+       czego brakuje, a nie jak ekran został zaprojektowany. Stoi w dymku:
+       tytuł i dwie czynności mówią to samo. */
     expect(screen.getByTitle("Nie wiadomo, o który towar pyta klient.")).toBeInTheDocument();
     expect(screen.queryByText(/Nie wiadomo, o który towar/)).toBeNull();
     expect(screen.queryByText(/Ekran mówi/)).toBeNull();
   });
 
-  /* ── Jedna linijka (0.548.0, wariant C) ─────────────────────────────────
-     Decyzja właściciela z 28 września 2026: brak i obie czynności w JEDNYM
+  /* ── Jedna linijka ───────────────────────────────────────────────────────
+     Decyzja właściciela: brak i obie czynności w JEDNYM
      rzędzie, który zawija się tylko przy braku miejsca. jsdom nie mierzy
      pikseli, więc pilnujemy struktury: tytuł i przyciski mają wspólny rząd,
      a rząd zawija się, zamiast wymuszać drugą linię. */

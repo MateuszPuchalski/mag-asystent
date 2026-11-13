@@ -10,9 +10,8 @@ import type { WyslijDoAllegro } from "./allegro-wysylka.js";
 import { zapiszPropozycje } from "./przeplyw-kategorii.js";
 
 /* Wysyłka jest jedyną drogą, którą treść wychodzi z WERTIS na zewnątrz.
-   Ten plik pilnuje ośmiu warunków z §8.5 oraz dwóch blizn naraz: 0.110.0
-   (kontrola świeżości — 409 i jawne „wyślij mimo to", nigdy ciche
-   nadpisanie) i 0.128.0 (idempotencja; drugi strzał nie robi duplikatu). */
+   Ten plik pilnuje ośmiu warunków z §8.5, kontroli świeżości (409 i jawne
+   „wyślij mimo to") i idempotencji (drugi strzał nie robi duplikatu). */
 
 const schema = fs.readFileSync(new URL("../db/schema.sql", import.meta.url), "utf8");
 
@@ -163,7 +162,7 @@ test("dopisek klienta zatrzymuje wysyłkę, a szkic zostaje nietknięty", async 
   assert.equal(szkic.body, "Pasuje, rozstaw 148 mm.", "409 nie ma prawa skasować szkicu");
 });
 
-/* ── Ostatnia wiadomość klienta PO CZASIE (23 września 2026) ─────────────────
+/* ── Ostatnia wiadomość klienta PO CZASIE ────────────────────────────────────
    Zgłoszenie właściciela ze zrzutem: dialog „klient dopisał wiadomość" padał
    często, choć wszystko stało na ekranie. Synchronizacja wpisywała paczkę od
    najnowszej, więc STARSZY dopisek dostawał wyższe `id`, a kontrola brała
@@ -304,7 +303,7 @@ test("każdy koniec wysyłki zostawia ślad w dzienniku, bez treści", async () 
   assert.ok(!payloady.includes(tajne), "treść odpowiedzi przeciekła do dziennika");
 });
 
-/* ── Uchwyt rozmowy i przydział przez odpowiedź (0.158.0) ────────────────────
+/* ── Uchwyt rozmowy i przydział przez odpowiedź ──────────────────────────────
    Decyzja właściciela: wejście w pytanie trzyma je na czas siedzenia,
    odpowiedź przydziela na stałe. Uchwyt żyje w PAMIĘCI, więc każdy test
    zaczyna od czystego stanu — inaczej niósłby się między nimi. */
@@ -387,10 +386,9 @@ test("własny uchwyt nie blokuje własnej odpowiedzi", async () => {
   assert.equal(w.status, "sent");
 });
 
-/* ── Wątek przeczytany po wysyłce (0.195.0) ──────────────────────────────────
-   Do 0.194.1 odpowiedź z panelu zostawiała wątek NIEPRZECZYTANY w Centrum
-   Wiadomości Allegro. Im lepiej działał panel, tym bardziej kłamał licznik po
-   tamtej stronie: czerwona plakietka przy sprawach dawno załatwionych.      */
+/* ── Wątek przeczytany po wysyłce ────────────────────────────────────────────
+   Bez tego licznik w Centrum Wiadomości Allegro świeci przy sprawach
+   załatwionych w panelu.                                                   */
 
 test("udana wysyłka oznacza wątek jako przeczytany — numerem z Allegro", async () => {
   const { d, ala, rozmowa, pytanie } = stanowisko();
@@ -440,7 +438,7 @@ test("nieudana wysyłka nie oznacza niczego jako przeczytane", async () => {
   assert.equal(oznaczen, 0);
 });
 
-/* ── Załączniki przy odpowiedzi (0.195.0) ────────────────────────────────── */
+/* ── Załączniki przy odpowiedzi ────────────────────────────────── */
 
 /** Załącznik już wgrany do Allegro, czekający przy szkicu. */
 const zalacznik = (d: DatabaseSync, rozmowa: number, allegroId: string, nazwa = "gwint.jpg") =>
@@ -513,7 +511,7 @@ test("kolejność załączników nie zmienia klucza — to ten sam zamiar", () =
     kluczIdempotencji(1, 10, "Ten gwint.", ["att-2", "att-1"]));
 });
 
-/* ── Los szkicu Copilota przy wysyłce (22 września 2026) ─────────────────────
+/* ── Los szkicu Copilota przy wysyłce ────────────────────────────────────────
    Specyfikacja mierzy, ile szkiców poszło bez zmian, a ile z poprawkami. To
    pomiar, nie bramka: wysyłka ma przejść tak samo bez względu na wynik. */
 function szkic(d: DatabaseSync, rozmowa: number, tresc: string, messageId: number) {
@@ -555,7 +553,7 @@ test("szkic ułożony na STARSZE pytanie nie liczy się do losu", async () => {
   assert.equal(los(d), null);
 });
 
-/* Twierdzenia do sprawdzenia zamrożone przy wysyłce (0.532.0). Szkic ma
+/* Twierdzenia do sprawdzenia zamrożone przy wysyłce. Szkic ma
    jeden wiersz na rozmowę i następny go nadpisze, więc pytanie „czy tarcie
    działa" ma odpowiedź tylko wtedy, gdy liczba jedzie w zdarzeniu. Reguła
    ta sama co w panelu: źródło inne niż „fakty". */
@@ -581,7 +579,7 @@ test("wysyłka ze szkicu zapisuje w zdarzeniu liczbę twierdzeń do sprawdzenia"
   assert.equal("szkicDoSprawdzenia" in zd(b.d), false);
 });
 
-/* „Wyślij i zakończ" (23 września 2026): werdykt jedzie w tej samej
+/* „Wyślij i zakończ": werdykt jedzie w tej samej
    transakcji co wiadomość — nieudana wysyłka nie zostawia rozmowy
    zakończonej bez odpowiedzi. */
 test("wyślij i zakończ: udana wysyłka kończy rozmowę, nieudana — nie", async () => {

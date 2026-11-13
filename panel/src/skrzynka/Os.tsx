@@ -1,5 +1,5 @@
 import React from "react";
-import { ArrowRight, Bot, Camera, ClipboardList, Lock, Paperclip, Ruler, ScanSearch, Send, User, Undo2 } from "lucide-react";
+import { ArrowRight, Bot, Camera, ClipboardList, Lock, Ruler, ScanSearch, Send, User, Undo2 } from "lucide-react";
 import type { StatusRozmowy, WpisOsi, ZalacznikOsi } from "../api/typy";
 import { NAZWA } from "./statusy";
 import { LoginKlienta, Przycisk, czas } from "../ui";
@@ -13,7 +13,7 @@ import { NAZWA_ZDARZENIA_ZWROTU } from "../zwroty/Os";
 import { DlugiTekst, KLASA_PRZELACZNIKA, useRozwiniecie } from "./DlugiTekst";
 import { useNoweKlucze } from "./Ruch";
 
-/* Załączniki wiadomości (0.155.0). Sonda pokazała je w 7 z 39 wiadomości —
+/* Załączniki wiadomości. Sonda pokazała je w 7 z 39 wiadomości —
    do tej pory rozmowa milczała o tym, że klient coś przysłał.
 
    ADRES ALLEGRO NIE TRAFIA DO PRZEGLĄDARKI. Pobranie idzie przez naszą trasę,
@@ -29,19 +29,15 @@ const POWOD: Record<string, string> = {
 };
 
 /**
- * ZDJĘCIE WIDAĆ, NIE TRZEBA W NIE KLIKAĆ (0.218.0, naprawione w 0.219.1).
- *
- * 0.155.0 dołożyło na oś nazwę pliku i na tym stanęło. Agent widział
- * „szarpak.jpeg" i musiał kliknąć, ściągnąć plik na dysk i otworzyć go
- * w przeglądarce zdjęć — trzy ruchy po to, żeby zobaczyć treść pytania.
+ * ZDJĘCIE WIDAĆ, NIE TRZEBA W NIE KLIKAĆ. Sama nazwa pliku kazałaby
+ * agentowi ściągać i otwierać plik, żeby zobaczyć treść pytania.
  * Właściciel: „gdy klient wysyła zdjęcie, wyświetlaj w czacie".
  *
- * ── OBIE DROGI IDĄ PRZEZ `fetch`, NIE PRZEZ ATRYBUT (0.219.1) ──────────────
+ * ── OBIE DROGI IDĄ PRZEZ `fetch`, NIE PRZEZ ATRYBUT ────────────────────────
  * Sesja jedzie nagłówkiem `x-session`, a ani `<img src>`, ani `<a href>` go
  * nie niosą: obie dostają 401 i pokazują ikonę zepsutego obrazu albo surowy
  * JSON z „Brak sesji". Podgląd bierze więc `useZdjecieZalacznika` (wspólna
- * kolejka obrazów), a pobranie — `pobierzPlik`. Pobranie było zepsute
- * od 0.155.0 i wyglądało, jakby działało.
+ * kolejka obrazów), a pobranie — `pobierzPlik`.
  *
  * PODGLĄD I POBRANIE ZOSTAJĄ OSOBNO. Pierwsze odpowiada na „co klient
  * przysłał", drugie na „chcę to mieć u siebie" — to dwa różne pytania,
@@ -69,15 +65,15 @@ function Zalacznik({ z }: { z: ZalacznikOsi }) {
     powodBrakuPobrania={POWOD[z.status] ?? `stan ${z.status}`} />;
 }
 
-/* Blok firmowy pod odpowiedzią, ZWINIĘTY (0.219.1): nazwa spółki, adres,
+/* Blok firmowy pod odpowiedzią, ZWINIĘTY: nazwa spółki, adres,
    NIP, KRS, REGON, telefon — siedem wierszy w każdej naszej wiadomości i ani
    jeden o sprawie klienta. Zwinięty, nie skasowany: to treść, którą klient
    DOSTAŁ. Podpis człowieka („Z poważaniem, Mateusz") zostaje w treści, bo
-   mówi, z kim klient rozmawiał. Od 0.523.0 stopkę odsłania ten sam
-   przełącznik co długą wypowiedź — `DlugiTekst`, powód tam. */
+   mówi, z kim klient rozmawiał. Stopkę odsłania ten sam przełącznik co
+   długą wypowiedź — `DlugiTekst`, powód tam. */
 
 /**
- * Nasze automatyczne potwierdzenie, ZWINIĘTE do jednej linijki (0.218.0).
+ * Nasze automatyczne potwierdzenie, ZWINIĘTE do jednej linijki.
  *
  * Odbicie „Dziękujemy za kontakt" jest długie — godziny pracy biura, ta sama
  * treść po polsku i po angielsku — i nie niesie ani jednego zdania o sprawie
@@ -90,7 +86,7 @@ function Zalacznik({ z }: { z: ZalacznikOsi }) {
  * dalej i pokazuje całość.
  */
 function Autoodpowiedz({ wpis }: { wpis: WpisOsi }) {
-  /* Stan ze wspólnego haka (0.523.0); cały wiersz zostaje przyciskiem,
+  /* Stan ze wspólnego haka; cały wiersz zostaje przyciskiem,
      bo zwinięta autoodpowiedź ma być jedną linijką, nie dwiema. */
   const { otwarte, przelacznik } = useRozwiniecie();
   return <article className="ml-auto max-w-[75ch] rounded-lg border border-dashed
@@ -112,35 +108,22 @@ function Autoodpowiedz({ wpis }: { wpis: WpisOsi }) {
    gałąź, a nie przepisać tę. Barwy idą z tokenów `os.*`, nie z klas Tailwinda
    wprost.
 
-   ── CZTERY CECHY, NIE JEDNA (0.193.0) ──────────────────────────────────────
-   Makieta `docs/projekt-widokow/Main.dc.html` odróżnia rodzaje kart CZTEREMA
-   cechami naraz — tłem, ramką, IKONĄ i WCIĘCIEM — plus podpisem rodzaju
-   („Klient · Allegro", „Odpowiedź firmy") we własnej barwie. Komentarz tłumaczący
-   tokeny w `tailwind.config.js` mówi to samo od początku.
+   ── CZTERY CECHY, NIE JEDNA ─────────────────────────────────────────────────
+   Rodzaje kart różnią się CZTEREMA cechami naraz — tłem, ramką, IKONĄ
+   i WCIĘCIEM — plus podpisem rodzaju we własnej barwie. Sama różnica tła
+   (#ffffff wobec #f8fafc) jest na ekranie niewidoczna, a podział „kto to
+   powiedział" to oś sporu w każdej rozmowie.
 
-   Front doszedł do jednej cechy z czterech. Wiadomość klienta ma tło #ffffff,
-   nasza odpowiedź #f8fafc, obie tę samą ramkę — na ekranie to jest RÓŻNICA
-   NIEWIDOCZNA. Wychodziło z tego, że jedynym wyraźnym wpisem osi była notatka
-   wewnętrzna, czyli rzecz, której klient w ogóle nie zobaczy, a najsłabszym —
-   podział „kto to powiedział", czyli oś sporu w każdej rozmowie.
+   Klient odsunięty od PRAWEJ, my od LEWEJ. Dwie strony rozmowy stoją po dwóch
+   stronach kolumny i widać to, zanim zdąży się przeczytać podpis.
 
-   Wcięcia idą wprost z makiety: klient odsunięty od PRAWEJ, my od LEWEJ.
-   Dwie strony rozmowy stoją po dwóch stronach kolumny i widać to, zanim
-   zdąży się przeczytać podpis.
-
-   Godzina wpisu doszła przy okazji: `at` jechał w kontrakcie od początku,
-   a oś go nie pokazywała wcale — czytało się rozmowę bez wiedzy, czy między
-   pytaniem a odpowiedzią minęła minuta, czy trzy dni. */
-/* ── OŚ ZJEŻDŻA NA DÓŁ SAMA (0.260.0) ────────────────────────────────────────
-   Serwer oddaje wpisy od najstarszego (`services/skrzynka.ts`, `ORDER BY m.id`),
-   a panel do 0.259.0 nie przewijał osi ani razu: w całym `panel/src` nie było
-   ani jednego `scrollTop`. Otwarcie rozmowy dłuższej niż okno stawiało agenta
-   na jej NAJSTARSZEJ wiadomości i kazało szukać pytania ręcznie — za każdym
-   razem. Nawet przycisk „Pokaż" pod banerem nowej wiadomości tylko odświeżał
-   dane i zostawiał widok tam, gdzie stał, czyli obiecywał ruch, którego nie
-   robił. Dwie inne kolejki tego panelu doganiają kursor od 0.165.0
-   (`zwroty/`, `reklamacje/`); oś rozmowy po prostu nigdy tego
-   nie dostała.
+   Godzina wpisu mówi, czy między pytaniem a odpowiedzią minęła minuta, czy
+   trzy dni. */
+/* ── OŚ ZJEŻDŻA NA DÓŁ SAMA ──────────────────────────────────────────────────
+   Serwer oddaje wpisy od najstarszego (`services/skrzynka.ts`, `ORDER BY m.id`).
+   Bez przewinięcia rozmowa dłuższa niż okno stawiałaby agenta na NAJSTARSZEJ
+   wiadomości. Przycisk „Pokaż" pod banerem nowej wiadomości obiecuje ten sam
+   ruch.
 
    CELEM JEST DÓŁ LISTY, a nie ostatnie pytanie klienta. Skok na pytanie
    chowałby pod krawędzią wszystko, co po nim padło — naszą odpowiedź, notatkę
@@ -180,7 +163,7 @@ export function Os({
   onZrodlo: (messageId: number | null) => void;
   onWstawDoSzkicu: (tresc: string) => void;
   /**
-   * Co stoi PO ostatniej wypowiedzi, w tym samym przewijaniu (0.495.0):
+   * Co stoi PO ostatniej wypowiedzi, w tym samym przewijaniu:
    * edytor odpowiedzi i formularz pomiaru. Poza listą wpisów, bo nie ma
    * `data-wpis` — skok po identyfikatorze i obserwator pytania go nie widzą.
    */
@@ -308,11 +291,11 @@ export function Os({
     setPodswietlony(celId);
   };
 
-  /* `min-h-40`, nie `min-h-0` (0.232.1): karta szkicu Copilota zwinęła oś do
+  /* `min-h-40`, nie `min-h-0`: karta szkicu Copilota zwinęła oś do
      jednej linii, bo edytor pod nią jest `shrink-0`. Rozmowa ma zostać
      czytelna przy każdej wysokości edytora — to ona jest powodem ekranu.
-     Od 0.495.0 edytor stoi W tej liście (`koniec`), więc go nie ściska;
-     próg zostaje dla bloków nad osią, które dalej są `shrink-0`. */
+     Edytor stoi W tej liście (`koniec`), więc go nie ściska; próg działa
+     dla bloków nad osią, które są `shrink-0`. */
   /* Jedna galeria na całą rozmowę: strzałka w powiększeniu idzie po
      zdjęciach wszystkich wiadomości, w kolejności czytania. */
   return <Galeria><div className="flex min-h-0 flex-1 flex-col">
@@ -363,7 +346,7 @@ export function Os({
             <Undo2 size={12} />Hala odesłała · {w.autor}</div>
           <p className="mt-1 whitespace-pre-wrap text-tresc">{w.tresc}</p>
         </article>
-      /* PRÓG CZYTELNOŚCI, nie ozdoba (0.198.0). Od zdjęcia ogranicznika
+      /* PRÓG CZYTELNOŚCI, nie ozdoba. Od zdjęcia ogranicznika
          1500 px z `<main>` środkowa kolumna rośnie z monitorem, a wypowiedź
          rozciągnięta na całą jej szerokość dawałaby linijkę na sto dwadzieścia
          znaków: oko gubi początek następnego wiersza. 75ch to górna granica
@@ -372,14 +355,14 @@ export function Os({
          Stałe `mr-10`/`ml-10` zostawiały na szerokim ekranie jeden martwy
          pas z jednej strony i nie mówiły nic — teraz strona sama mówi, kto
          mówi, zanim agent przeczyta podpis. */
-      /* ── PODKREŚLAJ PRZEZ WYGASZANIE (0.247.0) ────────────────────────────
+      /* ── PODKREŚLAJ PRZEZ WYGASZANIE ──────────────────────────────────────
          Pytanie klienta i nasza odpowiedź różniły się tłem #ffffff kontra
          #f8fafc przy identycznej obwódce — różnica na granicy widoczności,
          choć to rozróżnienie jest jedynym powodem, dla którego oś ma dwie
          strony. Zamiast rozjaśniać pytanie (nie ma dokąd: jest już białe),
          cofamy odpowiedź: nasza traci obwódkę i cień, a jej tekst schodzi
          na szarość. Pytanie zostaje jedyną kartą z cieniem na ekranie. */
-      /* PYTANIE BEZ ODPOWIEDZI MA RAMKĘ (0.506.0): to ono jest powodem
+      /* PYTANIE BEZ ODPOWIEDZI MA RAMKĘ: to ono jest powodem
          ekranu, a na długiej osi ginęło między naszymi wypowiedziami. Ramka
          tylko wtedy, gdy nic nie padło po nim — odpowiedziane wraca do tła. */
       : <article key={w.id} className={`group max-w-[75ch] rounded-lg p-3 ${w.odKlienta
@@ -387,22 +370,18 @@ export function Os({
             ? "border-2 border-amber-400" : "border-slate-300"}`
           : "ml-auto bg-os-firma"}`}>
           <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs text-slate-500">
-            {/* ── LOGIN STOI W MIEJSCU SŁOWA „KLIENT" (0.219.2) ────────────
-                Do 0.219.1 podpis brzmiał „KLIENT · ALLEGRO", a login jechał
-                obok, drobnym drukiem. Komentarz tłumaczył to zdaniem „login
-                kupującego i tak nic nie mówi" — i to jest nieprawda, którą
-                obalił własny ekran: agent czyta wątek, żeby wiedzieć, KTO
-                pisze, a „bagslublin" odróżnia rozmówcę, podczas gdy słowo
-                „klient" jest prawdziwe o każdej wiadomości przychodzącej.
+            {/* ── LOGIN STOI W MIEJSCU SŁOWA „KLIENT" ──────────────────────
+                Agent czyta wątek, żeby wiedzieć, KTO pisze. „bagslublin"
+                odróżnia rozmówcę, a słowo „klient" jest prawdziwe o każdej
+                wiadomości przychodzącej.
 
-                Fallback zostaje: gdy wątek nie niesie loginu, serwer podstawia
-                „Klient" i wtedy podpis wygląda jak dawniej. Kanał („Allegro")
+                Gdy wątek nie niesie loginu, serwer podstawia „Klient". Kanał („Allegro")
                 zostaje przy loginie, bo ten sam ciąg na innym kanale byłby
                 kimś innym. */}
             <span className={`flex items-center gap-1 font-bold uppercase tracking-wide ${
               w.odKlienta ? "text-amber-700" : "text-slate-600"}`}>
               {w.odKlienta ? <User size={12} /> : <Send size={12} />}
-              {/* Login kopiuje się kliknięciem (0.228.0). Kanał zostaje obok,
+              {/* Login kopiuje się kliknięciem. Kanał zostaje obok,
                   poza przyciskiem: kopiujemy sam login, nie zdanie o nim. */}
               {w.odKlienta
                 ? <><LoginKlienta login={w.autor} className="uppercase" /> · Allegro</>
@@ -426,17 +405,14 @@ export function Os({
             {w.zamowienieId && w.zamowienieId !== powiazanie?.zamowienieId
               && <span title={w.zamowienieId}>· zamówienie {w.zamowienieId.slice(0, 8)}…</span>}
           </div>
-          {/* JEDEN SZCZEBEL PO OBU STRONACH (0.258.0). Do 0.257.0 pytanie klienta
-              miało 15 px, a nasza odpowiedź 14 — różnica rozmiaru wyciszała to,
-              co już przeczytane. Wyciszenie zostaje, tylko niesie je sama barwa:
-              treść jest treścią po obu stronach wątku, a drabina ma na tę rolę
-              jeden szczebel. Dwa rozmiary dla jednej roli to był ten sam błąd,
-              który to wydanie naprawia w siedemnastu innych miejscach. */}
+          {/* JEDEN SZCZEBEL PO OBU STRONACH. To, co już przeczytane, wycisza
+              sama barwa: treść jest treścią po obu stronach wątku, a drabina
+              ma na tę rolę jeden szczebel. */}
           {w.odKlienta
             ? <p className="mt-1 whitespace-pre-wrap text-tresc">{w.tresc}</p>
             : <NaszaTresc tresc={w.tresc} stopka={w.stopka} />}
           {w.zalaczniki?.length ? <Zalaczniki lista={w.zalaczniki} /> : null}
-          {/* „Zleć" NA WIERZCHU TYLKO PRZY PYTANIU BEZ ODPOWIEDZI (0.506.0).
+          {/* „Zleć" NA WIERZCHU TYLKO PRZY PYTANIU BEZ ODPOWIEDZI.
               Stał pod każdą wiadomością klienta, więc na długiej osi ten sam
               napis powtarzał się co kilka akapitów. Przy starszych wychodzi
               pod myszą albo fokusem — zostaje w miejscu i w kolejności Tab. */}
@@ -453,7 +429,7 @@ export function Os({
   </div>
 
     {/* Pasek stoi POD oknem wiadomości — czyli tam, gdzie kończy się
-        czytanie. Od 0.495.0 edytor jest w oknie, więc pasek stoi pod nim. */}
+        czytanie. Edytor jest w oknie, więc pasek stoi pod nim. */}
     <PasekZdarzen zdarzenia={zdarzenia} onSkocz={skocz} />
 
     {/* Przypięte pytanie stoi PONIŻEJ paska zdarzeń, czyli najbliżej edytora:
@@ -463,17 +439,14 @@ export function Os({
   </div></Galeria>;
 }
 
-/* ── ZDARZENIA SPRAWY ZESZŁY Z OSI DO JEDNEGO PASKA (0.243.0) ────────────────
+/* ── ZDARZENIA SPRAWY ZESZŁY Z OSI DO JEDNEGO PASKA ──────────────────────────
    Zgłoszenie właściciela: „can we move all the status changes into one
    horizontal row below messaging window like a timeline, when clicking on
    event it goes to that part in messaging window".
 
-   Do 0.242.0 każda zmiana statusu i każde sklejenie sprawy stały
-   na osi jako osobna kreska między wypowiedziami. Przy jednej sprawie to jest
-   znak, że coś się wydarzyło; przy siedmiu — ściana szarego tekstu, przez
-   którą trzeba się przewinąć, żeby dojść do zdania klienta. Na zrzucie od
-   właściciela dwa takie bloki zajmują więcej miejsca niż obie wypowiedzi
-   razem, i to one, nie rozmowa, dyktują długość przewijania.
+   Zdarzenie jako kreska między wypowiedziami przy jednej sprawie jest znakiem,
+   przy siedmiu — ścianą szarego tekstu, przez którą trzeba się przewinąć,
+   żeby dojść do zdania klienta.
 
    OŚ ZOSTAJE ROZMOWĄ, PASEK ZOSTAJE PRZEBIEGIEM. To są dwa różne pytania:
    „co klient napisał" i „jak sprawa szła". Pierwsze czyta się po kolei, drugie
@@ -486,9 +459,9 @@ export function Os({
    Gdy zdarzenie jest ostatnie i nic po nim nie padło, celem zostaje ostatnia
    wypowiedź przed nim, bo skok donikąd byłby przyciskiem bez skutku.        */
 
-/* „zwrot" (0.502.0) MUSI tu stać: rodzaj spoza tego zbioru rysuje się jak
+/* „zwrot" MUSI tu stać: rodzaj spoza tego zbioru rysuje się jak
    wypowiedź, a decyzja zwrotu udająca zdanie do klienta to najgorszy możliwy
-   wynik (ta sama blizna co `odeslanie_zadania`, `api/typy.ts`). */
+   wynik (por. `odeslanie_zadania`, `api/typy.ts`). */
 const ZDARZENIE: ReadonlySet<string> = new Set(["status", "zwrot"]);
 
 type Zdarzenie = WpisOsi & { cel: string | null };
@@ -542,7 +515,7 @@ const BARWA_ZDARZENIA: Record<string, string> = {
 function etykieta(z: Zdarzenie): string {
   const e = z.zdarzenie;
   /* Bez pola strukturalnego zostaje pełne zdanie. To nie jest martwa gałąź:
-     oś bywa czytana z odpowiedzi zapisanej przed 0.243.0. */
+     oś bywa czytana ze starszej odpowiedzi bez tego pola. */
   if (!e) return z.tresc;
   if (e.rodzaj === "status") return e.po ? NAZWA[e.po as StatusRozmowy] ?? e.po : z.tresc;
   if (e.rodzaj === "zwrot") return `zwrot: ${NAZWA_ZDARZENIA_ZWROTU[e.co] ?? e.co.replace(/_/g, " ")}`;
@@ -553,7 +526,7 @@ function PasekZdarzen({ zdarzenia, onSkocz }: {
   zdarzenia: Zdarzenie[];
   onSkocz: (celId: string) => void;
 }) {
-  /* ── JEDNO ZDANIE, CAŁOŚĆ NA ŻĄDANIE (0.506.0) ─────────────────────────
+  /* ── JEDNO ZDANIE, CAŁOŚĆ NA ŻĄDANIE ───────────────────────────────────
      Zgłoszenie agenta: „przytłacza". Rząd siedmiu czipów stał pod każdą
      rozmową, a przy sprawie otwieranej i kończonej kilka razy mówił pięć
      razy „Otwarta → Zakończona". Przy pisaniu liczy się ostatnia zmiana;
@@ -573,7 +546,7 @@ function PasekZdarzen({ zdarzenia, onSkocz }: {
     </nav>;
   }
 
-  /* Pasek CICHNIE (0.247.0): niesie kontekst, nie treść, a stał w tej samej
+  /* Pasek CICHNIE: niesie kontekst, nie treść, a stał w tej samej
      wadze co wypowiedzi — obwódki chipów rysowały dziewięć ramek pod rozmową.
      Zostaje samo wypełnienie, bo to ono niesie rodzaj zdarzenia. */
   return <nav aria-label="Przebieg sprawy"
@@ -598,11 +571,10 @@ function PasekZdarzen({ zdarzenia, onSkocz }: {
   </nav>;
 }
 
-/* ── ZLECENIE DLA HALI NA OSI (0.226.0) ──────────────────────────────────────
+/* ── ZLECENIE DLA HALI NA OSI ────────────────────────────────────────────────
    Zgłoszenie właściciela: „zlecenie zmierzenia też powinno zostać pokazane
-   jako blok w wiadomości". Do 0.224.0 oś pokazywała sam WYNIK — prośba, która
-   go wywołała, nie zostawiała po sobie nic poza kreskami zmiany statusu
-   rozmowy, z których nie da się odczytać, o co kto poprosił.
+   jako blok w wiadomości". Z samego WYNIKU i kresek zmiany statusu nie da
+   się odczytać, o co kto poprosił.
 
    Blok stoi PO TEJ SAMEJ STRONIE co wynik (`ml-6`) i w tej samej rodzinie
    kształtu, bo to dwie połowy jednej sprawy: pytanie do hali i odpowiedź hali.
@@ -628,9 +600,9 @@ const RODZAJ_ZLECENIA: Record<string, { nazwa: string; Ikona: typeof Ruler }> = 
 const STAN_ZLECENIA: Record<string, { etykieta: string; klasa: string }> = {
   nowe: { etykieta: "czeka na halę", klasa: "bg-amber-100 text-amber-900" },
   w_toku: { etykieta: "hala pracuje", klasa: "bg-sky-100 text-sky-900" },
-  /* 0.352.0: bez tego wiersza kafelek wypisywał surowy klucz „odeslane"
-     w szarości, a karta zostawała bursztynowa jak przy czekaniu na halę —
-     czyli mówiła, że hala pracuje, choć hala właśnie odmówiła. Fiolet ten sam
+  /* Bez tego wiersza kafelek wypisałby surowy klucz „odeslane", a karta
+     zostałaby bursztynowa jak przy czekaniu na halę — czyli mówiłaby, że hala
+     pracuje, choć hala właśnie odmówiła. Fiolet ten sam
      co na ekranie zadań, żeby jeden stan miał jedną barwę w całym panelu. */
   odeslane: { etykieta: "hala odesłała", klasa: "bg-violet-100 text-violet-900" },
   wykonane: { etykieta: "wykonane", klasa: "bg-emerald-100 text-emerald-800" },
@@ -680,13 +652,13 @@ function Zlecenie({ wpis }: { wpis: WpisOsi }) {
   </article>;
 }
 
-/* ── NASZA WYPOWIEDŹ ZWINIĘTA DO CZTERECH LINII (0.506.0) ───────────────────
+/* ── NASZA WYPOWIEDŹ ZWINIĘTA DO CZTERECH LINII ─────────────────────────────
    Zrzut z „przytłacza": nasza odpowiedź ze stopką i pustymi wierszami zajęła
    całą oś, a pytanie klienta stało wciśnięte nad polem odpowiedzi. Własną
    treść agent już zna — wystarczy mu jej początek, całość na kliknięcie.
    Puste wiersze ponad jeden ściskamy WYŁĄCZNIE na ekranie: treść w bazie
-   i w Allegro zostaje taka, jaka poszła. Próg i przełącznik mieszkają od
-   0.523.0 w `DlugiTekst.tsx`, razem ze stopką. */
+   i w Allegro zostaje taka, jaka poszła. Próg i przełącznik mieszkają
+   w `DlugiTekst.tsx`, razem ze stopką. */
 function NaszaTresc({ tresc, stopka }: { tresc: string; stopka?: string | null }) {
   const zwarta = tresc.replace(/\n[ \t]*(\n[ \t]*){2,}/g, "\n\n").trim();
   return <DlugiTekst tresc={zwarta} stopka={stopka} className="text-tresc text-slate-600" />;

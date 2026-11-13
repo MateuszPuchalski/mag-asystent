@@ -12,19 +12,15 @@ import konfiguracjaTekst from "../tailwind.config.js?raw";
 const ZRODLA = import.meta.glob(["./**/*.tsx", "!./**/*.test.tsx"],
   { query: "?raw", eager: true, import: "default" }) as Record<string, string>;
 
-/* ── Strażnik drabiny typograficznej (0.258.0) ───────────────────────────────
-   Zmierzone przed tym wydaniem: 664 wystąpienia klas rozmiaru w `panel/src`,
-   z czego 95,2% w paśmie 11–14 px. Powyżej 16 px było DZIEWIĘĆ wystąpień na
-   664, a cztery z nich to liczby, nie tekst. Osiem różnych rozmiarów wzięło
-   się nie z decyzji, tylko z tego, że każdy dokładał, co mu pasowało.
-
+/* ── Strażnik drabiny typograficznej ─────────────────────────────────────────
+   Rozmiar pisma ma wynikać z decyzji, nie z tego, że każdy dokłada, co mu
+   pasuje.
    CO PILNUJE. Jednej rzeczy: **żadnych nowych arbitralnych `text-[NNpx]`**.
    Rozmiar bierze się z drabiny (`podpis`, `tresc`, `naglowek`, `tytul`) albo
    ze szczebla kontrolki (`text-xs`, `text-sm`). Arbitralna wartość to sposób,
-   w jaki drabina rozpadła się poprzednio — i ma dwie wady naraz: nie mówi
-   o ROLI oraz nie niesie interlinii, bo Tailwind nie przypisuje jej do
-   wartości arbitralnych. Osiemdziesiąt dwa `text-[11px]` dziedziczyły przez
-   to 1,5 z przeglądarki zamiast pary przypisanej do klasy.
+   w jaki drabina się rozpada — i ma dwie wady naraz: nie mówi o ROLI oraz
+   nie niesie interlinii, bo Tailwind nie przypisuje jej do wartości
+   arbitralnych.
 
    Pilnuje też, że drabina w konfiguracji ISTNIEJE i ma pary z interlinią —
    bez tego cztery szczeble dałoby się rozbroić jedną linijką i nikt by nie
@@ -39,7 +35,7 @@ const ZRODLA = import.meta.glob(["./**/*.tsx", "!./**/*.test.tsx"],
    ZWOLNIENIA SĄ JAWNE. Komentarz `skala: <powód>` w linii albo do sześciu
    linii nad nią zdejmuje zgłoszenie, a powód musi mieć co najmniej trzy
    wyrazy — ten sam mechanizm i próg co `kontrast:` oraz `ergonomia:`.
-   Dziś jest jedno zwolnienie i jest prawdziwe: napis „bez zdjęcia" musi się
+   Jedyne zwolnienie jest prawdziwe: napis „bez zdjęcia" musi się
    zmieścić w kafelku 44 px, a najniższy szczebel go rozsadza. To jedyne
    miejsce, gdzie rozmiar dyktuje POJEMNIK, a nie rola tekstu.            */
 

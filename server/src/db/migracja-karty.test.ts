@@ -4,16 +4,13 @@ import { DatabaseSync } from "node:sqlite";
 import fs from "node:fs";
 import { migrate } from "./db.js";
 
-/* ── Karta Copilota na bazie sprzed 0.276.0 (0.276.2) ────────────────────────
-   TO JEST TEST NA BŁĄD, KTÓRY ZGŁOSIŁ WŁAŚCICIEL, nie ćwiczenie z ostrożności.
-   0.276.0 dołożyło kolumny rady do `reklamacja_karta` WYŁĄCZNIE w `schema.sql`,
-   bo plan założył, że tabela z 0.275.0 „na produkcji jeszcze nie stoi". Stała.
+/* ── Karta Copilota na starej bazie ────────────────────────────────
    `CREATE TABLE IF NOT EXISTS` nie dokłada kolumn do istniejącej tabeli, więc
-   każde rozpoznanie sprawy padało zdaniem:
+   kolumna dopisana tylko w `schema.sql` wywraca zapis zdaniem:
 
      table reklamacja_karta has no column named rekomendacja
 
-   Stanowisko odtwarza to wiernie: NAJPIERW tabela w kształcie 0.275.0, dopiero
+   Stanowisko odtwarza to wiernie: NAJPIERW tabela w starym kształcie, dopiero
    potem pełny `schema.sql`, który ją wtedy pomija — dokładnie tak, jak wygląda
    baza, na której wdrożono dwa wydania po kolei.
 
@@ -24,7 +21,7 @@ import { migrate } from "./db.js";
 
 const schema = fs.readFileSync(new URL("./schema.sql", import.meta.url), "utf8");
 
-/** Kształt `reklamacja_karta` z 0.275.0 — same fakty, bez rady i bez oceny. */
+/** Stary kształt `reklamacja_karta` — same fakty, bez rady i bez oceny. */
 const KSZTALT_0_275_0 = `
   CREATE TABLE reklamacja_karta (
     reklamacja_id      INTEGER PRIMARY KEY REFERENCES reklamacja_klienta(id) ON DELETE CASCADE,
@@ -47,7 +44,7 @@ const kolumny = (d: DatabaseSync, tabela: string) =>
   (d.prepare(`PRAGMA table_info(${tabela})`).all() as Array<{ name: string }>)
     .map((k) => k.name).sort();
 
-/** Baza sprzed 0.276.0: stara tabela stoi, więc `schema.sql` jej nie tknie. */
+/** Stara baza: stara tabela stoi, więc `schema.sql` jej nie tknie. */
 function stara() {
   const d = new DatabaseSync(":memory:");
   d.exec(KSZTALT_0_275_0);

@@ -1,18 +1,16 @@
 import React from "react";
 import { Link } from "react-router-dom";
 
-/* ── Liczby i słupki wglądu (0.440.0) ───────────────────────────────────
-   Przyszły z ANALIZY w `biuro.html`, gdzie składał je ręcznie `slupkiSvg`
-   i `komorkaSlupka`. Panel nie miał dotąd ani jednego wykresu, a dwa
-   słupkowe wykresy jednej serii nie uzasadniają biblioteki — ta sama
-   decyzja, którą biuro zapisało przy swoim SVG.
+/* ── Liczby i słupki wglądu ─────────────────────────────────────────────
+   Dwa słupkowe wykresy jednej serii nie uzasadniają biblioteki, więc SVG
+   składa się tutaj.
 
-   BARWA SŁUPKA: CIEMNIEJSZY STOPIEŃ BURSZTYNU. Biuro malowało słupki barwą
-   marki (dziś #FF9100), a ta na bieli daje 2,26:1 — poniżej progu 3:1, który WCAG
-   stawia znakom graficznym, i dokładnie ta liczba, dla której `Kontrast.test`
-   zakazuje bursztynu jako pisma. `amber-600` (#D97706) zostaje w rodzinie
+   BARWA SŁUPKA: CIEMNIEJSZY STOPIEŃ BURSZTYNU. Barwa marki (#FF9100) na
+   bieli daje 2,26:1 — poniżej progu 3:1, który WCAG stawia znakom
+   graficznym, i dokładnie ta liczba, dla której `Kontrast.test` zakazuje
+   bursztynu jako pisma. `amber-600` (#D97706) zostaje w rodzinie
    marki i przechodzi walidator palety: pasmo jasności, nasycenie i kontrast
-   powyżej 3:1. Szarość łupkowa odpadła na nasyceniu — słupek „czyta się
+   powyżej 3:1. Szarość łupkowa odpada na nasyceniu — słupek „czyta się
    jako wyłączony", a wykres ma mówić, że tu są dane.
    Podpisy i liczby zostają atramentem: pismo nie nosi barwy danych. */
 
@@ -26,7 +24,7 @@ import { Link } from "react-router-dom";
 export const Liczba = ({ etykieta, ile, ton = "", doPracy }: {
   etykieta: string; ile: React.ReactNode; ton?: string;
   /**
-   * Adres listy, którą ta liczba liczy (0.502.0). Tylko przy liczbie o stanie
+   * Adres listy, którą ta liczba liczy. Tylko przy liczbie o stanie
    * BIEŻĄCYM: liczba z minionego tygodnia otworzyłaby listę, która dziś
    * znaczy co innego, a to gorsze niż brak odnośnika.
    */
@@ -36,8 +34,8 @@ export const Liczba = ({ etykieta, ile, ton = "", doPracy }: {
     <span className={`text-2xl font-bold ${ton}`}>{ile}</span>
     <span className="text-xs text-slate-500">{etykieta}</span>
   </>;
-  /* WGLĄD PROWADZI DO PRACY (0.502.0): liczba, której nie da się kliknąć,
-     zostaje ciekawostką — agent szukał potem tych samych spraw w kolejce. */
+  /* WGLĄD PROWADZI DO PRACY: liczba, której nie da się kliknąć, zostaje
+     ciekawostką, a agent szukałby potem tych samych spraw w kolejce. */
   return doPracy
     ? <Link to={doPracy} className="flex flex-col rounded hover:bg-slate-50" title="Otwórz listę">{tresc}</Link>
     : <div className="flex flex-col">{tresc}</div>;
@@ -81,9 +79,8 @@ const W = 560, H = 150, DOL = 22, GORA = 14;
  * `co` przerzedza podpisy osi: przy 90 dniach podpis pod każdym słupkiem
  * byłby nieczytelną kaszą.
  *
- * WARTOŚĆ NA KAŻDYM SŁUPKU, GDY SIĘ MIEŚCI — decyzja z 0.427.0 (dekalog
- * pkt 2): wcześniej podpisany był tylko najwyższy, a resztę trzeba było
- * szacować wzrokiem. 18 px na słupek mieści trzycyfrową liczbę w 10 px; przy
+ * WARTOŚĆ NA KAŻDYM SŁUPKU, GDY SIĘ MIEŚCI (dekalog pkt 2), żeby nie trzeba
+ * było szacować wzrokiem. 18 px na słupek mieści trzycyfrową liczbę w 10 px; przy
  * 90 dniach słupek ma 6 px i podpisy zlałyby się w pasek, więc wtedy zostaje
  * podpis samego maksimum. Pełne liczby i tak stoją w tabeli dla czytnika.
  */

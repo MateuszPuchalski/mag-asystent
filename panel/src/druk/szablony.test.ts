@@ -2,12 +2,10 @@ import { describe, expect, it } from "vitest";
 import { protokol } from "./szablony";
 import type { Wyjatek } from "../api/dostawy";
 
-/* ── Szablony protokołu (0.435.0) ──────────────────────────────────────────
-   Przyjechały z `biuro.html`, gdzie nie miały ani jednego testu — wybór
-   szablonu po nazwie dostawcy i ucieczkę znaków sprawdzał wyłącznie człowiek
-   przy drukarce. Tu pilnujemy dwóch rzeczy, których na wydruku nie widać,
-   dopóki nie pójdzie on do dostawcy: że GEKO dostaje SWÓJ druk i że nazwa
-   z bazy nie wstrzyknie znaczników. */
+/* ── Szablony protokołu ────────────────────────────────────────────────────
+   Pilnujemy dwóch rzeczy, których na wydruku nie widać, dopóki nie pójdzie
+   on do dostawcy: że GEKO dostaje SWÓJ druk i że nazwa z bazy nie wstrzyknie
+   znaczników. */
 
 const p = (o: Partial<Wyjatek> = {}): Wyjatek => ({
   id: 1, deliveryId: 50, lineId: 1, typ: "qty_mismatch", typLabel: "zła ilość", qty: 10,

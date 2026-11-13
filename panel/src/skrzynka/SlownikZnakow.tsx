@@ -8,7 +8,7 @@ import { NAZWA_KATEGORII } from "./statusy";
 import { Czekanie } from "./Czekanie";
 import { useOkienko } from "./MenuRozmowy";
 
-/* ── SŁOWNIK ZNAKÓW POD „?" (23 września 2026) ───────────────────────────────
+/* ── SŁOWNIK ZNAKÓW POD „?" ──────────────────────────────────────────────────
    Cena zamiany słów na znaki jest znana: znak trzeba raz poznać. Dekalog
    ergonomii (punkt 2) każe rozpoznawać zamiast pamiętać, więc pełna lista
    stoi JEDNO kliknięcie od kolejki, a każdy znak ma dodatkowo swój dymek.
@@ -17,17 +17,16 @@ import { useOkienko } from "./MenuRozmowy";
    jednocześnie, a okno zasłoniłoby wiersz, o który pyta. Otwarcie niczego nie
    zapisuje — to stan tego jednego komponentu.
 
-   ── ZNAKI I SKRÓTY POD JEDNYM „?" (0.522.0) ───────────────────────────────
-   Nad kolejką stały DWA znaki zapytania: ten, otwierany kliknięciem, i pomoc
-   klawiszy w paśmie szukania, otwierana najechaniem. Dwie reguły otwierania
-   dla jednego pytania „jak czytać tę kolejkę" to dwa nawyki do nauczenia.
+   ── ZNAKI I SKRÓTY POD JEDNYM „?" ─────────────────────────────────────────
+   Dwie reguły otwierania dla jednego pytania „jak czytać tę kolejkę" to dwa
+   nawyki do nauczenia.
 
    Zamyka się Escape'em i kliknięciem obok — `useOkienko`, ta sama reguła co
-   „⋯" rozmowy. Do tej pory zamykał go wyłącznie krzyżyk albo drugi klik.
+   „⋯" rozmowy.
 
    Klawisze stoją tu jako lista tej kolejki, bez przełączników ekranów
    z `sprawy/Skroty.tsx`: skrzynka nie ma sit, a „Wszystkie" to jej PIERWSZY
-   kubełek. Pełną listę panelu dalej daje klawisz `?`. */
+   kubełek. Pełną listę panelu daje klawisz `?`. */
 
 const G = 3_600_000;
 /** Szerokość panelu w pikselach — `w-[34rem]` przy 16 px na rem. */
@@ -42,7 +41,7 @@ export function SlownikZnakow({ kubelkow }: {
   kubelkow: number;
 }) {
   const { otwarte: otwarty, setOtwarte: setOtwarty, ramka } = useOkienko<HTMLSpanElement>();
-  /* PANEL W OKNIE, NIE W KARCIE (0.522.0). Karta kolejki ma `overflow-hidden`,
+  /* PANEL W OKNIE, NIE W KARCIE. Karta kolejki ma `overflow-hidden`,
      a słownik jest szerszy od niej — przy `absolute` ucinała go krawędź
      kolumny, razem z połową każdej nazwy. `fixed` liczony od przycisku
      w chwili otwarcia wychodzi nad sąsiednią kolumnę i mieści się w oknie. */
@@ -71,7 +70,7 @@ export function SlownikZnakow({ kubelkow }: {
           <ul className="flex flex-col gap-1.5">
             {kategorie.map((k) => {
               const Ikona = IKONA_KATEGORII[k];
-              /* Znak BEZ KAFLA, tak jak stoi w wierszu kolejki (0.548.0):
+              /* Znak BEZ KAFLA, tak jak stoi w wierszu kolejki:
                  słownik pokazuje to, co agent widzi, a nie jego dawny kształt. */
               return <li key={k} className="flex items-center gap-2">
                 <span className="inline-flex w-7 text-violet-700">

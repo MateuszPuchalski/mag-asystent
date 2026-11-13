@@ -89,9 +89,9 @@ export function budujFiltryDokumentow(
  */
 const ZAM_IMPORT_DAYS = 180;
 
-/* ── CENNIK KARTOTEKI (0.405.0) ──────────────────────────────────────────────
+/* ── CENNIK KARTOTEKI ──────────────────────────────────────────────
    Kształt WZIĘTY Z BAZY, nie z pamięci: właściciel uruchomił
-   `tools/sonda-cen.sql` 19 września 2026 i wynik stoi
+   `tools/sonda-cen.sql` i wynik stoi
    w `docs/subiekt-gt-struktura.md`. Dwie rzeczy z niego są zaskakujące i obie
    rządzą tym kodem:
 
@@ -139,8 +139,7 @@ interface DokRow {
   data_wyst: string;
   dok_MagId: number;
   dostawca: string | null;
-  /* Identyfikator kontrahenta — do 0.56.0 stał w JOIN-ie i był wyrzucany.
-     Po nim, a nie po nazwie, przypina się logo dostawcy: symbol w Subiekcie
+  /* Identyfikator kontrahenta. Po nim, a nie po nazwie, przypina się logo dostawcy: symbol w Subiekcie
      wolno poprawić, a ta sama firma potrafi wystąpić pod dwoma napisami. */
   kh_id: number | null;
   w_buforze: number;
@@ -191,12 +190,12 @@ export interface ImportStats {
      na ekranie kolektora oba wyglądają tak samo, a znaczą co innego. */
   mm: number;
   mmPozycje: number;
-  /* Dokumenty sprzedaży (0.174.0). Ta sama para co przy MM i z tego samego
+  /* Dokumenty sprzedaży. Ta sama para co przy MM i z tego samego
      powodu: „dziś nie sprzedano nic" wygląda na ekranie tak samo jak „pozycje
      wiszą na innej kolumnie", a znaczy co innego. */
   faktury: number;
   fakturyPozycje: number;
-  /* Wiersze cennika PO ROZWINIĘCIU kolumn na poziomy (0.405.0). Liczba mówi
+  /* Wiersze cennika PO ROZWINIĘCIU kolumn na poziomy. Liczba mówi
      o pracy, którą import naprawdę wykonał: 3415 kartotek przy dwóch
      używanych poziomach to ~6800 wierszy, a nie 3415. */
   ceny: number;
@@ -237,7 +236,7 @@ export const zrealWiarygodne = () => brakKolumnyZrealizowano === null;
 export let bladImportuMm: string | null = null;
 
 /**
- * Odczyt dokumentów sprzedaży padł — zdanie do `/api/health` (0.174.0).
+ * Odczyt dokumentów sprzedaży padł — zdanie do `/api/health`.
  *
  * Degraduje jak MM: stany i lokalizacje są ważniejsze niż numer faktury przy
  * zwrocie, a biuro woli wczorajszą listę dokumentów niż wywrócony import.
@@ -245,18 +244,18 @@ export let bladImportuMm: string | null = null;
 export let bladImportuFaktur: string | null = null;
 
 /**
- * Ustawiane, gdy nie da się odczytać cennika (0.405.0).
+ * Ustawiane, gdy nie da się odczytać cennika.
  *
  * NOWY GRANT: `GRANT SELECT ON dbo.tw_Cena` i `GRANT SELECT ON dbo.vwPoziomyCen` (DEPLOY §6h).
  * Żadna instalacja sprzed tego wydania go nie ma, a `git pull` nie ma prawa
  * wywrócić synchronizacji stanów przez cennik — dlatego brak uprawnienia
  * DEGRADUJE import (ceny zostają puste, reszta wchodzi) i melduje się zdaniem
- * w /api/health. Karta towaru bez cen rysuje się tak jak przed 0.405.0.
+ * w /api/health. Karta towaru rysuje się wtedy bez cen.
  */
 export let bladImportuCen: string | null = null;
 
 /**
- * Kolumna z numerem obcym nie istnieje — zdanie do `/api/health` (0.174.0).
+ * Kolumna z numerem obcym nie istnieje — zdanie do `/api/health`.
  *
  * To NIE to samo co `bladImportuFaktur`: dokumenty wchodzą, brakuje wyłącznie
  * sygnału rozstrzygającego, więc zwrot dopasuje się po pozycjach i czeka na
@@ -268,7 +267,7 @@ export let brakKolumnyNrOryg: string | null = null;
 /** Uwagi dokumentu (`dok_Uwagi`) niedostępne — numer zamówienia z nich nie wyjdzie. */
 export let brakKolumnyUwag: string | null = null;
 /**
- * Kolumna dokumentu korygowanego niedostępna (0.201.0).
+ * Kolumna dokumentu korygowanego niedostępna.
  *
  * Degradacja, nie awaria: numery korekt przepisuje wtedy człowiek, dokładnie
  * jak przed tym wydaniem. Zdanie w `/api/health` istnieje po to, żeby brak
@@ -279,8 +278,8 @@ export let brakKolumnyKorekty: string | null = null;
 /**
  * Dokumenty MM weszły, pozycji nie ma ani jednej.
  *
- * Dokładnie ten stan wystąpił po wdrożeniu 0.75.0 i był NIEWIDOCZNY: kolektor
- * pokazywał kosze z zerem pozycji, co wygląda jak spokojny dzień bez zwrotów.
+ * Ten stan jest NIEWIDOCZNY: kolektor pokazuje kosze z zerem pozycji, co
+ * wygląda jak spokojny dzień bez zwrotów.
  * Zero pozycji przy niezerowej liczbie dokumentów nie zdarza się naturalnie —
  * przesunięcie bez pozycji nie ma po co powstać.
  */
@@ -415,13 +414,12 @@ async function pobierzZamowienia(
  * Te same tabele co reszta importu (`dok__Dokument`, `dok_Pozycja`,
  * `kh__Kontrahent`), więc ZERO nowych GRANT-ów.
  *
- * SKALA JEST TU INNA NIŻ PRZY DOSTAWACH i wymusiła dwa odstępstwa (0.53.1):
+ * SKALA JEST TU INNA NIŻ PRZY DOSTAWACH i wymusiła dwa odstępstwa:
  *
  * 1. Pozycje idą JOIN-em z tymi samymi filtrami co nagłówki, NIE listą
- *    `IN (id, id, …)`. Okno 90 dni sprzedaży to dziesiątki tysięcy dok_Id;
- *    lista tej długości położyła wdrożenie 0.53.0 błędem 8623 („query
- *    processor ran out of internal resources") na przemian z timeoutem 15 s —
- *    a że import startowy jest twardym błędem, API weszło w pętlę restartów.
+ *    `IN (id, id, …)`. Okno 90 dni sprzedaży to dziesiątki tysięcy dok_Id,
+ *    a lista tej długości kończy się błędem 8623 („query processor ran out
+ *    of internal resources") albo timeoutem.
  *    Wzorzec `IN` zostaje przy dostawach/zamówieniach, gdzie dokumentów są
  *    dziesiątki, nie tysiące.
  * 2. `WITH (NOLOCK)` na obu zapytaniach: to zasilanie read-modelu odświeżanego
@@ -455,11 +453,10 @@ interface MmPozRow {
  * Wydzielone jak `budujFiltryDokumentow` — po to, żeby JEDNĄ rzecz, która się
  * tu psuje, dało się sprawdzić testem bez serwera MSSQL. Ta rzecz to kolumna
  * łącząca: MM jest dokumentem MAGAZYNOWYM, więc pozycje wiszą na
- * `ob_DokMagId`. Do 0.76.1 stało tu `ob_DokHanId` przepisane z zapytania
- * o sprzedaż — kolumna dokumentu HANDLOWEGO, której MM nie ma. JOIN nie łapał
- * ani jednego wiersza, a każdy kosz na kolektorze pokazywał zero pozycji.
+ * `ob_DokMagId`, nie `ob_DokHanId` — kolumna dokumentu HANDLOWEGO, której
+ * MM nie ma.
  *
- * POTWIERDZONE na bazie firmy (sierpień 2026): pozycje MM mają `ob_DokHanId`
+ * POTWIERDZONE na bazie firmy: pozycje MM mają `ob_DokHanId`
  * ustawione na NULL, a `ob_DokMagId` na identyfikator przesunięcia.
  *
  * `LEFT JOIN tw__Towar` niesie symbol i nazwę wprost z Subiekta. Importer
@@ -522,10 +519,8 @@ async function pobierzMmZwrotow(
  * bez serwera MSSQL (ten sam powód co przy `budujFiltryDokumentow`).
  *
  * Okno jest DATĄ, nie listą identyfikatorów. Kilka tygodni sprzedaży to
- * dziesiątki tysięcy dokumentów, a `IN (id, id, …)` tej długości położyło
- * wdrożenie 0.53.0 błędem 8623 („query processor ran out of internal
- * resources") na przemian z timeoutem — import startowy jest twardym błędem,
- * więc API weszło wtedy w pętlę restartów.
+ * dziesiątki tysięcy dokumentów, a `IN (id, id, …)` tej długości kończy się
+ * błędem 8623 („query processor ran out of internal resources").
  */
 export function budujFiltrFaktur(typy: number[]): string {
   const lista = typy.map((t) => Number(t)).join(",");
@@ -533,7 +528,7 @@ export function budujFiltrFaktur(typy: number[]): string {
 }
 
 /**
- * Dokumenty sprzedaży (FS/PA) do read-modelu `sgt_faktura` (0.174.0).
+ * Dokumenty sprzedaży (FS/PA) do read-modelu `sgt_faktura`.
  *
  * Bierzemy CZTERY kolumny i ani jednej więcej. Nie ma tu `kh_Symbol`, bo przy
  * sprzedaży konsumenckiej bywa tam imię i nazwisko, a polityka danych zwrotów
@@ -545,15 +540,14 @@ export function budujFiltrFaktur(typy: number[]): string {
  * brudny odczyt niczego nie psuje, a w dzienniku wdrożenia stoi deadlock
  * z Subiektem pracującym obok na tych samych tabelach.
  *
- * Pozycje wiszą na `ob_DokHanId` — FS i PA są dokumentami HANDLOWYMI. To ta
- * sama kolumna, którą 0.75.0 przepisało do MM i straciło wydanie; reguła stoi
- * w `docs/subiekt-gt-struktura.md`.
+ * Pozycje wiszą na `ob_DokHanId` — FS i PA są dokumentami HANDLOWYMI. Reguła
+ * stoi w `docs/subiekt-gt-struktura.md`.
  */
 async function pobierzFaktury(
   pool: sql.ConnectionPool
 ): Promise<{ faktury: FakturaRow[]; fakturyPozycje: PozRow[] }> {
   const c = config.mssql;
-  /* Korekty jadą TYM SAMYM zapytaniem co sprzedaż (0.201.0): to ten sam
+  /* Korekty jadą TYM SAMYM zapytaniem co sprzedaż: to ten sam
      dokument o innym `dok_Typ`, a osobna droga znaczyłaby drugą drabinkę
      degradacji i drugie miejsce do zapomnienia przy zmianie okna dat. */
   const gdzie = budujFiltrFaktur([c.dokTypFS, c.dokTypPA, ...c.dokTypyKorekt]);
@@ -567,7 +561,7 @@ async function pobierzFaktury(
     .slice(0, 10);
   const req = () => pool.request().input("cutoff", sql.VarChar, cutoff);
 
-  /* Numer zamówienia wchodzi DWIEMA drogami (0.175.0): kolumną numeru obcego
+  /* Numer zamówienia wchodzi DWIEMA drogami: kolumną numeru obcego
      i UUID-em wyciętym z uwag. Zrzut z Subiekta firmy pokazał, że Sellasist
      pisze go w `dok_Uwagi`, a `dok_NrPelnyOryg` zostawia pusty — więc do tego
      wydania mocny sygnał nie miał prawa zadziałać ani razu. Uwag NIE kopiujemy:
@@ -766,7 +760,7 @@ export async function importFromMssql(): Promise<ImportStats> {
   ).recordset;
 
   /* Magazyny ze słownika. NOWY GRANT: `GRANT SELECT ON dbo.sl_Magazyn`.
-     Instalacja sprzed lipca 2026 go NIE MA, a `git pull` nie ma prawa jej
+     Starsza instalacja go NIE MA, a aktualizacja nie ma prawa jej
      wywrócić — dlatego brak uprawnienia degraduje import do dawnego
      zachowania (trzy magazyny z konfiguracji) i melduje się zdaniem
      w /api/health, zamiast przerywać synchronizację. */
@@ -867,7 +861,7 @@ export async function importFromMssql(): Promise<ImportStats> {
   /* Cennik degraduje tak samo jak MM i sprzedaż, i z mocniejszego powodu:
      wchodzi jako PIERWSZE wydanie, które go czyta, więc żadna istniejąca
      instalacja nie ma jeszcze `GRANT SELECT ON dbo.tw_Cena`. Brak ceny na
-     karcie towaru to dokładnie stan sprzed 0.405.0; wywrócony import stanów
+     karcie towaru to drobna strata; wywrócony import stanów
      to zatrzymana hala. `cenyOk` steruje też czyszczeniem `sgt_cena`. */
   let ceny: CenaRow[] = [];
   let poziomyCen = new Map<number, string>();
@@ -943,10 +937,8 @@ export async function importFromMssql(): Promise<ImportStats> {
       ...(mmOk ? ["sgt_mm_zwrot_pozycja", "sgt_mm_zwrot"] : []),
       ...(fakturyOk ? ["sgt_faktura_pozycja", "sgt_faktura"] : []),
       "sgt_zam_pozycja", "sgt_zamowienie",
-      /* `sgt_cena` czyszczone TYLKO przy udanym odczycie (0.405.0) — ta sama
-         zasada, co przy MM i fakturach. Do 0.404.0 stało tu bezwarunkowo, bo
-         import cen nie istniał i nie było czego stracić. Teraz jest: gdyby
-         czyszczenie poszło mimo braku uprawnienia, pierwszy przebieg po
+      /* `sgt_cena` czyszczone TYLKO przy udanym odczycie — ta sama
+         zasada, co przy MM i fakturach. Gdyby czyszczenie poszło mimo braku uprawnienia, pierwszy przebieg po
          cofnięciu GRANT-u zostawiłby kartę bez cen zamiast z wczorajszymi. */
       ...(cenyOk ? ["sgt_cena"] : []),
       "sgt_pozycja", "sgt_dokument", "sgt_stan", "sgt_towar", "sgt_magazyn",
@@ -1036,7 +1028,7 @@ export async function importFromMssql(): Promise<ImportStats> {
       );
     }
 
-    /* KOREKTA DOPIERO PRZY DRUGIM ODCZYCIE (0.350.1) — uzasadnienie
+    /* KOREKTA DOPIERO PRZY DRUGIM ODCZYCIE — uzasadnienie
        w `korekty-dojrzale.ts`. Pamięć widzianych odświeżamy WYŁĄCZNIE przy
        udanym odczycie faktur: nieudany zostawia stary read-model i nie wie
        nic o tym, które korekty dziś istnieją. */

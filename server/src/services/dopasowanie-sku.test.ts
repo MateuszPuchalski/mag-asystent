@@ -11,9 +11,8 @@ import { kartotekaOferty, kartotekaPoSku, zaproponujKartoteke } from "./dopasowa
    i że gdy milczy, POWIE DLACZEGO.
 
    Fikstury celowo ROZJEŻDŻAJĄ przestrzenie identyfikatorów: UUID po stronie
-   zwrotu, numer po stronie oferty. Do 0.153.1 testy wstawiały po obu stronach
-   tę samą stałą „111" i dlatego przepuściły usterkę, w której złączenie mogło
-   nie trafiać nigdy. */
+   zwrotu, numer po stronie oferty. Ta sama stała po obu stronach
+   przepuściłaby złączenie, które w produkcji nie trafia nigdy. */
 
 const schema = fs.readFileSync(new URL("../db/schema.sql", import.meta.url), "utf8");
 const UUID_POZYCJI = "3e895572-9297-4d80-b151-353deb95bff6";
@@ -106,9 +105,8 @@ test("dwie pozycje o tej samej nazwie nie dają dopasowania", () => {
 });
 
 test("każde zerwane ogniwo ma WŁASNY powód, nie wspólne „bez kartoteki”", () => {
-  /* To jest sedno tego wydania: do 0.153.1 wszystkie pięć zerwań wyglądało na
-     ekranie identycznie, więc nie dało się odróżnić błędu kodu od braku
-     danych po stronie Allegro. */
+  /* Każde z pięciu zerwań wygląda na ekranie inaczej, żeby dało się
+     odróżnić błąd kodu od braku danych po stronie Allegro. */
   const d = stanowisko();
 
   assert.equal(propozycja(d, { orderId: null }).powod, "brak_zamowienia_w_zwrocie");
@@ -130,8 +128,7 @@ test("każde zerwane ogniwo ma WŁASNY powód, nie wspólne „bez kartoteki”"
 
 test("symbol z białym znakiem w kartotece też trafia", () => {
   /* `subiekt.mssql.ts` nie trimuje `tw_Symbol` przy imporcie, choć
-     `mag_Symbol` tuż obok trimuje. Do 0.153.1 trim był jednostronny, więc
-     taka kartoteka nie trafiała nigdy. */
+     `mag_Symbol` tuż obok trimuje. Trim jednostronny nie trafiłby nigdy. */
   const d = stanowisko();
   zamowienie(d, "ord-1", [{ offerId: NUMER_OFERTY, lineId: "l-1", nazwa: "S", sku: " SPACJA " }]);
   assert.equal(propozycja(d).twId, 14);
@@ -162,7 +159,7 @@ test("propozycja NICZEGO nie zapisuje", () => {
   assert.equal(licz(), przed);
 });
 
-/* ── Mostek dla SKRZYNKI: oferta → kartoteka BEZ zamówienia (0.179.0) ────────
+/* ── Mostek dla SKRZYNKI: oferta → kartoteka BEZ zamówienia ──────────────────
    Pytanie pada zwykle PRZED zakupem, więc zamówienia nie ma i mieć nie
    będzie. Zostają dwa ogniwa: pamięć wskazań i SKU ze snapshotu oferty.   */
 
@@ -225,7 +222,7 @@ test("skrzynka: bez numeru oferty pamięci nie ma czego szukać", () => {
   assert.equal(w.twId, 10, "sam SKU dalej działa");
 });
 
-/* ── Sygnatura się zmienia (0.219.0) ─────────────────────────────────────────
+/* ── Sygnatura się zmienia ───────────────────────────────────────────────────
    Decyzja właściciela: sprzedawca przepina sygnaturę oferty, gdy towar od
    jednego dostawcy się wyczerpie. Pamięć wskazania obowiązuje więc tylko przy
    TEJ SAMEJ sygnaturze; przy nowej rządzi sygnatura, a zdanie mówi, co ustąpiło. */

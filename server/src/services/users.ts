@@ -3,16 +3,12 @@ import { db, nowIso } from "../db/db.js";
 import { config } from "../config.js";
 
 /* ── Konta pracowników (plan §7) ────────────────────────────────────────────
-   Dotąd tożsamością był dowolny łańcuch wpisany na kolektorze i wysłany
-   w nagłówku `X-User`. Trzy skutki, wszystkie realne:
+   Tożsamość z dowolnego łańcucha w nagłówku miałaby trzy skutki:
      • `events.user_id` zbiera warianty tej samej osoby (Jan, jan, Jan K),
-       więc audyt nadaje się do czytania oczami i do niczego więcej,
      • każdy może podać się za kogokolwiek jednym wpisem,
-     • firma chce kont imiennych — czego ten model nie realizuje.
+     • firma chce kont imiennych.
 
-   Wejściem jest LOGIN I HASŁO. Do sierpnia 2026 był nim skan plakietki
-   `PRC-0007-3` — jedna sekunda zamiast wpisywania, ale własny, osobny wzorzec
-   w firmie, która wszędzie indziej loguje się loginem i hasłem.              */
+   Wejściem jest LOGIN I HASŁO, jak wszędzie indziej w firmie.               */
 
 export type Rola = "magazynier" | "biuro" | "admin";
 
@@ -197,8 +193,7 @@ export function brakKont(): boolean {
  * Konto demo `admin`/`admin` — wyłącznie tryb seeded, wyłącznie pusta baza.
  *
  * ŚWIADOME ODWRÓCENIE decyzji z `db/seed.ts` („stałego hasła demo świadomie
- * nie ma") — decyzją właściciela (0.53.2), tym samym trybem co odwrócenie
- * przy raporcie wydajności w 0.48.0. Uzasadnienie tamtej zasady brzmiało
+ * nie ma") — decyzją właściciela. Uzasadnienie tamtej zasady brzmiało
  * „wyjątek tylko-na-dev jedzie potem na produkcję"; tutaj ogrodzeniem jest
  * TRYB, nie dyscyplina: `SGT_MODE=seeded` nie ma prawa działać na produkcji
  * (odmawia go instalator, seed scenariuszy i SFERA_WORKER), więc konto nie
@@ -257,7 +252,7 @@ export function migrujHistorie(): MigracjaWynik {
   let zalozonych = 0;
 
   // Warianty tej samej osoby (Jan, jan, „Jan ") schodzą się w JEDNO konto —
-  // to jest cały powód, dla którego audyt dotąd był bezużyteczny.
+  // inaczej audyt nadaje się do czytania oczami i do niczego więcej.
   for (const n of nazwy) {
     if (!klucz(n)) continue;
     if (istniejace.has(klucz(n))) continue;

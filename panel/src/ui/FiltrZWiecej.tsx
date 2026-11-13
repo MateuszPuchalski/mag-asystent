@@ -1,15 +1,12 @@
 import React from "react";
 import { FiltrSegmentowy, type PozycjaFiltra } from "./index";
 
-/* ── KUBEŁKI PRACY NA WIERZCHU, PRZEGLĄDANIE POD „WIĘCEJ" (0.522.0) ─────────
-   Zgłoszenie agentów: „aplikacja przytłacza". 0.506.0 zwinęło w Skrzynce
-   „Oczekujące" i „Zakończone" do listy „Więcej", bo robotę robi się w trzech
-   kubełkach, a te dwa się przegląda. Ta sama diagnoza stoi na każdej kolejce
-   obsługi: „Tylko wgląd" zajmował pigułkę równą „Do decyzji".
+/* ── KUBEŁKI PRACY NA WIERZCHU, PRZEGLĄDANIE POD „WIĘCEJ" ───────────────────
+   Robotę robi się w kilku kubełkach, a resztę się przegląda. „Tylko wgląd"
+   nie zajmuje pigułki równej „Do decyzji", żeby aplikacja nie przytłaczała.
 
-   KOMPONENT, NIE KOPIA. W Skrzynce ten układ stał wpisany w kolejkę. Przepisany
-   na trzy kolejne ekrany byłby trzema kształtami jednego wyboru — dokładnie tym,
-   co 0.262.0 zlikwidowało przy pigułkach.
+   KOMPONENT, NIE KOPIA. Przepisany na kilka ekranów układ byłby kilkoma
+   kształtami jednego wyboru.
 
    CO ZOSTAJE: pigułki dalej rysuje `FiltrSegmentowy`, więc kształt wyboru jest
    jeden. Lista to zwykły `<select>`: jedno kliknięcie do każdego ukrytego
@@ -20,8 +17,8 @@ import { FiltrSegmentowy, type PozycjaFiltra } from "./index";
    WARTOŚĆ OPCJI TO INDEKS, nie klucz. Klucze kubełków bywają `null`
    („Wszystkie") i liczbą, a `<select>` zna wyłącznie napisy.
 
-   ── TRYB ZWARTY (0.548.0, wariant C skrzynki) ─────────────────────────────
-   Lista rozciągnięta na resztę rzędu po zawinięciu stawała się pełnoszerokim
+   ── TRYB ZWARTY ─────────────────────────────────────────────────────────────
+   Lista rozciągnięta na resztę rzędu po zawinięciu staje się pełnoszerokim
    paskiem pod kubełkami — osobnym pasmem sterowania nad pytaniami. W trybie
    zwartym „Więcej" ma szerokość swojej treści (`field-sizing: content`):
    stoi obok pigułek i schodzi do drugiego rzędu tylko wtedy, gdy się nie
@@ -48,8 +45,8 @@ export function FiltrZWiecej<T extends string | number | null>({
       value={wybranyUkryty < 0 ? "" : String(wybranyUkryty)}
       title={wybranyUkryty < 0 ? "Kubełki do przeglądania" : ukryte[wybranyUkryty].podpowiedz}
       onChange={(e) => { if (e.target.value !== "") onWybierz(ukryte[Number(e.target.value)].klucz); }}
-      /* Reszta rzędu, nie własna szerokość (0.506.0): stała szerokość
-         125 px spadała w kolumnie 360 px pod kubełki i dokładała rząd.
+      /* Reszta rzędu, nie własna szerokość: stała szerokość
+         125 px spadałaby w kolumnie 360 px pod kubełki i dokładała rząd.
          Tryb zwarty mierzy się treścią, więc stałej szerokości też nie ma. */
       className={`field w-auto py-1 text-xs font-semibold ${zwarty
         ? "shrink-0 px-2 [field-sizing:content]" : "min-w-0 flex-1 basis-[5.5rem]"} ${

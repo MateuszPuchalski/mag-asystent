@@ -7,18 +7,16 @@ const ZRODLA = import.meta.glob(
   ["../**/*.tsx", "../**/*.ts", "!../**/*.test.tsx", "!../**/*.test.ts", "!../ui/index.tsx"],
   { query: "?raw", eager: true, import: "default" }) as Record<string, string>;
 
-/* ── TRZY FORMY, NIE DWIE (audyt zwrotów, 15 września 2026) ──────────────────
+/* ── TRZY FORMY, NIE DWIE ──────────────────────────────────────────────────────
    Polszczyzna ma przy liczebniku trzy formy rzeczownika: „1 pozycja",
-   „2 pozycje", „5 pozycji". Panel liczył dwie w OŚMIU miejscach, na czterech
-   ekranach, i mylił się na dwa przeciwne sposoby:
+   „2 pozycje", „5 pozycji". Dwie formy mylą się na dwa przeciwne sposoby:
 
      * forma dla 2–4 wszędzie      → „5 pozycje", „i 5 inne";
      * dopełniacz mnogi wszędzie   → „2 pasujących zwrotów", „2 zdjęć".
 
    Drugi błąd jest CZĘSTSZY, choć wygląda niewinniej: dwa i trzy zdarzają się
-   na ekranie o wiele częściej niż pięć. Jedyna poprawna kopia reguły mieszkała
-   jako prywatna funkcja jednego ekranu — i właśnie dlatego, że w ekranie,
-   nikt jej nie znalazł przy ośmiu pozostałych miejscach.
+   na ekranie o wiele częściej niż pięć. Reguła mieszka w `ui/index.tsx`,
+   bo prywatnej funkcji w ekranie nikt nie znajdzie.
 
    CO PILNUJE. Dwugałęziowy wybór formy rzeczownika nie odradza się TAM, GDZIE
    OBOK STOI LICZBA. Sama liczba jest tu warunkiem, nie ozdobą: bez liczebnika

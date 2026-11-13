@@ -5,7 +5,7 @@ import os from "node:os";
 import path from "node:path";
 import type { FastifyInstance } from "fastify";
 
-/* ── Strażnik adresów CAŁEGO panelu (0.431.0) ──────────────────────────────
+/* ── Strażnik adresów CAŁEGO panelu ──────────────────────────────
    `skrzynka.test.ts` od 0.181.1 pilnuje, że każdy adres z `api/rozmowy.ts` ma
    trasę na serwerze. Pozostałe moduły `panel/src/api/*.ts` nie miały strażnika
    wcale — a przeprowadzka biura do panelu (`docs/obsluga-klienta.md` §7)

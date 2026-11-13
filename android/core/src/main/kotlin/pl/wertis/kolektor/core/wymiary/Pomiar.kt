@@ -5,6 +5,7 @@ import java.math.RoundingMode
 import pl.wertis.kolektor.core.net.PomiarBody
 import pl.wertis.kolektor.core.net.PozycjaBezWymiarow
 import pl.wertis.kolektor.core.net.TowarDoPomiaru
+import pl.wertis.kolektor.core.net.WymiaryTowaru
 
 /* ── Pomiar wagi i wymiarów z kolektora ─────────────────────────────────────
    Reguły formularza mieszkają tutaj, bo tylko tu mają testy. Ekran `:app`
@@ -173,10 +174,15 @@ fun cokolwiekWpisane(wpisy: Map<PolePomiaru, String>): Boolean =
  * Netto ponad brutto sprawdzamy także względem kartoteki: człowiek może wpisać
  * samo netto obok brutto, które już stoi w Subiekcie. Serwer robi to samo.
  */
-fun bladPomiaru(wpisy: Map<PolePomiaru, String>, towar: TowarDoPomiaru): String? {
+fun bladPomiaru(
+    wpisy: Map<PolePomiaru, String>,
+    towar: TowarDoPomiaru,
+    wymagane: Set<PolePomiaru> = emptySet(),
+): String? {
     for (pole in PolePomiaru.entries) {
         bladPola(pole, wpisy[pole].orEmpty())?.let { return it }
     }
+    brakWymaganych(wpisy, wymagane)?.let { return it }
     if (!cokolwiekWpisane(wpisy)) return "Wpisz co najmniej jedną wartość pomiaru."
     val brutto = wpisy[PolePomiaru.BRUTTO]?.let(::liczbaPomiaru)?.let { zaokraglij(PolePomiaru.BRUTTO, it) }
         ?: towar.brutto
@@ -202,6 +208,49 @@ fun cialoPomiaru(wpisy: Map<PolePomiaru, String>): PomiarBody {
         szerokosc = v(PolePomiaru.SZEROKOSC),
         wysokosc = v(PolePomiaru.WYSOKOSC),
     )
+}
+
+/* ── Pomiar wymuszony przy rozkładaniu dostawy ──────────────────────────────
+   Decyzja właściciela: towar bez kompletu pięciu wartości nie trafia na półkę,
+   dopóki ktoś go nie zważy i nie zmierzy. Rozkładanie to jedyna chwila, w której
+   każdy nowy towar na pewno przechodzi przez ręce, więc brak złapany tutaj nie
+   czeka miesiącami na liście „Do zmierzenia".
+
+   Wymagane są wyłącznie BRAKI. Wartość, którą kartoteka już ma, zostaje,
+   bo przepisywanie jej z wagi to praca bez nowej informacji.
+
+   Blokuje tylko odpowiedź serwera, która mówi „brakuje". Wyłączona funkcja,
+   pomiar w kolejce i brak odpowiedzi nie blokują: bez wiedzy o kartotece
+   blokada zatrzymałaby rozkładanie w każdej dziurze Wi-Fi.                   */
+
+/** Pola, których kartoteka nie ma — przy wymuszonym pomiarze każde trzeba wpisać. */
+fun wymaganePola(t: TowarDoPomiaru): Set<PolePomiaru> =
+    PolePomiaru.entries.filterTo(LinkedHashSet()) { obecne(t, it) == null }
+
+/**
+ * Zdanie o pustych wymaganych polach albo `null`, gdy wszystkie są wpisane.
+ * Przycisk zapisu zostaje aktywny, a odmowa mówi, czego brakuje: wyszarzony
+ * przycisk nie powie człowiekowi przy wadze, które pole pominął.
+ */
+fun brakWymaganych(wpisy: Map<PolePomiaru, String>, wymagane: Set<PolePomiaru>): String? {
+    val puste = PolePomiaru.entries.filter { it in wymagane && wpisy[it].orEmpty().isBlank() }
+    if (puste.isEmpty()) return null
+    return "Wpisz: " + puste.joinToString(", ") { it.etykieta.lowercase() } +
+        " — bez tego pozycji nie odłożysz."
+}
+
+/**
+ * Towar do wymuszonego pomiaru albo `null`, gdy odłożenie może iść dalej.
+ *
+ * @param twId towar otwartej pozycji; odpowiedź o innym to spóźnione żądanie
+ *   po poprzednim skanie i nie wolno nią blokować ani mierzyć
+ * @param zmierzone towary zmierzone z tego ekranu; Subiekt zobaczy pomiar
+ *   dopiero po workerze, a drugi arkusz byłby pytaniem o to samo
+ */
+fun pomiarPrzedOdlozeniem(w: WymiaryTowaru, twId: Long, zmierzone: Set<Long>): TowarDoPomiaru? {
+    val towar = w.towar ?: return null
+    if (!w.wlaczone || w.oczekuje || towar.twId != twId || twId in zmierzone) return null
+    return towar.takeIf { wymaganePola(it).isNotEmpty() }
 }
 
 /* ── Lista „Do zmierzenia" ───────────────────────────────────────────────── */

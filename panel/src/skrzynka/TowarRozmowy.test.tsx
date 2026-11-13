@@ -1,5 +1,4 @@
 import { describe, it, expect, vi } from "vitest";
-import React from "react";
 import { fireEvent, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type { CenaPoziomu, DopasowanieKartoteki, KartaTowaru, OfertaRozmowy } from "../api/typy";
@@ -42,8 +41,8 @@ describe("towar przy rozmowie", () => {
   });
 
   it("jedno trafienie po SKU jest powiązaniem: stan od razu, bez „Zatwierdź”, z podpisem źródła", () => {
-    /* Decyzja właściciela (0.219.0): sygnatura jeden do jednego łączy sama.
-       Do 0.218.0 stał tu przycisk, a stanu nie pobierano przed kliknięciem. */
+    /* Decyzja właściciela: sygnatura jeden do jednego łączy sama, bez
+       przycisku, a stan pobiera się od razu. */
     karta.mockReturnValue({ isLoading: false, error: null, data: PELNA });
     render(<TowarRozmowy rozmowaId={1} oferta={oferta({
       pewnosc: "sku", twId: 7701, symbol: "NOZ-STIGA-43",
@@ -52,7 +51,7 @@ describe("towar przy rozmowie", () => {
     expect(karta).toHaveBeenCalledWith(7701);
     expect(screen.queryByRole("button", { name: /Zatwierdź/ })).toBeNull();
     expect(screen.getByText(/SKU oferty/)).toBeInTheDocument();
-    /* Liczba „dostępny" stoi od 23 września 2026 WYŁĄCZNIE w paśmie
+    /* Liczba „dostępny" stoi WYŁĄCZNIE w paśmie
        odpowiedzi nad zakładkami (`PasmoOdpowiedzi.test.tsx`). Tu zostaje
        proporcja wolne–zarezerwowane, której pasmo nie pokazuje. */
     expect(screen.getByTitle("stan 7: 5 wolnych, 2 w rezerwacji")).toBeInTheDocument();
@@ -72,7 +71,7 @@ describe("towar przy rozmowie", () => {
     expect(karta).toHaveBeenCalledWith(null);
   });
 
-  /* ── JEDEN RAZ KAŻDY FAKT (23 września 2026) ────────────────────────────
+  /* ── JEDEN RAZ KAŻDY FAKT ───────────────────────────────────────────────
      Zrzut właściciela: nazwa towaru trzy razy w kolumnie, symbol cztery, stan
      i półka dwa. Nazwę, liczbę i półkę mówi pasmo odpowiedzi nad zakładkami —
      pod tym samym warunkiem, pod którym stoi ta sekcja. Test pilnuje, że
@@ -96,7 +95,7 @@ describe("towar przy rozmowie", () => {
     expect(screen.queryByText("Nóż do kosiarki 43 cm")).toBeNull();
     expect(screen.queryByText("R12-B3")).toBeNull();
     expect(screen.queryByText("5")).toBeNull();
-    /* Stan i rezerwacje ZOSTAJĄ — od 23 września 2026 jako pasek, z liczbami
+    /* Stan i rezerwacje stoją jako pasek, z liczbami
        w dymku i dla czytnika ekranu, a nie jako drugie zdanie. */
     expect(screen.getByTitle("stan 7: 5 wolnych, 2 w rezerwacji")).toBeInTheDocument();
     /* Identyfikatory z opisu (E3) — po nich klient pyta, gdy nie zna naszego symbolu. */
@@ -105,7 +104,7 @@ describe("towar przy rozmowie", () => {
     expect(screen.getByText(/A\. Lewandowska/)).toBeInTheDocument();
   });
 
-  /* ── Opis kartoteki (0.198.0) ────────────────────────────────────────────
+  /* ── Opis kartoteki ──────────────────────────────────────────────────────
      `desc` jechał w odpowiedzi `/api/products/:twId` od dawna i nie był
      pokazywany NIGDZIE. A to w nim ta firma trzyma gwinty, wymiary i sekcje
      „Modele:" — czyli odpowiedzi na najczęstsze pytania. Test pilnuje, że
@@ -223,11 +222,9 @@ describe("towar przy rozmowie", () => {
   /* Opis to WOLNY TEKST, w którym bywa notatka dla magazynu. Wstawka
      parametrów wybiera pola świadomie, bo szkic idzie do klienta.
 
-     Od 0.404.0 ta sekcja nie ma ŻADNEJ wstawki: parametry przeniosły się do
-     pasma odpowiedzi nad zakładkami (`PasmoOdpowiedzi.tsx`), bo przycisk po
-     sześciu sekcjach przewijania stał poza zasięgiem wzroku. Test pilnuje
-     tego, co pilnował: opisu nie da się wstawić jednym kliknięciem — a teraz
-     nie da się stąd wstawić niczego. */
+     Ta sekcja nie ma ŻADNEJ wstawki: parametry wstawia pasmo odpowiedzi nad
+     zakładkami (`PasmoOdpowiedzi.tsx`). Opisu nie da się wstawić jednym
+     kliknięciem. */
   it("opisu NIE da się wstawić do szkicu jednym kliknięciem", () => {
     karta.mockReturnValue({
       isLoading: false, error: null,
@@ -284,7 +281,7 @@ describe("towar przy rozmowie", () => {
   });
 });
 
-/* ── Ceny z kartoteki Subiekta (0.396.0) ─────────────────────────────────────
+/* ── Ceny z kartoteki Subiekta ───────────────────────────────────────────────
    Zgłoszenie właściciela: „nie widzę cen z Subiekta przy towarach". Kolumna
    mówiła CZY MAMY i GDZIE, a na „ile to kosztuje" agent musiał otwierać
    Subiekta — czyli robić to, czego §25 zabrania.
@@ -332,9 +329,9 @@ describe("ceny kartoteki", () => {
 
   it("ZERO BRUTTO to brak ceny, a nie najgłośniejsza liczba bloku (0.412.0)", () => {
     /* Poziom zakupu Subiekt wypełnia wyłącznie po stronie netto, a drugą
-       stronę pary zostawia zerem. Do 0.411.0 wiersz krzyczał więc `0,00 PLN`
-       grubym drukiem i wyciszał jedyną prawdziwą liczbę jako „netto" — przy
-       triażu reklamacji, gdzie właśnie ta liczba rozstrzyga. */
+       stronę pary zostawia zerem. Wiersz nie może krzyczeć `0,00 PLN` i
+       wyciszać jedynej prawdziwej liczby — przy triażu reklamacji to ona
+       rozstrzyga. */
     zKartoteka([{ poziom: 0, nazwa: "", nettoGrosze: 1864, bruttoGrosze: 0, waluta: "PLN" }]);
     expect(screen.getByText("18,64 PLN")).toBeInTheDocument();
     expect(screen.queryByText(/0,00/)).toBeNull();
@@ -351,7 +348,7 @@ describe("ceny kartoteki", () => {
   });
 });
 
-/* ── Ceny równe co do grosza sklejone (23 września 2026) ─────────────────────
+/* ── Ceny równe co do grosza sklejone ────────────────────────────────────────
    Zrzut właściciela: sześć poziomów, pięć takich samych. Grupa zachowuje
    kolejność Subiekta i nie gubi nazw — stoją w dymku. */
 describe("grupowanie cen", () => {
@@ -365,7 +362,7 @@ describe("grupowanie cen", () => {
   });
 });
 
-/* ── Cena oferty na osi poziomów kartoteki (0.498.0) ────────────────────────
+/* ── Cena oferty na osi poziomów kartoteki ──────────────────────────────────
    Nagranie właściciela: oferta 45,00 zł przy detalicznej 29,06 zł, a tabela
    tego nie mówiła. Zdanie ma nazwać kierunek i skalę rozjazdu, a poziom bez
    ceny brutto (zakupowy) nie może udawać najniższej ceny. */

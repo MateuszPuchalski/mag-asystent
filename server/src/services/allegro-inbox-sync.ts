@@ -13,10 +13,7 @@ import { kontoKanalu } from "./kanal-konto.js";
 import { zapiszZalaczniki } from "./zalaczniki-wiadomosci.js";
 import { ROLE_ALLEGRO } from "./glos-allegro.js";
 
-/* Kształt ze SPECYFIKACJI Allegro — patrz docs/allegro-ksztalt.md. Do 0.151.0
-   stały tu nazwy wymyślone razem z kodem (`lastMessageDate`, `author.role`,
-   `relatedObject`) i przez to skrzynka nie zapisała ani jednego wątku:
-   `undefined` na trzecim parametrze wstawki wywracał każdy z nich.
+/* Kształt ze SPECYFIKACJI Allegro — patrz docs/allegro-ksztalt.md.
    Pola, których świadomie nie mapujemy, są wymienione w kontrakcie —
    `surowe_json` i tak trzyma całą odpowiedź. Wyjątek: wątek z `beta.v1`
    idzie tam bez `participants`, bo loginów uczestników nie zapisujemy. */
@@ -47,8 +44,8 @@ export const PROBLEM_Z_ZAKUPEM = "POST_PURCHASE_ISSUE";
 /* Schemat mówi `type: boolean`, ale opublikowany PRZYKŁAD renderuje `read`
    jako tekst („false"). Ta funkcja przyjmuje obie postaci — kosztuje trzy
    linijki, a broni przed rozbieżnością, którą Allegro ma we własnej
-   dokumentacji. Wszystko inne jest błędem wątku, nie zgadniętym zerem: po
-   0.149.2 taki wątek zostaje pominięty, a przebieg leci dalej. */
+   dokumentacji. Wszystko inne jest błędem wątku, nie zgadniętym zerem:
+   taki wątek zostaje pominięty, a przebieg leci dalej. */
 function flaga(wartosc: unknown, pole: string): boolean {
   if (typeof wartosc === "boolean") return wartosc;
   if (wartosc === "true") return true;
@@ -56,10 +53,9 @@ function flaga(wartosc: unknown, pole: string): boolean {
   throw new Error(`Pole ${pole} ma nieoczekiwaną postać: ${JSON.stringify(wartosc)}`);
 }
 
-/* Kod bierze się z KLASY błędu, nie z jego zdania. Do 0.149.0 stało tu
-   wyrażenie szukające kodu w nawiasie — łapało „(401)", ale nie „Allegro
-   odpowiedziało 503: …", więc status synchronizacji milczał akurat przy
-   odmowach, które sam ma nazywać. */
+/* Kod bierze się z KLASY błędu, nie z jego zdania: „Allegro odpowiedziało
+   503: …" nie ma kodu w nawiasie, a status synchronizacji ma nazywać
+   każdą odmowę. */
 const kodHttp = (error: unknown): number | null =>
   error instanceof BladOdpowiedziAllegro ? error.status : null;
 
@@ -70,21 +66,15 @@ function tablica<T>(value: unknown, pole: string): T[] {
   return (value as Record<string, unknown>)[pole] as T[];
 }
 
-/* ── Sufit stron w jednym przebiegu (0.164.1) ────────────────────────────────
-   POWSTAŁO PO 316 TYSIĄCACH ŻĄDAŃ W CIĄGU DOBY. Skrzynka była jedyną z czterech
-   pętli Allegro bez ogranicznika: zwroty mają `MAKS_STRON`, rabaty mają,
-   zamówienia mają `NA_PRZEBIEG`, a tutaj przebieg szedł tyle stron, ile
-   Allegro miało do oddania. Przy niesparowanym kursorze i szerokiej granicy
-   znaczyło to całą historię konta — co minutę, przez siedem godzin.
+/* ── Sufit stron w jednym przebiegu ──────────────────────────────────────────
+   Bez ogranicznika przebieg przy niesparowanym kursorze czytałby całą
+   historię konta co minutę. Pozostałe pętle Allegro też mają sufit.
 
    Sufit jest BEZPIECZNY, bo lista przychodzi posortowana po dacie ostatniej
    wiadomości, od najnowszej (specyfikacja: „sorted by last message date,
    starting from newest"). Wątek, w którym coś się dzieje, wskakuje na górę.
    Zejść pod sufit może więc wyłącznie rozmowa, w której nic się nie zmieniło
    od 500 nowszych wątków — a takiej nie ma czego dociągać.
-
-   Sufit odcina teraz wyłącznie prawdziwą zaległość: kursor jest progiem daty,
-   więc kolejna wiadomość w najnowszym wątku kończy przebieg na pierwszej stronie.
 
    CZEGO SUFIT NIE GWARANTUJE: gdyby między dwoma przebiegami przybyło ponad
    500 wątków z nowymi wiadomościami, te spod sufitu poczekają do następnego
@@ -332,26 +322,16 @@ export async function synchronizujAllegroInbox(deps: InboxSyncDeps = {}): Promis
   const kursorParsowany = startState.cursorAt ? Date.parse(startState.cursorAt) : NaN;
   const kursorMs = Number.isNaN(kursorParsowany) ? null : kursorParsowany;
 
-  /**
-   * Zapis JEDNEJ STRONY listy. Wydzielone z ciała przebiegu, bo od 0.164.1
-   * woła się to po każdej stronie, a nie raz na końcu.
-   */
+  /** Zapis JEDNEJ STRONY listy, wołany po każdej stronie. */
   const zapiszPartie = (threads: Thread[], messages: Map<string, Message[]>,
     struktury: Map<string, StrukturaWatku> = new Map()): void => {
       /* KAŻDY WĄTEK MA WŁASNĄ TRANSAKCJĘ, bo §9 projektu panelu żąda, żeby
-         synchronizator „izolował błąd pojedynczego wątku". Do 0.149.2 cała
-         partia szła jedną transakcją i produkcja pokazała, co to znaczy:
-         Allegro przysłało wątek bez
-         `lastMessageDate`, `node:sqlite` odmówił związania `undefined`
-         („Provided value cannot be bound to SQLite parameter 3"), a wycofanie
-         zabrało ze sobą wszystkie zdrowe wątki z tego samego przebiegu. Skrzynka
-         stała przez wiele przebiegów z rzędu przez JEDEN zepsuty wątek.
+         synchronizator „izolował błąd pojedynczego wątku". Jedna transakcja
+         na partię oznaczałaby, że jeden zepsuty wątek wycofuje wszystkie
+         zdrowe z tego przebiegu.
 
-         Nie zgaduję tutaj, czy wątek bez daty ma prawo wejść do skrzynki z pustą
-         datą — rozstrzyga to specyfikacja Allegro, której wciąż nie mamy (patrz
-         znaczniki `[WERYFIKUJ]` w docs/allegro-ksztalt.md). Do tego czasu taki
-         wątek jest odrzucany, czyli tak samo jak dotąd; zmienia się wyłącznie
-         to, że nie zabiera reszty przebiegu ze sobą. */
+         Wątek, którego nie da się zapisać, jest odrzucany i nie zabiera
+         reszty przebiegu ze sobą. */
       for (const thread of threads) {
         try {
           transaction(database, () => {
@@ -455,13 +435,12 @@ export async function synchronizujAllegroInbox(deps: InboxSyncDeps = {}): Promis
       const messages = new Map<string, Message[]>();
       const struktury = new Map<string, StrukturaWatku>();
       for (const thread of page) {
-        /* GRANICA CZASU (0.152.0). Lista przychodzi od najnowszego, więc
+        /* GRANICA CZASU. Lista przychodzi od najnowszego, więc
            pierwszy wątek poniżej progu znaczy „dalej są już same starsze" —
-           i to jest jedyny moment, w którym wolno przestać czytać. Bez tego
-           każdy przebieg chodził przez całą historię konta aż do końca.
+           i to jest jedyny moment, w którym wolno przestać czytać.
 
            Wątek BEZ daty przepuszczamy: schemat Allegro dopuszcza brak
-           `lastMessageDateTime` (patrz 0.151.0), a świeżo założona rozmowa nie
+           `lastMessageDateTime`, a świeżo założona rozmowa nie
            ma jak mieć ostatniej wiadomości. Odrzucanie jej progiem znaczyłoby
            rozmowę, której panel nigdy nie pokaże. */
         if (od && thread.lastMessageDateTime && thread.lastMessageDateTime < od) {
@@ -472,9 +451,8 @@ export async function synchronizujAllegroInbox(deps: InboxSyncDeps = {}): Promis
            przeszedł już w którymś z poprzednich przebiegów, a lista idzie od
            najnowszego, więc dalej są same starsze. Sama para (data, id) nie
            wystarcza: kolejna wiadomość w wątku, który był kursorem, zmienia jego
-           datę i starej pary nie ma już nigdzie na liście. Przebieg czytał wtedy
-           cały sufit stron po KAŻDEJ wiadomości w najnowszym wątku, także po naszej
-           własnej odpowiedzi. Wątek o dokładnie tej samej dacie idzie dalej:
+           datę i starej pary nie ma już nigdzie na liście. Wątek o dokładnie tej
+           samej dacie idzie dalej:
            znany i niezmieniony nie kosztuje żądania, a nieznany nie może zostać
            pominięty. Data, której nie da się odczytać, progu nie uruchamia. */
         if (kursorMs !== null && thread.lastMessageDateTime
@@ -501,7 +479,7 @@ export async function synchronizujAllegroInbox(deps: InboxSyncDeps = {}): Promis
           if (st) struktury.set(thread.id, st);
         }
       }
-      /* ZAPIS PO KAŻDEJ STRONIE, nie na końcu przebiegu (0.164.1). Do tego
+      /* ZAPIS PO KAŻDEJ STRONIE, nie na końcu przebiegu. Do tego
          wydania wszystko czekało w pamięci do ostatniej strony, więc awaria
          na stronie trzechsetnej kasowała dorobek dwustu dziewięćdziesięciu
          dziewięciu — i następny przebieg pytał Allegro o te same wiadomości
@@ -547,17 +525,11 @@ export async function synchronizujAllegroInbox(deps: InboxSyncDeps = {}): Promis
     const dno = doDna ? (widziane.at(-1)?.lastMessageDateTime ?? at) : startState.dnoAt;
 
     transaction(database, () => {
-      /* `error_count` ZERUJE SIĘ na sukcesie i to jest zmiana z 0.147.0.
-         Wcześniej klauzula `DO UPDATE` go pomijała, więc licznik rósł do
-         końca życia bazy: pierwsza w tygodniu odmowa Allegro zostawiała
-         w panelu „błędów: 1" na stałe, a §21 nie miał z czego policzyć,
-         ile przebiegów Z RZĘDU się nie powiodło.
+      /* `error_count` ZERUJE SIĘ na sukcesie: §21 liczy, ile przebiegów
+         Z RZĘDU się nie powiodło, a pojedyncza odmowa nie ma wisieć w panelu.
 
          `error_thread_count` liczy co innego i dlatego stoi osobno: przebieg
-         z pominiętym wątkiem DOMKNĄŁ SIĘ, więc nie jest porażką przebiegu.
-         Kolumna i wiersz „Wątki z błędem" w panelu istnieją od 0.147.0 —
-         do 0.149.2 nikt do nich nie pisał, więc panel pokazywał zero także
-         wtedy, gdy skrzynka gubiła wątki. */
+         z pominiętym wątkiem DOMKNĄŁ SIĘ, więc nie jest porażką przebiegu. */
       database.prepare(`INSERT INTO allegro_inbox_sync_state
         (id,cursor_at,cursor_id,last_success_at,last_attempt_at,last_error_code,
          last_error_text,error_count,error_thread_count,next_attempt_at,dno_at)
@@ -626,15 +598,11 @@ async function czytajWiadomosci(query: InboxQuery, apiUrl: string, thread: Threa
   return lista;
 }
 
-/* ── Model kanoniczny (0.144.0) ─────────────────────────────────────────────
+/* ── Model kanoniczny ───────────────────────────────────────────────────────
    Tabele `allegro_inbox_*` zostają SUROWYM LĄDOWISKIEM: trzymają odpowiedź
    Allegro w kształcie, w jakim przyszła, razem z `surowe_json`. Obsługa
    klienta pracuje na `channel_account`/`conversation`/`message`, bo tylko ten
-   model unosi drugi kanał, przypisanie agenta, szkic i komentarze.
-
-   Do 0.143.1 nikt nie zapisywał do `conversation`, więc przejmowanie rozmowy
-   i szkic z 0.143.0 były kodem nieosiągalnym — trasy przyjmowały liczbowe id
-   rozmowy, której nic nie tworzyło. Ten zapis jest tym brakującym ogniwem. */
+   model unosi drugi kanał, przypisanie agenta, szkic i komentarze. */
 
 /* Powiązanie wiadomości z ofertą. Allegro daje `relatesTo` z osobnymi gałęziami
    `offer` i `order`, niezależnymi od siebie — wiadomość może nieść obie
@@ -645,12 +613,8 @@ function oferta(message: Message): [string | null, string | null] {
   return id == null ? [null, null] : ["OFFER", String(id)];
 }
 
-/* Gałąź `order` idzie do OSOBNEJ kolumny (0.166.0). Do 0.165.0 była
-   wyrzucana z uzasadnieniem „numer zamówienia zostaje w `surowe_json` do
-   czasu, aż będzie miał ekran" — a sonda z 2 września pokazała, że to
-   zamówienie, nie oferta, jest częstszym powiązaniem (7 z 33 wobec 5 z 33).
-   Mail Allegro „Wiadomość dotyczy" bierze towar właśnie stąd; panel bez tej
-   kolumny nie miał czego pokazać. */
+/* Gałąź `order` idzie do OSOBNEJ kolumny: zamówienie jest częstszym
+   powiązaniem wątku niż oferta, a panel pokazuje z niego towar. */
 function zamowienie(message: Message): string | null {
   const id = message.relatesTo?.order?.id;
   return id == null ? null : String(id);
@@ -664,25 +628,16 @@ function najnowsza(messages: Message[]): string | null {
 
 /* Temat rozmowy niesie WIADOMOŚĆ, nie wątek. Bierzemy pierwszy niepusty —
    Allegro powtarza go w kolejnych wiadomościach tego samego wątku. Gdy go nie
-   ma, wołający zostaje przy loginie rozmówcy, czyli przy tym, co stało
-   w `conversation.subject` do 0.151.0. */
+   ma, wołający zostaje przy loginie rozmówcy. */
 function temat(messages: Message[]): string | null {
   const s = messages.find((m) => typeof m.subject === "string" && m.subject !== "")?.subject;
   return s == null ? null : odkodujEncje(s);
 }
 
 /* ENCJE HTML SCHODZĄ TUTAJ, przy wjeździe do modelu pracy — nie przy
-   wyświetlaniu. To jest blizna 0.127.0 („polskie znaki przyjeżdżały jako encje
-   HTML") z listy w `docs/obsluga-klienta.md`, kupiona DRUGI RAZ: `odkodujEncje`
-   czekała w `tekst.ts` z kompletem testów i z komentarzem mówiącym wprost, że
-   nowa obsługa ma ją wziąć gotową, nie odkryć drugi raz na produkcji. Odkryła
-   ją drugi raz na produkcji — panel escape'uje przy renderowaniu, więc
-   `kt&oacute;ry` z bazy stał na ekranie dosłownie, w każdej polskiej
-   wiadomości.
-
-   Specyfikacja tego nie zapowiada: `Message.text` to goły `type: string`, bez
-   słowa o HTML-u. Tak wygląda różnica między tym, co Allegro DEKLARUJE,
-   a tym, co przysyła.
+   wyświetlaniu. Allegro przysyła polskie znaki jako encje, choć
+   `Message.text` to w specyfikacji goły `type: string`. Panel escape'uje przy
+   renderowaniu, więc `kt&oacute;ry` z bazy stałby na ekranie dosłownie.
 
    LĄDOWISKO ZOSTAJE SUROWE. `allegro_inbox_message.text` i `surowe_json` niosą
    odpowiedź w kształcie, w jakim przyszła — to jedyny ślad, gdyby dekodowanie
@@ -711,18 +666,14 @@ function zapiszKanonicznie(
     "SELECT id FROM conversation WHERE channel_account_id=? AND external_conversation_id=?",
   ).get(konto, thread.id) as { id: number }).id);
 
-  /* OD NAJSTARSZEJ (23 września 2026). Allegro oddaje wiadomości od
-     najnowszej, a wpis w tej kolejności dawał starszemu dopiskowi klienta
-     wyższe `id` — i wysyłka odmawiała 409, bo kontrola świeżości szła po
-     `id`. Kontrola czyta już po czasie; ten porządek sprawia, że nowe wiersze
-     w ogóle nie mają rozjazdu. `createdAt` to ISO 8601, więc porównanie
-     napisów jest porównaniem chwil. */
+  /* OD NAJSTARSZEJ. Allegro oddaje wiadomości od najnowszej, a wpis w tej
+     kolejności dawałby starszemu dopiskowi klienta wyższe `id`. Ten porządek
+     sprawia, że nowe wiersze nie mają rozjazdu. `createdAt` to ISO 8601,
+     więc porównanie napisów jest porównaniem chwil. */
   const odNajstarszej = [...messages].sort((a, b) => String(a.createdAt).localeCompare(String(b.createdAt)));
   for (const message of odNajstarszej) {
     /* KIERUNEK Z `isInterlocutor`. Rozmówca to ten, który nie jest nami,
-       więc jego wiadomość jest przychodząca. Do 0.151.0 stało tu porównanie
-       z rolą `SELLER`, której Allegro nie przysyła — na prawdziwej
-       odpowiedzi rzucało `TypeError`.
+       więc jego wiadomość jest przychodząca.
 
        Liczone RAZ, do zmiennej: ta sama flaga rozstrzyga o kierunku, o budzeniu
        rozmowy i o tym, czy zdarzenie ma zapalić pasek w panelu. Trzy odczyty
@@ -746,16 +697,11 @@ function zapiszKanonicznie(
       rozmowa, konto, message.id,
       kierunek,
       tresc, oferta(message)[0], oferta(message)[1], zamowienie(message) ?? zamowienieWatku,
-      /* Data POJEDYNCZEJ wiadomości. Do 0.151.0 wszystkie wiadomości wątku
-         dostawały tu jedną datę — datę wątku — bo kod twierdził, że Allegro
-         daty wiadomości nie podaje. Podaje: `createdAt`. */
+      /* Data POJEDYNCZEJ wiadomości (`createdAt`), nie data wątku. */
       message.createdAt,
-      /* AUTOODPOWIEDŹ ZNACZONA OD RAZU (0.257.0). Do tego wydania kolumny tu
-         nie było, więc zostawało `DEFAULT 0`, a flagę dosypywała dopiero
-         migracja przy starcie procesu. Między restartami nasze „Dziękujemy
-         za kontakt" liczyło się jako ruch biura i przestawiało rozmowę na
-         „czeka na klienta" — pytanie klienta gasło przez to, że skrzynka
-         grzecznie potwierdziła jego odbiór. */
+      /* AUTOODPOWIEDŹ ZNACZONA OD RAZU. Bez flagi nasze „Dziękujemy za
+         kontakt" liczyłoby się jako ruch biura i przestawiało rozmowę na
+         „czeka na klienta". */
       auto,
       /* Rola autora z `beta.v1`. Doradca Allegro pisze w Problemie
          z zakupem jako strona przychodząca, a oś rozmowy podpisywała
@@ -763,28 +709,24 @@ function zapiszKanonicznie(
          na ekranie jako słowa kupującego. */
       message.rola ?? null);
     if (wynik.changes > 0) {
-      /* PRZYCHODZĄCA BUDZI ROZMOWĘ (§7, 0.158.0). Klient dopisujący pytanie do
+      /* PRZYCHODZĄCA BUDZI ROZMOWĘ (§7). Klient dopisujący pytanie do
          sprawy uznanej za załatwioną musi ją z powrotem otworzyć — inaczej
          rozmowa zostaje na liście „rozwiązane" i nikt do niej nie zagląda.
          Wychodzące pomijamy: to nasza własna odpowiedź wracająca z Allegro. */
       if (ruchKlienta) obudzPrzychodzaca(database, rozmowa);
       else if (!przychodzaca) uzgodnijNiepewna(database, rozmowa, message.id, tresc);
-      /* ZDARZENIE NIESIE KIERUNEK (0.257.0, dług z 0.228.0). Panel zapala pasek
-         „Klient dopisał nową wiadomość" wyłącznie przy `odKlienta`. Tą drogą
-         pole nie jechało nigdy, bo ustawiał je tylko `zapiszWiadomosc`, którego
-         synchronizator nie woła — więc pasek nie zapalił się ani razu na
-         prawdziwej wiadomości z Allegro. */
+      /* ZDARZENIE NIESIE KIERUNEK. Panel zapala pasek „Klient dopisał nową
+         wiadomość" wyłącznie przy `odKlienta`, a synchronizator nie woła
+         `zapiszWiadomosc`, która je ustawia. */
       publishConversationEvent("message.created", rozmowa, {
         messageId: Number(wynik.lastInsertRowid), external: message.id,
         odKlienta: ruchKlienta,
         automatyczna: auto === 1,
       });
     }
-    /* ZAŁĄCZNIKI PRZY KAŻDYM PRZEBIEGU, także przy wiadomości już znanej.
-       Do 0.242.0 wchodziły wyłącznie z nową wiadomością, więc `NEW`
-       („Allegro jeszcze sprawdza") zostawało zamrożone na zawsze, a zdjęcia
-       z wiadomości sprzed 0.155.0 nie istniały w bazie wcale. Sama wiadomość
-       dalej jest nietykalna — wiszą na niej szkice i zadania; dotykamy
+    /* ZAŁĄCZNIKI PRZY KAŻDYM PRZEBIEGU, także przy wiadomości już znanej:
+       `NEW` („Allegro jeszcze sprawdza") ma przejść w końcowy stan. Sama
+       wiadomość jest nietykalna — wiszą na niej szkice i zadania; dotykamy
        wyłącznie tabeli załączników, po kluczu `(message_id, file_name)`. */
     const messageId = wynik.changes > 0
       ? Number(wynik.lastInsertRowid)
@@ -845,7 +787,7 @@ async function dociagnijZalacznikiNew(
 
 /**
  * Struktura jednego wątku — NIGDY nie przerywa przebiegu. Skrzynka bez typu
- * wątku działa jak do 22 września 2026; skrzynka bez wiadomości nie działa
+ * wątku działa; skrzynka bez wiadomości nie działa
  * wcale. Dlatego każda awaria bety kończy się tu `null`, a nie wyjątkiem.
  *
  * Odmowa wersji albo uprawnienia wstrzymuje odczyt na sześć godzin (patrz
@@ -870,13 +812,11 @@ async function czytajStrukture(
 
 /**
  * Wysyłka `send_uncertain` rozstrzyga się sama, gdy synchronizacja przyniesie
- * naszą wiadomość o tej samej treści (22 września 2026).
+ * naszą wiadomość o tej samej treści.
  *
  * Specyfikacja: „if a request times out after possible submission, mark its
  * result UNKNOWN and reconcile against outgoing messages before retrying; do
- * not assume the remote API deduplicates requests". Do tej wersji rozstrzygał
- * to człowiek: wysyłka odmawiała ponowienia ze zdaniem „najpierw zsynchronizuj
- * wątek", a po synchronizacji wiersz i tak stał niepewny.
+ * not assume the remote API deduplicates requests".
  *
  * Dopasowanie po TREŚCI w tej samej rozmowie, bez różnicy białych znaków —
  * Allegro nie oddaje naszego klucza idempotencji, więc treść jest jedynym

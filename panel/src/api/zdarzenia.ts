@@ -6,7 +6,7 @@ import { token } from "./klient";
 
 export type ZdarzenieRozmowy = {
   id: number;
-  /* `classification.updated` (22 września 2026): takt rozpoznaje w tle, więc
+  /* `classification.updated`: takt rozpoznaje w tle, więc
      plakietka ma przyjść sama. Obsługa jak przy każdym zdarzeniu innym niż
      obecność — lista i otwarta rozmowa odświeżają się po cichu. */
   type: "presence" | "message.created" | "assignment.changed" | "warehouse.result"
@@ -76,17 +76,15 @@ export function useSzynaZdarzen(
     function obsluz(z: ZdarzenieRozmowy) {
       if (z.type === "presence") {
         setObecnosc((z.obecni as Obecnosc[] | undefined) ?? []);
-        /* ── OBECNOŚĆ ŁATA CACHE, NIE ŚCIĄGA LISTY (0.196.0) ─────────────────
-           Wiersz kolejki pokazuje od 0.158.0, kto siedzi przy rozmowie, więc
-           zdarzenie obecności musi go zmienić. Do 0.195.0 robiło to przez
-           `invalidateQueries`, czyli PONOWNE POBRANIE CAŁEJ LISTY.
+        /* ── OBECNOŚĆ ŁATA CACHE, NIE ŚCIĄGA LISTY ───────────────────────────
+           Wiersz kolejki pokazuje, kto siedzi przy rozmowie, więc zdarzenie
+           obecności musi go zmienić — bez PONOWNEGO POBRANIA CAŁEJ LISTY.
 
-           Rachunek, dla którego to się zmienia: `listaRozmow()` nie ma
-           `LIMIT`-u i oddaje każdą zsynchronizowaną rozmowę z 21 kolumnami.
+           Rachunek: `listaRozmow()` nie ma `LIMIT`-u i oddaje każdą zsynchronizowaną rozmowę z 21 kolumnami.
            Pomiar na tym repo: 100 rozmów to 54 kB, 1000 — 537 kB, 5000 —
            2688 kB. Obecność leci przy wejściu, wyjściu i przy PISANIU
-           (dławione co 5 s), więc kolega redagujący odpowiedź ściągał u
-           wszystkich całą listę co pięć sekund.
+           (dławione co 5 s), więc kolega redagujący odpowiedź ściągałby
+           u wszystkich całą listę co pięć sekund.
 
            `staleTime` by tego NIE załatwił i to sprawdzone, nie założone:
            `invalidateQueries` znaczy rozmowę stałą niezależnie od niego
@@ -119,15 +117,12 @@ export function useSzynaZdarzen(
       if (z.conversationId !== wybranaRef.current) return;
       /* Nowa wiadomość klienta w OTWARTEJ rozmowie nie przeładowuje jej sama:
          agent może być w połowie szkicu. Ekran mówi o dopisku i czeka na
-         kliknięcie — blizna 0.110.0 zabrania cichego nadpisania.
+         kliknięcie, bez cichego nadpisania.
 
-         ── ALE TYLKO WIADOMOŚĆ KLIENTA (0.228.0) ────────────────────────────
-         Do 0.227.0 pasek „Klient dopisał nową wiadomość" zapalał się na KAŻDE
-         `message.created`: także na naszą własną odpowiedź wracającą
-         z synchronizacji i na autoodpowiedź „Dziękujemy za kontakt". Agent
-         odpisywał i po chwili dostawał od panelu wiadomość, że odpisał mu
-         klient — a szkic zostawał zablokowany paskiem, którego nie było czym
-         zamknąć poza kliknięciem „Pokaż".
+         ── ALE TYLKO WIADOMOŚĆ KLIENTA ──────────────────────────────────────
+         `message.created` przychodzi też dla naszej odpowiedzi wracającej
+         z synchronizacji i dla autoodpowiedzi. Pasek „Klient dopisał nową
+         wiadomość" mówiłby wtedy agentowi nieprawdę i blokował szkic.
 
          Nasza wiadomość i odbicie DOCIĄGAJĄ rozmowę po cichu: agent ma je
          zobaczyć na osi, tylko bez alarmu. */

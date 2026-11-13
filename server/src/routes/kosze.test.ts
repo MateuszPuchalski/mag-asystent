@@ -286,7 +286,7 @@ test("biuro: lista pominięć i szukanie po towarze, oba za bramką roli", async
   assert.equal(r.json().znalezione.length, 1);
   assert.equal(r.json().znalezione[0].symbol, "TEST-LINIA-DONE");
 
-  /* SŁOWA, NIE CAŁA FRAZA (0.484.3). Każde słowo trafia w któreś pole, bez
+  /* SŁOWA, NIE CAŁA FRAZA. Każde słowo trafia w któreś pole, bez
      względu na kolejność, wielkość liter i ogonki — „ODŁOŻONA całości" i
      „odlozona" to ta sama pozycja. Do 0.484.2 `UPPER` w SQLite nie znał
      polskich liter, a fraza szła jednym kawałkiem. */
@@ -346,7 +346,7 @@ test("biuro: lista pominięć i szukanie po towarze, oba za bramką roli", async
 
 
 test("potwierdzenie adresu: półka, drugi skan towaru i wpis zapisują się różnie", async () => {
-  /* Drugi skan towaru (0.189.0) kończy odłożenie tak samo jak ODŁÓŻ TUTAJ,
+  /* Drugi skan towaru kończy odłożenie tak samo jak ODŁÓŻ TUTAJ,
      ale NIE jest wpisem z klawiatury. `manual_entry` zasila raport etykiet do
      przedruku i kolumnę „ręczne" przy pracowniku, więc wpadając tam zgłaszałby
      półki, których nikt nie dotykał. Dziennik ma za to odróżniać odłożenie
@@ -401,7 +401,7 @@ test("starszy APK bez pola `potwierdzenie` dalej działa, a śmieć odpada", asy
     .prepare("SELECT id FROM kosz_pozycja WHERE kosz_id = ? ORDER BY id LIMIT 1")
     .get(koszId) as { id: number };
 
-  /* Do 0.189.0 istniały dwie drogi, więc `recznie` wystarcza do wyprowadzenia
+  /* Stary APK zna dwie drogi, więc `recznie` wystarcza do wyprowadzenia
      potwierdzenia. Serwer u klienta rusza przed APK, więc to jedyny kierunek
      zgodności, jakiego trzeba pilnować. */
   let r = await app.inject({
@@ -433,7 +433,7 @@ test("starszy APK bez pola `potwierdzenie` dalej działa, a śmieć odpada", asy
 });
 
 test("przeliczenie kosza: bramka biura, a kosz Z DOKUMENTEM dostaje 400 ze zdaniem", async () => {
-  /* Trasa z 0.334.0. Reguła, KIEDY wolno przeliczyć, stoi w serwisie
+  /* Reguła, KIEDY wolno przeliczyć, stoi w serwisie
      (`services/komplety.test.ts`); tutaj pilnujemy dwóch rzeczy, których
      serwis nie widzi: że hala tego nie kliknie i że odmowa dochodzi do
      ekranu ZDANIEM, a nie gołym „Bad Request". */

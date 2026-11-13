@@ -1,11 +1,11 @@
 import React from "react";
 import { KartaWgladu, Tabela, Td } from "../ui/wglad";
 import type { PomiarCopilota as Pomiar, RodzajPropozycji, Udzial, WierszPomiaruPrzeplywu } from "../api/typy";
-import { Liczba } from "./PokrycieSygnatur";
+import { Liczba } from "../ui/wykres";
 import { NAZWA_KATEGORII } from "../skrzynka/statusy";
 
 /* ── Pomiar Copilota (§14, etap F) ───────────────────────────────────────────
-   Diagnostyka mieszka ZA ZĘBATKĄ (0.168.0): ekran pracy niesie to, co woła
+   Diagnostyka mieszka ZA ZĘBATKĄ: ekran pracy niesie to, co woła
    o reakcję, a to jest tabela, którą czyta się raz na tydzień.
 
    Ta karta istnieje po to, żeby decyzja „zejdź na tańszy model" zapadła na
@@ -13,8 +13,8 @@ import { NAZWA_KATEGORII } from "../skrzynka/statusy";
    powiedziałby:
 
    PIERWSZA: `n`, przedział i NIEOZNACZONE stoją obok każdej precyzji
-   i czułości (specyfikacja z 20 września 2026: „counts and uncertainty
-   intervals"). Trzy trafienia na trzy to przedział 44–100 %, i dokładnie
+   i czułości („counts and uncertainty intervals"). Trzy trafienia na trzy
+   to przedział 44–100 %, i dokładnie
    tyle ta liczba wtedy wie. Agent częściej poprawia pomyłkę, niż potwierdza
    trafienie — próbka jest skrzywiona z założenia i ekran ma to powiedzieć.
 
@@ -38,9 +38,8 @@ function udzial(u: Udzial | null): string {
 /** Dolary na złotówki dla oka. Kurs orientacyjny — rachunek wystawia dostawca. */
 const zl = (usd: number) => `${(usd * 4).toFixed(2)} zł`;
 
-/* ── Czas czekania na Copilota (26 września 2026, 0.532.0) ──────────────
-   Księga zapisywała czas każdego wywołania od początku, a nikt go nie
-   czytał. Agent czeka na szkic przy otwartej rozmowie, więc to koszt
+/* ── Czas czekania na Copilota ───────────────────────────────────────────
+   Agent czeka na szkic przy otwartej rozmowie, więc to koszt
    w sekundach obok kosztu w złotych. Mediana mówi o zwykłym czekaniu,
    p90 o tym, które agent zapamięta. Nazwy zadań po ludzku, bo klucz
    z księgi to głos programisty. */
@@ -51,7 +50,7 @@ const NAZWA_ZADANIA: Record<string, string> = {
      dalej je niosą, a koszt bez nazwy byłby kosztem bez przyczyny. */
   pasowanie_siec: "pasowanie z sieci",
   pasowanie_siec_silnik: "pasowanie od silnika", klucz_modelu: "klucz modelu z opisu",
-  /* Poranek przed pracą (26 września 2026) ma własne zadania w księdze. */
+  /* Poranek przed pracą ma własne zadania w księdze. */
   szkic_przed_praca: "szkic przed pracą", klasyfikacja_przed_praca: "rozpoznanie przed pracą",
 };
 const sek = (ms: number | null) => (ms === null ? "—" : `${(ms / 1000).toFixed(1).replace(".", ",")} s`);
@@ -118,13 +117,11 @@ export function PomiarCopilota({ dane }: { dane: Pomiar | undefined }) {
   const cacheMilczy = dane.wywolan > 0 && dane.tokeny.cacheOdczyt === 0;
   const czekanie = dane.wgZadania.find((z) => z.zadanie === "szkic" && z.medianaMs !== null);
   const zCzasem = dane.wgZadania.filter((z) => z.medianaMs !== null);
-  /* Rama wspólna z resztą analizy (0.519.0). Na wierzchu zostały trzy
-     rzeczy, na których zapada decyzja o modelu: wywołania, nieudane
-     i rachunek. Zeszły z ekranu (0.519.0): podpis „tokeny liczone od
-     pierwszego wywołania", trzy kafelki tokenów i zdanie o prefiksie
-     instrukcji — to głos programisty, nie agenta, a rachunek w złotych mówi
-     o tokenach wszystko, co biuru potrzebne. Jedyny objaw tamtej diagnozy,
-     udział cache, stoi w szczegółach i dostaje ton „uwaga". */
+  /* Rama wspólna z resztą analizy. Na wierzchu stoją trzy rzeczy, na
+     których zapada decyzja o modelu: wywołania, nieudane i rachunek. Tokeny
+     i prefiks instrukcji to głos programisty, nie agenta, a rachunek
+     w złotych mówi o tokenach wszystko, co biuru potrzebne. Udział cache
+     stoi w szczegółach i dostaje ton „uwaga". */
   return <KartaWgladu tytul="Copilot — rozpoznawanie kategorii">
     <div className="flex flex-wrap gap-8">
       <Liczba etykieta="wywołań" ile={dane.wywolan} />
@@ -144,8 +141,8 @@ export function PomiarCopilota({ dane }: { dane: Pomiar | undefined }) {
         na której zapada decyzja o włączeniu automatu w danej kategorii. */}
     <PrzeplywyKategorii wiersze={dane.przeplyw} naZywo={dane.naZywo} />
 
-    {/* Decyzje, szkice i tabela precyzji zwinięte (0.519.0): to raport
-        czytany raz na tydzień, a otwarty zajmował pół ekranu analizy. */}
+    {/* Decyzje, szkice i tabela precyzji zwinięte: to raport czytany raz
+        na tydzień, a otwarty zająłby pół ekranu analizy. */}
     <details className="mt-4 border-t pt-4 text-sm">
       <summary className="cursor-pointer text-slate-600">Szczegóły</summary>
 
@@ -176,14 +173,13 @@ export function PomiarCopilota({ dane }: { dane: Pomiar | undefined }) {
         </p>;
       })()}
 
-      {/* SZKICE OSOBNO (0.231.0). Jeden szkic kosztuje kilkadziesiąt razy więcej
+      {/* SZKICE OSOBNO. Jeden szkic kosztuje kilkadziesiąt razy więcej
           niż etykieta, więc zlany rachunek mówiłby „klasyfikacja zdrożała".
 
-          MIARĄ JEST LOS PRZY WYSYŁCE (22 września 2026, decyzja właściciela).
-          Do tej wersji karta liczyła „użytych" z kliknięć „Wstaw" i „Zastąp",
-          a wstawiony szkic bywał potem przepisany — liczba mówiła o kliknięciu,
-          nie o tym, co dostał klient. Zostają: bez zmian, z poprawką i odrzucone,
-          czyli jedyny ślad, że agent napisał sam. */}
+          MIARĄ JEST LOS PRZY WYSYŁCE, decyzją właściciela. Kliknięcie
+          „Wstaw" nie mówi, co dostał klient, bo wstawiony szkic bywa potem
+          przepisany. Zostają: bez zmian, z poprawką i odrzucone, czyli
+          jedyny ślad, że agent napisał sam. */}
       {(() => {
         const sz = dane.wgZadania.find((z) => z.zadanie === "szkic");
         if (!sz && dane.szkice.ile === 0) return null;
@@ -197,7 +193,7 @@ export function PomiarCopilota({ dane }: { dane: Pomiar | undefined }) {
         </p>;
       })()}
 
-      {/* SZKICE PRZED PRACĄ OSOBNO (26 września 2026). Poranek ma własny limit
+      {/* SZKICE PRZED PRACĄ OSOBNO. Poranek ma własny limit
           i własne zadania w księdze. Zlany z wierszem wyżej nie powiedziałby,
           ile kosztuje gotowa kolejka w poniedziałek, a o to pyta właściciel
           przy decyzji o limicie. Wiersz znika, dopóki poranek nie płacił. */}
@@ -238,8 +234,7 @@ export function PomiarCopilota({ dane }: { dane: Pomiar | undefined }) {
         </Tabela>
       </div>}
 
-      {/* Tabela wspólna z resztą analizy (0.519.0) zamiast własnej, pisanej
-          wersalikami. */}
+      {/* Tabela wspólna z resztą analizy. */}
       {dane.klasyfikacja.wgKategorii.length > 0 && <div className="mt-3 border-t pt-3">
         <Tabela naglowki={["kategoria", "przewidzianych", "precyzja", "czułość"]} pusto="">
           {dane.klasyfikacja.wgKategorii.map((k) => <tr key={k.kategoria}>

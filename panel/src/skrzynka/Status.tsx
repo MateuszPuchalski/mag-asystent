@@ -7,19 +7,17 @@ import { klawiszZajety, useSkrotyDzialaja } from "../nawigacja/fokus";
 import { MenuRozmowy, WierszMenu } from "./MenuRozmowy";
 import { dzienZKalendarza, opisTerminu, poDniachRoboczych, terminyOdlozenia } from "./terminOdlozenia";
 
-/* Status rozmowy (§7, 0.158.0). Nagłówek rozmowy pokazuje go ZAWSZE, także
+/* Status rozmowy (§7). Nagłówek rozmowy pokazuje go ZAWSZE, także
    gdy nikt go nie ruszył — „Nowa" znaczy, że sprawy nie tknięto, a to jest
    informacja, nie brak informacji.
 
-   ── STATUS JEST ODCZYTEM, NIE WYBOREM (22 września 2026) ─────────────────
-   Decyzja właściciela: ręczne werdykty — odłożenie, „Rozwiązana",
-   „Zamknięta", „Spam" — odeszły razem z trasą, która je nadawała. Stan
-   wynika wyłącznie z faktów: z kierunku ostatniej wiadomości i ze zlecenia
-   pomiaru. Pole wyboru zostałoby polem z jedną pozycją, więc zostaje sama
-   plakietka. Werdykt zapisany przed tą zmianą widać dalej, bo stoi w bazie.
+   ── STATUS JEST ODCZYTEM, NIE WYBOREM ───────────────────────────────────
+   Decyzja właściciela: stan wynika wyłącznie z faktów — z kierunku ostatniej
+   wiadomości i ze zlecenia pomiaru — więc stoi sama plakietka. Starszy
+   ręczny werdykt widać, bo stoi w bazie.
 
-   Od 23 września 2026 wraca JEDEN werdykt — „Zakończ" — i tylko on. Menu
-   nie wraca: kto ma ruch, dalej liczy się sam (powód przy `wyliczStatus`). */
+   Jedyny ręczny werdykt to „Zakończ". Kto ma ruch, liczy się sam (powód
+   przy `wyliczStatus`). */
 /* Stany, w których ruch jest po naszej stronie — zakończenie przy nich
    wymaga jednego pytania (serwer pilnuje tego samego, patrz `zakonczRozmowe`). */
 const KLIENT_CZEKA = new Set(["new", "open", "waiting_for_us"]);
@@ -31,23 +29,21 @@ export function Status({ rozmowa, blad, onPriorytet, zapisujePriorytet,
   blad: string;
   onPriorytet: (priorytet: "normalny" | "pilny") => void;
   zapisujePriorytet: boolean;
-  /* Znacznik reklamacyjny (0.390.0) — OPCJONALNY tym samym wzorcem co Copilot
+  /* Znacznik reklamacyjny — OPCJONALNY tym samym wzorcem co Copilot
      i tagi: czego nie da się zrobić, tego nie ma na ekranie. */
   onReklamacyjna?: (reklamacyjna: boolean) => void;
   zapisujeReklamacyjna?: boolean;
-  /* ── ZAKOŃCZ / OTWÓRZ PONOWNIE (23 września 2026) ───────────────────────
+  /* ── ZAKOŃCZ / OTWÓRZ PONOWNIE ──────────────────────────────────────────
      Decyzja właściciela: „potrzebuję sposobu, żeby rozmowa była rozwiązana".
-     JEDEN werdykt zamiast menu statusów — tamto odeszło 22 września, bo nikt
-     go nie używał dobrze. Stan „kto ma ruch" dalej liczy się sam. */
+     JEDEN werdykt zamiast menu statusów. Stan „kto ma ruch" liczy się sam. */
   onZakoncz?: (mimoPytania: boolean) => void;
   onOtworz?: () => void;
-  /* ── ODŁÓŻ DO TERMINU (0.533.0) — decyzja właściciela z 26 września 2026,
-     powód przy `odlozRozmowe` na serwerze. Werdykt z datą, nie status z menu:
-     tamten odszedł 22 września i nie wraca. Drugi przycisk zdejmuje odłożenie. */
+  /* ── ODŁÓŻ DO TERMINU — decyzja właściciela, powód przy `odlozRozmowe`
+     na serwerze. Werdykt z datą, nie status z menu. Drugi przycisk zdejmuje odłożenie. */
   onOdloz?: (doKiedy: string, opis: string) => void;
   onWrocZOdlozenia?: () => void;
   zmieniaStatus?: boolean;
-  /* Wiersze menu „⋯" od ekranu rozmowy (0.506.0): prowadzący i kategoria.
+  /* Wiersze menu „⋯" od ekranu rozmowy: prowadzący i kategoria.
      Przełączniki w spoczynku dokłada tu sam `Status` — powód w `MenuRozmowy.tsx`. */
   menu?: React.ReactNode;
 }) {
@@ -65,7 +61,7 @@ export function Status({ rozmowa, blad, onPriorytet, zapisujePriorytet,
      czeka. Nasłuch mieszka TU, a nie w ekranie, bo to tu stoi pytanie; ten
      sam strażnik co przy E i R: pole tekstowe wygrywa zawsze, bo „z" w słowie
      „zamówienie" nie może kończyć rozmowy. */
-  /* DRUGIE „Z" ZATWIERDZA (0.533.0). Pytanie zostaje jedno i w miejscu
+  /* DRUGIE „Z" ZATWIERDZA. Pytanie zostaje jedno i w miejscu
      przycisku, ale odpowiedź na nie wymagała myszy — agent kończący
      z klawiatury musiał zmienić narzędzie w połowie ruchu. Esc anuluje. */
   const klawisz = useRef((_k: "z" | "o" | "esc") => {});
@@ -92,7 +88,7 @@ export function Status({ rozmowa, blad, onPriorytet, zapisujePriorytet,
     window.addEventListener("keydown", f);
     return () => window.removeEventListener("keydown", f);
   }, []);
-  /* Bez `w-full` (0.193.0): pasek statusu łamał wiersz nagłówka ZAWSZE,
+  /* Bez `w-full`: pasek statusu łamał wiersz nagłówka ZAWSZE,
      także wtedy, gdy miejsce było. Nagłówek rozmowy zajmował przez to dwa
      pasma zamiast jednego, a pytanie klienta zaczynało się niżej. Zawinięcie
      zostaje — przy wąskiej kolumnie ma się złamać. */
@@ -100,11 +96,11 @@ export function Status({ rozmowa, blad, onPriorytet, zapisujePriorytet,
     {/* Priorytet stoi PRZY statusie, nie w kolejce: „to się pali" mówi się
         o rozmowie, którą się właśnie czyta. Przełącznik jest jeden i widać po
         nim stan — flaga podniesiona wygląda inaczej niż opuszczona. */}
-    {/* ZNAK, GDY TO CZYNNOŚĆ; SŁOWO, GDY TO FAKT (23 września 2026, „za dużo
+    {/* ZNAK, GDY TO CZYNNOŚĆ; SŁOWO, GDY TO FAKT („za dużo
         tekstu"). Opuszczony przełącznik jest propozycją ruchu i wystarczy mu
         ikona z dymkiem. Podniesiony jest stanem sprawy — ten czyta się
         słowem, bo ma być zauważony, a nie rozszyfrowany. */}
-    {/* PODNIESIONA FLAGA ZOSTAJE NA WIERZCHU (0.506.0). To stan sprawy
+    {/* PODNIESIONA FLAGA ZOSTAJE NA WIERZCHU. To stan sprawy
         i ma krzyczeć; kliknięcie opuszcza ją tym samym przyciskiem.
         Przełącznik w spoczynku zszedł do menu „⋯" — `MenuRozmowy.tsx`. */}
     {rozmowa.priorytet === "pilny" && <button type="button" disabled={zapisujePriorytet}
@@ -134,7 +130,7 @@ export function Status({ rozmowa, blad, onPriorytet, zapisujePriorytet,
       className="inline-flex items-center gap-1 text-xs text-slate-600">
       <Lock size={13} aria-hidden="true" />zamknięty przez Allegro</span>}
 
-    {/* STATUS RAZ, NIE DWA (0.193.0): jedna plakietka z barwą stanu, bez
+    {/* STATUS RAZ, NIE DWA: jedna plakietka z barwą stanu, bez
         podpisu „Status" — nazwa stanu mówi to samo jednym wyrazem mniej. */}
     <span className={`rounded px-2 py-1 text-sm font-bold ${KLASA_STATUSU[rozmowa.status] ?? ""}`}
       title={zrodlo ?? undefined}
@@ -152,9 +148,9 @@ export function Status({ rozmowa, blad, onPriorytet, zapisujePriorytet,
 
     <MenuRozmowy>
       {menu}
-      {/* Przełączniki W SPOCZYNKU — ta sama gramatyka co dotąd: „pilne" mówi
+      {/* Przełączniki W SPOCZYNKU — „pilne" mówi
           o rozmowie, którą się czyta, a „reklamacyjna" o tym, jak ją prowadzimy.
-          Sprawy w Allegro to NIE zakłada (0.390.0) i podpis mówi to wprost. */}
+          Sprawy w Allegro to NIE zakłada i podpis mówi to wprost. */}
       {(rozmowa.priorytet !== "pilny" || (onReklamacyjna && !rozmowa.reklamacyjna)) &&
         <WierszMenu etykieta="Oznacz">
           {rozmowa.priorytet !== "pilny" && <button type="button" disabled={zapisujePriorytet}

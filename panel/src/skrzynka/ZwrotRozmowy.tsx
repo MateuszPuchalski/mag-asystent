@@ -1,4 +1,3 @@
-import React from "react";
 import { Link } from "react-router-dom";
 import type { Zwrot } from "../api/typy";
 import { zlote } from "../api/zwroty";
@@ -7,14 +6,13 @@ import { KUBELKI, SYGNALY } from "../zwroty/Kolejka";
 import { ODNOSNIK, OdnosnikAllegro } from "./odnosniki";
 
 /**
- * Zwrot tego zamówienia przy rozmowie (0.221.0).
+ * Zwrot tego zamówienia przy rozmowie.
  *
  * Właściciel: „klienci często pytają pod zamówieniem o zwrot, którego
- * dokonali". Do 0.220.0 agent szedł na ekran Zwroty i szukał zwrotu po
- * loginie — a odpowiedź „paczka doszła wczoraj, pieniądze idą jutro" zna
- * baza od dawna. Blok stoi POD zamówieniem, bo to zwrot tego zakupu; mostkiem
- * jest numer zamówienia, ten sam, którym zwrot znajduje swoje rozmowy od
- * 0.169.0. Po loginie nie dobieramy (blizna 0.56.6).
+ * dokonali". Odpowiedź „paczka doszła wczoraj, pieniądze idą jutro" zna
+ * baza, więc agent nie szuka jej na ekranie Zwroty. Blok stoi POD
+ * zamówieniem, bo to zwrot tego zakupu; mostkiem jest numer zamówienia, ten
+ * sam, którym zwrot znajduje swoje rozmowy. Po loginie nie dobieramy.
  *
  * Skład wiersza jest ten sam, co w kolejce zwrotów — kubełek, sygnały,
  * termin, paczka, pozycje, decyzja i kwota — więc agent czyta tu to, co

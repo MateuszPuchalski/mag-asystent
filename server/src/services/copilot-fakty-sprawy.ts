@@ -1,7 +1,7 @@
 import type { DatabaseSync } from "node:sqlite";
 import { zloz } from "../tekst.js";
 
-/* ── Fakty ze sprawy dla Copilota (0.282.0) ──────────────────────────────────
+/* ── Fakty ze sprawy dla Copilota ────────────────────────────────────────────
    POWSTAŁO Z JEDNEJ KARTY, którą właściciel wkleił z żywego panelu. Copilot
    poprosił agenta o „datę zakupu / numer zamówienia" i o „zdjęcia tabliczki
    w celu identyfikacji modelu" — czyli o trzy rzeczy, z których numer
@@ -128,7 +128,7 @@ export function tekstFaktow(f: FaktySprawy): string {
   dopisz("Numer zamówienia", f.orderId);
   /* ETYKIETA MÓWI, KTÓRY TO ZEGAR. `boughtAt` z zamówienia to moment zakupu
      pozycji; `checkoutForm.createdAt` to złożenie koszyka i bywa wcześniejszy.
-     Blizna 0.121.0 wzięła się z nazwania jednego zegara drugim. */
+     Nazwanie jednego zegara drugim wprowadzałoby agenta w błąd. */
   if (f.kupionoAt) {
     dopisz(f.kupionoZrodlo === "zamowienie" ? "Kupiono" : "Zamówienie złożone",
       dzien(f.kupionoAt));

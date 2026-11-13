@@ -6,20 +6,18 @@ import type { MojaSprawa } from "../api/typy";
 import { Blad, Karta, NaglowekSekcji, czas, termin } from "../ui";
 
 /* ── Jedno „Moje" ponad kolejkami (S4 spoiwa, `docs/obsluga-klienta-calosc.md`)
-   Sita „Moje" były dwa — w skrzynce i w reklamacjach — i każde
-   trzeba było odwiedzić osobno. Sprawa z terminem w kolejce, do której agent
-   akurat nie zaglądał, czekała aż ktoś tam zajrzy.
+   Jedno sito „Moje" dla skrzynki i reklamacji, żeby sprawa z terminem
+   w kolejce, do której agent akurat nie zagląda, nie czekała na odwiedziny.
 
    TO JEST ODCZYT, NIE PIĄTA KOLEJKA. Nie ma tu ani jednego przycisku pracy:
    werdykt, kwota i odpowiedź zostają na ekranie właściwej kolejki, bo tam
    stoją ich bramki. Wspólny ekran roboczy nad kolejkami byłby nakładką ze
-   wspólnym statusem — kształtem, który kosztował cztery tabele (0.140.0).
+   wspólnym statusem.
 
-   ZWROTÓW TU NIE MA i to nie jest brak: właściciel zdjął ze zwrotu znacznik
-   prowadzącego w 0.370.0, bo zwrot przechodzi przez biuro jako kolejka
-   decyzji, a nie jako czyjaś sprawa.
+   ZWROTÓW TU NIE MA i to nie jest brak: zwrot nie ma prowadzącego, bo
+   przechodzi przez biuro jako kolejka decyzji, a nie jako czyjaś sprawa.
 
-   SPRAWA KLIENTA TU JEST (S6, 0.535.0) i dalej bez przycisku. Wiersz
+   SPRAWA KLIENTA TU JEST (S6) i dalej bez przycisku. Wiersz
    prowadzi do źródła najnowszego zdarzenia albo do profilu klienta, bo tam
    stoją krok i zakończenie. Listę scala serwer (`mojaLista`), więc kolejność
    — obudzone, potem terminy, na końcu kroki czekające na swój dzień — jest
@@ -43,18 +41,15 @@ const dokad = (s: MojaSprawa, sciezka: string) => s.kolejka !== "klient"
 const zTerminemNaDzis = (s: MojaSprawa) =>
   s.kolejka === "klient" ? Boolean(s.dzis || s.poTerminie) : s.terminDo !== null;
 
-/* ── SEKCJA „DO ZROBIENIA", NIE OSOBNY EKRAN (23 września 2026) ────────────
-   „Do decyzji", „Moje" i „Wzmianki" odpowiadały na jedno pytanie — co teraz
-   zrobić — i trzeba było obejść trzy zakładki, żeby je zadać. Sekcja stoi
-   dziś na ekranie startowym razem z pozostałymi dwiema. Adres `/obsluga/moje`
-   przekierowuje tam, więc zakładka zapamiętana w przeglądarce nie gubi się. */
+/* ── SEKCJA „DO ZROBIENIA", NIE OSOBNY EKRAN ───────────────────────────────
+   Sekcja stoi na ekranie startowym razem z decyzjami i wzmiankami, bo
+   wszystkie trzy odpowiadają na jedno pytanie — co teraz zrobić. */
 /* `lista` niesie też sprawy klientów; starszy serwer daje samo `sprawy`.
    Wiersz rodzaju, którego ta karta nie zna, SCHODZI z listy, zamiast
    wywrócić ekran: panel nie ma granicy błędu, a serwer aktualizuje się
-   w nocy pod otwartą kartą. Tak wywróciłaby się karta sprzed 0.535.0.
-   Wyjęte do funkcji (0.545.0), bo ekran „Do zrobienia" pyta o to samo,
-   decydując, czy pusta sekcja zwija się do linijki — dwie kopie filtra
-   powiedziałyby „pusto" i „jedna sprawa" o tych samych danych. */
+   w nocy pod otwartą kartą. Wyjęte do funkcji, bo ekran „Do zrobienia"
+   pyta o to samo, decydując, czy pusta sekcja zwija się do linijki — dwie
+   kopie filtra powiedziałyby „pusto" i „jedna sprawa" o tych samych danych. */
 export const widoczneSprawy = (d: { sprawy: MojaSprawa[]; lista?: MojaSprawa[] } | undefined): MojaSprawa[] =>
   (d?.lista ?? d?.sprawy ?? []).filter((s) => Object.hasOwn(KOLEJKI, s.kolejka));
 
@@ -64,9 +59,8 @@ export function Moje() {
   const zTerminem = sprawy.filter(zTerminemNaDzis).length;
 
   return <Karta className="overflow-hidden p-0" aria-label="Moje sprawy" role="region">
-    {/* Nagłówek jak w dwóch sąsiednich sekcjach (0.524.0): `NaglowekSekcji`
-        i licznik po kropce. Powód przy `DoDecyzji`. „Wczytuję…" zeszło
-        z nagłówka do treści, tam gdzie stoi w sekcji decyzji. */}
+    {/* Nagłówek jak w dwóch sąsiednich sekcjach: `NaglowekSekcji`
+        i licznik po kropce. Powód przy `DoDecyzji`. */}
     <div className="flex flex-wrap items-center gap-2 border-b border-slate-200 bg-slate-50 px-4 py-2">
       <NaglowekSekcji jako="h3" ikona={<Briefcase size={14} />}>
         Moje sprawy{dane.data ? ` · ${sprawy.length}` : ""}
@@ -112,7 +106,7 @@ export function Moje() {
    a jej stary „po terminie" byłby na czerwono nieprawdą. Czerwień wyłącznie
    po terminie; „dziś" i „czeka do" to informacja, nie alarm.
 
-   DOSYŁKA (0.536.0) ZASTĘPUJE „dziś” i „czeka do”, a nie dokleja się do
+   DOSYŁKA ZASTĘPUJE „dziś” i „czeka do”, a nie dokleja się do
    opisu. Opis jest ucięty, więc dopisek znikałby właśnie przy długim kroku.
    Sprawa z dosyłką czeka na paczkę, a nie na datę. Samo „dziś”
    przy dosyłce bez numeru nie mówiłoby, co zrobić. Pogrubienie niesie to,

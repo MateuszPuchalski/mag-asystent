@@ -14,9 +14,8 @@ import path from "node:path";
    JEST lokalizacją pickingową (`locs.ts`), więc prośba o drugi adres kończyła
    się zmianą adresu podstawowego.
 
-   Do 0.233.1 `locAction` NIE MIAŁ ANI JEDNEGO TESTU w całym repo — i dlatego
-   ta gałąź mogła po cichu rozjechać się z `computeNewLocs` w trasie karty
-   towaru, która od zawsze dokłada na koniec. Ten plik pilnuje OBU akcji, żeby
+   Bez testu ta gałąź mogłaby po cichu rozjechać się z `computeNewLocs`
+   w trasie karty towaru, która dokłada na koniec. Ten plik pilnuje OBU akcji, żeby
    naprawa jednej nie zjadła drugiej.                                          */
 
 process.env.DB_PATH = path.join(fs.mkdtempSync(path.join(os.tmpdir(), "wertis-putloc-")), "t.db");
@@ -125,9 +124,8 @@ test("domyślną akcją bez rozjazdu jest ZAMIEŃ", () => {
 /* ── Pełne pole odmawia, zamiast uciąć kod w połowie ─────────────────────── */
 
 test("DODAJ przy pełnym polu ODMAWIA i nie kolejkuje niczego", () => {
-  /* Limit `tw_Lokalizacja` to 50 znaków, czyli pięć adresów. Dotąd stało tu
-     ślepe ucięcie — a odkąd DODAJ dokłada na końcu, ucięciu podlegałby kod
-     WŁAŚNIE ZESKANOWANY. Do kartoteki wjechałby adres, którego nikt nie
+  /* Limit `tw_Lokalizacja` to 50 znaków, czyli pięć adresów. DODAJ dokłada na
+     końcu, więc ślepe ucięcie zjadłoby kod WŁAŚNIE ZESKANOWANY. Do kartoteki wjechałby adres, którego nikt nie
      znajdzie, a magazynier byłby pewien, że odłożył. */
   const linia = przygotuj("A01-02-03 B02-03-04 C03-04-05 D04-05-06 E05-06-07");
   const w = D.putawayLine(linia, "F06-07-08", "jan", { locAction: "add" });

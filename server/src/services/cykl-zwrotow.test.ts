@@ -14,8 +14,8 @@ import path from "node:path";
       zamknięcia.
    2. BRAK DANYCH TO NIE ZERO. Karton bez zamknięcia nie wchodzi do mediany
       odcinka, zamiast wchodzić jako „zero minut".
-   3. USZKODZONY PAYLOAD NIE ZABIERA RAPORTU. Jeden ucięty JSON kładł kiedyś
-      całe `/api/metrics` (0.31.x) — tu ma zostać pominięty wiersz, nie raport.
+   3. USZKODZONY PAYLOAD NIE ZABIERA RAPORTU. Ma zostać pominięty wiersz,
+      nie raport.
    4. TEMPO LICZY SIĘ Z PRZEJŚĆ, nie z pozycji. Karton jednopozycyjny nie ma
       odstępu, więc nie ma prawa zaniżać sekund na pozycję.                    */
 
@@ -140,7 +140,7 @@ test("kosz hali dobiera się po zamknięciu koszyka, nie po samym kodzie", () =>
 });
 
 test("koszyk bez zamknięcia nie wchodzi do mediany jako zero", () => {
-  /* Blizna do uniknięcia: koszyk otwarty albo zamknięty przed oknem raportu
+  /* Koszyk otwarty albo zamknięty przed oknem raportu
      nie ma początku odcinka. Gdyby brak liczył się jako zero, „czekanie hali"
      spadłoby właśnie przy kartonach, które czekały najdłużej. */
   const q = zadanieMm(T(500), T(495), "MM 1209/MAG/2026");
@@ -156,8 +156,8 @@ test("koszyk bez zamknięcia nie wchodzi do mediany jako zero", () => {
 });
 
 test("uszkodzony payload pomija WIERSZ, nie raport", () => {
-  /* Dokładnie ten wiersz kładł kiedyś metryki i analizę: `json_extract`
-     w SQLite nie zwraca NULL na złym JSON-ie, tylko wywala zapytanie. */
+  /* `json_extract` w SQLite nie zwraca NULL na złym JSON-ie, tylko wywala
+     zapytanie. */
   const q = zadanieMm(T(500), T(495), "MM 1209/MAG/2026");
   koszyk("Z-7", T(600), T(540), q);
   const hala = koszHali("1209", T(490), null);

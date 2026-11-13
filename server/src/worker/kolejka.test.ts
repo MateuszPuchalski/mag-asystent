@@ -113,7 +113,7 @@ test("MM zapisuje numer dokumentu zwrócony przez Sferę", async () => {
 });
 
 test("kod kreskowy trafia do adaptera, nie w gałąź nieznanego typu", async () => {
-  /* `set_ean` to DRUGI typ zapisu do bazy firmy (0.37.0). Bez tego testu jego
+  /* `set_ean` to DRUGI typ zapisu do bazy firmy. Bez tego testu jego
      literówka w dyspozytorze wyglądałaby jak „nieznany typ zadania" — czyli
      zadanie w błędzie po trzech próbach, zamiast zapisu. */
   const payload = { twId: 1, ean: "5901234123457" };
@@ -137,7 +137,7 @@ test("kod kreskowy trafia do adaptera, nie w gałąź nieznanego typu", async ()
 });
 
 test("zdjęcie kartoteki trafia do adaptera, nie w gałąź nieznanego typu", async () => {
-  /* `set_zdjecie` to TRZECI typ zapisu do bazy firmy (0.88.0) i pierwszy, który
+  /* `set_zdjecie` to TRZECI typ zapisu do bazy firmy i pierwszy, który
      DODAJE WIERSZ. Bez tego testu literówka w dyspozytorze wyglądałaby jak
      „nieznany typ zadania" — zadanie w błędzie po trzech próbach — a magazynier
      i tak widziałby zdjęcie na karcie, bo leży w bazie WERTIS. Objawu nie
@@ -289,7 +289,7 @@ test("set_location nie czeka na dokument — wstrzymanie dotyczy tylko MM", asyn
 });
 
 test("takt workera jest OSŁONIĘTY — przejściowy błąd bazy nie kładzie procesu", () => {
-  /* Blizna produkcyjna (0.416.0): worker wywracał się w kółko na `database is
+  /* Blizna produkcyjna: worker wywracał się w kółko na `database is
      locked`, rzuconym z `zamelduj()` prosto w wywołaniu zwrotnym timera.
      Wyjątku w timerze nie ma kto złapać, więc ginął CAŁY proces, a NSSM
      podnosił go do następnej kolizji. Z workerem znikała kolejka zapisów,

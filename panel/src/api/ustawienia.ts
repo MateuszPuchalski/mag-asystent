@@ -1,7 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "./klient";
 
-/* ── Ustawienia biura (0.444.0) ────────────────────────────────────────
+/* ── Ustawienia biura ──────────────────────────────────────────────────
    Przeniesione z widoku za zębatką w `biuro.html`. Trasy są TE SAME, którymi
    jeździło biuro, z jednym wyjątkiem: dane firmy mieszkały w localStorage
    i dopiero to wydanie dało im trasę (`/api/biuro/firma`). Wzory typów leżą
@@ -123,8 +123,7 @@ export const useResetHasla = () => useMutation({
 
 export type RolaKonta = "magazynier" | "biuro" | "admin";
 
-/* Zakładanie konta z panelu (0.490.0). Dotąd tylko kreator na kolektorze albo
-   `curl`. Bramkę ról trzyma serwer: biuro zakłada halę, konta biura i admina
+/* Zakładanie konta z panelu. Bramkę ról trzyma serwer: biuro zakłada halę, konta biura i admina
    zakłada admin — ekran tylko nie proponuje ról, których serwer odmówi. */
 export function useZalozKonto() {
   const qc = useQueryClient();
@@ -144,7 +143,7 @@ export function useAktywnosc() {
   });
 }
 
-/* ── Konfiguracja serwera (0.488.0) ────────────────────────────────────── */
+/* ── Konfiguracja serwera ──────────────────────────────────────────────── */
 
 export type ZrodloUstawienia = "plik" | "przykryte" | "srodowisko" | "domyslna";
 
@@ -158,18 +157,18 @@ export interface WierszKonfiguracji {
   zrodlo: ZrodloUstawienia;
   /** `null` dla sekretu i dla wartości domyślnej — serwer nie wysyła ich wcale. */
   wartosc: string | null;
-  /** Jak zmienić z panelu (0.491.0); `null` = tylko plik albo instalator. */
+  /** Jak zmienić z panelu; `null` = tylko plik albo instalator. */
   edycja: { rodzaj: "tekst" | "liczba" | "data" | "wybor"; opcje?: string[] } | null;
   /** Rodzaj wartości także wtedy, gdy `edycja` jest `null` (klucz przykryty). */
   rodzaj?: "tekst" | "liczba" | "data" | "wybor" | null;
-  /** Nazwa po polsku — tylko decyzje właściciela (0.543.0). */
+  /** Nazwa po polsku — tylko decyzje właściciela. */
   nazwa?: string | null;
   /** Odmiana jednostki liczby: 1, 2–4, 5+. */
   jednostka?: [string, string, string] | null;
   /** Słowa zamiast wartości z pliku, np. `"0"` → „wyłączony". */
   wartosci?: Record<string, string> | null;
   /**
-   * Wartość, na której serwer pracuje teraz, w kształcie z pliku (0.543.0).
+   * Wartość, na której serwer pracuje teraz, w kształcie z pliku.
    * Przy domyślnej to jedyne źródło liczby; `null` dla sekretu i kluczy
    * workerów, których domyślnych serwer nie zna.
    */
@@ -184,7 +183,7 @@ export interface StanKonfiguracji {
 }
 
 /**
- * Zmiana jednego klucza (0.491.0). Serwer zapisuje `wertis.env` dopiero po
+ * Zmiana jednego klucza. Serwer zapisuje `wertis.env` dopiero po
  * udanej próbie startu i sam się restartuje pod NSSM (`restart: "sam"`).
  * Odświeżenie karty czeka, aż serwer wstanie — wcześniej pokazałaby starą
  * wartość, bo proces czyta plik raz, przy starcie.
@@ -211,7 +210,7 @@ export const useKonfiguracja = (admin: boolean) => useQuery({
   retry: false,
 });
 
-/* ── Aktualizacja serwera (0.492.0) ────────────────────────────────────
+/* ── Aktualizacja serwera ──────────────────────────────────────────────
    Wzory typów: `server/src/services/aktualizacja-serwera.ts`. */
 
 export interface WydanieSerwera { wersja: string; opublikowano: string | null; maPaczke: boolean }
@@ -224,7 +223,7 @@ export interface StanZadaniaAktualizacji {
   do?: string;
   kod?: number;
   komunikat?: string;
-  /** Bieżący krok instalatora (0.504.0) — tylko w trakcie, gdy go zapisał. */
+  /** Bieżący krok instalatora — tylko w trakcie, gdy go zapisał. */
   postep?: { krok: number; z: number; nazwa: string; at: string };
 }
 export interface StanAktualizacji {
@@ -237,7 +236,7 @@ export interface StanAktualizacji {
   czekaZlecenie: boolean;
   /** `null` = wolno zlecić; inaczej zdanie, dlaczego nie. */
   blokada: string | null;
-  /** Decyzja automatu (0.494.0) — `services/aktualizacja-auto.ts`. */
+  /** Decyzja automatu — `services/aktualizacja-auto.ts`. */
   auto?: {
     tryb: "noc" | "zaraz" | "wylaczona";
     okno: { od: number; do: number };
@@ -280,7 +279,7 @@ export function useZlecAktualizacje() {
   });
 }
 
-/* ── Nowy kolektor (0.496.0) ──────────────────────────────────────────── */
+/* ── Nowy kolektor ────────────────────────────────────────────────────── */
 
 export interface DaneKolektora { adresy: string[]; port: number; apk: { wersja: string | null } | null }
 

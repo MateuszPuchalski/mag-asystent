@@ -1,4 +1,3 @@
-import React from "react";
 import { describe, expect, it, vi, beforeEach } from "vitest";
 import { render, screen } from "@testing-library/react";
 import type { KartaTowaru, OsRozmowy } from "../api/typy";
@@ -6,9 +5,8 @@ import { BrakPolaczenia } from "../api/klient";
 
 /* ── Pasmo odpowiedzi ────────────────────────────────────────────────────────
    Zgłoszenie właściciela ze zrzutem: „popraw skrzynkę odpowiadania pytań".
-   Prawa kolumna niosła około czterdziestu faktów w jednej wadze, a trzy
-   rozstrzygające — co zamówił, czym to jest, czy mamy — leżały wśród nich,
-   przy czym stan i półka dopiero po sześciu sekcjach przewijania.
+   Trzy rozstrzygające fakty — co zamówił, czym to jest, czy mamy — giną
+   w prawej kolumnie wśród około czterdziestu innych.
 
    Testy pilnują TEGO, co uzasadnia pasmo, a nie jego wyglądu:
 
@@ -20,8 +18,7 @@ import { BrakPolaczenia } from "../api/klient";
    3. PROPOZYCJA KARTOTEKI NIE JEST FAKTEM. Pasmo mówi tylko o kartotece
       potwierdzonej (§4.3, §11.3); niepewne dopasowanie zostaje propozycją
       z przyciskiem w sekcji niżej.
-   4. WSTAWKA WSTAWIA TO SAMO, co przedtem przycisk pod tabelą Subiekta —
-      czyli pola wybrane świadomie, bo szkic idzie DO KLIENTA.              */
+   4. BEZ WSTAWKI: szkic Copilota układa odpowiedź z tych samych faktów.    */
 
 const karta = vi.fn();
 vi.mock("../api/rozmowy", () => ({
@@ -178,7 +175,7 @@ describe("Pasmo odpowiedzi nad zakładkami", () => {
   });
 
   it("nie ma wstawki do szkicu — odpowiedź układa Copilot z tych samych faktów", () => {
-    /* Decyzja właściciela z 22 września 2026: wstawka dublowała treść szkicu,
+    /* Decyzja właściciela: wstawka dublowałaby treść szkicu,
        który czeka przy każdej wiadomości. Pasmo zostaje do SPRAWDZANIA. */
     render(<PasmoOdpowiedzi dane={dane()} />);
     expect(screen.getByText("Mamy")).toBeInTheDocument();

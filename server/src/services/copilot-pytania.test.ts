@@ -270,7 +270,7 @@ test("odczyt wymian niczego nie mutuje", async () => {
   assert.deepEqual([liczba("copilot_pytanie"), liczba("copilot_wywolanie"), liczba("events")], przed);
 });
 
-/* ── Narzędzia (0.507.0) ─────────────────────────────────────────────────
+/* ── Narzędzia ───────────────────────────────────────────────────────────
    Model dostaje zestaw narzędzi i sam sięga do bazy. Pilnujemy trzech
    rzeczy: zestaw dochodzi do nadawcy, a ślad wywołań zostaje przy wymianie. */
 

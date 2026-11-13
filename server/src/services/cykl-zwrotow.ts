@@ -17,7 +17,7 @@ import { GRANICA_OKNA, OKNO, PRZERWA_MIN, czasAktywny, mediana } from "./raporty
 
    ── Dlaczego to zszywa DWA kosze ─────────────────────────────────────────
    Jeden karton nosi dziś dwa imiona. Obsługa napełnia koszyk „Z-7" w panelu,
-   a hala rozkłada kosz z jego dokumentu — „1209" (0.350.0). Liczone osobno,
+   a hala rozkłada kosz z jego dokumentu — „1209". Liczone osobno,
    pierwszy nie ma ani jednego odłożenia, a drugi nie ma zamknięcia; odcinek
    między nimi, czyli właśnie czekanie, nie istniałby w żadnym z nich.
 
@@ -46,10 +46,9 @@ const ZDARZENIA_HALI = [
 /**
  * Kosz, który zrodził DOKUMENT, a nie praca przy biurku.
  *
- * Do 0.376.0 wystarczał warunek `mm_dok_id IS NOT NULL` — dokument miały
- * wyłącznie kosze z Subiekta. Od wiązania koszyków ma go także koszyk z panelu,
- * więc rozstrzyga `mm_queue_id`: to MY zleciliśmy tamto MM. Bez tej poprawki
- * związany koszyk wypadłby z raportu jako „druga połowa cudzej sprawy".
+ * Dokument ma także koszyk z panelu związany z MM, więc rozstrzyga
+ * `mm_queue_id`: to MY zleciliśmy tamto MM. Bez tego związany koszyk
+ * wypadłby z raportu jako „druga połowa cudzej sprawy".
  */
 const jestKoszemHali = (k: WierszKosza): boolean =>
   k.mm_dok_id !== null && k.mm_queue_id === null;
@@ -127,8 +126,8 @@ interface WierszKosza {
 /** Payload zdarzenia albo `null` — uszkodzony JSON nie ma prawa zabrać raportu. */
 function ladunek(payload: string | null): Record<string, unknown> | null {
   /* `json_extract` w SQL nie zwraca NULL na uciętym payloadzie: wywala CAŁE
-     zapytanie. Na tym wyłożyły się kiedyś metryki i analiza (`raporty.ts`).
-     Czytamy więc w JS i pomijamy wiersz, którego nie da się odczytać. */
+     zapytanie. Czytamy więc w JS i pomijamy wiersz, którego nie da się
+     odczytać. */
   if (!payload) return null;
   try {
     const p = JSON.parse(payload) as unknown;
@@ -188,9 +187,9 @@ export function cyklZwrotow(dni = 90, database: Db = db()): CyklZwrotow {
   for (const k of kosze) {
     if (jestKoszemHali(k)) continue;
     /* Kosz hali szukamy PO ZAMKNIĘCIU koszyka i najbliższy w czasie: kod wraca
-       do obiegu, a numery MM powtarzają się co rok. Od 0.376.0 koszyk dostaje
-       swój dokument SAM, więc dla kartonów po tej zmianie ta lista jest pusta
-       i sprawa stoi na jednym koszu — tak, jak stoi w hali. */
+       do obiegu, a numery MM powtarzają się co rok. Koszyk związany ze swoim
+       dokumentem ma tę listę pustą i sprawa stoi na jednym koszu — tak, jak
+       stoi w hali. */
     const kandydaci = (zDokumentu.get(numerKosza(k.mm_numer ?? "")) ?? [])
       .filter((d) => !k.zamknieto_at || d.utworzono_at >= k.zamknieto_at)
       .sort((a, b) => a.utworzono_at.localeCompare(b.utworzono_at));

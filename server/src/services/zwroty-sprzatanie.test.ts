@@ -8,7 +8,7 @@ import {
 } from "./zwroty-sprzatanie.js";
 import { ocenPozycje, rozstrzygnijZwrot } from "./zwroty.js";
 
-/* ── Kasowanie zwrotów rozliczonych poza aplikacją (0.340.0) ────────────────
+/* ── Kasowanie zwrotów rozliczonych poza aplikacją ──────────────────────────
    Zgłoszenie właściciela: „wywal zwroty rozliczone poza aplikacją".
 
    Testy pilnują JEDNEJ rzeczy w dwie strony: znika dokładnie to, po czym nie

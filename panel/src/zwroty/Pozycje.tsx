@@ -1,4 +1,4 @@
-import React, { useMemo, useState, type MutableRefObject } from "react";
+import { useMemo, useState, type MutableRefObject } from "react";
 import {
   Barcode, Check, CircleHelp, ExternalLink, Layers, Link2, MessageSquareWarning, Tag, X as Krzyzyk,
 } from "lucide-react";
@@ -10,29 +10,20 @@ import { Wyszukiwarka, type Towar } from "../wyszukiwarka";
 import { Blad, Przycisk, Pusto } from "../ui";
 import { Kafel, KafelOferty } from "../towar/Kafel";
 import { Rabat } from "./Rabat";
-import { Link } from "./Link";
 import { Potracenie } from "./Potracenie";
 import { IloscZwrocona } from "./IloscZwrocona";
 import { Dopisz } from "./Dopisz";
 
-/* ── Produkty ze zwrotu (0.167.0) ────────────────────────────────────────────
-   Do 0.165.0 pozycje stały w PRAWEJ kolumnie, szerokiej na 340 px: nazwy
-   ucinały się w połowie („Podkaszarka elektry…"), zdjęcia miały 56 px, a
-   środek ekranu — najszerszy — świecił pustką pod paskiem decyzji. Decyzja
-   właściciela: produkty idą do głównego okna.
-
-   Razem z nimi przeniosła się AKCJA. Do 0.165.0 kubełki DO OCENY i DO ZWROTU
-   wypisywały te same pozycje drugi raz, jako gołe nazwy z przyciskami — bez
-   zdjęcia, bez powodu zwrotu, bez kartoteki. Operator oceniał towar, patrząc
-   na listę, która towaru nie pokazywała. Teraz jest jeden wiersz produktu,
-   a przycisk oceny albo pole zaznaczenia stoją na nim.
+/* ── Produkty ze zwrotu ──────────────────────────────────────────────────────
+   Decyzja właściciela: produkty stoją w głównym oknie, bo w 340 px nazwy
+   ucinałyby się w połowie. Razem z nimi stoi AKCJA: jeden wiersz produktu
+   niesie przycisk oceny albo pole zaznaczenia, więc operator ocenia towar,
+   patrząc na towar.
 
    Prawa kolumna zostaje kolumną DOWODÓW: zegar ustawowy, numery, zamówienie,
    paczka. To rzeczy o zwrocie, nie o towarze.                               */
 
-/* Siedemnaście powodów, bo tyle wymienia SCHEMAT Allegro (0.169.0). Do
-   0.167.0 stało tu jedenaście — te zaobserwowane przez sondę — a sześć
-   pozostałych pokazywało się operatorowi surowym kodem. `reason.type` nie ma
+/* Siedemnaście powodów, bo tyle wymienia SCHEMAT Allegro. `reason.type` nie ma
    w specyfikacji enuma, więc lista i tak nie jest zamknięta: nieznany kod
    nadal przechodzi surowy, zamiast zniknąć. */
 const POWODY: Record<string, string> = {
@@ -101,18 +92,14 @@ import { useAkcjaKlawisza, type AkcjeKlawiszy } from "./klawisze";
 import { calaDostawa, pewnaPropozycja } from "./regulaSzybkiej";
 import { PrzyciskTowaru } from "../towar/Szuflada";
 
-/* TRZY PRZYCISKI OD 0.375.0, i trzeci ma warunek. „Na przecenę" zeszła stąd
-   w 0.209.0, bo nie prowadziła donikąd: nie dokładała do koszyka, nie ruszała
-   stanu, nie zakładała zadania. Przycisk, który wygląda jak decyzja, a nie
-   jest żadną, kosztuje namysł przy każdej pozycji — a ocena jest tu naciskana
-   najczęściej ze wszystkiego.
+/* TRZY PRZYCISKI, i trzeci ma warunek. Przycisk, który wygląda jak decyzja,
+   a nie prowadzi donikąd, kosztuje namysł przy każdej pozycji.
 
    „Na outlet" wolno tu stać, bo kończy się LISTĄ ROBOCZĄ (`NaOutlet`): ktoś
-   niesie używkę na regał i odklikuje ją po wystawieniu MM w Subiekcie. Bez
-   tamtej listy byłby to ten sam ślepy zaułek drugi raz.
+   niesie używkę na regał i odklikuje ją po wystawieniu MM w Subiekcie.
 
-   Czego broni: bez tej oceny towar używany dostawał „na stan", jechał na halę
-   i wracał na półkę pickingową obok fabrycznych. Kompletujący brał ten, który
+   Czego broni: bez tej oceny towar używany dostawałby „na stan", jechał na
+   halę i wracał na półkę pickingową obok fabrycznych. Kompletujący brał ten, który
    stał bliżej. */
 const OCENY: Array<[Ocena, string, string]> = [
   ["stan", "S", "Na stan"],
@@ -135,13 +122,11 @@ function Kartoteka({ p }: { p: PozycjaZwrotu }) {
     zapisz.mutate({ pozycjaId: p.id, twId, zrodlo }, { onSuccess: () => setSzukam(false) });
 
   if (p.twId !== null) {
-    /* ── ZNACZNIK ZAMIAST ZDANIA (0.455.0) ─────────────────────────────────
+    /* ── ZNACZNIK ZAMIAST ZDANIA ───────────────────────────────────────────
        Zgłoszenie właściciela: „ulżyj przeładowaniu tekstem". Powiązana
-       kartoteka to stan DOBRY i najczęstszy, a zdanie „Kartoteka X ·
-       zatwierdzona propozycja" stało przy każdej pozycji każdego zwrotu.
-       Zielony znacznik z ikoną ogniwa mówi „powiązane" na pierwszy rzut oka;
+       kartoteka to stan DOBRY i najczęstszy. Zielony znacznik z ikoną ogniwa mówi „powiązane" na pierwszy rzut oka;
        źródło zostaje w podpowiedzi. „Zatwierdzona propozycja", a nie
-       „z SKU oferty": od 0.154.0 automat proponuje z czterech źródeł, a
+       „z SKU oferty": automat proponuje z czterech źródeł, a
        wszystkie zapisują się tym samym `sku`. */
     const skad = p.twZrodlo === "sku" ? "zatwierdzona propozycja" : "wskazana ręcznie";
     return <span title={`Kartoteka Subiekta — ${skad}`}
@@ -195,7 +180,7 @@ function Kartoteka({ p }: { p: PozycjaZwrotu }) {
          a nie na jednej wartości pewności — inaczej propozycja z pamięci
          wskazań (ta najpewniejsza, bo za nią stoi człowiek) nie dostałaby
          przycisku i wymagałaby ręcznego wskazania po raz drugi. */
-      /* Zdjęcie przy PROPOZYCJI (0.203.0). Kafel na początku wiersza pokazuje
+      /* Zdjęcie przy PROPOZYCJI. Kafel na początku wiersza pokazuje
          kartotekę POTWIERDZONĄ, więc pozycja czekająca na zatwierdzenie stała
          przy pustym kwadracie — a to właśnie przy niej zapada decyzja.
          Obraz siedzi WEWNĄTRZ bloku propozycji, w jego barwie: wyniesiony na
@@ -228,7 +213,7 @@ function Kartoteka({ p }: { p: PozycjaZwrotu }) {
 }
 
 /**
- * Ręczne wskazanie składu kompletu (0.336.0).
+ * Ręczne wskazanie składu kompletu.
  *
  * Zgłoszenie właściciela: „rozwiąż «nie weszła do koszyka» — nie wiem, gdzie
  * to wskazać". Automat sam odsyłał do tej drogi zdaniem „wskaż skład ręcznie",
@@ -301,7 +286,7 @@ function WskazSklad({ p, wiersze, zwrotId, onKoniec }: {
 }
 
 /**
- * Składniki kompletu z ptaszkami (0.335.0).
+ * Składniki kompletu z ptaszkami.
  *
  * Zgłoszenie właściciela: „powinno rozbijać na komponenty do zaznaczania,
  * które idą do MM". Z kompletu wracają nieraz same części — reszta zostaje
@@ -378,38 +363,35 @@ export function Pozycje({ zwrot, trwa, blad, trwaRabat = false, bladRabatu = "",
   blad: string;
   trwaRabat?: boolean;
   bladRabatu?: string;
-  /** Pozycje zamówienia, których w zwrocie jeszcze nie ma (0.184.0). */
+  /** Pozycje zamówienia, których w zwrocie jeszcze nie ma. */
   doDopisania?: DoDopisania[];
   bladDopisania?: string;
-  /** Co wejdzie do koszyka za każdą pozycję (0.328.0), po identyfikatorze. */
+  /** Co wejdzie do koszyka za każdą pozycję, po identyfikatorze. */
   sklady?: Record<number, SkladPozycji>;
-  /** Wiersze paragonu — materiał do ręcznego składu kompletu (0.336.0). */
+  /** Wiersze paragonu — materiał do ręcznego składu kompletu. */
   wierszeDokumentu?: WierszDokumentu[];
   onOcena: (pozycjaId: number, ocena: Ocena | null, koszId?: number) => void;
   onKwota: (pozycjeIds: number[], dostawa: boolean) => void;
   onZglosRabat?: (pozycjaId: number) => void;
   onPotracenie?: (pozycjaId: number, grosze: number | null, powod: string) => void;
-  /** Ile sztuk naprawdę wróciło; `null` czyści zapis (0.212.0). */
+  /** Ile sztuk naprawdę wróciło; `null` czyści zapis. */
   onIlosc?: (pozycjaId: number, ilosc: number | null) => void;
   onDopisz?: (zamPozycjaId: number) => void;
   onZdejmij?: (pozycjaId: number) => void;
-  /** Ocena WSZYSTKICH nieocenionych naraz (0.284.0) — patrz `onOcena`. */
+  /** Ocena WSZYSTKICH nieocenionych naraz — patrz `onOcena`. */
   onWszystkieNaStan?: () => void;
   /** Rejestr akcji dla klawiszy kubełka (`zwroty/klawisze.ts`). */
   akcje?: MutableRefObject<AkcjeKlawiszy>;
 }) {
   /* Pozycje startują ZAZNACZONE — to one wracają do nas. Dostawa zależy od
      tego, czy klient odstępuje od całego zamówienia, czy oddaje jedną rzecz
-     z pięciu — od 0.476.0 rozstrzyga to zamówienie, niżej przy `dostawa`.
+     z pięciu — rozstrzyga to zamówienie, niżej przy `dostawa`.
 
-     STAN TRZYMA ODZNACZONE, nie zaznaczone — i to jest naprawa błędu, nie
-     upodobanie. Lista zaznaczonych była KOPIĄ listy pozycji, więc rozjeżdżała
-     się z nią przy każdej zmianie: pozycja zdjęta ze zwrotu zostawiała martwy
-     identyfikator (serwer odbijał zapis: „Pozycje 3742 nie należą do tego
-     zwrotu"), a pozycja DOPISANA przez biuro wchodziła odznaczona i po cichu
-     wypadała z kwoty — bo serwer odrzuca nadmiar, nigdy braku. Wyprowadzenie
-     zaznaczenia z `zwrot.pozycje` znosi obie te drogi naraz. */
-  /* Która pozycja ma otwarty formularz składu (0.336.0). Jedna naraz: dwa
+     STAN TRZYMA ODZNACZONE, nie zaznaczone. Lista zaznaczonych byłaby KOPIĄ
+     listy pozycji i rozjeżdżała się z nią: pozycja zdjęta ze zwrotu zostawiłaby
+     martwy identyfikator, a DOPISANA weszłaby odznaczona i po cichu wypadła
+     z kwoty. Wyprowadzenie zaznaczenia z `zwrot.pozycje` znosi obie drogi. */
+  /* Która pozycja ma otwarty formularz składu. Jedna naraz: dwa
      otwarte pytałyby o to samo w dwóch miejscach ekranu. */
   /* Otwarte pudła z TEGO SAMEGO zapytania co pasek koszyka — react-query
      oddaje je z pamięci, więc przycisk oceny nie kosztuje strzału do serwera. */
@@ -419,18 +401,16 @@ export function Pozycje({ zwrot, trwa, blad, trwaRabat = false, bladRabatu = "",
   const wybrane = useMemo(
     () => zwrot.pozycje.filter((p) => !odznaczone.has(p.id)).map((p) => p.id),
     [zwrot.pozycje, odznaczone]);
-  /* ── DOSTAWA ZAZNACZONA, GDY WRACA CAŁE ZAMÓWIENIE (0.476.0) ──────────
-     Przegląd zwrotów z 23 września: pole zaczynało puste zawsze, choć
-     zamówienie mówi samo, czy klient oddaje wszystko. Przy odstąpieniu od
+  /* ── DOSTAWA ZAZNACZONA, GDY WRACA CAŁE ZAMÓWIENIE ────────────────────
+     Zamówienie mówi samo, czy klient oddaje wszystko. Przy odstąpieniu od
      całej umowy koszt dostawy się oddaje — więc to jest odpowiedź, którą ekran
      zna, a nie decyzja, którą ma zadać człowiekowi.
 
-     Przy zwrocie części pole dalej zaczyna puste i decyduje człowiek. Brak
+     Przy zwrocie części pole zaczyna puste i decyduje człowiek. Brak
      zamówienia to „nie wiem", a nie „wszystko wraca". */
   const [dostawa, setDostawa] = useState(() => calaDostawa(zwrot));
 
-  /* Wycena tylko PRZED kwotą (0.476.0). Od tego wydania zwrot wraca do DO
-     ZWROTU także po korekcie, gdy pieniądze jeszcze nie wyszły — a wtedy
+  /* Wycena tylko PRZED kwotą. Zwrot wraca do DO ZWROTU także po korekcie, gdy pieniądze jeszcze nie wyszły — a wtedy
      kwota stoi i drugi raz jej się nie zaznacza. */
   const wycena = zwrot.kubelek === "zwrot" && zwrot.kwotaGrosze === null;
   const ocenianie = zwrot.kubelek === "ocena";
@@ -438,10 +418,10 @@ export function Pozycje({ zwrot, trwa, blad, trwaRabat = false, bladRabatu = "",
      równie dobrze przy wycenie, co przy ocenianiu. Zamknięty i odrzucony
      odpadają, bo `podKlucz` po stronie serwera i tak ich nie wpuści. */
   const cofalne = zwrot.kubelek !== "zamkniety" && zwrot.kubelek !== "odrzucony";
-  /* KOREKTA ZAMYKA EDYCJĘ (0.484.7). Zapis korekty stawia `zamkniety_at`,
+  /* KOREKTA ZAMYKA EDYCJĘ. Zapis korekty stawia `zamkniety_at`,
      a `podKlucz` odmawia wtedy każdej zmiany — także w kubełku DO ZWROTU, gdzie
-     zwrot z korektą czeka na pieniądze od 0.476.0. Przyciski cofania, liczby
-     sztuk, potrącenia, zdjęcia i dopisania obiecywały tam ruch, którego serwer
+     zwrot z korektą czeka na pieniądze. Przyciski cofania, liczby sztuk,
+     potrącenia, zdjęcia i dopisania obiecywałyby tam ruch, którego serwer
      nie przyjmie. Wyjściem jest cofnięcie korekty (`R`), więc to ono otwiera
      edycję z powrotem. */
   const edytowalny = cofalne && !zwrot.korektaNumer;
@@ -469,9 +449,9 @@ export function Pozycje({ zwrot, trwa, blad, trwaRabat = false, bladRabatu = "",
      byłby drugą kopią tej samej reguły. */
   useAkcjaKlawisza(akcje, "zapiszKwote", () => { if (!trwa && wycena) onKwota(wybrane, dostawa); });
 
-  /* ── `-` i `D` OTWIERAJĄ WYJĄTKI (0.479.0) ─────────────────────────────
-     Przegląd zwrotów z 23 września: „wróciło mniej" i potrącenie były
-     wyłącznie dla myszy, więc każdy wyjątek zrywał pracę z klawiatury.
+  /* ── `-` i `D` OTWIERAJĄ WYJĄTKI ───────────────────────────────────────
+     „Wróciło mniej" i potrącenie nie mogą być wyłącznie dla myszy, bo każdy
+     wyjątek zrywałby pracę z klawiatury.
      PIERWSZA PASUJĄCA POZYCJA, jak przy ocenie `S` — klawisz idzie tą samą
      drogą, którą wędruje wzrok. Znacznik rośnie przy każdym naciśnięciu,
      więc drugi klawisz po „Wróć" otwiera pole jeszcze raz. */
@@ -509,13 +489,12 @@ export function Pozycje({ zwrot, trwa, blad, trwaRabat = false, bladRabatu = "",
   };
 
   if (!zwrot.pozycje.length) {
-    /* PUSTKA TEŻ MÓWI, CO ZROBIĆ (audyt, 15 września 2026). Zwrot bez pozycji
+    /* PUSTKA TEŻ MÓWI, CO ZROBIĆ (audyt). Zwrot bez pozycji
        ma dwie przyczyny i obie mają wyjście: zamówienia jeszcze nie pobrano
        (kolumna dowodów, „Dociągnij teraz") albo to paczka nieodebrana, której
        klient nie zgłosił — wtedy pozycje dopisuje biuro. */
-    /* Obie drogi MUSZĄ stać obok zdania (0.484.7). Do tego wydania pusty
-       zwrot odsyłał do dopisania, a listy dopisania tu nie było — wczesne
-       wyjście pomijało ją razem z resztą. „Dociągnij" pada tylko przy numerze
+    /* Obie drogi MUSZĄ stać obok zdania: pusty zwrot odsyła do dopisania,
+       więc wczesne wyjście nie może pominąć listy dopisania. „Dociągnij" pada tylko przy numerze
        zamówienia, bo bez niego przycisku w dowodach nie ma. */
     return <div className="p-4">
       <Pusto waga="lista">
@@ -529,10 +508,9 @@ export function Pozycje({ zwrot, trwa, blad, trwaRabat = false, bladRabatu = "",
 
   return <div className="p-4">
     {pewne.length > 1 &&
-      /* ── PEWNE KARTOTEKI JEDNYM RUCHEM (0.479.0) ────────────────────
-         Przegląd zwrotów z 23 września: przy zwrocie wielopozycyjnym
-         „Zatwierdź" klikało się po kolei przy każdej pozycji, choć żadna nie
-         wymagała namysłu. Hurtem idą WYŁĄCZNIE `sku` i `pamiec` — trafienie
+      /* ── PEWNE KARTOTEKI JEDNYM RUCHEM ──────────────────────────────
+         Przy zwrocie wielopozycyjnym „Zatwierdź" przy każdej pozycji to
+         klikanie bez namysłu. Hurtem idą WYŁĄCZNIE `sku` i `pamiec` — trafienie
          sygnatury i decyzja człowieka z innego zwrotu. `jedyna_pozycja`
          i `nazwa_w_zamowieniu` to zgadywanie (`services/sygnatury.ts`),
          a pomyłka kartoteki wraca towarem na złej półce, więc te zostają
@@ -548,7 +526,7 @@ export function Pozycje({ zwrot, trwa, blad, trwaRabat = false, bladRabatu = "",
         </Przycisk>
         {hurt.blad && <span className="text-xs text-red-700">{hurt.blad}</span>}
       </div>}
-    {/* OCENA HURTEM (0.284.0). Zwrot bywa wielopozycyjny, a ocena jest tu
+    {/* OCENA HURTEM. Zwrot bywa wielopozycyjny, a ocena jest tu
         naciskana najczęściej ze wszystkiego — przy pięciu pozycjach to pięć
         kliknięć w to samo. Przycisk staje TYLKO przy więcej niż jednej
         nieocenionej pozycji: przy jednej byłby drugim przyciskiem o tym samym
@@ -577,7 +555,7 @@ export function Pozycje({ zwrot, trwa, blad, trwaRabat = false, bladRabatu = "",
         {wycena && <input type="checkbox" className="mt-1 h-4 w-4 shrink-0"
           aria-label={`Oddaj: ${p.nazwa}`}
           checked={oddawana} onChange={() => przelacz(p.id)} />}
-        {/* ── DWA ZDJĘCIA, DWA PYTANIA (0.213.0) ──────────────────────────
+        {/* ── DWA ZDJĘCIA, DWA PYTANIA ────────────────────────────────────
             Kafel kartoteki odpowiada „co mamy na półce", kafel oferty — „co
             klient widział, kupując". To nie jest powtórzenie: różnica między
             nimi bywa właśnie tym, o co poszedł spór („na zdjęciu było inaczej").
@@ -617,9 +595,8 @@ export function Pozycje({ zwrot, trwa, blad, trwaRabat = false, bladRabatu = "",
                 {p.ilosc} × {zlote(p.cenaGrosze, p.waluta)}</span>}
             </span>
           </div>
-          {/* ── SZCZEGÓŁY Z IKONAMI, JEDEN RZĄD (0.455.0) ─────────────────────
-              Do 0.454.0 trzy linijki: „2 szt. · powód", „EAN … SKU …"
-              i „Zobacz ofertę". Ikona zastępuje etykietę, a pełna nazwa stoi
+          {/* ── SZCZEGÓŁY Z IKONAMI, JEDEN RZĄD ───────────────────────────────
+              Ikona zastępuje etykietę, a pełna nazwa stoi
               w podpowiedzi i w nazwie dostępnej. Kody zostają pismem stałej
               szerokości, bo po nich szuka się na półce i w Subiekcie.
 
@@ -638,7 +615,7 @@ export function Pozycje({ zwrot, trwa, blad, trwaRabat = false, bladRabatu = "",
             {p.sku && <span title="SKU oferty" className="inline-flex items-center gap-1">
               <Tag size={13} aria-hidden="true" /><span className="sr-only">SKU </span>
               <b className="font-mono font-normal text-slate-800">{p.sku}</b></span>}
-            {/* Odnośnik JAWNY (0.153.0): ikona wyjścia i słowo „oferta", pełna
+            {/* Odnośnik JAWNY: ikona wyjścia i słowo „oferta", pełna
                 nazwa w `aria-label`. Gdy adresu nie ma, ekran dalej to mówi —
                 krótko, a całe zdanie w podpowiedzi. Milczenie wyglądałoby jak
                 usterka panelu, a jest brakiem danych po stronie Allegro. */}
@@ -650,7 +627,7 @@ export function Pozycje({ zwrot, trwa, blad, trwaRabat = false, bladRabatu = "",
               : <span title="Allegro nie podało adresu oferty" className="text-slate-500">bez adresu oferty</span>}
           </div>
           {powodWyrozniony(p) && <PowodZwrotu p={p} />}
-          {/* Kartoteka i rabat W JEDNYM RZĘDZIE znaczników (0.455.0). Rabat
+          {/* Kartoteka i rabat W JEDNYM RZĘDZIE znaczników. Rabat
               stoi przy POZYCJI, nie przy zwrocie: wniosek składa się na pozycję
               zamówienia, więc zwrot z dwiema pozycjami ma dwa osobne rabaty. */}
           <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
@@ -679,7 +656,7 @@ export function Pozycje({ zwrot, trwa, blad, trwaRabat = false, bladRabatu = "",
               kubełku — to fakt o tej pozycji, nie stan ekranu. */}
           {ocenianie && !p.ocena && <div className="mt-2 flex flex-wrap gap-2">
             {OCENY.map(([klucz, klawisz, etykieta]) => {
-              /* ── WYBÓR PUDŁA PRZY OCENIE (0.379.0) ─────────────────────
+              /* ── WYBÓR PUDŁA PRZY OCENIE ───────────────────────────────
                  Decyzja właściciela, razem z odwróceniem zasady „jeden koszyk
                  na operatora": przy kilku otwartych pudłach ocena PYTA, do
                  którego. Zgadywanie „do najnowszego" byłoby tanie w kodzie
@@ -721,10 +698,8 @@ export function Pozycje({ zwrot, trwa, blad, trwaRabat = false, bladRabatu = "",
                   bez niej obiecywałby cały komplet na półce. */}
               {p.ocena === "stan" && naOutlet(sklady[p.id]) > 0 && <span className="font-normal">
                 · {naOutlet(sklady[p.id])} na outlet</span>}</span>
-            {/* COFNIĘCIE ZAMIAST POTWIERDZENIA (§25a.5). Do 0.202.0 przyciski
-                oceny znikały po pierwszym kliknięciu, więc pomyłkowa
-                „Utylizacja" na złym wierszu była z ekranu nie do odkręcenia.
-                Nie pokazujemy go tam, gdzie serwer i tak odmówi: zwrot
+            {/* COFNIĘCIE ZAMIAST POTWIERDZENIA (§25a.5): pomyłkowa „Utylizacja"
+                na złym wierszu ma być z ekranu do odkręcenia. Nie pokazujemy go tam, gdzie serwer i tak odmówi: zwrot
                 zamknięty i odrzucony są poza pracą, a pozycja z zamkniętego
                 koszyka dostanie zdanie z nazwą kosza dopiero po kliknięciu —
                 bo tego panel z listy pozycji nie wie. */}
@@ -732,7 +707,7 @@ export function Pozycje({ zwrot, trwa, blad, trwaRabat = false, bladRabatu = "",
               className="text-slate-500 underline underline-offset-2 hover:text-slate-800
                 disabled:opacity-50"
               onClick={() => onOcena(p.id, null)}>cofnij ocenę</button>}</p>}
-          {/* CICHA STRATA JEST TU NAJGORSZYM WYJŚCIEM (0.192.0). Ocena „na
+          {/* CICHA STRATA JEST TU NAJGORSZYM WYJŚCIEM. Ocena „na
               stan" dokłada pozycję do koszyka, czyli na dokument MM — ale MM
               przesuwa stany KARTOTEK, więc pozycja bez kartoteki wejść nie
               może. Ocena zapisuje się mimo to, bo jest faktem o towarze.
@@ -740,14 +715,12 @@ export function Pozycje({ zwrot, trwa, blad, trwaRabat = false, bladRabatu = "",
               ma na żadnym papierze, a magazynier zobaczyłby to dopiero przy
               rozkładaniu. */}
           {p.ocena === "stan" && !p.wKoszyku && <p className="mt-1 w-full text-xs font-semibold text-ranga-uwaga">
-            {/* POWÓD PISZE SERWER (0.328.0). Do tego wydania stało tu jedno
-                zdanie o braku kartoteki — jedyna wtedy przyczyna. Odkąd skład
-                bierze się z paragonu, przyczyny są trzy i prowadzą w różne
-                miejsca: brak kartoteki, brak dokumentu, dwie oferty bez
+            {/* POWÓD PISZE SERWER. Skład bierze się z paragonu, więc przyczyny
+                są trzy i prowadzą w różne miejsca: brak kartoteki, brak dokumentu, dwie oferty bez
                 kartoteki na jednym paragonie. */}
             Nie weszła do koszyka — {sklady[p.id]?.powod
               ?? "bez kartoteki nie ma czego wpisać na MM"}.</p>}
-          {/* DROGA WYJŚCIA, nie samo zdanie o kłopocie (0.336.0). Zgłoszenie
+          {/* DROGA WYJŚCIA, nie samo zdanie o kłopocie. Zgłoszenie
               właściciela: „nie wiem, gdzie to wskazać". Automat odsyłał do
               ręcznej drogi, której nie było — teraz stoi tuż pod powodem,
               czyli tam, gdzie człowiek właśnie czyta. */}
@@ -825,8 +798,8 @@ export function Pozycje({ zwrot, trwa, blad, trwaRabat = false, bladRabatu = "",
             <span className="text-xs font-bold uppercase text-slate-500">Do oddania</span>
             {/* Podgląd jest PODGLĄDEM. Do serwera idzie zaznaczenie, a sumę
                 składa on sam (§25a.3) — inaczej dałoby się zapisać dowolną
-                kwotę żądaniem z pominięciem tego ekranu. Od 0.516.0 mówi to
-                podpowiedź przy sumie: zdanie pod nią było głosem programisty. */}
+                kwotę żądaniem z pominięciem tego ekranu. Mówi to podpowiedź
+                przy sumie, nie zdanie pod nią. */}
             <b data-testid="suma" className="mr-auto tabular-nums text-lg"
               title="Kwotę przelicza serwer z zaznaczenia; to podgląd.">
               {zlote(suma, zwrot.waluta)}</b>
@@ -836,9 +809,9 @@ export function Pozycje({ zwrot, trwa, blad, trwaRabat = false, bladRabatu = "",
             </Przycisk>
           </div>
         </div>
-      /* STOPKA ZNIKA, GDY KWOTA JEST USTALONA (0.516.0, §26d). Wtedy liczba,
-         która idzie do klienta, stoi w „Pieniądzach" — dwie sumy obok niej
-         czytało się jak trzecią wersję tej samej kwoty. */
+      /* STOPKA ZNIKA, GDY KWOTA JEST USTALONA (§26d). Wtedy liczba, która
+         idzie do klienta, stoi w „Pieniądzach" — dwie sumy obok niej czytałoby
+         się jak trzecią wersję tej samej kwoty. */
       : zwrot.kwotaGrosze !== null ? null
       : <div className="mt-3 space-y-1 border-t border-slate-200 pt-2 text-sm">
           <div className="flex items-baseline justify-between">
@@ -850,7 +823,7 @@ export function Pozycje({ zwrot, trwa, blad, trwaRabat = false, bladRabatu = "",
                a tego jeszcze nie pobrano. */
             ? <p className="text-xs text-slate-500">
                 Kwoty pełnej nie znamy bez zamówienia — koszt dostawy stoi przy nim.
-                {/* Tylko z numerem: bez niego przycisku w dowodach nie ma (0.484.7). */}
+                {/* Tylko z numerem: bez niego przycisku w dowodach nie ma. */}
                 {zwrot.orderId && " Dociągnij je w kolumnie obok."}</p>
             : <div className="flex items-baseline justify-between">
                 <span className="font-bold">Z dostawą</span>

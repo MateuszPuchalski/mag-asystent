@@ -46,7 +46,7 @@ describe("odczyt ze zdjęć rozmowy", () => {
   });
 
   test("ZWINIĘTE domyślnie: szkic jest ważniejszy niż odczyt czterech zdjęć", () => {
-    /* Do 0.341.0 blok stał otwarty i wypychał szkic poza krawędź. Nagłówek
+    /* Otwarty blok wypychałby szkic poza krawędź. Nagłówek
        ma nieść tyle, żeby agent wiedział, czy warto rozwijać: liczbę zdjęć
        i zdanie, co z nimi zrobić. */
     render(<OdczytZdjec odczyt={[{ zdjecie: "Z1", tekst: "PARKSIDE PBRM 39 E4" }]} />);

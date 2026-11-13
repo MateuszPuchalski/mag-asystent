@@ -1,14 +1,13 @@
-import React, { useState } from "react";
+import { useState } from "react";
 import { Link } from "react-router-dom";
 import { MessageSquareText } from "lucide-react";
 import type { Zwrot } from "../api/typy";
 import { zlote } from "../api/zwroty";
 import { Skopiuj } from "../ui";
 
-/* ── Gotowa wiadomość do klienta (0.476.0) ─────────────────────────────────
-   Wywiad z właścicielem, 23 września 2026: wiadomości do klientów przy
-   zwrotach to głównie uszkodzony towar i pomniejszony zwrot. Każdą pisało się
-   od zera, przepisując z ekranu nazwy, kwoty i powody.
+/* ── Gotowa wiadomość do klienta ───────────────────────────────────────────
+   Wiadomości do klientów przy zwrotach to głównie uszkodzony towar
+   i pomniejszony zwrot. Szablon oszczędza przepisywania nazw, kwot i powodów.
 
    SZABLON, NIE WYSYŁKA. Panel odpisuje w istniejących wątkach skrzynki, ale
    nie zakłada nowych — a przy zwrocie wątku zwykle nie ma. Treść idzie więc

@@ -45,9 +45,8 @@ Krok zostaje krótki i rozkazujący. Powód schodzi pod niego do osobnego bloku:
 > **Dlaczego.** Wcześniej bramką był tylko ekran kolektora. Dowolne urządzenie
 > w sieci hali mogło zmienić lokalizację w Subiekcie.
 
-Trzy dokumenty są **poza zakresem** tych reguł, bo w całości są uzasadnieniami:
-[`architektura.md`](architektura.md), [`porownanie-asystent.md`](porownanie-asystent.md)
-i [`CHANGELOG.md`](../CHANGELOG.md). Limit 25 wyrazów wyciąłby z nich dokładnie
+Dwa dokumenty są **poza zakresem** tych reguł, bo w całości są uzasadnieniami:
+[`architektura.md`](architektura.md) i [`CHANGELOG.md`](../CHANGELOG.md). Limit 25 wyrazów wyciąłby z nich dokładnie
 tę treść, dla której powstały.
 
 ## Słowniczek

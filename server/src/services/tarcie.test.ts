@@ -8,7 +8,7 @@ import {
 } from "./tarcie.js";
 import { otworzRozmowe, zakonczRozmowe } from "./conversations.js";
 
-/* ── Pomiar tarcia w skrzynce (0.500.0) ─────────────────────────────────────
+/* ── Pomiar tarcia w skrzynce ───────────────────────────────────────────────
    Pilnujemy czterech rzeczy: udział szkiców bez zmian liczy się tylko ze
    szkiców na tę samą wiadomość; cofnięte zakończenie to wyłącznie otwarcie
    z paska „Cofnij"; liczba czasu z przeglądarki jest przycinana; a rozbicia
@@ -81,7 +81,7 @@ test("czas z przeglądarki: ujemny, nieliczbowy i dłuższy niż dzień pracy od
   for (const zly of [-1, Infinity, NaN, "100", null, 9 * 3_600_000]) assert.equal(czasDoWysylki(zly), null);
 });
 
-/* ── Pomiary pod decyzje (26 września 2026, 0.532.0) ───────────────────────
+/* ── Pomiary pod decyzje ───────────────────────────────────────────────────
    Każda z czterech liczb ma tu swój test: rozkład cofnięć z odczytem, tarcie
    wg twierdzeń do sprawdzenia, gotowość per klasa z dniami i przedziałem,
    pominięcia bez człowieka. Ostatni test pilnuje prywatności, nie liczby. */

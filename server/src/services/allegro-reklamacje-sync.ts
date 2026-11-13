@@ -9,17 +9,15 @@ import { oczyscSurowy } from "./allegro-oczyszczanie.js";
 import { naGrosze } from "./allegro-zwroty-sync.js";
 import { odkodujEncje } from "../tekst.js";
 
-/* ── Synchronizator reklamacji klienckich (0.222.0) ──────────────────────────
+/* ── Synchronizator reklamacji klienckich ────────────────────────────────────
    Kształt pól pochodzi z OFICJALNEJ specyfikacji OpenAPI Allegro (modele
    `PostPurchaseIssue`, `PostPurchaseIssueState`, `PostPurchaseIssueChat`,
-   `PostPurchaseIssueExpectation`, `PostPurchaseIssueReason`), a nie z kodu
-   sprzed 0.138.0 i nie z pamięci. Spis pól z uzasadnieniem stoi
-   w `docs/allegro-ksztalt.md`.
+   `PostPurchaseIssueExpectation`, `PostPurchaseIssueReason`), a nie
+   z pamięci. Spis pól z uzasadnieniem stoi w `docs/allegro-ksztalt.md`.
 
    ŻADEN Z TYCH SCHEMATÓW NIE MA LISTY `required`. Wymagalność pola mówi
    wyłącznie ta lista, więc tutaj KAŻDE pole jest opcjonalne — poza `id`, bez
-   którego nie ma czego zapisać. Tak samo potraktowaliśmy `OfferListingDto`
-   w 0.214.0 i to nie była wtedy usterka Allegro, tylko normalna odpowiedź.
+   którego nie ma czego zapisać.
 
    TRZY RZECZY, KTÓRE TEN PLIK ROBI INACZEJ NIŻ ZWROTY:
 
@@ -31,8 +29,7 @@ import { odkodujEncje } from "../tekst.js";
       a specyfikacja nie ma filtra po `type`. Panel prowadzi wyłącznie
       reklamacje: nowe sprawy kupujących Allegro zakłada jako Problemy
       z zakupem w Centrum Wiadomości, czyli w skrzynce. Dyskusja z listy nie
-      trafia do bazy, a wiersze zapisane dawniej zostają nietknięte i żadne
-      zapytanie ich już nie pokazuje.
+      trafia do bazy.
    3. CZAT DOCIĄGAMY OSOBNO I Z LIMITEM. Lista niesie samą PIERWSZĄ wiadomość
       (`chat.initialMessage`) oraz licznik i status ostatniej. Pełna rozmowa to
       jedno żądanie NA SPRAWĘ, więc pytamy tylko o te, w których licznik
@@ -66,11 +63,8 @@ type Sprawa = {
   description?: string | null;
   right?: string | null;
   buyer?: { login?: string } | null;
-  /* `createdAt` CZYTAMY OD 0.282.0. `PostPurchaseIssueCheckoutForm` ma
-     dokładnie dwa pola i przez trzy wydania braliśmy jedno — a Copilot
-     wypisywał „data zakupu" w liście braków, pytając o to, co przyszło
-     z nią w tej samej odpowiedzi. Typ węższy od schematu potrafi ukryć
-     dane skuteczniej niż ich brak. */
+  /* `PostPurchaseIssueCheckoutForm` ma dwa pola i bierzemy oba: Copilot
+     bez `createdAt` pytałby klienta o datę zakupu. */
   checkoutForm?: { id?: string; createdAt?: string | null } | null;
   offer?: { id?: string | null; quantity?: number | null } | null;
   reason?: { type?: string; description?: string } | null;
@@ -96,9 +90,8 @@ const kodHttp = (error: unknown): number | null =>
 /**
  * Ile stron wolno przejść w jednym przebiegu.
  *
- * BEZPIECZNIK, nie limit poprawnościowy — ta sama blizna 0.127.0 co przy
- * zwrotach. Dziesięć stron to tysiąc spraw; sonda z żywego konta widziała ich
- * sto w całej historii.
+ * BEZPIECZNIK, nie limit poprawnościowy — jak przy zwrotach. Dziesięć stron
+ * to tysiąc spraw; sonda z żywego konta widziała ich sto w całej historii.
  */
 const MAKS_STRON = 10;
 
@@ -115,7 +108,7 @@ const NA_STRONE = 100;
 export const CZATOW_NA_PRZEBIEG = 20;
 
 /**
- * Ile STRON rozmowy wolno przejść przy jednej sprawie (0.273.0).
+ * Ile STRON rozmowy wolno przejść przy jednej sprawie.
  *
  * Bezpiecznik tego samego gatunku co `MAKS_STRON`, ale z innym powodem:
  * budżet `CZATOW_NA_PRZEBIEG` liczy SPRAWY, nie żądania, więc bez tej
@@ -233,7 +226,7 @@ export async function synchronizujAllegroReklamacje(
   };
 
   try {
-    /* NAJPIERW SPRAWY OTWARTE (0.273.0). Lista jedzie malejąco po dacie
+    /* NAJPIERW SPRAWY OTWARTE. Lista jedzie malejąco po dacie
        otwarcia, a bezpiecznik stron ucina jej ogon — czyli sprawy NAJSTARSZE,
        czyli najbardziej spóźnione, czyli dokładnie te, dla których ten ekran
        powstał. Filtr `status` ze specyfikacji zawęża przelot do garści spraw
@@ -310,25 +303,16 @@ export async function synchronizujAllegroReklamacje(
 export function czatyDoUzupelnienia(
   database: Db, konto: number, limit = CZATOW_NA_PRZEBIEG,
 ): Array<{ id: number; externalId: string }> {
-  /* ── STATUS KOŃCOWY NIE WYCISZA ROZMOWY (0.398.0) ──────────────────────────
-     Zgłoszenie właściciela: „mam reklamację, która nie pokazuje dzisiejszych
-     wiadomości". Stał tu warunek odsiewający `CLAIM_ACCEPTED`,
-     `CLAIM_REJECTED` i `DISPUTE_CLOSED` — z uzasadnieniem, że „ich rozmowa
-     już niczego nie zmieni".
-
-     I to było nieprawdą O NASZYM WŁASNYM PRZEBIEGU PRACY. Po UZNANIU
-     reklamacji panel wysyła krok „czy towar do odesłania"
+  /* ── STATUS KOŃCOWY NIE WYCISZA ROZMOWY ────────────────────────────────────
+     Po UZNANIU reklamacji panel wysyła krok „czy towar do odesłania"
      (`reklamacje-wysylka.ts`, trasa `/zwrot-towaru`), a kupujący odpisuje
-     w tej samej rozmowie: kiedy odeśle, jakim kurierem, pod jaki adres.
-     Sprawa miała wtedy status `CLAIM_ACCEPTED`, więc jej rozmowa wypadała
-     z uzupełniania — i żadna z tych odpowiedzi nie docierała na ekran.
-     Agent widział rozmowę urwaną na własnym pytaniu.
+     w tej samej rozmowie przy statusie `CLAIM_ACCEPTED`. Odsiew po statusie
+     gubiłby te odpowiedzi.
 
      KOSZTU TO NIE PODNOSI, bo prawdziwym strażnikiem jest LICZNIK niżej:
      żądanie wychodzi wyłącznie wtedy, gdy Allegro mówi o większej liczbie
      wiadomości, niż mamy u siebie. Sprawa rozstrzygnięta i wyciszona ma te
-     liczby równe i tak nie wchodzi do kolejki. Status był drugą bramką, która
-     nie chroniła przed niczym, a cicho gubiła wiadomości. */
+     liczby równe i tak nie wchodzi do kolejki. */
   const wiersze = database.prepare(`
     SELECT r.id, r.external_id
       FROM reklamacja_klienta r
@@ -369,7 +353,7 @@ async function uzupelnijCzaty(
 }
 
 /**
- * Rozmowa JEDNEJ sprawy, wszystkie strony (0.273.0).
+ * Rozmowa JEDNEJ sprawy, wszystkie strony.
  *
  * Wydzielone, bo tę samą drogę przechodzi przebieg zbiorczy i odświeżenie
  * pojedynczej sprawy z ekranu. Dwie kopie stronicowania rozjechałyby się przy
@@ -383,28 +367,17 @@ async function pobierzCzat(
   opcje: { query: (url: string) => Promise<unknown | null>; apiUrl: string },
 ): Promise<boolean> {
   {
-    /* STRONICUJEMY, a nie bierzemy pierwszej setki (0.273.0). Do 0.272.0 to
-       żądanie szło RAZ, bez offsetu, choć `urlWiadomosciSprawy` umiał go od
-       początku. Rozmowa dłuższa niż sto wiadomości była przez to przycięta na
-       zawsze — a ekran obiecywał przy niej, że „reszta dojdzie następną
-       synchronizacją". Nie dochodziła nigdy.
-
-       Gorzej: taka sprawa spełniała warunek `czatyDoUzupelnienia` po KAŻDYM
-       przebiegu i stała na czele budżetu w kółko, wypychając z niego sprawy,
-       które dałoby się domknąć. Jedna gruba rozmowa głodziła dziewiętnaście
-       pozostałych. */
+    /* STRONICUJEMY, a nie bierzemy pierwszej setki. Przycięta rozmowa
+       spełniałaby warunek `czatyDoUzupelnienia` po KAŻDYM przebiegu i stała
+       na czele budżetu w kółko, głodząc pozostałe sprawy. */
     let wzieto = 0;
-    /* ── DWA RÓŻNE POWODY PRZERWANIA (0.398.0) ─────────────────────────────
-       Do 0.397.0 stała tu JEDNA zmienna `urwane` i to był drugi powód, dla
-       którego reklamacja przestawała pokazywać nowe wiadomości.
-
+    /* ── DWA RÓŻNE POWODY PRZERWANIA ───────────────────────────────────────
        Bezpiecznik stron i błąd sieci znaczą co innego. Bezpiecznik mówi
        „rozmowa jest dłuższa, niż bierzemy" — to stan trwały i wpis
        `czat_urwany=1` jest wtedy prawdą, która chroni budżet. Błąd jednej
-       strony mówi „tym razem nie wyszło" — a zapisanie go tą samą flagą
-       WYRZUCAŁO sprawę z uzupełniania NA ZAWSZE, bo `czatyDoUzupelnienia`
-       pomija `czat_urwany=1`. Jedno mignięcie sieci wyciszało rozmowę
-       na stałe, bez słowa na ekranie. */
+       strony mówi „tym razem nie wyszło". Zapisany tą samą flagą wyrzuciłby
+       sprawę z uzupełniania NA ZAWSZE, bo `czatyDoUzupelnienia` pomija
+       `czat_urwany=1`. */
     let urwaneLimitem = false;
     for (let strona = 0; strona < MAKS_STRON_CZATU; strona++) {
       let body: unknown | null;
@@ -450,20 +423,15 @@ async function pobierzCzat(
  *
  * PRACA CZŁOWIEKA JEST NIETYKALNA. Ponowne pobranie uzupełnia pola z Allegro
  * i podnosi `synced_at`, ale nie rusza `prowadzi`, `notatka` ani `wersja` —
- * to jest blizna 0.128.0 rozszerzona o pracę biura, dokładnie jak przy
- * zwrotach.
+ * dokładnie jak przy zwrotach.
  */
 /**
  * Tekst od człowieka — z encjami HTML zamienionymi na znaki.
  *
- * ALLEGRO KODUJE NIEKONSEKWENTNIE i to nie jest przypuszczenie: w jednym
- * zdaniu ze zgłoszenia właściciela — „Z&aacute;silka nebyla doručena" — `á`
- * przyszło jako encja, a `č` jako zwykły znak UTF-8. Dekodujemy więc KAŻDE
- * pole niosące słowa klienta, a nie tylko te, w których encję kiedyś widziano.
- *
- * Do 0.249.1 ten synchronizator nie dekodował NICZEGO. Skrzynka robi to od
- * 0.152.0 (blizna 0.127.0), a rodzina `/sale/issues` powstała później i tę
- * lekcję pominęła — więc temat i opis reklamacji stały na ekranie dosłownie.
+ * ALLEGRO KODUJE NIEKONSEKWENTNIE: w jednym zdaniu — „Z&aacute;silka nebyla
+ * doručena" — `á` przyszło jako encja, a `č` jako zwykły znak UTF-8.
+ * Dekodujemy więc KAŻDE pole niosące słowa klienta, a nie tylko te, w których
+ * encję kiedyś widziano.
  *
  * Pola słownikowe (`type`, `status`, `right`) NIE przechodzą tędy: to kody
  * z enumów Allegro, w których encji nie ma i być nie może.
@@ -589,7 +557,7 @@ function potwierdzWerdykt(database: Db, konto: number, externalId: string, statu
  * Jedna wiadomość czatu.
  *
  * `id` bywa nieobecne — schemat nie ma listy `required`, a bez identyfikatora
- * nie da się zbudować idempotencji (blizna 0.128.0). Taka wiadomość PRZEPADA
+ * nie da się zbudować idempotencji. Taka wiadomość PRZEPADA
  * świadomie: duplikat przy każdym przebiegu byłby gorszy od jej braku, a
  * `wiadomosci_ile` z Allegro i tak powie na ekranie, że rozmowa ma dalszy ciąg.
  */
@@ -610,7 +578,7 @@ function zapiszWiadomosc(database: Db, reklamacjaId: number, w: Wiadomosc): void
   for (const z of w.attachments ?? []) zapiszZalacznik(database, reklamacjaId, id, z);
 }
 
-/** Załącznik: nazwa i adres. PLIKU NIE POBIERAMY (polityka danych 0.143.0). */
+/** Załącznik: nazwa i adres. PLIKU NIE POBIERAMY (polityka danych). */
 function zapiszZalacznik(
   database: Db, reklamacjaId: number, wiadomoscId: number | null, z: Zalacznik,
 ): void {
@@ -620,23 +588,21 @@ function zapiszZalacznik(
     ON CONFLICT(reklamacja_id, url) DO UPDATE SET
       wiadomosc_id=COALESCE(excluded.wiadomosc_id, reklamacja_zalacznik.wiadomosc_id),
       nazwa=excluded.nazwa`).run(
-    /* Nazwa pliku też bywa zakodowana — skrzynka dekoduje ją od 0.244.0
-       (`zalaczniki-wiadomosci.ts`), bo po niej rozpoznaje się załącznik. */
+    /* Nazwa pliku też bywa zakodowana, jak w skrzynce
+       (`zalaczniki-wiadomosci.ts`), a po niej rozpoznaje się załącznik. */
     reklamacjaId, wiadomoscId, ludzki(z.fileName) ?? "", z.url);
 }
 
 /**
- * Odświeżenie JEDNEJ sprawy — `GET /sale/issues/{issueId}` (0.273.0).
+ * Odświeżenie JEDNEJ sprawy — `GET /sale/issues/{issueId}`.
  *
- * Czwarta końcówka rodziny i do 0.272.0 jedyna nieużywana wcale. Bez niej
- * świeży stan sprawy dawał wyłącznie PEŁNY przebieg listy, czyli takt trzech
- * minut — a agent, który właśnie wysłał odpowiedź albo werdykt, patrzy na
- * ekran teraz. Najgorzej wychodziło to przy wysyłce niejednoznacznej: pasek
- * kazał sprawdzić w Centrum Sprzedaży coś, co jedno żądanie rozstrzyga.
+ * Bez niej świeży stan sprawy dawałby wyłącznie PEŁNY przebieg listy, czyli
+ * takt trzech minut — a agent, który właśnie wysłał odpowiedź albo werdykt,
+ * patrzy na ekran teraz. Wysyłkę niejednoznaczną rozstrzyga jedno żądanie.
  *
  * PRACA CZŁOWIEKA ZOSTAJE NIETKNIĘTA, bo zapis idzie tym samym `zapisz()`, co
  * przebieg zbiorczy — `prowadzi`, `notatka`, `wersja` i werdykt są poza jego
- * zasięgiem (blizna 0.128.0). Rozmowa dociąga się przy okazji i tą samą drogą
+ * zasięgiem. Rozmowa dociąga się przy okazji i tą samą drogą
  * co w takcie, więc stronicowanie jest jedno.
  *
  * Oddaje `false`, gdy sprawy nie ma w bazie; błędy sieci idą wyjątkiem do
