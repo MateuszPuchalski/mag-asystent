@@ -3561,7 +3561,7 @@ decyzję właściciela, nie na kod".
 **Reklamacje i dyskusje zostają z sitem i tagami.** Tam sprawę bierze konkretna
 osoba i prowadzi rozmowę z klientem, więc pytanie „czyje to" jest prawdziwe.
 Zeszła oś wiązań zwrotów, nie maszyneria. Tagi zeszły z reklamacji później,
-w @wydanie (§25b.15), a sito `sprawy/Moje.tsx` zostaje.
+w 0.621.2 (§25b.15), a sito `sprawy/Moje.tsx` zostaje.
 
 Kolumny `prowadzi*` zostają w `zwrot_klienta` i nie czyta ich nikt. Przebudowa
 tabeli dla trzech nieużywanych kolumn niesie więcej ryzyka, niż kupuje.
@@ -4671,7 +4671,7 @@ a schowane przypomnienie to znowu pamiętanie.
 ### 25b.3b. Tagi spraw (0.279.0)
 
 Od 0.568.0 tagu reklamacji nie przypina się na ekranie sprawy — patrz
-§25b.10. Od @wydanie kolejka nie pokazuje tagów i nie filtruje po nich
+§25b.10. Od 0.621.2 kolejka nie pokazuje tagów i nie filtruje po nich
 (§25b.15). Poniżej projekt, nie opis działającego ekranu.
 
 Ta sama prośba właściciela, co przy sicie: łatwiej znaleźć swoje sprawy. Sito
@@ -5033,7 +5033,7 @@ samym przycisku, bo dotąd wypisywało go tylko pole notatki.
 
 **Rozstrzygnięte później.** Notatka wróciła na ekran sprawy, więc kolejka
 szuka po niej uczciwie, także po numerze sprawy Allegro. Tagi zeszły
-z kolejki w @wydanie (§25b.15).
+z kolejki w 0.621.2 (§25b.15).
 
 ### 25b.11. Reklamacje w trzech kolumnach (0.575.0)
 
@@ -5178,7 +5178,7 @@ i fakty sprawy stojące kilka razy. Właściciel zlecił uproszczenie całości.
   mieszkają w `reklamacje/useWysylki.ts`. Zdania o porażce czynności trzyma
   `sprawy/useBledy.ts` i czyści je przy zmianie sprawy.
 
-### 25b.15. Kod po zdjętych funkcjach usunięty (@wydanie)
+### 25b.15. Kod po zdjętych funkcjach usunięty (0.621.2)
 
 Ekran stracił te funkcje wcześniej, a kod został. Właściciel zdecydował
 6 listopada 2026, że kod schodzi także. Kod bez ekranu i tak trzeba utrzymywać
@@ -5627,12 +5627,12 @@ stoi. W tym repo zdarzyło się to już dwa razy.
 | Sprawy otwarte przed bezpiecznikiem stron | **działa** | filtr `status` ze specyfikacji; przelot otwartych przed przelotem pełnym |
 | Język odpowiedzi Allegro | **działa** | `accept-language: pl-PL` w `zapytajAllegro` — jedno miejsce dla całej rodziny końcówek |
 | Odświeżenie JEDNEJ sprawy | **działa** | `GET /sale/issues/{id}`, trasa `…/odswiez`; wołane po wysyłce i po werdykcie |
-| Copilot RADZI w reklamacji | **usunięte** w @wydanie | z ekranu zeszło w 0.564.0, kod i liczenie trafności w @wydanie (§25b.15); zapisane rady zostają w bazie |
-| Copilot reklamacyjny: karta faktów | **usunięte** w @wydanie | z ekranu zeszło w 0.564.0, `services/copilot-reklamacja.ts` w @wydanie; wiersze `reklamacja_karta` zostają w bazie |
-| Dowody biura w reklamacji | **usunięte** w @wydanie | z ekranu zeszło w 0.575.0, serwis i pole `dowody` w @wydanie; wiersze `reklamacja_dowod` zostają w bazie |
-| Reklamacja u dostawcy | **usunięte** w @wydanie | z ekranu zeszło w 0.575.0, trasa `…/u-dostawcy` i serwis w @wydanie; wiersze `reklamacja_u_dostawcy` zostają w bazie |
-| Ostatnia dostawa towaru w sprawie | **usunięte** w @wydanie | z ekranu zeszło w 0.575.0, serwis i pole `dostawa` w @wydanie |
-| Tagi w kolejce reklamacji | **usunięte** w @wydanie | przypinanie zeszło w 0.568.0, czipy i filtr w @wydanie; słownik zostaje w Ustawieniach |
+| Copilot RADZI w reklamacji | **usunięte** w 0.621.2 | z ekranu zeszło w 0.564.0, kod i liczenie trafności w 0.621.2 (§25b.15); zapisane rady zostają w bazie |
+| Copilot reklamacyjny: karta faktów | **usunięte** w 0.621.2 | z ekranu zeszło w 0.564.0, `services/copilot-reklamacja.ts` w 0.621.2; wiersze `reklamacja_karta` zostają w bazie |
+| Dowody biura w reklamacji | **usunięte** w 0.621.2 | z ekranu zeszło w 0.575.0, serwis i pole `dowody` w 0.621.2; wiersze `reklamacja_dowod` zostają w bazie |
+| Reklamacja u dostawcy | **usunięte** w 0.621.2 | z ekranu zeszło w 0.575.0, trasa `…/u-dostawcy` i serwis w 0.621.2; wiersze `reklamacja_u_dostawcy` zostają w bazie |
+| Ostatnia dostawa towaru w sprawie | **usunięte** w 0.621.2 | z ekranu zeszło w 0.575.0, serwis i pole `dostawa` w 0.621.2 |
+| Tagi w kolejce reklamacji | **usunięte** w 0.621.2 | przypinanie zeszło w 0.568.0, czipy i filtr w 0.621.2; słownik zostaje w Ustawieniach |
 | Kwota sprawy w kolejce | **działa** | `kwotaSprawy` w `services/reklamacje.ts`; żądanie klienta, potem cena z paragonu razy liczba sztuk, bez zgadywania jednej sztuki |
 | Załączniki WYCHODZĄCE w sprawie | **działa** | `services/reklamacje-zalaczniki.ts`; deklaracja z polem `fileName`, adres wgrania z nagłówka `Location`, spinacz wspólny ze skrzynką |
 | Werdykt reklamacji do Allegro | **działa** | `services/reklamacja-werdykt.ts`, `reklamacje/Werdykt.tsx`; `POST /sale/issues/{id}/status`, jedenaście wartości, kwota przy częściowym, `autoryzuj("reklamacja_werdykt")`, los na wierszu |

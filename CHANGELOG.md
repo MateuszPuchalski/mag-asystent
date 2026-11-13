@@ -10,6 +10,12 @@ z wersją monorepo" — i właśnie tak przestał być zgodny: `0.3.0` przetrwa�
 sześć zmergowanych zmian, w tym takie, które wymagały nowego uprawnienia SQL.
 Komentarz nie jest mechanizmem.
 
+## 0.621.2 — 13 listopada 2026
+
+Reklamacje straciły kod, który nie miał już nic na ekranie: dowody biura,
+reklamację u dostawcy, ostatnią dostawę, kartę i rady Copilota oraz tagi
+w kolejce. Zapisane wiersze zostają w bazie nietknięte.
+
 ## 0.621.1 — 9 listopada 2026
 
 Usunięty martwy kod serwera i panelu, komentarze-historia w kodzie oraz
