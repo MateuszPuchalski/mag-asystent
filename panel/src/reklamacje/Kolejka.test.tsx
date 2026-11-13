@@ -23,7 +23,7 @@ const rek = (n: Partial<Reklamacja> = {}): Reklamacja => ({
   wiadomosciIle: 3, ostatniaWiadomoscStatus: "BUYER_REPLIED",
   ostatniaWiadomoscAt: "2026-09-07T08:00:00.000Z", otwartoAt: "2026-09-06T10:00:00.000Z",
   kupionoAt: null, kupionoZrodlo: null, dniOdZakupu: null,
-  prowadzi: null, prowadziId: null, tagi: [],
+  prowadzi: null, prowadziId: null,
   notatkaAt: null, notatkaPrzez: null, maPoprzedniaNotatke: false, prowadziAt: null, notatka: null, wersja: 1,
   kubelek: "decyzja", sygnaly: [], link: null, linkZamowienia: null, linkOferty: null,
   ofertaNazwa: "Kosiarka spalinowa NAC LS 46-450", ofertaZdjecie: "brak",

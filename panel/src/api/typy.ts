@@ -1403,17 +1403,10 @@ export interface KolejkaZwrotow {
   stan: StanZwrotow;
 }
 
-/* ── Tagi spraw posprzedażowych ────────────────────────────────────────────
-   Tag na wierszu niesie TYLE, ile mieści czip: numer do zdjęcia i nazwę do
-   przeczytania. Stan „aktywny" należy do słownika w Ustawieniach, nie do
-   wiersza — na starej sprawie wyłączony tag ma być widoczny tak samo. */
-export interface TagSprawy {
+/** Wiersz słownika tagów — to, czym zarządza ekran ustawień. */
+export interface Tag {
   id: number;
   nazwa: string;
-}
-
-/** Wiersz słownika tagów — to, czym zarządza ekran ustawień. */
-export interface Tag extends TagSprawy {
   /** Wyłączony nie podpowiada się przy nowej sprawie, ale na starych zostaje. */
   aktywny: boolean;
 }
@@ -1633,8 +1626,6 @@ export interface Reklamacja {
   /** Tożsamość prowadzącego — po NIEJ liczy się sito „Moje". */
   prowadziId: number | null;
   prowadziAt: string | null;
-  /** Tagi biura. Zawężają listę, NIGDY nie przestawiają kolejki. */
-  tagi: TagSprawy[];
   /* ── Droga powrotna z notatki ────────────────────────────────────────────
      Poprzedniej TREŚCI panel nie dostaje i nie potrzebuje: cofnięcie jest
      zamianą, więc drugie kliknięcie przywraca stan sprzed pierwszego. */
@@ -1689,17 +1680,6 @@ export interface Reklamacja {
   zgloszonoPoDniach?: number | null;
   /** Dzisiejsza cena oferty z jej migawki; `null`, gdy migawki nie ma. */
   ofertaCenaGrosze?: number | null;
-}
-
-/** Ostatnia dostawa reklamowanego towaru — skąd przyszła sztuka klienta. */
-export interface OstatniaDostawaReklamacji {
-  /** Symbol kontrahenta z Subiekta; pełnej nazwy serwer nie importuje. */
-  dostawca: string;
-  data: string;
-  /** Numer faktury dostawcy; `null`, gdy biuro go nie uzupełniło. */
-  numer: string | null;
-  /** Czy to dostawa sprzed zakupu, czyli partia, z której klient dostał sztukę. */
-  przedZakupem: boolean;
 }
 
 export interface ZalacznikReklamacji {
@@ -1774,18 +1754,8 @@ export interface SzczegolReklamacji {
   zamowienie: Zamowienie | null;
   /** Gdzie jest paczka do klienta; `null` = nie ma zamówienia. */
   przesylka: StanPrzesylki | null;
-  /* Ten sam kształt, co kartoteka przy rozmowie: serwer liczy oba
-     `kartotekaOferty`. Wąski typ pewności pozwala kolumnie dowodów odróżnić
-     powiązanie od braku bez porównywania napisów z palca. */
-  kartoteka: DopasowanieKartoteki | null;
-  /** Karta faktów Copilota; `null`, gdy nikt jeszcze nie prosił. */
-  karta: KartaSprawy | null;
   /** Ile razy TO SAMO już się zdarzyło. */
   historia: HistoriaSprawy;
-  /* Pole opcjonalne z tego samego powodu co kwota na wierszu: starszy serwer
-     go nie zna, a brak ma znaczyć „nie wiemy". */
-  /** Ostatnia dostawa towaru; `null` = nie wiemy, skąd przyszła sztuka. */
-  dostawa?: OstatniaDostawaReklamacji | null;
   /* Opcjonalne, bo brak pola znaczy „serwer jeszcze nie powiedział", a nie
      „dokumentu nie ma". Brak dokumentu niesie `paragon.brak`. */
   /** Paragony i faktury zamówienia z Subiekta, ze wskazaniem reklamowanej pozycji. */
@@ -1869,58 +1839,6 @@ export interface SladHistorii {
 export interface HistoriaSprawy {
   towar: SladHistorii | null;
   klient: SladHistorii | null;
-}
-
-/** Pole karty z cytatem — numer wiadomości, z której model to wziął. */
-export interface PoleKarty { tresc: string; zrodlo: string }
-
-/**
- * Karta faktów ze sprawy — co maszyna WYCZYTAŁA, nigdy co radzi.
- *
- * Werdyktu tu nie ma i nie będzie: uznanie i odrzucenie są nieodwracalne wobec
- * kupującego i należą do człowieka. Najcenniejsze pole to `brakuje` — sprawa
- * stoi tygodniami nie dlatego, że nikt nie umie zdecydować, tylko dlatego, że
- * nikt nie zapytał o zdjęcie tabliczki.
- */
-export interface KartaSprawy {
-  usterka: PoleKarty | null;
-  kiedy: PoleKarty | null;
-  oczekiwanie: PoleKarty | null;
-  dowody: PoleKarty[];
-  brakuje: string[];
-  /** Co maszyna RADZI zrobić; `null`, gdy nie miała z czego. */
-  rada: RadaMaszyny | null;
-  /** `trafna`/`nietrafna` — liczone z werdyktu, nie z ankiety; `null` przed nim. */
-  ocena: string | null;
-  /* Które zdjęcie było którym `Z`. Bez tej mapy cytat `Z2` byłby
-     numerem, którego agent nie ma jak sprawdzić. */
-  zdjecia: ZdjecieKarty[];
-  model: string;
-  przez: string | null;
-  at: string;
-}
-
-export interface ZdjecieKarty {
-  numer: string;
-  zalacznikId: number;
-  nazwa: string;
-}
-
-/**
- * Rada maszyny: co zrobić, dlaczego, jak pewnie i CZEGO NIE WIE.
- *
- * `co` to jedna z jedenastu wartości werdyktu Allegro albo `POPROSIC_O_DOWODY`
- * — nasza dwunasta, znacząca „nie ma jeszcze czego rozstrzygać".
- *
- * `czegoNieWiem` jest przeciwwagą dla `pewnosc`, nie ozdobą: serwer odrzuca
- * kartę, w której model deklaruje wysoką pewność i nie umie nazwać ani jednej
- * rzeczy, której nie wie.
- */
-export interface RadaMaszyny {
-  co: string;
-  uzasadnienie: PoleKarty;
-  pewnosc: string;
-  czegoNieWiem: string[];
 }
 
 /** Wynik wysyłki odpowiedzi w reklamacji. */

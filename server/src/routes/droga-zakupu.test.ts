@@ -78,7 +78,8 @@ test("zakup z reklamacją: reklamacja w kształcie ekranu reklamacji", async () 
   const b = (await pobierz(login("biuro", "Ala"))).json();
   assert.equal(b.reklamacja.id, id);
   assert.equal(b.reklamacja.orderId, ZAM);
-  assert.ok(Array.isArray(b.reklamacja.tagi));
+  /* Tagów reklamacji nie przypina już żaden ekran, więc wiersz ich nie niesie. */
+  assert.equal("tagi" in b.reklamacja, false);
   /* Bez `pomin`: reklamacja jest też na liście spraw zakupu. */
   assert.deepEqual(b.sprawy.map((s: { id: number }) => s.id), [id]);
   const szczegol = (await app.inject({ method: "GET", url: `/api/obsluga/reklamacje/${id}`,

@@ -14,10 +14,11 @@
    w routes/device.ts. Czego nie ma w rejestrze, a jest w dzienniku, raport
    pokazuje osobno — nic nie ginie po cichu.
 
-   Typów doboru, bazy wiedzy i dyskusji (`dyskusja_*`) tu nie ma, choć dziennik
-   je niesie. Funkcji, która je pisała, już nie ma, więc raport „czego nikt
-   nie używa" nie ma o co pytać. Stare wiersze trafiają do listy spoza
-   rejestru. */
+   Typów doboru, bazy wiedzy, dyskusji (`dyskusja_*`), karty Copilota,
+   dowodów i reklamacji u dostawcy oraz przypinania tagów do sprawy tu nie
+   ma, choć dziennik je niesie. Funkcji, które je pisały, już nie ma, więc
+   raport „czego nikt nie używa" nie ma o co pytać. Stare wiersze trafiają
+   do listy spoza rejestru. */
 
 export const ZDARZENIA: readonly string[] = [
   "allegro_polaczono", "allegro_rozlaczono", "allegro_zamowienie_brak",
@@ -58,10 +59,9 @@ export const ZDARZENIA: readonly string[] = [
   "przyjecie_poza_aplikacja", "putaway_cofniete", "putaway_line_done", "putaway_polka_zmieniona",
   "putaway_qty_fixed", "queue_anulowane_recznie", "queue_applied", "queue_failed",
   "queue_ponowione_recznie", "queue_retry", "raport_tygodnia", "read_model_po_imporcie",
-  "reklamacja_dowod", "reklamacja_dowod_usuniety", "reklamacja_notatka", "rekoncyliacja",
+  "reklamacja_notatka", "rekoncyliacja",
   "reklamacja_notatka_cofnieta", "reklamacja_odpowiedz", "reklamacja_odswiezenie",
-  "reklamacja_prowadzi", "reklamacja_przesylka_reczna", "reklamacja_rozpoznanie",
-  "reklamacja_u_dostawcy", "reklamacja_werdykt", "reklamacja_werdykt_proba",
+  "reklamacja_prowadzi", "reklamacja_przesylka_reczna", "reklamacja_werdykt", "reklamacja_werdykt_proba",
   "reklamacja_wysylka_konflikt", "reklamacja_wysylka_proba", "reklamacja_zalacznik_bez_location",
   "reklamacja_zalacznik_dodany", "reklamacja_zalacznik_pobrany", "reklamacja_zalacznik_zdjety",
   "reklamacja_zwrot_towaru", "reklamacje_synchronizacja_reczna", "rozmowa_kartoteka_wskazana",
@@ -74,8 +74,8 @@ export const ZDARZENIA: readonly string[] = [
   "rozmowa_zalacznik_dodany", "rozmowa_zalacznik_zdjety", "rozmowa_zakonczenie_cofniete",
   "rozmowa_zamowienie_wskazane", "rozmowa_zwolniona", "scan", "scan_timing", "search",
   "sellasist_brak_powiadomiony", "sellasist_notatka", "sellasist_pracownik_przypisany",
-  "siec_przerwa", "skrzynka_synchronizacja_reczna", "sprawa_tag_nazwa", "sprawa_tag_przypiety",
-  "sprawa_tag_utworzony", "sprawa_tag_wlaczony", "sprawa_tag_wylaczony", "sprawa_tag_zdjety",
+  "siec_przerwa", "skrzynka_synchronizacja_reczna", "sprawa_tag_nazwa",
+  "sprawa_tag_utworzony", "sprawa_tag_wlaczony", "sprawa_tag_wylaczony",
   "strefa_zapis", "user_active_changed", "user_created", "user_haslo_changed",
   "user_wylogowany_wszedzie", "wymiary_pilne", "wymiary_set", "wzmianka_odhaczona", "zadanie_terenowe_anulowane",
   "zadanie_terenowe_oddane", "zadanie_terenowe_odeslane", "zadanie_terenowe_ponowione",

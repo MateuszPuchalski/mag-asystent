@@ -64,8 +64,8 @@ test("karta zapisuje się na bazie sprzed 0.276.0 — to jest zgłoszony błąd"
     VALUES (?,'i-1','2026-09-01T08:00:00Z','2026-09-11T09:00:00Z')`)
     .run(konto).lastInsertRowid);
 
-  /* Zapis jest KOPIĄ listy kolumn z `copilot-reklamacja.ts` — gdyby tamta
-     urosła bez migracji, ten test pada tak samo jak panel u właściciela. */
+  /* Zapis jest KOPIĄ listy kolumn, którą pisał kod karty. Kodu już nie ma,
+     ale takie wiersze leżą w bazach i migracja ma je dalej przyjmować. */
   d.prepare(`INSERT INTO reklamacja_karta
     (reklamacja_id, usterka, usterka_zrodlo, kiedy, kiedy_zrodlo,
      oczekiwanie, oczekiwanie_zrodlo, dowody, brakuje,

@@ -25,7 +25,7 @@ const rek = (n: Partial<Reklamacja> = {}): Reklamacja => ({
   czatAktywny: true, wiadomosciIle: 11, czatUrwany: false,
   ostatniaWiadomoscStatus: null, ostatniaWiadomoscAt: null,
   otwartoAt: "2026-09-10T06:03:00.000Z", kupionoAt: null, kupionoZrodlo: null,
-  prowadzi: null, prowadziId: null, prowadziAt: null, tagi: [],
+  prowadzi: null, prowadziId: null, prowadziAt: null,
   notatkaAt: null, notatkaPrzez: null, maPoprzedniaNotatke: false, notatka: null,
   wersja: 1, kubelek: "decyzja", sygnaly: [], link: "https://allegro.pl/reklamacja/5",
   linkZamowienia: "https://allegro.pl/zamowienie/5", linkOferty: "https://allegro.pl/oferta/1",
@@ -36,7 +36,7 @@ const rek = (n: Partial<Reklamacja> = {}): Reklamacja => ({
 
 const szczegol = (n: Partial<SzczegolReklamacji> = {}, r: Partial<Reklamacja> = {}) => ({
   reklamacja: rek(r), czat: [], zalaczniki: [], zwroty: [], rozmowy: [], sprawy: [],
-  droga: [], kartoteka: null, karta: null, zamowienie: null, przesylka: null,
+  droga: [], zamowienie: null, przesylka: null,
   historia: { towar: null, klient: null }, ...n,
 } as unknown as SzczegolReklamacji);
 

@@ -2,15 +2,13 @@ import type { FastifyInstance, FastifyReply } from "fastify";
 import { sesjaZadania } from "../context.js";
 import { db } from "../db/db.js";
 import {
-  BladTagu, odepnijTag, przelaczTag, przypnijTag, slownikTagow, utworzTag, zmienNazweTagu,
-  type OsTagow,
+  BladTagu, przelaczTag, slownikTagow, utworzTag, zmienNazweTagu,
 } from "../services/tagi-spraw.js";
 import { ROLE_BIUROWE } from "../services/users.js";
 
-/* ── Trasy tagów spraw ─────────────────────────────────────────────
-   SŁOWNIK JEST WSPÓLNY dla reklamacji i zwrotów, więc trasy słownika stoją
-   osobno, a nie pod `/reklamacje`. Przypięcie do sprawy zostaje tam, gdzie
-   sprawa — w `routes/reklamacje.ts` — bo tamta trasa zna już swoją bramkę.
+/* ── Trasy słownika tagów spraw ──────────────────────────────────────────────
+   Zostaje sam słownik, który prowadzi ekran Ustawień. Przypinania tagu do
+   sprawy nie ma już na żadnym ekranie, więc jego tras też nie ma.
 
    Bramka roli na KAŻDEJ trasie, także na odczycie. Nazwa tagu jest zdaniem
    biura o sprawie klienta; magazyn nie ma po co jej czytać.
@@ -71,40 +69,6 @@ export async function tagiRoutes(app: FastifyInstance) {
           return { tag: przelaczTag(db(), id, req.body.aktywny, kto()) };
         }
         return reply.code(400).send({ error: "Podaj nazwę albo stan tagu" });
-      } catch (e) { return blad(reply, e); }
-    });
-}
-
-/**
- * Przypięcie i zdjęcie tagu przy sprawie.
- *
- * JEDNA PARA TRAS dla każdego ekranu spraw, wołana z jego pliku tras z jego
- * własną bramką. Klucz jest tym samym wierszem tabeli wiązań, a zdublowanie
- * tras zdublowałoby też walidację numeru sprawy.
- */
-export function trasyTagowSprawy(app: FastifyInstance, sciezka: string, os: OsTagow) {
-  app.post<{ Params: { id: string; tagId: string } }>(
-    `${sciezka}/:id/tagi/:tagId`, async (req, reply) => {
-      const nie = odmowa(reply);
-      if (nie) return nie;
-      try {
-        const nowy = przypnijTag(
-          db(), os, Number(req.params.id), Number(req.params.tagId), kto());
-        /* `false` znaczy „już tam był" i NIE jest błędem: drugie kliknięcie
-           w ten sam tag to drugie kliknięcie, a nie drugi fakt. */
-        return { przypiety: nowy };
-      } catch (e) { return blad(reply, e); }
-    });
-
-  app.delete<{ Params: { id: string; tagId: string } }>(
-    `${sciezka}/:id/tagi/:tagId`, async (req, reply) => {
-      const nie = odmowa(reply);
-      if (nie) return nie;
-      try {
-        const zdjety = odepnijTag(
-          db(), os, Number(req.params.id), Number(req.params.tagId), kto());
-        if (!zdjety) return reply.code(404).send({ error: "Ta sprawa nie ma tego tagu" });
-        return { ok: true };
       } catch (e) { return blad(reply, e); }
     });
 }

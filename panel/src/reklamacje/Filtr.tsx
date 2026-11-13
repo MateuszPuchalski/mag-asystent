@@ -1,14 +1,13 @@
 import React, { useEffect, useId, useRef, useState } from "react";
 import { ListFilter, X } from "lucide-react";
-import type { ProgKolejki, TagSprawy } from "../api/typy";
+import type { ProgKolejki } from "../api/typy";
 import { useOkno } from "../nawigacja/fokus";
 import { NaglowekSekcji } from "../ui";
 import { PasekPorzadku, type OsPorzadku } from "../sprawy/Porzadek";
 import { PasekTla } from "../sprawy/PasekTla";
-import { FiltrTagow } from "../sprawy/Tagi";
 
 /* ── Filtr kolejki za jednym przyciskiem ─────────────────────────────────────
-   Tagi, porządek i próg daty zmienia się rzadko, a patrzy na listę ciągle.
+   Porządek i próg daty zmienia się rzadko, a patrzy na listę ciągle.
    Stały rząd przełączników nad kolejką kosztował miejsce przy każdej sprawie,
    więc stoją za przyciskiem obok tytułu (dekalog, punkt 2).
 
@@ -19,10 +18,7 @@ import { FiltrTagow } from "../sprawy/Tagi";
    OKNO NIEMODALNE. Stoi obok pracy, więc skróty kolejki działają dalej,
    a Escape i kliknięcie obok je zamykają. */
 
-export function FiltrKolejki({ wgTagow, tag, onTag, porzadek, osie, onPorzadek, prog, onPrzelaczProg }: {
-  wgTagow: Array<[TagSprawy, number]>;
-  tag: number | null;
-  onTag: (id: number | null) => void;
+export function FiltrKolejki({ porzadek, osie, onPorzadek, prog, onPrzelaczProg }: {
   porzadek: OsPorzadku;
   /** Osie tej kolejki; pierwsza jest domyślna, inny wybór zapala znak filtra. */
   osie: OsPorzadku[];
@@ -33,14 +29,14 @@ export function FiltrKolejki({ wgTagow, tag, onTag, porzadek, osie, onPorzadek, 
   const [otwarte, setOtwarte] = useState(false);
   const wyzwalacz = useRef<HTMLButtonElement | null>(null);
   const idOkna = useId();
-  const wlaczony = tag !== null || porzadek !== osie[0] || Boolean(prog?.zdjety);
+  const wlaczony = porzadek !== osie[0] || Boolean(prog?.zdjety);
   /* Ten sam warunek co w `PasekTla`: gdy pasek milczy, zdanie mówi, że lista
      jest pełna, zamiast zostawić sekcję pustą. */
   const mowiOZakresie = Boolean(prog?.od && (prog.zdjety || prog.ukrytych > 0));
   return <div className="relative">
     <button ref={wyzwalacz} type="button" aria-expanded={otwarte} aria-controls={otwarte ? idOkna : undefined}
-      aria-label={`Filtr tagów i sortowanie${wlaczony ? " (włączony)" : ""}`}
-      title="Filtr tagów, porządek i zakres listy" onClick={() => setOtwarte((o) => !o)}
+      aria-label={`Filtr i sortowanie${wlaczony ? " (włączony)" : ""}`}
+      title="Porządek i zakres listy" onClick={() => setOtwarte((o) => !o)}
       className="relative flex h-11 w-11 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-900 hover:bg-slate-50">
       <ListFilter size={18} aria-hidden="true" />
       {wlaczony && <span aria-hidden="true"
@@ -51,10 +47,6 @@ export function FiltrKolejki({ wgTagow, tag, onTag, porzadek, osie, onPorzadek, 
         <NaglowekSekcji jako="p">Porządek</NaglowekSekcji>
         <PasekPorzadku porzadek={porzadek} dozwolone={osie} onZmien={onPorzadek} />
       </div>
-      {wgTagow.length > 0 && <div className="flex flex-col gap-1.5">
-        <NaglowekSekcji jako="p">Tagi</NaglowekSekcji>
-        <div className="flex flex-wrap gap-1"><FiltrTagow wgLiczby={wgTagow} wybrany={tag} onWybierz={onTag} /></div>
-      </div>}
       <div className="flex flex-col gap-1.5">
         <NaglowekSekcji jako="p">Zakres listy</NaglowekSekcji>
         <PasekTla prog={prog} onPrzelaczProg={onPrzelaczProg} />

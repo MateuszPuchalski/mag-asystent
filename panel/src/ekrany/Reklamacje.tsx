@@ -19,7 +19,6 @@ import { KUBELKI, Kolejka, kwotaWiersza, wGrupach } from "../reklamacje/Kolejka"
 import { PasekSita, ZdanieOUkrytych, mojaSprawa, useSito, wSicie } from "../sprawy/Moje";
 import { posortuj, usePorzadek, type OsPorzadku } from "../sprawy/Porzadek";
 import { PasekProgu } from "../sprawy/Prog";
-import { tagiWgLiczby } from "../sprawy/Tagi";
 import { Czat } from "../reklamacje/Czat";
 import { Glowica } from "../reklamacje/Glowica";
 import { DrogaSprawy } from "../reklamacje/DrogaSprawy";
@@ -99,7 +98,6 @@ export function Reklamacje() {
   const { sito, przelacz: przelaczSito } = useSito();
   /* Domyślny porządek to TERMIN — kolejność, którą ekran miał zawsze. */
   const { porzadek, ustaw: ustawPorzadek } = usePorzadek("wertis.reklamacje.porzadek", OSIE, "termin");
-  const [tag, setTag] = useState<number | null>(null);
   const [bladSync, setBladSync] = useState("");
 
   /* Próg daty zdejmuje się NA ŻĄDANIE i wybór nie przeżywa zamknięcia
@@ -127,19 +125,9 @@ export function Reklamacje() {
     return (data?.reklamacje ?? []).filter((r) => pasujeDoFrazy(kody(r), fraza));
   }, [data, fraza]);
 
-  /* Tagi liczą skład KUBEŁKA, nie tego, co zostało po sitach. Licznik
-     malejący przy każdym kliknięciu mówiłby o filtrze, a nie o pracy. */
-  const wgTagow = useMemo(() => tagiWgLiczby(wKubelku), [wKubelku]);
-
   const moi = useMemo(
     () => wKubelku.filter((r) => wSicie(r.prowadziId, mojeId, sito)),
     [wKubelku, sito, mojeId]);
-
-  /* Tag NAKŁADA SIĘ na sito: pytania „czyje to” i „o czym to” zadaje się
-     naraz, więc odpowiedzi mają się mnożyć, nie wykluczać. */
-  const poSitach = useMemo(
-    () => (tag === null ? moi : moi.filter((r) => r.tagi.some((t) => t.id === tag))),
-    [moi, tag]);
 
   /* SZUKANIE PRZEBIJA SITO I KUBEŁEK (§25a.9): wpisany numer ma znaleźć
      sprawę także wtedy, gdy prowadzi ją kolega.
@@ -148,15 +136,15 @@ export function Reklamacje() {
      potem w jakiej kolejności. Grupa „Po terminie” idzie po sortowaniu, bo
      strzałki chodzą po tej samej tablicy, którą rysuje kolejka. */
   const widoczne = useMemo(
-    () => wGrupach(posortuj(pasujace ?? poSitach, porzadek, {
+    () => wGrupach(posortuj(pasujace ?? moi, porzadek, {
       otwarto: (r) => r.otwartoAt,
       ruch: (r) => r.ostatniaWiadomoscAt ?? r.otwartoAt,
       termin: (r) => r.decyzjaDo,
       kwota: kwotaWiersza,
     })),
-    [pasujace, poSitach, porzadek]);
-  /* Zdanie liczy WYŁĄCZNIE to, co chowa sito. Tag widać w zdaniu obok,
-     a pamiętanego sita nie widać nigdzie indziej. */
+    [pasujace, moi, porzadek]);
+  /* Zdanie liczy to, co chowa sito, bo pamiętanego sita nie widać nigdzie
+     indziej. Szukanie przebija sito, więc przy frazie nic nie jest schowane. */
   const ukrytych = pasujace || sito === null ? 0 : wKubelku.length - moi.length;
   const wybrana = id ? Number(id) : null;
   /* Szkic stoi ZARAZ ZA numerem sprawy, bo jest do niego przypisany. */
@@ -242,7 +230,6 @@ export function Reklamacje() {
   /* PRÓG, KTÓRY CHOWA PRACĘ, WOŁA NAD LISTĄ. W ciszy próg mieszka w filtrze,
      ale sprawy sprzed progu z żywym terminem to praca, a nie archiwum. */
   const progAlarmuje = Boolean(data?.prog && !data.prog.zdjety && data.prog.ukrytychZTerminem > 0);
-  const nazwaTagu = tag === null ? null : wgTagow.find(([t]) => t.id === tag)?.[0].nazwa ?? null;
 
   const d = szczegol.data;
   const r = d?.reklamacja;
@@ -267,8 +254,7 @@ export function Reklamacje() {
               </div>
               <StanSynchronizacji stan={data?.stan} blad={bladSync} />
             </div>
-            <FiltrKolejki wgTagow={wgTagow} tag={tag} onTag={setTag}
-              porzadek={porzadek} osie={OSIE} onPorzadek={ustawPorzadek}
+            <FiltrKolejki porzadek={porzadek} osie={OSIE} onPorzadek={ustawPorzadek}
               prog={data?.prog} onPrzelaczProg={setBezProgu} />
           </div>
           <label className="flex h-11 min-w-0 items-center gap-2 rounded-lg border border-slate-200 bg-slate-100 px-3">
@@ -292,13 +278,6 @@ export function Reklamacje() {
 
         {progAlarmuje && data?.prog && <div className="shrink-0 px-3 pt-3">
           <PasekProgu prog={data.prog} onPrzelacz={setBezProgu} /></div>}
-        {/* Tag schowany w filtrze zawęża listę po cichu, więc zdanie mówi
-            o nim nad wierszami i daje drogę powrotną jednym kliknięciem. */}
-        {nazwaTagu && !pasujace && <p className="flex shrink-0 items-center gap-2 border-b border-slate-200 bg-slate-50 px-4 text-podpis text-slate-600">
-          <span>Tylko sprawy z tagiem „{nazwaTagu}”.</span>
-          <button type="button" onClick={() => setTag(null)}
-            className="py-1 font-semibold text-slate-700 underline">pokaż wszystkie</button>
-        </p>}
         <ZdanieOUkrytych ile={ukrytych} nazwa={sito === "niczyje" ? "Niczyje" : "Moje"}
           onPokazWszystkie={() => przelaczSito(null)} />
 

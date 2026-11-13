@@ -2,15 +2,10 @@ import type { DatabaseSync } from "node:sqlite";
 import { db as defaultDb } from "../db/db.js";
 import { logEvent } from "./events.js";
 
-/* ── Tagi spraw posprzedażowych ──────────────────────────────────────────────
-   Właściciel poprosił o tagi w jednym celu: „abym łatwiej mógł znaleźć
-   reklamacje, którymi się zajmuję". Tag jest więc SITEM, a nie ozdobą, i cała
-   reszta decyzji z tego wynika.
-
-   CZEGO TAG NIE ROBI, i to jest linia, której bronię: nie przestawia kolejki.
-   §14.5 rozstrzygnął to samo przy kategoriach Copilota. Kolejność liczy termin
-   i czas czekania — FAKTY o sprawie. Tag jest zdaniem biura i jedna pomyłka
-   zakopałaby sprawę z zegarem na dole listy tak, że nikt by tego nie zauważył.
+/* ── Słownik tagów spraw posprzedażowych ─────────────────────────────────────
+   ZOSTAŁ SAM SŁOWNIK. Przypinania tagów do reklamacji nie ma już na żadnym
+   ekranie, więc zeszło razem z kodem wiązań. Ekran Ustawień dalej prowadzi
+   słownik, a zapisane przypięcia leżą w `reklamacja_tag_sprawy` nietknięte.
 
    SŁOWNIK JEST OTWARTY, ale nie dowolny. Właściciel wybrał „dodatkowo
    edytowalne", więc nazwy dopisuje biuro, a nie wydanie. Cena tej swobody jest
@@ -29,40 +24,6 @@ export interface Tag {
   nazwa: string;
   aktywny: boolean;
 }
-
-/** Tag przypięty do sprawy — tyle, ile niesie czip. */
-export interface TagSprawy {
-  id: number;
-  nazwa: string;
-}
-
-/* ── DWIE OSIE, JEDEN SŁOWNIK ────────────────────────────────────────────────
-   Tagi reklamacji wiszą na `reklamacja_klienta`. Zwrot mieszka we własnej tabeli, więc dostaje
-   własną tabelę wiązań, a nie własny słownik: „gwarancja" znaczy to samo przy
-   reklamacji i przy zwrocie, a dwa słowniki znaczyłyby dwa ekrany ustawień
-   i dwa sufity aktywnych nazw.
-
-   NAZWY TABEL I KOLUMN WCHODZĄ DO SQL-A PRZEZ INTERPOLACJĘ i to jest
-   bezpieczne, bo są STAŁYMI MODUŁU — nie ma drogi, którą wejście z żądania
-   trafiłoby do zapytania. Piszę to wprost, żeby czytający nie musiał tego
-   sprawdzać sam.                                                            */
-
-export interface OsTagow {
-  /** Tabela sprawy — po niej sprawdzamy, że wiersz w ogóle istnieje. */
-  sprawy: string;
-  /** Tabela wiązań tag ↔ sprawa. */
-  wiazania: string;
-  /** Kolumna wiązania wskazująca sprawę. */
-  kolumna: string;
-  /** Stały warunek SQL na wiersz sprawy; sprawa spoza niego „nie istnieje". */
-  warunek?: string;
-}
-
-export const TAGI_REKLAMACJI: OsTagow = {
-  sprawy: "reklamacja_klienta", wiazania: "reklamacja_tag_sprawy", kolumna: "reklamacja_id",
-  /* Wiersze dawnych dyskusji zostały w tabeli, ale tagów już nie dostają. */
-  warunek: "typ = 'CLAIM'",
-};
 
 export class BladTagu extends Error {
   constructor(message: string, readonly kod = 400) { super(message); }
@@ -110,11 +71,10 @@ function tagPoNazwie(
 /**
  * Nowy tag w słowniku.
  *
- * DUPLIKAT NIE JEST BŁĘDEM DO POKAZANIA, tylko trafieniem. Agent, który wpisuje
- * „czeka na część" przy sprawie, chce ten tag PRZYPIĄĆ — nie dowiedzieć się,
- * że już istnieje. Oddajemy więc istniejący wiersz i wołający przypina go tak
- * samo jak nowy. Wyłączony przy okazji wraca do użytku: skoro ktoś wpisał tę
- * nazwę z palca, to jest mu potrzebna.
+ * DUPLIKAT NIE JEST BŁĘDEM DO POKAZANIA, tylko trafieniem. Kto wpisuje nazwę,
+ * która już jest, chce tego tagu, a nie zdania, że istnieje. Oddajemy więc
+ * istniejący wiersz. Wyłączony przy okazji wraca do użytku: skoro ktoś wpisał
+ * tę nazwę z palca, to jest mu potrzebna.
  */
 export function utworzTag(
   database: DatabaseSync, nazwa: string, autor: { id: number; name: string },
@@ -185,98 +145,4 @@ export function przelaczTag(
   logEvent(aktywny ? "sprawa_tag_wlaczony" : "sprawa_tag_wylaczony", autor.name, null,
     { id, nazwa: String(w.nazwa) }, autor.id, database);
   return { ...zWiersza(w), aktywny };
-}
-
-/** Czy sprawa o tym numerze w ogóle istnieje — numer tagu nie jest przepustką. */
-function sprawaIstnieje(database: DatabaseSync, os: OsTagow, sprawaId: number): boolean {
-  return database.prepare(`SELECT 1 FROM ${os.sprawy} WHERE id=?${os.warunek ? ` AND ${os.warunek}` : ""}`)
-    .get(sprawaId) !== undefined;
-}
-
-/**
- * Przypięcie tagu do sprawy.
- *
- * Drugie kliknięcie w ten sam tag NIE JEST błędem: klucz z dwóch kolumn
- * odrzuca duplikat, a my oddajemy `false` i nie zostawiamy drugiego śladu.
- * Dziennik ma mówić, co się zmieniło, a nie ile razy ktoś kliknął.
- */
-export function przypnijTag(
-  database: DatabaseSync, os: OsTagow, sprawaId: number, tagId: number,
-  autor: { id: number; name: string },
-): boolean {
-  if (!sprawaIstnieje(database, os, sprawaId)) {
-    throw new BladTagu(`Sprawa ${sprawaId} nie istnieje`, 404);
-  }
-  const tag = database.prepare("SELECT id, nazwa, aktywny FROM reklamacja_tag WHERE id=?")
-    .get(tagId) as Record<string, unknown> | undefined;
-  if (!tag) throw new BladTagu(`Tag ${tagId} nie istnieje`, 404);
-  if (Number(tag.aktywny ?? 1) !== 1) {
-    /* Wyłączonego nie przypinamy NOWYM sprawom, choć na starych zostaje.
-       Inaczej „wyłączony" nie znaczyłoby nic. */
-    throw new BladTagu(`Tag „${String(tag.nazwa)}” jest wyłączony z użycia`, 409);
-  }
-
-  const zmiana = database.prepare(`INSERT OR IGNORE INTO ${os.wiazania}
-    (${os.kolumna}, tag_id, dodal_user_id) VALUES (?,?,?)`)
-    .run(sprawaId, tagId, autor.id);
-  if (Number(zmiana.changes) === 0) return false;
-  logEvent("sprawa_tag_przypiety", autor.name, null,
-    { id: sprawaId, os: os.kolumna, tagId, nazwa: String(tag.nazwa) }, autor.id, database);
-  return true;
-}
-
-/**
- * Zdjęcie tagu ze sprawy.
- *
- * TO JEST CAŁE COFNIĘCIE, jakiego tag potrzebuje. Przypięcie i zdjęcie to
- * jedno kliknięcie w każdą stronę, więc osobna końcówka `/cofnij` nie miałaby
- * czego cofać — §25a.5 mówi o cofnięciu zamiast potwierdzenia, a nie
- * o cofnięciu obok istniejącej drogi powrotnej.
- */
-export function odepnijTag(
-  database: DatabaseSync, os: OsTagow, sprawaId: number, tagId: number,
-  autor: { id: number; name: string },
-): boolean {
-  const tag = database.prepare("SELECT nazwa FROM reklamacja_tag WHERE id=?")
-    .get(tagId) as { nazwa: string } | undefined;
-  const zmiana = database.prepare(
-    `DELETE FROM ${os.wiazania} WHERE ${os.kolumna}=? AND tag_id=?`)
-    .run(sprawaId, tagId);
-  if (Number(zmiana.changes) === 0) return false;
-  logEvent("sprawa_tag_zdjety", autor.name, null,
-    { id: sprawaId, os: os.kolumna, tagId, nazwa: tag?.nazwa ?? null }, autor.id, database);
-  return true;
-}
-
-/** Tagi JEDNEJ sprawy, alfabetycznie — czipy w wierszu mają stać w miejscu. */
-export function tagiSprawy(
-  database: DatabaseSync, os: OsTagow, sprawaId: number,
-): TagSprawy[] {
-  return (database.prepare(`SELECT t.id, t.nazwa FROM ${os.wiazania} s
-    JOIN reklamacja_tag t ON t.id = s.tag_id
-    WHERE s.${os.kolumna} = ? ORDER BY t.nazwa COLLATE NOCASE`)
-    .all(sprawaId) as Array<Record<string, unknown>>)
-    .map((w) => ({ id: Number(w.id), nazwa: String(w.nazwa) }));
-}
-
-/**
- * Tagi WSZYSTKICH spraw naraz, do doklejenia na liście.
- *
- * JEDNO ZAPYTANIE NA KOLEJKĘ, nie jedno na wiersz. Kolejka woła to raz i
- * rozdziela w pamięci; zapytanie per sprawa dałoby przy pięćdziesięciu
- * sprawach pięćdziesiąt jeden zapytań na każde odświeżenie ekranu.
- */
-export function tagiWszystkichSpraw(
-  database: DatabaseSync, os: OsTagow,
-): Map<number, TagSprawy[]> {
-  const mapa = new Map<number, TagSprawy[]>();
-  for (const w of database.prepare(`SELECT s.${os.kolumna} AS sprawa_id, t.id, t.nazwa
-    FROM ${os.wiazania} s JOIN reklamacja_tag t ON t.id = s.tag_id
-    ORDER BY t.nazwa COLLATE NOCASE`).all() as Array<Record<string, unknown>>) {
-    const klucz = Number(w.sprawa_id);
-    const lista = mapa.get(klucz) ?? [];
-    lista.push({ id: Number(w.id), nazwa: String(w.nazwa) });
-    mapa.set(klucz, lista);
-  }
-  return mapa;
 }

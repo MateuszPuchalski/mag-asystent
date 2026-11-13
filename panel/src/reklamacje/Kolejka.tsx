@@ -6,7 +6,6 @@ import {
 import type { KubelekReklamacji, Reklamacja, SygnalReklamacji } from "../api/typy";
 import { ZdjecieOferty } from "../towar/Zdjecie";
 import { NaglowekSekcji, Pusto, dataCyfrowa, dniSlowo } from "../ui";
-import { CzipTagu } from "../sprawy/Tagi";
 import { mojaSprawa } from "../sprawy/Moje";
 
 /* ── Kolejka reklamacji ──────────────────────────────────────────────────────
@@ -174,7 +173,7 @@ export function Kolejka({ reklamacje, wybrana, zKubelkiem = false, onWybierz, mo
     const sygnaly = r.sygnaly.filter((s) => s !== "termin");
     const numer = r.numer ?? r.externalId;
     const werdykt = r.werdyktNazwa && r.werdyktStatus !== "send_failed";
-    const czipy = werdykt || r.tagi.length > 0 || sygnaly.length > 0;
+    const czipy = werdykt || sygnaly.length > 0;
     return <li key={r.id}>
       <button type="button"
         /* Enter na wierszu prowadzi do pola odpowiedzi, jak w skrzynce. */
@@ -222,9 +221,6 @@ export function Kolejka({ reklamacje, wybrana, zKubelkiem = false, onWybierz, mo
               <span title={`Werdykt z panelu${r.werdyktPrzez ? `: ${r.werdyktPrzez}` : ""}`}
                 className="inline-flex items-center gap-1 rounded bg-emerald-100 px-1.5 text-xs font-bold leading-5 text-emerald-800">
                 <Gavel size={13} />{r.werdyktNazwa}</span>}
-            {/* TAGI PRZED SYGNAŁAMI: sygnał liczy maszyna z faktu, tag pisze
-                człowiek, a szuka się słowa, które się samemu wpisało. */}
-            {r.tagi.map((t) => <CzipTagu key={t.id} nazwa={t.nazwa} />)}
             {sygnaly.map((s) => (
               <span key={s} title={SYGNALY[s].tytul}
                 className={`inline-flex items-center gap-1 rounded px-1.5 text-xs font-bold leading-5 ${SYGNALY[s].klasa}`}>

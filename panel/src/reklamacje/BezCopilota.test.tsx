@@ -21,9 +21,8 @@ vi.mock("../api/rozmowy", () => ({
 /* ── Ekran reklamacji bez Copilota ───────────────────────────────────────────
    Decyzja właściciela przy przebudowie ekranu: na razie bez karty „Co
    wyczytał Copilot", bez jego rady, bez „Przeczytaj sprawę" i bez szkicu
-   odpowiedzi. Zapisane karty zostają w bazie i serwer dalej je wysyła,
-   więc test podaje kolumnie kartę z radą. Gdyby ekran znów zaczął ją czytać,
-   ten plik ma odmówić.
+   odpowiedzi. Szczegół sprawy nie niesie już karty, więc ekran nie ma jej
+   skąd wziąć. Ten plik pilnuje, że nie wraca ani napis, ani przycisk modelu.
 
    Strażnik zastępuje testy samej karty. Reguła, której tamte broniły —
    maszyna nie wydaje werdyktu za człowieka — jest spełniona w całości,
@@ -38,30 +37,14 @@ const rek = (): Reklamacja => ({
   zwrotWymagany: null, czatAktywny: true, wiadomosciIle: 2, czatUrwany: false,
   ostatniaWiadomoscStatus: null, ostatniaWiadomoscAt: null,
   otwartoAt: "2026-09-06T10:00:00.000Z", prowadzi: null, prowadziAt: null,
-  notatka: null, wersja: 1, kubelek: "decyzja", sygnaly: [], tagi: [],
+  notatka: null, wersja: 1, kubelek: "decyzja", sygnaly: [],
   link: null, linkZamowienia: null, linkOferty: null,
   ofertaNazwa: null, ofertaZdjecie: "nieznane", twId: null, twSymbol: null,
 } as unknown as Reklamacja);
 
-/** Karta zapisana przed zmianą — z faktami, brakami i radą. */
-const KARTA: SzczegolReklamacji["karta"] = {
-  usterka: { tresc: "Kosiarka przestała ciąć", zrodlo: "W1" },
-  kiedy: { tresc: "po tygodniu", zrodlo: "W1" },
-  oczekiwanie: { tresc: "wymiana", zrodlo: "W1" },
-  dowody: [{ tresc: "zdjęcie noża", zrodlo: "W3" }],
-  brakuje: ["data zakupu", "numer seryjny"],
-  rada: {
-    co: "ACCEPTED_REFUND", pewnosc: "srednia",
-    uzasadnienie: { tresc: "Usterka zgłoszona w pierwszym tygodniu", zrodlo: "W1" },
-    czegoNieWiem: ["czy towar był używany zgodnie z instrukcją"],
-  },
-  ocena: null, zdjecia: [{ numer: "Z1", zalacznikId: 9, nazwa: "tabliczka.jpg" }],
-  model: "claude-test", przez: "Ala", at: "2026-09-11T09:00:00.000Z",
-};
-
 const szczegol = (): SzczegolReklamacji => ({
   reklamacja: rek(), czat: [], zalaczniki: [], zwroty: [], rozmowy: [], sprawy: [], droga: [],
-  kartoteka: null, karta: KARTA, zamowienie: null, przesylka: null,
+  zamowienie: null, przesylka: null,
   historia: { towar: null, klient: null },
 } as unknown as SzczegolReklamacji);
 
@@ -74,12 +57,11 @@ const Sprawa = () => <MemoryRouter>
 </MemoryRouter>;
 
 describe("kolumna reklamacji nie ma Copilota", () => {
-  it("zapisana karta nie wraca na ekran: ani faktów maszyny, ani rady", () => {
+  it("kolumna nie mówi o Copilocie: ani faktów maszyny, ani rady", () => {
     render(<Sprawa />);
     expect(screen.queryByText("Co wyczytał Copilot")).not.toBeInTheDocument();
     expect(screen.queryByText("Copilot radzi")).not.toBeInTheDocument();
     expect(screen.queryByText("Brakuje do rozstrzygnięcia")).not.toBeInTheDocument();
-    expect(screen.queryByText(/Kosiarka przestała ciąć/)).not.toBeInTheDocument();
     expect(screen.queryByText(/Copilot/)).not.toBeInTheDocument();
   });
 

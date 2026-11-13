@@ -2,12 +2,8 @@ import { config } from "../config.js";
 import { db as defaultDb, transaction, type Db } from "../db/db.js";
 import { logEvent } from "./events.js";
 import { czyPdfZNazwy } from "./typ-podgladu.js";
-import {
-  TAGI_REKLAMACJI, tagiSprawy, tagiWszystkichSpraw, type TagSprawy,
-} from "./tagi-spraw.js";
 import { listaZwrotow, type WierszZwrotu } from "./zwroty.js";
-import { kartaSprawy } from "./copilot-reklamacja.js";
-import { kartotekaOferty, ofertyKartoteki } from "./dopasowanie-sku.js";
+import { ofertyKartoteki } from "./dopasowanie-sku.js";
 import { linkOferty, linkReklamacji, linkZamowienia } from "./allegro-linki.js";
 import { zamowienieRozmowy, type Zamowienie } from "./zamowienia.js";
 import { przesylkaZamowienia, type StanPrzesylkiZamowienia } from "./przesylka-zamowienia.js";
@@ -15,11 +11,7 @@ import { ROZMOWA_ZAMOWIENIA, drogaZakupu, sprawyZakupu, type PrzystanekDrogi, ty
   from "./droga-klienta.js";
 import { stanZdjeciaOferty, type StanZdjeciaOferty } from "./zdjecia-ofert.js";
 import { STATUSY_KONCOWE } from "./statusy-spraw.js";
-import { ostatniaDostawa, type OstatniaDostawa } from "./ostatnia-dostawa.js";
 import { paragonReklamacji, type ParagonReklamacji } from "./paragon-reklamacji.js";
-import {
-  dowodyReklamacji, uDostawcyReklamacji, type DowodReklamacji, type ReklamacjaUDostawcy,
-} from "./reklamacja-dowody.js";
 
 /* ── Reklamacje klienckie — model pracy biura ────────────────────────────────
    TEN PLIK PROWADZI WYŁĄCZNIE REKLAMACJE (`typ = 'CLAIM'`) i musi to mówić
@@ -287,8 +279,6 @@ export interface WierszReklamacji {
   /** Tożsamość prowadzącego — po NIEJ liczy się filtr „Moje". */
   prowadziId: number | null;
   prowadziAt: string | null;
-  /** Tagi biura. Zawężają listę, NIGDY nie przestawiają kolejki. */
-  tagi: TagSprawy[];
   notatka: string | null;
   /* ── Droga powrotna z notatki ────────────────────────────────────────────
      Poprzedniej TREŚCI panel nie dostaje — wystarcza mu wiedza, że jest do
@@ -671,10 +661,6 @@ function zWiersza(w: Wiersz, teraz: number): WierszReklamacji {
     prowadzi: tekst(w.prowadzi),
     prowadziId: w.prowadzi_user_id == null ? null : Number(w.prowadzi_user_id),
     prowadziAt: tekst(w.prowadzi_at),
-    /* Puste, dopóki nie dołoży ich wołający. Tagi jadą OSOBNYM zapytaniem,
-       bo kolejka bierze je jednym strzałem dla całej listy — zapytanie
-       w mapowaniu wiersza dałoby jedno na sprawę. */
-    tagi: [],
     notatka: tekst(w.notatka),
     notatkaAt: tekst(w.notatka_at),
     notatkaPrzez: tekst(w.notatka_przez),
@@ -804,7 +790,7 @@ function zParagonuNaWiersz(
      (cenę razem z walutą, bo bez niej kwoty nie da się z niczym porównać).
    - Potwierdzona kartoteka Subiekta daje dzisiejsze mapowanie oferty.
      Propozycji kartoteki tu NIE liczymy: `kartotekaOferty` to kilka zapytań
-     na wiersz, a proponowanie jest pracą przy jednej otwartej sprawie.
+     na wiersz, a kolejka czyta setki wierszy naraz.
    - Zamówienie daje datę zakupu. Wiersz bywa go pozbawiony, bo Allegro
      odmawia 404 przy zamówieniach starszych niż jego retencja; wtedy zostaje
      data z ładunku sprawy.
@@ -852,12 +838,10 @@ export function listaReklamacji(
   od: string | null = config.allegro.reklamacjeOd,
 ): WierszReklamacji[] {
   const wiersze = wierszeReklamacji(database, "? IS NULL OR r.otwarto_at >= ?", od, od);
-  const tagi = tagiWszystkichSpraw(database, TAGI_REKLAMACJI);
   /* Sygnatury z paragonów JEDNYM zapytaniem na całą kolejkę. */
   const zParagonow = zParagonu(database, wiersze.map((w) => w.sku_paragonu as string | null));
   return wiersze.map((w) => {
     const r = zWiersza(w, teraz);
-    r.tagi = tagi.get(r.id) ?? [];
     zParagonuNaWiersz(r, w.sku_paragonu, zParagonow);
     return r;
   });
@@ -1143,21 +1127,8 @@ export interface SzczegolReklamacji {
   zamowienie: Zamowienie | null;
   /** Co wiemy o paczce do klienta; `null` = nie ma zamówienia. */
   przesylka: StanPrzesylkiZamowienia | null;
-  /** Kartoteka Subiekta wywiedziona z oferty, gdy reklamacja ją niesie. */
-  kartoteka: ReturnType<typeof kartotekaOferty> | null;
-  /* Karta faktów Copilota; `null`, gdy nikt o nią nie prosił. Ekran
-     reklamacji jej nie pokazuje i nie zamawia nowej (decyzja właściciela),
-     ale zapisane karty zostają i jadą dalej: to dane biura, nie ekranu,
-     a powrót Copilota nie będzie wtedy wymagał zmiany odpowiedzi. */
-  karta: ReturnType<typeof kartaSprawy>;
   /* Ile razy TO SAMO już się zdarzyło — patrz `historiaSprawy`. */
   historia: HistoriaSprawy;
-  /** Od kogo przyszedł ten towar — patrz `ostatniaDostawa`; `null` = nie wiemy. */
-  dostawa: OstatniaDostawa | null;
-  /** Dowody biura od najstarszego; pusta lista znaczy „nikt nic nie dopisał". */
-  dowody: DowodReklamacji[];
-  /** Reklamacja u dostawcy; `null`, dopóki biuro jej nie zgłosiło. */
-  uDostawcy: ReklamacjaUDostawcy | null;
   /**
    * FS i PA zamówienia z Subiekta z pozycjami i sporną pozycją; bez dokumentu
    * sam powód braku. Tylko w szczególe: kolejka czytałaby pozycje setek
@@ -1321,7 +1292,7 @@ export function historiaSprawy(
 }
 
 /**
- * Wiersz reklamacji w kształcie szczegółu: z sygnaturą z paragonu i tagami.
+ * Wiersz reklamacji w kształcie szczegółu: z sygnaturą z paragonu.
  *
  * Wspólny dla ekranu reklamacji i dla drogi zakupu, bo dwa składania tej samej
  * reklamacji rozjechałyby się przy pierwszym nowym polu. Czysty odczyt.
@@ -1333,7 +1304,6 @@ export function reklamacjaZeSzczegolu(
   const reklamacja = zWiersza(w, teraz);
   zParagonuNaWiersz(reklamacja, w.sku_paragonu,
     zParagonu(database, [w.sku_paragonu as string | null]));
-  reklamacja.tagi = tagiSprawy(database, TAGI_REKLAMACJI, reklamacja.id);
   return reklamacja;
 }
 
@@ -1375,17 +1345,6 @@ export function szczegolReklamacji(
   const { zwroty, rozmowy, sprawy, droga, zamowienie, przesylka } =
     kontekstZamowienia(database, konto, reklamacja.orderId, teraz, id);
 
-  /* Kartoteka po ofercie — ten sam łańcuch co w skrzynce (pamięć wskazań,
-     potem SKU ze snapshotu). Bez snapshotu `sku` jest `undefined` i ekran
-     mówi „oferty jeszcze nie pobrano", a nie „oferta bez SKU". */
-  let kartoteka: SzczegolReklamacji["kartoteka"] = null;
-  if (reklamacja.offerId) {
-    const snap = database.prepare(
-      "SELECT sku FROM offer_snapshot WHERE channel_account_id=? AND external_id=?",
-    ).get(konto, reklamacja.offerId) as { sku: string | null } | undefined;
-    kartoteka = kartotekaOferty(database, konto, reklamacja.offerId,
-      snap ? snap.sku : undefined);
-  }
   /* Kandydaci na sporną pozycję to mapowanie oferty i sygnatura z pozycji
      zamówienia. Obie są tylko podpowiedzią: rozstrzyga dokument po
      odejmowaniu, a symbol na ekran idzie wyłącznie z dokumentu. */
@@ -1399,20 +1358,16 @@ export function szczegolReklamacji(
   }, teraz);
   /* Towar sprawy to sporna pozycja paragonu i nic innego. Karta „Produkt"
      w panelu rysuje stan i ceny z `paragon.spornaTwId`, więc licznik „ten
-     towar" i dostawa liczone z mapowania mówiłyby o innej rzeczy w tej samej
-     karcie. Bez spornej pozycji obu nie ma, bo towar sprawy byłby zgadnięty. */
+     towar" liczony z mapowania mówiłby o innej rzeczy w tej samej karcie.
+     Bez spornej pozycji licznika nie ma, bo towar sprawy byłby zgadnięty. */
   const towarSprawy = paragon.spornaTwId;
 
   return {
     reklamacja,
     czat: czatReklamacji(database, id),
     zalaczniki: zalacznikiSprawy(database, id),
-    zwroty, rozmowy, sprawy, droga, zamowienie, przesylka, kartoteka,
-    karta: kartaSprawy(database, id),
+    zwroty, rozmowy, sprawy, droga, zamowienie, przesylka,
     historia: historiaSprawy(database, konto, id, towarSprawy, reklamacja.kupujacyLogin),
-    dostawa: ostatniaDostawa(database, towarSprawy, reklamacja.kupionoAt),
-    dowody: dowodyReklamacji(database, id),
-    uDostawcy: uDostawcyReklamacji(database, id),
     paragon,
   };
 }
