@@ -324,7 +324,8 @@ function kolejkiKlienta(teraz: number): PozycjaDecyzji[] {
     });
   }
 
-  const zwroty = listaZwrotow(db(), teraz).filter((z) => z.kubelek === "decyzja");
+  const zwroty = listaZwrotow(db(), teraz, null, { bezRabatow: true })
+    .filter((z) => z.kubelek === "decyzja");
   if (zwroty.length) {
     wiersze.push({
       klucz: "kolejka:zwroty", obszar: "obsluga", zrodlo: "zwroty",

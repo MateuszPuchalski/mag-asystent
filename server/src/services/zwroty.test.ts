@@ -572,6 +572,21 @@ test("przyjęcie zwrotu przesuwa go z DO DECYZJI do DO OCENY", () => {
   assert.equal(listaZwrotow(d).find((z) => z.id === id)?.kubelek, "ocena");
 });
 
+test("lista bez rabatów daje te same kubełki i sygnały, tylko bez rabatu", () => {
+  /* Liczniki („Do decyzji", migawka dnia) czytają kubełek i sygnały.
+     Rabat kosztuje kilka zapytań na pozycję, więc tam go nie liczymy —
+     ale wycięcie go nie ma prawa przesunąć zwrotu do innego kubełka. */
+  const d = stanowisko();
+  zwrotDoDecyzji(d);
+  zwrotDoDecyzji(d);
+  const pelna = listaZwrotow(d);
+  const lekka = listaZwrotow(d, Date.now(), null, { bezRabatow: true });
+  assert.deepEqual(lekka.map((z) => [z.id, z.kubelek, z.sygnaly]),
+    pelna.map((z) => [z.id, z.kubelek, z.sygnaly]));
+  assert.ok(pelna.flatMap((z) => z.pozycje).every((p) => p.rabat !== null));
+  assert.ok(lekka.flatMap((z) => z.pozycje).every((p) => p.rabat === null));
+});
+
 test("odrzucenie wymaga powodu — bez niego nie zapisuje niczego", () => {
   /* §25a.5: odmowa jest nieodwracalna, więc musi nieść uzasadnienie. Zwrot
      odrzucony bez powodu nie da się później obronić przed klientem. */

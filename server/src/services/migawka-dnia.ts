@@ -87,7 +87,8 @@ export function policzMigawke(database: Db = defaultDb(), teraz = Date.now()): M
     /* Okno siedmiu dni wystarcza: czekanie liczy się od pierwszej wiadomości
        po naszej odpowiedzi, a `czasOdpowiedzi` sięga tydzień dalej wstecz. */
     klientCzeka: sekcja("klient czeka", () => czasOdpowiedzi(7, false, database, teraz).czekaTeraz),
-    zwroty: sekcja("zwroty", () => kubelkiZwrotow(listaZwrotow(database, teraz))),
+    zwroty: sekcja("zwroty", () =>
+      kubelkiZwrotow(listaZwrotow(database, teraz, null, { bezRabatow: true }))),
     reklamacje: sekcja("reklamacje", () => kubelkiReklamacji(listaReklamacji(database, teraz))),
   };
 }

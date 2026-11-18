@@ -317,3 +317,17 @@ test("takt workera jest OSŁONIĘTY — przejściowy błąd bazy nie kładzie pr
   assert.ok(cialo.indexOf("try") < cialo.indexOf("zamelduj("),
     "meldunek stoi POZA `try` — a to on rzucał `database is locked` na produkcji");
 });
+
+test("błąd zadania przy zablokowanej bazie nie kładzie workera", () => {
+  /* `oznaczBlad` pisze do bazy, więc przy zablokowanej rzuca. Wołany wprost
+     z `.catch` obietnicy kładł proces nieobsłużonym odrzuceniem, a zadanie
+     zostawało w `processing`, którego `pickTask` już nie bierze. Źródło,
+     nie zachowanie — z tego samego powodu co test wyżej. */
+  const zrodlo = fs.readFileSync(path.join(import.meta.dirname, "worker.ts"), "utf8");
+  assert.doesNotMatch(zrodlo, /\.catch\(\s*\([^)]*\)\s*=>\s*oznaczBlad\(/,
+    "`oznaczBlad` wprost w `.catch` — jego własny błąd położy proces");
+  assert.match(zrodlo, /\.catch\(\s*\([^)]*\)\s*=>\s*oznaczAlboOdloz\(/);
+  const tick = zrodlo.slice(zrodlo.indexOf("function tick()"));
+  assert.ok(tick.indexOf("doOznaczenia") < tick.indexOf("pickTask("),
+    "odłożony błąd musi wejść do bazy, zanim worker weźmie następne zadanie");
+});
