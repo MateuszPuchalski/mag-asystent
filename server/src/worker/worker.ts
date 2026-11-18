@@ -5,7 +5,7 @@ import { zamelduj } from "../services/process-state.js";
 import { konfiguracjaZmienionaPo } from "../services/konfiguracja-zapis.js";
 import { podNssm } from "../services/restart.js";
 import {
-  czekaNaDokument, oznaczBlad, pickTask, powrotyPoDokumentachSfery, przetworzZadanie,
+  czekaNaDokument, oznaczBlad, type Task, pickTask, powrotyPoDokumentachSfery, przetworzZadanie,
 } from "./kolejka.js";
 
 /* ── Worker NIE migruje schematu ───────────────────────────────────
@@ -61,8 +61,31 @@ function schematGotowy(): boolean {
 }
 
 let busy = false;
+/* ── Błąd, którego nie dało się zapisać ───────────────────────────
+   `oznaczBlad` sam pisze do bazy, więc przy zablokowanej bazie rzuca
+   `database is locked`. Rzucony z `.catch` obietnicy nie ma kogo złapać
+   i kładzie cały proces, a zadanie zostaje w `processing` na zawsze, bo
+   `pickTask` bierze tylko `pending` i `waiting_for_doc`. Dlatego błąd czeka
+   tutaj, a każdy takt próbuje go zapisać, zanim weźmie następne zadanie. */
+let doOznaczenia: { task: Task; msg: string } | null = null;
+
+function oznaczAlboOdloz(task: Task, msg: string): void {
+  try {
+    oznaczBlad(task, msg);
+  } catch (e) {
+    doOznaczenia = { task, msg };
+    console.error(`[worker] #${task.id} nie zapisałem błędu (${e instanceof Error ? e.message : String(e)}) — spróbuję w następnym takcie.`);
+  }
+}
+
 function tick() {
   if (busy) return;
+  if (doOznaczenia) {
+    /* Rzut stąd łapie strażnik taktu niżej, a zadanie czeka dalej. */
+    const { task: t, msg } = doOznaczenia;
+    oznaczBlad(t, msg);
+    doOznaczenia = null;
+  }
   const task = pickTask();
   if (!task) return;
 
@@ -73,7 +96,7 @@ function tick() {
   busy = true;
   // błąd przed samym zapisem (np. zepsuty payload) też musi oznaczyć zadanie
   void przetworzZadanie(task, sfera)
-    .catch((e) => oznaczBlad(task, e instanceof Error ? e.message : String(e)))
+    .catch((e) => oznaczAlboOdloz(task, e instanceof Error ? e.message : String(e)))
     .finally(() => {
       busy = false;
     });

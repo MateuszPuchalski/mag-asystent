@@ -122,8 +122,11 @@ export interface PozycjaZwrotu {
   potraceniePowod: string | null;
   /** Propozycja automatu — pokazywana obok, nigdy zamiast potwierdzonej. */
   propozycja: Dopasowanie | null;
-  /** Rabat transakcyjny: czy wniosek o zwrot prowizji już jest. */
-  rabat: StanRabatu;
+  /**
+   * Rabat transakcyjny: czy wniosek o zwrot prowizji już jest.
+   * `null` tylko przy `bezRabatow` — liczniki rabatu nie czytają.
+   */
+  rabat: StanRabatu | null;
 }
 
 export interface WierszZwrotu {
@@ -765,6 +768,11 @@ export function listaZwrotow(
      JEDEN ZWROT — dla szczegółu, który odświeża się po każdym zapisie.
      Filtr zawęża też odczyty słownikowe niżej. */
   filtr: FiltrZwrotow | null = null,
+  /* BEZ RABATÓW dla liczników, które pytają tylko o kubełek i sygnały.
+     Rabat to kilka zapytań na KAŻDĄ pozycję zwrotu, a cała lista liczy się
+     synchronicznie w wątku serwera. Przez ten czas nie odpowiada żadne inne
+     żądanie, a takty Allegro przekraczają swoje limity czasu. */
+  opcje: { bezRabatow?: boolean } = {},
 ): WierszZwrotu[] {
   const znaki = (n: number) => Array.from({ length: n }, () => "?").join(",");
   /* Stan zadania ZW złączeniem, nie osobnym zapytaniem na zwrot:
@@ -1023,7 +1031,7 @@ export function listaZwrotow(
           /* Rabat liczy się dla KAŻDEJ pozycji, także rozstrzygniętej: wniosek
              o prowizję żyje własnym rytmem po stronie Allegro i bywa złożony
              długo po tym, jak zwrot zszedł z biurka. */
-          rabat: stanRabatu(database, Number(p.id)),
+          rabat: opcje.bezRabatow ? null : stanRabatu(database, Number(p.id)),
         };
       });
 
