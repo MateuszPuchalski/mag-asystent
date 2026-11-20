@@ -13,7 +13,8 @@ import type { Rozmowa } from "../api/typy";
    prosi o człowieka albo czeka dłużej niż godzinę. Powiadomienie przy każdej
    wiadomości przestaje być czytane pierwszego dnia — a wtedy nie działa także
    to jedno, które było ważne. Żadnego dźwięku: w otwartym biurze przeszkadza
-   wszystkim poza adresatem.
+   wszystkim poza adresatem. Dźwięk ma tylko problem w dostawie, bo zdarza
+   się rzadko i czeka na niego kierowca (`dostawy/alarm.ts`).
 
    Stan zgody trzyma przeglądarka (`localStorage`), bo to nawyk stanowiska,
    nie ustawienie firmy — ten sam wzór co kolejność listy w kolejce. Serwer

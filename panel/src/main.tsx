@@ -40,6 +40,7 @@ import { Protokol } from "./druk/Protokol";
 import "./index.css";
 import { CoNowego } from "./coNowego/CoNowego";
 import { SzufladaTowaru } from "./towar/Szuflada";
+import { AlarmDostaw } from "./dostawy/AlarmDostaw";
 
 /* Jeden cache zapytań na cały panel — budowa i powody w `api/klient-zapytan.ts`. */
 const klient = nowyKlientZapytan();
@@ -261,6 +262,9 @@ function Rama({ wyloguj }: { wyloguj: () => void }) {
         wydaniu. Powód w `coNowego/CoNowego.tsx`.
         Pasek braku połączenia stoi NAD nim: awaria jest ważniejsza niż nowość. */}
     <PasekPolaczenia />
+    {/* Problem zgłoszony z hali stoi nad pracą na każdym ekranie,
+        bo kierowca czeka teraz. Powód w `dostawy/alarm.ts`. */}
+    <AlarmDostaw />
     <CoNowego />
     {/* BEZ `max-w` i bez `mx-auto`: ogranicznik szerokości oddawałby
         szerokiemu monitorowi setki pikseli na marginesy, a kolumny stałyby
