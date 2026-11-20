@@ -12,6 +12,7 @@ import { Kafel, KafelOferty } from "../towar/Kafel";
 import { Rabat } from "./Rabat";
 import { Potracenie } from "./Potracenie";
 import { IloscZwrocona } from "./IloscZwrocona";
+import { PomylonyTowar } from "./PomylonyTowar";
 import { Dopisz } from "./Dopisz";
 
 /* ── Produkty ze zwrotu ──────────────────────────────────────────────────────
@@ -356,7 +357,7 @@ function Skladniki({ p, sklad, zwrotId }: {
 
 export function Pozycje({ zwrot, trwa, blad, trwaRabat = false, bladRabatu = "",
   doDopisania = [], bladDopisania = "", sklady = {}, wierszeDokumentu = [],
-  onOcena, onKwota, onZglosRabat, onPotracenie, onIlosc, onDopisz, onZdejmij,
+  onOcena, onKwota, onZglosRabat, onPotracenie, onIlosc, onPomylony, onDopisz, onZdejmij,
   onWszystkieNaStan, akcje }: {
   zwrot: Zwrot;
   trwa: boolean;
@@ -376,6 +377,8 @@ export function Pozycje({ zwrot, trwa, blad, trwaRabat = false, bladRabatu = "",
   onPotracenie?: (pozycjaId: number, grosze: number | null, powod: string) => void;
   /** Ile sztuk naprawdę wróciło; `null` czyści zapis. */
   onIlosc?: (pozycjaId: number, ilosc: number | null) => void;
+  /** Zaznaczenie albo zdjęcie znacznika „w kartonie inny towar". */
+  onPomylony?: (pozycjaId: number, pomylony: boolean, opis: string) => void;
   onDopisz?: (zamPozycjaId: number) => void;
   onZdejmij?: (pozycjaId: number) => void;
   /** Ocena WSZYSTKICH nieocenionych naraz — patrz `onOcena`. */
@@ -548,7 +551,8 @@ export function Pozycje({ zwrot, trwa, blad, trwaRabat = false, bladRabatu = "",
            ramka i przekreślona cena mówią to przy samym towarze, zanim suma
            na dole zdąży zaskoczyć. */
         const oddawana = !wycena || wybrane.includes(p.id);
-        return <li key={p.id} className={`flex items-start gap-3 rounded-xl border p-3 ${oddawana
+        return <li key={p.id} className={`flex items-start gap-3 rounded-xl border p-3 ${p.pomylonyTowar
+          ? "border-red-300 bg-white" : oddawana
           ? "border-slate-200 bg-white" : "border-dashed border-slate-300 bg-slate-50"}`}>
         {/* Pole zaznaczenia stoi PRZED zdjęciem, w jednej kolumnie dla całej
             listy: odhaczanie idzie wtedy w dół jednym ruchem oka. */}
@@ -748,6 +752,10 @@ export function Pozycje({ zwrot, trwa, blad, trwaRabat = false, bladRabatu = "",
           {/* Liczba sztuk pada PRZY ROZPAKOWANIU, czyli w kubełku DO OCENY —
               i tam ją proponujemy. Zapisaną widać wszędzie, bo po zamknięciu
               zwrotu to ona tłumaczy, czemu wypłata była niższa. */}
+          {onPomylony && (ocenianie || wycena || p.pomylonyTowar) &&
+            <PomylonyTowar p={p} trwa={trwa} edytowalny={edytowalny && (ocenianie || wycena)}
+              onZapisz={(tak, opis) => onPomylony(p.id, tak, opis)} />}
+
           {onIlosc && (ocenianie || wycena || p.iloscZwrocona != null) &&
             <IloscZwrocona p={p} trwa={trwa} blad={blad} tylkoOdczyt={!edytowalny}
               otworz={otworzIlosc?.id === p.id ? otworzIlosc.n : 0}
