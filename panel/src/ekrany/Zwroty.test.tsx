@@ -464,7 +464,8 @@ describe("Ekran zwrotów", () => {
        pracy. */
     pokaz();
     expect(screen.queryByText("ZW-2")).toBeNull();
-    await userEvent.click(screen.getByRole("button", { name: /Wszystkie/ }));
+    /* „Wszystkie” stoi pod „Więcej”, razem z odrzuconymi i zamkniętymi. */
+    await userEvent.selectOptions(screen.getByLabelText("Więcej kubełków"), "Wszystkie · 2");
     expect(screen.getAllByText("ZW-2").length).toBeGreaterThan(0);
     expect(screen.getAllByText("Do zwrotu").length).toBeGreaterThan(0);
     /* Pytanie nad LISTĄ milczy — nie ma czyje zadać. Nie ma go też
@@ -477,7 +478,7 @@ describe("Ekran zwrotów", () => {
     /* Termin steruje kolejnością pracy: odpowiada na pytanie „co się
        najbardziej pali". */
     pokaz();
-    await userEvent.click(screen.getByRole("button", { name: /Wszystkie/ }));
+    await userEvent.selectOptions(screen.getByLabelText("Więcej kubełków"), "Wszystkie · 2");
     const kolejnosc = screen.getAllByRole("button").map((b) => b.textContent ?? "")
       .filter((t) => t.includes("ZW-"));
     expect(kolejnosc[0]).toContain("ZW-1");
@@ -1043,20 +1044,20 @@ describe("Pasek rozjazdów", () => {
     ];
     try {
       pokaz();
-      for (const [nazwa, ile] of [["wszystkie", 5], ["doręczone", 1], ["w drodze", 2],
-        ["etykieta bez skanu", 1], ["nie odesłał", 1]] as const) {
-        expect(screen.getByRole("button", { name: `${nazwa} ${ile}` })).toBeInTheDocument();
-      }
-      await userEvent.click(screen.getByRole("button", { name: "etykieta bez skanu 1" }));
-      expect(screen.getByRole("button", { name: "etykieta bez skanu 1" }))
-        .toHaveAttribute("aria-pressed", "true");
+      /* Sito to lista w JEDNYM rzędzie z pytaniem kubełka — cztery pigułki
+         z liczbami nie mieszczą się obok niego w kolumnie listy. */
+      const sito = screen.getByLabelText("Sito do decyzji") as HTMLSelectElement;
+      expect(within(sito).getAllByRole("option").map((o) => o.textContent)).toEqual([
+        "wszystkie · 5", "doręczone · 1", "w drodze · 2", "etykieta bez skanu · 1", "nie odesłał · 1"]);
+      await userEvent.selectOptions(sito, "etykieta bez skanu · 1");
+      expect(sito.selectedOptions[0].textContent).toBe("etykieta bez skanu · 1");
       expect(screen.getByRole("button", { name: /SD-24/ })).toBeInTheDocument();
       expect(screen.queryByRole("button", { name: /SD-21/ })).toBeNull();
-      await userEvent.click(screen.getByRole("button", { name: "wszystkie 5" }));
+      await userEvent.selectOptions(sito, "wszystkie · 5");
       expect(screen.getByRole("button", { name: /SD-21/ })).toBeInTheDocument();
       /* Sita dzielą wyłącznie DO DECYZJI — w innym kubełku ich nie ma. */
       await userEvent.click(screen.getByRole("button", { name: /Do zwrotu/ }));
-      expect(screen.queryByRole("button", { name: /^doręczone/ })).toBeNull();
+      expect(screen.queryByLabelText("Sito do decyzji")).toBeNull();
     } finally { scena.zwroty = null; }
   });
 });

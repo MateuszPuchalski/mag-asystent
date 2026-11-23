@@ -1,11 +1,12 @@
 import React, { useEffect, useRef } from "react";
 import {
   AlertTriangle, MessageSquareWarning, Headset, Lock, PackageCheck, CircleHelp,
-  Gavel, CircleX, PackageSearch,
+  Gavel, CircleX, PackageSearch, ShieldQuestion,
 } from "lucide-react";
 import type { KubelekReklamacji, Reklamacja, SygnalReklamacji } from "../api/typy";
 import { ZdjecieOferty } from "../towar/Zdjecie";
-import { NaglowekSekcji, Pusto, dataCyfrowa, dniSlowo } from "../ui";
+import { NaglowekSekcji, dataCyfrowa, dniSlowo } from "../ui";
+import { PustaKolejka } from "../ui/KolumnaKolejki";
 import { mojaSprawa } from "../sprawy/Moje";
 
 /* ── Kolejka reklamacji ──────────────────────────────────────────────────────
@@ -160,10 +161,10 @@ export function Kolejka({ reklamacje, wybrana, zKubelkiem = false, onWybierz, mo
   useEffect(() => { aktywnyWiersz.current?.scrollIntoView?.({ block: "nearest" }); }, [wybrana]);
 
   if (!reklamacje.length) {
-    return <Pusto waga="lista">
+    return <PustaKolejka ikona={ShieldQuestion}>
       {zKubelkiem
         ? "Żadna reklamacja nie pasuje do tego, czego szukasz."
-        : "Ten kubełek jest pusty — nic tu nie czeka na ruch."}</Pusto>;
+        : "Ten kubełek jest pusty — nic tu nie czeka na ruch."}</PustaKolejka>;
   }
 
   const wiersz = (r: Reklamacja) => {

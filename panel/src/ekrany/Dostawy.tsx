@@ -5,8 +5,9 @@ import {
   useArchiwumDostaw, useDokument, useDostawy, useNotatkaDoHali, useOdpowiedziHali, usePozaWertis,
   usePrzeczytane, usePrzywrocDostawe, useRozwiazWyjatek, useWyjatkiOtwarte, useZamknijPozaWertis,
 } from "../api/dostawy";
-import { Blad, Karta, Pole, Pusto, SIATKA_TRZECH_KOLUMN, ile } from "../ui";
+import { Blad, Karta, Pusto, SIATKA_TRZECH_KOLUMN, SrodekIDowody, KARTA_PRACY, KARTA_DOWODOW, ile } from "../ui";
 import { FiltrZWiecej } from "../ui/FiltrZWiecej";
+import { KolumnaKolejki, SzukajWKolejce } from "../ui/KolumnaKolejki";
 import {
   KUBELKI_DOSTAW, KolejkaDostaw, KolejkaPozaWertis, WierszeSpozaOkna, kubelekDokumentu,
   type KubelekDostaw,
@@ -241,39 +242,36 @@ export function Dostawy() {
 
   return <div className="flex flex-col gap-4 lg:h-full lg:min-h-0">
     <div className={SIATKA_TRZECH_KOLUMN}>
-      <Karta className="flex min-h-0 flex-col overflow-hidden">
-        {/* Bez tytułu „Dostawy", bo powtarzałby podświetloną zakładkę
-            nawigacji nad ekranem. */}
-        <nav className="flex shrink-0 flex-wrap gap-1 p-2">
-          {/* „Zamknięte", „Poza WERTIS" i „Archiwum" pod „Więcej":
-              to przeglądanie, nie praca. „Poza WERTIS" zostaje o jedno
-              kliknięcie z licznikiem w opcji, bo ma wyłapać pomyłkowe
-              zdjęcie dostawy. Ten sam komponent co na pozostałych kolejkach. */}
-          <FiltrZWiecej<KubelekDostaw> wybrany={kubelek} onWybierz={wybierzKubelek}
-            wiecej={WIECEJ_DOSTAW}
-            pozycje={KUBELKI_DOSTAW.map((k) => ({ klucz: k.id, etykieta: k.etykieta, ile: liczniki[k.id],
-              podpowiedz: k.pytanie }))} />
-        </nav>
-        <div className="shrink-0 border-t border-slate-200 p-2">
-          <Pole value={fraza} onChange={(e) => setFraza(e.target.value)}
-            placeholder={kubelek === "archiwum" ? "Szukaj w archiwum: numer albo dostawca" : "Numer FZ, faktury dostawcy albo dostawca"}
-            aria-label="Szukaj dostawy" />
-        </div>
-        {/* PYTANIE KUBEŁKA I STOPKA W JEDNYM PAŚMIE, bo mówią o tej samej
-            liście: „co z nią zrobić" i „gdzie się kończy". Granica okna stoi
-            NAD listą, więc ucięte archiwum widać, zanim zacznie się ją
-            czytać. */}
-        <div className="flex shrink-0 flex-wrap items-baseline gap-x-3 border-y border-slate-200 bg-slate-50 px-2 py-1 text-xs text-slate-600">
-          <span className="font-semibold">{opis?.pytanie}</span>
-          <span className="ml-auto">{stopka}</span>
-        </div>
-        <div className="min-h-0 flex-1 overflow-y-auto">{lewa}</div>
+      {/* Kolumna listy z jednej formy (`ui/KolumnaKolejki.tsx`). Bez tytułu
+          „Dostawy”, bo powtarzałby podświetloną zakładkę menu, a kolejka nie ma
+          działań do postawienia w jego rzędzie. */}
+      <KolumnaKolejki etykieta="Kolejka dostaw"
+        /* „Zamknięte", „Poza WERTIS" i „Archiwum" pod „Więcej":
+           to przeglądanie, nie praca. „Poza WERTIS" zostaje o jedno
+           kliknięcie z licznikiem w opcji, bo ma wyłapać pomyłkowe
+           zdjęcie dostawy. */
+        kubelki={<FiltrZWiecej<KubelekDostaw> zwarty wybrany={kubelek} onWybierz={wybierzKubelek}
+          wiecej={WIECEJ_DOSTAW}
+          pozycje={KUBELKI_DOSTAW.map((k) => ({ klucz: k.id, etykieta: k.etykieta, ile: liczniki[k.id],
+            podpowiedz: k.pytanie }))} />}
+        szukaj={<SzukajWKolejce wartosc={fraza} onZmien={setFraza} etykieta="Szukaj dostawy"
+          placeholder={kubelek === "archiwum" ? "Szukaj w archiwum: numer albo dostawca" : "Numer FZ, faktury dostawcy albo dostawca"} />}
+        /* PYTANIE KUBEŁKA I STOPKA W JEDNYM PAŚMIE, bo mówią o tej samej
+           liście: „co z nią zrobić" i „gdzie się kończy". Granica okna stoi
+           NAD listą, więc ucięte archiwum widać, zanim zacznie się ją
+           czytać. */
+        drugi={<>
+          <span className="font-semibold text-xs text-slate-600">{opis?.pytanie}</span>
+          <span className="ml-auto text-xs text-slate-600">{stopka}</span>
+        </>}>
+        {lewa}
         {/* Pod listą tylko błąd odświeżenia, gdy dane zostały; bez danych
             błąd stoi zamiast listy. */}
         <Blad>{lista.error && lista.data ? (lista.error as Error).message : ""}</Blad>
-      </Karta>
+      </KolumnaKolejki>
 
-      <Karta className="flex min-h-0 flex-col overflow-hidden">
+      <SrodekIDowody>
+      <Karta className={`flex min-h-0 flex-col overflow-hidden ${KARTA_PRACY}`}>
         {wybrany === null
           ? <Pusto ikona={Truck}>Wybierz dostawę z kolejki.</Pusto>
           : wybrany === "bez"
@@ -294,7 +292,7 @@ export function Dostawy() {
                     ? (dokument.error as Error).message : "Nie znaleziono dokumentu."}</Pusto>}
       </Karta>
 
-      <Karta className="flex min-h-0 flex-col overflow-hidden">
+      <Karta className={`flex min-h-0 flex-col overflow-hidden ${KARTA_DOWODOW}`}>
         <div className="min-h-0 flex-1 overflow-y-auto">
           {dokument.data && typeof wybrany === "number"
             /* `key` NA DOKUMENCIE. Bez niego pole notatki i otwarty formularz
@@ -319,6 +317,7 @@ export function Dostawy() {
                 : "Dowody, dostawca i notatki pokażą się po wybraniu dostawy."}</Pusto>}
         </div>
       </Karta>
+      </SrodekIDowody>
     </div>
 
     {/* Powiększenie dowodu: „czy to TA część" przy kartotekach różniących się
