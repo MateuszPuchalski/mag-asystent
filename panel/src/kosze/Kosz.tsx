@@ -1,4 +1,4 @@
-import React, { useId, useState } from "react";
+import React, { useEffect, useId, useState } from "react";
 import { RefreshCw } from "lucide-react";
 import type { PowodBezPowrotu, PozycjaWKoszu, SzczegolKosza, WierszKosza } from "../api/kosze";
 import { useZdrowie } from "../api/rozmowy";
@@ -80,6 +80,12 @@ function PozycjaPominieta({ p, zdjecia, zalatw, blokujeMm }: {
   const [notatka, setNotatka] = useState("");
   const idPodpowiedzi = useId();
   const anuluj = () => { formularz.wycofaj(); setNotatka(""); };
+  /* ZAŁATWIONA POZYCJA ZAMYKA SWÓJ FORMULARZ I GUBI NOTATKĘ. Hala może
+     pominąć tę samą pozycję drugi raz, a serwer zeruje wtedy załatwienie.
+     Formularz schowany samym `zalatwioneAt` wróciłby przy odświeżeniu sam,
+     z fokusem i dawną notatką, i Enter zamknąłby nowe zgłoszenie hali. */
+  const zalatwiona = Boolean(p.zalatwioneAt);
+  useEffect(() => { if (zalatwiona) { formularz.zamknij(); setNotatka(""); } }, [zalatwiona]);
   return <div className="flex gap-3 border-b border-slate-200 py-3 last:border-b-0">
     {zdjecia && <Zdjecie twId={p.twId} rozmiar={44} nazwa={p.nazwa} />}
     <div className="min-w-0 flex-1">
@@ -122,6 +128,9 @@ function PozycjaPominieta({ p, zdjecia, zalatw, blokujeMm }: {
             <Przycisk wariant="glowny" type="submit" disabled={zalatw.trwa}>Załatwione</Przycisk>
             <Przycisk type="button" onClick={anuluj}>Anuluj</Przycisk>
           </div>
+          {/* Błąd przy polu, którego dotyczy, nie pod całą sekcją: przy kilku
+              pominiętych stałby daleko od miejsca, w którym człowiek patrzy. */}
+          {zalatw.blad && <p className="mt-1 text-xs text-ranga-zle">{zalatw.blad}</p>}
         </form>}
     </div>
   </div>;
@@ -285,7 +294,6 @@ export function Kosz({ k, przelicz, zalatw, ponowMm = null, bezPowrotu = null }:
         <NaglowekSekcji jako="h3">Pominięte przez halę · {licznikPominietych(pominiete)}</NaglowekSekcji>
         {pominiete.map((p) => <PozycjaPominieta key={p.id} p={p} zdjecia={zdjecia} zalatw={zalatw}
           blokujeMm={blokujeMm(p)} />)}
-        <Blad>{zalatw.blad}</Blad>
       </section>}
 
       <NaglowekSekcji jako="h3">

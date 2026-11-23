@@ -57,11 +57,22 @@ let odmowaPonowienia: string | null = null;
 let awarie = new Set<string>();
 /* Czy instalacja ma zdjęcia kartotek — tak mówi o tym `/api/health`. */
 let zdjeciaWHealth = false;
+/* Stan pozycji 2 w koszu 14: po zapisie załatwiona, potem pominięta ponownie. */
+let zalatwienie14: "nie" | "tak" = "nie";
+let ostatniQc: QueryClient | null = null;
+/* Skróty idą przez nasłuch czytnika: klawisz gęstszy niż 300 ms liczy się
+   jako seria skanu, a pierwszy znak czeka 40 ms. Test naciska więc jak człowiek. */
+const klawisz = async (k: string) => {
+  await new Promise((r) => setTimeout(r, 320));
+  await userEvent.keyboard(k);
+  await new Promise((r) => setTimeout(r, 60));
+};
 
 function odpowiedz(url: string, init?: RequestInit): unknown {
   const metoda = init?.method ?? "GET";
   if (metoda !== "GET") {
     wyslane.push(`${metoda} ${url} ${init?.body ?? ""}`);
+    if (url === "/api/biuro/kosze/pominiete/2/zalatwione") zalatwienie14 = "tak";
     if (url.endsWith("/mm-usun")) return { zadan: 1, anulowanych: 0, ilosc: 2, magazyn: 3 };
     if (url.endsWith("/ponow-mm")) {
       const blad = odmowaPonowienia; odmowaPonowienia = null;
@@ -94,7 +105,9 @@ function odpowiedz(url: string, init?: RequestInit): unknown {
     /* Bez MM powrotnego: rozłożony, dokument bez znanego kierunku. */
     kosz(17, { status: "rozlozony", rozlozonoAt: "2026-09-20T09:00:00.000Z", bezPowrotu: "kierunek" })] };
   if (url === "/api/biuro/kosze/pominiete") return { pominiete: POMINIETE };
-  if (url === "/api/biuro/kosze/14") return { kosz: SZCZEGOL };
+  if (url === "/api/biuro/kosze/14") return { kosz: zalatwienie14 === "nie" ? SZCZEGOL : { ...SZCZEGOL,
+    pozycje: SZCZEGOL.pozycje.map((p) => p.id === 2 ? { ...p, zalatwioneAt: "2026-09-22T10:00:00.000Z",
+      zalatwionePrzez: "Anna", zalatwioneNotatka: "znalazło się" } : p) } };
   if (url.startsWith("/api/biuro/kosze/szukaj?q=")) {
     szukane.push(decodeURIComponent(url.split("q=")[1]));
     return { znalezione: [{ koszId: 15, kod: "Z-15", mmNumer: null, koszStatus: "rozlozony", symbol: "HM-0410",
@@ -107,6 +120,7 @@ function odpowiedz(url: string, init?: RequestInit): unknown {
 
 beforeEach(() => {
   wyslane = []; szukane = []; odmowaPonowienia = null; awarie = new Set(); zdjeciaWHealth = false;
+  zalatwienie14 = "nie";
   _wyczyscPamiecZdjec();
   vi.stubGlobal("fetch", vi.fn(async (url: string, init?: RequestInit) => {
     if (awarie.has(url)) return new Response(JSON.stringify({ error: "Serwer nie odpowiada" }), { status: 502 });
@@ -121,6 +135,7 @@ function Adres() { return <span data-testid="adres">{useLocation().pathname}</sp
 
 function pokaz(adres = "/obsluga/zwroty/kosze") {
   const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+  ostatniQc = qc;
   return render(<QueryClientProvider client={qc}>
     <MemoryRouter initialEntries={[adres]}>
       <Routes>
@@ -337,12 +352,12 @@ describe("pominięte w koszu, klawisze i stany bez danych", () => {
   it("`j` i `k` chodzą po koszach, cyfra zmienia kubełek, a w polu to zwykłe znaki", async () => {
     pokaz("/obsluga/zwroty/kosze/14");
     await screen.findByRole("heading", { name: "Z-14" });
-    await userEvent.keyboard("j");
+    await klawisz("j");
     expect(screen.getAllByTestId("adres")[0]).toHaveTextContent("/obsluga/zwroty/kosze/16");
-    await userEvent.keyboard("k");
+    await klawisz("k");
     expect(screen.getAllByTestId("adres")[0]).toHaveTextContent("/obsluga/zwroty/kosze/14");
     /* Cyfra poza polem zmienia kubełek; kosz zostaje otwarty. */
-    await userEvent.keyboard("3");
+    await klawisz("3");
     expect(screen.getByRole("button", { name: /Problem z MM/ })).toHaveAttribute("aria-pressed", "true");
     expect(screen.getAllByTestId("adres")[0]).toHaveTextContent("/obsluga/zwroty/kosze/14");
     /* W polu szukania cyfra jest frazą. */
@@ -354,8 +369,69 @@ describe("pominięte w koszu, klawisze i stany bez danych", () => {
   it("bez otwartego kosza `j` otwiera pierwszy wiersz kubełka", async () => {
     pokaz();
     await screen.findByRole("button", { name: /Z-14/ });
-    await userEvent.keyboard("j");
+    await klawisz("j");
     expect(screen.getAllByTestId("adres")[0]).toHaveTextContent("/obsluga/zwroty/kosze/14");
+  });
+
+  it("po zmianie kubełka przy otwartym koszu `j` otwiera pierwszy wiersz nowej listy", async () => {
+    /* Z-16 stoi w „W pracy" jako drugi; „Rozłożone" to Z-17 i Z-15 i go nie zawiera.
+       Miejsce zapamiętane na tamtej liście otworzyłoby tu drugi wiersz. */
+    pokaz("/obsluga/zwroty/kosze/16");
+    await screen.findByRole("heading", { name: "Z-16" });
+    await klawisz("4");
+    await screen.findByRole("button", { name: /Z-17/ });
+    await klawisz("j");
+    expect(screen.getAllByTestId("adres")[0]).toHaveTextContent("/obsluga/zwroty/kosze/17");
+  });
+
+  it("skan kodu poza polem nie przerzuca kubełków", async () => {
+    pokaz();
+    await screen.findByRole("button", { name: /Z-14/ });
+    /* Seria cyfr z Enterem, klawisz po klawiszu bez przerwy — tak pisze czytnik. */
+    await userEvent.keyboard("5901234123457{Enter}");
+    await new Promise((r) => setTimeout(r, 80));
+    expect(screen.getByRole("button", { name: /^W pracy/ })).toHaveAttribute("aria-pressed", "true");
+    expect(screen.getAllByTestId("adres")[0]).toHaveTextContent(/^\/obsluga\/zwroty\/kosze$/);
+  });
+
+  it("w wynikach szukania widać, na którym koszu stoi kursor", async () => {
+    pokaz();
+    await screen.findByRole("button", { name: /Z-14/ });
+    await userEvent.type(screen.getByLabelText("Szukaj towaru w koszach"), "HM");
+    const wynik = await screen.findByRole("button", { name: /Szarpak/ });
+    expect(wynik).not.toHaveAttribute("aria-current");
+    (document.activeElement as HTMLElement).blur();
+    await klawisz("j");
+    expect(screen.getAllByTestId("adres")[0]).toHaveTextContent("/obsluga/zwroty/kosze/15");
+    expect(screen.getByRole("button", { name: /Szarpak/ })).toHaveAttribute("aria-current", "true");
+  });
+
+  it("załatwiona pozycja zamyka formularz na dobre — ponowne pominięcie nie otwiera go z dawną notatką", async () => {
+    pokaz("/obsluga/zwroty/kosze/14");
+    await userEvent.click(await screen.findByRole("button", { name: "Oznacz jako załatwione" }));
+    await userEvent.type(screen.getByLabelText("Jak załatwiono"), "znalazło się");
+    await userEvent.click(screen.getByRole("button", { name: "Załatwione" }));
+    expect(await screen.findByText(/^Załatwione: Anna · /)).toBeInTheDocument();
+    /* Hala pomija pozycję drugi raz: serwer zeruje załatwienie. */
+    zalatwienie14 = "nie";
+    await ostatniQc!.invalidateQueries();
+    expect(await screen.findByRole("button", { name: "Oznacz jako załatwione" })).toBeInTheDocument();
+    expect(screen.queryByLabelText("Jak załatwiono")).toBeNull();
+    /* Enter nie ma czego wysłać: zapis został jeden, ten zamierzony. */
+    await userEvent.keyboard("{Enter}");
+    expect(wyslane).toEqual(['POST /api/biuro/kosze/pominiete/2/zalatwione {"notatka":"znalazło się"}']);
+  });
+
+  it("potwierdzenie zdjęcia z MM nie przechodzi na następnie otwarty kosz", async () => {
+    pokaz("/obsluga/zwroty/kosze/16");
+    await userEvent.click(await screen.findByRole("button", { name: "Zdejmij z MM…" }));
+    expect(screen.getByRole("button", { name: "Zdejmij z MM" })).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: /Z-14/ }));
+    await screen.findByRole("heading", { name: "Z-14" });
+    await userEvent.click(screen.getByRole("button", { name: /Z-16/ }));
+    await screen.findByRole("heading", { name: "Z-16" });
+    expect(screen.queryByRole("button", { name: "Zdejmij z MM" })).toBeNull();
+    expect(wyslane).toEqual([]);
   });
 
   it("Pominięte: błąd zamiast „hala niczego nie pominęła”, bez zera w liczniku", async () => {
@@ -365,7 +441,7 @@ describe("pominięte w koszu, klawisze i stany bez danych", () => {
     expect(screen.queryByText(/Hala niczego nie pominęła/)).toBeNull();
     expect(screen.getByRole("button", { name: /^Pominięte/ }).textContent).not.toMatch(/\d/);
     /* Klawisz nie ma po czym chodzić. */
-    await userEvent.keyboard("j");
+    await klawisz("j");
     expect(screen.getAllByTestId("adres")[0]).toHaveTextContent(/^\/obsluga\/zwroty\/kosze$/);
   });
 

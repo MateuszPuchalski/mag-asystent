@@ -13,8 +13,8 @@ import { Kosz } from "../kosze/Kosz";
 import { KontekstKosza } from "../kosze/Kontekst";
 import { Koszyk, NowyKoszyk } from "../zwroty/Koszyk";
 import { PrzelacznikZwrotow } from "../zwroty/Przelacznik";
-import { klawiszZajety } from "../nawigacja/fokus";
 import { useKursorListy } from "../nawigacja/kursor";
+import { useSkaner } from "../skaner";
 
 /** Kubełki „Tylko wgląd” — stoją pod „Więcej”, nie na wierzchu. */
 const WIECEJ_KOSZY: ReadonlyArray<KubelekKoszy> = ["rozlozone", "anulowane"];
@@ -99,7 +99,7 @@ export function Kosze() {
        listą, więc tu wystarczy nie mówić nieprawdy. */
     : szuka ? (szukaj.isLoading ? <Pusto waga="lista">Szukam w koszach…</Pusto>
         : !szukaj.data ? null
-        : <WynikiSzukania lista={szukaj.data.znalezione} onWybierz={idz} />)
+        : <WynikiSzukania lista={szukaj.data.znalezione} wybranyKosz={wybrany} onWybierz={idz} />)
       : kubelek === "pominiete"
         ? (pominiete.isLoading ? <Pusto waga="lista">Wczytuję pominięte…</Pusto>
           : !pominiete.data
@@ -119,30 +119,32 @@ export function Kosze() {
     : kubelek === "pominiete" ? (pominiete.data?.pominiete ?? []).map((p) => p.koszId)
     : koszeWidoczne.map((k) => k.id);
   const widoczne = [...new Set(idKoszy)].map((x) => ({ id: x }));
-  const kursor = useKursorListy(widoczne, wybrany, (w) => idz(w.id));
-  /* Bez otwartego kosza klawisz otwiera pierwszy wiersz — powód przy tym
-     samym miejscu w `ekrany/Dostawy.tsx`. */
+  /* KOSZ ZOSTAJE OTWARTY PRZY ZMIANIE LISTY, bo ten sam kosz bywa w dwóch
+     kubełkach naraz. Kursor dostaje więc nazwę listy: miejsce zapamiętane
+     w „W pracy" nic nie mówi o wynikach szukania ani o „Problemie z MM". */
+  const kursor = useKursorListy(widoczne, wybrany, (w) => idz(w.id), szuka ? `szukaj ${q}` : kubelek);
+  /* Bez otwartego kosza klawisz otwiera pierwszy wiersz. */
   const idzOWiersz = (o: number) => {
     if (wybrany !== null) return kursor(o);
     const pierwszy = widoczne[0];
     if (pierwszy) idz(pierwszy.id);
   };
   /* TE SAME KLAWISZE CO NA POZOSTAŁYCH KOLEJKACH: `j`/`k` albo strzałki po
-     liście, cyfry po kubełkach. Kosz zostaje otwarty przy zmianie kubełka,
-     bo ten sam kosz bywa w dwóch naraz: „W pracy" i „Problem z MM". Skróty
-     milkną w polu pisania i pod oknem modalnym. */
-  useEffect(() => {
-    const nasluch = (e: KeyboardEvent) => {
-      if (e.ctrlKey || e.altKey || e.metaKey || klawiszZajety(e.target)) return;
-      if (e.key === "ArrowDown" || e.key === "j") { e.preventDefault(); idzOWiersz(1); }
-      else if (e.key === "ArrowUp" || e.key === "k") { e.preventDefault(); idzOWiersz(-1); }
-      else if (/^[1-9]$/.test(e.key)) {
-        const k = KUBELKI_KOSZY[Number(e.key) - 1];
-        if (k) setKubelek(k.id);
-      }
-    };
-    window.addEventListener("keydown", nasluch);
-    return () => window.removeEventListener("keydown", nasluch);
+     liście, cyfry po kubełkach.
+
+     SKRÓTY IDĄ PRZEZ NASŁUCH CZYTNIKA, jak w zwrotach. Pasek koszyka nad
+     listą ma pole skanu, a kod zeskanowany obok niego to seria cyfr: goły
+     nasłuch przerzucałby kubełki przy każdym takim skanie. Hak oddaje tu
+     wyłącznie klawisz, który nie był częścią serii, i milczy w polu pisania
+     oraz pod oknem modalnym. Sam skan poza polem nic tu nie robi — kod czyta
+     pole koszyka. */
+  useSkaner(() => {}, (e) => {
+    if (e.key === "ArrowDown" || e.key === "j") { e.preventDefault(); idzOWiersz(1); }
+    else if (e.key === "ArrowUp" || e.key === "k") { e.preventDefault(); idzOWiersz(-1); }
+    else if (/^[1-9]$/.test(e.key)) {
+      const k = KUBELKI_KOSZY[Number(e.key) - 1];
+      if (k) setKubelek(k.id);
+    }
   });
 
   return <div className="flex flex-col gap-4 lg:h-full lg:min-h-0">
@@ -184,7 +186,11 @@ export function Kosze() {
           ? <Pusto ikona={Package}>Wybierz kosz z kolejki.</Pusto>
           : szczegol.isLoading ? <Pusto waga="lista">Wczytuję zawartość kosza…</Pusto>
             : szczegol.data
-              ? <Kosz k={szczegol.data.kosz} bezPowrotu={bezPowrotu} zalatw={{
+              /* `key` NA KOSZU. Otwarty formularz i potwierdzenie zdjęcia
+                 z MM należą do jednego kosza. Bez klucza przeszłyby na
+                 następny kosz z tym samym towarem, z drugim krokiem już
+                 otwartym. */
+              ? <Kosz key={szczegol.data.kosz.id} k={szczegol.data.kosz} bezPowrotu={bezPowrotu} zalatw={{
                   trwa: zalatw.isPending, blad: bladZalatw,
                   onZalatw: (pozycjaId, notatka) => {
                     setBladZalatw("");

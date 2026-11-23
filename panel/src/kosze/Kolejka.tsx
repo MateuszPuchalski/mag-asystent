@@ -172,12 +172,16 @@ export function KolejkaPominietych({ lista, wybranyKosz, onWybierz }: {
 }
 
 /** „W którym koszu jechał ten towar?" — wynik szukania zamiast kolejki. */
-export function WynikiSzukania({ lista, onWybierz }: {
-  lista: ZnalezionaWKoszu[]; onWybierz: (koszId: number) => void;
+export function WynikiSzukania({ lista, wybranyKosz, onWybierz }: {
+  lista: ZnalezionaWKoszu[]; wybranyKosz: number | null; onWybierz: (koszId: number) => void;
 }) {
   if (!lista.length) return <Pusto waga="lista">Nic w koszach nie pasuje do tego, czego szukasz.</Pusto>;
   return <ul className="divide-y divide-slate-200">
-    {lista.map((z, i) => <WierszKolejki key={`${z.koszId}-${i}`} aktywny={false} onKlik={() => onWybierz(z.koszId)}>
+    {/* Wiersz to pozycja, a otwiera się kosz: podświetlone są wszystkie
+        wiersze otwartego kosza, jak w pominiętych. Bez tego nie widać, gdzie
+        stoi kursor klawiatury. */}
+    {lista.map((z, i) => <WierszKolejki key={`${z.koszId}-${i}`} aktywny={z.koszId === wybranyKosz}
+      onKlik={() => onWybierz(z.koszId)}>
       <span className="flex w-full items-baseline gap-2">
         <span className="truncate font-bold">{z.symbol || z.nazwa}</span>
         <span className="ml-auto shrink-0 text-xs text-slate-600">{z.kiedy ? czas(z.kiedy) : "—"}</span>

@@ -181,5 +181,10 @@ export function useFormularzWMiejscu() {
     przycisk,
     otworz: () => setOtwarty(true),
     wycofaj: () => { oddajFokus.current = true; setOtwarty(false); },
+    /**
+     * Zamyka po udanym zapisie. Formularz schowany samym stanem sprawy
+     * wróciłby z fokusem i dawną treścią, gdyby sprawa otworzyła się na nowo.
+     */
+    zamknij: () => setOtwarty(false),
   };
 }

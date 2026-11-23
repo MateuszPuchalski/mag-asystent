@@ -1,4 +1,4 @@
-import React, { useId, useState } from "react";
+import React, { useEffect, useId, useState } from "react";
 import { Camera } from "lucide-react";
 import type { Wyjatek as WyjatekHali } from "../api/dostawy";
 import { ilosc } from "../api/dostawy";
@@ -88,6 +88,10 @@ export function Wyjatek({ p, trwa, blad, onRozwiaz, onPowieksz }: {
   const maLiczby = p.typ === "wrong_item" || Boolean(p.symObcy) || p.qty != null || p.zamiastIlosc != null;
   /* Po wycofaniu fokus wraca na „Rozwiąż" — powód przy `useFormularzWMiejscu`. */
   const anuluj = () => { formularz.wycofaj(); setNota(""); };
+  /* Rozwiązany wyjątek zamyka swój formularz i gubi notatkę — powód przy
+     `zamknij` w tym samym haku. */
+  const rozwiazany = Boolean(p.resolvedAt);
+  useEffect(() => { if (rozwiazany) { formularz.zamknij(); setNota(""); } }, [rozwiazany]);
   /* STAN I PRZYCISK ZAWSZE Z PRAWEJ W PIERWSZYM RZĘDZIE. Rząd niesie tylko
      krótkie plakietki, więc „rozwiązany" i „otwarty" stoją w tym samym
      miejscu przy każdym wyjątku, bez względu na długość opisu. */
