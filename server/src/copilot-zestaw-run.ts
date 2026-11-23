@@ -6,7 +6,7 @@ import { subiekt } from "./context.js";
 import { INSTRUKCJA_SZKICU, nadawcaSzkicuZ, PROMPT_SZKICU } from "./adapters/copilot.anthropic.js";
 import { zestawNarzedzi } from "./services/copilot-narzedzia.js";
 import {
-  paryZestawu, przebiegZestawu, raportZestawu, sprawyZestawu, wycenaZestawu,
+  opisPominietych, paryZestawu, przebiegZestawu, raportZestawu, sprawyZestawu, wycenaZestawu,
 } from "./services/copilot-zestaw.js";
 
 /* ── Zestaw testowy Copilota: polecenie ──────────────────────────────────────
@@ -33,8 +33,11 @@ import {
    Dalsze: --limit 20 (ile spraw, od najnowszej), --od 2026-11-01,
    --raport plik.md (raport do pliku zamiast na ekran).
 
-   Tekst do poprawiania daje `--pokaz-instrukcje > nowa.txt`: wypisuje bieżącą
-   instrukcję szkicu i kończy, bez bazy i bez modelu.                        */
+   Tekst do poprawiania daje `--pokaz-instrukcje nowa.txt`: zapisuje bieżącą
+   instrukcję szkicu do pliku i kończy, bez bazy i bez modelu. Do pliku, nie
+   na ekran, bo przekierowanie ekranu dokleja nagłówek npm, a PowerShell
+   zmienia przy nim kodowanie. Model dostałby wtedy inny tekst niż ten,
+   który potem trafi do kodu.                                                */
 
 const arg = (nazwa: string): string | null => {
   const i = process.argv.indexOf(nazwa);
@@ -58,10 +61,12 @@ if (nieznane.length) {
   process.exit(2);
 }
 
-if (process.argv.includes("--pokaz-instrukcje")) {
+const plikPokazu = arg("--pokaz-instrukcje");
+if (plikPokazu) {
   /* Przed otwarciem bazy: punkt wyjścia do poprawek ma dać się wziąć także
      tam, gdzie bazy nie ma. */
-  console.log(INSTRUKCJA_SZKICU);
+  fs.writeFileSync(plikPokazu, `${INSTRUKCJA_SZKICU}\n`, "utf8");
+  console.error(`Instrukcja szkicu ${PROMPT_SZKICU}: ${plikPokazu}`);
   process.exit(0);
 }
 
@@ -71,14 +76,28 @@ const plikInstrukcji = arg("--instrukcja");
 const plikPar = arg("--pary");
 const plikRaportu = arg("--raport");
 const od = arg("--od");
-const limit = Math.min(200, Math.max(1, Number(arg("--limit") ?? 20) || 20));
+const limit = Number(arg("--limit") ?? 20);
+if (!Number.isInteger(limit) || limit < 1 || limit > 200) {
+  /* Bez cichej poprawki: `--limit 2OO` puszczone jako 20 wyglądałoby jak
+     wynik z dwustu spraw. */
+  console.error("--limit oczekuje liczby od 1 do 200.");
+  process.exit(2);
+}
 
 if (od && !/^\d{4}-\d{2}-\d{2}/.test(od)) {
   console.error("--od oczekuje daty, np. 2026-11-01.");
   process.exit(2);
 }
 
+if (plikInstrukcji && !fs.existsSync(plikInstrukcji)) {
+  console.error(`Nie ma pliku instrukcji: ${plikInstrukcji}`);
+  process.exit(2);
+}
 const instrukcja = plikInstrukcji ? fs.readFileSync(plikInstrukcji, "utf8").trim() : undefined;
+if (instrukcja === "") {
+  console.error(`Plik instrukcji jest pusty: ${plikInstrukcji}`);
+  process.exit(2);
+}
 /* Etykieta własnej instrukcji to skrót jej tekstu. Dwa przebiegi tego samego
    pliku liczą się w księdze razem, a poprawiony plik dostaje nową etykietę. */
 const wersja = instrukcja === undefined ? PROMPT_SZKICU
@@ -90,7 +109,7 @@ bezMigracji();
 async function main(): Promise<void> {
   const sprawy = sprawyZestawu(db(), { od, limit });
   const w = wycenaZestawu(sprawy, model);
-  console.error(`Spraw do powtórki: ${w.spraw}. Pominiętych, bo mają zdjęcia: ${w.pominietych}.`);
+  console.error(`Spraw do powtórki: ${w.spraw}. ${opisPominietych(sprawy.filter((s) => s.pominieta))}`);
   console.error(`Model: ${model}. Instrukcja: ${wersja}.`);
   console.error(`Szacunek kosztu: ${w.usd.toFixed(4)} USD`
     + (w.bezRachunku ? ` (bez ${w.bezRachunku} spraw, których szkic biura nie ma rachunku)` : "")
@@ -108,6 +127,10 @@ async function main(): Promise<void> {
     process.exitCode = 1;
     return;
   }
+
+  /* Pliki wyniku zakładamy PRZED przebiegiem. Zła ścieżka wywróciłaby
+     polecenie dopiero po zapłaconych wywołaniach i wynik by przepadł. */
+  for (const plik of [plikRaportu, plikPar]) if (plik) fs.writeFileSync(plik, "");
 
   const przebieg = await przebiegZestawu(db(), sprawy, {
     nadaj: nadawcaSzkicuZ({

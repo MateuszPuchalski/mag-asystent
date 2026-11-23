@@ -300,7 +300,8 @@ z firmy nie wychodzi ani jeden znak. Klasyfikacja nie pisze do klienta.
 - **Zestaw testowy puszcza zapisane wejścia jeszcze raz** (`npm run copilot:zestaw`
   w `server/`, od wydania @wydanie). Do dostawcy idzie to samo zamaskowane
   wejście, które już raz tam poszło, więc nowa treść nie wychodzi. Zmienia się
-  model albo instrukcja. Polecenie uruchamia człowiek na serwerze z bazą. Bez
+  model albo instrukcja. Wątek przechodzi przed wysyłką dzisiejszą kontrolę
+  maskowania, a sprawa, która jej nie przechodzi, do modelu nie idzie. Polecenie uruchamia człowiek na serwerze z bazą. Bez
   `--pusc` pokazuje tylko wycenę i nie woła modelu. Raport niesie liczby
   i numery wejść, bez treści. Wysłaną odpowiedź agenta polecenie czyta
   wyłącznie do policzenia bliskości i nigdzie jej nie zapisuje, bo nie ma

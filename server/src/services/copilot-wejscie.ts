@@ -158,8 +158,12 @@ const lista = <T>(json: unknown): T[] => {
 
 /**
  * Wejścia szkiców do powtórki, od najnowszego. Na jedną wiadomość klienta
- * wchodzi JEDNO wejście, ostatnie: agent, który kliknął szkic trzy razy,
- * dałby trzy razy tę samą sprawę, a każda powtórka kosztuje.
+ * wchodzi JEDNO wejście: agent, który kliknął szkic trzy razy, dałby trzy
+ * razy tę samą sprawę, a każda powtórka kosztuje.
+ *
+ * Bierzemy ostatnie wejście, które przeszło sita, a dopiero gdy takiego nie
+ * ma, ostatnie w ogóle. Szkic odrzucony sitem nie zastępuje poprzedniego
+ * przy rozmowie, więc agent oceniał i wysyłał ten, który przeszedł.
  *
  * Wątek i fakty dostają zamki typów z powrotem. Wolno, bo `zapiszWejscie`
  * przyjmuje w te dwie kolumny wyłącznie typy z zamkiem, a nikt inny do tej
@@ -171,9 +175,13 @@ export function wejsciaSzkicow(
   const zadania = ZADANIA_SZKICU.map((z) => `'${z}'`).join(",");
   const wiersze = database.prepare(`SELECT w.* FROM copilot_wejscie w
     WHERE w.zadanie IN (${zadania}) AND w.at >= ?
-      AND w.id = (SELECT MAX(x.id) FROM copilot_wejscie x
-                   WHERE x.zadanie IN (${zadania})
-                     AND x.conversation_id IS w.conversation_id AND x.message_id IS w.message_id)
+      AND w.id = COALESCE(
+        (SELECT MAX(x.id) FROM copilot_wejscie x
+          WHERE x.zadanie IN (${zadania}) AND x.wynik_sit = 'ok'
+            AND x.conversation_id IS w.conversation_id AND x.message_id IS w.message_id),
+        (SELECT MAX(x.id) FROM copilot_wejscie x
+          WHERE x.zadanie IN (${zadania})
+            AND x.conversation_id IS w.conversation_id AND x.message_id IS w.message_id))
     ORDER BY w.id DESC LIMIT ?`).all(o.od ?? "", o.limit) as Array<Record<string, unknown>>;
   return wiersze.map((w) => ({
     id: Number(w.id),

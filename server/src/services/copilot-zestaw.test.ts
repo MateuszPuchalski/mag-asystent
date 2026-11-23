@@ -384,7 +384,8 @@ test("koszt porównuje tylko sprawy z rachunkiem po obu stronach", async () => {
   /* 2000 wej., 300 wyj., 1500 z cache: Opus 5 po 5/25/0,5, Sonnet 5.5 po 2/10/0,1. */
   assert.equal(p.usdBazowy, 0.01825);
   assert.equal(p.usdNowy, 0.00715);
-  assert.equal(p.naprawione.length, 1, "sprawa, na której biuro dostało limit, teraz przechodzi");
+  assert.deepEqual(p.naprawione, [], "limit u biura nie jest szkicem odrzuconym sitem");
+  assert.equal(p.usdPrzebiegu, 0.0143, "koszt przebiegu liczy obie sprawy, także tę bez rachunku biura");
 });
 
 test("wycena przed puszczeniem liczy tokeny biura po stawce nowego modelu", async () => {
@@ -451,4 +452,136 @@ test("przerwany przebieg mówi o tym w raporcie", async () => {
   const p = await Z.przebiegZestawu(db(), sprawy(), opcje(async () => { throw limit(); }));
   assert.match(Z.raportZestawu(p, { model: "m", wersja: "s2" }),
     /Przebieg przerwany \(limit\)\.\*\* Nie poszło spraw: 1\./);
+});
+
+/* ── Przypadki, na których liczby zestawu kłamały ──────────────────────── */
+
+test("dopytanie między szkicem a oceną nie odcina odrzucenia", async () => {
+  const r = rozmowa(1);
+  await szkicBiura(r);
+  db().prepare(`INSERT INTO copilot_wejscie(conversation_id,message_id,zadanie,at,watek,fakty,pytanie)
+    VALUES (?,?,'pytanie',?,'KLIENT: pytanie','F1: fakt','Skróć to')`).run(r.id, r.wiadomosc, new Date().toISOString());
+  S.ocenSzkic(r.id, "odrzucony", KTO());
+
+  assert.equal(sprawy()[0]!.los, "odrzucony");
+});
+
+test("po szkicu odrzuconym sitem sprawą zostaje ten, który agent widział i wysłał", async () => {
+  const r = rozmowa(1);
+  await szkicBiura(r);
+  await szkicBiura(r, { tresc: ZMYSLONY });
+  wyslano(r, "Dzień dobry, gaźnik W09-0211 jest dziś dostępny.", "bez_zmian");
+
+  const [s] = sprawy();
+  assert.deepEqual([s!.bazowy.stan, s!.los], ["ok", "bez_zmian"]);
+  assert.equal(s!.bazowy.tresc, "Dzień dobry, gaźnik W09-0211 jest dziś dostępny.",
+    "bliskość liczy się z tekstu, który poszedł do klienta, nie z odrzuconego");
+});
+
+test("ocena przy rozmowie nie przechodzi na wejście, które szkicu nie zostawiło", async () => {
+  const r = rozmowa(1);
+  /* Jedyny szkic do tej wiadomości odpadł na sicie, więc ocena w dzienniku
+     dotyczyć może tylko starszego tekstu przy rozmowie. */
+  await szkicBiura(r, { tresc: ZMYSLONY });
+  db().prepare("INSERT INTO events(type,payload,user_id) VALUES ('copilot_szkic_ocena',?,'ala')")
+    .run(JSON.stringify({ conversationId: r.id, ocena: "odrzucony" }));
+
+  assert.equal(sprawy()[0]!.los, "bez_odpowiedzi");
+});
+
+test("szkic biura przesiewa dzisiejszy kod, nie wynik zapisany w dniu szkicu", async () => {
+  const r = rozmowa(1);
+  await szkicBiura(r);
+  /* Zapis mówi „ok", ale treść nie przeszłaby dzisiejszych sit. */
+  db().prepare("UPDATE copilot_wejscie SET wyjscie=?").run(JSON.stringify({
+    tresc: ZMYSLONY, uzyteFakty: ["F1"], zastrzezenia: [], twierdzenia: [], odczytZeZdjec: [],
+  }));
+
+  const b = sprawy()[0]!.bazowy;
+  assert.deepEqual([b.stan, (b as { kod: string }).kod], ["sito", "numer_niezadeklarowany"]);
+});
+
+test("wątek, który nie przechodzi dzisiejszej kontroli maskowania, nie idzie do modelu", async () => {
+  const r = rozmowa(1);
+  await szkicBiura(r);
+  db().prepare("UPDATE copilot_wejscie SET watek = watek || ?").run(`\nKLIENT: dzwońcie ${TELEFON}`);
+  let wywolan = 0;
+
+  const p = await Z.przebiegZestawu(db(), sprawy(), opcje(async () => {
+    wywolan += 1;
+    return odpowiedz();
+  }));
+
+  assert.equal(wywolan, 0);
+  assert.deepEqual(p.pominiete.map((s) => s.pominieta), ["maskowanie"]);
+  assert.match(Z.raportZestawu(p, { model: "m", wersja: "s2" }), /kontroli maskowania: 1\./);
+});
+
+test("seria odrzuconych żądań przerywa przebieg i nie liczy się jako zepsute", async () => {
+  const { BladOdpowiedziCopilota } = await import("../adapters/copilot.js");
+  for (const nr of [1, 2, 3, 4, 5]) await szkicBiura(rozmowa(nr));
+  let wywolan = 0;
+
+  /* Literówka w nazwie modelu: dostawca odrzuca każde żądanie tak samo. */
+  const p = await Z.przebiegZestawu(db(), sprawy(), opcje(async () => {
+    wywolan += 1;
+    throw new BladOdpowiedziCopilota("Dostawca odrzucił żądanie", 404, "not_found_error");
+  }));
+
+  assert.equal(wywolan, Z.SERIA_BLEDOW);
+  assert.deepEqual([p.przerwano, p.niepuszczonych], ["seria_bledow", 2]);
+  const s = Z.podsumujZestaw(p);
+  assert.deepEqual(s.zepsute, [], "błąd dostawcy nic nie mówi o szkicu");
+  const e = db().prepare("SELECT payload FROM events WHERE type='copilot_zestaw'").get() as { payload: string };
+  assert.equal((JSON.parse(e.payload) as { zepsutych: number }).zepsutych, 0);
+});
+
+test("pojedynczy błąd między udanymi sprawami przebiegu nie przerywa", async () => {
+  const { BladOdpowiedziCopilota } = await import("../adapters/copilot.js");
+  for (const nr of [1, 2, 3, 4, 5]) await szkicBiura(rozmowa(nr));
+  let wywolan = 0;
+
+  const p = await Z.przebiegZestawu(db(), sprawy(), opcje(async () => {
+    wywolan += 1;
+    if (wywolan % 2 === 0) throw new BladOdpowiedziCopilota("Model nie oddał szkicu", 200, "", "uciety");
+    return odpowiedz();
+  }));
+
+  assert.deepEqual([wywolan, p.przerwano, p.wyniki.length], [5, null, 5]);
+});
+
+test("nieudane powtórki nie są błędami Copilota w pomiarze biura ani w raporcie tygodnia", async () => {
+  const K = await import("./copilot-klasyfikacja.js");
+  const R = await import("./raport-tygodnia.js");
+  for (const nr of [1, 2, 3]) await szkicBiura(rozmowa(nr));
+  const przed = K.pomiarCopilota(db());
+  assert.deepEqual([przed.wywolan, przed.bledow], [3, 0]);
+
+  /* Wtorek tygodnia, w którym biuro nie pracowało: w raporcie stoją same powtórki. */
+  await Z.przebiegZestawu(db(), sprawy(), opcje(nadawca({ tresc: ZMYSLONY, model: "claude-sonnet-5-5" }),
+    { teraz: () => new Date("2026-09-08T10:00:00Z") }));
+
+  const po = K.pomiarCopilota(db());
+  assert.deepEqual([po.wywolan, po.bledow], [3, 0], "karta pomiaru liczy pracę biura");
+  assert.ok(po.kosztUsd > przed.kosztUsd, "koszt powtórek jest na rachunku");
+  const zestaw = po.wgZadania.find((z) => z.zadanie === Z.ZADANIE_ZESTAWU)!;
+  assert.deepEqual([zestaw.wywolan, zestaw.bledow], [3, 3], "zestaw ma własny wiersz z własnymi liczbami");
+
+  const tydzien = R.zbudujRaport("2026-09-07", db()).copilot;
+  assert.deepEqual([tydzien.wywolan, tydzien.bledow], [0, 0]);
+  assert.ok(tydzien.kosztUsd > 0);
+});
+
+test("czas porównuje się w parach, jak koszt", async () => {
+  const a = rozmowa(1);
+  const b = rozmowa(2);
+  await szkicBiura(a, { ms: 4000 });
+  await S.ulozSzkic(b.id, KTO(), async () => { throw limit(); }, subiekt).catch(() => undefined);
+
+  /* Sprawa bez czasu biura idzie pierwsza i trwa długo. Mediana ze wszystkich
+     nowych czasów dałaby 5000, a para jest tylko jedna. */
+  const czasy = [9000, 1000];
+  const p = Z.podsumujZestaw(await Z.przebiegZestawu(db(), sprawy(),
+    opcje(async () => odpowiedz({ ms: czasy.shift()! }))));
+  assert.deepEqual([p.medianaMsBazowa, p.medianaMsNowa], [4000, 1000]);
 });

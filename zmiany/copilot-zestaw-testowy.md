@@ -12,6 +12,8 @@ Bez `--pusc` polecenie tylko wycenia przebieg i nie woła modelu. Opcja
 `--pary plik.md` zapisuje oba szkice obok siebie do przeczytania.
 
 Powtórka stoi w pomiarze Copilota jako osobne zadanie „zestaw testowy
-szkiców” i nie liczy się do sufitu szkiców z automatu. Sprawy ze zdjęciami
+szkiców” i nie liczy się do sufitu szkiców z automatu. Liczba wywołań
+i błędów na karcie pomiaru oraz w raporcie tygodnia pomija powtórki, a koszt
+je obejmuje. Sprawy ze zdjęciami
 są pomijane, a narzędzie ofert nie pyta Allegro. Zasady danych:
 `docs/obsluga-klienta.md`, rozdział o Copilocie.

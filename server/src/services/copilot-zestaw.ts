@@ -5,11 +5,12 @@ import {
 import { kodBledu, sladPorazki, zapiszWKsiedze } from "./copilot-ksiega.js";
 import { kosztUsd, type Tokeny } from "./copilot-koszt.js";
 import { narzedziaZZapisu, type ZestawNarzedzi } from "./copilot-narzedzia.js";
+import { zostalyDaneOsobowe } from "./copilot-maskowanie.js";
 import {
   bezZnacznikow, faktyZTekstu, ocenTwierdzenia, sitaSzkicu, zRozpoznaniaNiepewne,
   type NadawcaSzkicu, type SzkicSurowy,
 } from "./copilot-szkic.js";
-import { wejsciaSzkicow, type WejscieSzkicu } from "./copilot-wejscie.js";
+import { wejsciaSzkicow, ZADANIA_SZKICU, type WejscieSzkicu } from "./copilot-wejscie.js";
 import { logEvent } from "./events.js";
 import { mediana } from "./raporty.js";
 import { podzielStopke } from "./stopka.js";
@@ -23,6 +24,8 @@ import { podzielStopke } from "./stopka.js";
    TRZY PYTANIA, każde z liczbą, której nie ocenia model:
    1. SITA. Czy nowy szkic przechodzi te same sita co szkic biura. Sito
       odrzuca wymyślony numer, więc „zepsute" jest tu najważniejszym słowem.
+      Oba szkice przesiewa DZISIEJSZY kod. Wynik sit zapisany w dniu szkicu
+      mierzyłby po zmianie sit zmianę sit, a nie modelu.
    2. KOSZT I CZAS. Z tych samych stawek co pomiar biura.
    3. BLISKOŚĆ DO TEGO, CO POSZŁO DO KLIENTA. Udział wspólnych słów szkicu
       i wysłanej odpowiedzi. To miara zgrubna i raport mówi dlaczego.
@@ -87,7 +90,18 @@ export interface SprawaZestawu {
    */
   wyslane: string | null;
   /** Dlaczego sprawy nie da się powtórzyć; `null` = da się. */
-  pominieta: "zdjecia" | null;
+  pominieta: "zdjecia" | "maskowanie" | null;
+}
+
+/** Surowa odpowiedź z zapisu, gdy ma kształt, który czytają sita. */
+function szkicZWyjscia(wyjscie: unknown): SzkicSurowy | null {
+  const w = wyjscie as Partial<SzkicSurowy> | null;
+  if (!w || typeof w.tresc !== "string") return null;
+  const lista = <T>(v: T[] | undefined): T[] => (Array.isArray(v) ? v : []);
+  return {
+    tresc: w.tresc, uzyteFakty: lista(w.uzyteFakty), zastrzezenia: lista(w.zastrzezenia),
+    twierdzenia: lista(w.twierdzenia), odczytZeZdjec: lista(w.odczytZeZdjec),
+  };
 }
 
 const zuzycieZKsiegi = (k: Record<string, unknown> | undefined): Tokeny | null => {
@@ -112,28 +126,37 @@ export function sprawyZestawu(
   const wysylka = database.prepare(`SELECT body, szkic_los FROM outbox
     WHERE conversation_id=? AND status='sent' AND expected_last_message_id=? AND created_at >= ?
     ORDER BY id LIMIT 1`);
-  /* Ostatnia ocena po tym szkicu. Wejście jest ostatnim szkicem tej
-     wiadomości, więc oceny wcześniejszych szkiców odcina sama data. */
+  /* Ostatnia ocena po tym szkicu, a przed następnym szkicem rozmowy, który
+     przeszedł sita. Tylko taki szkic zastępuje poprzedni i kasuje jego ocenę.
+     Dopytanie i szkic odrzucony sitem okna nie zamykają: po nich agent dalej
+     ocenia ten sam tekst. */
+  const zadania = ZADANIA_SZKICU.map((z) => `'${z}'`).join(",");
   const ocena = database.prepare(`SELECT json_extract(payload,'$.ocena') AS ocena FROM events
     WHERE type='copilot_szkic_ocena' AND json_valid(payload)
       AND json_extract(payload,'$.conversationId')=? AND created_at >= ?
       AND created_at < COALESCE((SELECT MIN(x.at) FROM copilot_wejscie x
-                                  WHERE x.conversation_id=? AND x.id > ?), '9999')
+                                  WHERE x.conversation_id=? AND x.id > ?
+                                    AND x.zadanie IN (${zadania}) AND x.wynik_sit='ok'), '9999')
     ORDER BY id DESC LIMIT 1`);
 
   return wejsciaSzkicow(database, o).map((w): SprawaZestawu => {
     const k = w.wywolanieId == null ? undefined
       : ksiega.get(w.wywolanieId) as Record<string, unknown> | undefined;
-    const wyj = w.wyjscie as { tresc?: unknown } | null;
-    const tresc = typeof wyj?.tresc === "string" ? bezZnacznikow(wyj.tresc) : null;
-    const stan: StanSzkicu = w.wynikSit === "ok" ? { stan: "ok" }
-      : w.wynikSit ? { stan: "sito", kod: w.wynikSit }
-        : { stan: "blad", kod: String(k?.kod_bledu ?? "inny") };
+    const surowy = szkicZWyjscia(w.wyjscie);
+    const sito = surowy ? sitaSzkicu(surowy, {
+      fakty: faktyZTekstu(String(w.fakty)), material: `${w.fakty}\n${w.watek}`,
+      wyslaneZdjecia: new Set(w.zdjecia.map((z) => z.numer)), wynikiN: w.wynikiNarzedzi,
+    }) : null;
+    const tresc = !surowy || !sito ? null : sito.ok ? sito.tresc : bezZnacznikow(surowy.tresc);
+    const stan: StanSzkicu = !sito ? { stan: "blad", kod: String(k?.kod_bledu ?? "inny") }
+      : sito.ok ? { stan: "ok" } : { stan: "sito", kod: sito.kod };
 
     const wys = w.conversationId == null || w.messageId == null ? undefined
       : wysylka.get(w.conversationId, w.messageId, w.at) as
         { body: string; szkic_los: string | null } | undefined;
-    const oc = w.conversationId == null ? undefined
+    /* Ocena dotyczy szkicu przy rozmowie. Wejście odrzucone sitem szkicu nie
+       zostawiło, więc ocena w jego oknie należy do starszego tekstu. */
+    const oc = w.conversationId == null || w.wynikSit !== "ok" ? undefined
       : ocena.get(w.conversationId, w.at, w.conversationId, w.id) as { ocena: string | null } | undefined;
     const los: LosSzkicu = oc?.ocena === "odrzucony" ? "odrzucony"
       : wys?.szkic_los === "bez_zmian" ? "bez_zmian"
@@ -149,7 +172,10 @@ export function sprawyZestawu(
       kategoria: k?.kategoria == null ? null : String(k.kategoria),
       los,
       wyslane: wys ? podzielStopke(wys.body).tresc.trim() : null,
-      pominieta: w.zdjecia.length > 0 ? "zdjecia" : null,
+      /* Ta sama asercja co przed szkicem biura. Wejście wyszło już raz, ale
+         leży do 90 dni, a wzorce maskowania przez ten czas się poprawiają. */
+      pominieta: w.zdjecia.length > 0 ? "zdjecia"
+        : zostalyDaneOsobowe(String(w.watek)) ? "maskowanie" : null,
     };
   });
 }
@@ -215,7 +241,7 @@ export interface Przebieg {
   wyniki: WynikSprawy[];
   pominiete: SprawaZestawu[];
   /** Powód przerwania przed końcem; pozostałe sprawy nie poszły. */
-  przerwano: "limit" | "klucz" | "przeciazenie" | "lacznosc" | null;
+  przerwano: "limit" | "klucz" | "przeciazenie" | "lacznosc" | "seria_bledow" | null;
   niepuszczonych: number;
 }
 
@@ -226,8 +252,11 @@ export interface Przebieg {
  * Każde wywołanie zostawia wiersz w księdze, także nieudane: za powtórkę
  * też się płaci i koszt pomiaru ma to pokazać. Limit, przeciążenie, brak
  * łączności i brak klucza przerywają przebieg, bo następna sprawa skończyłaby
- * się tak samo.
+ * się tak samo. Przerywa też seria błędów dostawcy z rzędu: literówka
+ * w nazwie modelu odrzuca każde żądanie, a księga nie ma retencji.
  */
+export const SERIA_BLEDOW = 3;
+
 export async function przebiegZestawu(
   database: DatabaseSync, sprawy: readonly SprawaZestawu[], o: OpcjePrzebiegu,
 ): Promise<Przebieg> {
@@ -235,6 +264,7 @@ export async function przebiegZestawu(
   const pominiete = sprawy.filter((s) => s.pominieta);
   const wyniki: WynikSprawy[] = [];
   let przerwano: Przebieg["przerwano"] = null;
+  let bledowZRzedu = 0;
 
   for (const sprawa of doPuszczenia) {
     const w = sprawa.wejscie;
@@ -271,6 +301,7 @@ export async function przebiegZestawu(
         });
       }
       const tresc = sito.ok ? sito.tresc : bezZnacznikow(odp.tresc);
+      bledowZRzedu = 0;
       wyniki.push({
         sprawa, nowy: sito.ok ? { stan: "ok" } : { stan: "sito", kod: sito.kod },
         surowy: {
@@ -299,6 +330,8 @@ export async function przebiegZestawu(
       if (e instanceof BladKluczaCopilota) przerwano = "klucz";
       if (e instanceof BladPrzeciazeniaCopilota) przerwano = "przeciazenie";
       if (e instanceof BladLacznosciCopilota) przerwano = "lacznosc";
+      bledowZRzedu += 1;
+      if (!przerwano && bledowZRzedu >= SERIA_BLEDOW) przerwano = "seria_bledow";
     }
     o.postep?.(wyniki.length, doPuszczenia.length);
     if (przerwano) break;
@@ -312,7 +345,7 @@ export async function przebiegZestawu(
   logEvent("copilot_zestaw", "system", null, {
     spraw: wyniki.length, pominietych: pominiete.length, przerwano,
     ok: p.nowy.ok, naprawionych: p.naprawione.length, zepsutych: p.zepsute.length,
-    model: o.model, usd: p.usdNowy,
+    model: o.model, usd: p.usdPrzebiegu,
   }, null, database);
   return przebieg;
 }
@@ -322,10 +355,16 @@ export interface Podsumowanie {
   pominietych: number;
   bazowy: { ok: number; odpadlo: Record<string, number> };
   nowy: { ok: number; odpadlo: Record<string, number> };
-  /** Wejścia, gdzie szkic biura nie przeszedł, a nowy przechodzi. */
+  /** Wejścia, gdzie szkic biura odpadł na sicie, a nowy przechodzi. */
   naprawione: number[];
-  /** Wejścia, gdzie szkic biura przeszedł, a nowy nie. */
+  /**
+   * Wejścia, gdzie szkic biura przeszedł, a nowy odpada na sicie. Błąd
+   * dostawcy tu nie wchodzi: limit albo zła nazwa modelu nic nie mówią
+   * o tym, co model napisałby klientowi.
+   */
   zepsute: number[];
+  /** Ile kosztował cały przebieg, razem ze sprawami bez rachunku biura. */
+  usdPrzebiegu: number;
   usdBazowy: number;
   usdNowy: number;
   /** Ile spraw ma rachunek po obu stronach; koszt porównujemy tylko na nich. */
@@ -352,22 +391,25 @@ export function podsumujZestaw(p: Przebieg): Podsumowanie {
   const zRachunkiem = p.wyniki.filter((w) => w.zuzycie && w.sprawa.bazowy.zuzycie);
   const usd = (l: Array<{ model: string; zuzycie: Tokeny | null }>) =>
     Number(l.reduce((s, x) => s + (x.zuzycie ? kosztUsd(x.model, x.zuzycie) : 0), 0).toFixed(6));
-  const ms = (l: Array<number | null>) => mediana(l.filter((x): x is number => x !== null));
+  /* Czas w parach, jak koszt: mediana z innych spraw po każdej stronie
+     porównywałaby sprawy, nie warianty. */
+  const zCzasem = p.wyniki.filter((w) => w.ms !== null && w.sprawa.bazowy.ms !== null);
 
   return {
     spraw: p.wyniki.length,
     pominietych: p.pominiete.length,
     bazowy: zlicz(p.wyniki.map((w) => w.sprawa.bazowy)),
     nowy: zlicz(p.wyniki.map((w) => w.nowy)),
-    naprawione: p.wyniki.filter((w) => w.sprawa.bazowy.stan !== "ok" && w.nowy.stan === "ok")
+    naprawione: p.wyniki.filter((w) => w.sprawa.bazowy.stan === "sito" && w.nowy.stan === "ok")
       .map((w) => w.sprawa.wejscie.id),
-    zepsute: p.wyniki.filter((w) => w.sprawa.bazowy.stan === "ok" && w.nowy.stan !== "ok")
+    zepsute: p.wyniki.filter((w) => w.sprawa.bazowy.stan === "ok" && w.nowy.stan === "sito")
       .map((w) => w.sprawa.wejscie.id),
+    usdPrzebiegu: usd(p.wyniki),
     usdBazowy: usd(zRachunkiem.map((w) => w.sprawa.bazowy)),
     usdNowy: usd(zRachunkiem),
     zRachunkiem: zRachunkiem.length,
-    medianaMsBazowa: ms(p.wyniki.map((w) => w.sprawa.bazowy.ms)),
-    medianaMsNowa: ms(p.wyniki.map((w) => w.ms)),
+    medianaMsBazowa: mediana(zCzasem.map((w) => w.sprawa.bazowy.ms!)),
+    medianaMsNowa: mediana(zCzasem.map((w) => w.ms!)),
     bliskosc: LOSY.map((los) => {
       /* Para: oba szkice mają treść i jest z czym je porównać. Średnia
          z różnych spraw po każdej stronie porównywałaby sprawy, nie szkice. */
@@ -400,6 +442,13 @@ export function wycenaZestawu(sprawy: readonly SprawaZestawu[], model: string): 
   };
 }
 
+/** Zdanie o sprawach, które nie poszły do modelu, z powodem każdej grupy. */
+export function opisPominietych(pominiete: readonly SprawaZestawu[]): string {
+  const ile = (powod: SprawaZestawu["pominieta"]) => pominiete.filter((s) => s.pominieta === powod).length;
+  return `Pominiętych, bo mają zdjęcia: ${ile("zdjecia")}.`
+    + (ile("maskowanie") ? ` Pominiętych, bo wątek nie przechodzi dzisiejszej kontroli maskowania: ${ile("maskowanie")}.` : "");
+}
+
 const proc = (x: number | null): string => (x === null ? "—" : `${Math.round(x * 100)}%`);
 const sek = (ms: number | null): string => (ms === null ? "—" : `${(ms / 1000).toFixed(1).replace(".", ",")} s`);
 const dol = (x: number): string => `${x.toFixed(4).replace(".", ",")} USD`;
@@ -422,7 +471,7 @@ export function raportZestawu(p: Przebieg, o: { model: string; wersja: string; o
     "# Zestaw testowy Copilota",
     "",
     `Model powtórki: ${o.model}. Instrukcja: ${o.wersja}.${o.od ? ` Sprawy od ${o.od}.` : ""}`,
-    `Spraw puszczonych: ${s.spraw}. Pominiętych, bo mają zdjęcia: ${s.pominietych}.`,
+    `Spraw puszczonych: ${s.spraw}. ${opisPominietych(p.pominiete)}`,
   ];
   if (p.przerwano) {
     linie.push("", `**Przebieg przerwany (${p.przerwano}).** Nie poszło spraw: ${p.niepuszczonych}.`);
@@ -434,9 +483,11 @@ export function raportZestawu(p: Przebieg, o: { model: string; wersja: string; o
       ["szkic nowy", String(s.nowy.ok), odpadlo(s.nowy.odpadlo)],
     ]),
     "",
-    `Naprawione (zapisany odpadł, nowy przechodzi): ${s.naprawione.length}`
+    "Oba szkice przesiewa dzisiejszy kod. Błąd dostawcy stoi w tabeli jako „blad” i nie jest zepsuciem.",
+    "",
+    `Naprawione (zapisany odpadł na sicie, nowy przechodzi): ${s.naprawione.length}`
       + (s.naprawione.length ? ` — wejścia ${s.naprawione.join(", ")}` : ""),
-    `Zepsute (zapisany przeszedł, nowy odpada): ${s.zepsute.length}`
+    `Zepsute (zapisany przeszedł, nowy odpada na sicie): ${s.zepsute.length}`
       + (s.zepsute.length ? ` — wejścia ${s.zepsute.join(", ")}` : ""),
     "", "## Koszt i czas", "",
     tabela(["", `koszt (spraw z rachunkiem po obu stronach: ${s.zRachunkiem})`, "mediana czasu"], [
@@ -444,6 +495,7 @@ export function raportZestawu(p: Przebieg, o: { model: string; wersja: string; o
       ["szkic nowy", dol(s.usdNowy), sek(s.medianaMsNowa)],
     ]),
     "",
+    `Cały przebieg kosztował ${dol(s.usdPrzebiegu)}.`,
     "Powtórka bierze wyniki narzędzi z zapisu i nie pobiera zdjęć, więc jej czas bywa krótszy niż w biurze.",
     "", "## Bliskość do odpowiedzi wysłanej klientowi", "",
   );
