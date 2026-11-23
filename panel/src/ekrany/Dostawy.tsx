@@ -110,7 +110,7 @@ export function Dostawy() {
      stoi „wczytuję" albo błąd, kursor nie ma po czym chodzić: klawisz nie
      może otworzyć wiersza, którego człowiek nie widzi. */
   const bezListy = lista.isLoading || Boolean(lista.error && !lista.data)
-    || (kubelek === "archiwum" && archiwum.isLoading);
+    || (kubelek === "poza" && !poza.data) || (kubelek === "archiwum" && !archiwum.data);
   const pozaWidoczne = (poza.data?.documents ?? []).filter((d) => pasuje(d.nrPelny, d.dostawca));
   const archiwumWidoczne = archiwum.data?.documents ?? [];
   const kubelekWidoczny = kubelek === "poza" || kubelek === "archiwum" ? []
@@ -181,12 +181,15 @@ export function Dostawy() {
      gdy lista jest znana — dalej kubełek należy do człowieka. */
   const kubelekZLinku = useRef(false);
   useEffect(() => {
-    if (kubelekZLinku.current || parametry.get("kubelek") || !lista.data || !poza.data) return;
+    /* Czekamy, aż lista zdjętych się ROZSTRZYGNIE, nie aż się uda. Gdy padnie,
+       dokument z okna importu dalej da się rozpoznać, a czekanie na dane,
+       które nie przyjdą, zostawiłoby go obok cudzej listy. */
+    if (kubelekZLinku.current || parametry.get("kubelek") || !lista.data || (!poza.data && !poza.error)) return;
     kubelekZLinku.current = true;
     const k = kubelekWybranego();
     if (k) setKubelek(k);
-    // zależności celowo tylko dwie: efekt ma zadziałać raz, gdy obie listy są znane
-  }, [lista.data, poza.data]);
+    // zależności celowo tylko te: efekt ma zadziałać raz, gdy obie listy są rozstrzygnięte
+  }, [lista.data, poza.data, poza.error]);
 
   const rozwiaz = useRozwiazWyjatek();
   const notatka = useNotatkaDoHali();
@@ -209,18 +212,28 @@ export function Dostawy() {
     },
   };
 
+  const zrodloListy = kubelek === "poza" ? poza : kubelek === "archiwum" ? archiwum : lista;
+
   const lewa = (() => {
     if (lista.isLoading) return <Pusto waga="lista">Wczytuję dostawy…</Pusto>;
     /* Błąd BEZ danych zamiast listy: „nic nie czeka na biuro" przy zerwanym
        połączeniu brzmiałoby jak koniec pracy. */
     if (lista.error && !lista.data) return <Blad>{(lista.error as Error).message}</Blad>;
+    /* KAŻDY KUBEŁEK MA WŁASNE ŹRÓDŁO I WŁASNY BŁĄD. Zdjęte dostawy i archiwum
+       przychodzą osobnymi zapytaniami, więc udana lista dostaw nic o nich nie
+       mówi. „Nic nie zdjęto" przy zerwanym zapytaniu ukryłoby pomyłkowe
+       zdjęcie dostawy, a po to ten kubełek jest. */
     if (kubelek === "poza") {
+      if (poza.isLoading) return <Pusto waga="lista">Wczytuję zdjęte dostawy…</Pusto>;
+      if (!poza.data) return <Blad>{(poza.error as Error | null)?.message ?? "Nie udało się wczytać zdjętych dostaw."}</Blad>;
       return <KolejkaPozaWertis wybrany={dokId} onWybierz={idz} lista={pozaWidoczne} />;
     }
     if (kubelek === "archiwum") {
       /* Archiwum przychodzi z serwera już zawężone — filtrowanie go jeszcze
          raz zawężałoby stronę wyników, a nie zbiór. */
       if (archiwum.isLoading) return <Pusto waga="lista">Wczytuję archiwum…</Pusto>;
+      /* „Archiwum jest puste" bez danych to orzeczenie, że faktury nie ma. */
+      if (!archiwum.data) return <Blad>{(archiwum.error as Error | null)?.message ?? "Nie udało się wczytać archiwum."}</Blad>;
       return <KolejkaDostaw dokumenty={archiwumWidoczne} zOdpowiedzia={zOdpowiedzia}
         wybrany={dokId} onWybierz={idz}
         pusto={frazaArchiwum ? "Nic w archiwum nie pasuje do wyszukiwania."
@@ -242,8 +255,10 @@ export function Dostawy() {
   /* „Poza WERTIS" nie ma okna importu: serwer oddaje każdą zdjętą dostawę,
      także sprzed miesięcy, więc zdanie o czternastu dniach mówiłoby
      nieprawdę o granicy listy. */
+  /* Bez danych stopka milczy: „0 zdjętych" przy zerwanym zapytaniu byłoby
+     liczbą, której nikt nie policzył. */
   const stopka = kubelek === "poza"
-    ? `${ile(poza.data?.documents.length ?? 0, "zdjęta", "zdjęte", "zdjętych")} z listy — bez granicy okna importu`
+    ? poza.data && `${ile(poza.data.documents.length, "zdjęta", "zdjęte", "zdjętych")} z listy — bez granicy okna importu`
     : kubelek === "archiwum"
     ? archiwum.data && (archiwum.data.ile > archiwum.data.documents.length
         ? `pokazano ${archiwum.data.documents.length} z ${archiwum.data.ile} — zawęź wyszukiwaniem`
@@ -279,8 +294,10 @@ export function Dostawy() {
         </>}>
         {lewa}
         {/* Pod listą tylko błąd odświeżenia, gdy dane zostały; bez danych
-            błąd stoi zamiast listy. */}
-        <Blad>{lista.error && lista.data ? (lista.error as Error).message : ""}</Blad>
+            błąd stoi zamiast listy. Mówi o źródle listy, którą widać: po
+            przywróceniu dostawy nieodświeżona lista zdjętych dalej by ją
+            pokazywała. */}
+        <Blad>{zrodloListy.error && zrodloListy.data ? (zrodloListy.error as Error).message : ""}</Blad>
       </KolumnaKolejki>
 
       <SrodekIDowody>
