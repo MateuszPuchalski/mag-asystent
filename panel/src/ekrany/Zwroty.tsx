@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { Undo2 } from "lucide-react";
-import { useDociagnijPoSkanie, useSkanZwrotu, useSynchronizujZwroty, useZwroty, useSprawdzWszystkiePlatnosci, type WynikSkanu, type WynikSprawdzeniaWszystkich } from "../api/zwroty";
+import { useDociagnijPoSkanie, useSkanZwrotu, useSynchronizujZwroty, useZwroty, useSprawdzWszystkiePlatnosci, type WynikSkanu } from "../api/zwroty";
 import { Konflikt } from "../api/klient";
 import type { BilansKartotek, Kubelek, Ocena, StanZwrotow, WynikDosylki, Zwrot } from "../api/typy";
 import { Decyzje } from "../zwroty/Decyzje";
@@ -442,9 +442,9 @@ export function Zwroty() {
   const synchronizuj = useSynchronizujZwroty();
   /* Wynik hurtowego sprawdzenia żyje TU, nie w pasku szukania: przełączenie
      kubełka nie może go zgasić, bo agent czyta go, przeglądając kolejkę. */
+  /* Wynik i błąd czyta się wprost z mutacji: żyje w ekranie, więc przeżywa
+     zmianę kubełka, a ponowny klik sam czyści poprzedni wynik. */
   const sprawdzWszystkie = useSprawdzWszystkiePlatnosci();
-  const [wynikWszystkich, setWynikWszystkich] = useState<WynikSprawdzeniaWszystkich | null>(null);
-  const [bladWszystkich, setBladWszystkich] = useState("");
   const przelew = useZapiszPrzelew();
   const cofnijPrzelew = useCofnijPrzelew();
   const zamknijRecznie = useZamknijRecznie();
@@ -935,7 +935,7 @@ export function Zwroty() {
     { wPolach: true },
   );
 
-  /* Zapytanie padło i nie ma danych: błąd zamiast listy, a kafle bez liczb.
+  /* Zapytanie padło i nie ma danych: błąd zamiast listy, a kubełki bez liczb.
      Pusta lista albo „0” przy awarii czytałyby się jako „nic nie czeka”.
      Nieudane odświeżenie przy danych w pamięci nie zdejmuje ekranu, bo
      serwer znika przy każdej aktualizacji, a operator jest w środku zwrotu. */
@@ -1015,14 +1015,7 @@ export function Zwroty() {
       akcje={<>
         <PasekPorzadku porzadek={porzadek} dozwolone={["termin", "otwarto", "kwota"]}
           onZmien={ustawPorzadek} />
-        <PrzyciskSprawdzenia trwa={sprawdzWszystkie.isPending}
-          onSprawdz={() => {
-            setWynikWszystkich(null); setBladWszystkich("");
-            sprawdzWszystkie.mutate(undefined, {
-              onSuccess: (w) => setWynikWszystkich(w),
-              onError: (e) => setBladWszystkich((e as Error).message),
-            });
-          }} />
+        <PrzyciskSprawdzenia trwa={sprawdzWszystkie.isPending} onSprawdz={() => sprawdzWszystkie.mutate()} />
       {/* `sita={false}`: sita „Niczyje" tu nie ma, więc pomoc nie obiecuje
           klawisza `n`. */}
       <SkrotyKlawiszy zMoje={false} sita={false} kubelkow={KUBELKI.length}
@@ -1072,8 +1065,9 @@ export function Zwroty() {
         onSzukaj={(v) => { kodZCzytnika.current = ""; szukaj(v); }}
         onSkan={(v) => { void naSkan(v); }}
         towar={skanTowaru}
-        pod={<WynikSprawdzenia blad={bladWszystkich} wynik={wynikWszystkich}
-          onZamknij={() => { setWynikWszystkich(null); setBladWszystkich(""); }} />}
+        pod={<WynikSprawdzenia wynik={sprawdzWszystkie.data ?? null}
+          blad={sprawdzWszystkie.error ? (sprawdzWszystkie.error as Error).message : ""}
+          onZamknij={sprawdzWszystkie.reset} />}
         onDociagnij={(v) => dociagnij.mutate(v, {
           onSuccess: przyjmij, onError: (e) => setBladSkanu((e as Error).message) })}
         onWybierz={(x) => { setWynikSkanu(null); nawiguj(`/obsluga/zwroty/${x}`); }}

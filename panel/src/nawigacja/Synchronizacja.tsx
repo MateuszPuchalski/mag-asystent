@@ -1,6 +1,7 @@
 import { useZdrowie } from "../api/rozmowy";
 import type { Zdrowie } from "../api/typy";
 import { godzina } from "../ui";
+import { podpisPaska } from "./wierszPaska";
 
 /* ── Stan synchronizacji w nagłówku ──────────────────────────────────────────
    Stoi w NAGŁÓWKU, a nie w skrzynce: agent ma go widzieć z każdej zakładki.
@@ -47,7 +48,7 @@ export function WskaznikSynchronizacji({ zwiniety = false }: { zwiniety?: boolea
       <span className={`h-2 w-2 shrink-0 rounded-full ${
         zle ? "bg-red-400" : nigdy ? "bg-slate-500" : "bg-emerald-400"}`} />
       {nigdy
-        ? <span className={zwiniety ? "sr-only" : "max-[1279px]:sr-only"}>{zdanie}</span>
+        ? <span className={podpisPaska(zwiniety)}>{zdanie}</span>
         : godzina(i.ostatniaUdanaSynchronizacja)}</>}
   </span>;
 }

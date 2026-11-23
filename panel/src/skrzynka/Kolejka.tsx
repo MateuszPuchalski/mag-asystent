@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from "react";
 import {
-  AlarmClock, AlertTriangle, Bell, BellOff, Eye, Inbox, Lock, MessageSquare, RefreshCw, Ruler, Search, UserCheck, X,
+  AlarmClock, AlertTriangle, Bell, BellOff, Eye, Inbox, Lock, MessageSquare, RefreshCw, Ruler, Search, UserCheck,
 } from "lucide-react";
 import type {
   Rozmowa, StanCopilota, StanSkrzynki, StatusRozmowy, WynikPartii,
