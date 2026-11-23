@@ -122,7 +122,9 @@ export function Dostawy() {
        ...kubelekWidoczny.map((d) => ({ id: d.dokId }))];
   /* Po zamknięciu ostatniego wyjątku faktura schodzi z DO DECYZJI, a `j` ma
      otworzyć tę, która stanęła na jej miejscu. Powód przy `nawigacja/kursor.ts`. */
-  const kursor = useKursorListy(widoczne, wybrany, (w) => idz(w.id));
+  /* Nazwa listy dla kursora: dokument zostaje otwarty przy zmianie frazy,
+     a miejsce zapamiętane przed odsianiem nic nie mówi o liście po nim. */
+  const kursor = useKursorListy(widoczne, wybrany, (w) => idz(w.id), `${kubelek} ${q}`);
   /* BEZ OTWARTEJ SPRAWY KLAWISZ OTWIERA PIERWSZY WIERSZ. Kursor pamięta
      ostatnie miejsce po to, żeby przeżyć zejście sprawy z listy. Po zmianie
      kubełka sprawy nie ma wcale, a pamięć z poprzedniej listy otwierałaby
