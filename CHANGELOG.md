@@ -10,6 +10,16 @@ z wersją monorepo" — i właśnie tak przestał być zgodny: `0.3.0` przetrwa�
 sześć zmergowanych zmian, w tym takie, które wymagały nowego uprawnienia SQL.
 Komentarz nie jest mechanizmem.
 
+## 0.623.0 — 23 listopada 2026
+
+**Obowiązkowy pomiar przy dostawie da się wyłączyć.** W Ustawieniach, w grupie
+„Magazyny i dokumenty", stoi przełącznik „Pomiar przy rozkładaniu dostawy".
+Wyłączony sprawia, że kolektor nie zatrzymuje odłożenia towaru bez wagi
+i wymiarów. Lista „Do zmierzenia" i pomiar z karty towaru działają dalej.
+Domyślnie pomiar zostaje obowiązkowy, więc po aktualizacji nic się nie zmienia.
+Kolektor słucha przełącznika od nowej wersji aplikacji; starsza wymusza pomiar
+jak dotąd.
+
 ## 0.622.0 — 20 listopada 2026
 
 **Problem w dostawie krzyczy w biurze.** Gdy hala zgłosi wyjątek w dostawie,
