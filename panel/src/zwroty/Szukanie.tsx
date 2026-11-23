@@ -222,7 +222,9 @@ export function Szukanie({
       </div>
     : null;
 
-  return <div className="shrink-0 border-b border-slate-200 p-2">
+  /* Bez własnej ramki: pasmo z kreską i odstępem daje `KolumnaKolejki`,
+     a druga kreska pod pierwszą rysowała w zwrotach podwójną linię. */
+  return <div>
     <div className="flex items-center gap-2">
       <ScanLine size={16} className="shrink-0 text-slate-400" />
       <div className="relative flex min-w-0 flex-1 items-center">

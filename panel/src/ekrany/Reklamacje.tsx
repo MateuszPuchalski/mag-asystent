@@ -60,7 +60,6 @@ const UKLAD = "flex flex-wrap items-start gap-4 "
   + "xl:grid xl:min-h-0 xl:flex-1 xl:grid-cols-[21rem_minmax(0,1fr)_22rem] "
   + "xl:grid-rows-[minmax(0,1fr)] xl:items-stretch 2xl:grid-cols-[25rem_minmax(0,1fr)_28rem]";
 const KOLUMNA = "min-w-0 xl:min-h-0";
-const KARTA = "rounded-xl border border-slate-200 bg-white shadow-sm";
 
 /** Osie porządku tej kolejki; pierwsza jest domyślna. */
 const OSIE: OsPorzadku[] = ["termin", "otwarto", "ruch", "kwota"];
@@ -284,7 +283,7 @@ export function Reklamacje() {
       {bezDanych ? null : d && r
         ? <>
           <section aria-label={`Reklamacja ${r.numer ?? r.externalId}`}
-            className={`${KOLUMNA} ${KARTA} flex flex-[999_1_560px] flex-col xl:overflow-y-auto`}>
+            className={`${KOLUMNA} card flex flex-[999_1_560px] flex-col xl:overflow-y-auto`}>
             <Glowica szczegol={d} mojeId={mojeId} trwa={prowadze.isPending} blad={blad("prowadze")}
               onProwadze={() => prowadze.mutate({ id: r.id, wersja: r.wersja }, zBledem("prowadze"))}
               onOdswiez={() => odswiez.mutate({ id: r.id })} odswieza={odswiez.isPending} />
