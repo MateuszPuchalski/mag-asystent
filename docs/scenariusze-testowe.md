@@ -828,7 +828,9 @@ Otwórz ją i zacznij pisać. W tym czasie niech w wątku
 `scenariusz-watek-dopisek` przybędzie wiadomość klienta. Przyniesie ją
 synchronizacja skrzynki.
 
-Kliknij wysyłkę. Serwer ma odpowiedzieć 409 ze zdaniem „Klient dopisał
+Ekran ma pokazać pasek „Klient dopisał nową wiadomość" i nie wysłać
+odpowiedzi po cichu. To pierwsza zapora. Druga stoi na serwerze: wysyłka
+z numerem starej wiadomości dostaje 409 ze zdaniem „Klient dopisał
 wiadomość" i treścią dopisku. Na osi nie przybywa odpowiedź biura. Wysłać da
 się dopiero po jawnym zatwierdzeniu.
 
@@ -854,8 +856,8 @@ pieniądze nie wyjdą. Sama kwota bez korekty stałaby w „Do korekty".
 Kwota to 125,41 zł: dwie sztuki po 49,96 zł, jedna za 12,50 zł i dostawa
 12,99 zł. Oś zwrotu pokazuje wszystkie ruchy biura z podpisem.
 
-Kliknij **Oddaj pieniądze**. Ekran ma zapytać o potwierdzenie z kwotą, zanim
-cokolwiek wyśle. Po udanej wypłacie zwrot przechodzi do „Zamkniętych".
+Kliknij **Oddaj pieniądze**. Ekran nie pyta o potwierdzenie: jedno kliknięcie
+wysyła polecenie wypłaty. Po udanej wypłacie zwrot przechodzi do „Zamkniętych".
 
 Kwoty nie ma w żądaniu panelu. Serwer wysyła tę, którą sam policzył
 z zaznaczenia.

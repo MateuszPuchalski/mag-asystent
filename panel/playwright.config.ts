@@ -12,6 +12,9 @@ import { PORT_DYMU, PORT_PANELU, URL_API, URL_DYMU, URL_PANELU } from "./e2e/sro
    świeżo zasianej bazie (`e2e/serwer-api.mjs`). Powód: każde zielone
    scalenie samo trafia do magazynu, a jsdom nie przechodzi drogi od
    logowania przez kolejkę do zapisu na serwerze.
+   Za Allegro stoi lokalny, udawany serwer (`e2e/udawane-allegro.mjs`), z którym
+   rozmawia prawdziwy klient HTTP naszego serwera. Startuje i kończy razem ze
+   skryptem serwera API, bo składa odpowiedzi z tego, co zasiał seed.
 
    Każdy projekt ma własny panel na własnym porcie, a żaden nie pożycza
    serwera, który już chodzi (`reuseExistingServer: false`). Pożyczony

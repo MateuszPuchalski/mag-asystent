@@ -1,5 +1,5 @@
 import { expect, type APIRequestContext, type Page } from "@playwright/test";
-import { HASLO, URL_API } from "./srodowisko";
+import { HASLO, TOKEN, URL_ALLEGRO, URL_API } from "./srodowisko";
 
 /* Wejście FORMULARZEM, nie tokenem wsadzonym do przeglądarki. Logowanie jest
    pierwszym krokiem każdej drogi biura, a token wstawiony z boku ominąłby
@@ -59,4 +59,58 @@ export function zapisJako(request: APIRequestContext, token: string | null, scie
     headers: token ? { "x-session": token } : {},
     data: cialo,
   });
+}
+
+/** Jedno żądanie, które nasz serwer wysłał do udawanego Allegro. */
+export interface WpisAllegro {
+  metoda: string;
+  sciezka: string;
+  accept: string;
+  contentType: string | null;
+  autoryzacja: boolean;
+  cialo: Record<string, unknown> | null;
+  kod: number;
+  /** Odpowiedź 2xx. Reszta to odmowy, także te z negocjacji wersji zasobu. */
+  przyjete: boolean;
+  odpowiedz: Record<string, unknown> | null;
+}
+
+/**
+ * Żądania, które doszły do udawanego Allegro pod daną ścieżką.
+ *
+ * Zwraca WSZYSTKIE, przyjęte i odrzucone. Test rozdziela je sam, bo oba
+ * pytania są ważne: „czy wyszło dokładnie jedno przyjęte” mówi o skutku,
+ * a „czy wyszło cokolwiek” o tym, czy droga ochronna naprawdę nic nie wysłała.
+ */
+export async function zadaniaDoAllegro(request: APIRequestContext, metoda: string, sciezka: string | RegExp) {
+  const odp = await request.get(`${URL_ALLEGRO}/__e2e/dziennik`);
+  expect(odp.ok(), "dziennik udawanego Allegro").toBe(true);
+  const dziennik = await odp.json() as WpisAllegro[];
+  return dziennik.filter((w) => w.metoda === metoda
+    && (typeof sciezka === "string" ? w.sciezka === sciezka : sciezka.test(w.sciezka)));
+}
+
+/* Odczyt wprost z API jako biuro. Służy asercjom o stanie, którego ekran nie
+   nazywa jednym słowem: numerowi zwrotu płatności, wersji sprawy, statusowi
+   wysyłki. Nie zastępuje patrzenia na ekran, tylko je uzupełnia. */
+export async function odczytJakoBiuro<T>(request: APIRequestContext, sciezka: string): Promise<T> {
+  const odp = await request.get(`${URL_API}${sciezka}`, { headers: { "x-session": TOKEN.biuro } });
+  expect(odp.ok(), `odczyt ${sciezka}`).toBe(true);
+  return await odp.json() as T;
+}
+
+/** Numer sprawy z adresu ekranu: `/obsluga/zwroty/7` daje 7. */
+export function numerZAdresu(page: Page): number {
+  const numer = Number(new URL(page.url()).pathname.split("/").pop());
+  expect(Number.isInteger(numer), `adres ${page.url()} kończy się numerem sprawy`).toBe(true);
+  return numer;
+}
+
+/** Wybiera kubełek z listy „Więcej kubełków” po początku jego nazwy. */
+export async function wybierzKubelek(page: Page, nazwa: string) {
+  const lista = page.getByRole("combobox", { name: "Więcej kubełków" });
+  /* Opcja niesie też licznik („Oczekujące · 1”), a ten zmienia się z każdą
+     sprawą. Wybór po wartości odczytanej z opcji nie zależy od liczby. */
+  const wartosc = await lista.locator("option", { hasText: nazwa }).getAttribute("value");
+  await lista.selectOption(wartosc ?? "");
 }

@@ -11,10 +11,14 @@ import path from "node:path";
    z wczoraj. Własny port razem z `reuseExistingServer: false` daje pewność,
    że przebieg widzi wyłącznie serwer, który sam postawił.                   */
 export const PORT_API = 3187;
+export const PORT_ALLEGRO = 3188;
 export const PORT_PANELU = 5187;
 export const PORT_DYMU = 5186;
 
 export const URL_API = `http://127.0.0.1:${PORT_API}`;
+/* Udawane Allegro z `udawane-allegro.mjs`. Testy pytają je wyłącznie o dziennik
+   żądań i każą mu dopisać wiadomość klienta. Z Allegro rozmawia nasz serwer. */
+export const URL_ALLEGRO = `http://127.0.0.1:${PORT_ALLEGRO}`;
 export const URL_PANELU = `http://127.0.0.1:${PORT_PANELU}`;
 export const URL_DYMU = `http://127.0.0.1:${PORT_DYMU}`;
 
@@ -40,4 +44,19 @@ export const TOKEN = {
   biuro: "scenariusz-biuro",
   admin: "scenariusz-admin",
   magazynier: "scenariusz-jan",
+} as const;
+
+/* Uchwyty spraw obsługi klienta z seeda scenariuszy (`SPRAWY_OBSLUGI`
+   w `server/src/db/seed-scenariusze.ts`, opis w `docs/scenariusze-testowe.md`).
+   Sprawy szuka się po loginie albo numerze, nigdy po numerze wiersza: ten
+   zależy od kolejności wstawiania w seedzie. */
+export const SPRAWA = {
+  rozmowaWolna: { login: "klient.testowy", watek: "scenariusz-watek-pytanie" },
+  rozmowaDopisek: { login: "klient.dopisujacy", watek: "scenariusz-watek-dopisek" },
+  zwrotDoDecyzji: { numer: "SCEN-1/ZWROT", login: "klient.zwrot.decyzja" },
+  zwrotDoWyplaty: {
+    numer: "SCEN-2/ZWROT", login: "klient.zwrot.wyplata",
+    platnosc: "scenariusz-platnosc-wyplata", zamowienie: "scenariusz-zam-zwrot-wyplata",
+  },
+  reklamacja: { numer: "SCEN-1/REKLAMACJA", login: "klient.reklamacja", sprawa: "scenariusz-reklamacja" },
 } as const;

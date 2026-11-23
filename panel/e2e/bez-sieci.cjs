@@ -3,19 +3,21 @@
    Przepuszcza połączenia wyłącznie na własną maszynę. Każde inne kończy się
    błędem połączenia i wierszem w dzienniku odmów.
 
-   PO CO, skoro tryb `seeded` i tak nie ma sparowanego konta. Bo tę pewność
-   daje dziś zbieg okoliczności, a nie bramka: wysyłka odpowiedzi, zwrot
-   pieniędzy i werdykt wołają prawdziwego klienta HTTP Allegro w każdym trybie
-   i zatrzymuje je dopiero brak tokena w bazie. Test, który kiedyś dostanie
-   token albo klucz modelu w środowisku, pisałby do prawdziwych klientów firmy.
-   Mur zamienia „nie powinno wyjść" na „nie ma którędy".
+   PO CO, skoro adres Allegro wskazuje udawany serwer na tej samej maszynie.
+   Bo wysyłka, wypłata i werdykt wołają prawdziwego klienta HTTP w każdym
+   trybie, a przebieg ma w bazie token, żeby dało się je przejść do skutku.
+   Od prawdziwego Allegro dzieli go wtedy jedna zmienna z adresem. Literówka
+   w niej albo końcówka, która bierze adres skądinąd, pisałaby do prawdziwych
+   klientów firmy. Mur zamienia „nie powinno wyjść" na „nie ma którędy".
 
    NA GNIEŹDZIE, nie na `fetch`. `fetch`, `http`, `https` i sterownik MSSQL
    schodzą się w `net.Socket.connect`, więc jedna łata obejmuje także
    bibliotekę, której jeszcze tu nie ma.
 
-   To NIE jest atrapa Allegro. Mur niczego nie odpowiada w cudzym imieniu:
-   serwer dostaje zwykły błąd sieci i pokazuje go tak, jak pokazałby awarię. */
+   Mur niczego nie odpowiada w cudzym imieniu: serwer dostaje zwykły błąd sieci
+   i pokazuje go tak, jak pokazałby awarię. Za Allegro odpowiada osobny,
+   lokalny serwer z `udawane-allegro.mjs`, który mur przepuszcza jak każdy
+   ruch na własną maszynę. */
 const fs = require("node:fs");
 const net = require("node:net");
 
