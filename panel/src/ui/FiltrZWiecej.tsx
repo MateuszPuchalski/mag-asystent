@@ -17,24 +17,21 @@ import { FiltrSegmentowy, type PozycjaFiltra } from "./index";
    WARTOŚĆ OPCJI TO INDEKS, nie klucz. Klucze kubełków bywają `null`
    („Wszystkie") i liczbą, a `<select>` zna wyłącznie napisy.
 
-   ── TRYB ZWARTY ─────────────────────────────────────────────────────────────
+   ── „WIĘCEJ" MA SZEROKOŚĆ SWOJEJ TREŚCI ────────────────────────────────────
    Lista rozciągnięta na resztę rzędu po zawinięciu staje się pełnoszerokim
-   paskiem pod kubełkami — osobnym pasmem sterowania nad pytaniami. W trybie
-   zwartym „Więcej" ma szerokość swojej treści (`field-sizing: content`):
-   stoi obok pigułek i schodzi do drugiego rzędu tylko wtedy, gdy się nie
-   mieści. Przeglądarka bez `field-sizing` bierze szerokość najdłuższej
-   opcji, czyli dalej zwarty element, tylko szerszy. Tryb jest wyborem
-   ekranu, bo pozostałe kolejki mają inne szerokości kolumn. */
+   paskiem pod kubełkami — osobnym pasmem sterowania nad pytaniami. Dlatego
+   mierzy się treścią (`field-sizing: content`): stoi obok pigułek i schodzi
+   do drugiego rzędu tylko wtedy, gdy się nie mieści. Przeglądarka bez
+   `field-sizing` bierze szerokość najdłuższej opcji, czyli dalej zwarty
+   element, tylko szerszy. */
 export function FiltrZWiecej<T extends string | number | null>({
-  wybrany, onWybierz, pozycje, wiecej, zwarty = false,
+  wybrany, onWybierz, pozycje, wiecej,
 }: {
   wybrany: T;
   onWybierz: (v: T) => void;
   pozycje: Array<PozycjaFiltra<T>>;
   /** Klucze kubełków do przeglądania — stoją pod „Więcej", nie na wierzchu. */
   wiecej: ReadonlyArray<T>;
-  /** „Więcej" na szerokość treści, nie na resztę rzędu — patrz komentarz wyżej. */
-  zwarty?: boolean;
 }) {
   const ukryte = pozycje.filter((p) => wiecej.includes(p.klucz));
   const naWierzchu = pozycje.filter((p) => !wiecej.includes(p.klucz));
@@ -45,15 +42,14 @@ export function FiltrZWiecej<T extends string | number | null>({
       value={wybranyUkryty < 0 ? "" : String(wybranyUkryty)}
       title={wybranyUkryty < 0 ? "Kubełki do przeglądania" : ukryte[wybranyUkryty].podpowiedz}
       onChange={(e) => { if (e.target.value !== "") onWybierz(ukryte[Number(e.target.value)].klucz); }}
-      /* Reszta rzędu, nie własna szerokość: stała szerokość
-         125 px spadałaby w kolumnie 360 px pod kubełki i dokładała rząd.
-         Tryb zwarty mierzy się treścią, więc stałej szerokości też nie ma. */
-      className={`field w-auto py-1 text-xs font-semibold ${zwarty
-        ? "shrink-0 px-2 [field-sizing:content]" : "min-w-0 flex-1 basis-[5.5rem]"} ${
+      /* Szerokość treści, nie stała i nie reszta rzędu: stała spadałaby pod
+         kubełki, choć krótka nazwa by się zmieściła, a reszta rzędu po
+         zawinięciu robi z listy osobny pasek. */
+      className={`field w-auto shrink-0 px-2 py-1 text-xs font-semibold [field-sizing:content] ${
         wybranyUkryty < 0 ? "" : "border-wertis-ink"}`}>
-      {/* Bez wielokropka w trybie zwartym: strzałkę rysuje sama lista,
-          a „Więcej…" obok niej mówiłoby dwa razy „jest tu coś jeszcze". */}
-      <option value="">{zwarty ? "Więcej" : "Więcej…"}</option>
+      {/* Bez wielokropka: strzałkę rysuje sama lista, a „Więcej…" obok niej
+          mówiłoby dwa razy „jest tu coś jeszcze". */}
+      <option value="">Więcej</option>
       {ukryte.map((p, i) => <option key={String(p.klucz)} value={String(i)} title={p.podpowiedz}>
         {p.etykieta}{p.ile === undefined ? "" : ` · ${p.ile}`}</option>)}
     </select>}

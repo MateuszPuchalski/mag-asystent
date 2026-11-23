@@ -2,10 +2,10 @@ import React from "react";
 import { Search, X } from "lucide-react";
 import { Pusto } from "./index";
 
-/* ── JEDNA KOLUMNA LISTY NA CZTERY KOLEJKI ───────────────────────────────────
-   Skrzynka, Zwroty, Reklamacje i Dostawy mają tę samą pracę: wybrać kubełek,
-   znaleźć sprawę, przejść po liście. Cztery własne układy tej kolumny to
-   cztery nawyki, a agent przechodzi między nimi kilkadziesiąt razy dziennie
+/* ── JEDNA KOLUMNA LISTY NA PIĘĆ KOLEJEK ─────────────────────────────────────
+   Skrzynka, Zwroty, Kosze, Reklamacje i Dostawy mają tę samą pracę: wybrać
+   kubełek, znaleźć sprawę, przejść po liście. Pięć własnych układów tej kolumny
+   to pięć nawyków, a agent przechodzi między nimi kilkadziesiąt razy dziennie
    (dekalog p. 2: rozpoznanie tańsze od pamiętania).
 
    KOLEJNOŚĆ JEST STAŁA: tytuł z działaniami po prawej, kubełki, szukanie,
@@ -81,8 +81,10 @@ export function SzukajWKolejce({ wartosc, onZmien, etykieta, placeholder }: {
     <input value={wartosc} onChange={(e) => onZmien(e.target.value)}
       aria-label={etykieta} placeholder={placeholder}
       className={`field w-full py-1 pl-7 text-sm ${wartosc !== "" ? "pr-7" : "pr-2"}`} />
+    {/* Krzyżyk ma 24 px boku, choć ikona 14: to najmniejszy cel wskaźnika
+        w WCAG 2.2 (2.5.8), a przycisk leży na polu, więc odstęp go nie ratuje. */}
     {wartosc !== "" && <button type="button" onClick={() => onZmien("")} aria-label="Wyczyść szukanie"
-      className="absolute right-2 top-1/2 -translate-y-1/2 rounded p-0.5 text-slate-600 hover:bg-slate-100 hover:text-slate-900">
+      className="absolute right-1 top-1/2 flex h-6 w-6 -translate-y-1/2 items-center justify-center rounded text-slate-600 hover:bg-slate-100 hover:text-slate-900">
       <X size={14} aria-hidden="true" /></button>}
   </div>;
 }

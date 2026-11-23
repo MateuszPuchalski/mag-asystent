@@ -1,6 +1,8 @@
 import React from "react";
+import { Package, Search } from "lucide-react";
 import type { Pominieta, WierszKosza, ZnalezionaWKoszu } from "../api/kosze";
-import { Pusto, WierszKolejki, czas, dniSlowo, ile } from "../ui";
+import { WierszKolejki, czas, dniSlowo, ile } from "../ui";
+import { PustaKolejka } from "../ui/KolumnaKolejki";
 import { CyklKosza, StanMmKosza } from "./Cykl";
 
 /* ── Kolejka koszy ─────────────────────────────────────────────────────────
@@ -92,7 +94,7 @@ export function KolejkaKoszy({ kosze, wybrany, onWybierz, pokazBladMm = false }:
   /** W kubełku PROBLEM Z MM treść odmowy zastępuje zdanie o postępie. */
   pokazBladMm?: boolean;
 }) {
-  if (!kosze.length) return <Pusto waga="lista">Ten kubełek jest pusty.</Pusto>;
+  if (!kosze.length) return <PustaKolejka ikona={Package}>Ten kubełek jest pusty.</PustaKolejka>;
   return <ul className="divide-y divide-slate-200">
     {kosze.map((k) => {
       const karton = k.rodzaj === "karton";
@@ -149,7 +151,7 @@ export function KolejkaKoszy({ kosze, wybrany, onWybierz, pokazBladMm = false }:
 export function KolejkaPominietych({ lista, wybranyKosz, onWybierz }: {
   lista: Pominieta[]; wybranyKosz: number | null; onWybierz: (koszId: number) => void;
 }) {
-  if (!lista.length) return <Pusto waga="lista">Hala niczego nie pominęła — nic tu nie czeka.</Pusto>;
+  if (!lista.length) return <PustaKolejka ikona={Package}>Hala niczego nie pominęła — nic tu nie czeka.</PustaKolejka>;
   return <ul className="divide-y divide-slate-200">
     {lista.map((p) => <WierszKolejki key={p.pozycjaId} aktywny={p.koszId === wybranyKosz}
       onKlik={() => onWybierz(p.koszId)}>
@@ -171,7 +173,7 @@ export function KolejkaPominietych({ lista, wybranyKosz, onWybierz }: {
 export function WynikiSzukania({ lista, onWybierz }: {
   lista: ZnalezionaWKoszu[]; onWybierz: (koszId: number) => void;
 }) {
-  if (!lista.length) return <Pusto waga="lista">Nic w koszach nie pasuje do tego, czego szukasz.</Pusto>;
+  if (!lista.length) return <PustaKolejka ikona={Search}>Nic w koszach nie pasuje do tego, czego szukasz.</PustaKolejka>;
   return <ul className="divide-y divide-slate-200">
     {lista.map((z, i) => <WierszKolejki key={`${z.koszId}-${i}`} aktywny={false} onKlik={() => onWybierz(z.koszId)}>
       <span className="flex w-full items-baseline gap-2">

@@ -5,8 +5,9 @@ import {
   useKosze, usePominiete, usePonowMmKosza, usePrzeliczKosz, useSzczegolKosza, useSzukajWKoszach,
   useUsunZMm, useZalatwPominiecie,
 } from "../api/kosze";
-import { Blad, Karta, Pole, Pusto, SIATKA_TRZECH_KOLUMN, SrodekIDowody, KARTA_PRACY, KARTA_DOWODOW } from "../ui";
+import { Blad, Karta, Pusto, SIATKA_TRZECH_KOLUMN, SrodekIDowody, KARTA_PRACY, KARTA_DOWODOW } from "../ui";
 import { FiltrZWiecej } from "../ui/FiltrZWiecej";
+import { KolumnaKolejki, SzukajWKolejce } from "../ui/KolumnaKolejki";
 import { KUBELKI_KOSZY, KolejkaKoszy, KolejkaPominietych, WynikiSzukania, koszeKubelka, kubelekKosza,
   maKlopotMm, type KubelekKoszy } from "../kosze/Kolejka";
 import { Kosz } from "../kosze/Kosz";
@@ -87,6 +88,9 @@ export function Kosze() {
   const idz = (x: number) => nawiguj(`/obsluga/zwroty/kosze/${x}`);
   const szuka = q.length >= 2;
 
+  const bladListy = kosze.error && kosze.data ? (kosze.error as Error).message
+    : szukaj.error ? (szukaj.error as Error).message : "";
+
   const lewa = kosze.isLoading ? <Pusto waga="lista">Wczytuję kosze…</Pusto>
     /* Błąd bez danych zamiast „ten kubełek jest pusty". */
     : kosze.error && !kosze.data ? <Blad>{(kosze.error as Error).message}</Blad>
@@ -105,33 +109,32 @@ export function Kosze() {
     </div>
     <Koszyk />
     <div className={SIATKA_TRZECH_KOLUMN}>
-      <Karta className="flex min-h-0 flex-col overflow-hidden">
-        {/* Bez tytułu „Kosze", bo powtarzałby wybraną zakładkę
-            przełącznika tuż nad nim. */}
-        <nav className="flex shrink-0 flex-wrap gap-1 p-2">
-          {/* „Rozłożone" i „Anulowane" pod „Więcej": oba to „Tylko wgląd".
-              Ten sam komponent co w Skrzynce i reklamacjach. */}
-          <FiltrZWiecej<KubelekKoszy> wybrany={kubelek} onWybierz={setKubelek}
-            wiecej={WIECEJ_KOSZY}
-            pozycje={KUBELKI_KOSZY.map((k) => ({ klucz: k.id, etykieta: k.etykieta,
-              ile: liczniki[k.id], podpowiedz: k.pytanie }))} />
-        </nav>
-        <div className="shrink-0 border-t border-slate-200 p-2">
-          {/* „W którym koszu jechał ten towar?" — pytanie pada po fakcie: towar
-              zniknął albo klient dopomina się o zwrot. */}
-          <Pole value={fraza} onChange={(e) => setFraza(e.target.value)}
-            placeholder="W którym koszu? Symbol, nazwa, kod, kosz albo zwrot" aria-label="Szukaj towaru w koszach" />
-        </div>
-        {!szuka && <div className="shrink-0 border-y border-slate-200 bg-slate-50 px-2 py-1">
-          <span className="text-xs font-semibold text-slate-600">{opis?.pytanie}</span>
-        </div>}
-        <div className="min-h-0 flex-1 overflow-y-auto">{lewa}</div>
-        <Blad>{kosze.error && kosze.data ? (kosze.error as Error).message
-          : szukaj.error ? (szukaj.error as Error).message : ""}</Blad>
-      </Karta>
+      {/* Kolumna listy z jednej formy (`ui/KolumnaKolejki.tsx`). Bez tytułu
+          „Kosze", bo powtarzałby wybraną zakładkę przełącznika tuż nad nim. */}
+      <KolumnaKolejki etykieta="Kolejka koszy"
+        /* „Rozłożone" i „Anulowane" pod „Więcej": oba to „Tylko wgląd". */
+        kubelki={<FiltrZWiecej<KubelekKoszy> wybrany={kubelek} onWybierz={setKubelek}
+          wiecej={WIECEJ_KOSZY}
+          pozycje={KUBELKI_KOSZY.map((k) => ({ klucz: k.id, etykieta: k.etykieta,
+            ile: liczniki[k.id], podpowiedz: k.pytanie }))} />}
+        /* „W którym koszu jechał ten towar?" — pytanie pada po fakcie: towar
+           zniknął albo klient dopomina się o zwrot. Podpowiedź wylicza same
+           klucze szukania, bo dłuższa ucina się w kolumnie 21 rem i gubi
+           ostatni z nich. */
+        szukaj={<SzukajWKolejce wartosc={fraza} onZmien={setFraza} etykieta="Szukaj towaru w koszach"
+          placeholder="Symbol, nazwa, kod, kosz albo zwrot" />}
+        /* Pytanie kubełka znika przy szukaniu, bo wyniki idą ze wszystkich
+           kubełków naraz. */
+        drugi={!szuka && <span className="text-xs font-semibold text-slate-600">{opis?.pytanie}</span>}
+        /* Błąd odświeżenia i szukania stoi NAD listą, nie w niej: pod długim
+           kubełkiem zjechałby poza okno, a lista wyglądałaby na aktualną.
+           Bez danych o koszach błąd stoi zamiast listy. */
+        nad={bladListy && <div className="shrink-0"><Blad>{bladListy}</Blad></div>}>
+        {lewa}
+      </KolumnaKolejki>
 
       <SrodekIDowody>
-      <Karta className={`flex min-h-0 flex-col overflow-hidden ${KARTA_PRACY}`}>
+      <Karta className={KARTA_PRACY}>
         {wybrany === null
           ? <Pusto ikona={Package}>Wybierz kosz z kolejki.</Pusto>
           : szczegol.isLoading ? <Pusto waga="lista">Wczytuję zawartość kosza…</Pusto>
@@ -178,7 +181,7 @@ export function Kosze() {
               : <Pusto waga="lista">{szczegol.error ? (szczegol.error as Error).message : "Nie znaleziono kosza."}</Pusto>}
       </Karta>
 
-      <Karta className={`flex min-h-0 flex-col overflow-hidden ${KARTA_DOWODOW}`}>
+      <Karta className={KARTA_DOWODOW}>
         <div className="min-h-0 flex-1 overflow-y-auto">
           {szczegol.data
             ? <KontekstKosza k={szczegol.data.kosz} zalatw={{
