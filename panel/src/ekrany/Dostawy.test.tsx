@@ -7,6 +7,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Dostawy } from "./Dostawy";
 import { kubelekDokumentu, wiekDokumentu } from "../dostawy/Kolejka";
 import { Wyjatek as WyjatekWiersz } from "../dostawy/Wyjatek";
+import { WyjatkiLuzem } from "../dostawy/Dokument";
 import type { Dokument, DokumentDostawy, Wyjatek } from "../api/dostawy";
 import { _wyczyscPamiecZdjec } from "../towar/useZdjecie";
 
@@ -96,6 +97,8 @@ let archiwumPytania: string[] = [];
 /* Czy instalacja ma zdjęcia kartotek — tak mówi o tym `/api/health`. */
 let zdjeciaWHealth = false;
 let pytaniaOObrazy: string[] = [];
+/* Adresy, które w danym teście odpowiadają awarią serwera (502). */
+let awarie = new Set<string>();
 
 function odpowiedz(url: string, init?: RequestInit): unknown {
   const metoda = init?.method ?? "GET";
@@ -148,7 +151,9 @@ beforeEach(() => {
   _wyczyscPamiecZdjec();
   /* `URL.createObjectURL` nie istnieje w jsdom — ten sam zastępnik co w `useZdjecie.test.tsx`. */
   (URL as unknown as { createObjectURL: () => string }).createObjectURL = () => "blob:dowod";
+  awarie = new Set();
   vi.stubGlobal("fetch", vi.fn(async (url: string, init?: RequestInit) => {
+    if (awarie.has(url)) return new Response(JSON.stringify({ error: "Serwer nie odpowiada" }), { status: 502 });
     /* Zdjęcia kartotek i dowodów — brak jest ODPOWIEDZIĄ (404), nie awarią. */
     /* Obiekt zamiast `Response`: `Blob` z jsdom nie wchodzi do `Response` z Node
        (brak `stream()`) — ten sam kształt, co w `useZdjecie.test.tsx`. */
@@ -506,5 +511,129 @@ describe("audyt ekranu dostaw — drobne", () => {
     await screen.findByRole("heading", { name: "FZ 802/MAG/09/2026" });
     expect(screen.getByLabelText("Notatka do hali")).toHaveAttribute("placeholder", "Pytanie do hali");
     expect(screen.getByText("Hala musi odpowiedzieć, zanim dostawa się domknie.")).toBeInTheDocument();
+  });
+});
+
+/* ── Praca na wyjątku i klawisze kolejki ───────────────────────────────────
+   Wyjątek czyta się i zamyka bez szukania: zdjęcie jest przy zgłoszeniu,
+   zamknięty mówi, kto go zamknął, a po kolejce chodzi się tymi samymi
+   klawiszami co w zwrotach i reklamacjach. */
+describe("wyjątek i klawisze kolejki", () => {
+  it("`j` i `k` chodzą po kolejce, cyfra zmienia kubełek, a w polu to zwykłe znaki", async () => {
+    pokaz("/obsluga/dostawy/802");
+    await screen.findByRole("heading", { name: "FZ 802/MAG/09/2026" });
+    await userEvent.keyboard("j");
+    expect(await screen.findByRole("heading", { name: "FZ 803/MAG/09/2026" })).toBeInTheDocument();
+    await userEvent.keyboard("k");
+    expect(await screen.findByRole("heading", { name: "FZ 802/MAG/09/2026" })).toBeInTheDocument();
+
+    /* W polu szukania cyfra jest frazą, nie kubełkiem. */
+    await userEvent.type(screen.getByLabelText("Szukaj dostawy"), "2");
+    expect(screen.getByRole("button", { name: /^Do decyzji/ })).toHaveAttribute("aria-pressed", "true");
+    await userEvent.clear(screen.getByLabelText("Szukaj dostawy"));
+
+    /* Poza polem `2` otwiera „W toku" i zamyka sprawę spoza tego kubełka. */
+    (document.activeElement as HTMLElement).blur();
+    await userEvent.keyboard("2");
+    expect(screen.getByRole("button", { name: /^W toku/ })).toHaveAttribute("aria-pressed", "true");
+    expect(await screen.findByText("Wybierz dostawę z kolejki.")).toBeInTheDocument();
+    /* Chodzenie po kolejce to patrzenie: zero zapisów. */
+    expect(wyslane).toEqual([]);
+  });
+
+  it("po zmianie kubełka `j` otwiera pierwszy wiersz, nie miejsce z poprzedniej listy", async () => {
+    /* 803 stoi w „Do decyzji" jako czwarty wiersz; „W toku" ma jeden. */
+    pokaz("/obsluga/dostawy/803");
+    await screen.findByRole("heading", { name: "FZ 803/MAG/09/2026" });
+    await userEvent.keyboard("3");
+    expect(await screen.findByText("Wybierz dostawę z kolejki.")).toBeInTheDocument();
+    await userEvent.keyboard("1");
+    await userEvent.keyboard("j");
+    /* Pierwszy wiersz „Do decyzji" to dokument spoza okna importu. */
+    await waitFor(() => expect(screen.getByRole("button", { name: /FZ 700\/MAG\/07\/2026/ }))
+      .toHaveAttribute("aria-current", "true"));
+  });
+
+  it("gdy lista padła, klawisz nie otwiera wiersza, którego nie widać", async () => {
+    awarie.add("/api/delivery/documents");
+    pokaz();
+    expect(await screen.findByText("Serwer nie odpowiada")).toBeInTheDocument();
+    await userEvent.keyboard("j");
+    expect(screen.getByText("Wybierz dostawę z kolejki.")).toBeInTheDocument();
+  });
+
+  it("towar spoza dokumentu bez danych mówi o błędzie, nie o braku wyjątków", async () => {
+    awarie.add("/api/problems/unresolved");
+    pokaz("/obsluga/dostawy/bez");
+    expect(await screen.findByText("Serwer nie odpowiada")).toBeInTheDocument();
+    expect(screen.queryByText("Nie ma już otwartych wyjątków bez dokumentu.")).toBeNull();
+  });
+
+  it("nieudane pobranie zdjęcia daje przy wyjątku „ponów”, a zgubiony plik zdanie wprost", async () => {
+    awarie.add("/api/problems/1/photo");
+    pokaz("/obsluga/dostawy/806");
+    const ponow = await screen.findByRole("button", { name: "Ponów zdjęcie" });
+    expect(screen.queryByRole("button", { name: "Zdjęcie" })).toBeNull();
+    awarie.clear();
+    await userEvent.click(ponow);
+    expect(await screen.findByRole("button", { name: "Zdjęcie" })).toBeInTheDocument();
+  });
+
+  it("zgubiony plik zdjęcia stoi słowami także przy wyjątku", async () => {
+    pokaz("/obsluga/dostawy/808");
+    expect(await screen.findByText("pliku zdjęcia brak")).toBeInTheDocument();
+  });
+
+  it("zdjęcie z hali otwiera się wprost z wyjątku, którego dotyczy", async () => {
+    pokaz("/obsluga/dostawy/806");
+    const zdjecie = await screen.findByRole("button", { name: "Zdjęcie" });
+    await waitFor(() => expect(zdjecie).toBeEnabled());
+    await userEvent.click(zdjecie);
+    expect(screen.getByRole("dialog", { name: /powiększenie/ })).toBeInTheDocument();
+  });
+
+  it("wyjątek bez zdjęcia nie ma przycisku zdjęcia", async () => {
+    pokaz("/obsluga/dostawy/802");
+    await screen.findByRole("heading", { name: "FZ 802/MAG/09/2026" });
+    expect(screen.queryByRole("button", { name: "Zdjęcie" })).toBeNull();
+  });
+
+  it("Escape wycofuje się z zamykania wyjątku i niczego nie wysyła", async () => {
+    pokaz("/obsluga/dostawy/802");
+    await userEvent.click(await screen.findByRole("button", { name: "Rozwiąż" }));
+    /* Stan zostaje na ekranie także przy otwartym formularzu. */
+    expect(screen.getByText("otwarty")).toBeInTheDocument();
+    await userEvent.type(screen.getByLabelText("Jak załatwiono wyjątek"), "dosłali{Escape}");
+    expect(screen.queryByLabelText("Jak załatwiono wyjątek")).toBeNull();
+    /* Fokus wraca na przycisk, z którego formularz otwarto. */
+    expect(screen.getByRole("button", { name: "Rozwiąż" })).toHaveFocus();
+    expect(wyslane).toEqual([]);
+  });
+
+  it("zamknięty wyjątek mówi, kto i kiedy go zamknął — także bez notatki", () => {
+    render(<WyjatekWiersz trwa={false} blad="" onRozwiaz={() => {}}
+      p={wyj(41, { resolvedAt: "2026-09-22T10:00:00.000Z", resolvedBy: "Anna", resolvedNote: null })} />);
+    expect(screen.getByText(/^Zamknięty: Anna · /)).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Rozwiąż" })).toBeNull();
+  });
+
+  it("opis z hali stoi pod rzędem plakietek, nie obok przycisku", () => {
+    render(<WyjatekWiersz trwa={false} blad="" onRozwiaz={() => {}} p={wyj(42, { opis: "pęknięta obudowa" })} />);
+    const rzad = screen.getByRole("button", { name: "Rozwiąż" }).parentElement!.parentElement!;
+    expect(within(rzad).getByText("uszkodzone")).toBeInTheDocument();
+    expect(within(rzad).queryByText("pęknięta obudowa")).toBeNull();
+  });
+
+  it("towar spoza dokumentu po zamknięciu ostatniego wyjątku mówi, że nic nie zostało", () => {
+    render(<WyjatkiLuzem tytul="Towar spoza dokumentu" podtytul="—" lista={[]}
+      rozwiaz={{ trwa: false, blad: "", onRozwiaz: () => {} }} />);
+    expect(screen.getByText("Nie ma już otwartych wyjątków bez dokumentu.")).toBeInTheDocument();
+  });
+
+  it("druki dostawy stoją razem na końcu nagłówka", async () => {
+    pokaz("/obsluga/dostawy/802");
+    const protokol = await screen.findByRole("link", { name: /Protokół dla dostawcy/ });
+    expect(within(protokol.parentElement!).getByRole("button", { name: "CSV" })).toBeInTheDocument();
+    expect(within(protokol.parentElement!).queryByRole("heading")).toBeNull();
   });
 });
