@@ -114,7 +114,11 @@ export function KolejkaKoszy({ kosze, wybrany, onWybierz, pokazBladMm = false }:
         <span className="mt-1 flex w-full flex-wrap items-center gap-1.5">
           {karton && <span className="rounded bg-slate-200 px-1.5 py-0.5 text-xs font-bold text-slate-700">karton</span>}
           <CyklKosza status={k.status} mmBlad={k.mmStan === "blad" && !k.mmNumer && !karton} />
-          <StanMmKosza mmStan={k.mmStan} mmNumer={k.mmNumer} brakujeKorekt={k.brakujeKorekt} karton={karton} />
+          {/* MM w błędzie mówi znacznik kłopotu niżej, z liczbą prób i treścią
+              odmowy w podpowiedzi. Dwie czerwone plakietki o tym samym
+              wyglądałyby jak dwa różne kłopoty. */}
+          {!(k.mmStan === "blad" && k.problemMm) &&
+            <StanMmKosza mmStan={k.mmStan} mmNumer={k.mmNumer} brakujeKorekt={k.brakujeKorekt} karton={karton} />}
           {/* ZNACZNIK KŁOPOTU Z MM w każdym kubełku. Czerwony, gdy
               zadanie stoi w błędzie teraz; bursztynowy, gdy przeszło po
               odmowie — wtedy dokument jest, ale stany trzeba sprawdzić. */}

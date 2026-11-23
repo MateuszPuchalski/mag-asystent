@@ -5,6 +5,7 @@ import React from "react";
 import { MemoryRouter, Route, Routes, useLocation } from "react-router-dom";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Kosze } from "./Kosze";
+import { KolejkaKoszy } from "../kosze/Kolejka";
 import { Dowody } from "../zwroty/Dowody";
 import type { Pominieta, SzczegolKosza, WierszKosza } from "../api/kosze";
 import type { Zwrot } from "../api/typy";
@@ -52,6 +53,10 @@ let wyslane: string[] = [];
 let szukane: string[] = [];
 /* Pierwsza odmowa ponowienia MM: `null` = serwer ponawia od razu. */
 let odmowaPonowienia: string | null = null;
+/* Adresy, które w danym teście odpowiadają awarią serwera (502). */
+let awarie = new Set<string>();
+/* Czy instalacja ma zdjęcia kartotek — tak mówi o tym `/api/health`. */
+let zdjeciaWHealth = false;
 
 function odpowiedz(url: string, init?: RequestInit): unknown {
   const metoda = init?.method ?? "GET";
@@ -64,6 +69,15 @@ function odpowiedz(url: string, init?: RequestInit): unknown {
     }
     return { pominiete: [] };
   }
+  if (url === "/api/health") return zdjeciaWHealth ? { zdjecia: { plikow: 3 } } : {};
+  /* Jedna pozycja załatwiona, jedna czeka — i załatwiona stoi PIERWSZA,
+     żeby test kolejności nie przeszedł na samym porządku z serwera. */
+  if (url === "/api/biuro/kosze/19") return { kosz: { ...SZCZEGOL, id: 19, kod: "Z-19", pozycje: [
+    { ...SZCZEGOL.pozycje[1], id: 31, symbol: "HM-ZAL", zalatwioneAt: "2026-09-22T10:00:00.000Z",
+      zalatwionePrzez: "Anna", zalatwioneNotatka: "znalazło się" },
+    { ...SZCZEGOL.pozycje[1], id: 32, symbol: "HM-CZEKA" },
+    SZCZEGOL.pozycje[0],
+  ] } };
   if (url === "/api/biuro/kosze/17") return { kosz: { ...SZCZEGOL, id: 17, kod: "Z-17", status: "rozlozony" } };
   /* Kosz jeszcze bez dokumentu — przeliczenie jest dozwolone. */
   if (url === "/api/biuro/kosze/18") return { kosz: { ...SZCZEGOL, id: 18, kod: "Z-18", status: "otwarty", doEdycji: true } };
@@ -92,9 +106,10 @@ function odpowiedz(url: string, init?: RequestInit): unknown {
 }
 
 beforeEach(() => {
-  wyslane = []; szukane = []; odmowaPonowienia = null;
+  wyslane = []; szukane = []; odmowaPonowienia = null; awarie = new Set(); zdjeciaWHealth = false;
   _wyczyscPamiecZdjec();
   vi.stubGlobal("fetch", vi.fn(async (url: string, init?: RequestInit) => {
+    if (awarie.has(url)) return new Response(JSON.stringify({ error: "Serwer nie odpowiada" }), { status: 502 });
     if (/\/zdjecie$/.test(url)) return new Response("{}", { status: 404 });
     const tresc = odpowiedz(url, init) as { __status?: number };
     return new Response(JSON.stringify(tresc), { status: tresc.__status ?? 200 });
@@ -167,7 +182,7 @@ describe("Kosze w zakładce Zwroty", () => {
     pokaz("/obsluga/zwroty/kosze/16");
     expect(await screen.findByText(/MM chce 2 szt\. z ZWR, a tam jest 2, z czego 1 zarezerwowane/)).toBeInTheDocument();
     expect(screen.getByText("blokuje MM — brak wolnego stanu")).toBeInTheDocument();
-    await userEvent.click(screen.getByRole("button", { name: "usuń z MM" }));
+    await userEvent.click(screen.getByRole("button", { name: "Zdejmij z MM…" }));
     expect(wyslane).toEqual([]);
     expect(screen.getByText(/Zostanie na ZWR/)).toBeInTheDocument();
     await userEvent.click(screen.getByRole("button", { name: "Zdejmij z MM" }));
@@ -233,10 +248,11 @@ describe("Kosze w zakładce Zwroty", () => {
     await userEvent.click(await screen.findByRole("button", { name: /Pominięte/ }));
     await userEvent.click(await screen.findByRole("button", { name: /HM-0520/ }));
     expect(screen.getAllByTestId("adres")[0]).toHaveTextContent("/obsluga/zwroty/kosze/14");
-    const prawa = await screen.findByText(/Pominięte do załatwienia/);
-    await userEvent.click(within(prawa.closest("div")!).getByRole("button", { name: "Załatwione" }));
+    /* Dwa napisy na dwa kroki: pierwszy otwiera pole i nic nie wysyła. */
+    await userEvent.click(await screen.findByRole("button", { name: "Oznacz jako załatwione" }));
+    expect(wyslane).toEqual([]);
     await userEvent.type(screen.getByLabelText("Jak załatwiono"), "znalazło się");
-    await userEvent.click(screen.getAllByRole("button", { name: "Załatwione" }).at(-1)!);
+    await userEvent.click(screen.getByRole("button", { name: "Załatwione" }));
     await waitFor(() => expect(wyslane).toEqual(
       ['POST /api/biuro/kosze/pominiete/2/zalatwione {"notatka":"znalazło się"}']));
   });
@@ -270,5 +286,105 @@ describe("Kosze w zakładce Zwroty", () => {
     pokaz();
     await userEvent.click(await screen.findByRole("button", { name: /^Zwroty/ }));
     expect(screen.getAllByTestId("adres")[0]).toHaveTextContent(/^\/obsluga\/zwroty$/);
+  });
+});
+
+/* ── Praca na koszu ────────────────────────────────────────────────────────
+   Pominięte stoją przy zawartości kosza i tam się je załatwia. Po koszach
+   chodzi się tymi samymi klawiszami co po pozostałych kolejkach. Zapytanie,
+   które padło, nie udaje pustej listy. */
+describe("pominięte w koszu, klawisze i stany bez danych", () => {
+  it("pominięte stoją nad tabelą, czekające przed załatwionymi, a tabela ich nie powtarza", async () => {
+    pokaz("/obsluga/zwroty/kosze/19");
+    const naglowek = await screen.findByRole("heading", { name: /Pominięte przez halę · 1 do załatwienia · 1 załatwiona/ });
+    const sekcja = naglowek.parentElement!;
+    expect(within(sekcja).getAllByText(/^HM-(CZEKA|ZAL)$/).map((e) => e.textContent)).toEqual(["HM-CZEKA", "HM-ZAL"]);
+    /* Załatwiona mówi, kto, kiedy i jak — i nie ma już przycisku. */
+    expect(within(sekcja).getByText(/^Załatwione: Anna · /)).toHaveTextContent("znalazło się");
+    expect(within(sekcja).getAllByRole("button", { name: "Oznacz jako załatwione" })).toHaveLength(1);
+    expect(screen.getByRole("heading", { name: "Pozostała zawartość · 1" })).toBeInTheDocument();
+    expect(screen.getByRole("row", { name: /HM-0410/ })).toBeInTheDocument();
+    expect(screen.queryByRole("row", { name: /HM-CZEKA|HM-ZAL/ })).toBeNull();
+    /* Nagłówek kosza liczy to samo co sekcja. */
+    expect(screen.getByText(/hala pominęła 2 poz\. — 1 czeka na biuro/)).toBeInTheDocument();
+  });
+
+  it("Escape wycofuje się z załatwiania, oddaje fokus przyciskowi i niczego nie wysyła", async () => {
+    pokaz("/obsluga/zwroty/kosze/14");
+    await userEvent.click(await screen.findByRole("button", { name: "Oznacz jako załatwione" }));
+    await userEvent.type(screen.getByLabelText("Jak załatwiono"), "znalazło{Escape}");
+    expect(screen.queryByLabelText("Jak załatwiono")).toBeNull();
+    expect(screen.getByRole("button", { name: "Oznacz jako załatwione" })).toHaveFocus();
+    expect(wyslane).toEqual([]);
+  });
+
+  it("tabela ma adres ze stanem w jednej kolumnie, a zdjęcia tylko gdy instalacja je ma", async () => {
+    pokaz("/obsluga/zwroty/kosze/14");
+    expect(await screen.findByRole("columnheader", { name: "Adres · stan" })).toBeInTheDocument();
+    const wiersz = screen.getByRole("row", { name: /HM-0410/ });
+    expect(within(wiersz).getByText("ZWR-1")).toBeInTheDocument();
+    expect(within(wiersz).getByText("odłożona")).toBeInTheDocument();
+    expect(within(wiersz).getByText(/j\.wrona · /)).toBeInTheDocument();
+    expect(screen.queryByRole("columnheader", { name: "Zdjęcie" })).toBeNull();
+  });
+
+  it("instalacja ze zdjęciami: pozycje kosza dostają kolumnę zdjęć", async () => {
+    zdjeciaWHealth = true;
+    pokaz("/obsluga/zwroty/kosze/14");
+    expect(await screen.findByRole("columnheader", { name: "Zdjęcie" })).toBeInTheDocument();
+  });
+
+  it("`j` i `k` chodzą po koszach, cyfra zmienia kubełek, a w polu to zwykłe znaki", async () => {
+    pokaz("/obsluga/zwroty/kosze/14");
+    await screen.findByRole("heading", { name: "Z-14" });
+    await userEvent.keyboard("j");
+    expect(screen.getAllByTestId("adres")[0]).toHaveTextContent("/obsluga/zwroty/kosze/16");
+    await userEvent.keyboard("k");
+    expect(screen.getAllByTestId("adres")[0]).toHaveTextContent("/obsluga/zwroty/kosze/14");
+    /* Cyfra poza polem zmienia kubełek; kosz zostaje otwarty. */
+    await userEvent.keyboard("3");
+    expect(screen.getByRole("button", { name: /Problem z MM/ })).toHaveAttribute("aria-pressed", "true");
+    expect(screen.getAllByTestId("adres")[0]).toHaveTextContent("/obsluga/zwroty/kosze/14");
+    /* W polu szukania cyfra jest frazą. */
+    await userEvent.type(screen.getByLabelText("Szukaj towaru w koszach"), "1");
+    expect(screen.getByRole("button", { name: /Problem z MM/ })).toHaveAttribute("aria-pressed", "true");
+    expect(wyslane).toEqual([]);
+  });
+
+  it("bez otwartego kosza `j` otwiera pierwszy wiersz kubełka", async () => {
+    pokaz();
+    await screen.findByRole("button", { name: /Z-14/ });
+    await userEvent.keyboard("j");
+    expect(screen.getAllByTestId("adres")[0]).toHaveTextContent("/obsluga/zwroty/kosze/14");
+  });
+
+  it("Pominięte: błąd zamiast „hala niczego nie pominęła”, bez zera w liczniku", async () => {
+    awarie.add("/api/biuro/kosze/pominiete");
+    pokaz("/obsluga/zwroty/kosze?kubelek=pominiete");
+    expect(await screen.findByText("Serwer nie odpowiada")).toBeInTheDocument();
+    expect(screen.queryByText(/Hala niczego nie pominęła/)).toBeNull();
+    expect(screen.getByRole("button", { name: /^Pominięte/ }).textContent).not.toMatch(/\d/);
+    /* Klawisz nie ma po czym chodzić. */
+    await userEvent.keyboard("j");
+    expect(screen.getAllByTestId("adres")[0]).toHaveTextContent(/^\/obsluga\/zwroty\/kosze$/);
+  });
+
+  it("MM w błędzie stoi w wierszu listy raz, nie dwiema plakietkami", () => {
+    /* Kosz na hali z zadaniem MM w błędzie niesie oba sygnały serwera naraz. */
+    render(<KolejkaKoszy wybrany={null} onWybierz={() => {}} kosze={[kosz(21, { mmStan: "blad",
+      problemMm: { prob: 2, ostatniBlad: "Brak towaru", ostatnioAt: "2026-09-22T09:00:00.000Z", nierozwiazany: true } }),
+      /* Bez zapisanego kłopotu zostaje zdanie o kolejce — jedyny sygnał. */
+      kosz(22, { mmStan: "blad" })]} />);
+    expect(within(screen.getByRole("button", { name: /Z-21/ })).getAllByText(/MM w błędzie/)).toHaveLength(1);
+    expect(within(screen.getByRole("button", { name: /Z-22/ })).getByText("MM w błędzie — sprawdź kolejkę")).toBeInTheDocument();
+  });
+
+  it("szukanie, które padło, nie mówi „nic nie pasuje”", async () => {
+    awarie.add("/api/biuro/kosze/szukaj?q=HM");
+    pokaz();
+    await screen.findByRole("button", { name: /Z-14/ });
+    await userEvent.type(screen.getByLabelText("Szukaj towaru w koszach"), "HM");
+    expect(await screen.findByText("Serwer nie odpowiada")).toBeInTheDocument();
+    expect(screen.queryByText(/Nic w koszach nie pasuje/)).toBeNull();
   });
 });

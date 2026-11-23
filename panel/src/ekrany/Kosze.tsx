@@ -13,6 +13,8 @@ import { Kosz } from "../kosze/Kosz";
 import { KontekstKosza } from "../kosze/Kontekst";
 import { Koszyk, NowyKoszyk } from "../zwroty/Koszyk";
 import { PrzelacznikZwrotow } from "../zwroty/Przelacznik";
+import { klawiszZajety } from "../nawigacja/fokus";
+import { useKursorListy } from "../nawigacja/kursor";
 
 /** Kubełki „Tylko wgląd” — stoją pod „Więcej”, nie na wierzchu. */
 const WIECEJ_KOSZY: ReadonlyArray<KubelekKoszy> = ["rozlozone", "anulowane"];
@@ -87,15 +89,61 @@ export function Kosze() {
   const idz = (x: number) => nawiguj(`/obsluga/zwroty/kosze/${x}`);
   const szuka = q.length >= 2;
 
+  const koszeWidoczne = koszeKubelka(lista, kubelek);
   const lewa = kosze.isLoading ? <Pusto waga="lista">Wczytuję kosze…</Pusto>
     /* Błąd bez danych zamiast „ten kubełek jest pusty". */
     : kosze.error && !kosze.data ? <Blad>{(kosze.error as Error).message}</Blad>
+    /* SZUKANIE I POMINIĘTE MAJĄ WŁASNE ZAPYTANIA, więc własne „nie wiem".
+       „Nic nie pasuje" albo „hala niczego nie pominęła" bez danych
+       to orzeczenie, którego nikt nie sprawdził. Błąd szukania stoi pod
+       listą, więc tu wystarczy nie mówić nieprawdy. */
     : szuka ? (szukaj.isLoading ? <Pusto waga="lista">Szukam w koszach…</Pusto>
-        : <WynikiSzukania lista={szukaj.data?.znalezione ?? []} onWybierz={idz} />)
+        : !szukaj.data ? null
+        : <WynikiSzukania lista={szukaj.data.znalezione} onWybierz={idz} />)
       : kubelek === "pominiete"
-        ? <KolejkaPominietych lista={pominiete.data?.pominiete ?? []} wybranyKosz={wybrany} onWybierz={idz} />
-        : <KolejkaKoszy kosze={koszeKubelka(lista, kubelek)} wybrany={wybrany} onWybierz={idz}
+        ? (pominiete.isLoading ? <Pusto waga="lista">Wczytuję pominięte…</Pusto>
+          : !pominiete.data
+            ? <Blad>{(pominiete.error as Error | null)?.message ?? "Nie udało się wczytać pominiętych."}</Blad>
+            : <KolejkaPominietych lista={pominiete.data.pominiete} wybranyKosz={wybrany} onWybierz={idz} />)
+        : <KolejkaKoszy kosze={koszeWidoczne} wybrany={wybrany} onWybierz={idz}
             pokazBladMm={kubelek === "mm"} />;
+
+  /* KURSOR CHODZI PO KOSZACH, KTÓRE WIDAĆ. W szukaniu i w pominiętych wiersz
+     to pozycja, a otwiera się kosz, więc kilka wierszy jednego kosza liczy
+     się raz. Gdy zamiast listy stoi „wczytuję" albo błąd, kursor nie ma po
+     czym chodzić. */
+  const bezListy = kosze.isLoading || !kosze.data
+    || (szuka ? !szukaj.data : kubelek === "pominiete" && !pominiete.data);
+  const idKoszy = bezListy ? []
+    : szuka ? (szukaj.data?.znalezione ?? []).map((z) => z.koszId)
+    : kubelek === "pominiete" ? (pominiete.data?.pominiete ?? []).map((p) => p.koszId)
+    : koszeWidoczne.map((k) => k.id);
+  const widoczne = [...new Set(idKoszy)].map((x) => ({ id: x }));
+  const kursor = useKursorListy(widoczne, wybrany, (w) => idz(w.id));
+  /* Bez otwartego kosza klawisz otwiera pierwszy wiersz — powód przy tym
+     samym miejscu w `ekrany/Dostawy.tsx`. */
+  const idzOWiersz = (o: number) => {
+    if (wybrany !== null) return kursor(o);
+    const pierwszy = widoczne[0];
+    if (pierwszy) idz(pierwszy.id);
+  };
+  /* TE SAME KLAWISZE CO NA POZOSTAŁYCH KOLEJKACH: `j`/`k` albo strzałki po
+     liście, cyfry po kubełkach. Kosz zostaje otwarty przy zmianie kubełka,
+     bo ten sam kosz bywa w dwóch naraz: „W pracy" i „Problem z MM". Skróty
+     milkną w polu pisania i pod oknem modalnym. */
+  useEffect(() => {
+    const nasluch = (e: KeyboardEvent) => {
+      if (e.ctrlKey || e.altKey || e.metaKey || klawiszZajety(e.target)) return;
+      if (e.key === "ArrowDown" || e.key === "j") { e.preventDefault(); idzOWiersz(1); }
+      else if (e.key === "ArrowUp" || e.key === "k") { e.preventDefault(); idzOWiersz(-1); }
+      else if (/^[1-9]$/.test(e.key)) {
+        const k = KUBELKI_KOSZY[Number(e.key) - 1];
+        if (k) setKubelek(k.id);
+      }
+    };
+    window.addEventListener("keydown", nasluch);
+    return () => window.removeEventListener("keydown", nasluch);
+  });
 
   return <div className="flex flex-col gap-4 lg:h-full lg:min-h-0">
     {/* Jeden rząd nagłówka, jak na liście zwrotów. */}
@@ -136,7 +184,12 @@ export function Kosze() {
           ? <Pusto ikona={Package}>Wybierz kosz z kolejki.</Pusto>
           : szczegol.isLoading ? <Pusto waga="lista">Wczytuję zawartość kosza…</Pusto>
             : szczegol.data
-              ? <Kosz k={szczegol.data.kosz} bezPowrotu={bezPowrotu} ponowMm={problemMm && wybrany !== null ? {
+              ? <Kosz k={szczegol.data.kosz} bezPowrotu={bezPowrotu} zalatw={{
+                  trwa: zalatw.isPending, blad: bladZalatw,
+                  onZalatw: (pozycjaId, notatka) => {
+                    setBladZalatw("");
+                    zalatw.mutate({ pozycjaId, notatka }, { onError: (e) => setBladZalatw((e as Error).message) });
+                  } }} ponowMm={problemMm && wybrany !== null ? {
                   problem: problemMm, trwa: ponow.isPending, blad: bladPonow, wynik: wynikPonow,
                   czekaNaSprawdzenie,
                   usun: { trwa: usunZMm.isPending, blad: bladUsun, wynik: wynikUsun,
@@ -181,13 +234,8 @@ export function Kosze() {
       <Karta className={`flex min-h-0 flex-col overflow-hidden ${KARTA_DOWODOW}`}>
         <div className="min-h-0 flex-1 overflow-y-auto">
           {szczegol.data
-            ? <KontekstKosza k={szczegol.data.kosz} zalatw={{
-                trwa: zalatw.isPending, blad: bladZalatw,
-                onZalatw: (pozycjaId, notatka) => {
-                  setBladZalatw("");
-                  zalatw.mutate({ pozycjaId, notatka }, { onError: (e) => setBladZalatw((e as Error).message) });
-                } }} />
-            : <Pusto waga="lista">Zwroty i pominięte pozycje pokażą się po wybraniu kosza.</Pusto>}
+            ? <KontekstKosza k={szczegol.data.kosz} />
+            : <Pusto waga="lista">Zwroty z kosza pokażą się po jego wybraniu.</Pusto>}
         </div>
       </Karta>
       </SrodekIDowody>
