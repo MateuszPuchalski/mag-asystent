@@ -74,6 +74,16 @@ describe("kolejki używają jednej kolumny", () => {
     expect(SIATKA_TRZECH_KOLUMN).toContain("xl:grid-cols-[21rem_minmax(0,1fr)_16rem]");
   });
 
+  it("kolumna listy ma tę samą szerokość na każdej kolejce", () => {
+    /* Trzy siatki piszą szerokość listy osobno (reklamacje progami `xl`, więc
+       nie mogą wziąć wspólnego napisu). Zmiana w jednej bez pozostałych dałaby
+       agentowi kolejkę, która skacze przy przejściu między zakładkami. */
+    const listy = (s: string) => [...new Set([...s.matchAll(/grid-cols-\[(\d+rem)_/g)].map((m) => m[1]))];
+    for (const siatka of [SIATKA_TRZECH_KOLUMN, SIATKA_SKRZYNKI(true), SIATKA_SKRZYNKI(false), reklamacje]) {
+      expect(listy(siatka)).toEqual(["21rem", "25rem"]);
+    }
+  });
+
   it("skrzynka bez otwartej rozmowy oddaje rozmowie miejsce po kontekście", () => {
     expect(SIATKA_SKRZYNKI(false)).not.toContain("16rem");
     expect(SIATKA_SKRZYNKI(true)).toContain("16rem");
