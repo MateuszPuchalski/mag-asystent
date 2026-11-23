@@ -48,6 +48,18 @@ export function useBezZdjecia(q: string, offset: number, sortuj: SortBezZdjecia 
   });
 }
 
+/**
+ * Czy dodawanie zdjęć jest w tej instalacji wyłączone.
+ *
+ * Pyta o TĄ SAMĄ listę z domyślnymi parametrami co ekran zdjęć, więc oba
+ * miejsca dzielą jedną odpowiedź w pamięci podręcznej. Dopóki odpowiedź nie
+ * przyszła (albo padła), mówi „nie": zakładka ma stać, a nie znikać po cichu.
+ */
+export function useZdjeciaWylaczone(): boolean {
+  const lista = useBezZdjecia("", 0);
+  return lista.data !== undefined && !lista.data.wlaczone;
+}
+
 export interface PodgladZdjecia {
   podgladId: string;
   tlo: "usuniete" | "zostawione";

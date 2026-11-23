@@ -121,6 +121,24 @@ describe("Filtr segmentowy: zachowanie pigułki", () => {
     expect(screen.getByRole("button", { name: "Pusty 0" })).toBeInTheDocument();
   });
 
+  it("zero przygasza pigułkę, liczba dodatnia i brak danych jej nie przygaszają", () => {
+    /* Rząd kubełków ma pokazać, gdzie jest praca. Przygaszenie idzie barwą
+       pisma i tła, nie przezroczystością, która zabrałaby kontrast. „—” to brak
+       danych, nie zero: przygaszona pigułka czytałaby się jak „nic nie czeka”. */
+    render(<FiltrSegmentowy wybrany="x" onWybierz={() => {}} pozycje={[
+      { klucz: "x", etykieta: "Wybrany", ile: 0 },
+      { klucz: "y", etykieta: "Pusty", ile: 0 },
+      { klucz: "z", etykieta: "Pracy", ile: 4 },
+      { klucz: "w", etykieta: "Nieznany", ile: "—" },
+    ]} />);
+    expect(screen.getByRole("button", { name: "Pusty 0" }).className).toContain("bg-slate-50");
+    expect(screen.getByRole("button", { name: "Pracy 4" }).className).not.toContain("bg-slate-50");
+    expect(screen.getByRole("button", { name: "Pracy 4" }).className).toContain("text-slate-900");
+    expect(screen.getByRole("button", { name: "Nieznany —" }).className).not.toContain("bg-slate-50");
+    /* Wybrana pigułka zostaje czytelna, nawet gdy jej kubełek jest pusty. */
+    expect(screen.getByRole("button", { name: "Wybrany 0" }).className).toContain("bg-wertis-ink");
+  });
+
   it("`podpowiedz` ląduje w `title`, a jej brak nie zostawia pustego", () => {
     render(<FiltrSegmentowy wybrany="a" onWybierz={() => {}} pozycje={POZYCJE} />);
     expect(screen.getByRole("button", { name: /Do decyzji/ }))

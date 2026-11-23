@@ -11,7 +11,7 @@ import {
   useDodajZalacznik, useUsunZalacznik, useZalaczniki,
 } from "../api/rozmowy";
 import { useSzynaZdarzen } from "../api/zdarzenia";
-import { Blad, SIATKA_TRZECH_KOLUMN } from "../ui";
+import { Blad, SIATKA_SKRZYNKI } from "../ui";
 import { Kolejka } from "../skrzynka/Kolejka";
 import {
   LIMIT_PYTANIA, useCopilot, useKlasyfikuj, usePoprawKlasyfikacje, useOcenSzkic, useUlozSzkic,
@@ -627,7 +627,7 @@ export function Skrzynka() {
         środek rozpychałby się ponad przydział, gdy oś dostanie długi wyraz.
         `lg:grid-rows-[minmax(0,1fr)]` trzyma wysokość: pojedynczy wiersz
         `auto` mierzy się do `max-content` i grid wylewa się poza okno. */}
-    <div className={SIATKA_TRZECH_KOLUMN}>
+    <div className={SIATKA_SKRZYNKI(Boolean(rozmowa.data))}>
     <Kolejka
       nieswieza={alarm}
       copilot={copilot.data}
@@ -908,8 +908,9 @@ export function Skrzynka() {
     />
     </div>
 
-    {/* Trzecia kolumna. Bez rozmowy nie ma czego pokazać — kolumna znika,
-        zamiast stać pusta i zabierać środkowi 340 px. */}
+    {/* Trzecia kolumna. Bez rozmowy nie ma czego pokazać — siatka przechodzi
+        wtedy na dwie kolumny (`SIATKA_SKRZYNKI`), więc rozmowa bierze po prawej
+        całe miejsce, a nie zostawia pustego pola. */}
     {rozmowa.data && <Kontekst dane={rozmowa.data}
       onWstawDoSzkicu={(t) => ustawSzkic(szkic ? `${szkic}\n${t}` : t)}
       /* Ta sama droga, co z osi rozmowy: historia klienta prowadzi do jego

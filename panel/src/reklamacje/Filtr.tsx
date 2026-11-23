@@ -37,7 +37,7 @@ export function FiltrKolejki({ porzadek, osie, onPorzadek, prog, onPrzelaczProg 
     <button ref={wyzwalacz} type="button" aria-expanded={otwarte} aria-controls={otwarte ? idOkna : undefined}
       aria-label={`Filtr i sortowanie${wlaczony ? " (włączony)" : ""}`}
       title="Porządek i zakres listy" onClick={() => setOtwarte((o) => !o)}
-      className="relative flex h-11 w-11 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-900 hover:bg-slate-50">
+      className="relative flex h-8 w-8 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-900 hover:bg-slate-50">
       <ListFilter size={18} aria-hidden="true" />
       {wlaczony && <span aria-hidden="true"
         className="absolute right-1.5 top-1.5 h-2 w-2 rounded-full bg-wertis-ink" />}
