@@ -40,7 +40,7 @@ export function ekranZgloszenia(pathname: string): string {
   return pathname.replace(/^(\/obsluga\/klient)\/[^/]+/, "$1/:login").slice(0, 200);
 }
 
-/** Przycisk paska bocznego. Sama ikona, bo zwinięty pasek ma 80 px szerokości. */
+/** Przycisk paska bocznego. W zwiniętym pasku sama ikona, bo ma on 80 px szerokości. */
 export function PrzyciskZgloszenia({ zwiniety = false }: { zwiniety?: boolean }) {
   const [otwarte, setOtwarte] = useState(false);
   return <>

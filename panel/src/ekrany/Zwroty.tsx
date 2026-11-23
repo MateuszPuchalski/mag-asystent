@@ -128,12 +128,12 @@ const NAZWA_ROZJAZDU: Record<string, string> = {
   zwrot_rozliczony_bez_korekty: "rozliczony w Allegro bez korekty",
 };
 
-/* Rodzaje, które dotyczą ZWROTU — ich klucz to numer zwrotu, więc zawężają
-   listę. Pozostałe mówią o koszach i prowadzą do ekranu koszy. */
 /* Kubełki przeglądania, nie pracy: stoją pod „Więcej”. Na wierzchu zostaje to,
    co czeka na biuro — decyzja, ocena, zwrot pieniędzy i korekta. */
 const POD_WIECEJ: ReadonlyArray<Kubelek | null> = ["odrzucony", "zamkniety", null];
 
+/* Rodzaje, które dotyczą ZWROTU — ich klucz to numer zwrotu, więc zawężają
+   listę. Pozostałe mówią o koszach i prowadzą do ekranu koszy. */
 const ROZJAZDY_ZWROTOW = new Set(["zwrot_po_terminie", "zwrot_bez_przelewu", "zwrot_rozliczony_bez_korekty"]);
 
 function PasekRozjazdow({ rozjazdy, filtr, onFiltr }: {
