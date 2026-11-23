@@ -49,7 +49,7 @@ describe("FiltrZWiecej", () => {
     expect(screen.getByRole("button", { name: "Do decyzji 3" })).toHaveAttribute("aria-pressed", "false");
   });
 
-  it("kubełek z wierzchu zostawia listę na „Więcej…” bez obwódki", () => {
+  it("kubełek z wierzchu zostawia listę na „Więcej” bez obwódki", () => {
     render(<Filtr />);
     const lista = screen.getByLabelText("Więcej kubełków") as HTMLSelectElement;
     expect(lista.value).toBe("");
@@ -63,20 +63,15 @@ describe("FiltrZWiecej", () => {
     expect(screen.getAllByRole("button")).toHaveLength(2);
   });
 
-  /* Tryb zwarty: lista na szerokość treści,
-     w rzędzie pigułek. Domyślny zostaje dla kolejek, które go nie wybrały. */
-  it("zwarta lista mierzy się treścią, domyślna bierze resztę rzędu", () => {
-    const pozycje = [{ klucz: "a", etykieta: "A" }, { klucz: "b", etykieta: "B", ile: 2 }];
-    const { unmount } = render(<FiltrZWiecej<string> zwarty wybrany="a" onWybierz={() => {}}
-      wiecej={["b"]} pozycje={pozycje} />);
-    const zwarta = screen.getByLabelText("Więcej kubełków") as HTMLSelectElement;
-    expect(zwarta.className).toMatch(/\bshrink-0\b/);
-    expect(zwarta.className).not.toMatch(/\bflex-1\b/);
-    expect(zwarta.selectedOptions[0].textContent).toBe("Więcej");
-    unmount();
-    render(<FiltrZWiecej<string> wybrany="a" onWybierz={() => {}} wiecej={["b"]} pozycje={pozycje} />);
-    const domyslna = screen.getByLabelText("Więcej kubełków") as HTMLSelectElement;
-    expect(domyslna.className).toMatch(/\bflex-1\b/);
-    expect(domyslna.selectedOptions[0].textContent).toBe("Więcej…");
+  /* Lista stoi w rzędzie pigułek na szerokość treści. Rozciągnięta na resztę
+     rzędu po zawinięciu byłaby osobnym paskiem pod kubełkami. */
+  it("lista mierzy się treścią, nie resztą rzędu", () => {
+    render(<FiltrZWiecej<string> wybrany="a" onWybierz={() => {}} wiecej={["b"]}
+      pozycje={[{ klucz: "a", etykieta: "A" }, { klucz: "b", etykieta: "B", ile: 2 }]} />);
+    const lista = screen.getByLabelText("Więcej kubełków") as HTMLSelectElement;
+    expect(lista.className).toMatch(/\bshrink-0\b/);
+    expect(lista.className).toContain("[field-sizing:content]");
+    expect(lista.className).not.toMatch(/\bflex-1\b/);
+    expect(lista.selectedOptions[0].textContent).toBe("Więcej");
   });
 });

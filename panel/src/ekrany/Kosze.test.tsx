@@ -110,6 +110,7 @@ function odpowiedz(url: string, init?: RequestInit): unknown {
       zalatwionePrzez: "Anna", zalatwioneNotatka: "znalazło się" } : p) } };
   if (url.startsWith("/api/biuro/kosze/szukaj?q=")) {
     szukane.push(decodeURIComponent(url.split("q=")[1]));
+    if (url.endsWith("q=PADA")) return { __status: 500, error: "Serwer nie odpowiada" };
     return { znalezione: [{ koszId: 15, kod: "Z-15", mmNumer: null, koszStatus: "rozlozony", symbol: "HM-0410",
       nazwa: "Szarpak", ilosc: 1, status: "done", lokFaktyczna: "ZWR-2", powod: null, kiedy: null }] };
   }
@@ -279,6 +280,18 @@ describe("Kosze w zakładce Zwroty", () => {
     await waitFor(() => expect(szukane).toContain("HM"));
     await userEvent.click(await screen.findByRole("button", { name: /Szarpak/ }));
     expect(screen.getAllByTestId("adres")[0]).toHaveTextContent("/obsluga/zwroty/kosze/15");
+  });
+
+  it("błąd listy stoi nad listą, nie w przewijanej części kolumny", async () => {
+    /* Pod długim kubełkiem błąd zjechałby poza okno, a lista wyglądałaby na
+       aktualną. Kolumna przewija wyłącznie listę. */
+    pokaz();
+    await screen.findByRole("button", { name: /Z-14/ });
+    await userEvent.type(screen.getByLabelText("Szukaj towaru w koszach"), "PADA");
+    const blad = await screen.findByText("Serwer nie odpowiada");
+    const kolumna = screen.getByRole("region", { name: "Kolejka koszy" });
+    expect(kolumna).toContainElement(blad);
+    expect(blad.closest(".overflow-y-auto")).toBeNull();
   });
 
   it("kolejka nie powtarza tytułem wybranej zakładki przełącznika (0.525.0)", async () => {

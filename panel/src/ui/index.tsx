@@ -278,9 +278,13 @@ export function SrodekIDowody({ children }: { children: React.ReactNode }) {
   return <div className="flex min-h-0 flex-col gap-4 lg:overflow-y-auto xl:contents">{children}</div>;
 }
 
+/* Układ kolumny stoi w stałych kart, a nie przy każdej karcie: obie są kolumnami
+   z własnym przewijaniem, a ekran, który by go pominął, wypchnąłby kartę poza okno. */
+const KARTA_KOLUMNA = "flex min-h-0 flex-col overflow-hidden";
+
 /** Klasy karty w `SrodekIDowody`: praca zajmuje co najmniej okno, dowody schodzą pod nią. */
-export const KARTA_PRACY = "lg:min-h-full xl:min-h-0 shrink-0 xl:shrink";
-export const KARTA_DOWODOW = "shrink-0 xl:shrink";
+export const KARTA_PRACY = `${KARTA_KOLUMNA} lg:min-h-full xl:min-h-0 shrink-0 xl:shrink`;
+export const KARTA_DOWODOW = `${KARTA_KOLUMNA} shrink-0 xl:shrink`;
 
 /** Czas w formacie, który czyta biuro — jedna funkcja na cały panel. */
 /* ── ZNACZNIK CZASU BEZ SEKUND ─────────────────────────────────────────────────
