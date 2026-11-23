@@ -18,6 +18,7 @@ import { Reklamacje } from "./ekrany/Reklamacje";
 import { Zadania } from "./ekrany/Zadania";
 import { Pomylki } from "./ekrany/Pomylki";
 import { useLicznikPomylek } from "./api/pomylki";
+import { useZdjeciaWylaczone } from "./api/zdjecia";
 import { SzukajIKlawisze } from "./nawigacja/Klawisze";
 import { WskaznikSynchronizacji } from "./nawigacja/Synchronizacja";
 import { PasekPolaczenia } from "./nawigacja/Polaczenie";
@@ -113,7 +114,12 @@ function LicznikPomylek() {
 function PasekBoczny({ wyloguj }: { wyloguj: () => void }) {
   const { pathname } = useLocation();
   const [zwiniety, przelaczZwiniecie] = useZwinietyPasek();
-  /* Zwinięty pasek i okno węższe niż 900 px wyglądają tak samo: same ikony
+  const ja = useJa().data?.user.name;
+  /* Zakładka Zdjęcia znika, gdy ta instalacja ich nie dodaje: ekran kończył się
+     tam pustą kartą z jednym zdaniem. Dopóki odpowiedź nie przyszła, zakładka
+     stoi, a trasa zostaje pod bezpośrednim linkiem. */
+  const zdjeciaWylaczone = useZdjeciaWylaczone();
+  /* Zwinięty pasek i okno węższe niż 1280 px wyglądają tak samo: same ikony
      i liczniki. Klasy wąskiego okna stoją więc obok klas zwinięcia, a nie
      zamiast nich — ręczny wybór nie może przegrać z szerokością okna.
      Klasy są pisane w całości, bo Tailwind nie widzi tych, które sklejamy. */
@@ -123,12 +129,16 @@ function PasekBoczny({ wyloguj }: { wyloguj: () => void }) {
      kolejki i tak nie wykorzystują, a oddaje pracy całą wysokość okna.
 
      Na dole stoją rzeczy, które rzadko się klika albo tylko się czyta:
-     szukanie, stan synchronizacji i menu „Więcej". Menu otwiera się w górę,
-     bo pod nim nie ma już miejsca na ekranie.
+     szukanie, zgłoszenie uwagi, stan synchronizacji i menu „Więcej". Rozwinięty
+     pasek podpisuje je słowami, bo cztery ikony bez podpisu każą zgadywać,
+     która co robi; zwinięty zostaje przy samych ikonach. Pod spodem stoi
+     imię zalogowanego, żeby było widać, na czyim koncie się pracuje.
+     Menu otwiera się w górę, bo pod nim nie ma już miejsca na ekranie.
 
      Pasek można zwinąć do ikon przyciskiem na dole (`useZwinietyPasek`).
-     Poniżej 900 px zwija się sam, a przycisk znika, bo rozwinięty pasek
-     zjadłby tam trzecią część pracy. Nazwa zakładki zostaje dla czytnika
+     Poniżej 1280 px zwija się sam, a przycisk znika: przy 1180 px (laptop
+     obok Subiekta) rozwinięty pasek zabierałby pracy 144 px, a to ona jest
+     treścią ekranu. Nazwa zakładki zostaje dla czytnika
      ekranu i w dymku (`sr-only`).
 
      Przewija się tylko lista zakładek. Dolny blok nie może mieć `overflow`,
@@ -139,16 +149,16 @@ function PasekBoczny({ wyloguj }: { wyloguj: () => void }) {
      musi mieścić się w jego szerokości albo zawijać się w niej. */
   return <aside aria-label="Menu panelu" data-zwiniety={zwiniety}
     className={`sticky top-0 z-20 flex shrink-0 flex-col gap-3 self-start border-r border-slate-200 bg-wertis-ink p-2 text-white lg:static lg:self-stretch ${
-      zwiniety ? "w-20" : "w-56 max-[899px]:w-20"}`}>
+      zwiniety ? "w-20" : "w-56 max-[1279px]:w-20"}`}>
     {/* BIAŁE LOGO NA GRAFITOWYM PASKU. Znak w barwach marki ma grafitowe litery
         i na tym tle znikał, więc stał na białej tabliczce. Wersja dla ciemnego
         tła z księgi znaku nie potrzebuje tabliczki. W wąskim pasku logo nie ma
         gdzie się zmieścić, więc ustępuje miejsca zakładkom. */}
     <img src={logoBiale} alt="WERTIS — sklep z częściami"
-      className={`mx-auto block h-12 w-auto ${zwiniety ? "hidden" : "max-[899px]:hidden"}`} />
+      className={`mx-auto block h-12 w-auto ${zwiniety ? "hidden" : "max-[1279px]:hidden"}`} />
     {/* Nazwa „Praca" odróżnia ten blok od menu „Więcej" dla czytnika ekranu. */}
     <nav id="pasek-zakladki" aria-label="Praca" className="flex min-h-0 flex-1 flex-col gap-1 overflow-y-auto">
-      {ZAKLADKI.map((z) => {
+      {ZAKLADKI.filter((z) => !(zdjeciaWylaczone && z.do === "/obsluga/zdjecia")).map((z) => {
         const aktywna = z.korzen ? pathname === z.do : pathname.startsWith(z.do);
         return <React.Fragment key={z.do}>
           {z.kreska && <span aria-hidden="true" className="mx-1 my-1 h-px bg-white/15" />}
@@ -160,9 +170,9 @@ function PasekBoczny({ wyloguj }: { wyloguj: () => void }) {
             aria-current={aktywna ? "page" : undefined} title={z.etykieta}
             className={`flex min-h-10 items-center gap-2.5 whitespace-nowrap rounded-lg px-3 py-2 text-sm font-semibold ${
               zwiniety ? "flex-wrap justify-center px-1.5"
-                : "max-[899px]:flex-wrap max-[899px]:justify-center max-[899px]:px-1.5"} ${
+                : "max-[1279px]:flex-wrap max-[1279px]:justify-center max-[1279px]:px-1.5"} ${
               aktywna ? "bg-wertis-amber text-wertis-ink" : "text-slate-300 hover:bg-white/10"}`}>
-            {z.ikona}<span className={zwiniety ? "sr-only" : "max-[899px]:sr-only"}>{z.etykieta}</span>
+            {z.ikona}<span className={zwiniety ? "sr-only" : "max-[1279px]:sr-only"}>{z.etykieta}</span>
             {z.do === "/obsluga/" && <LicznikDoZrobienia />}
             {z.do === "/obsluga/pomylki" && <LicznikPomylek />}</Link>
         </React.Fragment>;
@@ -176,20 +186,31 @@ function PasekBoczny({ wyloguj }: { wyloguj: () => void }) {
     <div className="flex flex-col gap-2">
       <EtykietaInstancji />
       <PlakietkaSpoznien />
-      <WskaznikSynchronizacji />
+      <WskaznikSynchronizacji zwiniety={zwiniety} />
       {/* Szukanie przed menu: pytanie „gdzie to jest" pada, zanim wiadomo,
-          do której zakładki iść. */}
-      <div className="flex flex-wrap items-center gap-2">
-        <SzukajIKlawisze />
-        {/* Zgłoszenie uwagi stoi w dolnym bloku, bo ma być na każdym ekranie,
-            a pracą nie jest. Sama ikona mieści się w zwiniętym pasku 80 px. */}
-        <PrzyciskZgloszenia />
-        <Wiecej wyloguj={wyloguj} />
-        {/* Przycisk zwinięcia stoi na końcu, z dala od zakładek: pomyłka
-            w kliku w zakładkę nie może zwijać paska. */}
+          do której zakładki iść. Zgłoszenie uwagi stoi w dolnym bloku, bo ma
+          być na każdym ekranie, a pracą nie jest.
+
+          Wiersze, nie rząd ikon: rozwinięty pasek ma 208 px wewnątrz, więc trzy
+          podpisane wiersze mieszczą się jeden pod drugim, a w zwiniętym pasku
+          80 px i tak wypadałaby jedna ikona na wiersz. Dolny blok nie ma
+          `overflow`, bo przycięłoby okienko „Więcej". */}
+      <div className="flex flex-col gap-1">
+        <SzukajIKlawisze zwiniety={zwiniety} />
+        <PrzyciskZgloszenia zwiniety={zwiniety} />
+        <Wiecej wyloguj={wyloguj} zwiniety={zwiniety} />
+      </div>
+      {/* Przycisk zwinięcia stoi na końcu, z dala od zakładek: pomyłka
+          w kliku w zakładkę nie może zwijać paska. Imię stoi obok niego
+          i znika razem z podpisami, bo w pasku ikon nie ma na nie miejsca. */}
+      <div className={`flex items-center gap-2 ${zwiniety ? "justify-center"
+        : "justify-between max-[1279px]:justify-center"}`}>
+        {ja && <span title={`Zalogowano: ${ja}`}
+          className={`min-w-0 truncate px-1 text-xs text-slate-300 ${zwiniety ? "hidden" : "max-[1279px]:hidden"}`}>
+          {ja}</span>}
         <button type="button" onClick={przelaczZwiniecie} aria-expanded={!zwiniety} aria-controls="pasek-zakladki"
           aria-label={zwiniety ? "Rozwiń menu" : "Zwiń menu"} title={zwiniety ? "Rozwiń menu" : "Zwiń menu"}
-          className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-white/10 text-slate-300 hover:bg-white/15 max-[899px]:hidden">
+          className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-white/10 text-slate-300 hover:bg-white/15 max-[1279px]:hidden">
           {zwiniety ? <PanelLeftOpen size={18} /> : <PanelLeftClose size={18} />}
         </button>
       </div>

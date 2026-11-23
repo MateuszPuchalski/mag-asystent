@@ -5,6 +5,7 @@ import { useJa, useZdrowie } from "../api/rozmowy";
 import { useLicznikZgloszen } from "../api/zgloszenia";
 import { useOkienko } from "../skrzynka/MenuRozmowy";
 import { zdanieSynchronizacji } from "./Synchronizacja";
+import { podpisPaska, wierszPaska } from "./wierszPaska";
 
 /** Adres ustawień w JEDNYM miejscu: czyta go menu i trasa w `main.tsx`. */
 export const USTAWIENIA = "/obsluga/ustawienia";
@@ -38,13 +39,14 @@ const WGLAD = [
 
 const POZYCJA = "flex min-h-10 items-center gap-2.5 rounded-lg px-2.5 text-sm font-semibold";
 
-export function Wiecej({ wyloguj }: { wyloguj: () => void }) {
+export function Wiecej({ wyloguj, zwiniety = false }: { wyloguj: () => void; zwiniety?: boolean }) {
   const { pathname } = useLocation();
   const { otwarte, setOtwarte, ramka } = useOkienko<HTMLDivElement>();
   const zdrowie = useZdrowie().data;
   /* Zgłoszenia czyta wyłącznie właściciel, więc innym rolom pozycji nie ma.
      Licznik nowych mówi mu, że ktoś czeka na jego słowo. */
-  const admin = useJa().data?.user.role === "admin";
+  const ja = useJa().data?.user;
+  const admin = ja?.role === "admin";
   /* Brak danych to nie zero: przy awarii licznik mówi „—”, a nie milknie.
      Zgaszony licznik właściciel czytałby jako „nikt nic nie zgłosił”. */
   const licznikZgloszen = useLicznikZgloszen(admin);
@@ -61,16 +63,23 @@ export function Wiecej({ wyloguj }: { wyloguj: () => void }) {
       aria-label="Więcej: stan systemu, dziennik, analiza, ustawienia, wyloguj"
       title="Stan systemu, dziennik, analiza, ustawienia, wyloguj"
       /* bursztyn: przycisk na ciemnym tle jest marką, jak aktywna zakładka */
-      className={`flex h-10 items-center gap-0.5 rounded-lg border px-2 ${
+      className={`${wierszPaska(zwiniety)} border ${
         wMenu ? "border-wertis-amber bg-wertis-amber text-wertis-ink"
           : otwarte ? "border-white/30 bg-white/15 text-white"
             : "border-white/15 bg-white/5 text-slate-300 hover:bg-white/10"}`}>
-      <Menu size={18} /><ChevronDown size={12} /></button>
+      <Menu size={18} className="shrink-0" />
+      <span className={`mr-auto ${podpisPaska(zwiniety)}`}>Więcej</span>
+      <ChevronDown size={12} className="shrink-0" /></button>
     {otwarte && <div role="group" aria-label="Więcej"
       /* Własny kolor tekstu, bo okienko rysuje się w pasku bocznym z
          `text-white` — ta sama pułapka co przy oknie szukania. Otwiera się
          w górę i w prawo: menu stoi na dole paska, a pod nim nie ma ekranu. */
       className="absolute bottom-full left-0 z-30 mb-2 flex w-72 flex-col gap-0.5 rounded-xl border border-slate-200 bg-white p-2 text-slate-900 shadow-lg">
+      {/* Kto jest zalogowany stoi na górze okienka w obu stanach paska:
+          w zwiniętym nie ma innego miejsca, a „Wyloguj" bez imienia każe
+          zgadywać, z czyjego konta się wychodzi. */}
+      {ja && <p className="truncate px-2.5 pb-1 pt-1 text-xs text-slate-600">
+        Zalogowano: <b className="text-slate-900">{ja.name}</b></p>}
       <span className="px-2.5 pb-0.5 pt-1.5 text-podpis font-bold uppercase tracking-wide text-slate-600">Wgląd</span>
       {WGLAD.map((p) => <Link key={p.do} to={p.do} onClick={zamknij}
         aria-current={tu(p.do) ? "page" : undefined} className={klasaPozycji(p.do)}>

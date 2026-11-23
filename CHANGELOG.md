@@ -10,6 +10,24 @@ z wersją monorepo" — i właśnie tak przestał być zgodny: `0.3.0` przetrwa�
 sześć zmergowanych zmian, w tym takie, które wymagały nowego uprawnienia SQL.
 Komentarz nie jest mechanizmem.
 
+## 0.624.0 — 23 listopada 2026
+
+**Otwarta sprawa mieści się na laptopie obok Subiekta.** Poniżej 1280 px menu
+zwija się samo do ikon. W Dostawach, Zwrotach i Koszach dowody schodzą pod
+pracę, więc opis wyjątku nie łamie się po dwa słowa.
+
+**Kolejki wyglądają tak samo.** Skrzynka, Zwroty, Reklamacje i Dostawy mają
+jeden układ kolumny z listą: kubełki pracy, reszta pod „Więcej", szukanie
+i jedno zdanie pustej kolejki. Zwroty oddają liście wysokość, którą zajmowały
+kafelki. Pusty kubełek jest przygaszony.
+
+**Dolny blok menu mówi, co jest czym.** Rozwinięte menu podpisuje szukanie,
+zgłoszenie i „Więcej", pokazuje, kto jest zalogowany, a stan synchronizacji
+stoi słowami.
+
+**Zakładka Zdjęcia znika, gdy dodawanie zdjęć jest wyłączone.** Skrzynka bez
+otwartej rozmowy oddaje jej całą prawą stronę okna.
+
 ## 0.623.0 — 23 listopada 2026
 
 **Obowiązkowy pomiar przy dostawie da się wyłączyć.** W Ustawieniach, w grupie

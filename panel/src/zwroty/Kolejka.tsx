@@ -1,9 +1,10 @@
 import React, { useEffect, useRef } from "react";
-import { AlertTriangle, PackageX, Ban, CircleHelp, BanknoteArrowDown, Copy } from "lucide-react";
+import { AlertTriangle, PackageX, Ban, CircleHelp, BanknoteArrowDown, Copy, Undo2 } from "lucide-react";
 import type { Kubelek, Sygnal, Zwrot } from "../api/typy";
 import { zlote } from "../api/zwroty";
 import { Zdjecie } from "../towar/Zdjecie";
-import { Pusto, ile, dniSlowo } from "../ui";
+import { ile, dniSlowo } from "../ui";
+import { PustaKolejka } from "../ui/KolumnaKolejki";
 
 /* ── Kolejka zwrotów ─────────────────────────────────────────────────────────
    Wiersz ma się czytać W BIEGU, więc niesie SIEDEM rzeczy i ani jednej
@@ -137,10 +138,10 @@ export function Kolejka({ zwroty, wybrany, zKubelkiem = false, onWybierz }: {
   useEffect(() => { aktywnyWiersz.current?.scrollIntoView({ block: "nearest" }); }, [wybrany]);
 
   if (!zwroty.length) {
-    return <Pusto waga="lista">
+    return <PustaKolejka ikona={Undo2}>
       {zKubelkiem
         ? "Żaden zwrot nie pasuje do tego, czego szukasz."
-        : "Ten kubełek jest pusty — nic tu nie czeka na ruch."}</Pusto>;
+        : "Ten kubełek jest pusty — nic tu nie czeka na ruch."}</PustaKolejka>;
   }
   /* Pierwsza paczka w drodze dostaje nad sobą przegródkę. Ekran
      ustawia takie zwroty na końcu (`Zwroty.tsx`), a przegródka mówi, że od

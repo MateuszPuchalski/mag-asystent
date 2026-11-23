@@ -1,7 +1,9 @@
 import React from "react";
+import { Truck } from "lucide-react";
 import type { DokumentDostawy, ZamknietaPoza } from "../api/dostawy";
 import { useLogoDostawcy } from "../towar/useZdjecie";
-import { Pusto, WierszKolejki, czas, dataLokalna, dzien, ile } from "../ui";
+import { WierszKolejki, czas, dataLokalna, dzien, ile } from "../ui";
+import { PustaKolejka } from "../ui/KolumnaKolejki";
 
 /* ── Kolejka dostaw ────────────────────────────────────────────────────────
    - WIERSZ W DWÓCH LINIACH (dekalog pkt 2). Numer z dostawcą i wiekiem, pod
@@ -113,7 +115,7 @@ export function KolejkaDostaw({ dokumenty, zOdpowiedzia, wybrany, onWybierz, pus
 }) {
   /* Pusty napis = nic nie mówić: w DO DECYZJI nad listą stoją wtedy wiersze
      spoza okna importu, a „nic nie czeka" pod nimi przeczyłoby im. */
-  if (!dokumenty.length) return pusto ? <Pusto waga="lista">{pusto}</Pusto> : null;
+  if (!dokumenty.length) return pusto ? <PustaKolejka ikona={Truck}>{pusto}</PustaKolejka> : null;
   const zLogo = dokumenty.some((d) => d.maLogo);
   return <ul className="divide-y divide-slate-200">
     {dokumenty.map((d) => {
@@ -188,7 +190,7 @@ export function KolejkaPozaWertis({ lista, wybrany, onWybierz }: {
   onWybierz: (dokId: number) => void;
 }) {
   /* Bez „w tym oknie": ta lista nie ma okna, serwer oddaje każde zdjęcie. */
-  if (!lista.length) return <Pusto waga="lista">Nic nie zdjęto z listy.</Pusto>;
+  if (!lista.length) return <PustaKolejka ikona={Truck}>Nic nie zdjęto z listy.</PustaKolejka>;
   return <ul className="divide-y divide-slate-200">
     {lista.map((d) => <Wiersz key={d.dokId} aktywny={d.dokId === wybrany} onKlik={() => onWybierz(d.dokId)}>
       <span className="flex w-full items-baseline gap-2">
