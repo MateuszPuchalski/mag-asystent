@@ -85,6 +85,61 @@ const TABELA: Array<{ opis: string; sym: string; oczekiwane: Array<[string, stri
     po: "ukośnik dzieli listę zamienników tak samo jak listę OEM" },
   { opis: "PRO-491588-ZAM zestaw naprawczy", sym: "P1", oczekiwane: [],
     po: "`ZAM` BEZ dwukropka to część symbolu, nie etykieta — inaczej pół opisu byłoby listą" },
+  /* ── Numery ze spacjami w środku listy ────────────────────────────────────
+     Pomiar na kartotece: 83 wiersze tabeli były urywkami takich numerów
+     (`4238`, `91-01`), a 49 pełnych numerów nie było w niej wcale. Urywek jest
+     gorszy od braku, bo `4238` zaczyna dziesiątki numerów Stihla. */
+  { opis: "Modele: TS500  OEM: 4238 141 0300 // 4238 140 1800 / 4238 140 4401 // 4238 141 300B // 4238 140 4402 // Zamiennik: FTC171 // 89-051",
+    sym: "W08-1101",
+    oczekiwane: [["oem", "4238 141 0300"], ["oem", "4238 140 1800"], ["oem", "4238 140 4401"], ["oem", "4238 141 300B"],
+      ["oem", "4238 140 4402"], ["zamiennik", "FTC171"], ["zamiennik", "89-051"]],
+    po: "zapis Stihla 4-3-4 to JEDEN numer, także z literą w ostatniej grupie" },
+  { opis: "346SP, 350, 351, 353, 2145 OEM: 537 06 91-01 537 06 91-02 503 93 21-01 540 05 79-01", sym: "28-05014",
+    oczekiwane: [["oem", "537 06 91-01"], ["oem", "537 06 91-02"], ["oem", "503 93 21-01"], ["oem", "540 05 79-01"]],
+    po: "numery Husqvarny jeden za drugim po samej spacji to cztery numery, nie cztery ogony" },
+  { opis: "FS85 FS90 FS96 BG60 BG61 Walbro WT-38 OEM: 4117 120 0605 41171200605 Zamiennik: 10-04032", sym: "76-084",
+    oczekiwane: [["oem", "4117 120 0605"], ["zamiennik", "10-04032"]],
+    po: "zapis ze spacjami i zapis zwarty obok siebie to jeden wiersz, bez `4117` i `0605`" },
+  { opis: "Numer części oryginalnej: 573 93 88-05 / WALBRO MBU-16", sym: "09-05010",
+    oczekiwane: [["nr_oryg", "573 93 88-05"], ["nr_oryg", "MBU-16"]],
+    po: "ukośnik po myślniku nie dzieli kawałka, więc numer trzeba rozpoznać w jego środku" },
+  { opis: "wał 22.2 mm OEM: 0000 702 5000/6350 702 5000", sym: "17-2670",
+    oczekiwane: [["oem", "0000 702 5000"], ["oem", "6350 702 5000"]], po: "dwa numery Vikinga przez ukośnik" },
+  /* ── Pisownia znanych etykiet ─────────────────────────────────────────────
+     Te same etykiety, inaczej napisane. Pomiar: 27 numerów w czternastu opisach. */
+  { opis: "OEM: 41283580800 Zaminnik: NZ652 //  012-0001 // 10-04008", sym: "W39-0401",
+    oczekiwane: [["oem", "41283580800"], ["zamiennik", "NZ652"], ["zamiennik", "012-0001"], ["zamiennik", "10-04008"]],
+    po: "`Zaminnik:` to literówka od `Zamiennik:`" },
+  { opis: "Zaamiennie: NZ565 // 31-0041", sym: "08-12036",
+    oczekiwane: [["zamiennik", "NZ565"], ["zamiennik", "31-0041"]], po: "`Zaamiennie:` to literówka od `Zamiennie:`" },
+  { opis: "Nr. zamienny: RO9159 10-9159 OEM: 723-0448 / 723-0448A / 923-0448A", sym: "22-25002",
+    oczekiwane: [["oem", "723-0448"], ["oem", "723-0448A"], ["oem", "923-0448A"], ["zamiennik", "RO9159"], ["zamiennik", "10-9159"]],
+    po: "`Nr. zamienny:` otwiera listę zamienników" },
+  { opis: "Zamienne: 100-061 bez otowrów // 15-50299 14-09008-(bez otworów bocznych) 118995 440126", sym: "RO50299",
+    oczekiwane: [["zamiennik", "100-061"], ["zamiennik", "15-50299"], ["zamiennik", "14-09008"], ["zamiennik", "118995"], ["zamiennik", "440126"]],
+    po: "`Zamienne:` otwiera listę; dopisek w nawiasie nie przykleja się do numeru" },
+  { opis: "Zastępuje nr: 606083 Zamiennik: 100-143", sym: "W37-0504",
+    oczekiwane: [["zamiennik", "606083"], ["zamiennik", "100-143"]], po: "`Zastępuje nr:` to `Zastępuje:` z dopowiedzeniem" },
+  { opis: "Stihl FS80, FS85 - (kwadrat 25,4mm) Zastępuje nr: 4180 640 0114 // 41806400114", sym: "W37-0401",
+    oczekiwane: [["zamiennik", "4180 640 0114"]], po: "obie poprawki naraz: etykieta i zapis Stihla" },
+  { opis: "Zamiennie: 115-049 // 99-005 // 010023 Do: 240E Nr.org: 574 71 93-01 // 577 10 17-01 // 581 06 39-01", sym: "28-05064",
+    oczekiwane: [["nr_oryg", "574 71 93-01"], ["nr_oryg", "577 10 17-01"], ["nr_oryg", "581 06 39-01"],
+      ["zamiennik", "115-049"], ["zamiennik", "99-005"], ["zamiennik", "010023"]],
+    po: "`Nr.org:` to `Nr. oryg.:` bez `y`; `Do:` nadal kończy listę zamienników" },
+  { opis: "CASTELGARDEN TC92, TC102, TC122 nr. org: 112735694/0, 12735694/0, 9987-5238-12", sym: "16-11014",
+    oczekiwane: [["nr_oryg", "112735694/0"], ["nr_oryg", "12735694/0"], ["nr_oryg", "9987-5238-12"]],
+    po: "`nr. org:` małymi literami; modele przed etykietą nie wchodzą" },
+  { opis: "Husqvarna 40 45 , Jonsered 2045 , Partner 400 Nr oryginału: 506014004", sym: "28-05021",
+    oczekiwane: [["nr_oryg", "506014004"]], po: "`Nr oryginału:` to ta sama etykieta w dopełniaczu" },
+  /* Strażnicy drugiej strony: szersza pisownia nie ma prawa wpuścić sekcji,
+     które mówią o czymś innym niż ta kartoteka. */
+  { opis: "OEM: 692519 806232 OEM wstępny: 692520 ZAM: W08-1305 ZAM wstępny: 510011", sym: "692519",
+    oczekiwane: [["oem", "806232"], ["zamiennik", "W08-1305"]],
+    po: "`OEM wstępny:` i `ZAM wstępny:` to numery filtra wstępnego, czyli innej części" },
+  { opis: "Zamiennik pasuję do: 470 BRE 470 BRV 520 BRV Powerline 4700 BRV Powerline 5200 BRV", sym: "470055",
+    oczekiwane: [], po: "po `Zamiennik pasuję do:` stoją modele, nie numery" },
+  { opis: "duży gwint do nr oryginalnego: 11-06036, PR15Y, BPMR7A", sym: "RCJ6Y", oczekiwane: [],
+    po: "`do nr oryginalnego:` to zdanie, nie etykieta `Nr oryg.:`" },
 ];
 
 test("parser identyfikatorów: kształty z prawdziwych opisów", () => {
@@ -96,7 +151,7 @@ test("parser identyfikatorów: kształty z prawdziwych opisów", () => {
 
 test("na pełnej kartotece przebudowa daje setki identyfikatorów, nie zero i nie tysiące", () => {
   const w = I.przebudujIdentyfikatory(db());
-  /* Progi z rodziną „zamiennik": 973 kartoteki i 3443 numery, z czego 1701
+  /* Progi z rodziną „zamiennik": 981 kartotek i 3436 numerów, z czego 1720
      z sekcji zamienników. Dolna granica pilnuje, że reguły w ogóle trafiają
      w dane, a górna — że parser nie zaczął mielić prozy. */
   assert.ok(w.kartotek >= 800 && w.kartotek <= 1100, `kartotek z identyfikatorem: ${w.kartotek}`);
@@ -110,6 +165,14 @@ test("na pełnej kartotece przebudowa daje setki identyfikatorów, nie zero i ni
   assert.ok(I.szukajPoIdentyfikatorze("41307131600").map((i) => i.symbol).includes("FTC272"));
   assert.equal(I.szukajPoIdentyfikatorze("532 16 56-30").length, I.szukajPoIdentyfikatorze("5321656-30").length);
   assert.ok(I.szukajPoIdentyfikatorze("532 16 56-30").length >= 1);
+  /* Numer Stihla klient pisze ze spacjami albo bez — oba zapisy prowadzą do
+     kartoteki. Sam początek `4238` nie prowadzi nigdzie: to urywek, nie numer. */
+  assert.ok(I.szukajPoIdentyfikatorze("4238 140 1800").map((i) => i.symbol).includes("W08-1101"));
+  assert.ok(I.szukajPoIdentyfikatorze("42381401800").map((i) => i.symbol).includes("W08-1101"));
+  assert.deepEqual(I.szukajPoIdentyfikatorze("4238"), []);
+  /* Ogon numeru Husqvarny (`91-01` z `537 06 91-01`) też nie jest numerem. */
+  assert.deepEqual(I.szukajPoIdentyfikatorze("91-01"), []);
+  assert.ok(I.szukajPoIdentyfikatorze("537069101").map((i) => i.symbol).includes("28-05014"));
 });
 
 test("z sekcji zamienników wchodzą OBCE numery, nasze kartoteki zostają zamiennikami", () => {

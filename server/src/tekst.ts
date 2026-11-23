@@ -70,6 +70,31 @@ export function zwin(s: string): string {
   return out;
 }
 
+/* ── Kształt numeru części ───────────────────────────────────────────────────
+   Litery i cyfry z myślnikiem albo ukośnikiem, co najmniej cztery znaki, co
+   najmniej jedna cyfra. Łapie `W09-0211`, `GX160`, `17211-ZL8-023`,
+   `5901234567890`; nie łapie „148 mm" ani słów bez cyfr.
+
+   JEDNA REGUŁA NA DWA ZASTOSOWANIA, i dlatego mieszka tutaj. Kontrola szkicu
+   pyta nią, czy model nie dopisał klientowi numeru spoza faktów. Pomiar
+   parsera identyfikatorów pyta nią, ile numerów zostało w opisach kartotek
+   nieodczytanych. Dwie reguły rozjechałyby się przy pierwszej poprawce, a
+   pomiar liczyłby wtedy co innego, niż kontrola uznaje za numer.
+
+   Kropka i spacja do kształtu NIE należą: `110.004.065` i `532 16 56-30` reguła
+   widzi w kawałkach albo wcale. To świadoma cena prostoty, a pomiar ją
+   wypisuje jako swoją granicę. */
+const KSZTALT_NUMERU = /\b[A-Z0-9][A-Z0-9\-\/]{3,}\b/gi;
+
+/** Ciągi w kształcie numeru części wraz z miejscem w tekście. */
+export function ciagiNumerow(tekst: string): Array<{ numer: string; indeks: number }> {
+  const out: Array<{ numer: string; indeks: number }> = [];
+  for (const m of tekst.matchAll(KSZTALT_NUMERU)) {
+    if (/\d/.test(m[0])) out.push({ numer: m[0], indeks: m.index });
+  }
+  return out;
+}
+
 /** Ile znaków zapytania w ogóle bierzemy pod uwagę. */
 const MAX_ZNAKOW = 100;
 /** Ile słów. Wklejony opis to 30 tokenów × 3600 wierszy — już nie 15 ms. */
