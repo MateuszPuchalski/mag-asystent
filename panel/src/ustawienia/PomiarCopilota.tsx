@@ -52,6 +52,9 @@ const NAZWA_ZADANIA: Record<string, string> = {
   pasowanie_siec_silnik: "pasowanie od silnika", klucz_modelu: "klucz modelu z opisu",
   /* Poranek przed pracą ma własne zadania w księdze. */
   szkic_przed_praca: "szkic przed pracą", klasyfikacja_przed_praca: "rozpoznanie przed pracą",
+  /* Powtórki zapisanych spraw puszczane ręcznie na serwerze. Biuro ich nie
+     zleca, ale koszt jest prawdziwy i ma mieć nazwę. */
+  szkic_zestaw: "zestaw testowy szkiców",
 };
 const sek = (ms: number | null) => (ms === null ? "—" : `${(ms / 1000).toFixed(1).replace(".", ",")} s`);
 

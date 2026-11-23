@@ -124,3 +124,70 @@ export function sprzatnijWejscia(database: DatabaseSync, teraz: Date, dni = DNI_
   }
   return usunietych;
 }
+
+/** Wejście szkicu odczytane z bazy, z zamkami typów z powrotem na miejscu. */
+export interface WejscieSzkicu {
+  id: number;
+  wywolanieId: number | null;
+  conversationId: number | null;
+  messageId: number | null;
+  zadanie: string;
+  at: string;
+  model: string | null;
+  wersjaInstrukcji: string | null;
+  watek: TrescBezpieczna;
+  fakty: FaktyBezpieczne;
+  zdjecia: ZdjecieWejscia[];
+  wynikiNarzedzi: WynikWywolania[];
+  /** Surowa odpowiedź sprzed sit; `null`, gdy dostawca nie odpowiedział. */
+  wyjscie: unknown;
+  wynikSit: string | null;
+}
+
+/** Zadania, które układają szkic na kliknięcie albo z taktu. Dopytanie ma inne wejście. */
+export const ZADANIA_SZKICU = ["szkic", "szkic_przed_praca"] as const;
+
+const lista = <T>(json: unknown): T[] => {
+  try {
+    const v = JSON.parse(String(json ?? "[]")) as unknown;
+    return Array.isArray(v) ? v as T[] : [];
+  } catch {
+    return [];
+  }
+};
+
+/**
+ * Wejścia szkiców do powtórki, od najnowszego. Na jedną wiadomość klienta
+ * wchodzi JEDNO wejście, ostatnie: agent, który kliknął szkic trzy razy,
+ * dałby trzy razy tę samą sprawę, a każda powtórka kosztuje.
+ *
+ * Wątek i fakty dostają zamki typów z powrotem. Wolno, bo `zapiszWejscie`
+ * przyjmuje w te dwie kolumny wyłącznie typy z zamkiem, a nikt inny do tej
+ * tabeli nie pisze. Czysty odczyt.
+ */
+export function wejsciaSzkicow(
+  database: DatabaseSync, o: { od?: string | null; limit: number },
+): WejscieSzkicu[] {
+  const zadania = ZADANIA_SZKICU.map((z) => `'${z}'`).join(",");
+  const wiersze = database.prepare(`SELECT w.* FROM copilot_wejscie w
+    WHERE w.zadanie IN (${zadania}) AND w.at >= ?
+      AND w.id = (SELECT MAX(x.id) FROM copilot_wejscie x
+                   WHERE x.zadanie IN (${zadania})
+                     AND x.conversation_id IS w.conversation_id AND x.message_id IS w.message_id)
+    ORDER BY w.id DESC LIMIT ?`).all(o.od ?? "", o.limit) as Array<Record<string, unknown>>;
+  return wiersze.map((w) => ({
+    id: Number(w.id),
+    wywolanieId: w.wywolanie_id == null ? null : Number(w.wywolanie_id),
+    conversationId: w.conversation_id == null ? null : Number(w.conversation_id),
+    messageId: w.message_id == null ? null : Number(w.message_id),
+    zadanie: String(w.zadanie), at: String(w.at),
+    model: w.model == null ? null : String(w.model),
+    wersjaInstrukcji: w.wersja_instrukcji == null ? null : String(w.wersja_instrukcji),
+    watek: String(w.watek) as TrescBezpieczna,
+    fakty: String(w.fakty) as FaktyBezpieczne,
+    zdjecia: lista<ZdjecieWejscia>(w.zdjecia),
+    wynikiNarzedzi: lista<WynikWywolania>(w.wyniki_narzedzi),
+    wyjscie: w.wyjscie == null ? null : JSON.parse(String(w.wyjscie)) as unknown,
+    wynikSit: w.wynik_sit == null ? null : String(w.wynik_sit),
+  }));
+}
