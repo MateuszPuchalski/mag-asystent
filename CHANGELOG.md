@@ -10,6 +10,15 @@ z wersją monorepo" — i właśnie tak przestał być zgodny: `0.3.0` przetrwa�
 sześć zmergowanych zmian, w tym takie, które wymagały nowego uprawnienia SQL.
 Komentarz nie jest mechanizmem.
 
+## 0.625.1 — 23 listopada 2026
+
+**Dostawy: „Poza WERTIS” i „Archiwum” nie mówią „pusto”, gdy lista się nie
+wczytała.** Zamiast „nic nie zdjęto z listy” albo „archiwum jest puste” ekran
+pokazuje błąd, a stopka i licznik nie podają zera, którego nikt nie policzył.
+
+Link do dokumentu otwiera jego kubełek także wtedy, gdy lista zdjętych dostaw
+padła. Błąd odświeżenia pod listą dotyczy listy, którą widać.
+
 ## 0.625.0 — 23 listopada 2026
 
 **Dostawy: wyjątek czyta się w całej szerokości.** Opis z hali stoi pod rodzajem
