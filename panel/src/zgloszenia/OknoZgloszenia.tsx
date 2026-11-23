@@ -7,6 +7,7 @@ import {
   useMojeZgloszenia, useWyslijZgloszenie, type RodzajZgloszenia,
 } from "../api/zgloszenia";
 import { useOkno } from "../nawigacja/fokus";
+import { podpisPaska, wierszPaska } from "../nawigacja/wierszPaska";
 import { Blad, FiltrSegmentowy, Plakietka, Przycisk, kiedy } from "../ui";
 import { przygotujZdjecie } from "./zdjecie";
 
@@ -40,13 +41,14 @@ export function ekranZgloszenia(pathname: string): string {
 }
 
 /** Przycisk paska bocznego. Sama ikona, bo zwinięty pasek ma 80 px szerokości. */
-export function PrzyciskZgloszenia() {
+export function PrzyciskZgloszenia({ zwiniety = false }: { zwiniety?: boolean }) {
   const [otwarte, setOtwarte] = useState(false);
   return <>
     <button type="button" onClick={() => setOtwarte(true)} aria-haspopup="dialog"
       aria-label="Zgłoś uwagę lub pomysł" title="Zgłoś uwagę lub pomysł"
-      className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-white/10 text-slate-300 hover:bg-white/15">
-      <MessageSquarePlus size={18} />
+      className={`${wierszPaska(zwiniety)} bg-white/10 text-slate-300 hover:bg-white/15`}>
+      <MessageSquarePlus size={18} className="shrink-0" aria-hidden="true" />
+      <span className={podpisPaska(zwiniety)}>Zgłoś uwagę</span>
     </button>
     {otwarte && <OknoZgloszenia onZamknij={() => setOtwarte(false)} />}
   </>;

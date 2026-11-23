@@ -307,7 +307,10 @@ export function Zadania() {
         {t.status === "odeslane" && <Odeslane zadanie={t} />}
       </Karta>)}
     </div>
-    {!widoczne.length && <Karta className="grid place-items-center p-16">
+    {/* Pusty ekran to `Pusto` w gołej karcie, jak w pomyłkach: własne
+        wypełnienie karty dokładałoby się do wypełnienia pustki i tworzyło
+        kartę dwa razy wyższą niż na innych ekranach. */}
+    {!widoczne.length && <Karta>
       <Pusto ikona={ClipboardList}>Brak zadań w tym widoku</Pusto></Karta>}
     {modal && <NoweZadanie zamknij={() => setModal(false)} />}
   </div>;

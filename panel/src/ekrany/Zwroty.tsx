@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import { List, Undo2 } from "lucide-react";
+import { Undo2 } from "lucide-react";
 import { useDociagnijPoSkanie, useSkanZwrotu, useSynchronizujZwroty, useZwroty, useSprawdzWszystkiePlatnosci, type WynikSkanu, type WynikSprawdzeniaWszystkich } from "../api/zwroty";
 import { Konflikt } from "../api/klient";
 import type { BilansKartotek, Kubelek, Ocena, StanZwrotow, WynikDosylki, Zwrot } from "../api/typy";
@@ -19,12 +19,14 @@ import {
   useDolozTowar, szukajTowaruDoKosza, type TowarDoKosza, useKosz, usePotwierdzKartoteke,
 } from "../api/zwroty";
 import { wygladaNaEan } from "../zwroty/rodzajKodu";
-import { Blad, FiltrSegmentowy, Karta, Pusto, SIATKA_TRZECH_KOLUMN } from "../ui";
+import { Blad, Karta, Pusto, SIATKA_TRZECH_KOLUMN, SrodekIDowody, KARTA_PRACY, KARTA_DOWODOW } from "../ui";
+import { FiltrZWiecej } from "../ui/FiltrZWiecej";
+import { KolumnaKolejki } from "../ui/KolumnaKolejki";
 import { PrzelacznikZwrotow } from "../zwroty/Przelacznik";
 import { Naglowek } from "../zwroty/Naglowek";
 import { DrogaKlienta } from "../sprawy/DrogaKlienta";
 import { ZlaPaczka } from "../pomylki/ZlaPaczka";
-import { Etapy, IKONA_KUBELKA } from "../zwroty/Etapy";
+import { Etapy } from "../zwroty/Etapy";
 import { KUBELKI, Kolejka } from "../zwroty/Kolejka";
 import { Dowody } from "../zwroty/Dowody";
 import { polecanyKandydat } from "../zwroty/Dokument";
@@ -33,7 +35,7 @@ import { NieOdeslany, POWOD_NIE_ODESLAL } from "../zwroty/NieOdeslany";
 import { pewnaPropozycja, szybkaSciezka } from "../zwroty/regulaSzybkiej";
 import { SITA_DECYZJI, sitoDecyzji, type SitoDecyzji } from "../zwroty/sita";
 import { Szukanie } from "../zwroty/Szukanie";
-import { SprawdzWszystkie } from "../zwroty/SprawdzWszystkie";
+import { PrzyciskSprawdzenia, WynikSprawdzenia } from "../zwroty/SprawdzWszystkie";
 import { PasekPorzadku, posortuj, usePorzadek } from "../sprawy/Porzadek";
 import { Koszyk, NowyKoszyk } from "../zwroty/Koszyk";
 import { NaOutlet } from "../zwroty/NaOutlet";
@@ -128,6 +130,10 @@ const NAZWA_ROZJAZDU: Record<string, string> = {
 
 /* Rodzaje, które dotyczą ZWROTU — ich klucz to numer zwrotu, więc zawężają
    listę. Pozostałe mówią o koszach i prowadzą do ekranu koszy. */
+/* Kubełki przeglądania, nie pracy: stoją pod „Więcej”. Na wierzchu zostaje to,
+   co czeka na biuro — decyzja, ocena, zwrot pieniędzy i korekta. */
+const POD_WIECEJ: ReadonlyArray<Kubelek | null> = ["odrzucony", "zamkniety", null];
+
 const ROZJAZDY_ZWROTOW = new Set(["zwrot_po_terminie", "zwrot_bez_przelewu", "zwrot_rozliczony_bez_korekty"]);
 
 function PasekRozjazdow({ rozjazdy, filtr, onFiltr }: {
@@ -996,45 +1002,27 @@ export function Zwroty() {
         Outlet nie ma pudła ani dokumentu — ma listę i czyjeś ręce. */}
     <NaOutlet />
     <div className={SIATKA_TRZECH_KOLUMN}>
-    <Karta className="flex min-h-0 flex-col overflow-hidden">
-      {/* `shrink-0` na blokach nad listą nie jest kosmetyką: lista ma bazę 0,
-          więc przy ciasnym oknie kurczyłyby się WYŁĄCZNIE one. */}
-      {/* ── KAFLE ZAMIAST PIGUŁEK ───────────────────────────────────────────
-          Ikony zamiast tekstu. Siatka trzech kolumn układa kubełki w równe
-          rzędy, a kolejność i pomoc stają w ostatnim, obok „Wszystkie" — tam,
-          gdzie zostaje miejsce, zamiast przed kubełkami, które czyta się
-          pierwsze. */}
-      <nav className="grid shrink-0 grid-cols-3 gap-1 border-b border-slate-200 p-2">
-        {/* ── JEDEN KSZTAŁT WYBORU ───────────────────────────────────────────
-            Kształt jest jeden dla całego panelu — powód stoi przy
-            `FiltrSegmentowy`.
+    {/* ── KOLUMNA LISTY Z JEDNEJ FORMY ────────────────────────────────────
+        Układ pasm stoi w `ui/KolumnaKolejki.tsx`, tak samo jak w skrzynce,
+        reklamacjach i dostawach. Zwroty oddają liście wysokość, którą zajmowało
+        siedem kafli: na wierzchu stoją cztery kubełki pracy biura, a odrzucone,
+        zamknięte i wszystkie — pod „Więcej”. Klawisze 1–7 zostają bez zmian.
 
-            „Wszystkie" WCHODZI DO TABLICY, zamiast wisieć osobnym przyciskiem
-            pod pętlą: to jest ten sam wybór, co każdy kubełek, tylko bez
-            zawężenia. Numer klawisza liczy się z długości listy, więc dopisanie
-            kubełka nie zostawia w podpowiedzi nieaktualnej cyfry. */}
-        {/* Kolejność i pomoc w RZĘDZIE KUBEŁKÓW. Tu, inaczej niż
-            w reklamacjach, nie ma osobnego wiersza narzędzi: szukanie zwrotów
-            to skaner z własnym rzędem (`zwroty/Szukanie.tsx`), więc dokładanie
-            mu sąsiadów zrobiłoby z niego to, czym nie jest. */}
-        <FiltrSegmentowy<Kubelek | null> kafle wybrany={kubelek} onWybierz={przelacz}
-          pozycje={[
-            ...KUBELKI.map((k, i) => ({ klucz: k.id, etykieta: k.etykieta,
-              ile: data ? data.liczniki?.[k.id] ?? 0 : undefined,
-              /* Ta sama ikona co na osi etapów nad zwrotem — słownik ikon
-                 ma jedną wagę na jedno znaczenie. */
-              ikona: React.createElement(IKONA_KUBELKA[k.id], { size: 18 }),
-              podpowiedz: `${k.pytanie} (klawisz ${i + 1})` })),
-            { klucz: null, etykieta: "Wszystkie", ile: data?.zwroty.length,
-              ikona: <List size={18} />,
-              podpowiedz: `Wszystkie zwroty (klawisz ${KUBELKI.length + 1})` },
-          ]} />
-        <div className="flex items-center justify-center">
-          <PasekPorzadku porzadek={porzadek} dozwolone={["termin", "otwarto", "kwota"]}
-            onZmien={ustawPorzadek} />
-        </div>
-      {/* Pomoc w swojej komórce siatki — obok kolejności, na końcu rzędu. */}
-      <div className="flex items-center justify-center">
+        KOLEJNOŚĆ, POMOC I HURTOWE SPRAWDZENIE W RZĘDZIE TYTUŁU. Szukanie
+        zwrotów to skaner z własnym rzędem (`zwroty/Szukanie.tsx`), więc
+        dokładanie mu sąsiadów zrobiłoby z niego to, czym nie jest. */}
+    <KolumnaKolejki tytul="Zwroty" etykieta="Kolejka zwrotów"
+      akcje={<>
+        <PasekPorzadku porzadek={porzadek} dozwolone={["termin", "otwarto", "kwota"]}
+          onZmien={ustawPorzadek} />
+        <PrzyciskSprawdzenia trwa={sprawdzWszystkie.isPending}
+          onSprawdz={() => {
+            setWynikWszystkich(null); setBladWszystkich("");
+            sprawdzWszystkie.mutate(undefined, {
+              onSuccess: (w) => setWynikWszystkich(w),
+              onError: (e) => setBladWszystkich((e as Error).message),
+            });
+          }} />
       {/* `sita={false}`: sita „Niczyje" tu nie ma, więc pomoc nie obiecuje
           klawisza `n`. */}
       <SkrotyKlawiszy zMoje={false} sita={false} kubelkow={KUBELKI.length}
@@ -1063,26 +1051,29 @@ export function Zwroty() {
                przez Allegro) milczy. */
             ...(zwrot?.korektaNumer ? [["R", "cofnij korektę"] as const] : []),
           ]} />
-      </div>
-      </nav>
-
-      <Szukanie
+      </>}
+      /* „Wszystkie" wchodzi do tej samej tablicy co kubełki, zamiast wisieć
+         osobnym przyciskiem: to ten sam wybór, tylko bez zawężenia. Numer
+         klawisza liczy się z długości listy, więc dopisanie kubełka nie
+         zostawia w podpowiedzi nieaktualnej cyfry. */
+      kubelki={<FiltrZWiecej<Kubelek | null> zwarty wybrany={kubelek} onWybierz={przelacz}
+        wiecej={POD_WIECEJ}
+        pozycje={[
+          ...KUBELKI.map((k, i) => ({ klucz: k.id, etykieta: k.etykieta,
+            ile: data ? data.liczniki?.[k.id] ?? 0 : undefined,
+            podpowiedz: `${k.pytanie} (klawisz ${i + 1})` })),
+          { klucz: null, etykieta: "Wszystkie", ile: data?.zwroty.length,
+            podpowiedz: `Wszystkie zwroty (klawisz ${KUBELKI.length + 1})` },
+        ]} />}
+      szukaj={<Szukanie
         wynik={wynikSkanu} kod={kod} fraza={fraza} ile={pasujace?.length ?? null}
         szuka={skan.isPending} dociaga={dociagnij.isPending} blad={bladSkanu}
         onFraza={(v) => { setFraza(v); if (v) setFiltrRozjazdu(null); if (!v) setWynikSkanu(null); }}
         onSzukaj={(v) => { kodZCzytnika.current = ""; szukaj(v); }}
         onSkan={(v) => { void naSkan(v); }}
         towar={skanTowaru}
-        pod={<SprawdzWszystkie
-          trwa={sprawdzWszystkie.isPending} blad={bladWszystkich} wynik={wynikWszystkich}
-          onZamknij={() => { setWynikWszystkich(null); setBladWszystkich(""); }}
-          onSprawdz={() => {
-            setWynikWszystkich(null); setBladWszystkich("");
-            sprawdzWszystkie.mutate(undefined, {
-              onSuccess: (w) => setWynikWszystkich(w),
-              onError: (e) => setBladWszystkich((e as Error).message),
-            });
-          }} />}
+        pod={<WynikSprawdzenia blad={bladWszystkich} wynik={wynikWszystkich}
+          onZamknij={() => { setWynikWszystkich(null); setBladWszystkich(""); }} />}
         onDociagnij={(v) => dociagnij.mutate(v, {
           onSuccess: przyjmij, onError: (e) => setBladSkanu((e as Error).message) })}
         onWybierz={(x) => { setWynikSkanu(null); nawiguj(`/obsluga/zwroty/${x}`); }}
@@ -1136,60 +1127,64 @@ export function Zwroty() {
           { onError: (e) => setBladSync((e as Error).message) }); }}
         /* Rejestracji paczki nie ma — biuro tylko wyszukuje ją w Allegro.
            Uzasadnienie stoi w `Szukanie`. */
-      />
+      />}
 
-      {/* PYTANIE KUBEŁKA. Pasmo niesie jedno zdanie i milczy przy szukaniu
-          oraz w zakładce WSZYSTKIE, gdzie pytania nie ma. */}
-      {!pasujace && kubelek !== null &&
-        <div className="flex shrink-0 flex-wrap items-center gap-1 border-b border-slate-200 bg-slate-50 px-2 py-1">
-          <span className="mr-1 text-xs font-semibold text-slate-600">{opis?.pytanie}</span>
-          {/* SITA W PAŚMIE PYTANIA, nie w rzędzie kubełków: dzielą
-              jeden kubełek, więc stoją tam, gdzie widać, który. Kliknięcie
-              przestawia kursor na pierwszy zwrot sita — powód przy `przelacz`. */}
-          {kubelek === "decyzja" &&
-            <FiltrSegmentowy<SitoDecyzji | null> wybrany={sito}
-              onWybierz={(s) => {
-                setSito(s);
-                const pierwszy = (data?.zwroty ?? []).find((z) => z.kubelek === "decyzja"
-                  && (s === null || sitoDecyzji(z) === s));
-                nawiguj(pierwszy ? `/obsluga/zwroty/${pierwszy.id}` : "/obsluga/zwroty");
-              }}
-              pozycje={[
-                /* Suma sit, nie licznik serwera: cztery liczby obok mają się
-                   do niej dodawać co do sztuki. */
-                { klucz: null, etykieta: "wszystkie",
-                  ile: Object.values(ileWSicie).reduce((a, b) => a + b, 0) },
-                ...SITA_DECYZJI.map((s) => ({ klucz: s.id, etykieta: s.etykieta,
-                  ile: ileWSicie[s.id], podpowiedz: s.podpowiedz })),
-              ]} />}
-        </div>}
-      {/* Aktywna grupa rozjazdów w miejscu pytania kubełka — lista
-          mówi, dlaczego jest krótsza, i ma wyjście jednym kliknięciem. */}
-      {filtrRozjazdu &&
-        <div className="flex shrink-0 items-center gap-2 border-b border-amber-200 bg-amber-50 px-2 py-1">
+      /* PYTANIE KUBEŁKA W JEDNYM RZĘDZIE. Pasmo niesie jedno zdanie i milczy
+         przy szukaniu oraz w zakładce WSZYSTKIE, gdzie pytania nie ma.
+
+         SITA W PAŚMIE PYTANIA, nie w rzędzie kubełków: dzielą jeden kubełek,
+         więc stoją tam, gdzie widać, który. Cztery pigułki z liczbami nie
+         mieszczą się obok pytania w jednym rzędzie, więc sito jest listą.
+         Wybór przestawia kursor na pierwszy zwrot sita — powód przy `przelacz`.
+
+         AKTYWNA GRUPA ROZJAZDÓW stoi w miejscu pytania: lista mówi, dlaczego
+         jest krótsza, i ma wyjście jednym kliknięciem. */
+      drugi={filtrRozjazdu
+        ? <>
           <span className="text-xs font-semibold text-amber-900">
             Tylko: {NAZWA_ROZJAZDU[filtrRozjazdu] ?? filtrRozjazdu} ({pasujace?.length ?? 0})</span>
           <button type="button" onClick={() => setFiltrRozjazdu(null)}
             className="ml-auto text-xs text-amber-900 underline">wyczyść</button>
-        </div>}
-
+        </>
+        : !pasujace && kubelek !== null
+          ? <>
+            <span className="shrink-0 text-xs font-semibold text-slate-600">{opis?.pytanie}</span>
+            {kubelek === "decyzja" &&
+              <select aria-label="Sito do decyzji" value={sito ?? ""}
+                onChange={(e) => {
+                  const s = (e.target.value || null) as SitoDecyzji | null;
+                  setSito(s);
+                  const pierwszy = (data?.zwroty ?? []).find((z) => z.kubelek === "decyzja"
+                    && (s === null || sitoDecyzji(z) === s));
+                  nawiguj(pierwszy ? `/obsluga/zwroty/${pierwszy.id}` : "/obsluga/zwroty");
+                }}
+                title={sito ? SITA_DECYZJI.find((x) => x.id === sito)?.podpowiedz : "Wszystkie zwroty do decyzji"}
+                className={`field ml-auto w-auto min-w-0 flex-1 py-0.5 text-xs font-semibold ${
+                  sito ? "border-wertis-ink" : ""}`}>
+                {/* Suma sit, nie licznik serwera: cztery liczby obok mają się
+                    do niej dodawać co do sztuki. */}
+                <option value="">wszystkie · {Object.values(ileWSicie).reduce((a, b) => a + b, 0)}</option>
+                {SITA_DECYZJI.map((x) => <option key={x.id} value={x.id} title={x.podpowiedz}>
+                  {x.etykieta} · {ileWSicie[x.id]}</option>)}
+              </select>}
+          </>
+          : undefined}>
       {/* Klawisze NA EKRANIE, wzorem reklamacji. Dekalog p. 2:
           rozpoznanie jest tańsze od pamiętania. Pasek pokazuje klawisze
-          OGLĄDANEGO kubełka, bo tylko one coś tam robią — lista wszystkich
-          uczyłaby przebiegać wzrokiem obok tego jednego, który jest do rzeczy.
+          OGLĄDANEGO kubełka, bo tylko one coś tam robią.
           Sit „moje"/„niczyje" tu nie ma: zwrot nie nosi prowadzącego. */}
-      <div className="min-h-0 flex-1 overflow-y-auto">
-        {bezDanych
-          ? <div className="p-3"><Blad>{(error as Error).message}</Blad></div>
-          : isLoading
-          ? <Pusto waga="lista">Wczytuję kolejkę…</Pusto>
-          : <Kolejka zwroty={widoczne} wybrany={wybrany}
-              zKubelkiem={Boolean(pasujace) || kubelek === null}
-              onWybierz={(z) => nawiguj(`/obsluga/zwroty/${z}`)} />}
-      </div>
-    </Karta>
+      {bezDanych
+        ? <div className="p-3"><Blad>{(error as Error).message}</Blad></div>
+        : isLoading
+        ? <Pusto waga="lista">Wczytuję kolejkę…</Pusto>
+        : <Kolejka zwroty={widoczne} wybrany={wybrany}
+            zKubelkiem={Boolean(pasujace) || kubelek === null}
+            onWybierz={(z) => nawiguj(`/obsluga/zwroty/${z}`)} />}
+    </KolumnaKolejki>
 
-    <Karta className="flex min-h-0 flex-col overflow-hidden">
+    {/* Praca i dowody w jednym pojemniku poniżej `xl` — powód przy `SrodekIDowody`. */}
+    <SrodekIDowody>
+    <Karta className={`flex min-h-0 flex-col overflow-hidden ${KARTA_PRACY}`}>
       {/* Bez kolejki nie ma czego wybrać, więc środek milczy. */}
       {!zwrot
         ? bezDanych ? null : <Pusto ikona={Undo2}>
@@ -1396,7 +1391,7 @@ export function Zwroty() {
 
     {/* Cała ta kolumna jest do czytania, więc cała jedzie do scrollera —
         `Dowody` nie muszą o tym wiedzieć. */}
-    <Karta className="flex min-h-0 flex-col overflow-hidden">
+    <Karta className={`flex min-h-0 flex-col overflow-hidden ${KARTA_DOWODOW}`}>
       <div className="min-h-0 flex-1 overflow-y-auto">
       {zwrot
         ? <Dowody zwrot={zwrot} os={szczegol.data?.os ?? []}
@@ -1424,6 +1419,7 @@ export function Zwroty() {
             Dowody pokażą się po wybraniu zwrotu.</Pusto>}
       </div>
     </Karta>
+    </SrodekIDowody>
     </div>
   </div>;
 }

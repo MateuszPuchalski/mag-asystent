@@ -5,7 +5,7 @@ import {
   useKosze, usePominiete, usePonowMmKosza, usePrzeliczKosz, useSzczegolKosza, useSzukajWKoszach,
   useUsunZMm, useZalatwPominiecie,
 } from "../api/kosze";
-import { Blad, Karta, Pole, Pusto, SIATKA_TRZECH_KOLUMN } from "../ui";
+import { Blad, Karta, Pole, Pusto, SIATKA_TRZECH_KOLUMN, SrodekIDowody, KARTA_PRACY, KARTA_DOWODOW } from "../ui";
 import { FiltrZWiecej } from "../ui/FiltrZWiecej";
 import { KUBELKI_KOSZY, KolejkaKoszy, KolejkaPominietych, WynikiSzukania, koszeKubelka, kubelekKosza,
   maKlopotMm, type KubelekKoszy } from "../kosze/Kolejka";
@@ -130,7 +130,8 @@ export function Kosze() {
           : szukaj.error ? (szukaj.error as Error).message : ""}</Blad>
       </Karta>
 
-      <Karta className="flex min-h-0 flex-col overflow-hidden">
+      <SrodekIDowody>
+      <Karta className={`flex min-h-0 flex-col overflow-hidden ${KARTA_PRACY}`}>
         {wybrany === null
           ? <Pusto ikona={Package}>Wybierz kosz z kolejki.</Pusto>
           : szczegol.isLoading ? <Pusto waga="lista">Wczytuję zawartość kosza…</Pusto>
@@ -177,7 +178,7 @@ export function Kosze() {
               : <Pusto waga="lista">{szczegol.error ? (szczegol.error as Error).message : "Nie znaleziono kosza."}</Pusto>}
       </Karta>
 
-      <Karta className="flex min-h-0 flex-col overflow-hidden">
+      <Karta className={`flex min-h-0 flex-col overflow-hidden ${KARTA_DOWODOW}`}>
         <div className="min-h-0 flex-1 overflow-y-auto">
           {szczegol.data
             ? <KontekstKosza k={szczegol.data.kosz} zalatw={{
@@ -189,6 +190,7 @@ export function Kosze() {
             : <Pusto waga="lista">Zwroty i pominięte pozycje pokażą się po wybraniu kosza.</Pusto>}
         </div>
       </Karta>
+      </SrodekIDowody>
     </div>
   </div>;
 }
