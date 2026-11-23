@@ -637,3 +637,35 @@ describe("wyjątek i klawisze kolejki", () => {
     expect(within(protokol.parentElement!).queryByRole("heading")).toBeNull();
   });
 });
+
+/* ── Kubełki do przeglądania mają własne źródła ────────────────────────────
+   Zdjęte dostawy i archiwum przychodzą osobnymi zapytaniami. Gdy takie
+   zapytanie padnie, ekran mówi o błędzie, a nie że nic tam nie ma. */
+describe("Poza WERTIS i Archiwum bez danych", () => {
+  it("Poza WERTIS: błąd zamiast „nic nie zdjęto”, bez zera w stopce i liczniku", async () => {
+    awarie.add("/api/biuro/zamkniete-poza");
+    pokaz("/obsluga/dostawy?kubelek=poza");
+    expect(await screen.findByText("Serwer nie odpowiada")).toBeInTheDocument();
+    expect(screen.queryByText("Nic nie zdjęto z listy.")).toBeNull();
+    expect(screen.queryByText(/zdjętych z listy/)).toBeNull();
+    expect(screen.getByRole("option", { name: /Poza WERTIS/ }).textContent).not.toMatch(/\d/);
+    /* Klawisz nie ma po czym chodzić. */
+    await userEvent.keyboard("j");
+    expect(screen.getByText("Wybierz dostawę z kolejki.")).toBeInTheDocument();
+  });
+
+  it("Archiwum: błąd zamiast „archiwum jest puste”", async () => {
+    awarie.add("/api/biuro/dostawy/archiwum?q=");
+    pokaz("/obsluga/dostawy?kubelek=archiwum");
+    expect(await screen.findByText("Serwer nie odpowiada")).toBeInTheDocument();
+    expect(screen.queryByText(/Archiwum jest puste/)).toBeNull();
+    expect(screen.queryByText(/starszych niż/)).toBeNull();
+  });
+
+  it("link do dokumentu trafia do swojego kubełka także wtedy, gdy lista zdjętych padła", async () => {
+    awarie.add("/api/biuro/zamkniete-poza");
+    pokaz("/obsluga/dostawy/804");
+    await screen.findByRole("heading", { name: "FZ 804/MAG/09/2026" });
+    await waitFor(() => expect(screen.getByRole("button", { name: /^W toku/ })).toHaveAttribute("aria-pressed", "true"));
+  });
+});
