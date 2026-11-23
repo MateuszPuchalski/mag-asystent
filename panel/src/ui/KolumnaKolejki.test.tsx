@@ -53,7 +53,11 @@ describe("KolumnaKolejki", () => {
     const { rerender } = render(<SzukajWKolejce wartosc="" onZmien={() => {}} etykieta="Szukaj" placeholder="p" />);
     expect(screen.queryByRole("button", { name: "Wyczyść szukanie" })).toBeNull();
     rerender(<SzukajWKolejce wartosc="a" onZmien={() => {}} etykieta="Szukaj" placeholder="p" />);
-    expect(screen.getByRole("button", { name: "Wyczyść szukanie" })).toBeInTheDocument();
+    /* jsdom nie liczy układu, więc pilnujemy klas: 24 px to najmniejszy cel
+       wskaźnika, a mniejszy krzyżyk zatrzymuje dopiero audyt w przeglądarce. */
+    const krzyzyk = screen.getByRole("button", { name: "Wyczyść szukanie" });
+    expect(krzyzyk.className).toMatch(/\bh-6\b/);
+    expect(krzyzyk.className).toMatch(/\bw-6\b/);
   });
 });
 
@@ -71,7 +75,10 @@ describe("kolejki używają jednej kolumny", () => {
     for (const [nazwa, zrodlo] of Object.entries({ skrzynka, listaZwrotow, listaReklamacji, listaDostaw, listaKoszy })) {
       expect(zrodlo, nazwa).toContain("<PustaKolejka");
     }
-    expect(listaKoszy).not.toContain("<Pusto ");
+    /* Skrzynka ma jedno uprawnione `Pusto`: „Wczytuję…" przed pierwszymi danymi. */
+    for (const [nazwa, zrodlo] of Object.entries({ listaZwrotow, listaReklamacji, listaDostaw, listaKoszy })) {
+      expect(zrodlo, nazwa).not.toContain("<Pusto ");
+    }
     for (const [nazwa, zrodlo] of Object.entries({ skrzynka, reklamacje, dostawy, kosze })) {
       expect(zrodlo, nazwa).toContain("<SzukajWKolejce");
     }
@@ -87,6 +94,11 @@ describe("kolejki używają jednej kolumny", () => {
     }
     expect(KARTA_PRACY).toContain("xl:min-h-0");
     expect(KARTA_DOWODOW).toContain("shrink-0");
+    /* Obie karty są kolumnami z własnym przewijaniem. Ekran podaje samą stałą,
+       więc bez tych klas treść wypchnęłaby kartę poza okno. */
+    for (const karta of [KARTA_PRACY, KARTA_DOWODOW]) {
+      expect(karta).toContain("flex min-h-0 flex-col overflow-hidden");
+    }
     /* Trzecia kolumna siatki zaczyna się dopiero od xl, czyli od 1280 px. */
     expect(SIATKA_TRZECH_KOLUMN).toMatch(/lg:grid-cols-\[21rem_minmax\(0,1fr\)\] /);
     expect(SIATKA_TRZECH_KOLUMN).toContain("xl:grid-cols-[21rem_minmax(0,1fr)_16rem]");

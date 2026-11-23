@@ -88,6 +88,9 @@ export function Kosze() {
   const idz = (x: number) => nawiguj(`/obsluga/zwroty/kosze/${x}`);
   const szuka = q.length >= 2;
 
+  const bladListy = kosze.error && kosze.data ? (kosze.error as Error).message
+    : szukaj.error ? (szukaj.error as Error).message : "";
+
   const lewa = kosze.isLoading ? <Pusto waga="lista">Wczytuję kosze…</Pusto>
     /* Błąd bez danych zamiast „ten kubełek jest pusty". */
     : kosze.error && !kosze.data ? <Blad>{(kosze.error as Error).message}</Blad>
@@ -122,16 +125,16 @@ export function Kosze() {
           placeholder="Symbol, nazwa, kod, kosz albo zwrot" />}
         /* Pytanie kubełka znika przy szukaniu, bo wyniki idą ze wszystkich
            kubełków naraz. */
-        drugi={!szuka && <span className="text-xs font-semibold text-slate-600">{opis?.pytanie}</span>}>
+        drugi={!szuka && <span className="text-xs font-semibold text-slate-600">{opis?.pytanie}</span>}
+        /* Błąd odświeżenia i szukania stoi NAD listą, nie w niej: pod długim
+           kubełkiem zjechałby poza okno, a lista wyglądałaby na aktualną.
+           Bez danych o koszach błąd stoi zamiast listy. */
+        nad={bladListy && <div className="shrink-0"><Blad>{bladListy}</Blad></div>}>
         {lewa}
-        {/* Pod listą tylko błąd odświeżenia, gdy dane zostały; bez danych
-            błąd stoi zamiast listy. */}
-        <Blad>{kosze.error && kosze.data ? (kosze.error as Error).message
-          : szukaj.error ? (szukaj.error as Error).message : ""}</Blad>
       </KolumnaKolejki>
 
       <SrodekIDowody>
-      <Karta className={`flex min-h-0 flex-col overflow-hidden ${KARTA_PRACY}`}>
+      <Karta className={KARTA_PRACY}>
         {wybrany === null
           ? <Pusto ikona={Package}>Wybierz kosz z kolejki.</Pusto>
           : szczegol.isLoading ? <Pusto waga="lista">Wczytuję zawartość kosza…</Pusto>
@@ -178,7 +181,7 @@ export function Kosze() {
               : <Pusto waga="lista">{szczegol.error ? (szczegol.error as Error).message : "Nie znaleziono kosza."}</Pusto>}
       </Karta>
 
-      <Karta className={`flex min-h-0 flex-col overflow-hidden ${KARTA_DOWODOW}`}>
+      <Karta className={KARTA_DOWODOW}>
         <div className="min-h-0 flex-1 overflow-y-auto">
           {szczegol.data
             ? <KontekstKosza k={szczegol.data.kosz} zalatw={{

@@ -1004,7 +1004,7 @@ export function Zwroty() {
     <div className={SIATKA_TRZECH_KOLUMN}>
     {/* ── KOLUMNA LISTY Z JEDNEJ FORMY ────────────────────────────────────
         Układ pasm stoi w `ui/KolumnaKolejki.tsx`, tak samo jak w skrzynce,
-        reklamacjach i dostawach. Zwroty oddają liście wysokość, którą zajmowało
+        koszach, reklamacjach i dostawach. Zwroty oddają liście wysokość, którą zajmowało
         siedem kafli: na wierzchu stoją cztery kubełki pracy biura, a odrzucone,
         zamknięte i wszystkie — pod „Więcej”. Klawisze 1–7 zostają bez zmian.
 
@@ -1178,7 +1178,7 @@ export function Zwroty() {
 
     {/* Praca i dowody w jednym pojemniku poniżej `xl` — powód przy `SrodekIDowody`. */}
     <SrodekIDowody>
-    <Karta className={`flex min-h-0 flex-col overflow-hidden ${KARTA_PRACY}`}>
+    <Karta className={KARTA_PRACY}>
       {/* Bez kolejki nie ma czego wybrać, więc środek milczy. */}
       {!zwrot
         ? bezDanych ? null : <Pusto ikona={Undo2}>
@@ -1385,7 +1385,7 @@ export function Zwroty() {
 
     {/* Cała ta kolumna jest do czytania, więc cała jedzie do scrollera —
         `Dowody` nie muszą o tym wiedzieć. */}
-    <Karta className={`flex min-h-0 flex-col overflow-hidden ${KARTA_DOWODOW}`}>
+    <Karta className={KARTA_DOWODOW}>
       <div className="min-h-0 flex-1 overflow-y-auto">
       {zwrot
         ? <Dowody zwrot={zwrot} os={szczegol.data?.os ?? []}

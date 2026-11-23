@@ -264,7 +264,7 @@ export function Kolejka({ rozmowy, stan, copilot, klasyfikacja, onRozpoznaj = ()
     return () => window.removeEventListener("keydown", f);
   }, []);
 
-  /* ── JEDNA KOLUMNA LISTY, ta sama co w zwrotach, reklamacjach i dostawach ──
+  /* ── JEDNA KOLUMNA LISTY, ta sama co w pozostałych kolejkach ─────────
      Układ pasm stoi w `ui/KolumnaKolejki.tsx`. Tu zostaje to, co należy do
      skrzynki: data synchronizacji obok tytułu, pomoc, powiadomienia, znak
      Copilota i odświeżenie.
