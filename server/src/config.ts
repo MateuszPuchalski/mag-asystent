@@ -979,6 +979,13 @@ export const config = {
   locStrict: process.env.LOC_STRICT !== "0",
   /** Czy zezwolić na ręczne wpisywanie lokalizacji na kolektorze. */
   allowManualLoc: process.env.ALLOW_MANUAL_LOC !== "0",
+  /**
+   * Czy kolektor wymusza wagę i wymiary przed odłożeniem towaru z dostawy.
+   * Domyślnie TAK, bo to decyzja właściciela: rozkładanie to jedyna chwila,
+   * w której każdy nowy towar na pewno przechodzi przez ręce. `0` zostawia
+   * pomiar dobrowolny, gdy hala nie nadąża z rozkładaniem.
+   */
+  pomiarPrzyDostawie: process.env.POMIAR_PRZY_DOSTAWIE !== "0",
 
   /** Symulacja workera (dev): opóźnienie zapisu Sfery [ms] i tryb błędów. */
   worker: {

@@ -591,6 +591,7 @@ export function getDelivery(id: number): DeliveryView | undefined {
        stan do przeniesienia, więc niesie tu swój magazyn. */
     sourceMagId:
       d.source_mag_id != null && d.source_mag_id !== config.magId.MAG ? d.source_mag_id : null,
+    pomiarWymagany: config.pomiarPrzyDostawie,
     // null tu znaczy „jeszcze nie pytano" — kolektor pyta wtedy i tylko wtedy
     nrPrzesylki: d.nr_przesylki ?? null,
     kurierProtokol: d.kurier_protokol ?? null,
