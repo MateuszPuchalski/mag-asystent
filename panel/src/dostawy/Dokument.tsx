@@ -19,7 +19,7 @@ import { otwarteWyjatki } from "./Kolejka";
      pod adres, bo odpowiadają na drugie: gdzie i kto tam położył.
    - PROTOKÓŁ STOI W NAGŁÓWKU DOKUMENTU, nie w osobnej karcie reklamacji.
      Reklamuje się fakturę, więc druk mieszka przy fakturze. Druki mają
-     własny rząd na końcu nagłówka: w rzędzie tytułu spadały pod niego
+     własny rząd na końcu nagłówka: w rzędzie tytułu spadają pod niego
      pojedynczo, raz jeden, raz oba, zależnie od długości numeru i stanu.
 
    ── ZDJĘCIE PRZY KAŻDEJ POZYCJI ────────────────────────────────────────

@@ -15,8 +15,8 @@ import { Pole, Przycisk, czas } from "../ui";
    protokołu dla dostawcy.
 
    OPIS Z HALI MA CAŁĄ SZEROKOŚĆ. Rodzaj, stan i przycisk stoją w jednym
-   krótkim rzędzie, a zdania pod nim. Opis obok przycisku dostawał pół
-   kolumny i łamał się po dwa słowa, a to jego biuro czyta przed decyzją. */
+   krótkim rzędzie, a zdania pod nim. Opis obok przycisku dostaje pół
+   kolumny i łamie się po dwa słowa, a to jego biuro czyta przed decyzją. */
 
 /**
  * Co policzyła hala — zdaniem, które znaczy jedno.
@@ -45,11 +45,23 @@ function Policzone({ p }: { p: WyjatekHali }) {
  * Miniatury stoją w kolumnie dowodów i trzeba je dopasować do wyjątku po
  * podpisie. Przycisk przy wyjątku tego nie wymaga. Towar spoza dokumentu nie
  * ma kolumny dowodów wcale, więc tam to jedyna droga do zdjęcia.
- * Zgubiony plik zgłasza kolumna dowodów — tu przycisku wtedy nie ma.
+ *
+ * BRAK ZDJĘCIA MA TU POWÓD, bo przy towarze spoza dokumentu nikt inny go nie
+ * poda. Nieudane pobranie daje „ponów", a zgubiony plik zdanie wprost.
+ * Cisza w obu przypadkach wyglądałaby jak zgłoszenie bez zdjęcia, a to
+ * zdjęcie jest podstawą reklamacji u dostawcy.
  */
 function ZdjecieWyjatku({ id, onPowieksz }: { id: number; onPowieksz: (url: string) => void }) {
-  const { url } = useZdjecieDowodu(id);
-  if (url === null) return null;
+  const { url, blad, ponow } = useZdjecieDowodu(id);
+  if (blad) {
+    return <Przycisk className="!px-2.5 !py-1 !text-xs" title={blad} onClick={ponow}>
+      <Camera size={14} aria-hidden="true" />Ponów zdjęcie</Przycisk>;
+  }
+  if (url === null) {
+    return <span className="text-xs text-ranga-zle"
+      title="Hala dołączyła zdjęcie, ale serwer nie ma jego pliku — dowód do reklamacji przepadł">
+      pliku zdjęcia brak</span>;
+  }
   return <Przycisk className="!px-2.5 !py-1 !text-xs disabled:opacity-50" disabled={!url}
     onClick={() => { if (url) onPowieksz(url); }}>
     <Camera size={14} aria-hidden="true" />Zdjęcie</Przycisk>;
@@ -116,7 +128,7 @@ export function Wyjatek({ p, trwa, blad, onRozwiaz, onPowieksz }: {
         {p.resolvedNote && <> — <span className="text-slate-800">{p.resolvedNote}</span></>}</p>}
     {otwarte && !p.resolvedAt &&
       /* POLE W CAŁEJ SZEROKOŚCI, PRZYCISKI POD NIM. W jednym rzędzie
-         z przyciskami pole miało sto pikseli i ucinało własną podpowiedź.
+         z przyciskami pole ma sto pikseli i ucina własną podpowiedź.
          Escape wycofuje się z formularza jak „Anuluj", bo ręka jest na
          klawiaturze. */
       <form className="mt-2"

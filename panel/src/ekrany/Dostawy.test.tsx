@@ -97,6 +97,8 @@ let archiwumPytania: string[] = [];
 /* Czy instalacja ma zdjęcia kartotek — tak mówi o tym `/api/health`. */
 let zdjeciaWHealth = false;
 let pytaniaOObrazy: string[] = [];
+/* Adresy, które w danym teście odpowiadają awarią serwera (502). */
+let awarie = new Set<string>();
 
 function odpowiedz(url: string, init?: RequestInit): unknown {
   const metoda = init?.method ?? "GET";
@@ -149,7 +151,9 @@ beforeEach(() => {
   _wyczyscPamiecZdjec();
   /* `URL.createObjectURL` nie istnieje w jsdom — ten sam zastępnik co w `useZdjecie.test.tsx`. */
   (URL as unknown as { createObjectURL: () => string }).createObjectURL = () => "blob:dowod";
+  awarie = new Set();
   vi.stubGlobal("fetch", vi.fn(async (url: string, init?: RequestInit) => {
+    if (awarie.has(url)) return new Response(JSON.stringify({ error: "Serwer nie odpowiada" }), { status: 502 });
     /* Zdjęcia kartotek i dowodów — brak jest ODPOWIEDZIĄ (404), nie awarią. */
     /* Obiekt zamiast `Response`: `Blob` z jsdom nie wchodzi do `Response` z Node
        (brak `stream()`) — ten sam kształt, co w `useZdjecie.test.tsx`. */
@@ -535,6 +539,49 @@ describe("wyjątek i klawisze kolejki", () => {
     expect(await screen.findByText("Wybierz dostawę z kolejki.")).toBeInTheDocument();
     /* Chodzenie po kolejce to patrzenie: zero zapisów. */
     expect(wyslane).toEqual([]);
+  });
+
+  it("po zmianie kubełka `j` otwiera pierwszy wiersz, nie miejsce z poprzedniej listy", async () => {
+    /* 803 stoi w „Do decyzji" jako czwarty wiersz; „W toku" ma jeden. */
+    pokaz("/obsluga/dostawy/803");
+    await screen.findByRole("heading", { name: "FZ 803/MAG/09/2026" });
+    await userEvent.keyboard("3");
+    expect(await screen.findByText("Wybierz dostawę z kolejki.")).toBeInTheDocument();
+    await userEvent.keyboard("1");
+    await userEvent.keyboard("j");
+    /* Pierwszy wiersz „Do decyzji" to dokument spoza okna importu. */
+    await waitFor(() => expect(screen.getByRole("button", { name: /FZ 700\/MAG\/07\/2026/ }))
+      .toHaveAttribute("aria-current", "true"));
+  });
+
+  it("gdy lista padła, klawisz nie otwiera wiersza, którego nie widać", async () => {
+    awarie.add("/api/delivery/documents");
+    pokaz();
+    expect(await screen.findByText("Serwer nie odpowiada")).toBeInTheDocument();
+    await userEvent.keyboard("j");
+    expect(screen.getByText("Wybierz dostawę z kolejki.")).toBeInTheDocument();
+  });
+
+  it("towar spoza dokumentu bez danych mówi o błędzie, nie o braku wyjątków", async () => {
+    awarie.add("/api/problems/unresolved");
+    pokaz("/obsluga/dostawy/bez");
+    expect(await screen.findByText("Serwer nie odpowiada")).toBeInTheDocument();
+    expect(screen.queryByText("Nie ma już otwartych wyjątków bez dokumentu.")).toBeNull();
+  });
+
+  it("nieudane pobranie zdjęcia daje przy wyjątku „ponów”, a zgubiony plik zdanie wprost", async () => {
+    awarie.add("/api/problems/1/photo");
+    pokaz("/obsluga/dostawy/806");
+    const ponow = await screen.findByRole("button", { name: "Ponów zdjęcie" });
+    expect(screen.queryByRole("button", { name: "Zdjęcie" })).toBeNull();
+    awarie.clear();
+    await userEvent.click(ponow);
+    expect(await screen.findByRole("button", { name: "Zdjęcie" })).toBeInTheDocument();
+  });
+
+  it("zgubiony plik zdjęcia stoi słowami także przy wyjątku", async () => {
+    pokaz("/obsluga/dostawy/808");
+    expect(await screen.findByText("pliku zdjęcia brak")).toBeInTheDocument();
   });
 
   it("zdjęcie z hali otwiera się wprost z wyjątku, którego dotyczy", async () => {

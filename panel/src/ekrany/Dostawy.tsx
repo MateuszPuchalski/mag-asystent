@@ -106,19 +106,32 @@ export function Dostawy() {
 
   /* JEDNA LISTA WIDOCZNA dla rysowania i dla klawiszy. Kursor chodzi po tym,
      co stoi na ekranie, w tej samej kolejności: najpierw wiersze spoza okna
-     importu, potem dokumenty kubełka po odsianiu frazą. */
+     importu, potem dokumenty kubełka po odsianiu frazą. Gdy zamiast listy
+     stoi „wczytuję" albo błąd, kursor nie ma po czym chodzić: klawisz nie
+     może otworzyć wiersza, którego człowiek nie widzi. */
+  const bezListy = lista.isLoading || Boolean(lista.error && !lista.data)
+    || (kubelek === "archiwum" && archiwum.isLoading);
   const pozaWidoczne = (poza.data?.documents ?? []).filter((d) => pasuje(d.nrPelny, d.dostawca));
   const archiwumWidoczne = archiwum.data?.documents ?? [];
   const kubelekWidoczny = kubelek === "poza" || kubelek === "archiwum" ? []
     : wKubelku(kubelek).filter((d) => pasuje(d.nrPelny, d.dostawca, d.nrDostawcy));
-  const widoczne: Array<{ id: number | "bez" }> =
-    kubelek === "poza" ? pozaWidoczne.map((d) => ({ id: d.dokId }))
+  const widoczne: Array<{ id: number | "bez" }> = bezListy ? []
+    : kubelek === "poza" ? pozaWidoczne.map((d) => ({ id: d.dokId }))
     : kubelek === "archiwum" ? archiwumWidoczne.map((d) => ({ id: d.dokId }))
     : [...(kubelek === "decyzja" ? spozaOkna.map((g) => ({ id: g.dokId ?? ("bez" as const) })) : []),
        ...kubelekWidoczny.map((d) => ({ id: d.dokId }))];
   /* Po zamknięciu ostatniego wyjątku faktura schodzi z DO DECYZJI, a `j` ma
      otworzyć tę, która stanęła na jej miejscu. Powód przy `nawigacja/kursor.ts`. */
-  const idzOWiersz = useKursorListy(widoczne, wybrany, (w) => idz(w.id));
+  const kursor = useKursorListy(widoczne, wybrany, (w) => idz(w.id));
+  /* BEZ OTWARTEJ SPRAWY KLAWISZ OTWIERA PIERWSZY WIERSZ. Kursor pamięta
+     ostatnie miejsce po to, żeby przeżyć zejście sprawy z listy. Po zmianie
+     kubełka sprawy nie ma wcale, a pamięć z poprzedniej listy otwierałaby
+     wiersz ze środka nowej. */
+  const idzOWiersz = (o: number) => {
+    if (wybrany !== null) return kursor(o);
+    const pierwszy = widoczne[0];
+    if (pierwszy) idz(pierwszy.id);
+  };
 
   /* Do którego kubełka należy wybrana sprawa — `null`, gdy nie wiadomo.
      Archiwum przychodzi z serwera dopiero po otwarciu kubełka, więc
@@ -144,8 +157,8 @@ export function Dostawy() {
 
   /* TE SAME KLAWISZE CO W ZWROTACH I REKLAMACJACH: `j`/`k` albo strzałki po
      liście, cyfry po kubełkach. Biuro przechodzi między kolejkami bez zmiany
-     nawyku, a dostawy były jedyną, która wymagała myszy. Skróty milkną w polu
-     pisania i pod oknem modalnym, inaczej cyfra z notatki zmieniałaby kubełek. */
+     nawyku. Skróty milkną w polu pisania i pod oknem modalnym, inaczej cyfra
+     z notatki zmieniałaby kubełek. */
   useEffect(() => {
     const nasluch = (e: KeyboardEvent) => {
       if (e.ctrlKey || e.altKey || e.metaKey || klawiszZajety(e.target)) return;
