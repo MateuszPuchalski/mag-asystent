@@ -1056,7 +1056,7 @@ export function Zwroty() {
          osobnym przyciskiem: to ten sam wybór, tylko bez zawężenia. Numer
          klawisza liczy się z długości listy, więc dopisanie kubełka nie
          zostawia w podpowiedzi nieaktualnej cyfry. */
-      kubelki={<FiltrZWiecej<Kubelek | null> zwarty wybrany={kubelek} onWybierz={przelacz}
+      kubelki={<FiltrZWiecej<Kubelek | null> wybrany={kubelek} onWybierz={przelacz}
         wiecej={POD_WIECEJ}
         pozycje={[
           ...KUBELKI.map((k, i) => ({ klucz: k.id, etykieta: k.etykieta,

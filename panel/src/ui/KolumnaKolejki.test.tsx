@@ -10,10 +10,14 @@ import skrzynka from "../skrzynka/Kolejka.tsx?raw";
 import zwroty from "../ekrany/Zwroty.tsx?raw";
 import kosze from "../ekrany/Kosze.tsx?raw";
 import ekranSkrzynki from "../ekrany/Skrzynka.tsx?raw";
+import listaDostaw from "../dostawy/Kolejka.tsx?raw";
+import listaKoszy from "../kosze/Kolejka.tsx?raw";
+import listaReklamacji from "../reklamacje/Kolejka.tsx?raw";
+import listaZwrotow from "../zwroty/Kolejka.tsx?raw";
 
-/* ── Jedna kolumna listy na cztery kolejki ───────────────────────────────────
-   Pilnujemy kolejności pasm i tego, że żadna z czterech kolejek nie wraca do
-   własnego układu. Kolejka z własną kolumną to piąty nawyk do nauczenia. */
+/* ── Jedna kolumna listy na pięć kolejek ─────────────────────────────────────
+   Pilnujemy kolejności pasm i tego, że żadna z pięciu kolejek nie wraca do
+   własnego układu. Kolejka z własną kolumną to osobny nawyk do nauczenia. */
 
 describe("KolumnaKolejki", () => {
   it("pasma stoją w stałej kolejności: tytuł, kubełki, szukanie, drugi filtr, lista", () => {
@@ -54,10 +58,24 @@ describe("KolumnaKolejki", () => {
 });
 
 describe("kolejki używają jednej kolumny", () => {
-  it("skrzynka, zwroty, reklamacje i dostawy składają listę z KolumnaKolejki", () => {
-    for (const [nazwa, zrodlo] of Object.entries({ skrzynka, zwroty, reklamacje, dostawy })) {
+  it("skrzynka, zwroty, reklamacje, dostawy i kosze składają listę z KolumnaKolejki", () => {
+    for (const [nazwa, zrodlo] of Object.entries({ skrzynka, zwroty, reklamacje, dostawy, kosze })) {
       expect(zrodlo, nazwa).toContain("<KolumnaKolejki");
     }
+  });
+
+  it("pusta lista każdej kolejki to PustaKolejka, a szukanie to SzukajWKolejce", () => {
+    /* Listy stoją w osobnych plikach, więc sam ekran ich nie pokaże. Własne
+       `Pusto` albo własne pole szukania wracałoby po cichu do innej wysokości
+       pustki i do pola bez lupy. */
+    for (const [nazwa, zrodlo] of Object.entries({ skrzynka, listaZwrotow, listaReklamacji, listaDostaw, listaKoszy })) {
+      expect(zrodlo, nazwa).toContain("<PustaKolejka");
+    }
+    expect(listaKoszy).not.toContain("<Pusto ");
+    for (const [nazwa, zrodlo] of Object.entries({ skrzynka, reklamacje, dostawy, kosze })) {
+      expect(zrodlo, nazwa).toContain("<SzukajWKolejce");
+    }
+    expect(kosze).not.toContain("<Pole ");
   });
 
   it("zwroty, dostawy i kosze chowają dowody pod pracę poniżej xl", () => {

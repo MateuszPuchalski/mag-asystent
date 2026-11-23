@@ -5,8 +5,9 @@ import {
   useKosze, usePominiete, usePonowMmKosza, usePrzeliczKosz, useSzczegolKosza, useSzukajWKoszach,
   useUsunZMm, useZalatwPominiecie,
 } from "../api/kosze";
-import { Blad, Karta, Pole, Pusto, SIATKA_TRZECH_KOLUMN, SrodekIDowody, KARTA_PRACY, KARTA_DOWODOW } from "../ui";
+import { Blad, Karta, Pusto, SIATKA_TRZECH_KOLUMN, SrodekIDowody, KARTA_PRACY, KARTA_DOWODOW } from "../ui";
 import { FiltrZWiecej } from "../ui/FiltrZWiecej";
+import { KolumnaKolejki, SzukajWKolejce } from "../ui/KolumnaKolejki";
 import { KUBELKI_KOSZY, KolejkaKoszy, KolejkaPominietych, WynikiSzukania, koszeKubelka, kubelekKosza,
   maKlopotMm, type KubelekKoszy } from "../kosze/Kolejka";
 import { Kosz } from "../kosze/Kosz";
@@ -105,30 +106,29 @@ export function Kosze() {
     </div>
     <Koszyk />
     <div className={SIATKA_TRZECH_KOLUMN}>
-      <Karta className="flex min-h-0 flex-col overflow-hidden">
-        {/* Bez tytułu „Kosze", bo powtarzałby wybraną zakładkę
-            przełącznika tuż nad nim. */}
-        <nav className="flex shrink-0 flex-wrap gap-1 p-2">
-          {/* „Rozłożone" i „Anulowane" pod „Więcej": oba to „Tylko wgląd".
-              Ten sam komponent co w Skrzynce i reklamacjach. */}
-          <FiltrZWiecej<KubelekKoszy> wybrany={kubelek} onWybierz={setKubelek}
-            wiecej={WIECEJ_KOSZY}
-            pozycje={KUBELKI_KOSZY.map((k) => ({ klucz: k.id, etykieta: k.etykieta,
-              ile: liczniki[k.id], podpowiedz: k.pytanie }))} />
-        </nav>
-        <div className="shrink-0 border-t border-slate-200 p-2">
-          {/* „W którym koszu jechał ten towar?" — pytanie pada po fakcie: towar
-              zniknął albo klient dopomina się o zwrot. */}
-          <Pole value={fraza} onChange={(e) => setFraza(e.target.value)}
-            placeholder="W którym koszu? Symbol, nazwa, kod, kosz albo zwrot" aria-label="Szukaj towaru w koszach" />
-        </div>
-        {!szuka && <div className="shrink-0 border-y border-slate-200 bg-slate-50 px-2 py-1">
-          <span className="text-xs font-semibold text-slate-600">{opis?.pytanie}</span>
-        </div>}
-        <div className="min-h-0 flex-1 overflow-y-auto">{lewa}</div>
+      {/* Kolumna listy z jednej formy (`ui/KolumnaKolejki.tsx`). Bez tytułu
+          „Kosze", bo powtarzałby wybraną zakładkę przełącznika tuż nad nim. */}
+      <KolumnaKolejki etykieta="Kolejka koszy"
+        /* „Rozłożone" i „Anulowane" pod „Więcej": oba to „Tylko wgląd". */
+        kubelki={<FiltrZWiecej<KubelekKoszy> wybrany={kubelek} onWybierz={setKubelek}
+          wiecej={WIECEJ_KOSZY}
+          pozycje={KUBELKI_KOSZY.map((k) => ({ klucz: k.id, etykieta: k.etykieta,
+            ile: liczniki[k.id], podpowiedz: k.pytanie }))} />}
+        /* „W którym koszu jechał ten towar?" — pytanie pada po fakcie: towar
+           zniknął albo klient dopomina się o zwrot. Podpowiedź wylicza same
+           klucze szukania, bo dłuższa ucina się w kolumnie 21 rem i gubi
+           ostatni z nich. */
+        szukaj={<SzukajWKolejce wartosc={fraza} onZmien={setFraza} etykieta="Szukaj towaru w koszach"
+          placeholder="Symbol, nazwa, kod, kosz albo zwrot" />}
+        /* Pytanie kubełka znika przy szukaniu, bo wyniki idą ze wszystkich
+           kubełków naraz. */
+        drugi={!szuka && <span className="text-xs font-semibold text-slate-600">{opis?.pytanie}</span>}>
+        {lewa}
+        {/* Pod listą tylko błąd odświeżenia, gdy dane zostały; bez danych
+            błąd stoi zamiast listy. */}
         <Blad>{kosze.error && kosze.data ? (kosze.error as Error).message
           : szukaj.error ? (szukaj.error as Error).message : ""}</Blad>
-      </Karta>
+      </KolumnaKolejki>
 
       <SrodekIDowody>
       <Karta className={`flex min-h-0 flex-col overflow-hidden ${KARTA_PRACY}`}>

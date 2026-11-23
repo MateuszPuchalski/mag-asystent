@@ -263,7 +263,7 @@ export function Dostawy() {
            to przeglądanie, nie praca. „Poza WERTIS" zostaje o jedno
            kliknięcie z licznikiem w opcji, bo ma wyłapać pomyłkowe
            zdjęcie dostawy. */
-        kubelki={<FiltrZWiecej<KubelekDostaw> zwarty wybrany={kubelek} onWybierz={wybierzKubelek}
+        kubelki={<FiltrZWiecej<KubelekDostaw> wybrany={kubelek} onWybierz={wybierzKubelek}
           wiecej={WIECEJ_DOSTAW}
           pozycje={KUBELKI_DOSTAW.map((k) => ({ klucz: k.id, etykieta: k.etykieta, ile: liczniki[k.id],
             podpowiedz: k.pytanie }))} />}

@@ -2,10 +2,10 @@ import React from "react";
 import { Search, X } from "lucide-react";
 import { Pusto } from "./index";
 
-/* ── JEDNA KOLUMNA LISTY NA CZTERY KOLEJKI ───────────────────────────────────
-   Skrzynka, Zwroty, Reklamacje i Dostawy mają tę samą pracę: wybrać kubełek,
-   znaleźć sprawę, przejść po liście. Cztery własne układy tej kolumny to
-   cztery nawyki, a agent przechodzi między nimi kilkadziesiąt razy dziennie
+/* ── JEDNA KOLUMNA LISTY NA PIĘĆ KOLEJEK ─────────────────────────────────────
+   Skrzynka, Zwroty, Kosze, Reklamacje i Dostawy mają tę samą pracę: wybrać
+   kubełek, znaleźć sprawę, przejść po liście. Pięć własnych układów tej kolumny
+   to pięć nawyków, a agent przechodzi między nimi kilkadziesiąt razy dziennie
    (dekalog p. 2: rozpoznanie tańsze od pamiętania).
 
    KOLEJNOŚĆ JEST STAŁA: tytuł z działaniami po prawej, kubełki, szukanie,
