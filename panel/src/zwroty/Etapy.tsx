@@ -24,13 +24,13 @@ import { KUBELKI } from "./Kolejka";
    sprawa nigdy nie wejdzie, byłyby obietnicą bez pokrycia.                   */
 
 /**
- * Ikona kubełka — JEDNA dla osi etapów i kafli kolejki.
+ * Ikona kubełka na osi etapów.
  *
  * Słownik ikon z projektu „Zwroty — mniej tekstu" ma zasadę: jedna ikona,
- * jedno znaczenie w całym panelu. Dwie mapy — tu i przy kaflach — rozjechałyby
- * się przy pierwszej zmianie i ta sama waga znaczyłaby dwie różne rzeczy.
+ * jedno znaczenie w całym panelu. Druga mapa obok tej rozjechałaby się przy
+ * pierwszej zmianie i ta sama waga znaczyłaby dwie różne rzeczy.
  */
-export const IKONA_KUBELKA: Record<Kubelek, LucideIcon> = {
+const IKONA_KUBELKA: Record<Kubelek, LucideIcon> = {
   decyzja: Scale, ocena: Eye, zwrot: Banknote, korekta: FileText,
   zamkniety: CircleCheck, odrzucony: CircleX,
 };

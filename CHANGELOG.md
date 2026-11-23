@@ -10,6 +10,27 @@ z wersją monorepo" — i właśnie tak przestał być zgodny: `0.3.0` przetrwa�
 sześć zmergowanych zmian, w tym takie, które wymagały nowego uprawnienia SQL.
 Komentarz nie jest mechanizmem.
 
+## 0.625.2 — 23 listopada 2026
+
+Uproszczenia kodu panelu po porządku w ekranach biura. Z filtru kubełków
+wyszły tryb kafli i podmiana barw, których nic już nie używało. Klasy
+zwiniętego paska i siatki kolejek stoją teraz w jednym miejscu. Nowy strażnik
+pilnuje, że kolumna listy ma tę samą szerokość na każdej kolejce.
+
+Pasek boczny pyta o wyłączone zdjęcia najwyżej raz na pięć minut. Dotąd każdy
+powrót do okna panelu pytał Subiekta o pięćdziesiąt kartotek, na każdym ekranie.
+
+W zwrotach pod polem szukania stoi jedna kreska zamiast dwóch.
+
+## 0.625.1 — 23 listopada 2026
+
+**Dostawy: „Poza WERTIS” i „Archiwum” nie mówią „pusto”, gdy lista się nie
+wczytała.** Zamiast „nic nie zdjęto z listy” albo „archiwum jest puste” ekran
+pokazuje błąd, a stopka i licznik nie podają zera, którego nikt nie policzył.
+
+Link do dokumentu otwiera jego kubełek także wtedy, gdy lista zdjętych dostaw
+padła. Błąd odświeżenia pod listą dotyczy listy, którą widać.
+
 ## 0.625.0 — 23 listopada 2026
 
 **Dostawy: wyjątek czyta się w całej szerokości.** Opis z hali stoi pod rodzajem
