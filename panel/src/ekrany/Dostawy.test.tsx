@@ -7,6 +7,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Dostawy } from "./Dostawy";
 import { kubelekDokumentu, wiekDokumentu } from "../dostawy/Kolejka";
 import { Wyjatek as WyjatekWiersz } from "../dostawy/Wyjatek";
+import { WyjatkiLuzem } from "../dostawy/Dokument";
 import type { Dokument, DokumentDostawy, Wyjatek } from "../api/dostawy";
 import { _wyczyscPamiecZdjec } from "../towar/useZdjecie";
 
@@ -506,5 +507,86 @@ describe("audyt ekranu dostaw — drobne", () => {
     await screen.findByRole("heading", { name: "FZ 802/MAG/09/2026" });
     expect(screen.getByLabelText("Notatka do hali")).toHaveAttribute("placeholder", "Pytanie do hali");
     expect(screen.getByText("Hala musi odpowiedzieć, zanim dostawa się domknie.")).toBeInTheDocument();
+  });
+});
+
+/* ── Praca na wyjątku i klawisze kolejki ───────────────────────────────────
+   Wyjątek czyta się i zamyka bez szukania: zdjęcie jest przy zgłoszeniu,
+   zamknięty mówi, kto go zamknął, a po kolejce chodzi się tymi samymi
+   klawiszami co w zwrotach i reklamacjach. */
+describe("wyjątek i klawisze kolejki", () => {
+  it("`j` i `k` chodzą po kolejce, cyfra zmienia kubełek, a w polu to zwykłe znaki", async () => {
+    pokaz("/obsluga/dostawy/802");
+    await screen.findByRole("heading", { name: "FZ 802/MAG/09/2026" });
+    await userEvent.keyboard("j");
+    expect(await screen.findByRole("heading", { name: "FZ 803/MAG/09/2026" })).toBeInTheDocument();
+    await userEvent.keyboard("k");
+    expect(await screen.findByRole("heading", { name: "FZ 802/MAG/09/2026" })).toBeInTheDocument();
+
+    /* W polu szukania cyfra jest frazą, nie kubełkiem. */
+    await userEvent.type(screen.getByLabelText("Szukaj dostawy"), "2");
+    expect(screen.getByRole("button", { name: /^Do decyzji/ })).toHaveAttribute("aria-pressed", "true");
+    await userEvent.clear(screen.getByLabelText("Szukaj dostawy"));
+
+    /* Poza polem `2` otwiera „W toku" i zamyka sprawę spoza tego kubełka. */
+    (document.activeElement as HTMLElement).blur();
+    await userEvent.keyboard("2");
+    expect(screen.getByRole("button", { name: /^W toku/ })).toHaveAttribute("aria-pressed", "true");
+    expect(await screen.findByText("Wybierz dostawę z kolejki.")).toBeInTheDocument();
+    /* Chodzenie po kolejce to patrzenie: zero zapisów. */
+    expect(wyslane).toEqual([]);
+  });
+
+  it("zdjęcie z hali otwiera się wprost z wyjątku, którego dotyczy", async () => {
+    pokaz("/obsluga/dostawy/806");
+    const zdjecie = await screen.findByRole("button", { name: "Zdjęcie" });
+    await waitFor(() => expect(zdjecie).toBeEnabled());
+    await userEvent.click(zdjecie);
+    expect(screen.getByRole("dialog", { name: /powiększenie/ })).toBeInTheDocument();
+  });
+
+  it("wyjątek bez zdjęcia nie ma przycisku zdjęcia", async () => {
+    pokaz("/obsluga/dostawy/802");
+    await screen.findByRole("heading", { name: "FZ 802/MAG/09/2026" });
+    expect(screen.queryByRole("button", { name: "Zdjęcie" })).toBeNull();
+  });
+
+  it("Escape wycofuje się z zamykania wyjątku i niczego nie wysyła", async () => {
+    pokaz("/obsluga/dostawy/802");
+    await userEvent.click(await screen.findByRole("button", { name: "Rozwiąż" }));
+    /* Stan zostaje na ekranie także przy otwartym formularzu. */
+    expect(screen.getByText("otwarty")).toBeInTheDocument();
+    await userEvent.type(screen.getByLabelText("Jak załatwiono wyjątek"), "dosłali{Escape}");
+    expect(screen.queryByLabelText("Jak załatwiono wyjątek")).toBeNull();
+    /* Fokus wraca na przycisk, z którego formularz otwarto. */
+    expect(screen.getByRole("button", { name: "Rozwiąż" })).toHaveFocus();
+    expect(wyslane).toEqual([]);
+  });
+
+  it("zamknięty wyjątek mówi, kto i kiedy go zamknął — także bez notatki", () => {
+    render(<WyjatekWiersz trwa={false} blad="" onRozwiaz={() => {}}
+      p={wyj(41, { resolvedAt: "2026-09-22T10:00:00.000Z", resolvedBy: "Anna", resolvedNote: null })} />);
+    expect(screen.getByText(/^Zamknięty: Anna · /)).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Rozwiąż" })).toBeNull();
+  });
+
+  it("opis z hali stoi pod rzędem plakietek, nie obok przycisku", () => {
+    render(<WyjatekWiersz trwa={false} blad="" onRozwiaz={() => {}} p={wyj(42, { opis: "pęknięta obudowa" })} />);
+    const rzad = screen.getByRole("button", { name: "Rozwiąż" }).parentElement!.parentElement!;
+    expect(within(rzad).getByText("uszkodzone")).toBeInTheDocument();
+    expect(within(rzad).queryByText("pęknięta obudowa")).toBeNull();
+  });
+
+  it("towar spoza dokumentu po zamknięciu ostatniego wyjątku mówi, że nic nie zostało", () => {
+    render(<WyjatkiLuzem tytul="Towar spoza dokumentu" podtytul="—" lista={[]}
+      rozwiaz={{ trwa: false, blad: "", onRozwiaz: () => {} }} />);
+    expect(screen.getByText("Nie ma już otwartych wyjątków bez dokumentu.")).toBeInTheDocument();
+  });
+
+  it("druki dostawy stoją razem na końcu nagłówka", async () => {
+    pokaz("/obsluga/dostawy/802");
+    const protokol = await screen.findByRole("link", { name: /Protokół dla dostawcy/ });
+    expect(within(protokol.parentElement!).getByRole("button", { name: "CSV" })).toBeInTheDocument();
+    expect(within(protokol.parentElement!).queryByRole("heading")).toBeNull();
   });
 });

@@ -13,7 +13,8 @@ import {
 } from "../dostawy/Kolejka";
 import { Dokument, WyjatkiLuzem } from "../dostawy/Dokument";
 import { Kontekst } from "../dostawy/Kontekst";
-import { useOkno } from "../nawigacja/fokus";
+import { klawiszZajety, useOkno } from "../nawigacja/fokus";
+import { useKursorListy } from "../nawigacja/kursor";
 
 /** Kubełki do przeglądania — stoją pod „Więcej”, nie na wierzchu. */
 const WIECEJ_DOSTAW: ReadonlyArray<KubelekDostaw> = ["zamkniete", "poza", "archiwum"];
@@ -102,6 +103,22 @@ export function Dostawy() {
   const opis = KUBELKI_DOSTAW.find((k) => k.id === kubelek);
   const idz = (x: number | "bez") => nawiguj(`/obsluga/dostawy/${x}`);
 
+  /* JEDNA LISTA WIDOCZNA dla rysowania i dla klawiszy. Kursor chodzi po tym,
+     co stoi na ekranie, w tej samej kolejności: najpierw wiersze spoza okna
+     importu, potem dokumenty kubełka po odsianiu frazą. */
+  const pozaWidoczne = (poza.data?.documents ?? []).filter((d) => pasuje(d.nrPelny, d.dostawca));
+  const archiwumWidoczne = archiwum.data?.documents ?? [];
+  const kubelekWidoczny = kubelek === "poza" || kubelek === "archiwum" ? []
+    : wKubelku(kubelek).filter((d) => pasuje(d.nrPelny, d.dostawca, d.nrDostawcy));
+  const widoczne: Array<{ id: number | "bez" }> =
+    kubelek === "poza" ? pozaWidoczne.map((d) => ({ id: d.dokId }))
+    : kubelek === "archiwum" ? archiwumWidoczne.map((d) => ({ id: d.dokId }))
+    : [...(kubelek === "decyzja" ? spozaOkna.map((g) => ({ id: g.dokId ?? ("bez" as const) })) : []),
+       ...kubelekWidoczny.map((d) => ({ id: d.dokId }))];
+  /* Po zamknięciu ostatniego wyjątku faktura schodzi z DO DECYZJI, a `j` ma
+     otworzyć tę, która stanęła na jej miejscu. Powód przy `nawigacja/kursor.ts`. */
+  const idzOWiersz = useKursorListy(widoczne, wybrany, (w) => idz(w.id));
+
   /* Do którego kubełka należy wybrana sprawa — `null`, gdy nie wiadomo.
      Archiwum przychodzi z serwera dopiero po otwarciu kubełka, więc
      dokumentu stamtąd nie da się rozpoznać z góry. */
@@ -123,6 +140,26 @@ export function Dostawy() {
     setKubelek(k);
     if (wybrany !== null && kubelekWybranego() !== k) nawiguj("/obsluga/dostawy");
   };
+
+  /* TE SAME KLAWISZE CO W ZWROTACH I REKLAMACJACH: `j`/`k` albo strzałki po
+     liście, cyfry po kubełkach. Biuro przechodzi między kolejkami bez zmiany
+     nawyku, a dostawy były jedyną, która wymagała myszy. Skróty milkną w polu
+     pisania i pod oknem modalnym, inaczej cyfra z notatki zmieniałaby kubełek. */
+  useEffect(() => {
+    const nasluch = (e: KeyboardEvent) => {
+      if (e.ctrlKey || e.altKey || e.metaKey || klawiszZajety(e.target)) return;
+      if (e.key === "ArrowDown" || e.key === "j") { e.preventDefault(); idzOWiersz(1); }
+      else if (e.key === "ArrowUp" || e.key === "k") { e.preventDefault(); idzOWiersz(-1); }
+      /* Cyfry liczą się z długości `KUBELKI_DOSTAW`, więc dopisanie kubełka
+         nie rozjedzie klawiszy. */
+      else if (/^[1-9]$/.test(e.key)) {
+        const k = KUBELKI_DOSTAW[Number(e.key) - 1];
+        if (k) wybierzKubelek(k.id);
+      }
+    };
+    window.addEventListener("keydown", nasluch);
+    return () => window.removeEventListener("keydown", nasluch);
+  });
 
   /* LINK DO DOKUMENTU OTWIERA JEGO KUBEŁEK. Adres `/dostawy/9003` bez
      `?kubelek=` stawał zawsze na „Do decyzji", więc zamknięta albo nietknięta
@@ -164,21 +201,20 @@ export function Dostawy() {
        połączeniu brzmiałoby jak koniec pracy. */
     if (lista.error && !lista.data) return <Blad>{(lista.error as Error).message}</Blad>;
     if (kubelek === "poza") {
-      return <KolejkaPozaWertis wybrany={dokId} onWybierz={idz}
-        lista={(poza.data?.documents ?? []).filter((d) => pasuje(d.nrPelny, d.dostawca))} />;
+      return <KolejkaPozaWertis wybrany={dokId} onWybierz={idz} lista={pozaWidoczne} />;
     }
     if (kubelek === "archiwum") {
       /* Archiwum przychodzi z serwera już zawężone — filtrowanie go jeszcze
          raz zawężałoby stronę wyników, a nie zbiór. */
       if (archiwum.isLoading) return <Pusto waga="lista">Wczytuję archiwum…</Pusto>;
-      return <KolejkaDostaw dokumenty={archiwum.data?.documents ?? []} zOdpowiedzia={zOdpowiedzia}
+      return <KolejkaDostaw dokumenty={archiwumWidoczne} zOdpowiedzia={zOdpowiedzia}
         wybrany={dokId} onWybierz={idz}
         pusto={frazaArchiwum ? "Nic w archiwum nie pasuje do wyszukiwania."
           : "Archiwum jest puste — nic jeszcze nie wypadło z okna importu."} />;
     }
     return <>
       {kubelek === "decyzja" && <WierszeSpozaOkna grupy={spozaOkna} wybrany={wybrany} onWybierz={idz} />}
-      <KolejkaDostaw dokumenty={wKubelku(kubelek).filter((d) => pasuje(d.nrPelny, d.dostawca, d.nrDostawcy))}
+      <KolejkaDostaw dokumenty={kubelekWidoczny}
         zOdpowiedzia={zOdpowiedzia} wybrany={dokId} onWybierz={idz}
         pusto={kubelek === "decyzja" && spozaOkna.length ? ""
           : kubelek === "decyzja" ? "Nic nie czeka na biuro — hala rozkłada bez pytań."
@@ -241,13 +277,19 @@ export function Dostawy() {
         {wybrany === null
           ? <Pusto ikona={Truck}>Wybierz dostawę z kolejki.</Pusto>
           : wybrany === "bez"
-            ? <WyjatkiLuzem tytul="Towar spoza dokumentu"
-                podtytul="Hala zgłosiła towar, którego nie było na żadnej fakturze. Rozstrzygnij każdy z osobna."
-                lista={luzem} rozwiaz={propsRozwiaz} />
+            /* Bez danych nie mówimy „nie ma wyjątków": przy zerwanym połączeniu
+               to zdanie znaczyłoby koniec pracy, a prawda brzmi „nie wiem". */
+            ? wyjatki.isLoading
+              ? <Pusto waga="lista">Wczytuję wyjątki…</Pusto>
+              : !wyjatki.data
+                ? <Pusto waga="lista">{(wyjatki.error as Error | null)?.message ?? "Nie udało się wczytać wyjątków."}</Pusto>
+                : <WyjatkiLuzem tytul="Towar spoza dokumentu"
+                    podtytul="Hala zgłosiła towar, którego nie było na żadnej fakturze. Rozstrzygnij każdy z osobna."
+                    lista={luzem} rozwiaz={propsRozwiaz} onPowieksz={setLupa} />
             : dokument.isLoading
               ? <Pusto waga="lista">Wczytuję dokument…</Pusto>
               : dokument.data
-                ? <Dokument key={dokument.data.dokId} d={dokument.data} rozwiaz={propsRozwiaz} />
+                ? <Dokument key={dokument.data.dokId} d={dokument.data} rozwiaz={propsRozwiaz} onPowieksz={setLupa} />
                 : <Pusto waga="lista">{dokument.error
                     ? (dokument.error as Error).message : "Nie znaleziono dokumentu."}</Pusto>}
       </Karta>
@@ -270,7 +312,11 @@ export function Dostawy() {
                     { onError: (e) => setBladPoza((e as Error).message) }); },
                   onPrzywroc: () => { setBladPoza(""); przywroc.mutate(dokument.data!.dokId,
                     { onError: (e) => setBladPoza((e as Error).message) }); } }} />
-            : <Pusto waga="lista">Dowody, dostawca i notatki pokażą się po wybraniu dostawy.</Pusto>}
+            /* Towar spoza dokumentu nie ma faktury, więc nie ma też dostawcy
+               ani notatek. Obietnica „pokażą się" kazałaby na nie czekać. */
+            : <Pusto waga="lista">{wybrany === "bez"
+                ? "Towar spoza dokumentu nie ma dostawcy ani notatek. Zdjęcie z hali stoi przy wyjątku."
+                : "Dowody, dostawca i notatki pokażą się po wybraniu dostawy."}</Pusto>}
         </div>
       </Karta>
     </div>
