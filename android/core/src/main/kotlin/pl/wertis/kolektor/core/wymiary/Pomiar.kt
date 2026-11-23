@@ -2,6 +2,7 @@ package pl.wertis.kolektor.core.wymiary
 
 import java.math.BigDecimal
 import java.math.RoundingMode
+import pl.wertis.kolektor.core.net.DeliveryView
 import pl.wertis.kolektor.core.net.PomiarBody
 import pl.wertis.kolektor.core.net.PozycjaBezWymiarow
 import pl.wertis.kolektor.core.net.TowarDoPomiaru
@@ -216,12 +217,23 @@ fun cialoPomiaru(wpisy: Map<PolePomiaru, String>): PomiarBody {
    każdy nowy towar na pewno przechodzi przez ręce, więc brak złapany tutaj nie
    czeka miesiącami na liście „Do zmierzenia".
 
+   Właściciel może tę decyzję wyłączyć w panelu (`POMIAR_PRZY_DOSTAWIE`), gdy
+   hala nie nadąża z rozkładaniem. Wtedy pomiar zostaje dobrowolny: z listy
+   „Do zmierzenia" i z karty towaru, a przy dostawie kolektor nie pyta wcale.
+
    Wymagane są wyłącznie BRAKI. Wartość, którą kartoteka już ma, zostaje,
    bo przepisywanie jej z wagi to praca bez nowej informacji.
 
    Blokuje tylko odpowiedź serwera, która mówi „brakuje". Wyłączona funkcja,
    pomiar w kolejce i brak odpowiedzi nie blokują: bez wiedzy o kartotece
    blokada zatrzymałaby rozkładanie w każdej dziurze Wi-Fi.                   */
+
+/**
+ * Czy ta dostawa wymusza pomiar. Przed wczytaniem widoku `true`: krótka
+ * blokada przy pierwszym skanie kosztuje mniej niż towar, który przemknął
+ * bez pomiaru wbrew decyzji właściciela.
+ */
+fun pomiarWymuszony(view: DeliveryView?): Boolean = view?.pomiarWymagany ?: true
 
 /** Pola, których kartoteka nie ma — przy wymuszonym pomiarze każde trzeba wpisać. */
 fun wymaganePola(t: TowarDoPomiaru): Set<PolePomiaru> =

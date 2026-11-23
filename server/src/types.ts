@@ -312,6 +312,12 @@ export interface DeliveryView {
    */
   sourceMagId: number | null;
   /**
+   * Czy kolektor wymusza wagę i wymiary przed odłożeniem (`POMIAR_PRZY_DOSTAWIE`).
+   * Jedzie z widokiem dostawy, bo kolektor czyta go przy każdym otwarciu,
+   * więc zmiana w panelu działa od następnego wejścia w dostawę.
+   */
+  pomiarWymagany: boolean;
+  /**
    * Czy zamkniętą dostawę da się otworzyć ponownie, a jeśli nie — dlaczego.
    * `null` na dostawie otwartej. Powód idzie gotowym zdaniem, bo kolektor
    * ma go pokazać zamiast wyszarzonego przycisku bez słowa.

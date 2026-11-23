@@ -23,6 +23,7 @@ export const OBOWIAZUJE: Readonly<Record<string, Pole>> = {
   POZYCJE_NIE_TOWAROWE: (c) => c.pozycjeNieTowarowe,
   TW_ID_PRZESYLKA: (c) => c.twIdPrzesylka,
   ALLOW_MANUAL_LOC: (c) => c.allowManualLoc,
+  POMIAR_PRZY_DOSTAWIE: (c) => c.pomiarPrzyDostawie,
   ZDJECIA_DODAWANIE: (c) => c.zdjecia.dodawanie,
 
   ALLEGRO_CLIENT_ID: (c) => c.allegro.clientId,

@@ -706,6 +706,12 @@ data class DeliveryView(
      */
     val sourceMagId: Long? = null,
     /**
+     * Czy towar bez wagi i wymiarów musi być zmierzony przed odłożeniem —
+     * przełącznik właściciela w panelu. Brak pola (starszy serwer) to `true`,
+     * bo tak kolektor pracował, zanim przełącznik powstał.
+     */
+    val pomiarWymagany: Boolean = true,
+    /**
      * Czy zamkniętą dostawę da się otworzyć ponownie. `null` na otwartej
      * i u starszego serwera. Powód przychodzi gotowym zdaniem — ekran ma go
      * pokazać zamiast przycisku, który by odmówił.

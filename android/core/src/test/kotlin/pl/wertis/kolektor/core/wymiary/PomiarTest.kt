@@ -5,6 +5,7 @@ import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
+import pl.wertis.kolektor.core.net.DeliveryView
 import pl.wertis.kolektor.core.net.ListaBezWymiarow
 import pl.wertis.kolektor.core.net.PomiarBody
 import pl.wertis.kolektor.core.net.PozycjaBezWymiarow
@@ -329,6 +330,19 @@ class PomiarTest {
     @Test fun `wylaczona funkcja nie blokuje`() {
         assertNull(pomiarPrzedOdlozeniem(odp(null, wlaczone = false), 1, emptySet()))
         assertNull(pomiarPrzedOdlozeniem(odp(pusty, wlaczone = false), 1, emptySet()))
+    }
+
+    @Test fun `przelacznik wlasciciela decyduje o wymuszonym pomiarze`() {
+        val naglowek = """"id":1,"dokId":2,"nrPelny":"FZ 1","dostawca":"X","dataWyst":"","status":"open","lines":[]"""
+        val wylaczony = WertisJson.decodeFromString<DeliveryView>("{$naglowek,\"pomiarWymagany\":false}")
+        val wlaczony = WertisJson.decodeFromString<DeliveryView>("{$naglowek,\"pomiarWymagany\":true}")
+        // starszy serwer pola nie wysyła — kolektor pracuje wtedy jak dotąd
+        val starszy = WertisJson.decodeFromString<DeliveryView>("{$naglowek}")
+        assertFalse(pomiarWymuszony(wylaczony))
+        assertTrue(pomiarWymuszony(wlaczony))
+        assertTrue(pomiarWymuszony(starszy))
+        // widok jeszcze się nie wczytał
+        assertTrue(pomiarWymuszony(null))
     }
 
     @Test fun `odpowiedz o innym towarze nie blokuje`() {

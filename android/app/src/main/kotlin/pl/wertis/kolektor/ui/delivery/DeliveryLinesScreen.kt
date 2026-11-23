@@ -104,6 +104,7 @@ import pl.wertis.kolektor.ui.przesuniecie.PrzesuniecieSheet
 import pl.wertis.kolektor.ui.wymiary.PomiarSheet
 import pl.wertis.kolektor.core.net.TowarDoPomiaru
 import pl.wertis.kolektor.core.wymiary.pomiarPrzedOdlozeniem
+import pl.wertis.kolektor.core.wymiary.pomiarWymuszony
 import pl.wertis.kolektor.core.wymiary.wymaganePola
 import pl.wertis.kolektor.ui.components.LoadingRow
 import pl.wertis.kolektor.ui.components.LokPastylka
@@ -282,7 +283,10 @@ fun DeliveryLinesScreen(graph: AppGraph) {
        Towar bez kompletu wagi i wymiarów nie idzie na półkę, dopóki ktoś go
        nie zmierzy. Reguła i wyjątki od niej stoją przy `pomiarPrzedOdlozeniem`
        w `:core`. Pytamy zaraz po skanie towaru, bo wtedy karton leży przy
-       wadze; przy regale człowiek ma już tylko towar i drabinę. */
+       wadze; przy regale człowiek ma już tylko towar i drabinę. Przełącznik
+       właściciela w widoku dostawy wyłącza całość, łącznie z pytaniem serwera,
+       żeby skan półki nie czekał na odpowiedź, której nikt nie potrzebuje. */
+    val wymuszony = pomiarWymuszony(view)
     /** Otwarty arkusz wymuszonego pomiaru — `null` = zamknięty. */
     var pomiarDla by remember(id) { mutableStateOf<TowarDoPomiaru?>(null) }
     /** Towar, którego kartotekę właśnie czytamy; skan półki czeka na odpowiedź. */
@@ -302,8 +306,9 @@ fun DeliveryLinesScreen(graph: AppGraph) {
        Znany brak też pytamy od nowa: towar mógł zmierzyć w międzyczasie
        drugi kolektor albo lista „Do zmierzenia". */
     val otwartyTwId = active?.twId
-    LaunchedEffect(otwartyTwId) {
+    LaunchedEffect(otwartyTwId, wymuszony) {
         val twId = otwartyTwId ?: return@LaunchedEffect
+        if (!wymuszony) return@LaunchedEffect
         if (twId in bezBlokady || twId in zmierzone) return@LaunchedEffect
         sprawdzany = twId
         val w = try {
@@ -337,6 +342,7 @@ fun DeliveryLinesScreen(graph: AppGraph) {
      * i głosem, bo skan półki połknięty po cichu czyta się jak zapisany.
      */
     fun czekaNaPomiar(line: DeliveryLineView): Boolean {
+        if (!wymuszony) return false
         val brak = doPomiaru[line.twId]
         if (brak != null) {
             graph.feedback.beep(false)
