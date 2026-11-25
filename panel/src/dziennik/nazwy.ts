@@ -126,6 +126,7 @@ export const NAZWA_ZDARZENIA: Record<string, string> = {
   zwrot_pozycja_dopisana: "Pozycja zwrotu dopisana",
   zwrot_pozycja_zdjeta: "Pozycja zwrotu zdjęta",
   zwrot_ilosc_zwrocona: "Ilość zwrócona zmieniona",
+  zwrot_pomylony_towar: "Pomylony towar w zwrocie",
   zwrot_kartoteka: "Kartoteka zwrotu wskazana",
   zwrot_kartoteka_zdjeta: "Kartoteka zwrotu zdjęta",
   zwrot_ocena: "Ocena stanu zwrotu",

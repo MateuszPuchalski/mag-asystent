@@ -1072,6 +1072,10 @@ export interface PozycjaZwrotu {
    * `ilosc` obok niesie DEKLARACJĘ klienta i nadpisuje ją synchronizator.
    */
   iloscZwrocona: number | null;
+  /** W kartonie przyjechał inny towar niż w zamówieniu — zaznacza biuro. */
+  pomylonyTowar?: boolean;
+  /** Co przyjechało naprawdę; `null`, gdy biuro tylko zaznaczyło pomyłkę. */
+  pomylonyOpis?: string | null;
   id: number;
   /** `allegro` = ze zgłoszenia klienta, `biuro` = dopisana u nas. */
   zrodlo: string;

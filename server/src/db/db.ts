@@ -548,6 +548,12 @@ export function migrate(database: DatabaseSync) {
      Rozjazd ilości sprawdza BIURO — decyzja właściciela: „biuro zajmuje się
      otwieraniem i procesowaniem zwrotów". */
   addColumn("zwrot_klienta_pozycja", "ilosc_zwrocona", "REAL");
+  /* W kartonie leży INNY towar niż w zamówieniu. Wiedzę ma wyłącznie biuro,
+     które otwiera paczkę, więc synchronizator tej kolumny nie rusza. Opis
+     mówi, co przyjechało naprawdę; sama flaga wystarczy, gdy nie ma czasu
+     pisać. */
+  addColumn("zwrot_klienta_pozycja", "pomylony_towar", "INTEGER NOT NULL DEFAULT 0");
+  addColumn("zwrot_klienta_pozycja", "pomylony_opis", "TEXT");
   /* Skąd wziął się numer korekty — patrz `zwrot_klienta.korekta_zrodlo`. */
   addColumn("zwrot_klienta", "korekta_zrodlo", "TEXT");
   /* Ręczne zamknięcie zwrotu bez korekty. */

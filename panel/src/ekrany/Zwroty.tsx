@@ -11,7 +11,7 @@ import { Pozycje } from "../zwroty/Pozycje";
 import { DolozTowar } from "../zwroty/DolozTowar";
 import {
   useCofnijKorekte, useCofnijKwote, useCofnijWerdykt, useDopiszPozycje,
-  useIloscZwrocona, useFaktura, useKorekta, useKwota,
+  useIloscZwrocona, usePomylonyTowar, useFaktura, useKorekta, useKwota,
   usePaczkiKlienta, useZamowieniaZAllegro, usePrzyjmijNieodebrana, wygladaNaLogin, useOcena, usePotracenie, useWerdykt, useZdejmijPozycje,
   useZglosRabat, useZwrot, useZwrocPieniadze, useOdmowPlatnosci, useSledzDosylkeZwrotu, useSprawdzPlatnosci,
   useZapiszPrzelew, useCofnijPrzelew, useZamknijRecznie, useOtworzPonownie,
@@ -402,14 +402,15 @@ export function Zwroty() {
   const bladPieniedzyDla = (zwrotId: number, przedrostek = "") => (e: unknown) =>
     setBladPieniedzy({ zwrotId, tekst: `${przedrostek}${(e as Error).message}` });
   const [bladFaktury, setBladFaktury] = useState("");
+  const pomylony = usePomylonyTowar();
   const trwa = werdykt.isPending || ocena2.isPending || kwota.isPending
     || korekta.isPending || cofnijKorekte.isPending || cofnijKwote.isPending
-    || cofnijWerdykt.isPending || ilosc.isPending
+    || cofnijWerdykt.isPending || ilosc.isPending || pomylony.isPending
     || potracenie.isPending;
   /* Konflikt wersji ma brzmieć jak zdanie, nie jak kod. Serwer przysyła je
      gotowe przy 409 — panel go nie układa od nowa. */
   const bledy = [werdykt.error, ocena2.error, kwota.error, korekta.error, cofnijKorekte.error,
-    cofnijKwote.error, cofnijWerdykt.error, ilosc.error,
+    cofnijKwote.error, cofnijWerdykt.error, ilosc.error, pomylony.error,
     potracenie.error];
   const bladDecyzji = bledy.find(Boolean) instanceof Error
     ? String((bledy.find(Boolean) as Error).message) : "";
@@ -1346,6 +1347,8 @@ export function Zwroty() {
                   potracenie.mutate({ pozycjaId, grosze, powod, wersja: zwrot.wersja })}
                 onIlosc={(pozycjaId, ile) =>
                   ilosc.mutate({ pozycjaId, ilosc: ile, wersja: zwrot.wersja })}
+                onPomylony={(pozycjaId, tak, opis) =>
+                  pomylony.mutate({ pozycjaId, pomylony: tak, opis, wersja: zwrot.wersja })}
                 onZglosRabat={(pozycjaId) => {
                   setBladRabatu("");
                   rabat.mutate({ pozycjaId },
