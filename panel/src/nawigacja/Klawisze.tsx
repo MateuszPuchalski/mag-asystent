@@ -5,7 +5,7 @@ import { OknoSzukania } from "./Szukaj";
 /* „Czy klawisz padł w polu" pyta jeden wspólny strażnik. */
 import { polePisania, useOkno } from "./fokus";
 import { Klawisz } from "./Klawisz";
-import { podpisPaska, wierszPaska } from "./wierszPaska";
+import { podpisPaska, ukrytePaska, wierszPaska } from "./wierszPaska";
 
 /* ── Jedna lista skrótów i klawisze całego panelu ───────────────────────────
    Dekalog p. 2 — rozpoznanie tańsze od pamiętania — wymaga jednego miejsca
@@ -34,9 +34,9 @@ export const SKROTY: ReadonlyArray<SekcjaSkrotow> = [
     ["?", "ta lista"],
     ["Esc", "zamknij okno"],
   ] },
-  /* Kosze nie mają klawiatury, więc tytuł wylicza kolejki, w których te
-     klawisze działają. */
-  { tytul: "Skrzynka, zwroty, reklamacje, dostawy", sciezka: null, klawisze: [
+  /* Tytuł wylicza kolejki, w których te klawisze działają. Pomyłki i zadania
+     ich nie mają, więc „każda kolejka" obiecywałaby za dużo. */
+  { tytul: "Skrzynka, zwroty, kosze, reklamacje, dostawy", sciezka: null, klawisze: [
     ["j k", "następna / poprzednia sprawa"],
     ["1–9", "kubełek"],
   ] },
@@ -169,7 +169,7 @@ export function SzukajIKlawisze({ zwiniety = false }: { zwiniety?: boolean }) {
       <Search size={18} className="shrink-0" aria-hidden="true" />
       <span className={`mr-auto ${podpisPaska(zwiniety)}`}>Szukaj</span>
       <span aria-hidden="true"
-        className={`text-podpis font-normal text-slate-300 ${zwiniety ? "hidden" : "max-[1279px]:hidden"}`}>Ctrl K</span>
+        className={`text-podpis font-normal text-slate-300 ${ukrytePaska(zwiniety)}`}>Ctrl K</span>
     </button>
     {szukanie && <OknoSzukania onZamknij={() => setSzukanie(false)} />}
     {lista && <ListaSkrotow onZamknij={() => setLista(false)} />}

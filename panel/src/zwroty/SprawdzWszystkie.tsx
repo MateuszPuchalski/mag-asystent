@@ -6,7 +6,7 @@ import type { WynikSprawdzeniaWszystkich } from "../api/zwroty";
    Przycisk stoi w rzędzie tytułu kolumny (jedna ikona), a wynik pod polem
    szukania, bo zdanie o wyniku jest dłuższe niż rząd tytułu.
 
-   Wynik żyje w stanie EKRANU, nie tutaj: ten komponent odmontowuje się razem
+   Wynik żyje w mutacji EKRANU, nie tutaj: ten komponent odmontowuje się razem
    z paskiem szukania, a agent przełącza kubełki, patrząc na wynik. Zostaje na
    ekranie, dopóki agent go nie zamknie albo nie kliknie ponownie — zdanie,
    które znika samo, nie da się doczytać.

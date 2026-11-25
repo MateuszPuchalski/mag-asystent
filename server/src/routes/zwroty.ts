@@ -12,9 +12,9 @@ import {
 import { koszeZwrotu, towarZKodu } from "../services/kosze.js";
 import { wierszeDokumentuZwrotu } from "../services/komplety.js";
 import {
-  bilansKartotek, cofnijKorekte, cofnijKwote, cofnijWerdykt, licznikiKubelkow, listaZwrotow, ocenPozycje, osZwrotu,
+  bilansKartotek, cofnijKorekte, cofnijKwote, cofnijWerdykt, licznikiKubelkow, listaZwrotow, zwrotyZInnymTowarem, ocenPozycje, osZwrotu,
   potwierdzKartoteke, rozstrzygnijZwrot, zapiszIloscZwrocona, zapiszKorekte, zapiszKwote,
-  zapiszPotracenie,
+  zapiszPomylonyTowar, zapiszPotracenie,
   znajdzZwrotPoKodzie,
   ZwrotConflict,
   dopiszPozycje, doDopisania, usunDopisanaPozycje,
@@ -97,6 +97,15 @@ export async function zwrotyRoutes(app: FastifyInstance) {
       kartoteki: bilansKartotek(zwroty),
       stan: stanZwrotowHealth(db()),
     };
+  });
+
+  /* Alarm biura: klient wskazał powód „inny towar". Lekki odczyt, bo panel
+     pyta o to co pół minuty na każdym ekranie, a pełna lista zwrotów jest
+     na to za ciężka. */
+  app.get("/api/obsluga/zwroty/alarm-inny-towar", async (_req, reply) => {
+    const nie = odmowa(reply);
+    if (nie) return nie;
+    return { zwroty: zwrotyZInnymTowarem(db()) };
   });
 
   /* Ręczna synchronizacja zwrotów (§9, wzorzec ze skrzynki i reklamacji).
@@ -729,6 +738,21 @@ export async function zwrotyRoutes(app: FastifyInstance) {
       try {
         return zapiszIloscZwrocona(db(), Number(req.params.id), i ?? null,
           Number(req.body?.wersja), kto());
+      } catch (e) { return konflikt(reply, e); }
+    });
+
+  /* Pomylony towar w kartonie: flaga i krótki opis. Bramkę „najpierw
+     przyjmij" zna serwis, jak przy liczeniu sztuk. */
+  app.post<{ Params: { id: string }; Body: { pomylony?: boolean; opis?: string; wersja?: number } }>(
+    "/api/obsluga/zwroty/pozycje/:id/pomylony", async (req, reply) => {
+      const nie = odmowa(reply);
+      if (nie) return nie;
+      if (typeof req.body?.pomylony !== "boolean") {
+        return reply.code(400).send({ error: "Pomylony towar to tak albo nie." });
+      }
+      try {
+        return zapiszPomylonyTowar(db(), Number(req.params.id), req.body.pomylony,
+          String(req.body?.opis ?? ""), Number(req.body?.wersja), kto());
       } catch (e) { return konflikt(reply, e); }
     });
 

@@ -231,6 +231,8 @@ const bezOdswiezenia = () => scena.mutacje.filter((m) => !m.startsWith("odswiez:
 
 /** Jeden rząd kubełków nad kolejką. */
 const kubelki = () => screen.getByRole("group", { name: "Kubełki kolejki" });
+/** Kubełki pod „Więcej” nie mają pigułki, więc stoją w liście wyboru. */
+const wiecej = () => within(kubelki()).getByLabelText("Więcej kubełków") as HTMLSelectElement;
 
 /** Otwiera okno filtra przy tytule kolejki. */
 const otworzFiltr = async () => {
@@ -334,7 +336,7 @@ describe("Jeden rząd kubełków zamiast kafli", () => {
     expect(screen.queryByText("+6 od zeszłego tygodnia")).not.toBeInTheDocument();
     const szukaj = screen.getByLabelText("Szukaj reklamacji");
     const sito = screen.getByRole("button", { name: /^Moje/ });
-    /* Kolejność kolumny jest wspólna dla czterech kolejek: tytuł, kubełki,
+    /* Kolejność kolumny jest wspólna dla wszystkich kolejek: tytuł, kubełki,
        szukanie, drugi filtr, lista (`ui/KolumnaKolejki.tsx`). */
     expect(kubelki().compareDocumentPosition(szukaj) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     expect(szukaj.compareDocumentPosition(sito) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
@@ -344,8 +346,7 @@ describe("Jeden rząd kubełków zamiast kafli", () => {
     pokaz();
     expect(within(kubelki()).getAllByRole("button").map((b) => b.textContent))
       .toEqual(["Do decyzji 4", "Do odpowiedzi 0"]);
-    const wiecej = within(kubelki()).getByLabelText("Więcej kubełków");
-    expect(within(wiecej).getAllByRole("option").map((o) => o.textContent))
+    expect(within(wiecej()).getAllByRole("option").map((o) => o.textContent))
       .toEqual(["Więcej", "Rozstrzygnięte · 1", "Bez ruchu · 0", "Wszystkie · 5"]);
     expect(within(kubelki()).getByTitle("Uznać czy odrzucić? (klawisz 1)")).toBeInTheDocument();
     expect(within(kubelki()).getByTitle("Tylko wgląd. (klawisz 3)")).toBeInTheDocument();
@@ -381,7 +382,7 @@ describe("Jeden rząd kubełków zamiast kafli", () => {
     expect(screen.queryByText(/Ten kubełek jest pusty/)).not.toBeInTheDocument();
     expect(within(kubelki()).getAllByRole("button").map((b) => b.textContent))
       .toEqual(["Do decyzji —", "Do odpowiedzi —"]);
-    expect(within(within(kubelki()).getByLabelText("Więcej kubełków")).getAllByRole("option")
+    expect(within(wiecej()).getAllByRole("option")
       .map((o) => o.textContent)).toEqual(["Więcej", "Rozstrzygnięte · —", "Bez ruchu · —", "Wszystkie · —"]);
     /* Sito liczyłoby z pustej listy i mówiłoby „Moje 0”. */
     expect(screen.queryByRole("button", { name: /^Moje/ })).not.toBeInTheDocument();
@@ -436,7 +437,7 @@ describe("Kubełki i skróty", () => {
 
   it("przełączenie kubełka przestawia KURSOR na jego pierwszą sprawę", async () => {
     pokaz("/obsluga/reklamacje/1");
-    await userEvent.selectOptions(within(kubelki()).getByLabelText("Więcej kubełków"), "Rozstrzygnięte · 1");
+    await userEvent.selectOptions(wiecej(), "Rozstrzygnięte · 1");
     const wiersz = await screen.findByRole("button", { name: /222\/2026/, current: true });
     expect(wiersz).toHaveAttribute("aria-current", "true");
     expect(screen.queryByRole("button", { name: /111\/2026/ })).not.toBeInTheDocument();
@@ -446,8 +447,6 @@ describe("Kubełki i skróty", () => {
     pokaz();
     await userEvent.keyboard("2");
     expect(within(kubelki()).getByRole("button", { name: /Do odpowiedzi/ })).toHaveAttribute("aria-pressed", "true");
-    /* Kubełki pod „Więcej” nie mają pigułki, więc wybór widać w liście. */
-    const wiecej = () => within(kubelki()).getByLabelText("Więcej kubełków") as HTMLSelectElement;
     await userEvent.keyboard("3");
     expect(wiecej().selectedOptions[0].textContent).toMatch(/^Rozstrzygnięte/);
     await userEvent.keyboard("4");

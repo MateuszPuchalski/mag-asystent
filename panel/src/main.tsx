@@ -21,6 +21,7 @@ import { useLicznikPomylek } from "./api/pomylki";
 import { useZdjeciaWylaczone } from "./api/zdjecia";
 import { SzukajIKlawisze } from "./nawigacja/Klawisze";
 import { WskaznikSynchronizacji } from "./nawigacja/Synchronizacja";
+import { ukrytePaska } from "./nawigacja/wierszPaska";
 import { PasekPolaczenia } from "./nawigacja/Polaczenie";
 import { USTAWIENIA, Wiecej } from "./nawigacja/Wiecej";
 import { ZGLOSZENIA } from "./nawigacja/Wiecej";
@@ -42,6 +43,7 @@ import "./index.css";
 import { CoNowego } from "./coNowego/CoNowego";
 import { SzufladaTowaru } from "./towar/Szuflada";
 import { AlarmDostaw } from "./dostawy/AlarmDostaw";
+import { AlarmInnyTowar } from "./zwroty/AlarmInnyTowar";
 
 /* Jeden cache zapytań na cały panel — budowa i powody w `api/klient-zapytan.ts`. */
 const klient = nowyKlientZapytan();
@@ -155,7 +157,7 @@ function PasekBoczny({ wyloguj }: { wyloguj: () => void }) {
         tła z księgi znaku nie potrzebuje tabliczki. W wąskim pasku logo nie ma
         gdzie się zmieścić, więc ustępuje miejsca zakładkom. */}
     <img src={logoBiale} alt="WERTIS — sklep z częściami"
-      className={`mx-auto block h-12 w-auto ${zwiniety ? "hidden" : "max-[1279px]:hidden"}`} />
+      className={`mx-auto block h-12 w-auto ${ukrytePaska(zwiniety)}`} />
     {/* Nazwa „Praca" odróżnia ten blok od menu „Więcej" dla czytnika ekranu. */}
     <nav id="pasek-zakladki" aria-label="Praca" className="flex min-h-0 flex-1 flex-col gap-1 overflow-y-auto">
       {ZAKLADKI.filter((z) => !(zdjeciaWylaczone && z.do === "/obsluga/zdjecia")).map((z) => {
@@ -206,7 +208,7 @@ function PasekBoczny({ wyloguj }: { wyloguj: () => void }) {
       <div className={`flex items-center gap-2 ${zwiniety ? "justify-center"
         : "justify-between max-[1279px]:justify-center"}`}>
         {ja && <span title={`Zalogowano: ${ja}`}
-          className={`min-w-0 truncate px-1 text-xs text-slate-300 ${zwiniety ? "hidden" : "max-[1279px]:hidden"}`}>
+          className={`min-w-0 truncate px-1 text-xs text-slate-300 ${ukrytePaska(zwiniety)}`}>
           {ja}</span>}
         <button type="button" onClick={przelaczZwiniecie} aria-expanded={!zwiniety} aria-controls="pasek-zakladki"
           aria-label={zwiniety ? "Rozwiń menu" : "Zwiń menu"} title={zwiniety ? "Rozwiń menu" : "Zwiń menu"}
@@ -286,6 +288,9 @@ function Rama({ wyloguj }: { wyloguj: () => void }) {
     {/* Problem zgłoszony z hali stoi nad pracą na każdym ekranie,
         bo kierowca czeka teraz. Powód w `dostawy/alarm.ts`. */}
     <AlarmDostaw />
+    {/* Klient wskazał powód „inny towar" — zarzut wobec nas. Powód w
+        `zwroty/powodInnyTowar.ts`. */}
+    <AlarmInnyTowar />
     <CoNowego />
     {/* BEZ `max-w` i bez `mx-auto`: ogranicznik szerokości oddawałby
         szerokiemu monitorowi setki pikseli na marginesy, a kolumny stałyby

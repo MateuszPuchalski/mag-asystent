@@ -10,10 +10,14 @@ import skrzynka from "../skrzynka/Kolejka.tsx?raw";
 import zwroty from "../ekrany/Zwroty.tsx?raw";
 import kosze from "../ekrany/Kosze.tsx?raw";
 import ekranSkrzynki from "../ekrany/Skrzynka.tsx?raw";
+import listaDostaw from "../dostawy/Kolejka.tsx?raw";
+import listaKoszy from "../kosze/Kolejka.tsx?raw";
+import listaReklamacji from "../reklamacje/Kolejka.tsx?raw";
+import listaZwrotow from "../zwroty/Kolejka.tsx?raw";
 
-/* ── Jedna kolumna listy na cztery kolejki ───────────────────────────────────
-   Pilnujemy kolejności pasm i tego, że żadna z czterech kolejek nie wraca do
-   własnego układu. Kolejka z własną kolumną to piąty nawyk do nauczenia. */
+/* ── Jedna kolumna listy na pięć kolejek ─────────────────────────────────────
+   Pilnujemy kolejności pasm i tego, że żadna z pięciu kolejek nie wraca do
+   własnego układu. Kolejka z własną kolumną to osobny nawyk do nauczenia. */
 
 describe("KolumnaKolejki", () => {
   it("pasma stoją w stałej kolejności: tytuł, kubełki, szukanie, drugi filtr, lista", () => {
@@ -49,15 +53,36 @@ describe("KolumnaKolejki", () => {
     const { rerender } = render(<SzukajWKolejce wartosc="" onZmien={() => {}} etykieta="Szukaj" placeholder="p" />);
     expect(screen.queryByRole("button", { name: "Wyczyść szukanie" })).toBeNull();
     rerender(<SzukajWKolejce wartosc="a" onZmien={() => {}} etykieta="Szukaj" placeholder="p" />);
-    expect(screen.getByRole("button", { name: "Wyczyść szukanie" })).toBeInTheDocument();
+    /* jsdom nie liczy układu, więc pilnujemy klas: 24 px to najmniejszy cel
+       wskaźnika, a mniejszy krzyżyk zatrzymuje dopiero audyt w przeglądarce. */
+    const krzyzyk = screen.getByRole("button", { name: "Wyczyść szukanie" });
+    expect(krzyzyk.className).toMatch(/\bh-6\b/);
+    expect(krzyzyk.className).toMatch(/\bw-6\b/);
   });
 });
 
 describe("kolejki używają jednej kolumny", () => {
-  it("skrzynka, zwroty, reklamacje i dostawy składają listę z KolumnaKolejki", () => {
-    for (const [nazwa, zrodlo] of Object.entries({ skrzynka, zwroty, reklamacje, dostawy })) {
+  it("skrzynka, zwroty, reklamacje, dostawy i kosze składają listę z KolumnaKolejki", () => {
+    for (const [nazwa, zrodlo] of Object.entries({ skrzynka, zwroty, reklamacje, dostawy, kosze })) {
       expect(zrodlo, nazwa).toContain("<KolumnaKolejki");
     }
+  });
+
+  it("pusta lista każdej kolejki to PustaKolejka, a szukanie to SzukajWKolejce", () => {
+    /* Listy stoją w osobnych plikach, więc sam ekran ich nie pokaże. Własne
+       `Pusto` albo własne pole szukania wracałoby po cichu do innej wysokości
+       pustki i do pola bez lupy. */
+    for (const [nazwa, zrodlo] of Object.entries({ skrzynka, listaZwrotow, listaReklamacji, listaDostaw, listaKoszy })) {
+      expect(zrodlo, nazwa).toContain("<PustaKolejka");
+    }
+    /* Skrzynka ma jedno uprawnione `Pusto`: „Wczytuję…" przed pierwszymi danymi. */
+    for (const [nazwa, zrodlo] of Object.entries({ listaZwrotow, listaReklamacji, listaDostaw, listaKoszy })) {
+      expect(zrodlo, nazwa).not.toContain("<Pusto ");
+    }
+    for (const [nazwa, zrodlo] of Object.entries({ skrzynka, reklamacje, dostawy, kosze })) {
+      expect(zrodlo, nazwa).toContain("<SzukajWKolejce");
+    }
+    expect(kosze).not.toContain("<Pole ");
   });
 
   it("zwroty, dostawy i kosze chowają dowody pod pracę poniżej xl", () => {
@@ -69,9 +94,24 @@ describe("kolejki używają jednej kolumny", () => {
     }
     expect(KARTA_PRACY).toContain("xl:min-h-0");
     expect(KARTA_DOWODOW).toContain("shrink-0");
+    /* Obie karty są kolumnami z własnym przewijaniem. Ekran podaje samą stałą,
+       więc bez tych klas treść wypchnęłaby kartę poza okno. */
+    for (const karta of [KARTA_PRACY, KARTA_DOWODOW]) {
+      expect(karta).toContain("flex min-h-0 flex-col overflow-hidden");
+    }
     /* Trzecia kolumna siatki zaczyna się dopiero od xl, czyli od 1280 px. */
     expect(SIATKA_TRZECH_KOLUMN).toMatch(/lg:grid-cols-\[21rem_minmax\(0,1fr\)\] /);
     expect(SIATKA_TRZECH_KOLUMN).toContain("xl:grid-cols-[21rem_minmax(0,1fr)_16rem]");
+  });
+
+  it("kolumna listy ma tę samą szerokość na każdej kolejce", () => {
+    /* Trzy siatki piszą szerokość listy osobno (reklamacje progami `xl`, więc
+       nie mogą wziąć wspólnego napisu). Zmiana w jednej bez pozostałych dałaby
+       agentowi kolejkę, która skacze przy przejściu między zakładkami. */
+    const listy = (s: string) => [...new Set([...s.matchAll(/grid-cols-\[(\d+rem)_/g)].map((m) => m[1]))];
+    for (const siatka of [SIATKA_TRZECH_KOLUMN, SIATKA_SKRZYNKI(true), SIATKA_SKRZYNKI(false), reklamacje]) {
+      expect(listy(siatka)).toEqual(["21rem", "25rem"]);
+    }
   });
 
   it("skrzynka bez otwartej rozmowy oddaje rozmowie miejsce po kontekście", () => {

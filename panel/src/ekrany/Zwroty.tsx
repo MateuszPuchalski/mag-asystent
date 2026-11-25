@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { Undo2 } from "lucide-react";
-import { useDociagnijPoSkanie, useSkanZwrotu, useSynchronizujZwroty, useZwroty, useSprawdzWszystkiePlatnosci, type WynikSkanu, type WynikSprawdzeniaWszystkich } from "../api/zwroty";
+import { useDociagnijPoSkanie, useSkanZwrotu, useSynchronizujZwroty, useZwroty, useSprawdzWszystkiePlatnosci, type WynikSkanu } from "../api/zwroty";
 import { Konflikt } from "../api/klient";
 import type { BilansKartotek, Kubelek, Ocena, StanZwrotow, WynikDosylki, Zwrot } from "../api/typy";
 import { Decyzje } from "../zwroty/Decyzje";
@@ -11,7 +11,7 @@ import { Pozycje } from "../zwroty/Pozycje";
 import { DolozTowar } from "../zwroty/DolozTowar";
 import {
   useCofnijKorekte, useCofnijKwote, useCofnijWerdykt, useDopiszPozycje,
-  useIloscZwrocona, useFaktura, useKorekta, useKwota,
+  useIloscZwrocona, usePomylonyTowar, useFaktura, useKorekta, useKwota,
   usePaczkiKlienta, useZamowieniaZAllegro, usePrzyjmijNieodebrana, wygladaNaLogin, useOcena, usePotracenie, useWerdykt, useZdejmijPozycje,
   useZglosRabat, useZwrot, useZwrocPieniadze, useOdmowPlatnosci, useSledzDosylkeZwrotu, useSprawdzPlatnosci,
   useZapiszPrzelew, useCofnijPrzelew, useZamknijRecznie, useOtworzPonownie,
@@ -402,14 +402,15 @@ export function Zwroty() {
   const bladPieniedzyDla = (zwrotId: number, przedrostek = "") => (e: unknown) =>
     setBladPieniedzy({ zwrotId, tekst: `${przedrostek}${(e as Error).message}` });
   const [bladFaktury, setBladFaktury] = useState("");
+  const pomylony = usePomylonyTowar();
   const trwa = werdykt.isPending || ocena2.isPending || kwota.isPending
     || korekta.isPending || cofnijKorekte.isPending || cofnijKwote.isPending
-    || cofnijWerdykt.isPending || ilosc.isPending
+    || cofnijWerdykt.isPending || ilosc.isPending || pomylony.isPending
     || potracenie.isPending;
   /* Konflikt wersji ma brzmieć jak zdanie, nie jak kod. Serwer przysyła je
      gotowe przy 409 — panel go nie układa od nowa. */
   const bledy = [werdykt.error, ocena2.error, kwota.error, korekta.error, cofnijKorekte.error,
-    cofnijKwote.error, cofnijWerdykt.error, ilosc.error,
+    cofnijKwote.error, cofnijWerdykt.error, ilosc.error, pomylony.error,
     potracenie.error];
   const bladDecyzji = bledy.find(Boolean) instanceof Error
     ? String((bledy.find(Boolean) as Error).message) : "";
@@ -442,9 +443,9 @@ export function Zwroty() {
   const synchronizuj = useSynchronizujZwroty();
   /* Wynik hurtowego sprawdzenia żyje TU, nie w pasku szukania: przełączenie
      kubełka nie może go zgasić, bo agent czyta go, przeglądając kolejkę. */
+  /* Wynik i błąd czyta się wprost z mutacji: żyje w ekranie, więc przeżywa
+     zmianę kubełka, a ponowny klik sam czyści poprzedni wynik. */
   const sprawdzWszystkie = useSprawdzWszystkiePlatnosci();
-  const [wynikWszystkich, setWynikWszystkich] = useState<WynikSprawdzeniaWszystkich | null>(null);
-  const [bladWszystkich, setBladWszystkich] = useState("");
   const przelew = useZapiszPrzelew();
   const cofnijPrzelew = useCofnijPrzelew();
   const zamknijRecznie = useZamknijRecznie();
@@ -935,7 +936,7 @@ export function Zwroty() {
     { wPolach: true },
   );
 
-  /* Zapytanie padło i nie ma danych: błąd zamiast listy, a kafle bez liczb.
+  /* Zapytanie padło i nie ma danych: błąd zamiast listy, a kubełki bez liczb.
      Pusta lista albo „0” przy awarii czytałyby się jako „nic nie czeka”.
      Nieudane odświeżenie przy danych w pamięci nie zdejmuje ekranu, bo
      serwer znika przy każdej aktualizacji, a operator jest w środku zwrotu. */
@@ -1004,7 +1005,7 @@ export function Zwroty() {
     <div className={SIATKA_TRZECH_KOLUMN}>
     {/* ── KOLUMNA LISTY Z JEDNEJ FORMY ────────────────────────────────────
         Układ pasm stoi w `ui/KolumnaKolejki.tsx`, tak samo jak w skrzynce,
-        reklamacjach i dostawach. Zwroty oddają liście wysokość, którą zajmowało
+        koszach, reklamacjach i dostawach. Zwroty oddają liście wysokość, którą zajmowało
         siedem kafli: na wierzchu stoją cztery kubełki pracy biura, a odrzucone,
         zamknięte i wszystkie — pod „Więcej”. Klawisze 1–7 zostają bez zmian.
 
@@ -1015,14 +1016,7 @@ export function Zwroty() {
       akcje={<>
         <PasekPorzadku porzadek={porzadek} dozwolone={["termin", "otwarto", "kwota"]}
           onZmien={ustawPorzadek} />
-        <PrzyciskSprawdzenia trwa={sprawdzWszystkie.isPending}
-          onSprawdz={() => {
-            setWynikWszystkich(null); setBladWszystkich("");
-            sprawdzWszystkie.mutate(undefined, {
-              onSuccess: (w) => setWynikWszystkich(w),
-              onError: (e) => setBladWszystkich((e as Error).message),
-            });
-          }} />
+        <PrzyciskSprawdzenia trwa={sprawdzWszystkie.isPending} onSprawdz={() => sprawdzWszystkie.mutate()} />
       {/* `sita={false}`: sita „Niczyje" tu nie ma, więc pomoc nie obiecuje
           klawisza `n`. */}
       <SkrotyKlawiszy zMoje={false} sita={false} kubelkow={KUBELKI.length}
@@ -1056,7 +1050,7 @@ export function Zwroty() {
          osobnym przyciskiem: to ten sam wybór, tylko bez zawężenia. Numer
          klawisza liczy się z długości listy, więc dopisanie kubełka nie
          zostawia w podpowiedzi nieaktualnej cyfry. */
-      kubelki={<FiltrZWiecej<Kubelek | null> zwarty wybrany={kubelek} onWybierz={przelacz}
+      kubelki={<FiltrZWiecej<Kubelek | null> wybrany={kubelek} onWybierz={przelacz}
         wiecej={POD_WIECEJ}
         pozycje={[
           ...KUBELKI.map((k, i) => ({ klucz: k.id, etykieta: k.etykieta,
@@ -1072,8 +1066,9 @@ export function Zwroty() {
         onSzukaj={(v) => { kodZCzytnika.current = ""; szukaj(v); }}
         onSkan={(v) => { void naSkan(v); }}
         towar={skanTowaru}
-        pod={<WynikSprawdzenia blad={bladWszystkich} wynik={wynikWszystkich}
-          onZamknij={() => { setWynikWszystkich(null); setBladWszystkich(""); }} />}
+        pod={<WynikSprawdzenia wynik={sprawdzWszystkie.data ?? null}
+          blad={sprawdzWszystkie.error ? (sprawdzWszystkie.error as Error).message : ""}
+          onZamknij={sprawdzWszystkie.reset} />}
         onDociagnij={(v) => dociagnij.mutate(v, {
           onSuccess: przyjmij, onError: (e) => setBladSkanu((e as Error).message) })}
         onWybierz={(x) => { setWynikSkanu(null); nawiguj(`/obsluga/zwroty/${x}`); }}
@@ -1184,7 +1179,7 @@ export function Zwroty() {
 
     {/* Praca i dowody w jednym pojemniku poniżej `xl` — powód przy `SrodekIDowody`. */}
     <SrodekIDowody>
-    <Karta className={`flex min-h-0 flex-col overflow-hidden ${KARTA_PRACY}`}>
+    <Karta className={KARTA_PRACY}>
       {/* Bez kolejki nie ma czego wybrać, więc środek milczy. */}
       {!zwrot
         ? bezDanych ? null : <Pusto ikona={Undo2}>
@@ -1352,6 +1347,8 @@ export function Zwroty() {
                   potracenie.mutate({ pozycjaId, grosze, powod, wersja: zwrot.wersja })}
                 onIlosc={(pozycjaId, ile) =>
                   ilosc.mutate({ pozycjaId, ilosc: ile, wersja: zwrot.wersja })}
+                onPomylony={(pozycjaId, tak, opis) =>
+                  pomylony.mutate({ pozycjaId, pomylony: tak, opis, wersja: zwrot.wersja })}
                 onZglosRabat={(pozycjaId) => {
                   setBladRabatu("");
                   rabat.mutate({ pozycjaId },
@@ -1391,7 +1388,7 @@ export function Zwroty() {
 
     {/* Cała ta kolumna jest do czytania, więc cała jedzie do scrollera —
         `Dowody` nie muszą o tym wiedzieć. */}
-    <Karta className={`flex min-h-0 flex-col overflow-hidden ${KARTA_DOWODOW}`}>
+    <Karta className={KARTA_DOWODOW}>
       <div className="min-h-0 flex-1 overflow-y-auto">
       {zwrot
         ? <Dowody zwrot={zwrot} os={szczegol.data?.os ?? []}

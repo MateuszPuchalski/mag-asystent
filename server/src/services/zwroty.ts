@@ -79,6 +79,10 @@ export interface PozycjaZwrotu {
    * `ilosc` obok niesie DEKLARACJĘ klienta i nadpisuje ją synchronizator.
    */
   iloscZwrocona: number | null;
+  /** W kartonie przyjechał inny towar niż w zamówieniu — wpisuje biuro. */
+  pomylonyTowar: boolean;
+  /** Co przyjechało naprawdę; `null`, gdy biuro tylko zaznaczyło pomyłkę. */
+  pomylonyOpis: string | null;
   /** `allegro` = ze zgłoszenia klienta, `biuro` = dopisana u nas. */
   zrodlo: string;
   offerId: string | null;
@@ -1017,6 +1021,8 @@ export function listaZwrotow(
           zrodlo: String(p.zrodlo ?? "allegro"),
           /* Ile NAPRAWDĘ wróciło; `null` = nikt jeszcze nie liczył. */
           iloscZwrocona: p.ilosc_zwrocona == null ? null : Number(p.ilosc_zwrocona),
+          pomylonyTowar: Number(p.pomylony_towar ?? 0) === 1,
+          pomylonyOpis: (p.pomylony_opis as string) ?? null,
           potracenieGrosze: p.potracenie_grosze == null ? null : Number(p.potracenie_grosze),
           potraceniePowod: (p.potracenie_powod as string) ?? null,
           /* Propozycję liczymy TYLKO tam, gdzie kartoteki jeszcze nie ma.
@@ -1102,6 +1108,48 @@ export function bilansKartotek(zwroty: WierszZwrotu[]) {
     }
   }
   return { bez, wszystkie, powody };
+}
+
+/** Zwrot, w którym klient wskazał powód „inny towar". */
+export interface ZwrotInnyTowar {
+  id: number;
+  numer: string | null;
+  utworzono: string;
+  /** Nazwy pozycji z tym powodem. */
+  pozycje: string[];
+  /** Słowa klienta z pierwszej takiej pozycji, o ile je napisał. */
+  komentarz: string | null;
+}
+
+/**
+ * Zwroty w pracy, w których klient jako powód wybrał „inny towar" (`DIFFERENT`).
+ *
+ * To zarzut wobec nas: albo wysłaliśmy co innego, albo klient oddaje cudzy
+ * przedmiot, więc biuro ma o tym wiedzieć, zanim ktoś otworzy kolejkę.
+ * Zamknięty i odrzucony zwrot odpada, bo nie ma już kogo alarmować.
+ * Odczyt bez zapisu — alarm pyta o to stale.
+ */
+export function zwrotyZInnymTowarem(database: Db): ZwrotInnyTowar[] {
+  const wiersze = database.prepare(
+    `SELECT z.id, z.reference_number, z.created_at, p.nazwa, p.powod_komentarz
+       FROM zwrot_klienta z JOIN zwrot_klienta_pozycja p ON p.zwrot_id = z.id
+      WHERE p.powod = 'DIFFERENT'
+        AND z.zamkniety_at IS NULL AND z.rejection_code IS NULL
+        AND z.werdykt IS NOT 'odrzucony'
+      ORDER BY z.created_at DESC, z.id DESC, p.id ASC`)
+    .all() as Array<{ id: number; reference_number: string | null; created_at: string;
+      nazwa: string; powod_komentarz: string | null }>;
+  const wg = new Map<number, ZwrotInnyTowar>();
+  for (const w of wiersze) {
+    const z = wg.get(Number(w.id)) ?? {
+      id: Number(w.id), numer: w.reference_number, utworzono: w.created_at,
+      pozycje: [], komentarz: null,
+    };
+    z.pozycje.push(String(w.nazwa));
+    z.komentarz ??= w.powod_komentarz?.trim() || null;
+    wg.set(Number(w.id), z);
+  }
+  return [...wg.values()];
 }
 
 /** Ile pracy stoi w każdym kubełku — liczby przy zakładkach kolejki. */
@@ -2097,6 +2145,41 @@ export function zapiszIloscZwrocona(
       { zwrotId: Number(p.zwrot_id), pozycjaId, zgloszono: Number(p.ilosc), wrocilo: ilosc },
       kto.id, database);
     return { wersja: wersja + 1, iloscZwrocona: ilosc };
+  })();
+}
+
+/**
+ * Zaznacza, że w kartonie leży INNY towar niż w zamówieniu.
+ *
+ * Pomyłka jest faktem o pozycji, nie oceną: nie zmienia kwoty ani koszyka.
+ * Ma tylko wyjść na wierzch, bo ocena „na stan" pod kartoteką zamówionego
+ * towaru wpisałaby na półkę coś, czego tam nie ma. Opis jest dobrowolny —
+ * zaznaczenie nie może kosztować pisania przy otwartym kartonie.
+ *
+ * `false` czyści flagę razem z opisem. Bramka „najpierw przyjmij" jak przy
+ * liczeniu sztuk: pomyłkę widać dopiero po otwarciu paczki.
+ */
+export function zapiszPomylonyTowar(
+  database: Db, pozycjaId: number, pomylony: boolean, opis: string,
+  wersja: number, kto: { id: number; name: string },
+): { wersja: number; pomylonyTowar: boolean; pomylonyOpis: string | null } {
+  const p = database.prepare("SELECT id, zwrot_id FROM zwrot_klienta_pozycja WHERE id=?")
+    .get(pozycjaId) as { id: number; zwrot_id: number } | undefined;
+  if (!p) throw new Error("Nie znaleziono pozycji zwrotu");
+
+  const tekst = (opis ?? "").trim().slice(0, 300);
+  const zapis = pomylony && tekst ? tekst : null;
+
+  return transaction(database, () => {
+    const z = podKlucz(database, Number(p.zwrot_id), wersja);
+    if (z.werdykt !== "przyjety") throw new Error("Najpierw przyjmij zwrot");
+    database.prepare(
+      "UPDATE zwrot_klienta_pozycja SET pomylony_towar=?, pomylony_opis=? WHERE id=?")
+      .run(pomylony ? 1 : 0, zapis, pozycjaId);
+    podnies(database, Number(p.zwrot_id));
+    logEvent("zwrot_pomylony_towar", kto.name, null,
+      { zwrotId: Number(p.zwrot_id), pozycjaId, pomylony, opis: zapis }, kto.id, database);
+    return { wersja: wersja + 1, pomylonyTowar: pomylony, pomylonyOpis: zapis };
   })();
 }
 

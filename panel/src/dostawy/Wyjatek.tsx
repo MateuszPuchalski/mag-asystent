@@ -1,7 +1,8 @@
-import React, { useEffect, useId, useRef, useState } from "react";
+import React, { useEffect, useId, useState } from "react";
 import { Camera } from "lucide-react";
 import type { Wyjatek as WyjatekHali } from "../api/dostawy";
 import { ilosc } from "../api/dostawy";
+import { useFormularzWMiejscu } from "../nawigacja/fokus";
 import { useZdjecieDowodu } from "../towar/useZdjecie";
 import { Pole, Przycisk, czas } from "../ui";
 
@@ -75,7 +76,8 @@ export function Wyjatek({ p, trwa, blad, onRozwiaz, onPowieksz }: {
   /** Otwiera powiększenie dowodu; bez niego wyjątek nie pokazuje przycisku zdjęcia. */
   onPowieksz?: (url: string) => void;
 }) {
-  const [otwarte, setOtwarte] = useState(false);
+  const formularz = useFormularzWMiejscu();
+  const otwarte = formularz.otwarty;
   const [nota, setNota] = useState("");
   const idPodpowiedzi = useId();
   /* Zgłoszenie bez żadnego wskazania towaru — ani pozycji, ani symbolu,
@@ -84,17 +86,12 @@ export function Wyjatek({ p, trwa, blad, onRozwiaz, onPowieksz }: {
      dla dostawcy wyjdzie z takiego wiersza bez towaru. */
   const bezTowaru = p.lineId == null && !p.sym && !p.symObcy;
   const maLiczby = p.typ === "wrong_item" || Boolean(p.symObcy) || p.qty != null || p.zamiastIlosc != null;
-  /* PO WYCOFANIU FOKUS WRACA NA „ROZWIĄŻ". Pole znika razem z formularzem,
-     a fokus bez adresu spada na początek strony i klawiatura gubi wyjątek,
-     przy którym człowiek stał. */
-  const rozwiazRef = useRef<HTMLButtonElement | null>(null);
-  const oddajFokus = useRef(false);
-  const anuluj = () => { oddajFokus.current = true; setOtwarte(false); setNota(""); };
-  useEffect(() => {
-    if (otwarte || !oddajFokus.current) return;
-    oddajFokus.current = false;
-    rozwiazRef.current?.focus();
-  }, [otwarte]);
+  /* Po wycofaniu fokus wraca na „Rozwiąż" — powód przy `useFormularzWMiejscu`. */
+  const anuluj = () => { formularz.wycofaj(); setNota(""); };
+  /* Rozwiązany wyjątek zamyka swój formularz i gubi notatkę — powód przy
+     `zamknij` w tym samym haku. */
+  const rozwiazany = Boolean(p.resolvedAt);
+  useEffect(() => { if (rozwiazany) { formularz.zamknij(); setNota(""); } }, [rozwiazany]);
   /* STAN I PRZYCISK ZAWSZE Z PRAWEJ W PIERWSZYM RZĘDZIE. Rząd niesie tylko
      krótkie plakietki, więc „rozwiązany" i „otwarty" stoją w tym samym
      miejscu przy każdym wyjątku, bez względu na długość opisu. */
@@ -109,8 +106,8 @@ export function Wyjatek({ p, trwa, blad, onRozwiaz, onPowieksz }: {
               {/* Stan zostaje przy otwartym formularzu: znika tylko przycisk,
                   który formularz zastąpił. */}
               <span className="rounded bg-red-100 px-1.5 py-0.5 text-xs font-bold text-ranga-zle">otwarty</span>
-              {!otwarte && <button ref={rozwiazRef} type="button" className="btn-secondary !px-2.5 !py-1 !text-xs"
-                onClick={() => setOtwarte(true)}>Rozwiąż</button>}
+              {!otwarte && <button ref={formularz.przycisk} type="button" className="btn-secondary !px-2.5 !py-1 !text-xs"
+                onClick={formularz.otworz}>Rozwiąż</button>}
             </>}
       </span>
     </div>

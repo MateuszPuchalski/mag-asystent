@@ -61,7 +61,7 @@ export function nowePoWidzianych(wyjatki: Wyjatek[], widziane: Set<number> | nul
 export const adresDostawy = (w: Wyjatek) => `/obsluga/dostawy/${w.dokId ?? "bez"}`;
 
 /** Krótki, dwutonowy sygnał. Bez pliku dźwięku, więc bez pobierania. */
-function zagraj() {
+export function zagraj() {
   try {
     const Kontekst = window.AudioContext
       ?? (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
