@@ -696,6 +696,22 @@ export function useIloscZwrocona() {
 }
 
 /**
+ * Zaznaczenie, że w kartonie leży INNY towar niż w zamówieniu. `pomylony:
+ * false` zdejmuje znacznik razem z opisem.
+ */
+export function usePomylonyTowar() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (v: { pozycjaId: number; pomylony: boolean; opis: string; wersja: number }) =>
+      api<{ wersja: number; pomylonyTowar: boolean; pomylonyOpis: string | null }>(
+        `/api/obsluga/zwroty/pozycje/${v.pozycjaId}/pomylony`,
+        { method: "POST", body: JSON.stringify(
+          { pomylony: v.pomylony, opis: v.opis, wersja: v.wersja }) }),
+    onSettled: () => qc.invalidateQueries({ queryKey: kluczeZwrotow.kolejka, exact: true }),
+  });
+}
+
+/**
  * Cofnięcie PRZYJĘCIA zwrotu — wraca do kubełka DECYZJA.
  */
 export function useCofnijWerdykt() {

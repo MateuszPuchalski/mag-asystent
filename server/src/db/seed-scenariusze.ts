@@ -4,6 +4,8 @@ import path from "node:path";
 import { db, transaction } from "./db.js";
 import { config } from "../config.js";
 import { hashSekret } from "../services/users.js";
+import { kontoKanalu } from "../services/kanal-konto.js";
+import { oczyscSurowy } from "../services/allegro-oczyszczanie.js";
 import { etykietyDostaw } from "../adapters/subiekt.seeded.js";
 
 /* ── Seed scenariuszy — dane pod przypadki brzegowe ──────────────────────────
@@ -22,7 +24,8 @@ import { etykietyDostaw } from "../adapters/subiekt.seeded.js";
    TRZY REGUŁY, KTÓRE TEN SEED NA SIEBIE NAKŁADA:
 
    1. NIE TYKA DANYCH SPOZA SWOJEGO ZAKRESU. Kartoteki scenariuszy mają
-      `tw_id >= 900001`, dokumenty `dok_id >= 9001`, konta swoje loginy.
+      `tw_id >= 900001`, dokumenty `dok_id >= 9001`, konta swoje loginy,
+      a sprawy obsługi klienta własne konto kanału.
       Uruchomienie go po `npm run seed` niczego z niego nie kasuje.
    2. JEST IDEMPOTENTNY. Każde uruchomienie kasuje NAJPIERW własne wiersze,
       potem buduje je od nowa. Wielokrotne odpalenie daje ten sam stan bazy,
@@ -106,6 +109,52 @@ const AUTORZY = [
  * a migracja historii robiłaby z niego kolejne konto-widmo.
  */
 const PODPISY = [...new Set([...AUTORZY, ...LOGINY])];
+
+/**
+ * Klucz konta kanału, na którym stoją sprawy obsługi klienta ze scenariuszy.
+ *
+ * OSOBNE konto, nie to z `ALLEGRO_CLIENT_ID`. Sprawy zmyślone nie mogą stanąć
+ * obok prawdziwych, a kasowanie po koncie nie dotknie niczego, co przyszło
+ * z Allegro. Synchronizatory biorą konto z `ALLEGRO_CLIENT_ID`, więc przebieg,
+ * który ma dopisać wiadomość do zasianej rozmowy, ustawia tę samą wartość.
+ */
+export const KONTO_KANALU_SCENARIUSZY = "scenariusze";
+
+/**
+ * Przedrostek identyfikatorów po stronie „Allegro" w sprawach scenariuszy.
+ *
+ * Lądowiska (`allegro_inbox_thread`, `allegro_reklamacja`) nie mają kolumny
+ * konta, więc po nim rozpoznajemy własne wiersze. Prawdziwy identyfikator
+ * Allegro to UUID albo liczba, więc zderzenia nie będzie.
+ */
+const ID_SC = "scenariusz-";
+
+/**
+ * Uchwyty spraw obsługi klienta — po nich znajduje je test i człowiek.
+ *
+ * Loginy są jawnie zmyślone. Sprawy nie niosą adresu ani telefonu: polityka
+ * danych obowiązuje także pokaz, a ekran i tak musi znieść ich brak.
+ */
+export const SPRAWY_OBSLUGI = {
+  rozmowaWolna: { watek: `${ID_SC}watek-pytanie`, login: "klient.testowy" },
+  rozmowaDopisek: { watek: `${ID_SC}watek-dopisek`, login: "klient.dopisujacy" },
+  zwrotDoDecyzji: {
+    zwrot: `${ID_SC}zwrot-decyzja`, numer: "SCEN-1/ZWROT",
+    zamowienie: `${ID_SC}zam-zwrot-decyzja`, login: "klient.zwrot.decyzja",
+  },
+  zwrotDoWyplaty: {
+    zwrot: `${ID_SC}zwrot-wyplata`, numer: "SCEN-2/ZWROT",
+    zamowienie: `${ID_SC}zam-zwrot-wyplata`, login: "klient.zwrot.wyplata",
+    platnosc: `${ID_SC}platnosc-wyplata`, korekta: "KFS SCEN-1/2026",
+  },
+  reklamacja: {
+    sprawa: `${ID_SC}reklamacja`, numer: "SCEN-1/REKLAMACJA",
+    zamowienie: `${ID_SC}zam-reklamacja`, login: "klient.reklamacja",
+  },
+} as const;
+
+/** Loginy kupujących ze scenariuszy — po nich schodzą sprawy klienta i notatki. */
+const LOGINY_KUPUJACYCH = Object.values(SPRAWY_OBSLUGI).map((s) => s.login);
 
 /* ── Katalog scenariuszy ─────────────────────────────────────────────────────
    Jedno źródło prawdy dla skryptu, konsoli i dokumentacji. `docs/scenariusze-
@@ -214,6 +263,13 @@ export const KATALOG: Scenariusz[] = [
   { id: "S77", obszar: "dostawy", tytul: "Analiza dostaw: u kogo się psuje, i dostawa zdjęta poza WERTIS", wejscie: "/obsluga/analiza → zakres „Dostawy\"" },
   { id: "S79", obszar: "konta", tytul: "Ustawienia biura w panelu: dane firmy na serwerze, konta dla admina", wejscie: "/obsluga → zębatka" },
   { id: "S80", obszar: "kolejka", tytul: "Masowa zmiana lokalizacji z arkusza: podgląd, potem zapis", wejscie: "/obsluga → STAN SYSTEMU → WGRAJ ARKUSZ" },
+
+  // ── obsługa klienta: skrzynka, zwroty, reklamacje ──
+  { id: "S90", obszar: "obsluga", tytul: "Rozmowa bez prowadzącego, ostatnie słowo klienta", wejscie: "/obsluga/skrzynka → klient.testowy" },
+  { id: "S91", obszar: "obsluga", tytul: "Rozmowa pod dopisek klienta w trakcie redagowania", wejscie: "/obsluga/skrzynka → klient.dopisujacy" },
+  { id: "S92", obszar: "obsluga", tytul: "Zwrot bez werdyktu — stoi w „Do decyzji\"", wejscie: "/obsluga/zwroty → SCEN-1/ZWROT" },
+  { id: "S93", obszar: "obsluga", tytul: "Zwrot przyjęty, z kwotą i korektą — w „Do zwrotu\" czeka wypłata", wejscie: "/obsluga/zwroty → Do zwrotu → SCEN-2/ZWROT" },
+  { id: "S94", obszar: "obsluga", tytul: "Reklamacja bez werdyktu, z zamówieniem i rozmową", wejscie: "/obsluga/reklamacje → SCEN-1/REKLAMACJA" },
 ];
 
 /* ── Pomocniki czasu ─────────────────────────────────────────────────────────
@@ -443,6 +499,10 @@ export interface Podsumowanie {
   przyjecia: number;
   /** Domknięte dostawy historyczne pod zakres DOSTAWY w ANALIZIE. */
   historiaDostaw: number;
+  /** Sprawy obsługi klienta. Zera przy sparowanym koncie Allegro — patrz `obslugaKlienta`. */
+  rozmowy: number;
+  zwroty: number;
+  reklamacje: number;
 }
 
 /**
@@ -463,7 +523,7 @@ export function zbudujScenariusze(): Podsumowanie {
   const licz = {
     towary: 0, dokumenty: 0, dostawy: 0, linie: 0, wyjatki: 0, kolejka: 0,
     konta: 0, zdarzenia: 0, zamowienia: 0, dokumentyWz: 0, pozycjeWz: 0,
-    przyjecia: 0, historiaDostaw: 0,
+    przyjecia: 0, historiaDostaw: 0, rozmowy: 0, zwroty: 0, reklamacje: 0,
   };
 
   const wszystkieTowary = [...TOWARY, ...DROBNICA];
@@ -487,6 +547,11 @@ export function zbudujScenariusze(): Podsumowanie {
     licz.przyjecia = przyjeciaDemo();
     licz.historiaDostaw = historiaDostaw();
     logoDostawcow();
+    // po kontach i kartotekach: zwrot przyjęty niesie podpis biura i SKU z kartoteki
+    const obsluga = obslugaKlienta();
+    licz.rozmowy = obsluga.rozmowy;
+    licz.zwroty = obsluga.zwroty;
+    licz.reklamacje = obsluga.reklamacje;
   })();
 
   // Zdjęcia leżą POZA transakcją — to dysk, nie baza, i wycofanie transakcji
@@ -506,6 +571,11 @@ function wyczysc(): void {
   const luki = (n: number) => Array.from({ length: n }, () => "?").join(",");
 
   transaction(d, () => {
+    /* Sprawy obsługi klienta PRZED kontami: rozmowa po odpowiedzi wskazuje
+       prowadzącego, a zwrot po werdykcie tego, kto go wydał. Oba klucze są bez
+       kaskady, więc odwrotna kolejność zatrzymałaby kasowanie kont. */
+    wyczyscObsluge();
+
     d.prepare(
       `DELETE FROM problem WHERE delivery_id IN
          (SELECT id FROM delivery WHERE sgt_dok_id >= ?)`
@@ -1495,6 +1565,567 @@ function przyjeciaDemo(): number {
   return kosze.length;
 }
 
+/* ── Obsługa klienta: skrzynka, zwroty, reklamacja ──────────────────────────
+   Trzy drogi, na których pomyłka wychodzi poza firmę: odpowiedź do klienta,
+   wypłata przy zwrocie i werdykt reklamacji. Bez spraw w bazie ich ekrany
+   stoją puste, więc nie ma na czym sprawdzić ani kolejki, ani bramek.
+
+   SPRAWY WYGLĄDAJĄ JAK PO SYNCHRONIZACJI. Rozmowa i reklamacja powstają
+   z ładunku w kształcie Allegro, a ładunek zostaje w lądowisku, jak po
+   prawdziwym pobraniu. Test obok przepuszcza go przez prawdziwy synchronizator
+   i porównuje wynik z zasianym. Stan nieosiągalny z aplikacji byłby pokazem,
+   który kłamie o własnych regułach.
+
+   TOKENA ALLEGRO TU NIE MA. Zakłada go parowanie, a w przebiegu
+   przeglądarkowym — samo uruchamianie testów, we własnej bazie. Bez tokena
+   wysyłka, wypłata i werdykt kończą się zdaniem o niepołączonym koncie,
+   zanim cokolwiek wyjdzie do sieci.                                         */
+
+/**
+ * Czy na tej bazie stoi sparowane konto Allegro.
+ *
+ * Wtedy spraw obsługi klienta NIE budujemy. Takty ofert i zamówień wybierają
+ * pracę z całej bazy, bez względu na konto kanału, więc pytałyby prawdziwe
+ * Allegro o zmyślone numery — co kilka minut, z adresu firmy. Kasowanie
+ * własnych wierszy idzie mimo to, bo sprawy mogły powstać przed parowaniem.
+ */
+function kontoAllegroSparowane(): boolean {
+  return Boolean(db().prepare("SELECT 1 FROM allegro_token WHERE id = 1").get());
+}
+
+/** Klucz obcy: wiersz `dziecko.kolumna` wskazuje `rodzic.cel`. */
+interface KluczObcy {
+  dziecko: string;
+  kolumna: string;
+  rodzic: string;
+  cel: string;
+  poUsunieciu: string;
+}
+
+/** Klucze obce całej bazy, odczytane ze schematu, nie przepisane ręką. */
+function kluczeObce(): KluczObcy[] {
+  const d = db();
+  const tabele = (d.prepare(
+    "SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'"
+  ).all() as Array<{ name: string }>).map((t) => t.name);
+  const kluczGlowny = (tabela: string): string =>
+    (d.prepare("SELECT name FROM pragma_table_info(?) WHERE pk = 1").get(tabela) as
+      { name: string } | undefined)?.name ?? "rowid";
+  const klucze: KluczObcy[] = [];
+  for (const dziecko of tabele) {
+    const lista = d.prepare(`PRAGMA foreign_key_list("${dziecko}")`).all() as Array<{
+      table: string; from: string; to: string | null; on_delete: string;
+    }>;
+    for (const k of lista) {
+      klucze.push({
+        dziecko, kolumna: k.from, rodzic: k.table,
+        // `REFERENCES tabela` bez kolumny wskazuje klucz główny rodzica
+        cel: k.to ?? kluczGlowny(k.table),
+        poUsunieciu: k.on_delete,
+      });
+    }
+  }
+  return klucze;
+}
+
+/**
+ * Kasuje wiersze `tabela` spełniające `warunek` razem z tym, co na nie wskazuje.
+ *
+ * LISTA DZIECI IDZIE ZE SCHEMATU, nie z tego pliku. Rozmowa, zwrot i reklamacja
+ * mają po kilkanaście tabel potomnych i przybywa ich z każdą funkcją. Lista
+ * przepisana ręką zestarzałaby się po cichu: seed stawałby w pół drogi dopiero
+ * wtedy, gdy ktoś przeklikał sprawę na bazie pokazowej, czyli nie u piszącego.
+ *
+ * Klucz z `SET NULL` zostaje bazie. Wiersz, który po nim zostaje, należy do
+ * kogo innego — wpis księgi Copilota ma przeżyć skasowaną rozmowę.
+ */
+function kasujZPotomstwem(
+  klucze: KluczObcy[], tabela: string, warunek: string, parametry: Array<string | number>,
+  sciezka: string[] = [],
+): void {
+  for (const k of klucze) {
+    if (k.rodzic !== tabela || k.poUsunieciu === "SET NULL") continue;
+    const krok = `${k.dziecko}.${k.kolumna}`;
+    // tabela wskazująca samą siebie nie ma prawa zapętlić kasowania
+    if (sciezka.includes(krok)) continue;
+    kasujZPotomstwem(
+      klucze, k.dziecko,
+      `"${k.kolumna}" IN (SELECT "${k.cel}" FROM "${tabela}" WHERE ${warunek})`,
+      parametry, [...sciezka, krok],
+    );
+  }
+  db().prepare(`DELETE FROM "${tabela}" WHERE ${warunek}`).run(...parametry);
+}
+
+/**
+ * Kasuje sprawy obsługi klienta ze scenariuszy i wszystko, co na nich narosło.
+ *
+ * Korzeniem jest konto kanału scenariuszy: co na nim wisi, jest nasze. Reszta
+ * to trzy rodzaje wierszy, do których klucz obcy nie prowadzi.
+ */
+function wyczyscObsluge(): void {
+  const d = db();
+  const klucze = kluczeObce();
+  const luki = (n: number) => Array.from({ length: n }, () => "?").join(",");
+
+  const konto = (d.prepare(
+    "SELECT id FROM channel_account WHERE channel = 'allegro' AND external_account_id = ?"
+  ).get(KONTO_KANALU_SCENARIUSZY) as { id: number } | undefined)?.id;
+  if (konto !== undefined) {
+    /* Te trzy tabele trzymają numer pozycji zwrotu albo konta zwykłą liczbą,
+       bez klucza obcego. Schemat ich nie pokaże, więc stoją tu z nazwy. */
+    const pozycjeZwrotow = `SELECT p.id FROM zwrot_klienta_pozycja p
+       JOIN zwrot_klienta z ON z.id = p.zwrot_id WHERE z.channel_account_id = ?`;
+    d.prepare(`DELETE FROM kosz_pozycja WHERE zwrot_pozycja_id IN (${pozycjeZwrotow})`).run(konto);
+    d.prepare(`DELETE FROM zwrot_skladnik_outlet WHERE pozycja_id IN (${pozycjeZwrotow})`).run(konto);
+    d.prepare("DELETE FROM pomylka_wysylki WHERE konto = ?").run(konto);
+    kasujZPotomstwem(klucze, "channel_account", "id = ?", [konto]);
+  }
+
+  /* Sprawa klienta i notatka wiszą na LOGINIE kupującego, nie na koncie
+     kanału. Porównanie bez wielkości liter, bo tak porównuje je aplikacja. */
+  const loginy = LOGINY_KUPUJACYCH.map((l) => l.toLowerCase());
+  kasujZPotomstwem(klucze, "klient_prowadzenie", `lower(login) IN (${luki(loginy.length)})`, loginy);
+  d.prepare(`DELETE FROM klient_notatka WHERE lower(login) IN (${luki(loginy.length)})`).run(...loginy);
+
+  /* Lądowiska nie mają kolumny konta, więc własne wiersze poznajemy po
+     przedrostku. Zwrotów i zamówień seed tam nie kładzie, ale synchronizacja
+     z udawanym Allegro w teście przeglądarkowym już tak. */
+  for (const ladowisko of [
+    "allegro_inbox_thread", "allegro_reklamacja", "allegro_zwrot", "allegro_zamowienie",
+  ]) {
+    kasujZPotomstwem(klucze, ladowisko, "id LIKE ?", [`${ID_SC}%`]);
+  }
+}
+
+const DOBA_MIN = 1440;
+
+interface OfertaSc {
+  id: string;
+  nazwa: string;
+  /** Sygnatura sprzedawcy — po niej oferta trafia w kartotekę scenariuszy. */
+  sku: string;
+  cenaGrosze: number;
+}
+
+/* Identyfikator oferty NIE JEST liczbą, choć prawdziwe są. Panel buduje z niego
+   odnośnik do Allegro, a liczba mogłaby trafić w cudzą, żywą aukcję. */
+const OFERTY_SC = {
+  cennik: {
+    id: `${ID_SC}oferta-cennik`, nazwa: "TEST Towar z pełnym cennikiem — oferta pokazowa",
+    sku: "TEST-CENY-PELNE", cenaGrosze: 4996,
+  },
+  zawleczka: {
+    id: `${ID_SC}oferta-zawleczka`, nazwa: "TEST Zawleczka — oferta pokazowa",
+    sku: "TEST-EAN8", cenaGrosze: 1250,
+  },
+  wszedzie: {
+    id: `${ID_SC}oferta-wszedzie`, nazwa: "TEST Towar ze wszystkich magazynów — oferta pokazowa",
+    sku: "TEST-WSZEDZIE", cenaGrosze: 8900,
+  },
+  sprzeglo: {
+    id: `${ID_SC}oferta-sprzeglo`, nazwa: "TEST Sprzęgło odśrodkowe — oferta pokazowa",
+    sku: "TEST-ZAMIENNIK", cenaGrosze: 15900,
+  },
+} satisfies Record<string, OfertaSc>;
+
+function obslugaKlienta(): { rozmowy: number; zwroty: number; reklamacje: number } {
+  if (kontoAllegroSparowane()) return { rozmowy: 0, zwroty: 0, reklamacje: 0 };
+
+  const d = db();
+  /* Ta sama funkcja, którą konto zakładają synchronizatory. Druga kopia tego
+     zapytania rozjechałaby się przy pierwszej zmianie klucza konta. */
+  const konto = kontoKanalu(d, KONTO_KANALU_SCENARIUSZY);
+  d.prepare("UPDATE channel_account SET display_name = ? WHERE id = ?")
+    .run("Scenariusze (konto pokazowe)", konto);
+  const at = chwila(0);
+
+  /* Snapshot KAŻDEJ oferty, o którą zahaczają sprawy. Takt ofert dociąga te,
+     których snapshotu nie ma, więc brak jednej kosztowałby żądanie do Allegro.
+     Pusty adres zdjęcia znaczy „pytaliśmy i obrazu nie ma": panel rysuje kafel
+     zastępczy, a serwer nie sięga po plik do sieci. */
+  const insOferta = d.prepare(
+    `INSERT INTO offer_snapshot
+       (channel_account_id, external_id, nazwa, sku, cena_grosze, waluta, status,
+        primary_image_url, synced_at)
+     VALUES (?,?,?,?,?,'PLN','ACTIVE','',?)`
+  );
+  for (const o of Object.values(OFERTY_SC)) {
+    insOferta.run(konto, o.id, o.nazwa, o.sku, o.cenaGrosze, at);
+  }
+
+  const rozmowy = rozmowySc(konto, at);
+  const zwroty = zwrotySc(konto, at);
+  const reklamacje = reklamacjaSc(konto, at);
+  return { rozmowy, zwroty, reklamacje };
+}
+
+/* ── S90, S91: rozmowy w skrzynce ───────────────────────────────────────────
+   Obie są pytaniem spod oferty, sprzed zakupu: jedna wiadomość klienta, nikt
+   nie prowadzi, zamówienia nie ma. Druga istnieje osobno, żeby dopisek klienta
+   w trakcie redagowania nie zależał od tego, co test zrobił z pierwszą.     */
+
+interface RozmowaSc {
+  watek: string;
+  login: string;
+  wiadomosc: string;
+  oferta: OfertaSc;
+  minutTemu: number;
+  tresc: string;
+}
+
+const ROZMOWY_SC: RozmowaSc[] = [
+  {
+    ...SPRAWY_OBSLUGI.rozmowaWolna, wiadomosc: `${ID_SC}wiadomosc-pytanie`,
+    oferta: OFERTY_SC.cennik, minutTemu: 25,
+    tresc: "Dzień dobry, czy ten towar jest dostępny od ręki? Potrzebuję dwóch sztuk na przyszły tydzień.",
+  },
+  {
+    ...SPRAWY_OBSLUGI.rozmowaDopisek, wiadomosc: `${ID_SC}wiadomosc-dopisek-1`,
+    oferta: OFERTY_SC.zawleczka, minutTemu: 55,
+    tresc: "Dzień dobry, czy ta zawleczka pasuje do sworznia 8 mm? Proszę o wymiary.",
+  },
+];
+
+/** Wątek w kształcie `Thread` z `public.v1` — tak oddaje go lista wątków. */
+const ladunekWatku = (r: RozmowaSc, kiedy: string) => ({
+  id: r.watek, read: false, lastMessageDateTime: kiedy,
+  interlocutor: { login: r.login, avatarUrl: "" },
+});
+
+/** Wiadomość w kształcie `Message` z `public.v1`, ze wszystkimi polami wymaganymi. */
+const ladunekWiadomosci = (r: RozmowaSc, kiedy: string) => ({
+  id: r.wiadomosc, status: "DELIVERED", type: "ASK_QUESTION", createdAt: kiedy,
+  thread: { id: r.watek }, author: { login: r.login, isInterlocutor: true },
+  text: r.tresc, subject: null, relatesTo: { offer: { id: r.oferta.id } },
+  hasAdditionalAttachments: false, attachments: [],
+});
+
+function rozmowySc(konto: number, at: string): number {
+  const d = db();
+  const insWatek = d.prepare(
+    `INSERT INTO allegro_inbox_thread
+       (id, read, last_message_at, interlocutor_login, surowe_json, synced_at,
+        watek_typ, watek_status, watek_zamowienia, struktura_at)
+     VALUES (?,0,?,?,?,?,'COMMON','OPEN','[]',?)`
+  );
+  const insSurowa = d.prepare(
+    `INSERT INTO allegro_inbox_message
+       (id, thread_id, author_login, author_is_interlocutor, text, subject, status,
+        created_at, related_object_type, related_object_id, surowe_json)
+     VALUES (?,?,?,1,?,NULL,'DELIVERED',?,'OFFER',?,?)`
+  );
+  /* Status `open`, nie domyślne `new`: pierwsza wiadomość klienta budzi
+     rozmowę przy zapisie. Temat to login, bo wiadomość nie niesie własnego. */
+  const insRozmowa = d.prepare(
+    `INSERT INTO conversation
+       (channel_account_id, external_conversation_id, subject, unread, status, updated_at)
+     VALUES (?,?,?,1,'open',?)`
+  );
+  const insWiadomosc = d.prepare(
+    `INSERT INTO message
+       (conversation_id, channel_account_id, external_message_id, direction, body,
+        related_object_type, related_object_id, sent_at)
+     VALUES (?,?,?,'incoming',?,'OFFER',?,?)`
+  );
+  const insZdarzenie = d.prepare(
+    "INSERT INTO conversation_event(conversation_id, event_type, payload) VALUES (?,?,?)"
+  );
+  for (const r of ROZMOWY_SC) {
+    const kiedy = chwila(-r.minutTemu);
+    insWatek.run(r.watek, kiedy, r.login, JSON.stringify(ladunekWatku(r, kiedy)), at, at);
+    insSurowa.run(
+      r.wiadomosc, r.watek, r.login, r.tresc, kiedy, r.oferta.id,
+      JSON.stringify(ladunekWiadomosci(r, kiedy))
+    );
+    const rozmowa = Number(insRozmowa.run(konto, r.watek, r.login, kiedy).lastInsertRowid);
+    insWiadomosc.run(rozmowa, konto, r.wiadomosc, r.tresc, r.oferta.id, kiedy);
+    // ślad obudzenia: stan zmienił klient swoją wiadomością, nie agent
+    insZdarzenie.run(
+      rozmowa, "status_changed", JSON.stringify({ przed: "new", po: "open", autor: "klient" })
+    );
+  }
+  return ROZMOWY_SC.length;
+}
+
+/* ── S92, S93, S94: zamówienia pod zwroty i reklamację ──────────────────────
+   Zwrot i reklamacja niosą sam numer zamówienia. Pozycje, koszt dostawy
+   i identyfikator płatności przyjeżdżają osobno, z zamówienia — a bez nich
+   nie ma ani kwoty pełnej, ani czego oddać przez Allegro.                   */
+
+interface ZamowienieSc {
+  id: string;
+  login: string;
+  dniTemu: number;
+  platnosc: string;
+  dostawaGrosze: number;
+  pozycje: Array<{ linia: string; oferta: OfertaSc; ilosc: number }>;
+}
+
+function zamowienieSc(konto: number, z: ZamowienieSc, at: string): void {
+  const d = db();
+  const kupiono = chwila(-z.dniTemu * DOBA_MIN);
+  const suma = z.pozycje.reduce((s, p) => s + p.oferta.cenaGrosze * p.ilosc, 0) + z.dostawaGrosze;
+  /* Adres dostawy i telefon zostają PUSTE. Allegro ich nie gwarantuje, ekran
+     musi to znieść, a zmyślony adres wyglądałby na czyjś prawdziwy. */
+  const id = Number(d.prepare(
+    `INSERT INTO zamowienie_klienta
+       (channel_account_id, external_id, status, kupujacy_login, odbiorca_nazwa,
+        dostawa_grosze, dostawa_metoda, platnosc_typ, platnosc_at, platnosc_id,
+        faktura_zadana, suma_grosze, waluta, kupiono_at, zmieniono_at,
+        realizacja_status, synced_at)
+     VALUES (?,?,'READY_FOR_PROCESSING',?,'Odbiorca pokazowy',?,'Paczkomat (metoda pokazowa)',
+             'ONLINE',?,?,0,?,'PLN',?,?,'PICKED_UP',?)`
+  ).run(
+    konto, z.id, z.login, z.dostawaGrosze, kupiono, z.platnosc, suma, kupiono, kupiono, at
+  ).lastInsertRowid);
+  const insPozycja = d.prepare(
+    `INSERT INTO zamowienie_klienta_pozycja
+       (zamowienie_id, external_id, offer_id, nazwa, sku, ilosc, cena_grosze, waluta)
+     VALUES (?,?,?,?,?,?,?,'PLN')`
+  );
+  for (const p of z.pozycje) {
+    insPozycja.run(id, p.linia, p.oferta.id, p.oferta.nazwa, p.oferta.sku, p.ilosc, p.oferta.cenaGrosze);
+  }
+}
+
+/**
+ * Podpis automatu wiążącego pozycję z kartoteką po sygnaturze.
+ *
+ * Ten sam napis co `AUTOMAT` w `services/sygnatury.ts`. Powtórzony, bo import
+ * ciągnąłby do seeda cały serwis zwrotów dla jednej stałej. Zgodności pilnuje
+ * test obok.
+ */
+const AUTOMAT_SYGNATURY = "automat (sygnatura)";
+
+interface ZwrotSc {
+  zwrot: string;
+  numer: string;
+  zamowienie: string;
+  login: string;
+  list: string;
+  /** Zgłoszenie, nadanie paczki i doręczenie — w minutach wstecz od teraz. */
+  zgloszonoMin: number;
+  nadanoMin: number;
+  doreczonoMin: number;
+  pozycje: Array<{ oferta: OfertaSc; ilosc: number; komentarz: string }>;
+}
+
+/** Zwrot w stanie po synchronizacji i powiązaniu kartotek. Oddaje numery wierszy. */
+function zwrotSc(konto: number, z: ZwrotSc, at: string): { id: number; pozycje: number[] } {
+  const d = db();
+  /* Doręczenie rusza zegar ustawowy. Bez niego zwrot nie miałby terminu,
+     a przyjęty i wyceniony nie czekałby na wypłatę (`pieniadzeCzekaja`). */
+  const id = Number(d.prepare(
+    `INSERT INTO zwrot_klienta
+       (channel_account_id, external_id, reference_number, order_id, created_at, paczka_at,
+        kupujacy_login, przewoznik, waybill, status_allegro, dostarczono_at, przesylka_status,
+        synced_at)
+     VALUES (?,?,?,?,?,?,?,'INPOST',?,'DELIVERED',?,'DELIVERED',?)`
+  ).run(
+    konto, z.zwrot, z.numer, z.zamowienie, chwila(-z.zgloszonoMin), chwila(-z.nadanoMin),
+    z.login, z.list, chwila(-z.doreczonoMin), at
+  ).lastInsertRowid);
+
+  const insPozycja = d.prepare(
+    `INSERT INTO zwrot_klienta_pozycja
+       (zwrot_id, offer_id, nazwa, ilosc, cena_grosze, waluta, powod, powod_komentarz, klucz,
+        tw_id, tw_symbol, tw_zrodlo, tw_at, tw_przez)
+     VALUES (?,?,?,?,?,'PLN','MISTAKE',?,?,?,?,'sku',?,?)`
+  );
+  const pozycje: number[] = [];
+  for (const p of z.pozycje) {
+    const towar = d.prepare("SELECT tw_id, symbol FROM sgt_towar WHERE symbol = ?")
+      .get(p.oferta.sku) as { tw_id: number; symbol: string };
+    pozycje.push(Number(insPozycja.run(
+      id, p.oferta.id, p.oferta.nazwa, p.ilosc, p.oferta.cenaGrosze, p.komentarz,
+      // klucz naturalny pozycji, liczony jak w synchronizatorze zwrotów
+      `${p.oferta.id}|${p.oferta.nazwa}`,
+      towar.tw_id, towar.symbol, at, AUTOMAT_SYGNATURY
+    ).lastInsertRowid));
+  }
+  return { id, pozycje };
+}
+
+function zwrotySc(konto: number, at: string): number {
+  const d = db();
+  const DOSTAWA = 1299;
+
+  /* S92 — zwrot, o którym biuro jeszcze nie zdecydowało. Paczka doręczona,
+     więc termin biegnie; werdyktu nie ma, więc stoi w „Do decyzji". */
+  const s92 = SPRAWY_OBSLUGI.zwrotDoDecyzji;
+  zamowienieSc(konto, {
+    id: s92.zamowienie, login: s92.login, dniTemu: 12, platnosc: `${ID_SC}platnosc-decyzja`,
+    dostawaGrosze: DOSTAWA,
+    pozycje: [{ linia: `${ID_SC}linia-decyzja-1`, oferta: OFERTY_SC.wszedzie, ilosc: 1 }],
+  }, at);
+  zwrotSc(konto, {
+    ...s92, list: "SCEN-LIST-0001",
+    zgloszonoMin: 2 * DOBA_MIN, nadanoMin: DOBA_MIN, doreczonoMin: 180,
+    pozycje: [{ oferta: OFERTY_SC.wszedzie, ilosc: 1, komentarz: "Zamówiłem nie ten model (tekst pokazowy)." }],
+  }, at);
+
+  /* S93 — zwrot po całej pracy biura poza wypłatą. Kwota bez korekty stałaby
+     w „Do korekty", więc korekta jest wpisana: zamyka zwrot w bazie, a ten
+     wraca do „Do zwrotu", dopóki pieniądze nie wyjdą (`kubelekZwrotu`).
+
+     Ocena „outlet", nie „na stan". Ocena „na stan" dokłada pozycję do koszyka
+     zwrotów, czyli zakłada pudło i dokument MM. Outlet koszyka nie ma z
+     definicji, więc stan da się zapisać w całości na wierszach zwrotu. */
+  const s93 = SPRAWY_OBSLUGI.zwrotDoWyplaty;
+  const pozycjeS93 = [
+    { oferta: OFERTY_SC.cennik, ilosc: 2, komentarz: "Kupiłem o dwie sztuki za dużo (tekst pokazowy)." },
+    { oferta: OFERTY_SC.zawleczka, ilosc: 1, komentarz: "Nie pasuje do sworznia (tekst pokazowy)." },
+  ];
+  zamowienieSc(konto, {
+    id: s93.zamowienie, login: s93.login, dniTemu: 14, platnosc: s93.platnosc,
+    dostawaGrosze: DOSTAWA,
+    pozycje: pozycjeS93.map((p, i) => ({
+      linia: `${ID_SC}linia-wyplata-${i + 1}`, oferta: p.oferta, ilosc: p.ilosc,
+    })),
+  }, at);
+  const zwrot = zwrotSc(konto, {
+    ...s93, list: "SCEN-LIST-0002",
+    zgloszonoMin: 4 * DOBA_MIN, nadanoMin: 3 * DOBA_MIN, doreczonoMin: 2 * DOBA_MIN,
+    pozycje: pozycjeS93,
+  }, at);
+
+  /* Dalej to, co zapisałyby serwisy przy pięciu ruchach biura, w tej samej
+     kolejności: werdykt, ocena, przeniesienie na outlet, kwota, korekta.
+     Każdy ruch zostawia wpis na osi zwrotu — bez nich oś mówiłaby, że nikt
+     tu nic nie zrobił, choć zwrot jest zamknięty. */
+  const biuro = "Biuro (scenariusze)";
+  const kiedyWerdykt = chwila(-26 * 60);
+  const kiedyOcena = chwila(-25 * 60);
+  const kiedyOutlet = chwila(-24 * 60 - 30);
+  const kiedyKwota = chwila(-24 * 60);
+  const kiedyKorekta = chwila(-23 * 60);
+  const kwotaPozycji = pozycjeS93.reduce((s, p) => s + p.oferta.cenaGrosze * p.ilosc, 0);
+  const kwota = kwotaPozycji + DOSTAWA;
+
+  const insOs = d.prepare(
+    `INSERT INTO zwrot_zdarzenie(zwrot_id, rodzaj, tresc, dane_json, kiedy_at, kto, kto_user_id)
+     VALUES (?,?,?,?,?,?,?)`
+  );
+  const os = (rodzaj: string, tresc: string, dane: Record<string, unknown>, kiedy: string) =>
+    insOs.run(zwrot.id, rodzaj, tresc, JSON.stringify(dane), kiedy, biuro, idBiura);
+
+  os("werdykt", "Zwrot przyjęty", { decyzja: "przyjety", powod: null }, kiedyWerdykt);
+  const ocen = d.prepare(
+    `UPDATE zwrot_klienta_pozycja
+        SET ocena = 'outlet', ocena_at = ?, ocena_przez = ?, outlet_at = ?, outlet_przez = ?,
+            w_zwrocie = 1
+      WHERE id = ?`
+  );
+  zwrot.pozycje.forEach((pozycjaId, i) => {
+    ocen.run(kiedyOcena, biuro, kiedyOutlet, biuro, pozycjaId);
+    os("ocena", `${pozycjeS93[i].oferta.nazwa} — na outlet`, { pozycjaId, ocena: "outlet" }, kiedyOcena);
+  });
+  zwrot.pozycje.forEach((pozycjaId, i) => {
+    os("outlet", `${pozycjeS93[i].oferta.nazwa} — przeniesiono na regał outletowy`,
+      { pozycjaId }, kiedyOutlet);
+  });
+  os("kwota", `Do oddania ${(kwota / 100).toFixed(2)} (pełna)`,
+    { kwotaGrosze: kwota, dostawaGrosze: DOSTAWA, wariant: "pelna" }, kiedyKwota);
+  os("korekta", `Korekta ${s93.korekta}`, { numer: s93.korekta }, kiedyKorekta);
+
+  /* Wersja 6: werdykt, dwie oceny, kwota i korekta podnoszą ją po jednym.
+     Przeniesienie na outlet wersji nie rusza — to meldunek, nie decyzja. */
+  d.prepare(
+    `UPDATE zwrot_klienta
+        SET werdykt = 'przyjety', werdykt_at = ?, werdykt_przez = ?, werdykt_user_id = ?,
+            kwota_wariant = 'pelna', kwota_grosze = ?, kwota_dostawa_grosze = ?,
+            kwota_at = ?, kwota_przez = ?,
+            korekta_numer = ?, korekta_zrodlo = 'reczne', zamkniety_at = ?,
+            wersja = 6
+      WHERE id = ?`
+  ).run(
+    kiedyWerdykt, biuro, idBiura, kwota, DOSTAWA, kiedyKwota, biuro,
+    s93.korekta, kiedyKorekta, zwrot.id
+  );
+
+  return 2;
+}
+
+/* ── S94: reklamacja bez werdyktu ───────────────────────────────────────────
+   Sprawa świeżo pobrana z Allegro: status `CLAIM_SUBMITTED`, termin decyzji
+   przed nami, czat otwarty, jedna wiadomość kupującego. Praca biura jest
+   jeszcze przed nią, więc nie ma tu ani prowadzącego, ani notatki.
+
+   CAŁA SPRAWA MIEŚCI SIĘ W JEDNYM ŁADUNKU, i to jest powód jednej wiadomości.
+   Lista spraw niesie pierwszą wiadomość czatu. Druga wymagałaby osobnej
+   końcówki czatu, a ekran odświeża sprawę z Allegro przy każdym wejściu.    */
+
+function reklamacjaSc(konto: number, at: string): number {
+  const d = db();
+  const s = SPRAWY_OBSLUGI.reklamacja;
+  const oferta = OFERTY_SC.sprzeglo;
+  const otwarto = chwila(-2 * DOBA_MIN);
+  const decyzjaDo = chwila(12 * DOBA_MIN);
+  const kupiono = chwila(-20 * DOBA_MIN);
+  const opis = "Sprzęgło ślizga się po trzech użyciach. Proszę o zwrot pieniędzy (tekst pokazowy).";
+  const wiadomosc = `${ID_SC}reklamacja-wiadomosc-1`;
+
+  zamowienieSc(konto, {
+    id: s.zamowienie, login: s.login, dniTemu: 20, platnosc: `${ID_SC}platnosc-reklamacja`,
+    dostawaGrosze: 1299,
+    pozycje: [{ linia: `${ID_SC}linia-reklamacja-1`, oferta, ilosc: 1 }],
+  }, at);
+
+  /* `PostPurchaseIssue` ze specyfikacji Allegro. Każde pole, które czyta
+     synchronizator, jest tu jawnie — także puste, bo odświeżenie sprawy
+     nadpisuje wiersz tym, co odda Allegro. */
+  const ladunek = {
+    id: s.sprawa, type: "CLAIM", referenceNumber: s.numer,
+    decisionDueDate: decyzjaDo, openedDate: otwarto,
+    subject: "wady ujawniły się w trakcie użytkowania", description: opis,
+    buyer: { login: s.login },
+    checkoutForm: { id: s.zamowienie, createdAt: kupiono },
+    currentState: {
+      status: "CLAIM_SUBMITTED", statusDueDate: decyzjaDo, returnRequired: null, chatActive: true,
+    },
+    chat: {
+      messagesCount: 1,
+      lastMessage: { status: "NEW", createdAt: otwarto },
+      initialMessage: {
+        id: wiadomosc, text: opis, attachments: [],
+        author: { login: s.login, role: "BUYER" }, createdAt: otwarto,
+      },
+    },
+    expectations: [{ name: "REFUND", refund: null }],
+    offer: { id: oferta.id, quantity: 1 },
+    reason: { type: "DEFECT_FOUND_DURING_USE", description: null },
+    right: "COMPLAINT",
+    attachments: [],
+  };
+
+  d.prepare(
+    "INSERT INTO allegro_reklamacja(id, created_at, surowe_json, synced_at) VALUES (?,?,?,?)"
+  ).run(s.sprawa, otwarto, JSON.stringify(oczyscSurowy(ladunek)), at);
+
+  const id = Number(d.prepare(
+    `INSERT INTO reklamacja_klienta
+       (channel_account_id, external_id, reference_number, order_id, zamowienie_at, offer_id,
+        kupujacy_login, typ, prawo, powod_typ, powod_opis, temat, opis, oczekiwanie,
+        oczekiwana_kwota_grosze, waluta, status_allegro, decyzja_do, status_do, zwrot_wymagany,
+        czat_aktywny, wiadomosci_ile, ostatnia_wiadomosc_status, ostatnia_wiadomosc_at,
+        otwarto_at, synced_at, ilosc)
+     VALUES (?,?,?,?,?,?,?,'CLAIM','COMPLAINT',?,NULL,?,?,'REFUND',NULL,'PLN',
+             'CLAIM_SUBMITTED',?,?,NULL,1,1,'NEW',?,?,?,1)`
+  ).run(
+    konto, s.sprawa, s.numer, s.zamowienie, kupiono, oferta.id, s.login,
+    ladunek.reason.type, ladunek.subject, opis, decyzjaDo, decyzjaDo, otwarto, otwarto, at
+  ).lastInsertRowid);
+
+  d.prepare(
+    `INSERT INTO reklamacja_wiadomosc
+       (reklamacja_id, external_id, autor_login, autor_rola, tresc, utworzono_at)
+     VALUES (?,?,?,'BUYER',?,?)`
+  ).run(id, wiadomosc, s.login, opis, otwarto);
+
+  return 1;
+}
+
 function zdjecia(): void {
   const dir = path.resolve(path.dirname(config.dbPath), "photos");
   fs.mkdirSync(dir, { recursive: true });
@@ -1519,6 +2150,12 @@ function wypisz(licz: Podsumowanie): void {
   console.log(`[scenariusze] historia pobrań: WZ=${licz.dokumentyWz}, pozycji=${licz.pozycjeWz}`);
   console.log(`[scenariusze] przyjęcia na regał zwrotów (kosze z kartką): ${licz.przyjecia}`);
   console.log(`[scenariusze] domknięte dostawy historyczne (analiza dostaw): ${licz.historiaDostaw}`);
+  console.log(
+    licz.rozmowy + licz.zwroty + licz.reklamacje === 0
+      ? "[scenariusze] obsługa klienta POMINIĘTA — na tej bazie stoi sparowane konto Allegro"
+      : `[scenariusze] obsługa klienta: rozmowy=${licz.rozmowy} zwroty=${licz.zwroty} ` +
+        `reklamacje=${licz.reklamacje} (konto kanału „${KONTO_KANALU_SCENARIUSZY}")`
+  );
   console.log("");
   let obszar = "";
   for (const s of KATALOG) {

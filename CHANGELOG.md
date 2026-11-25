@@ -10,6 +10,56 @@ z wersją monorepo" — i właśnie tak przestał być zgodny: `0.3.0` przetrwa�
 sześć zmergowanych zmian, w tym takie, które wymagały nowego uprawnienia SQL.
 Komentarz nie jest mechanizmem.
 
+## 0.627.2 — 25 listopada 2026
+
+**Pasek „Klient dopisał nową wiadomość” znów się zapala.** Gdy klient dopisał
+coś w trakcie pisania odpowiedzi, skrzynka odświeżała rozmowę po cichu
+i odpowiedź na stare pytanie wychodziła bez ostrzeżenia. Panel czytał pola
+zdarzenia z innego miejsca, niż wysyła je serwer. Z tego samego powodu
+znacznik „kto siedzi przy rozmowie” nie zmieniał się na żywo.
+
+Błąd znalazły nowe testy przeglądarkowe. Przechodzą przez prawdziwy panel
+i prawdziwy serwer na świeżej bazie: odpowiedź z oknem cofnięcia, dopisek
+klienta w trakcie, werdykt zwrotu, wypłata i werdykt reklamacji. Z serwerem
+rozmawia lokalny udawany serwer Allegro, a mur sieci zatrzymuje każde
+połączenie poza własną maszynę. Uruchamia się je ręcznie
+(`npm run test:e2e` w `panel/`), w CI nie biegną.
+
+Seed scenariuszy zakłada dwie rozmowy, dwa zwroty i reklamację
+(`docs/scenariusze-testowe.md`, S90–S94). Na bazie ze sparowanym kontem
+Allegro tych spraw nie buduje.
+
+## 0.627.1 — 25 listopada 2026
+
+Polecenie `npm run copilot:zestaw` w `server/` puszcza zapisane wejścia
+szkiców jeszcze raz, innym modelem (`--model`) albo inną instrukcją
+(`--instrukcja plik.txt`). Wynik przechodzi przez te same sita co szkic biura.
+Raport pokazuje, które sprawy nowy wariant naprawił, a które zepsuł, koszt
+i czas obu stron oraz bliskość szkicu do odpowiedzi, którą agent wysłał.
+Bez `--pusc` polecenie tylko wycenia przebieg i nie woła modelu. Opcja
+`--pary plik.md` zapisuje oba szkice obok siebie do przeczytania.
+
+Powtórka stoi w pomiarze Copilota jako osobne zadanie „zestaw testowy
+szkiców” i nie liczy się do sufitu szkiców z automatu. Liczba wywołań
+i błędów na karcie pomiaru oraz w raporcie tygodnia pomija powtórki, a koszt
+je obejmuje. Sprawy ze zdjęciami
+są pomijane, a narzędzie ofert nie pyta Allegro. Zasady danych:
+`docs/obsluga-klienta.md`, rozdział o Copilocie.
+
+## 0.627.0 — 25 listopada 2026
+
+**Pomylony towar w zwrocie.** Gdy w kartonie leży co innego, niż klient
+kupił, przy pozycji klikasz „to nie ten towar" i dopisujesz, co przyjechało.
+Pozycja dostaje czerwoną ramkę, a ocena „na stan" pod zamówioną kartoteką
+dostaje ostrzeżenie. Znacznik nie zmienia kwoty ani koszyka. Zaznaczenie
+da się cofnąć.
+
+**Alarm, gdy klient wskaże „inny towar".** Gdy w zwrocie klient wybierze
+powód „inny towar", na każdym ekranie panelu staje czerwony pas z numerem
+zwrotu, nazwą pozycji i słowami klienta. Panel gra krótki sygnał, a gdy karta
+jest w tle, pokazuje powiadomienie Windows. Pas znika na tym komputerze po
+otwarciu zwrotu.
+
 ## 0.626.0 — 23 listopada 2026
 
 **Kosze: pominięte pozycje stoją na górze kosza.** „Załatwione” klika się przy

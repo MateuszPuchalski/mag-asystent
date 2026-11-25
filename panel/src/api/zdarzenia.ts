@@ -12,8 +12,17 @@ export type ZdarzenieRozmowy = {
   type: "presence" | "message.created" | "assignment.changed" | "warehouse.result"
     | "classification.updated";
   conversationId: number;
-  [k: string]: unknown;
+  /* Pola zdarzenia stoją w kopercie `data`, tak jak wysyła je serwer
+     (`publishConversationEvent`). Czytane z wierzchu zdarzenia były zawsze
+     puste: pasek o dopisku klienta nie zapalał się nigdy, a odpowiedź na
+     stare pytanie wychodziła bez ostrzeżenia. */
+  data?: unknown;
 };
+
+/** Pola z koperty zdarzenia. Brak koperty to brak pól, nie błąd. */
+function pola(z: ZdarzenieRozmowy): Record<string, unknown> {
+  return z.data && typeof z.data === "object" ? z.data as Record<string, unknown> : {};
+}
 
 export type Obecnosc = { userId: number; name: string; typing: boolean };
 
@@ -75,7 +84,7 @@ export function useSzynaZdarzen(
 
     function obsluz(z: ZdarzenieRozmowy) {
       if (z.type === "presence") {
-        setObecnosc((z.obecni as Obecnosc[] | undefined) ?? []);
+        setObecnosc((pola(z).obecni as Obecnosc[] | undefined) ?? []);
         /* ── OBECNOŚĆ ŁATA CACHE, NIE ŚCIĄGA LISTY ───────────────────────────
            Wiersz kolejki pokazuje, kto siedzi przy rozmowie, więc zdarzenie
            obecności musi go zmienić — bez PONOWNEGO POBRANIA CAŁEJ LISTY.
@@ -98,7 +107,7 @@ export function useSzynaZdarzen(
 
            Efekt uboczny jest dodatni: znacznik pojawia się od razu, bez
            czekania na odpowiedź serwera. */
-        const obecniTeraz = (z.obecni as Obecnosc[] | undefined) ?? [];
+        const obecniTeraz = (pola(z).obecni as Obecnosc[] | undefined) ?? [];
         const trzyma = obecniTeraz[0]
           ? { userId: obecniTeraz[0].userId, name: obecniTeraz[0].name }
           : null;
@@ -127,7 +136,7 @@ export function useSzynaZdarzen(
          Nasza wiadomość i odbicie DOCIĄGAJĄ rozmowę po cichu: agent ma je
          zobaczyć na osi, tylko bez alarmu. */
       const odKlienta = z.type === "message.created"
-        && z.odKlienta === true && z.automatyczna !== true;
+        && pola(z).odKlienta === true && pola(z).automatyczna !== true;
       if (odKlienta) onNowa.current(z.conversationId);
       else qc.invalidateQueries({ queryKey: klucze.rozmowa(z.conversationId) });
     }

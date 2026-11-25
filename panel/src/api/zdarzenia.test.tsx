@@ -4,6 +4,7 @@ import { QueryClient, QueryClientProvider, useQuery } from "@tanstack/react-quer
 import { useSzynaZdarzen } from "./zdarzenia";
 import { klucze } from "./rozmowy";
 import type { Rozmowa } from "./typy";
+import zrodloSzyny from "../../../server/src/services/conversation-realtime.ts?raw";
 
 /* ── Szyna zdarzeń a kolejka ─────────────────────────────────────────────────
    Zdarzenie OBECNOŚCI (wejście, wyjście, „pisze") zmienia w kolejce jedną
@@ -87,7 +88,7 @@ describe("Szyna zdarzeń a kolejka rozmów", () => {
   it("obecność NIE ściąga listy rozmów", async () => {
     const { pobran, widok, wyslij } = stanowisko([rozmowa()]);
     await wyslij([{ id: 1, type: "presence", conversationId: 1,
-      obecni: [{ userId: 9, name: "M. Wójcik", typing: true }] }]);
+      data: { obecni: [{ userId: 9, name: "M. Wójcik", typing: true }] } }]);
 
     await waitFor(() => expect(widok.getByTestId("oglada").textContent).toBe("M. Wójcik"));
     /* Jedno pobranie to pierwsze wejście na ekran — zdarzenie nie dołożyło drugiego. */
@@ -97,7 +98,7 @@ describe("Szyna zdarzeń a kolejka rozmów", () => {
   it("…ale znacznik obecności i tak się zmienia", async () => {
     const { widok, wyslij } = stanowisko([rozmowa({ oglada: null })]);
     await wyslij([{ id: 1, type: "presence", conversationId: 1,
-      obecni: [{ userId: 9, name: "M. Wójcik", typing: false }] }]);
+      data: { obecni: [{ userId: 9, name: "M. Wójcik", typing: false }] } }]);
 
     await waitFor(() => expect(widok.getByTestId("oglada").textContent).toBe("M. Wójcik"));
   });
@@ -106,7 +107,7 @@ describe("Szyna zdarzeń a kolejka rozmów", () => {
     /* Pusta lista obecnych to `null`, nie „zostaw jak było" — inaczej znacznik
        wisiałby po kimś, kto dawno wyszedł. */
     const { widok, wyslij } = stanowisko([rozmowa({ oglada: { userId: 9, name: "M. Wójcik" } })]);
-    await wyslij([{ id: 1, type: "presence", conversationId: 1, obecni: [] }]);
+    await wyslij([{ id: 1, type: "presence", conversationId: 1, data: { obecni: [] } }]);
 
     await waitFor(() => expect(widok.getByTestId("oglada").textContent).toBe("nikt"));
   });
@@ -116,10 +117,10 @@ describe("Szyna zdarzeń a kolejka rozmów", () => {
        oddaje listę już posortowaną po czasie. Klient bierze pierwszy element
        zamiast wyprowadzać tę regułę drugi raz. */
     const { widok, wyslij } = stanowisko([rozmowa()]);
-    await wyslij([{ id: 1, type: "presence", conversationId: 1, obecni: [
+    await wyslij([{ id: 1, type: "presence", conversationId: 1, data: { obecni: [
       { userId: 9, name: "M. Wójcik", typing: false },
       { userId: 4, name: "A. Lewandowska", typing: true },
-    ] }]);
+    ] } }]);
 
     await waitFor(() => expect(widok.getByTestId("oglada").textContent).toBe("M. Wójcik"));
   });
@@ -127,7 +128,7 @@ describe("Szyna zdarzeń a kolejka rozmów", () => {
   it("obecność przy INNEJ rozmowie nie rusza tego wiersza", async () => {
     const { widok, wyslij } = stanowisko([rozmowa({ id: 1, oglada: null })]);
     await wyslij([{ id: 1, type: "presence", conversationId: 77,
-      obecni: [{ userId: 9, name: "M. Wójcik", typing: true }] }]);
+      data: { obecni: [{ userId: 9, name: "M. Wójcik", typing: true }] } }]);
 
     await waitFor(() => expect(widok.getByTestId("oglada").textContent).toBe("nikt"));
   });
@@ -136,7 +137,7 @@ describe("Szyna zdarzeń a kolejka rozmów", () => {
     /* Oszczędność dotyczy obecności, nie wszystkiego. Zdarzenia rzadkie mają
        odświeżać natychmiast, bo od nich zależy, za co agent się bierze. */
     const { pobran, wyslij } = stanowisko([rozmowa()]);
-    await wyslij([{ id: 1, type: "message.created", conversationId: 1, odKlienta: true }]);
+    await wyslij([{ id: 1, type: "message.created", conversationId: 1, data: { odKlienta: true } }]);
 
     await waitFor(() => expect(pobran.ile).toBe(2));
   });
@@ -151,14 +152,14 @@ describe("Szyna zdarzeń a kolejka rozmów", () => {
 describe("Alarm o nowej wiadomości", () => {
   it("wiadomość KLIENTA zapala pasek", async () => {
     const { alarm, wyslij } = stanowisko([rozmowa()]);
-    await wyslij([{ id: 1, type: "message.created", conversationId: 1, odKlienta: true }]);
+    await wyslij([{ id: 1, type: "message.created", conversationId: 1, data: { odKlienta: true } }]);
 
     await waitFor(() => expect(alarm.ile).toBe(1));
   });
 
   it("NASZA odpowiedź paska nie zapala", async () => {
     const { alarm, pobran, wyslij } = stanowisko([rozmowa()]);
-    await wyslij([{ id: 1, type: "message.created", conversationId: 1, odKlienta: false }]);
+    await wyslij([{ id: 1, type: "message.created", conversationId: 1, data: { odKlienta: false } }]);
 
     /* Rozmowa dociąga się mimo to — agent ma zobaczyć własną wiadomość na osi,
        tylko bez alarmu. Po tym pobraniu wiemy, że ramka NIE została zgubiona. */
@@ -171,7 +172,28 @@ describe("Alarm o nowej wiadomości", () => {
        tu drugą bramkę — na wypadek, gdyby przyszło innym kierunkiem. */
     const { alarm, pobran, wyslij } = stanowisko([rozmowa()]);
     await wyslij([{ id: 1, type: "message.created", conversationId: 1,
-      odKlienta: true, automatyczna: true }]);
+      data: { odKlienta: true, automatyczna: true } }]);
+
+    await waitFor(() => expect(pobran.ile).toBe(2));
+    expect(alarm.ile).toBe(0);
+  });
+});
+
+/* ── Kształt zdarzenia ma jednego właściciela: serwer ────────────────────────
+   Testy wyżej karmią szynę zdarzeniami z polami w kopercie `data`, bo tak
+   wysyła je serwer. Gdy serwer zmieni kształt, te testy dalej będą zielone,
+   a pasek o dopisku klienta zgaśnie po cichu. Dlatego ten test czyta źródło
+   serwera i pada, gdy koperta zniknie albo zmieni nazwę. */
+describe("Kształt zdarzenia z serwera", () => {
+  it("pola zdarzenia stoją w kopercie `data`", () => {
+    expect(zrodloSzyny).toMatch(/const event = \{ id: \+\+sequence, type, conversationId, data, at:/);
+  });
+
+  it("zdarzenie z polami na wierzchu, bez koperty, paska nie zapala", async () => {
+    /* Druga strona tej samej umowy: gdyby panel czytał oba miejsca, zmiana
+       kształtu po stronie serwera przeszłaby niezauważona. */
+    const { alarm, pobran, wyslij } = stanowisko([rozmowa()]);
+    await wyslij([{ id: 1, type: "message.created", conversationId: 1, odKlienta: true }]);
 
     await waitFor(() => expect(pobran.ile).toBe(2));
     expect(alarm.ile).toBe(0);

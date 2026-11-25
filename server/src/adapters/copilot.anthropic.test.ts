@@ -649,3 +649,66 @@ test("udany szkic i udane dopytanie oddają swoją wersję instrukcji i rundy", 
     _ustawKlienta(null);
   }
 });
+
+/* ── Wariant szkicu dla zestawu testowego ────────────────────────────────────
+   Zestaw puszcza zapisane sprawy innym modelem albo inną instrukcją. Reszta
+   żądania ma zostać ta sama, a księga ma wiedzieć, czym liczono. */
+test("wariant szkicu podmienia model i instrukcję, a wersja idzie do odpowiedzi", async () => {
+  const { nadawcaSzkicuZ } = await import("./copilot.anthropic.js");
+  let wyslane: Record<string, unknown> | null = null;
+  _ustawKlienta({ messages: { create: async (p: Record<string, unknown>) => {
+    wyslane = p;
+    return {
+      content: [{ type: "text", text: JSON.stringify({
+        tresc: "Dzień dobry.", uzyteFakty: [], zastrzezenia: [], twierdzenia: [], odczytZeZdjec: [],
+      }) }],
+      model: "claude-sonnet-5-5", stop_reason: "end_turn", usage: { input_tokens: 10, output_tokens: 5 },
+    };
+  } } } as unknown as Anthropic);
+  try {
+    const odp = await nadawcaSzkicuZ({
+      model: "claude-sonnet-5-5", instrukcja: "Pisz krótko.", wersja: "plik:abcd1234",
+    })(TRESC, FAKTY);
+    const p = wyslane as unknown as { model: string; system: Array<{ text: string }> };
+    assert.equal(p.model, "claude-sonnet-5-5");
+    assert.equal(p.system[0]!.text, "Pisz krótko.");
+    assert.equal(odp.wersjaInstrukcji, "plik:abcd1234");
+    assert.equal(odp.model, "claude-sonnet-5-5");
+  } finally {
+    _ustawKlienta(null);
+  }
+});
+
+test("własna instrukcja bez etykiety nie wychodzi do dostawcy", async () => {
+  const { nadawcaSzkicuZ } = await import("./copilot.anthropic.js");
+  let wyslanych = 0;
+  _ustawKlienta({ messages: { create: async () => {
+    wyslanych += 1;
+    throw new Error("nie powinno dojść do żądania");
+  } } } as unknown as Anthropic);
+  try {
+    await assert.rejects(nadawcaSzkicuZ({ instrukcja: "Pisz krótko." })(TRESC, FAKTY), /etykiety wersji/);
+    assert.equal(wyslanych, 0, "pod numerem instrukcji z kodu stanąłby obcy tekst");
+  } finally {
+    _ustawKlienta(null);
+  }
+});
+
+test("nadawca biura bierze model z konfiguracji i instrukcję z kodu", async () => {
+  const { config } = await import("../config.js");
+  const { INSTRUKCJA_SZKICU } = await import("./copilot.anthropic.js");
+  let wyslane: Record<string, unknown> | null = null;
+  _ustawKlienta({ messages: { create: async (p: Record<string, unknown>) => {
+    wyslane = p;
+    return { content: [], model: undefined, stop_reason: "end_turn",
+      usage: { input_tokens: 1, output_tokens: 1 } };
+  } } } as unknown as Anthropic);
+  try {
+    await nadawcaSzkicuAnthropic(TRESC, FAKTY).catch(() => null);
+    const p = wyslane as unknown as { model: string; system: Array<{ text: string }> };
+    assert.equal(p.model, config.copilot.model);
+    assert.equal(p.system[0]!.text, INSTRUKCJA_SZKICU);
+  } finally {
+    _ustawKlienta(null);
+  }
+});

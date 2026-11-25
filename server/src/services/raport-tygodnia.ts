@@ -38,8 +38,9 @@ import { migawki, zrobMigawke, type WpisMigawki } from "./migawka-dnia.js";
    brak, a nie liczy go w locie.                                            */
 
 /** Podbij przy każdej zmianie reguły liczenia albo kształtu `RaportTygodnia`.
- *  2: koszt Copilota dolicza wyszukiwania w sieci, płatne od sztuki. */
-export const WERSJA_RAPORTU = 2;
+ *  2: koszt Copilota dolicza wyszukiwania w sieci, płatne od sztuki.
+ *  3: wywołania i błędy Copilota bez powtórek zestawu testowego; koszt je liczy. */
+export const WERSJA_RAPORTU = 3;
 
 /* Tyle tygodni wstecz automat nadrabia po przerwie. Cztery, bo miesiąc to
    najdłuższa przerwa, po której porównanie z poprzednim tygodniem jeszcze
@@ -181,9 +182,9 @@ export function zbudujRaport(poniedzialek: string, database: Db = defaultDb()): 
   const czas = czasOdpowiedzi(dlugoscDni, false, database, Date.parse(doChwili));
 
   // ── Copilot: koszt z tych samych stawek co pomiar ───────────────────────
-  const wywolania = database.prepare(`SELECT model, wynik, tokeny_wej, tokeny_wyj,
+  const wywolania = database.prepare(`SELECT model, wynik, zrodlo, tokeny_wej, tokeny_wyj,
       tokeny_cache_zapis, tokeny_cache_odczyt, wyszukiwania FROM copilot_wywolanie WHERE ${wOknie("at")}`)
-    .all(od, doChwili) as Array<{ model: string; wynik: string; tokeny_wej: number;
+    .all(od, doChwili) as Array<{ model: string; wynik: string; zrodlo: string | null; tokeny_wej: number;
       tokeny_wyj: number; tokeny_cache_zapis: number; tokeny_cache_odczyt: number; wyszukiwania: number }>;
   const koszt = wywolania.reduce((s, w) => s + kosztUsd(w.model, {
     wej: w.tokeny_wej, wyj: w.tokeny_wyj, cacheZapis: w.tokeny_cache_zapis, cacheOdczyt: w.tokeny_cache_odczyt,
@@ -225,8 +226,10 @@ export function zbudujRaport(poniedzialek: string, database: Db = defaultDb()): 
       reklamacjeRozstrzygniete: ile(database, `SELECT COUNT(*) AS n FROM reklamacja_klienta WHERE typ = 'CLAIM' AND ${wOknie("werdykt_at")}`, od, doChwili),
     },
     copilot: {
-      wywolan: wywolania.length,
-      bledow: wywolania.filter((w) => w.wynik === "blad").length,
+      /* Praca biura, bez powtórek zestawu testowego. Koszt wyżej liczy
+         wszystko, bo powtórka też jest na rachunku. */
+      wywolan: wywolania.filter((w) => w.zrodlo !== "eval").length,
+      bledow: wywolania.filter((w) => w.wynik === "blad" && w.zrodlo !== "eval").length,
       kosztUsd: Number(koszt.toFixed(2)),
     },
     system: {

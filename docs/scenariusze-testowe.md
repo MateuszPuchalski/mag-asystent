@@ -78,6 +78,8 @@ Rozdział zakresów jest jedynym mechanizmem chroniącym dane z `npm run seed`.
 | dokumenty i zamówienia (`dok_id`) | od 9001 |
 | dokumenty WZ z historią pobrań | od 20001 |
 | konta | loginy z tabeli wyżej |
+| sprawy obsługi klienta | konto kanału `scenariusze` |
+| numery po stronie Allegro | przedrostek `scenariusz-` |
 
 ---
 
@@ -780,3 +782,103 @@ ten sam plik pokazuje „bez zmian".
 
 Zaloguj się jako **biuro** albo magazynier i spróbuj wgrać plik. Serwer ma
 odmówić — kartę widać, ale operacja należy do administratora.
+
+---
+
+## Obsługa klienta: skrzynka, zwroty i reklamacje
+
+Pięć spraw pod trzy drogi, na których pomyłka wychodzi poza firmę. To odpowiedź
+do klienta, wypłata przy zwrocie i werdykt reklamacji.
+
+Sprawy stoją na osobnym koncie kanału o kluczu `scenariusze`. Prawdziwe konto
+bierze klucz z `ALLEGRO_CLIENT_ID`, więc obie grupy nigdy się nie mieszają.
+
+Dane są jawnie zmyślone. Loginy zaczynają się od `klient.`, a zamówienia nie
+niosą adresu ani telefonu.
+
+**Tokena Allegro seed nie zakłada.** Bez sparowanego konta wysyłka, wypłata
+i werdykt kończą się zdaniem o niepołączonym koncie. Kolejki, bramki ról
+i zapisy lokalne działają bez niego.
+
+**Na bazie ze sparowanym kontem tych spraw nie będzie.** Takty ofert i zamówień
+pytałyby wtedy prawdziwe Allegro o zmyślone numery. Seed mówi o pominięciu
+jednym wierszem.
+
+Wszystkie pięć scenariuszy otwiera konto `biuro.test`. Magazynier dostaje na
+tych trasach 403, bo obsługę klienta prowadzi biuro.
+
+### S90 — rozmowa bez prowadzącego
+
+Wejdź w `/obsluga/skrzynka`. Rozmowa klienta `klient.testowy` stoi w „Do
+odpowiedzi" i w „Nieprzypisanych". Ostatnie słowo należy do klienta.
+
+Otwórz ją. Prawa kolumna ma pokazać ofertę pokazową i kartotekę
+`TEST-CENY-PELNE`, dopasowaną po sygnaturze. Samo otwarcie niczego nie zapisuje.
+
+Napisz odpowiedź i wyślij. Bez połączenia z Allegro serwer odmówi, a szkic
+zostanie na ekranie. Z połączeniem odpowiedź staje na osi, a rozmowa dostaje
+prowadzącego.
+
+### S91 — klient dopisał w trakcie redagowania
+
+Rozmowa klienta `klient.dopisujacy` ma jedną wiadomość i nikt jej nie prowadzi.
+Istnieje osobno, żeby ten scenariusz nie zależał od losu S90.
+
+Otwórz ją i zacznij pisać. W tym czasie niech w wątku
+`scenariusz-watek-dopisek` przybędzie wiadomość klienta. Przyniesie ją
+synchronizacja skrzynki.
+
+Ekran ma pokazać pasek „Klient dopisał nową wiadomość" i nie wysłać
+odpowiedzi po cichu. To pierwsza zapora. Druga stoi na serwerze: wysyłka
+z numerem starej wiadomości dostaje 409 ze zdaniem „Klient dopisał
+wiadomość" i treścią dopisku. Na osi nie przybywa odpowiedź biura. Wysłać da
+się dopiero po jawnym zatwierdzeniu.
+
+### S92 — zwrot bez werdyktu
+
+Wejdź w `/obsluga/zwroty`. Zwrot `SCEN-1/ZWROT` stoi w „Do decyzji": paczka
+doręczona, termin biegnie, werdyktu nie ma.
+
+Kliknij przyjęcie. Zwrot ma przejść do „Do oceny" i zostać tam po odświeżeniu
+strony. Werdykt zapisuje się wyłącznie u nas i nie wychodzi do Allegro.
+
+Sekcja pieniędzy ma powiedzieć, że najpierw trzeba przyjąć zwrot. Odmowa
+wypłaty jest dostępna od razu, bo to osobna droga.
+
+### S93 — zwrot z kwotą czeka na wypłatę
+
+Zwrot `SCEN-2/ZWROT` stoi w „Do zwrotu". Biuro go przyjęło, oceniło obie pozycje
+na outlet, policzyło kwotę i wpisało korektę `KFS SCEN-1/2026`.
+
+Korekta zamyka zwrot w bazie. Zwrot wraca jednak do „Do zwrotu", dopóki
+pieniądze nie wyjdą. Sama kwota bez korekty stałaby w „Do korekty".
+
+Kwota to 125,41 zł: dwie sztuki po 49,96 zł, jedna za 12,50 zł i dostawa
+12,99 zł. Oś zwrotu pokazuje wszystkie ruchy biura z podpisem.
+
+Kliknij **Oddaj pieniądze**. Ekran nie pyta o potwierdzenie: jedno kliknięcie
+wysyła polecenie wypłaty. Po udanej wypłacie zwrot przechodzi do „Zamkniętych".
+
+Kwoty nie ma w żądaniu panelu. Serwer wysyła tę, którą sam policzył
+z zaznaczenia.
+
+### S94 — reklamacja bez werdyktu
+
+Wejdź w `/obsluga/reklamacje`. Sprawa `SCEN-1/REKLAMACJA` stoi w „Do decyzji",
+z terminem za kilkanaście dni. Ma zamówienie i jedną wiadomość kupującego.
+
+Wejście w sprawę odświeża ją z Allegro jednym żądaniem. To jedyny zapis przy
+patrzeniu w całym panelu. Bez połączenia z Allegro odświeżenie się nie uda,
+a sprawa zostaje taka, jak w bazie.
+
+Wydaj werdykt. Wiadomość do kupującego jest wymagana, a przycisk czeka na
+zgodę. Po wysłaniu sprawa niesie nazwę werdyktu i wychodzi z „Do decyzji".
+
+Trafia do „Do odpowiedzi", nie do „Rozstrzygniętych". Ostatnie słowo w czacie
+nadal należy do kupującego, a werdykt nie jest wiadomością czatu.
+
+Spróbuj wydać drugi werdykt w tej samej sprawie. Serwer ma odmówić kodem 409,
+bo Allegro drugiego nie przyjmie.
+
+Uprawnienie do wypłaty i do werdyktu mają role biuro i admin, bez różnicy
+między nimi. Odmowę widać wyłącznie na koncie magazyniera.

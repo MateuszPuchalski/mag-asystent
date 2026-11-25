@@ -297,6 +297,19 @@ z firmy nie wychodzi ani jeden znak. Klasyfikacja nie pisze do klienta.
   nowe kopie nie powstają, stare leżą dalej, razem z wejściem. Kopia
   zanonimizowana ma tę tabelę pustą. `COPILOT_ZAPIS_WEJSCIA=0` wyłącza zapis, a kasowanie chodzi
   dalej.
+- **Zestaw testowy puszcza zapisane wejścia jeszcze raz** (`npm run copilot:zestaw`
+  w `server/`, od wydania 0.627.1). Do dostawcy idzie to samo zamaskowane
+  wejście, które już raz tam poszło, więc nowa treść nie wychodzi. Zmienia się
+  model albo instrukcja. Wątek przechodzi przed wysyłką dzisiejszą kontrolę
+  maskowania, a sprawa, która jej nie przechodzi, do modelu nie idzie. Polecenie uruchamia człowiek na serwerze z bazą. Bez
+  `--pusc` pokazuje tylko wycenę i nie woła modelu. Raport niesie liczby
+  i numery wejść, bez treści. Wysłaną odpowiedź agenta polecenie czyta
+  wyłącznie do policzenia bliskości i nigdzie jej nie zapisuje, bo nie ma
+  maski. Plik par szkiców (`--pary`) niesie zamaskowaną rozmowę, fakty i oba
+  szkice. Powstaje tylko na życzenie i nie ma retencji, więc kasuje go ten,
+  kto go przeczytał. Sprawy ze zdjęciami zestaw pomija, bo wejście nie trzyma
+  bajtów. Narzędzie ofert odpowiada z kopii w bazie i nie pyta Allegro.
+  Powtórka stoi w księdze jako zadanie `szkic_zestaw` ze źródłem `eval`.
 
 **Zdjęcia w rozmowie wychodzą do dostawcy, także bez kliknięcia.** Pikseli
 zamaskować się nie da: zdjęcie bywa paragonem, etykietą albo ekranem telefonu

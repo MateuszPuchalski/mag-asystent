@@ -560,13 +560,33 @@ export const PROMPT_SZKICU = "s2";
    pełne żądanie płacone bez kliknięcia człowieka. */
 export const SUFIT_RUND_SZKICU = 3;
 
-/** Realny nadawca szkicu. Wstrzykuje go TRASA, jak nadawcę klasyfikacji. */
-export const nadawcaSzkicuAnthropic: NadawcaSzkicu =
+/**
+ * Co zestaw testowy podmienia w nadawcy szkicu: model, tekst instrukcji albo
+ * jedno i drugie. Biuro nie podaje nic i dostaje ustawienia z konfiguracji.
+ * Reszta żądania zostaje wspólna, bo porównanie ma różnić się tylko tym,
+ * co się porównuje.
+ */
+export interface WariantSzkicu {
+  model?: string;
+  instrukcja?: string;
+  /** Etykieta instrukcji do księgi. Wymagana przy własnej instrukcji. */
+  wersja?: string;
+}
+
+/** Nadawca szkicu w podanym wariancie. Pusty wariant to nadawca biura. */
+export const nadawcaSzkicuZ = (wariant: WariantSzkicu = {}): NadawcaSzkicu =>
   async (watek, fakty, zdjecia = [], narzedzia): Promise<OdpowiedzSzkicu> => {
+  /* Obcy tekst pod numerem instrukcji z kodu zmieszałby w księdze dwie
+     instrukcje pod jedną wersją, a pomiar dzieli wyniki właśnie po niej. */
+  if (wariant.instrukcja !== undefined && !wariant.wersja) {
+    throw new Error("Własna instrukcja szkicu wymaga własnej etykiety wersji");
+  }
+  const wersja = wariant.wersja ?? PROMPT_SZKICU;
   const start = Date.now();
   const tekst = `FAKTY:\n${String(fakty)}\n\nROZMOWA:\n${String(watek)}`;
   const r = await rozmowaZNarzedziami({
-    system: INSTRUKCJA_SZKICU,
+    model: wariant.model,
+    system: wariant.instrukcja ?? INSTRUKCJA_SZKICU,
     format: zodOutputFormat(Szkic),
     narzedzia,
     sufitRund: SUFIT_RUND_SZKICU,
@@ -590,7 +610,7 @@ export const nadawcaSzkicuAnthropic: NadawcaSzkicu =
        Warunek `wspieraWysilek` siedzi w pętli. */
     wysilek: "medium",
     coNieOddal: "szkicu",
-    wersja: PROMPT_SZKICU,
+    wersja,
     numerujWyniki: true,
     /* ── OBRAZY PRZED TEKSTEM ───────────────────────────────────────────────
        Ten sam kształt, co przy karcie reklamacyjnej, i z tego
@@ -627,9 +647,12 @@ export const nadawcaSzkicuAnthropic: NadawcaSzkicu =
     narzedzia: r.uzyte,
     wynikiNarzedzi: r.wyniki,
     rund: r.rund,
-    wersjaInstrukcji: PROMPT_SZKICU,
+    wersjaInstrukcji: wersja,
   };
 };
+
+/** Realny nadawca szkicu. Wstrzykuje go TRASA, jak nadawcę klasyfikacji. */
+export const nadawcaSzkicuAnthropic: NadawcaSzkicu = nadawcaSzkicuZ();
 
 /* ── Dopytanie Copilota ──────────────────────────────────────────────────────
    Jedno wywołanie, dwa teksty. `odpowiedz` jest dla AGENTA, nie dla klienta,
@@ -831,8 +854,10 @@ async function rozmowaZNarzedziami<T>(o: {
   numerujWyniki: boolean;
   /** Wersja instrukcji `system`. Wraca też z błędem, bo porażkę księga liczy pod tą samą wersją. */
   wersja: string;
+  /** Model inny niż w konfiguracji. Podaje go wyłącznie zestaw testowy. */
+  model?: string;
 }): Promise<WynikRozmowy<T>> {
-  const model = config.copilot.model;
+  const model = o.model ?? config.copilot.model;
   const zuzycie: Tokeny = { wej: 0, wyj: 0, cacheZapis: 0, cacheOdczyt: 0 };
   const uzyte: UzycieNarzedzia[] = [];
   const wyniki: WynikWywolania[] = [];

@@ -126,6 +126,7 @@ export const NAZWA_ZDARZENIA: Record<string, string> = {
   zwrot_pozycja_dopisana: "Pozycja zwrotu dopisana",
   zwrot_pozycja_zdjeta: "Pozycja zwrotu zdjęta",
   zwrot_ilosc_zwrocona: "Ilość zwrócona zmieniona",
+  zwrot_pomylony_towar: "Pomylony towar w zwrocie",
   zwrot_kartoteka: "Kartoteka zwrotu wskazana",
   zwrot_kartoteka_zdjeta: "Kartoteka zwrotu zdjęta",
   zwrot_ocena: "Ocena stanu zwrotu",
@@ -263,6 +264,7 @@ export const NAZWA_ZDARZENIA: Record<string, string> = {
   /* Copilot */
   copilot_pytanie: "Pytanie do Copilota",
   copilot_wejscie_retencja: "Stare wejścia Copilota skasowane",
+  copilot_zestaw: "Zestaw testowy Copilota puszczony",
   copilot_szkic: "Szkic Copilota",
   copilot_szkic_ocena: "Szkic Copilota oceniony",
   copilot_szkic_po_rozpoznaniu: "Szkic Copilota po rozpoznaniu",
