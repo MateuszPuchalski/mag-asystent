@@ -1,6 +1,8 @@
 import React from "react";
+import { Package, Search } from "lucide-react";
 import type { Pominieta, WierszKosza, ZnalezionaWKoszu } from "../api/kosze";
-import { Pusto, WierszKolejki, czas, dniSlowo, ile } from "../ui";
+import { WierszKolejki, czas, dniSlowo, ile } from "../ui";
+import { PustaKolejka } from "../ui/KolumnaKolejki";
 import { CyklKosza, StanMmKosza } from "./Cykl";
 
 /* ── Kolejka koszy ─────────────────────────────────────────────────────────
@@ -92,7 +94,7 @@ export function KolejkaKoszy({ kosze, wybrany, onWybierz, pokazBladMm = false }:
   /** W kubełku PROBLEM Z MM treść odmowy zastępuje zdanie o postępie. */
   pokazBladMm?: boolean;
 }) {
-  if (!kosze.length) return <Pusto waga="lista">Ten kubełek jest pusty.</Pusto>;
+  if (!kosze.length) return <PustaKolejka ikona={Package}>Ten kubełek jest pusty.</PustaKolejka>;
   return <ul className="divide-y divide-slate-200">
     {kosze.map((k) => {
       const karton = k.rodzaj === "karton";
@@ -114,7 +116,11 @@ export function KolejkaKoszy({ kosze, wybrany, onWybierz, pokazBladMm = false }:
         <span className="mt-1 flex w-full flex-wrap items-center gap-1.5">
           {karton && <span className="rounded bg-slate-200 px-1.5 py-0.5 text-xs font-bold text-slate-700">karton</span>}
           <CyklKosza status={k.status} mmBlad={k.mmStan === "blad" && !k.mmNumer && !karton} />
-          <StanMmKosza mmStan={k.mmStan} mmNumer={k.mmNumer} brakujeKorekt={k.brakujeKorekt} karton={karton} />
+          {/* MM w błędzie mówi znacznik kłopotu niżej, z liczbą prób i treścią
+              odmowy w podpowiedzi. Dwie czerwone plakietki o tym samym
+              wyglądałyby jak dwa różne kłopoty. */}
+          {!(k.mmStan === "blad" && k.problemMm) &&
+            <StanMmKosza mmStan={k.mmStan} mmNumer={k.mmNumer} brakujeKorekt={k.brakujeKorekt} karton={karton} />}
           {/* ZNACZNIK KŁOPOTU Z MM w każdym kubełku. Czerwony, gdy
               zadanie stoi w błędzie teraz; bursztynowy, gdy przeszło po
               odmowie — wtedy dokument jest, ale stany trzeba sprawdzić. */}
@@ -149,7 +155,7 @@ export function KolejkaKoszy({ kosze, wybrany, onWybierz, pokazBladMm = false }:
 export function KolejkaPominietych({ lista, wybranyKosz, onWybierz }: {
   lista: Pominieta[]; wybranyKosz: number | null; onWybierz: (koszId: number) => void;
 }) {
-  if (!lista.length) return <Pusto waga="lista">Hala niczego nie pominęła — nic tu nie czeka.</Pusto>;
+  if (!lista.length) return <PustaKolejka ikona={Package}>Hala niczego nie pominęła — nic tu nie czeka.</PustaKolejka>;
   return <ul className="divide-y divide-slate-200">
     {lista.map((p) => <WierszKolejki key={p.pozycjaId} aktywny={p.koszId === wybranyKosz}
       onKlik={() => onWybierz(p.koszId)}>
@@ -168,12 +174,16 @@ export function KolejkaPominietych({ lista, wybranyKosz, onWybierz }: {
 }
 
 /** „W którym koszu jechał ten towar?" — wynik szukania zamiast kolejki. */
-export function WynikiSzukania({ lista, onWybierz }: {
-  lista: ZnalezionaWKoszu[]; onWybierz: (koszId: number) => void;
+export function WynikiSzukania({ lista, wybranyKosz, onWybierz }: {
+  lista: ZnalezionaWKoszu[]; wybranyKosz: number | null; onWybierz: (koszId: number) => void;
 }) {
-  if (!lista.length) return <Pusto waga="lista">Nic w koszach nie pasuje do tego, czego szukasz.</Pusto>;
+  if (!lista.length) return <PustaKolejka ikona={Search}>Nic w koszach nie pasuje do tego, czego szukasz.</PustaKolejka>;
   return <ul className="divide-y divide-slate-200">
-    {lista.map((z, i) => <WierszKolejki key={`${z.koszId}-${i}`} aktywny={false} onKlik={() => onWybierz(z.koszId)}>
+    {/* Wiersz to pozycja, a otwiera się kosz: podświetlone są wszystkie
+        wiersze otwartego kosza, jak w pominiętych. Bez tego nie widać, gdzie
+        stoi kursor klawiatury. */}
+    {lista.map((z, i) => <WierszKolejki key={`${z.koszId}-${i}`} aktywny={z.koszId === wybranyKosz}
+      onKlik={() => onWybierz(z.koszId)}>
       <span className="flex w-full items-baseline gap-2">
         <span className="truncate font-bold">{z.symbol || z.nazwa}</span>
         <span className="ml-auto shrink-0 text-xs text-slate-600">{z.kiedy ? czas(z.kiedy) : "—"}</span>

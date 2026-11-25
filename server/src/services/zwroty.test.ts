@@ -9,7 +9,7 @@ import {
   pozycjeNaOutlet, przeniesionoNaOutlet,
   zapiszPotracenie, zarejestrujNieodebrana,
   rozstrzygnijZwrot, sumaPozycji, sygnalyZwrotu, terminZwrotu, zapiszKorekte, zapiszKwote,
-  cofnijKorekte, cofnijKwote, cofnijWerdykt, kwotaRozjechana, zapiszIloscZwrocona,
+  cofnijKorekte, cofnijKwote, cofnijWerdykt, kwotaRozjechana, zapiszIloscZwrocona, zapiszPomylonyTowar, zwrotyZInnymTowarem,
   znajdzZwrotPoKodzie,
   dopiszPozycje, doDopisania, usunDopisanaPozycje,
   osZwrotu, zapiszNotatkeZwrotu, cofnijNotatkeZwrotu, ZwrotConflict,
@@ -821,6 +821,46 @@ test("więcej niż zgłoszono ODPADA — nadmiar z kartonu to inna pozycja", () 
   assert.equal((d.prepare("SELECT ilosc_zwrocona FROM zwrot_klienta_pozycja WHERE id=?")
     .get(poz[0]) as { ilosc_zwrocona: number | null }).ilosc_zwrocona, null,
     "odmowa niczego nie zapisuje");
+});
+
+test("pomylony towar: flaga i opis wracają na liście, cofnięcie czyści oba", () => {
+  const d = stanowisko();
+  const KTO = biuro(d);
+  const { id, poz } = zwrotDoDecyzji(d);
+  /* Przed przyjęciem karton jest nieotwarty, więc nie ma czego zaznaczać. */
+  assert.throws(() => zapiszPomylonyTowar(d, poz[0], true, "", 1, KTO), /przyjmij/);
+  rozstrzygnijZwrot(d, id, "przyjety", null, 1, KTO);
+
+  const w = zapiszPomylonyTowar(d, poz[0], true, "  inny kolor  ", 2, KTO);
+  assert.equal(w.pomylonyOpis, "inny kolor");
+  const p = listaZwrotow(d).find((x) => x.id === id)!.pozycje.find((x) => x.id === poz[0])!;
+  assert.equal(p.pomylonyTowar, true);
+  assert.equal(p.pomylonyOpis, "inny kolor");
+  assert.equal(listaZwrotow(d).find((x) => x.id === id)!.pozycje.find((x) => x.id === poz[1])!
+    .pomylonyTowar, false, "druga pozycja nietknięta");
+
+  zapiszPomylonyTowar(d, poz[0], false, "zostanie zignorowany", 3, KTO);
+  const po = listaZwrotow(d).find((x) => x.id === id)!.pozycje.find((x) => x.id === poz[0])!;
+  assert.equal(po.pomylonyTowar, false);
+  assert.equal(po.pomylonyOpis, null, "cofnięcie zabiera też opis");
+});
+
+test("alarm: zwrot z powodem „inny towar” trafia na listę, dopóki jest w pracy", () => {
+  const d = stanowisko();
+  const KTO = biuro(d);
+  const { id, poz } = zwrotDoDecyzji(d);
+  assert.deepEqual(zwrotyZInnymTowarem(d), [], "zwykły powód nie alarmuje");
+
+  d.prepare("UPDATE zwrot_klienta_pozycja SET powod='DIFFERENT', powod_komentarz=' dostałem kosę ' WHERE id=?")
+    .run(poz[0]);
+  const l = zwrotyZInnymTowarem(d);
+  assert.equal(l.length, 1);
+  assert.equal(l[0].id, id);
+  assert.equal(l[0].komentarz, "dostałem kosę");
+  assert.equal(l[0].pozycje.length, 1);
+
+  rozstrzygnijZwrot(d, id, "odrzucony", "test", 1, KTO);
+  assert.deepEqual(zwrotyZInnymTowarem(d), [], "odrzucony zwrot już nie alarmuje");
 });
 
 /* ── Drogi, które prowadziły donikąd ────────────────────────────────────────

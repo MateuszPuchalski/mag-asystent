@@ -478,3 +478,36 @@ export function zestawNarzedzi(
     },
   };
 }
+
+/**
+ * Zestaw dla powtórki zapisanej sprawy. Pytanie, które model zadał już przy
+ * szkicu pierwotnym, dostaje zapisaną odpowiedź, a nowe idzie do `naZywo`.
+ * Powód: kartoteka i oferty zmieniły się od tamtej chwili, a porównanie
+ * szkiców ma różnić się instrukcją albo modelem, nie stanem magazynu.
+ *
+ * Zapisana treść nosi typ wyniku, bo powstała w tym pliku i wróciła z bazy
+ * bez zmian. Bez `naZywo` nowe pytanie kończy się błędem narzędzia, nie
+ * zmyśloną odpowiedzią.
+ */
+export function narzedziaZZapisu(
+  zapis: readonly WynikWywolania[], naZywo: ZestawNarzedzi | null,
+  licz?: (skad: "zapis" | "zywo" | "brak") => void,
+): ZestawNarzedzi {
+  return {
+    definicje: naZywo?.definicje ?? DEFINICJE,
+    async wykonaj(nazwa, wejscie) {
+      const q = String((wejscie as { zapytanie?: unknown } | null)?.zapytanie ?? "").trim().slice(0, 120);
+      const znany = zapis.find((w) => w.nazwa === nazwa && zwin(w.argument) === zwin(q));
+      if (znany && zwin(q)) {
+        licz?.("zapis");
+        return { wynik: znany.tresc as WynikNarzedzia, blad: false };
+      }
+      if (naZywo) {
+        licz?.("zywo");
+        return naZywo.wykonaj(nazwa, wejscie);
+      }
+      licz?.("brak");
+      return { wynik: "Zapis sprawy nie ma wyniku dla tego zapytania." as WynikNarzedzia, blad: true };
+    },
+  };
+}

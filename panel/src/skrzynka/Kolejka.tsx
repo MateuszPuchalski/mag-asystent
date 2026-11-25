@@ -264,7 +264,7 @@ export function Kolejka({ rozmowy, stan, copilot, klasyfikacja, onRozpoznaj = ()
     return () => window.removeEventListener("keydown", f);
   }, []);
 
-  /* ── JEDNA KOLUMNA LISTY, ta sama co w zwrotach, reklamacjach i dostawach ──
+  /* ── JEDNA KOLUMNA LISTY, ta sama co w pozostałych kolejkach ─────────
      Układ pasm stoi w `ui/KolumnaKolejki.tsx`. Tu zostaje to, co należy do
      skrzynki: data synchronizacji obok tytułu, pomoc, powiadomienia, znak
      Copilota i odświeżenie.
@@ -319,8 +319,8 @@ export function Kolejka({ rozmowy, stan, copilot, klasyfikacja, onRozpoznaj = ()
     /* ── TRZY KUBEŁKI NA WIERZCHU, RESZTA POD „WIĘCEJ" ────────────────────
        Zgłoszenie agenta: „przytłacza". Robota dzieje się w trzech kubełkach;
        „Oczekujące", „Zakończone" i „Wszystkie" to przeglądanie, a cyfry 4–6
-       je wybierają. Tryb zwarty trzyma „Więcej" w rzędzie pigułek. */
-    kubelki={<FiltrZWiecej<Kubelek> zwarty wybrany={kubelek} onWybierz={setKubelek} wiecej={POD_WIECEJ}
+       je wybierają. „Więcej" mierzy się treścią, więc stoi w rzędzie pigułek. */
+    kubelki={<FiltrZWiecej<Kubelek> wybrany={kubelek} onWybierz={setKubelek} wiecej={POD_WIECEJ}
       pozycje={KUBELKI.map((k) => ({ klucz: k.klucz, etykieta: k.etykieta,
         ile: bladBezDanych ? undefined : rozmowy.filter((r) => wKubelku(r, k.klucz, mojeId)).length }))} />}
     /* Pole stoi pod kubełkami: kubełek wybiera się raz na wejście, a szuka się

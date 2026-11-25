@@ -767,9 +767,13 @@ export interface PomiarCopilota {
 
 /** Pomiar do ekranu ustawień. Czysty odczyt — nie zapisuje niczego. */
 export function pomiarCopilota(database: DatabaseSync = defaultDb()): PomiarCopilota {
+  /* Liczba wywołań i błędów bez powtórek zestawu testowego: szkic kandydata
+     odrzucony sitem nie jest błędem Copilota biura. Tokeny liczą się
+     wszystkie, bo powtórka kosztuje prawdziwe pieniądze. Zestaw ma własny
+     wiersz w tabeli zadań. */
   const w = database.prepare(`SELECT
-      COUNT(*) AS wywolan,
-      SUM(CASE WHEN wynik='blad' THEN 1 ELSE 0 END) AS bledow,
+      SUM(CASE WHEN zrodlo IS NOT 'eval' THEN 1 ELSE 0 END) AS wywolan,
+      SUM(CASE WHEN wynik='blad' AND zrodlo IS NOT 'eval' THEN 1 ELSE 0 END) AS bledow,
       COALESCE(SUM(tokeny_wej),0) AS wej, COALESCE(SUM(tokeny_wyj),0) AS wyj,
       COALESCE(SUM(tokeny_cache_zapis),0) AS cacheZapis,
       COALESCE(SUM(tokeny_cache_odczyt),0) AS cacheOdczyt
@@ -849,7 +853,7 @@ export function pomiarCopilota(database: DatabaseSync = defaultDb()): PomiarCopi
 
   const wejscieRazem = tokeny.wej + tokeny.cacheOdczyt;
   return {
-    wywolan: Number(w.wywolan), bledow: Number(w.bledow ?? 0),
+    wywolan: Number(w.wywolan ?? 0), bledow: Number(w.bledow ?? 0),
     tokeny, kosztUsd: Number(usd.toFixed(6)),
     udzialCache: wejscieRazem > 0
       ? Number((tokeny.cacheOdczyt / wejscieRazem).toFixed(2)) : null,

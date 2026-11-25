@@ -10,6 +10,75 @@ z wersją monorepo" — i właśnie tak przestał być zgodny: `0.3.0` przetrwa�
 sześć zmergowanych zmian, w tym takie, które wymagały nowego uprawnienia SQL.
 Komentarz nie jest mechanizmem.
 
+## 0.627.1 — 25 listopada 2026
+
+Polecenie `npm run copilot:zestaw` w `server/` puszcza zapisane wejścia
+szkiców jeszcze raz, innym modelem (`--model`) albo inną instrukcją
+(`--instrukcja plik.txt`). Wynik przechodzi przez te same sita co szkic biura.
+Raport pokazuje, które sprawy nowy wariant naprawił, a które zepsuł, koszt
+i czas obu stron oraz bliskość szkicu do odpowiedzi, którą agent wysłał.
+Bez `--pusc` polecenie tylko wycenia przebieg i nie woła modelu. Opcja
+`--pary plik.md` zapisuje oba szkice obok siebie do przeczytania.
+
+Powtórka stoi w pomiarze Copilota jako osobne zadanie „zestaw testowy
+szkiców” i nie liczy się do sufitu szkiców z automatu. Liczba wywołań
+i błędów na karcie pomiaru oraz w raporcie tygodnia pomija powtórki, a koszt
+je obejmuje. Sprawy ze zdjęciami
+są pomijane, a narzędzie ofert nie pyta Allegro. Zasady danych:
+`docs/obsluga-klienta.md`, rozdział o Copilocie.
+
+## 0.627.0 — 25 listopada 2026
+
+**Pomylony towar w zwrocie.** Gdy w kartonie leży co innego, niż klient
+kupił, przy pozycji klikasz „to nie ten towar" i dopisujesz, co przyjechało.
+Pozycja dostaje czerwoną ramkę, a ocena „na stan" pod zamówioną kartoteką
+dostaje ostrzeżenie. Znacznik nie zmienia kwoty ani koszyka. Zaznaczenie
+da się cofnąć.
+
+**Alarm, gdy klient wskaże „inny towar".** Gdy w zwrocie klient wybierze
+powód „inny towar", na każdym ekranie panelu staje czerwony pas z numerem
+zwrotu, nazwą pozycji i słowami klienta. Panel gra krótki sygnał, a gdy karta
+jest w tle, pokazuje powiadomienie Windows. Pas znika na tym komputerze po
+otwarciu zwrotu.
+
+## 0.626.0 — 23 listopada 2026
+
+**Kosze: pominięte pozycje stoją na górze kosza.** „Załatwione” klika się przy
+pozycji, której dotyczy, a pole notatki ma całą szerokość. Wcześniej stało
+w wąskiej kolumnie obok, a na małym oknie pod całą tabelą. Załatwiona pozycja
+mówi, kto, kiedy i jak ją załatwił.
+
+**Zawartość kosza czyta się w jednej linii.** Adres i stan pozycji stoją
+w jednej kolumnie, więc nazwa towaru nie łamie się na trzy linie.
+
+**Po koszach chodzi się klawiaturą.** `j` i `k` albo strzałki przechodzą po
+liście, cyfry zmieniają kubełek, jak w zwrotach i dostawach.
+
+**„Zdejmij z MM” jest przyciskiem pod towarem, który blokuje dokument.**
+Wcześniej był dopiskiem na końcu zdania, pod innym słowem niż potwierdzenie.
+
+Wiersz listy pokazuje „MM w błędzie” raz, a nie dwiema plakietkami. Kubełek
+„Pominięte” i szukanie w koszach mówią o błędzie, gdy ich zapytanie padnie,
+zamiast „hala niczego nie pominęła” i „nic nie pasuje”. Kolumna zdjęć stoi
+tylko w instalacji, która ma zdjęcia kartotek.
+
+## 0.625.3 — 23 listopada 2026
+
+Lista koszy stoi w tej samej kolumnie co skrzynka, zwroty, reklamacje i dostawy.
+Szukanie dostało lupę i krzyżyk, a pusty kubełek ikonę kosza. Pasma kolumny mają
+te same odstępy co w dostawach. Lista „Więcej" przy kubełkach koszy ma szerokość
+swojej nazwy, jak w pozostałych kolejkach. Podpowiedź w polu szukania wylicza
+same klucze, więc mieści się w kolumnie w całości. Błąd odświeżenia koszy stoi
+nad listą, a nie pod nią.
+
+Krzyżyk czyszczący szukanie ma 24 px boku w każdej kolejce. Mniejszy nie
+spełniał najmniejszego celu wskaźnika z WCAG 2.2.
+
+Filtr kubełków z listą „Więcej" ma już jeden kształt. Tryb rozciągnięty na
+resztę rzędu wyszedł z kodu, bo kosze były jego ostatnim ekranem. Klasy kart
+pracy i dowodów niosą swój układ kolumny, więc ekrany nie powtarzają go przy
+każdej karcie.
+
 ## 0.625.2 — 23 listopada 2026
 
 Uproszczenia kodu panelu po porządku w ekranach biura. Z filtru kubełków

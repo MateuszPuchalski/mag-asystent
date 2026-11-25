@@ -44,7 +44,7 @@ export function Kubelki({ wybrany, liczniki, wszystkich, onWybierz }: {
     };
   });
   return <div role="group" aria-label="Kubełki kolejki" className="flex flex-wrap items-center gap-1">
-    <FiltrZWiecej<KubelekReklamacji | null> zwarty wybrany={wybrany} pozycje={pozycje} wiecej={POD_WIECEJ}
+    <FiltrZWiecej<KubelekReklamacji | null> wybrany={wybrany} pozycje={pozycje} wiecej={POD_WIECEJ}
       onWybierz={onWybierz} />
   </div>;
 }

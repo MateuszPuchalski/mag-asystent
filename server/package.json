@@ -1,7 +1,7 @@
 {
   "name": "@wertis/server",
   "private": true,
-  "version": "0.625.2",
+  "version": "0.627.1",
   "type": "module",
   "description": "WERTIS — serwer API + worker Sfery (Fastify, SQLite).",
   "main": "dist/index.js",
@@ -24,6 +24,7 @@
     "sellasist:sonda": "tsx src/sellasist-sonda-run.ts",
     "sonda:zalacznik": "tsx src/sonda-zalacznik-run.ts",
     "sonda:jev": "tsx src/jev-sonda-run.ts",
+    "copilot:zestaw": "tsx src/copilot-zestaw-run.ts",
     "inwentarz": "tsx src/inwentarz-run.ts",
     "identyfikatory:pomiar": "tsx src/identyfikatory-pomiar-run.ts",
     "zwroty:reset": "tsx src/zwroty-reset-run.ts",

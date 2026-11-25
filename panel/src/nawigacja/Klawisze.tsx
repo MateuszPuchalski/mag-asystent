@@ -34,9 +34,9 @@ export const SKROTY: ReadonlyArray<SekcjaSkrotow> = [
     ["?", "ta lista"],
     ["Esc", "zamknij okno"],
   ] },
-  /* Kosze nie mają klawiatury, więc tytuł wylicza kolejki, w których te
-     klawisze działają. */
-  { tytul: "Skrzynka, zwroty, reklamacje, dostawy", sciezka: null, klawisze: [
+  /* Tytuł wylicza kolejki, w których te klawisze działają. Pomyłki i zadania
+     ich nie mają, więc „każda kolejka" obiecywałaby za dużo. */
+  { tytul: "Skrzynka, zwroty, kosze, reklamacje, dostawy", sciezka: null, klawisze: [
     ["j k", "następna / poprzednia sprawa"],
     ["1–9", "kubełek"],
   ] },

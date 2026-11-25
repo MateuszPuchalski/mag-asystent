@@ -11,7 +11,7 @@ import { Pozycje } from "../zwroty/Pozycje";
 import { DolozTowar } from "../zwroty/DolozTowar";
 import {
   useCofnijKorekte, useCofnijKwote, useCofnijWerdykt, useDopiszPozycje,
-  useIloscZwrocona, useFaktura, useKorekta, useKwota,
+  useIloscZwrocona, usePomylonyTowar, useFaktura, useKorekta, useKwota,
   usePaczkiKlienta, useZamowieniaZAllegro, usePrzyjmijNieodebrana, wygladaNaLogin, useOcena, usePotracenie, useWerdykt, useZdejmijPozycje,
   useZglosRabat, useZwrot, useZwrocPieniadze, useOdmowPlatnosci, useSledzDosylkeZwrotu, useSprawdzPlatnosci,
   useZapiszPrzelew, useCofnijPrzelew, useZamknijRecznie, useOtworzPonownie,
@@ -402,14 +402,15 @@ export function Zwroty() {
   const bladPieniedzyDla = (zwrotId: number, przedrostek = "") => (e: unknown) =>
     setBladPieniedzy({ zwrotId, tekst: `${przedrostek}${(e as Error).message}` });
   const [bladFaktury, setBladFaktury] = useState("");
+  const pomylony = usePomylonyTowar();
   const trwa = werdykt.isPending || ocena2.isPending || kwota.isPending
     || korekta.isPending || cofnijKorekte.isPending || cofnijKwote.isPending
-    || cofnijWerdykt.isPending || ilosc.isPending
+    || cofnijWerdykt.isPending || ilosc.isPending || pomylony.isPending
     || potracenie.isPending;
   /* Konflikt wersji ma brzmieć jak zdanie, nie jak kod. Serwer przysyła je
      gotowe przy 409 — panel go nie układa od nowa. */
   const bledy = [werdykt.error, ocena2.error, kwota.error, korekta.error, cofnijKorekte.error,
-    cofnijKwote.error, cofnijWerdykt.error, ilosc.error,
+    cofnijKwote.error, cofnijWerdykt.error, ilosc.error, pomylony.error,
     potracenie.error];
   const bladDecyzji = bledy.find(Boolean) instanceof Error
     ? String((bledy.find(Boolean) as Error).message) : "";
@@ -1004,7 +1005,7 @@ export function Zwroty() {
     <div className={SIATKA_TRZECH_KOLUMN}>
     {/* ── KOLUMNA LISTY Z JEDNEJ FORMY ────────────────────────────────────
         Układ pasm stoi w `ui/KolumnaKolejki.tsx`, tak samo jak w skrzynce,
-        reklamacjach i dostawach. Zwroty oddają liście wysokość, którą zajmowało
+        koszach, reklamacjach i dostawach. Zwroty oddają liście wysokość, którą zajmowało
         siedem kafli: na wierzchu stoją cztery kubełki pracy biura, a odrzucone,
         zamknięte i wszystkie — pod „Więcej”. Klawisze 1–7 zostają bez zmian.
 
@@ -1049,7 +1050,7 @@ export function Zwroty() {
          osobnym przyciskiem: to ten sam wybór, tylko bez zawężenia. Numer
          klawisza liczy się z długości listy, więc dopisanie kubełka nie
          zostawia w podpowiedzi nieaktualnej cyfry. */
-      kubelki={<FiltrZWiecej<Kubelek | null> zwarty wybrany={kubelek} onWybierz={przelacz}
+      kubelki={<FiltrZWiecej<Kubelek | null> wybrany={kubelek} onWybierz={przelacz}
         wiecej={POD_WIECEJ}
         pozycje={[
           ...KUBELKI.map((k, i) => ({ klucz: k.id, etykieta: k.etykieta,
@@ -1178,7 +1179,7 @@ export function Zwroty() {
 
     {/* Praca i dowody w jednym pojemniku poniżej `xl` — powód przy `SrodekIDowody`. */}
     <SrodekIDowody>
-    <Karta className={`flex min-h-0 flex-col overflow-hidden ${KARTA_PRACY}`}>
+    <Karta className={KARTA_PRACY}>
       {/* Bez kolejki nie ma czego wybrać, więc środek milczy. */}
       {!zwrot
         ? bezDanych ? null : <Pusto ikona={Undo2}>
@@ -1346,6 +1347,8 @@ export function Zwroty() {
                   potracenie.mutate({ pozycjaId, grosze, powod, wersja: zwrot.wersja })}
                 onIlosc={(pozycjaId, ile) =>
                   ilosc.mutate({ pozycjaId, ilosc: ile, wersja: zwrot.wersja })}
+                onPomylony={(pozycjaId, tak, opis) =>
+                  pomylony.mutate({ pozycjaId, pomylony: tak, opis, wersja: zwrot.wersja })}
                 onZglosRabat={(pozycjaId) => {
                   setBladRabatu("");
                   rabat.mutate({ pozycjaId },
@@ -1385,7 +1388,7 @@ export function Zwroty() {
 
     {/* Cała ta kolumna jest do czytania, więc cała jedzie do scrollera —
         `Dowody` nie muszą o tym wiedzieć. */}
-    <Karta className={`flex min-h-0 flex-col overflow-hidden ${KARTA_DOWODOW}`}>
+    <Karta className={KARTA_DOWODOW}>
       <div className="min-h-0 flex-1 overflow-y-auto">
       {zwrot
         ? <Dowody zwrot={zwrot} os={szczegol.data?.os ?? []}
