@@ -61,7 +61,7 @@ function granice(o: Okres): { od: string; do: string } | null {
 
 /** Czy któryś z rzadkich filtrów odbiega od domyślnego — wtedy zostają na widoku. */
 const dodatkoweUstawione = (f: FiltrDziennika) =>
-  f.twId !== FILTR_PUSTY.twId || f.device !== FILTR_PUSTY.device || f.limit !== FILTR_PUSTY.limit;
+  f.towar !== FILTR_PUSTY.towar || f.device !== FILTR_PUSTY.device || f.limit !== FILTR_PUSTY.limit;
 
 export function Dziennik() {
   const [szkic, setSzkic] = useState<FiltrDziennika>(FILTR_PUSTY);
@@ -118,11 +118,11 @@ export function Dziennik() {
           <option value="">wszystkie</option>
           {(agenci.data?.users ?? []).map((u) => <option key={u.userId} value={String(u.userId)}>{u.name}</option>)}
         </select></Etykieta>
-      {/* „Towar", nie „Towar (tw_id)": agent nie zna nazwy kolumny w bazie,
-          a numer kartoteki widzi w kolumnie „Towar" tej samej tabeli. */}
+      {/* Jedno pole na symbol i numer: człowiek nie wybiera, czym szuka.
+          Symbol zna z kartoteki, numer widzi w kolumnie „Towar" tej tabeli. */}
       {widacWiecej && <>
         <Etykieta napis="Towar">
-          <Pole className="w-28" inputMode="numeric" value={szkic.twId} onChange={(e) => zmien("twId", e.target.value)} /></Etykieta>
+          <Pole className="w-44" placeholder="symbol lub numer" value={szkic.towar} onChange={(e) => zmien("towar", e.target.value)} /></Etykieta>
         <Etykieta napis="Urządzenie">
           <Pole className="w-36" value={szkic.device} onChange={(e) => zmien("device", e.target.value)} /></Etykieta>
         <Etykieta napis="Wierszy">

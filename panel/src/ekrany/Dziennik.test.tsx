@@ -120,6 +120,17 @@ describe("Dziennik w panelu", () => {
     expect(zapisy).toEqual([]);
   });
 
+  it("towar wpisany symbolem idzie tak samo do tabeli i do CSV", async () => {
+    pokaz();
+    await screen.findByText("Zapis do Subiekta nie wszedł", { selector: "td span" });
+    await userEvent.click(screen.getByRole("button", { name: "Więcej filtrów" }));
+    await userEvent.type(screen.getByLabelText("Towar"), "W32-0203");
+    await waitFor(() => expect(zapytaniaDziennika().some((a) => a.includes("towar=W32-0203"))).toBe(true));
+    await userEvent.click(screen.getByRole("button", { name: /CSV/ }));
+    await waitFor(() => expect(adresy.some((a) => a.startsWith("/api/events/csv?") && a.includes("towar=W32-0203"))).toBe(true));
+    expect(zapisy).toEqual([]);
+  });
+
   it("towar, urządzenie i liczba wierszy czekają pod „Więcej filtrów” — ustawione się nie chowają", async () => {
     pokaz();
     await screen.findByText("Zapis do Subiekta nie wszedł", { selector: "td span" });
