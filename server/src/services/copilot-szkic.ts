@@ -17,7 +17,7 @@ import { zapewnijSnapshotOferty } from "./allegro-oferty-sync.js";
 import { buildProductCard } from "./stock.js";
 import { podzielStopke } from "./stopka.js";
 import { LIMIT_ZNAKOW } from "./wysylka.js";
-import { bezPodpisu, zwin } from "../tekst.js";
+import { bezPodpisu, ciagiNumerow, zwin } from "../tekst.js";
 import { TAKSONOMIA_WERSJA } from "./klasyfikacja-slownik.js";
 import { wzorzecOdpowiedzi } from "./wzorce-odpowiedzi.js";
 import { numerZamowieniaRozmowy } from "./zamowienia-kandydaci.js";
@@ -398,18 +398,14 @@ export function bezZnacznikow(tresc: string): string {
     .replace(/ +([.,;:!?])/g, "$1");
 }
 
-/* Kształt numeru części: litery i cyfry z myślnikiem albo ukośnikiem, co
-   najmniej cztery znaki, co najmniej jedna cyfra. Łapie `W09-0211`, `GX160`,
-   `17211-ZL8-023`, `5901234567890`; nie łapie „148 mm" ani słów bez cyfr. */
-const NUMER = /\b[A-Z0-9][A-Z0-9\-\/]{3,}\b/gi;
-
-/** Numery ze szkicu, których NIE MA ani w faktach, ani w rozmowie. */
+/** Numery ze szkicu, których NIE MA ani w faktach, ani w rozmowie.
+ *  Kształt numeru rozstrzyga `ciagiNumerow` z `tekst.ts`, wspólnie z pomiarem
+ *  parsera identyfikatorów. */
 export function numerySpozaFaktow(tresc: string, dozwolone: string): string[] {
   const korpus = dozwolone.toUpperCase();
   const obce = new Set<string>();
-  for (const m of tresc.match(NUMER) ?? []) {
-    if (!/\d/.test(m)) continue;
-    if (!korpus.includes(m.toUpperCase())) obce.add(m);
+  for (const { numer } of ciagiNumerow(tresc)) {
+    if (!korpus.includes(numer.toUpperCase())) obce.add(numer);
   }
   return [...obce];
 }

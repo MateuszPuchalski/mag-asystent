@@ -2,6 +2,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { DatabaseSync } from "node:sqlite";
 import {
+  ciagiNumerow,
   LITERY,
   naLike,
   odkodujEncje,
@@ -252,4 +253,19 @@ test("bezPodpisu wycina autora po dacie w trzech kształtach podpisu", () => {
     "Do X pasuje Y — źródło: rozmowa, 12.09.2026.");
   assert.equal(bezPodpisu("pomiar własny, 1.09.2026, Anna"), "pomiar własny, 1.09.2026");
   assert.equal(bezPodpisu("bez daty, Anna"), "bez daty, Anna", "bez daty nie ma czego wycinać");
+});
+
+// ── Kształt numeru części ───────────────────────────────────────────────────
+
+test("kształt numeru części: co najmniej cztery znaki i cyfra, z miejscem w tekście", () => {
+  /* Jedna reguła dla kontroli szkicu i dla pomiaru parsera identyfikatorów.
+     Gdyby zaczęła łapać „148 mm" albo słowa bez cyfr, kontrola odrzucałaby
+     dobre szkice, a pomiar liczyłby prozę jako zgubione numery. */
+  assert.deepEqual(
+    ciagiNumerow("Pasuje 17211-ZL8-023 i GX160, pomiar 148 mm, uszczelka głowicy").map((c) => c.numer),
+    ["17211-ZL8-023", "GX160"]);
+  assert.deepEqual(ciagiNumerow("OEM: 41307131600 // 81001145/0"), [
+    { numer: "41307131600", indeks: 5 }, { numer: "81001145/0", indeks: 20 }]);
+  /* Spacja i kropka do kształtu nie należą — pomiar wypisuje to jako granicę. */
+  assert.deepEqual(ciagiNumerow("532 16 56-30 i 110.004.065").map((c) => c.numer), ["56-30"]);
 });

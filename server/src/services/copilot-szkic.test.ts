@@ -712,7 +712,7 @@ test("rozmowa bez zdjęć nie wychodzi po bajty i dostaje pusty spis", async () 
   assert.ok(!s.widziane.fakty.includes("ZDJĘCIA"), "zdanie o niczym kosztuje tokeny");
 });
 
-/* Numer z tabliczki, który NAPRAWDĘ wpada w odsiew. `NUMER` wymaga czterech
+/* Numer z tabliczki, który NAPRAWDĘ wpada w odsiew. `ciagiNumerow` wymaga czterech
    znaków i cyfry, więc „PBRM", „39" i „E4" mu się wymykają — sprawdzenie na
    nich byłoby testem, który przechodzi także bez poprawki. IAN ma sześć cyfr
    i jest dokładnie tym, o co tu chodzi: numerem, po którym szuka się części. */

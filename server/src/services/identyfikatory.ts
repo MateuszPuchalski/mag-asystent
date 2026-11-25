@@ -32,7 +32,10 @@ const ETYKIETY: Array<{ rodzaj: RodzajIdentyfikatora; re: RegExp }> = [
      Bez tego wyjątku te numery nie trafiają do tabeli i szukanie
      po numerze ich nie znajdzie. Bez dwukropka nadal nie jest etykietą. */
   { rodzaj: "oem", re: /\bO(?:EM|ME)\s*:/gi },
-  { rodzaj: "nr_oryg", re: /\b(?:nr\.?\s*oryg(?:inaln[ya]|\.)?|numery?\s+(?:cz[eę][sś]ci\s+)?oryginaln(?:y|ej)(?:\s+cz[eę][sś]ci)?)\s*:/gi },
+  /* `Nr.org:`, `nr. org:` i `Nr oryginału:` to ta sama etykieta w innej
+     pisowni. Pomiar znalazł je w trzech opisach, a pod nimi siedem numerów
+     producenta, których szukanie nie widziało. */
+  { rodzaj: "nr_oryg", re: /\b(?:nr\.?\s*ory?g(?:inaln[ya]|ina[lł]u|\.)?|numery?\s+(?:cz[eę][sś]ci\s+)?oryginaln(?:y|ej)(?:\s+cz[eę][sś]ci)?)\s*:/gi },
   { rodzaj: "stare_sku", re: /\bstare\s+sku\s*:/gi },
   /* SEKCJA ZAMIENNIKÓW. Ta sama rodzina etykiet co w
      `zamienniki.ts` — świadomie, bo mówi o tej samej liście. Tamten parser
@@ -43,10 +46,33 @@ const ETYKIETY: Array<{ rodzaj: RodzajIdentyfikatora; re: RegExp }> = [
      połowa mostka „numer klienta → towar" leżała nieużywana.
 
      Bez `\b` przed `ZAM`, bo `\b` nie zadziała po myślniku w `PRO-491588-ZAM:`;
-     dwukropek jest tu jedynym wymogiem, tak samo jak w `zamienniki.ts`. */
+     dwukropek jest tu jedynym wymogiem, tak samo jak w `zamienniki.ts`.
+
+     SZERZEJ NIŻ W `zamienniki.ts` O PISOWNIĘ, nie o znaczenie. Tu wchodzą też
+     `Zaminnik:`, `Zaamiennie:`, `Zamienne:`, `Nr. zamienny:` i `Zastępuje nr:`,
+     bo pomiar znalazł pod nimi numery obcych katalogów w jedenastu opisach.
+     Tamten parser decyduje, co kolektor pokaże jako zamiennik, i jego etykiet
+     ta zmiana nie rusza. Wymóg dwukropka zostaje: `Zamienne części do kosy`
+     w prozie nie jest etykietą. */
   { rodzaj: "zamiennik",
-    re: /\b(?:zamienni[a-ząćęłńóśźż]*|zamienne\s+na|zast[ęe]puje|odpowiednik[a-ząćęłńóśźż]*)\s*:|ZAM\s*:/gi },
+    re: /\b(?:za{1,2}mie?nn[a-ząćęłńóśźż]*|zamienne\s+na|zast[ęe]puje(?:\s+nr\.?)?|odpowiednik[a-ząćęłńóśźż]*)\s*:|ZAM\s*:/gi },
 ];
+
+/**
+ * Czy parser CZYTA sekcję po tej etykiecie, a jeśli tak, to jako co.
+ *
+ * Pomiar (`identyfikatory-pomiar.ts`) musi odróżnić numer zgubiony pod
+ * etykietą, której parser nie zna, od numeru odrzuconego w sekcji, którą zna.
+ * Pyta o to parser, zamiast trzymać własną listę etykiet: druga lista
+ * przestałaby się zgadzać przy pierwszej poprawce tej tutaj.
+ */
+export function rodzajEtykiety(etykieta: string): RodzajIdentyfikatora | null {
+  for (const { rodzaj, re } of ETYKIETY) {
+    /* Kopia bez flagi `g`: `test` na globalnym regexie pamięta pozycję. */
+    if (new RegExp(re.source, "i").test(etykieta)) return rodzaj;
+  }
+  return null;
+}
 
 /** Zapora na patologiczny opis — jak `LIMIT_KANDYDATOW` w zamiennikach. */
 const LIMIT_NA_OPIS = 40;
@@ -68,15 +94,57 @@ function kawalkiSekcji(sekcja: string): string[] {
     .flatMap((k) => k.split(/(?<=[A-Za-z0-9]{3})\s*\/\s*(?=[A-Za-z0-9]{3})/));
 }
 
+/**
+ * Dwa zapisy producentów ze spacjami, rozpoznawane W ŚRODKU kawałka:
+ * Stihl i Viking `4238 140 1800` (4-3-4, ostatnia grupa bywa `300B`) oraz
+ * Husqvarna `537 06 91-01` (3-2-2-2 z myślnikiem).
+ *
+ * `JEDEN_NUMER_ZE_SPACJAMI` wymaga, żeby numer był CAŁYM kawałkiem i miał
+ * grupy do trzech cyfr. Numer Stihla ma grupy po cztery, a numery Husqvarny
+ * stoją często jeden za drugim po samej spacji. Podział po spacji robił
+ * wtedy z nich urywki: `4137` i `1350` z `4137 400 1350`, `91-01` z
+ * `537 06 91-01`. Urywek to numer zmyślony, bo `4137` zaczyna dziesiątki
+ * numerów Stihla i prowadzi do cudzej kartoteki, a prawdziwego numeru
+ * w tabeli nie było wcale.
+ *
+ * Wzorzec jest wąski z rozmysłem: dokładnie te dwa układy grup, bez cyfry,
+ * litery i myślnika po bokach. Inne układy zostają przy dotychczasowej regule.
+ */
+const NUMER_ZE_SPACJAMI_W_LISCIE =
+  /(?<![A-Za-z0-9-])(?:\d{4} \d{3} (?:\d{4}|\d{3}[A-Za-z])|\d{3} \d{2} \d{2}-\d{2})(?![A-Za-z0-9-])/g;
+
 function tokenyIdentyfikatorow(sekcja: string): string[] {
   const out: string[] = [];
+  /* Nawias dzieli jak spacja: w `14-09008-(bez otworów)` dopisek przykleił
+     się do numeru i bez tego do tabeli szło `14-09008-(bez`, którego nikt nie
+     wpisze. */
+  const poSpacji = (fragment: string) => {
+    for (const t of fragment.split(/[ ()]+/)) if (/\d/.test(t)) out.push(t);
+  };
   for (const surowy of kawalkiSekcji(sekcja)) {
     const k = surowy.trim().replace(/\s+/g, " ");
     if (!k) continue;
     if (JEDEN_NUMER_ZE_SPACJAMI.test(k)) { out.push(k); continue; }
-    for (const t of k.split(" ")) if (/\d/.test(t)) out.push(t);
+    /* Kolejność z opisu zostaje: limit na opis ucina od końca, więc numer
+       wyjęty przed kolejką wypchnąłby numery stojące wcześniej. */
+    let od = 0;
+    for (const m of k.matchAll(NUMER_ZE_SPACJAMI_W_LISCIE)) {
+      poSpacji(k.slice(od, m.index));
+      out.push(m[0]);
+      od = m.index + m[0].length;
+    }
+    poSpacji(k.slice(od));
   }
   return out;
+}
+
+/**
+ * ≥ 4 znaki i ≥ 2 cyfry: `021`, `S`, `x2` to nie numery katalogowe.
+ * Osobna funkcja, bo pomiar pyta o ten sam próg, gdy tłumaczy, czemu numer
+ * spod znanej etykiety nie trafił do tabeli.
+ */
+export function dosycCyfr(wartosc: string): boolean {
+  return wartosc.length >= 4 && (wartosc.match(/\d/g) ?? []).length >= 2;
 }
 
 export interface IdentyfikatorZOpisu { rodzaj: RodzajIdentyfikatora; wartosc: string }
@@ -91,9 +159,8 @@ export function identyfikatoryZOpisu(desc: string, wlasnySymbol: string): Identy
       for (const surowy of tokenyIdentyfikatorow(sekcja)) {
         const wartosc = oczysc(surowy);
         const norm = zwin(wartosc);
-        /* ≥ 4 znaki i ≥ 2 cyfry: `021`, `S`, `x2` to nie numery katalogowe.
-           Własny symbol odpada — opis bywa autoreferencyjny. */
-        if (wartosc.length < 4 || (wartosc.match(/\d/g) ?? []).length < 2) continue;
+        /* Własny symbol odpada — opis bywa autoreferencyjny. */
+        if (!dosycCyfr(wartosc)) continue;
         if (!norm || norm === wlasny || widziane.has(norm)) continue;
         widziane.add(norm);
         out.push({ rodzaj, wartosc });
