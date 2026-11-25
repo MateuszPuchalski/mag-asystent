@@ -10,6 +10,20 @@ z wersją monorepo" — i właśnie tak przestał być zgodny: `0.3.0` przetrwa�
 sześć zmergowanych zmian, w tym takie, które wymagały nowego uprawnienia SQL.
 Komentarz nie jest mechanizmem.
 
+## 0.627.0 — 25 listopada 2026
+
+**Pomylony towar w zwrocie.** Gdy w kartonie leży co innego, niż klient
+kupił, przy pozycji klikasz „to nie ten towar" i dopisujesz, co przyjechało.
+Pozycja dostaje czerwoną ramkę, a ocena „na stan" pod zamówioną kartoteką
+dostaje ostrzeżenie. Znacznik nie zmienia kwoty ani koszyka. Zaznaczenie
+da się cofnąć.
+
+**Alarm, gdy klient wskaże „inny towar".** Gdy w zwrocie klient wybierze
+powód „inny towar", na każdym ekranie panelu staje czerwony pas z numerem
+zwrotu, nazwą pozycji i słowami klienta. Panel gra krótki sygnał, a gdy karta
+jest w tle, pokazuje powiadomienie Windows. Pas znika na tym komputerze po
+otwarciu zwrotu.
+
 ## 0.626.0 — 23 listopada 2026
 
 **Kosze: pominięte pozycje stoją na górze kosza.** „Załatwione” klika się przy
