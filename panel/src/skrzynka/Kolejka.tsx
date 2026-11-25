@@ -1,12 +1,13 @@
 import React, { useEffect, useRef, useState } from "react";
 import {
-  AlarmClock, AlertTriangle, Bell, BellOff, Eye, Inbox, Lock, MessageSquare, RefreshCw, Ruler, Search, UserCheck, X,
+  AlarmClock, AlertTriangle, Bell, BellOff, Eye, Inbox, Lock, MessageSquare, RefreshCw, Ruler, Search, UserCheck,
 } from "lucide-react";
 import type {
   Rozmowa, StanCopilota, StanSkrzynki, StatusRozmowy, WynikPartii,
 } from "../api/typy";
 import { Blad, czas, kiedy, Plakietka, Pusto } from "../ui";
 import { FiltrZWiecej } from "../ui/FiltrZWiecej";
+import { KolumnaKolejki, PustaKolejka, SzukajWKolejce } from "../ui/KolumnaKolejki";
 import { klawiszZajety } from "../nawigacja/fokus";
 import { DYMEK_ZAMKNIETEGO_PROBLEMU, NAZWA, dymekProblemowZakupu, opisProblemuZakupu } from "./statusy";
 import { CZESTE, PasekCopilota, ZnakCopilota, ZnakKategorii, doRozpoznania, nazwaNaPlakietce } from "./Copilot";
@@ -263,36 +264,23 @@ export function Kolejka({ rozmowy, stan, copilot, klasyfikacja, onRozpoznaj = ()
     return () => window.removeEventListener("keydown", f);
   }, []);
 
-  return <section className="card flex min-h-0 flex-col overflow-hidden">
-    {/* `shrink-0` nad scrollerem i `min-h-0` na nim. Bez tego przy
-        węższej kolumnie kubełki zawijają się na trzy rzędy, a lista — jedyny
-        blok z bazą 0 — kurczy się do zera. Wzorzec z kolumn zwrotów. */}
-    {/* JEDNO PASMO ZAMIAST DWÓCH. Data synchronizacji stała we
-        WŁASNYM pasku pod nagłówkiem, a pigułka „Synchronizacja 18:29 · 0 błędów"
-        niesie tę samą rzecz w pasku górnym, na każdym ekranie panelu. Pięć
-        pasm sterujących nad pierwszym wierszem zjadało ćwierć wysokości
-        kolumny — a kolumna kolejki istnieje po to, żeby pokazywać PYTANIA.
+  /* ── JEDNA KOLUMNA LISTY, ta sama co w pozostałych kolejkach ─────────
+     Układ pasm stoi w `ui/KolumnaKolejki.tsx`. Tu zostaje to, co należy do
+     skrzynki: data synchronizacji obok tytułu, pomoc, powiadomienia, znak
+     Copilota i odświeżenie.
 
-        Dlaczego data w ogóle tu jest: pusta lista o 9:00 znaczy co innego, gdy
-        synchronizator stanął o 6:00, a co innego, gdy przebiegł minutę temu.
-        Tego zdania nie usuwamy — schodzi obok tytułu, w rozmiar podpisu. */}
-    {/* NAGŁÓWEK W JEDNYM WIERSZU. Tytuł i data synchronizacji stały
-        jeden pod drugim i kosztowały 73 px — czyli więcej niż wiersz z pytaniem
-        klienta. Data ZOSTAJE (patrz akapit wyżej: pusta lista o 9:00 znaczy co
-        innego przy stojącym synchronizatorze), tylko schodzi obok tytułu,
-        w rozmiar podpisu, i ustępuje mu miejsca przy wąskiej kolumnie. */}
-    <header className="shrink-0 border-b px-4 py-2.5">
-    <div className="flex items-center gap-2">
-      <Inbox size={16} className="shrink-0" />
-      <b className="text-naglowek shrink-0">Rozmowy</b>
-      <p className="mr-auto min-w-0 truncate text-podpis font-normal text-slate-500">
-        synchronizacja {czas(stan.ostatniaSynchronizacja)}
-        {stan.bledy > 0 && <span className="ml-1 font-bold text-amber-700">· błędów: {stan.bledy}</span>}
-      </p>
-      {/* JEDEN „?" ZAMIAST DWÓCH. Słownik znaków stał w nagłówku,
-          skróty klawiszy w paśmie szukania — dwa znaki zapytania o dwóch
-          regułach otwierania. Pomoc tej kolejki jest jedna, więc otwiera się
-          jednym przyciskiem i zamyka jak każde okienko panelu. */}
+     DATA SYNCHRONIZACJI ZOSTAJE: pusta lista o 9:00 znaczy co innego, gdy
+     synchronizator stanął o 6:00, a co innego, gdy przebiegł minutę temu.
+     Schodzi obok tytułu w rozmiar podpisu i ustępuje mu miejsca. */
+  return <KolumnaKolejki tytul="Rozmowy" ikona={<Inbox size={16} />} nieswieza={nieswieza}
+    opis={<>
+      {stan.ostatniaSynchronizacja ? <>synchronizacja {czas(stan.ostatniaSynchronizacja)}</>
+        : "bez synchronizacji"}
+      {stan.bledy > 0 && <span className="ml-1 font-bold text-amber-700">· błędów: {stan.bledy}</span>}
+    </>}
+    akcje={<>
+      {/* JEDEN „?" ZAMIAST DWÓCH: słownik znaków i skróty klawiszy to jedna
+          pomoc tej kolejki, otwierana jednym przyciskiem. */}
       <SlownikZnakow kubelkow={KUBELKI.length} />
       {powiadomienia && powiadomienia.stan !== "brak" && <button type="button"
         aria-pressed={powiadomienia.stan === "wlaczone"}
@@ -309,113 +297,69 @@ export function Kolejka({ rozmowy, stan, copilot, klasyfikacja, onRozpoznaj = ()
         {powiadomienia.stan === "wlaczone" ? <Bell size={16} /> : <BellOff size={16} />}</button>}
       <ZnakCopilota stan={copilot} kandydaci={doRozpoznania(wKubelkuTeraz, copilot)} />
       {/* Bez plakietki „STAN Z …": baner alarmu nad kolumnami mówi „dane
-          sprzed…" pełnym zdaniem. Godzinę niesie zdanie obok tytułu. */}
+          sprzed…" pełnym zdaniem. */}
       <button type="button" className="rounded p-1 text-slate-500 hover:bg-slate-100" onClick={onOdswiez}
         title="Odśwież" aria-label="Odśwież" aria-busy={odswieza}>
         {/* Kręci się tylko z `motion-safe:`; bez animacji w systemie ikona
             ciemnieje, żeby kliknięcie nadal coś pokazywało. */}
         <RefreshCw size={16} className={odswieza ? "motion-safe:animate-spin motion-reduce:opacity-40" : ""} /></button>
-    </div>
-    {/* ── PROBLEMY Z ZAKUPEM NIE DOCHODZĄ ─────────────────────────────────
-        Osobna linijka pod datą, nie dopisek do niej. Zdanie o synchronizacji
-        ucina się wielokropkiem przy kolumnie 21 rem, a dopisek na jego końcu
-        znikałby pierwszy. Linijka staje tylko wtedy, gdy beta nie działa.
-
-        Agent ma wiedzieć, że ta lista nie pokaże sprawy kupującego. Przyczyna,
-        termin i co zrobić stoją w dymku i dla czytnika, bo konfiguracji
-        z tego miejsca i tak nikt nie naprawi. */}
-    {problemyZakupu && <p className="mt-1 flex items-center gap-1.5 text-podpis font-semibold text-ranga-uwaga"
+    </>}
+    /* ── PROBLEMY Z ZAKUPEM NIE DOCHODZĄ ─────────────────────────────────
+       Osobna linijka pod datą, nie dopisek do niej: zdanie o synchronizacji
+       ucina się wielokropkiem, a dopisek na jego końcu znikałby pierwszy.
+       Linijka staje tylko wtedy, gdy beta nie działa. Przyczyna, termin
+       i co zrobić stoją w dymku i dla czytnika, bo konfiguracji z tego miejsca
+       i tak nikt nie naprawi. */
+    podTytulem={problemyZakupu && <p className="flex items-center gap-1.5 pb-1 text-podpis font-semibold text-ranga-uwaga"
       title={dymekProblemowZakupu(problemyZakupu)}>
       <AlertTriangle size={13} className="shrink-0" aria-hidden="true" />
       Problemy z zakupem nie dochodzą
       <span className="sr-only"> — {dymekProblemowZakupu(problemyZakupu)}</span>
     </p>}
-    </header>
-    {/* ── CEL KLIKALNY MA 24 px, A ZA WYSOKOŚĆ PŁACI PASMO ───────────────────
-        `py-0.5` dawało cele 20 px przy progu 24×24 z WCAG 2.2 AA (2.5.8).
-        Pigułka ma `py-1`, a rachunek pokrywa własne wypełnienie pasma:
-        `py-1.5` → `py-1`. Kubełki zawijają się na dwa rzędy przy kolumnie
-        400 px, więc pigułki kosztują +8 px, a pasmo oddaje 4 px. Netto +4 px
-        chromu — cena, której próg dostępności jest wart. */}
-    {/* ── TRZY KUBEŁKI NA WIERZCHU, DWA POD „WIĘCEJ" ───────────────────────
-        Zgłoszenie agenta: „przytłacza". Pięć pigułek zawijałoby się na dwa
-        rzędy nad pierwszym pytaniem. Robota dzieje się w trzech; „Oczekujące"
-        i „Zakończone" to przeglądanie — stoją pod „Więcej" z liczbą, a cyfry
-        4 i 5 je wybierają. Układ mieszka w `ui/FiltrZWiecej.tsx`, bo to samo
-        „Więcej" mają inne kolejki.
+    /* ── TRZY KUBEŁKI NA WIERZCHU, RESZTA POD „WIĘCEJ" ────────────────────
+       Zgłoszenie agenta: „przytłacza". Robota dzieje się w trzech kubełkach;
+       „Oczekujące", „Zakończone" i „Wszystkie" to przeglądanie, a cyfry 4–6
+       je wybierają. „Więcej" mierzy się treścią, więc stoi w rzędzie pigułek. */
+    kubelki={<FiltrZWiecej<Kubelek> wybrany={kubelek} onWybierz={setKubelek} wiecej={POD_WIECEJ}
+      pozycje={KUBELKI.map((k) => ({ klucz: k.klucz, etykieta: k.etykieta,
+        ile: bladBezDanych ? undefined : rozmowy.filter((r) => wKubelku(r, k.klucz, mojeId)).length }))} />}
+    /* Pole stoi pod kubełkami: kubełek wybiera się raz na wejście, a szuka się
+       w środku tego, co się wybrało. Kolejność obok pola, bo to trzecie sito
+       na tę samą listę, a osobny rząd zjadałby wysokość listy.
 
-        „WIĘCEJ" W RZĘDZIE KUBEŁKÓW. Tryb zwarty mierzy listę treścią: stoi
-        obok „Moje" i schodzi niżej tylko, gdy się nie mieści. Inaczej byłaby
-        drugim pasmem sterowania nad pytaniami. */}
-    <div className="flex shrink-0 flex-wrap items-center gap-1 border-b px-2 py-1">
-      <FiltrZWiecej<Kubelek> zwarty wybrany={kubelek} onWybierz={setKubelek} wiecej={POD_WIECEJ}
-        pozycje={KUBELKI.map((k) => ({ klucz: k.klucz, etykieta: k.etykieta,
-          ile: bladBezDanych ? undefined : rozmowy.filter((r) => wKubelku(r, k.klucz, mojeId)).length }))} />
-    </div>
-    {/* Pole stoi POD kubełkami, nie nad nimi: kubełek wybiera się raz na
-        wejście, a szuka się w środku tego, co się wybrało. Kolejność obok
-        pola, w tym samym paśmie: to trzecie sito na tę samą listę, a osobny
-        rząd zjadałby wysokość kolumny, która ma pokazywać PYTANIA. */}
-    <div className="flex shrink-0 items-center gap-2 border-b px-2 py-1.5">
-      <div className="relative min-w-0 flex-1">
-        <Search size={14} className="absolute left-2 top-1/2 -translate-y-1/2 text-slate-400" />
-        {/* Podpowiedź MIEŚCI SIĘ w polu. „Szukaj: login, treść,
-            prowadzący" potrzebowało 192 px, a pole ma 136 px przy 1280 i 1440
-            — agent czytał „prc". „Szukaj" mówi lupa i nazwa pola, a miejsce
-            na krzyżyk rezerwujemy dopiero, gdy krzyżyk stoi: to daje 156 px
-            na 150 px podpowiedzi. Pomiar w Chromium, czcionka panelu. */}
-        <input value={fraza} onChange={(e) => setFraza(e.target.value)}
-          aria-label="Szukaj w rozmowach"
-          placeholder="Login, treść, prowadzący"
-          className={`field w-full py-1 pl-7 text-sm ${fraza !== "" ? "pr-7" : "pr-2"}`} />
-        {fraza !== "" && <button type="button" onClick={() => setFraza("")}
-          aria-label="Wyczyść szukanie"
-          className="absolute right-2 top-1/2 -translate-y-1/2 rounded p-0.5 text-slate-400 hover:bg-slate-100 hover:text-slate-700">
-          <X size={14} /></button>}
-      </div>
+       Podpowiedź MIEŚCI SIĘ w polu: „Szukaj: login, treść, prowadzący" nie
+       mieści się w 136 px, więc „Szukaj" mówi lupa i nazwa pola. */
+    szukaj={<div className="flex items-center gap-2">
+      <SzukajWKolejce wartosc={fraza} onZmien={setFraza}
+        etykieta="Szukaj w rozmowach" placeholder="Login, treść, prowadzący" />
       <select className="field w-auto shrink-0 py-1 text-xs" aria-label="Kolejność" value={porzadek}
         onChange={(e) => ustawPorzadek(e.target.value as Porzadek)}>
         <option value="czekanie">najdłużej czekające</option>
         <option value="najnowsze">od najnowszych</option>
       </select>
-      {/* Skróty klawiszy stoją pod „?" w nagłówku — obok słownika znaków,
-          jedną pomocą zamiast dwóch. */}
-    </div>
-    <PasekCopilota stan={copilot} kandydaci={doRozpoznania(wKubelkuTeraz, copilot)}
+    </div>}
+    nad={<PasekCopilota stan={copilot} kandydaci={doRozpoznania(wKubelkuTeraz, copilot)}
       trwa={klasyfikacja?.trwa} wynik={klasyfikacja?.wynik} blad={klasyfikacja?.blad}
-      onRozpoznaj={onRozpoznaj} />
-    {/* ── PIGUŁEK KATEGORII NIE MA ─────────────────────────────────────────
-        Decyzja właściciela. Pasek liczył kategorie w kubełku i zawężał listę
-        po PRZYPUSZCZENIU maszyny — przy piętnastu klasach potrafił zająć trzy
-        rzędy nad pierwszym pytaniem. Kategoria zostaje na wierszu i w nagłówku
-        rozmowy. Zakaz przestawiania kolejki po kategorii stoi dalej: kolejność
-        niosą fakty — flaga „pilne" i czas oczekiwania. */}
-    <div className={`min-h-0 flex-1 overflow-y-auto ${nieswieza ? "opacity-60" : ""}`}>
-      {/* Klawisze NA EKRANIE, wzorem reklamacji. Dekalog p. 2:
-          rozpoznanie jest tańsze od pamiętania, a skrót, o którym nikt nie wie,
-          nie skraca niczyjej pracy. Sit „moje"/„niczyje" skrzynka nie ma —
-          „Moje" jest tu KUBEŁKIEM, więc siedzi już pod cyfrą i drugi raz nie
-          ma po co stać. */}
+      onRozpoznaj={onRozpoznaj} />}>
+    {/* PIGUŁEK KATEGORII NIE MA — decyzja właściciela. Pasek liczył kategorie
+        po PRZYPUSZCZENIU maszyny i potrafił zająć trzy rzędy nad pierwszym
+        pytaniem. Kategoria zostaje na wierszu i w nagłówku rozmowy. Kolejność
+        niosą fakty: flaga „pilne" i czas oczekiwania. */}
+    <>
       {laduje && <Pusto waga="lista">Wczytuję…</Pusto>}
       {!laduje && !rozmowy.length && (bladBezDanych
         ? <Blad>{bladBezDanych}</Blad>
-        : <Pusto waga="lista">Brak rozmów w zsynchronizowanej skrzynce.</Pusto>)}
-      {/* Pusty KUBEŁEK to co innego niż pusta skrzynka: „nic nie czeka na
-          mnie" nie znaczy „nic nie przyszło", a jedno zdanie mniej kazałoby
-          agentowi zgadywać, czy synchronizacja stanęła. */}
-      {/* Pusty KUBEŁEK to co innego niż pusty FILTR. „Zajrzyj do Wszystkie"
-          przy włączonym filtrze kategorii wysłałoby agenta w złą stronę —
-          rozmowy są, tylko sito je zasłania. */}
-      {/* Pusty WYNIK SZUKANIA to co innego niż pusty kubełek i niż pusty filtr:
-          rozmowy są, tylko żadna nie pasuje do frazy. Zdanie mówi frazę, bo
-          literówki w polu wyszukiwania widać dopiero wtedy, gdy się je zacytuje. */}
+        : <PustaKolejka ikona={Inbox}>Brak rozmów w zsynchronizowanej skrzynce.</PustaKolejka>)}
+      {/* Pusty KUBEŁEK to co innego niż pusta skrzynka i niż pusty WYNIK
+          SZUKANIA: „nic nie czeka na mnie" nie znaczy „nic nie przyszło".
+          Zdanie o szukaniu cytuje frazę, bo literówki widać dopiero wtedy. */}
       {!laduje && rozmowy.length > 0 && !widoczne.length && szukane !== "" &&
-        <Pusto waga="lista">
+        <PustaKolejka ikona={Search}>
           Nic nie pasuje do „{fraza.trim()}" w tym kubełku.{" "}
           <button type="button" className="underline" onClick={() => setFraza("")}>
-            Wyczyść szukanie</button></Pusto>}
+            Wyczyść szukanie</button></PustaKolejka>}
       {!laduje && rozmowy.length > 0 && !widoczne.length && szukane === "" &&
-        <Pusto waga="lista">Ten kubełek jest pusty — zajrzyj do „Wszystkie".</Pusto>}
+        <PustaKolejka ikona={Inbox}>Ten kubełek jest pusty — zajrzyj do „Wszystkie".</PustaKolejka>}
       {widoczne.map((r) => {
         /* ── ZEGAR MIERZY NASZ DŁUG, NIE WIEK ROZMOWY ─────────────────────
            `czekaOdMs` liczy się od ostatniej wiadomości KLIENTA. Przy statusie
@@ -609,6 +553,6 @@ export function Kolejka({ rozmowy, stan, copilot, klasyfikacja, onRozpoznaj = ()
       })}
       {/* Bez stopki o dalszych wierszach w Allegro: baner alarmu mówi to samo —
           „nowe pytania mogą już czekać, a ich tu nie widać". */}
-    </div>
-  </section>;
+    </>
+  </KolumnaKolejki>;
 }

@@ -51,8 +51,9 @@ describe("Rama okna nie może stać na jednostce okna", () => {
 
   it("pasek boczny zwęża się do ikon, zamiast wypychać stronę w bok", () => {
     /* Przy powiększeniu 200% okno ma 640 px CSS; pasek o stałej szerokości
-       zjadłby trzecią część pracy. Poniżej 900 px zostają ikony. */
-    expect(tsx).toMatch(/<aside[^>]*"w-56 max-\[899px\]:w-20"/);
+       zjadłby trzecią część pracy, a przy 1180 px (laptop obok Subiekta) odbierałby
+       pracy 144 px. Poniżej 1280 px zostają ikony. */
+    expect(tsx).toMatch(/<aside[^>]*"w-56 max-\[1279px\]:w-20"/);
     /* Ręczne zwinięcie dostaje te same ikony bez względu na szerokość. */
     expect(tsx).toMatch(/<aside[^>]*zwiniety \? "w-20"/);
   });

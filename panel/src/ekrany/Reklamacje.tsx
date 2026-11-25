@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import { Search, ShieldQuestion } from "lucide-react";
+import { ShieldQuestion } from "lucide-react";
 import {
   useCofnijNotatkeReklamacji, useDodajZalacznikSprawy, useNotatkaReklamacji,
   useOdswiez, useProwadze, useReklamacja, useReklamacje, useSprawdzPrzesylke, useSynchronizuj,
@@ -15,6 +15,7 @@ import { Werdykt } from "../reklamacje/Werdykt";
 import { useSzkicSprawy } from "../sprawy/useSzkicSprawy";
 import { useBledy } from "../sprawy/useBledy";
 import { Blad, Karta, Pusto } from "../ui";
+import { KolumnaKolejki, SzukajWKolejce } from "../ui/KolumnaKolejki";
 import { KUBELKI, Kolejka, kwotaWiersza, wGrupach } from "../reklamacje/Kolejka";
 import { PasekSita, ZdanieOUkrytych, mojaSprawa, useSito, wSicie } from "../sprawy/Moje";
 import { posortuj, usePorzadek, type OsPorzadku } from "../sprawy/Porzadek";
@@ -56,10 +57,9 @@ import { useKursorListy } from "../nawigacja/kursor";
    Poniżej `xl` ten sam kontener jest flexem z zawijaniem, więc kolumny same
    spadają pod siebie, a sprawa bierze resztę szerokości. */
 const UKLAD = "flex flex-wrap items-start gap-4 "
-  + "xl:grid xl:min-h-0 xl:flex-1 xl:grid-cols-[22rem_minmax(0,1fr)_22rem] "
-  + "xl:grid-rows-[minmax(0,1fr)] xl:items-stretch 2xl:grid-cols-[24rem_minmax(0,1fr)_24rem]";
+  + "xl:grid xl:min-h-0 xl:flex-1 xl:grid-cols-[21rem_minmax(0,1fr)_22rem] "
+  + "xl:grid-rows-[minmax(0,1fr)] xl:items-stretch 2xl:grid-cols-[25rem_minmax(0,1fr)_28rem]";
 const KOLUMNA = "min-w-0 xl:min-h-0";
-const KARTA = "rounded-xl border border-slate-200 bg-white shadow-sm";
 
 /** Osie porządku tej kolejki; pierwsza jest domyślna. */
 const OSIE: OsPorzadku[] = ["termin", "otwarto", "ruch", "kwota"];
@@ -240,65 +240,50 @@ export function Reklamacje() {
 
   return <div className="flex flex-col gap-4 lg:h-full lg:min-h-0 lg:overflow-y-auto xl:overflow-hidden">
     <div className={UKLAD}>
-      <section aria-label="Kolejka reklamacji"
-        className={`${KOLUMNA} ${KARTA} flex flex-[1_1_340px] flex-col xl:overflow-hidden`}>
-        {/* Tytuł z synchronizacją i filtrem, szukanie, kubełki, sito, lista.
-            Liczby stoją raz, w kubełkach, bo drugi licznik tej samej pracy
-            to druga decyzja. */}
-        <div className="flex shrink-0 flex-col gap-3 border-b border-slate-200 px-4 pb-3 pt-4">
-          <div className="flex items-start gap-1">
-            <div className="min-w-0 flex-1">
-              <div className="flex items-center gap-1">
-                <h1 className="text-tytul font-bold text-slate-900">Reklamacje</h1>
-                <PrzyciskSynchronizacji trwa={synchronizuj.isPending} onSynchronizuj={synchronizujTeraz} />
-              </div>
-              <StanSynchronizacji stan={data?.stan} blad={bladSync} />
-            </div>
-            <FiltrKolejki porzadek={porzadek} osie={OSIE} onPorzadek={ustawPorzadek}
-              prog={data?.prog} onPrzelaczProg={setBezProgu} />
-          </div>
-          <label className="flex h-11 min-w-0 items-center gap-2 rounded-lg border border-slate-200 bg-slate-100 px-3">
-            <Search size={18} aria-hidden="true" className="shrink-0 text-slate-600" />
-            <span className="sr-only">Szukaj reklamacji</span>
-            <input type="search" className="h-10 min-w-0 flex-1 bg-transparent text-tresc outline-none"
-              value={fraza} onChange={(e) => setFraza(e.target.value)}
-              placeholder="Login, numer, zamówienie, towar, notatka" />
-          </label>
-          <Kubelki wybrany={kubelek} onWybierz={przelacz}
-            liczniki={data?.liczniki} wszystkich={data?.reklamacje.length} />
-          {/* Sito bez danych mówiłoby „Moje 0”, czyli „nic nie czeka”. */}
-          {!bezDanych && <div className="flex flex-wrap items-center gap-1.5">
-            <PasekSita sito={sito} mojeId={mojeId} onPrzelacz={przelaczSito}
-              moich={wKubelku.filter((x) => mojaSprawa(x.prowadziId, mojeId)).length}
-              niczyich={wKubelku.filter((x) => x.prowadziId === null).length} />
-            {OPIS_PORZADKU[porzadek] &&
-              <span className="ml-auto text-xs text-slate-600">{OPIS_PORZADKU[porzadek]}</span>}
-          </div>}
-        </div>
-
-        {progAlarmuje && data?.prog && <div className="shrink-0 px-3 pt-3">
-          <PasekProgu prog={data.prog} onPrzelacz={setBezProgu} /></div>}
-        <ZdanieOUkrytych ile={ukrytych} nazwa={sito === "niczyje" ? "Niczyje" : "Moje"}
-          onPokazWszystkie={() => przelaczSito(null)} />
-
-        <div className="xl:min-h-0 xl:flex-1 xl:overflow-y-auto">
-          {bezDanych
-            ? <div className="p-3"><Blad>{(error as Error).message}</Blad></div>
-            : isLoading
-            ? <Pusto waga="lista">Wczytuję kolejkę…</Pusto>
-            : <Kolejka reklamacje={widoczne} wybrana={wybrana} mojeId={mojeId}
-                nazwaGrupy={nazwaGrupy}
-                zKubelkiem={Boolean(pasujace) || kubelek === null}
-                onWybierz={(x) => nawiguj(`/obsluga/reklamacje/${x}`)} />}
-        </div>
-      </section>
+      {/* Kolumna listy z jednej formy (`ui/KolumnaKolejki.tsx`): tytuł z synchronizacją
+          i filtrem, kubełki, szukanie, sito, lista. Liczby stoją raz, w kubełkach,
+          bo drugi licznik tej samej pracy to druga decyzja. */}
+      <KolumnaKolejki tytul="Reklamacje" etykieta="Kolejka reklamacji" className={`${KOLUMNA} flex-[1_1_340px]`}
+        akcje={<>
+          <PrzyciskSynchronizacji trwa={synchronizuj.isPending} onSynchronizuj={synchronizujTeraz} />
+          <FiltrKolejki porzadek={porzadek} osie={OSIE} onPorzadek={ustawPorzadek}
+            prog={data?.prog} onPrzelaczProg={setBezProgu} />
+        </>}
+        podTytulem={<div className="pb-1"><StanSynchronizacji stan={data?.stan} blad={bladSync} /></div>}
+        kubelki={<Kubelki wybrany={kubelek} onWybierz={przelacz}
+          liczniki={data?.liczniki} wszystkich={data?.reklamacje.length} />}
+        szukaj={<SzukajWKolejce wartosc={fraza} onZmien={setFraza} etykieta="Szukaj reklamacji"
+          placeholder="Login, numer, zamówienie, towar, notatka" />}
+        /* Sito bez danych mówiłoby „Moje 0”, czyli „nic nie czeka”. */
+        drugi={bezDanych ? undefined : <>
+          <PasekSita sito={sito} mojeId={mojeId} onPrzelacz={przelaczSito}
+            moich={wKubelku.filter((x) => mojaSprawa(x.prowadziId, mojeId)).length}
+            niczyich={wKubelku.filter((x) => x.prowadziId === null).length} />
+          {OPIS_PORZADKU[porzadek] &&
+            <span className="ml-auto text-xs text-slate-600">{OPIS_PORZADKU[porzadek]}</span>}
+        </>}
+        nad={<>
+          {progAlarmuje && data?.prog && <div className="shrink-0 px-3 pt-3">
+            <PasekProgu prog={data.prog} onPrzelacz={setBezProgu} /></div>}
+          <ZdanieOUkrytych ile={ukrytych} nazwa={sito === "niczyje" ? "Niczyje" : "Moje"}
+            onPokazWszystkie={() => przelaczSito(null)} />
+        </>}>
+        {bezDanych
+          ? <div className="p-3"><Blad>{(error as Error).message}</Blad></div>
+          : isLoading
+          ? <Pusto waga="lista">Wczytuję kolejkę…</Pusto>
+          : <Kolejka reklamacje={widoczne} wybrana={wybrana} mojeId={mojeId}
+              nazwaGrupy={nazwaGrupy}
+              zKubelkiem={Boolean(pasujace) || kubelek === null}
+              onWybierz={(x) => nawiguj(`/obsluga/reklamacje/${x}`)} />}
+      </KolumnaKolejki>
 
       {/* Bez kolejki nie ma czego otworzyć, więc środek milczy zamiast
           obiecywać sprawę, która nie przyjdzie. */}
       {bezDanych ? null : d && r
         ? <>
           <section aria-label={`Reklamacja ${r.numer ?? r.externalId}`}
-            className={`${KOLUMNA} ${KARTA} flex flex-[999_1_560px] flex-col xl:overflow-y-auto`}>
+            className={`${KOLUMNA} card flex flex-[999_1_560px] flex-col xl:overflow-y-auto`}>
             <Glowica szczegol={d} mojeId={mojeId} trwa={prowadze.isPending} blad={blad("prowadze")}
               onProwadze={() => prowadze.mutate({ id: r.id, wersja: r.wersja }, zBledem("prowadze"))}
               onOdswiez={() => odswiez.mutate({ id: r.id })} odswieza={odswiez.isPending} />

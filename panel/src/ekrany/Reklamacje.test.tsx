@@ -231,6 +231,8 @@ const bezOdswiezenia = () => scena.mutacje.filter((m) => !m.startsWith("odswiez:
 
 /** Jeden rząd kubełków nad kolejką. */
 const kubelki = () => screen.getByRole("group", { name: "Kubełki kolejki" });
+/** Kubełki pod „Więcej” nie mają pigułki, więc stoją w liście wyboru. */
+const wiecej = () => within(kubelki()).getByLabelText("Więcej kubełków") as HTMLSelectElement;
 
 /** Otwiera okno filtra przy tytule kolejki. */
 const otworzFiltr = async () => {
@@ -323,7 +325,7 @@ describe("Ekran reklamacji", () => {
 });
 
 describe("Jeden rząd kubełków zamiast kafli", () => {
-  it("rząd stoi W KOLEJCE między szukaniem a sitem, a liczb dnia z trendem nad listą nie ma", () => {
+  it("rząd stoi W KOLEJCE nad szukaniem, a sito pod nim; liczb dnia z trendem nad listą nie ma", () => {
     scena.statystyki = STATYSTYKI;
     pokaz();
     const kolejka = screen.getByRole("region", { name: "Kolejka reklamacji" });
@@ -334,14 +336,18 @@ describe("Jeden rząd kubełków zamiast kafli", () => {
     expect(screen.queryByText("+6 od zeszłego tygodnia")).not.toBeInTheDocument();
     const szukaj = screen.getByLabelText("Szukaj reklamacji");
     const sito = screen.getByRole("button", { name: /^Moje/ });
-    expect(szukaj.compareDocumentPosition(kubelki()) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
-    expect(kubelki().compareDocumentPosition(sito) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    /* Kolejność kolumny jest wspólna dla wszystkich kolejek: tytuł, kubełki,
+       szukanie, drugi filtr, lista (`ui/KolumnaKolejki.tsx`). */
+    expect(kubelki().compareDocumentPosition(szukaj) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(szukaj.compareDocumentPosition(sito) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
   });
 
-  it("pięć pigułek w kolejności klawiszy, z liczbą listy — każdy widok stoi raz", () => {
+  it("dwie pigułki pracy i trzy widoki pod „Więcej” w kolejności klawiszy, z liczbą listy", () => {
     pokaz();
     expect(within(kubelki()).getAllByRole("button").map((b) => b.textContent))
-      .toEqual(["Do decyzji 4", "Do odpowiedzi 0", "Rozstrzygnięte 1", "Bez ruchu 0", "Wszystkie 5"]);
+      .toEqual(["Do decyzji 4", "Do odpowiedzi 0"]);
+    expect(within(wiecej()).getAllByRole("option").map((o) => o.textContent))
+      .toEqual(["Więcej", "Rozstrzygnięte · 1", "Bez ruchu · 0", "Wszystkie · 5"]);
     expect(within(kubelki()).getByTitle("Uznać czy odrzucić? (klawisz 1)")).toBeInTheDocument();
     expect(within(kubelki()).getByTitle("Tylko wgląd. (klawisz 3)")).toBeInTheDocument();
     expect(within(kubelki()).getByTitle("Każda sprawa z kolejki. (klawisz 5)")).toBeInTheDocument();
@@ -375,7 +381,9 @@ describe("Jeden rząd kubełków zamiast kafli", () => {
     expect(screen.getByText("Brak połączenia z serwerem")).toBeInTheDocument();
     expect(screen.queryByText(/Ten kubełek jest pusty/)).not.toBeInTheDocument();
     expect(within(kubelki()).getAllByRole("button").map((b) => b.textContent))
-      .toEqual(["Do decyzji —", "Do odpowiedzi —", "Rozstrzygnięte —", "Bez ruchu —", "Wszystkie —"]);
+      .toEqual(["Do decyzji —", "Do odpowiedzi —"]);
+    expect(within(wiecej()).getAllByRole("option")
+      .map((o) => o.textContent)).toEqual(["Więcej", "Rozstrzygnięte · —", "Bez ruchu · —", "Wszystkie · —"]);
     /* Sito liczyłoby z pustej listy i mówiłoby „Moje 0”. */
     expect(screen.queryByRole("button", { name: /^Moje/ })).not.toBeInTheDocument();
     expect(screen.queryByText(/Wybierz reklamację z kolejki/)).not.toBeInTheDocument();
@@ -429,7 +437,7 @@ describe("Kubełki i skróty", () => {
 
   it("przełączenie kubełka przestawia KURSOR na jego pierwszą sprawę", async () => {
     pokaz("/obsluga/reklamacje/1");
-    await userEvent.click(within(kubelki()).getByRole("button", { name: /^Rozstrzygnięte/ }));
+    await userEvent.selectOptions(wiecej(), "Rozstrzygnięte · 1");
     const wiersz = await screen.findByRole("button", { name: /222\/2026/, current: true });
     expect(wiersz).toHaveAttribute("aria-current", "true");
     expect(screen.queryByRole("button", { name: /111\/2026/ })).not.toBeInTheDocument();
@@ -440,11 +448,11 @@ describe("Kubełki i skróty", () => {
     await userEvent.keyboard("2");
     expect(within(kubelki()).getByRole("button", { name: /Do odpowiedzi/ })).toHaveAttribute("aria-pressed", "true");
     await userEvent.keyboard("3");
-    expect(within(kubelki()).getByRole("button", { name: /Rozstrzygnięte/ })).toHaveAttribute("aria-pressed", "true");
+    expect(wiecej().selectedOptions[0].textContent).toMatch(/^Rozstrzygnięte/);
     await userEvent.keyboard("4");
-    expect(within(kubelki()).getByRole("button", { name: /Bez ruchu/ })).toHaveAttribute("aria-pressed", "true");
+    expect(wiecej().selectedOptions[0].textContent).toMatch(/^Bez ruchu/);
     await userEvent.keyboard("5");
-    expect(within(kubelki()).getByRole("button", { name: /Wszystkie/ })).toHaveAttribute("aria-pressed", "true");
+    expect(wiecej().selectedOptions[0].textContent).toMatch(/^Wszystkie/);
     expect(screen.getAllByRole("button", { name: /111\/2026/ }).length).toBeGreaterThan(0);
     expect(screen.getAllByRole("button", { name: /222\/2026/ }).length).toBeGreaterThan(0);
     await userEvent.keyboard("1");

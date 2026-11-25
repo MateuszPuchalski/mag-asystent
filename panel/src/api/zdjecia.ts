@@ -34,18 +34,43 @@ export const NA_STRONIE = 50;
 /** Porządek listy; nazwy idą do serwera, który zna tylko te cztery. */
 export type SortBezZdjecia = "sprzedaz" | "stan" | "symbol" | "nazwa" | "najnowsze";
 
-export function useBezZdjecia(q: string, offset: number, sortuj: SortBezZdjecia = "sprzedaz",
+/** Klucz i pobranie listy — wspólne dla ekranu zdjęć i pytania paska bocznego. */
+function zapytanieBezZdjecia(q: string, offset: number, sortuj: SortBezZdjecia = "sprzedaz",
   naStanie = false, sprzedane = false) {
   const p = new URLSearchParams({ q, limit: String(NA_STRONIE), offset: String(offset), sortuj });
   if (naStanie) p.set("naStanie", "1");
   if (sprzedane) p.set("sprzedane", "1");
-  return useQuery({
+  return {
     queryKey: ["zdjecia", "bez-zdjecia", q, offset, sortuj, naStanie, sprzedane],
     queryFn: () => api<ListaBezZdjecia>(`/api/zdjecia/bez-zdjecia?${p}`),
+  };
+}
+
+export function useBezZdjecia(q: string, offset: number, sortuj: SortBezZdjecia = "sprzedaz",
+  naStanie = false, sprzedane = false) {
+  return useQuery({
+    ...zapytanieBezZdjecia(q, offset, sortuj, naStanie, sprzedane),
     /* Poprzednia strona zostaje na ekranie, dopóki nie przyjdzie następna.
        Pusta lista na ułamek sekundy przesuwałaby wiersze pod kursorem. */
     placeholderData: keepPreviousData,
   });
+}
+
+/**
+ * Czy dodawanie zdjęć jest w tej instalacji wyłączone.
+ *
+ * Pyta o TĄ SAMĄ listę z domyślnymi parametrami co ekran zdjęć, więc oba
+ * miejsca dzielą jedną odpowiedź w pamięci podręcznej. Dopóki odpowiedź nie
+ * przyszła (albo padła), mówi „nie": zakładka ma stać, a nie znikać po cichu.
+ *
+ * WŁASNA ŚWIEŻOŚĆ, bo pasek boczny stoi na każdym ekranie. Z domyślną każdy
+ * powrót do okna panelu pytałby Subiekta o pięćdziesiąt wierszy dla jednej
+ * flagi z konfiguracji serwera. Ekran zdjęć zostaje przy domyślnej,
+ * a unieważnienie listy odświeża flagę od razu.
+ */
+export function useZdjeciaWylaczone(): boolean {
+  const lista = useQuery({ ...zapytanieBezZdjecia("", 0), staleTime: 5 * 60_000 });
+  return lista.data !== undefined && !lista.data.wlaczone;
 }
 
 export interface PodgladZdjecia {

@@ -66,6 +66,21 @@ describe("menu „Więcej” w nagłówku", () => {
     expect(wyslane).toEqual([]);
   });
 
+  it("nagłówek okienka mówi, kto jest zalogowany", async () => {
+    /* W zwiniętym pasku to jedyne miejsce z imieniem, a „Wyloguj” bez niego
+       każe zgadywać, z czyjego konta się wychodzi. */
+    const { przycisk } = pokaz();
+    await userEvent.click(przycisk);
+    expect(await within(screen.getByRole("group", { name: "Więcej" })).findByText("Ola")).toBeTruthy();
+    expect(screen.getByRole("group", { name: "Więcej" }).textContent).toContain("Zalogowano: Ola");
+  });
+
+  it("rozwinięty pasek podpisuje przycisk słowem, a zwinięty zostawia samą ikonę", () => {
+    const rozwiniety = pokaz();
+    expect(rozwiniety.przycisk.textContent).toContain("Więcej");
+    expect(rozwiniety.przycisk.querySelector("span")?.className).toBe("mr-auto max-[1279px]:sr-only");
+  });
+
   it("zamyka się Esc, klikiem obok i przejściem na ekran", async () => {
     const { przycisk } = pokaz();
     await userEvent.click(przycisk);
@@ -158,6 +173,9 @@ describe("wskaźnik synchronizacji", () => {
     expect(wskaznik.getAttribute("title")).toBe("Synchronizacja jeszcze się nie odbyła");
     expect(wskaznik.querySelector(".bg-emerald-400")).toBeNull();
     expect(wskaznik.querySelector(".bg-slate-500")).not.toBeNull();
+    /* Słowa zamiast gołego „—” przy kropce: kreska czytała się jak usterka. */
+    expect(wskaznik.textContent).toBe("Synchronizacja jeszcze się nie odbyła");
+    expect(wskaznik.textContent).not.toContain("—");
   });
 
   it("w alarmie mówi słowem „Stanęła”, nie samym kolorem kropki", async () => {
@@ -172,18 +190,18 @@ describe("boczny pasek menu", () => {
   it("nie ma drugiego rzędu ani osobnego paska wglądu", () => {
     expect(tsx).not.toContain('aria-label="Magazyn i wgląd"');
     expect(tsx).not.toContain("px-5 pb-3");
-    expect(tsx).toContain("<Wiecej wyloguj={wyloguj} />");
+    expect(tsx).toContain("<Wiecej wyloguj={wyloguj} zwiniety={zwiniety} />");
   });
 
   it("przy powiększeniu 200% zakładki nie wychodzą za kadr", () => {
     /* Poziomy rząd zakładek z `shrink-0` był przy 640 px CSS szerszy od okna.
        jsdom nie liczy układu, więc strażnik pilnuje obu przyczyn: lista może
-       się zwęzić i przewinąć, a nazwa zakładki chowa się poniżej 900 px,
+       się zwęzić i przewinąć, a nazwa zakładki chowa się poniżej 1280 px,
        zostając dla czytnika ekranu. */
     const bieznia = tsx.slice(tsx.indexOf('<nav id="pasek-zakladki"'), tsx.indexOf("</nav>"));
     expect(bieznia).toContain('className="flex min-h-0 flex-1 flex-col');
     expect(bieznia).not.toContain("shrink-0 rounded-lg");
-    expect(bieznia).toContain('<span className={zwiniety ? "sr-only" : "max-[899px]:sr-only"}>{z.etykieta}</span>');
+    expect(bieznia).toContain('<span className={zwiniety ? "sr-only" : "max-[1279px]:sr-only"}>{z.etykieta}</span>');
     expect(bieznia).toContain("title={z.etykieta}");
   });
 

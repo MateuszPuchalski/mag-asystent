@@ -30,7 +30,7 @@ export function PrzyciskSynchronizacji({ trwa, onSynchronizuj }: {
   return <button type="button" disabled={trwa} onClick={onSynchronizuj}
     aria-label="Synchronizuj z Allegro" aria-busy={trwa}
     title={trwa ? "Pobieram z Allegro…" : "Synchronizuj z Allegro"}
-    className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-lg text-slate-700 hover:bg-slate-100 disabled:opacity-50">
+    className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-slate-700 hover:bg-slate-100 disabled:opacity-50">
     <RefreshCw size={18} aria-hidden="true" className={trwa ? "motion-safe:animate-spin" : ""} />
   </button>;
 }

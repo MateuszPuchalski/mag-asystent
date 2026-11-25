@@ -1,10 +1,11 @@
 import type { KubelekReklamacji } from "../api/typy";
-import { FiltrSegmentowy } from "../ui";
+import { FiltrZWiecej } from "../ui/FiltrZWiecej";
 import { KUBELKI } from "./Kolejka";
 
-/* ── Kubełki kolejki: jeden rząd pigułek ─────────────────────────────────────
-   Wszystkie widoki kolejki w jednym kształcie wyboru, w kolejności klawiszy
-   1–5. Kafle z liczbami dnia i osobny rząd „pozostałych” były dwoma
+/* ── Kubełki kolejki: praca na wierzchu, wgląd pod „Więcej” ─────────────────────────────────────
+   Wszystkie widoki kolejki w jednym kształcie wyboru (`FiltrZWiecej`), w kolejności
+   klawiszy 1–5. Na wierzchu stoją kubełki pracy, a rozstrzygnięte, bez ruchu
+   i wszystkie — pod „Więcej”, jak w pozostałych kolejkach. Kafle z liczbami dnia i osobny rząd „pozostałych” były dwoma
    miejscami do jednego wyboru, a to więcej decyzji, nie mniej (dekalog,
    punkt 1). Praca stoi pierwsza, wgląd za nią.
 
@@ -19,15 +20,15 @@ import { KUBELKI } from "./Kolejka";
    BRAK LICZBY TO KRESKA, NIE ZERO. Przy awarii serwera pigułka mówi „—”, bo
    „0” agent czyta jako „nic nie czeka” (`panel/CLAUDE.md`). */
 
-/** Widoki w rzędzie, w kolejności klawiszy; `null` to „Wszystkie”. */
+/** Widoki w kolejności klawiszy; `null` to „Wszystkie”. */
 const WIDOKI: Array<KubelekReklamacji | null> = [...KUBELKI.map((k) => k.id), null];
 
-/** `FiltrSegmentowy` chce klucza-napisu, a „Wszystkie” to brak kubełka. */
-const WSZYSTKIE = "wszystkie";
+/** Kubełki przeglądania, nie pracy — pod „Więcej”. */
+const POD_WIECEJ: ReadonlyArray<KubelekReklamacji | null> = ["zamknieta", "bez_ruchu", null];
 
 export function Kubelki({ wybrany, liczniki, wszystkich, onWybierz }: {
   wybrany: KubelekReklamacji | null;
-  /** `undefined` = nie wiemy; wtedy każda pigułka mówi „—”. */
+  /** `undefined` = nie wiemy; wtedy każda pozycja mówi „—”. */
   liczniki?: Partial<Record<KubelekReklamacji, number>>;
   wszystkich?: number;
   onWybierz: (k: KubelekReklamacji | null) => void;
@@ -36,14 +37,14 @@ export function Kubelki({ wybrany, liczniki, wszystkich, onWybierz }: {
     const opis = k === null ? null : KUBELKI.find((x) => x.id === k)!;
     const n = k === null ? wszystkich : liczniki?.[k];
     return {
-      klucz: k ?? WSZYSTKIE,
+      klucz: k,
       etykieta: opis?.etykieta ?? "Wszystkie",
       ile: n === undefined ? "—" as const : n,
       podpowiedz: `${opis?.pytanie ?? "Każda sprawa z kolejki."} (klawisz ${i + 1})`,
     };
   });
-  return <div role="group" aria-label="Kubełki kolejki" className="flex flex-wrap gap-1.5">
-    <FiltrSegmentowy<string> wybrany={wybrany ?? WSZYSTKIE} pozycje={pozycje}
-      onWybierz={(k) => onWybierz(k === WSZYSTKIE ? null : k as KubelekReklamacji)} />
+  return <div role="group" aria-label="Kubełki kolejki" className="flex flex-wrap items-center gap-1">
+    <FiltrZWiecej<KubelekReklamacji | null> wybrany={wybrany} pozycje={pozycje} wiecej={POD_WIECEJ}
+      onWybierz={onWybierz} />
   </div>;
 }

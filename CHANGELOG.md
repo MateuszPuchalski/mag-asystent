@@ -10,6 +10,123 @@ z wersją monorepo" — i właśnie tak przestał być zgodny: `0.3.0` przetrwa�
 sześć zmergowanych zmian, w tym takie, które wymagały nowego uprawnienia SQL.
 Komentarz nie jest mechanizmem.
 
+## 0.626.0 — 23 listopada 2026
+
+**Kosze: pominięte pozycje stoją na górze kosza.** „Załatwione” klika się przy
+pozycji, której dotyczy, a pole notatki ma całą szerokość. Wcześniej stało
+w wąskiej kolumnie obok, a na małym oknie pod całą tabelą. Załatwiona pozycja
+mówi, kto, kiedy i jak ją załatwił.
+
+**Zawartość kosza czyta się w jednej linii.** Adres i stan pozycji stoją
+w jednej kolumnie, więc nazwa towaru nie łamie się na trzy linie.
+
+**Po koszach chodzi się klawiaturą.** `j` i `k` albo strzałki przechodzą po
+liście, cyfry zmieniają kubełek, jak w zwrotach i dostawach.
+
+**„Zdejmij z MM” jest przyciskiem pod towarem, który blokuje dokument.**
+Wcześniej był dopiskiem na końcu zdania, pod innym słowem niż potwierdzenie.
+
+Wiersz listy pokazuje „MM w błędzie” raz, a nie dwiema plakietkami. Kubełek
+„Pominięte” i szukanie w koszach mówią o błędzie, gdy ich zapytanie padnie,
+zamiast „hala niczego nie pominęła” i „nic nie pasuje”. Kolumna zdjęć stoi
+tylko w instalacji, która ma zdjęcia kartotek.
+
+## 0.625.3 — 23 listopada 2026
+
+Lista koszy stoi w tej samej kolumnie co skrzynka, zwroty, reklamacje i dostawy.
+Szukanie dostało lupę i krzyżyk, a pusty kubełek ikonę kosza. Pasma kolumny mają
+te same odstępy co w dostawach. Lista „Więcej" przy kubełkach koszy ma szerokość
+swojej nazwy, jak w pozostałych kolejkach. Podpowiedź w polu szukania wylicza
+same klucze, więc mieści się w kolumnie w całości. Błąd odświeżenia koszy stoi
+nad listą, a nie pod nią.
+
+Krzyżyk czyszczący szukanie ma 24 px boku w każdej kolejce. Mniejszy nie
+spełniał najmniejszego celu wskaźnika z WCAG 2.2.
+
+Filtr kubełków z listą „Więcej" ma już jeden kształt. Tryb rozciągnięty na
+resztę rzędu wyszedł z kodu, bo kosze były jego ostatnim ekranem. Klasy kart
+pracy i dowodów niosą swój układ kolumny, więc ekrany nie powtarzają go przy
+każdej karcie.
+
+## 0.625.2 — 23 listopada 2026
+
+Uproszczenia kodu panelu po porządku w ekranach biura. Z filtru kubełków
+wyszły tryb kafli i podmiana barw, których nic już nie używało. Klasy
+zwiniętego paska i siatki kolejek stoją teraz w jednym miejscu. Nowy strażnik
+pilnuje, że kolumna listy ma tę samą szerokość na każdej kolejce.
+
+Pasek boczny pyta o wyłączone zdjęcia najwyżej raz na pięć minut. Dotąd każdy
+powrót do okna panelu pytał Subiekta o pięćdziesiąt kartotek, na każdym ekranie.
+
+W zwrotach pod polem szukania stoi jedna kreska zamiast dwóch.
+
+## 0.625.1 — 23 listopada 2026
+
+**Dostawy: „Poza WERTIS” i „Archiwum” nie mówią „pusto”, gdy lista się nie
+wczytała.** Zamiast „nic nie zdjęto z listy” albo „archiwum jest puste” ekran
+pokazuje błąd, a stopka i licznik nie podają zera, którego nikt nie policzył.
+
+Link do dokumentu otwiera jego kubełek także wtedy, gdy lista zdjętych dostaw
+padła. Błąd odświeżenia pod listą dotyczy listy, którą widać.
+
+## 0.625.0 — 23 listopada 2026
+
+**Dostawy: wyjątek czyta się w całej szerokości.** Opis z hali stoi pod rodzajem
+wyjątku, a nie obok przycisku, więc nie łamie się po dwa słowa. Pole notatki
+przy zamykaniu wyjątku też ma całą szerokość, a Escape z niego wychodzi.
+
+**Zdjęcie z hali otwiera się wprost z wyjątku.** Przycisk „Zdjęcie” stoi przy
+zgłoszeniu, którego dotyczy, także przy towarze spoza dokumentu. Miniatur
+w kolumnie dowodów nie trzeba już dopasowywać po podpisie.
+
+**Zamknięty wyjątek mówi, kto i kiedy go zamknął.** Także wtedy, gdy zamknięto
+go bez notatki.
+
+**Po dostawach chodzi się klawiaturą jak po zwrotach.** `j` i `k` albo strzałki
+przechodzą po kolejce, cyfry zmieniają kubełek. Lista skrótów pod `?` to mówi.
+
+**Protokół i CSV stoją razem pod opisem dostawy.** Wcześniej spadały pod tytuł
+pojedynczo, zależnie od długości numeru.
+
+Karta „Towar spoza dokumentu” po zamknięciu ostatniego wyjątku mówi, że nic nie
+zostało, zamiast stać pusta. Bez danych z serwera mówi o błędzie, nie o braku
+wyjątków.
+
+## 0.624.0 — 23 listopada 2026
+
+**Otwarta sprawa mieści się na laptopie obok Subiekta.** Poniżej 1280 px menu
+zwija się samo do ikon. W Dostawach, Zwrotach i Koszach dowody schodzą pod
+pracę, więc opis wyjątku nie łamie się po dwa słowa.
+
+**Kolejki wyglądają tak samo.** Skrzynka, Zwroty, Reklamacje i Dostawy mają
+jeden układ kolumny z listą: kubełki pracy, reszta pod „Więcej", szukanie
+i jedno zdanie pustej kolejki. Zwroty oddają liście wysokość, którą zajmowały
+kafelki. Pusty kubełek jest przygaszony.
+
+**Dolny blok menu mówi, co jest czym.** Rozwinięte menu podpisuje szukanie,
+zgłoszenie i „Więcej", pokazuje, kto jest zalogowany, a stan synchronizacji
+stoi słowami.
+
+**Zakładka Zdjęcia znika, gdy dodawanie zdjęć jest wyłączone.** Skrzynka bez
+otwartej rozmowy oddaje jej całą prawą stronę okna.
+
+## 0.623.0 — 23 listopada 2026
+
+**Obowiązkowy pomiar przy dostawie da się wyłączyć.** W Ustawieniach, w grupie
+„Magazyny i dokumenty", stoi przełącznik „Pomiar przy rozkładaniu dostawy".
+Wyłączony sprawia, że kolektor nie zatrzymuje odłożenia towaru bez wagi
+i wymiarów. Lista „Do zmierzenia" i pomiar z karty towaru działają dalej.
+Domyślnie pomiar zostaje obowiązkowy, więc po aktualizacji nic się nie zmienia.
+Kolektor słucha przełącznika od nowej wersji aplikacji; starsza wymusza pomiar
+jak dotąd.
+
+## 0.622.0 — 20 listopada 2026
+
+**Problem w dostawie krzyczy w biurze.** Gdy hala zgłosi wyjątek w dostawie,
+na każdym ekranie panelu staje czerwony pas z dostawą i rodzajem problemu.
+Panel gra krótki sygnał, a gdy karta jest w tle, pokazuje powiadomienie
+Windows. Pas znika na tym komputerze po otwarciu dostawy.
+
 ## 0.621.3 — 18 listopada 2026
 
 **Ekran „Do decyzji” otwiera się od razu.** Licznik zwrotów do decyzji liczy

@@ -121,6 +121,24 @@ describe("Filtr segmentowy: zachowanie pigułki", () => {
     expect(screen.getByRole("button", { name: "Pusty 0" })).toBeInTheDocument();
   });
 
+  it("zero przygasza pigułkę, liczba dodatnia i brak danych jej nie przygaszają", () => {
+    /* Rząd kubełków ma pokazać, gdzie jest praca. Przygaszenie idzie barwą
+       pisma i tła, nie przezroczystością, która zabrałaby kontrast. „—” to brak
+       danych, nie zero: przygaszona pigułka czytałaby się jak „nic nie czeka”. */
+    render(<FiltrSegmentowy wybrany="x" onWybierz={() => {}} pozycje={[
+      { klucz: "x", etykieta: "Wybrany", ile: 0 },
+      { klucz: "y", etykieta: "Pusty", ile: 0 },
+      { klucz: "z", etykieta: "Pracy", ile: 4 },
+      { klucz: "w", etykieta: "Nieznany", ile: "—" },
+    ]} />);
+    expect(screen.getByRole("button", { name: "Pusty 0" }).className).toContain("bg-slate-50");
+    expect(screen.getByRole("button", { name: "Pracy 4" }).className).not.toContain("bg-slate-50");
+    expect(screen.getByRole("button", { name: "Pracy 4" }).className).toContain("text-slate-900");
+    expect(screen.getByRole("button", { name: "Nieznany —" }).className).not.toContain("bg-slate-50");
+    /* Wybrana pigułka zostaje czytelna, nawet gdy jej kubełek jest pusty. */
+    expect(screen.getByRole("button", { name: "Wybrany 0" }).className).toContain("bg-wertis-ink");
+  });
+
   it("`podpowiedz` ląduje w `title`, a jej brak nie zostawia pustego", () => {
     render(<FiltrSegmentowy wybrany="a" onWybierz={() => {}} pozycje={POZYCJE} />);
     expect(screen.getByRole("button", { name: /Do decyzji/ }))
@@ -145,51 +163,5 @@ describe("Filtr segmentowy: zachowanie pigułki", () => {
     const k = container.querySelector("button")!.className;
     expect(k).toContain("py-1");
     expect(k).not.toContain("py-0.5");
-  });
-});
-
-describe("Filtr segmentowy: wyjątek barwy", () => {
-  it("`ton` podmienia SAME barwy, kształt i próg zostają", () => {
-    /* Fiolet kategorii Copilota jest wyjątkiem znaczenia — to przypuszczenie
-       maszyny, a nie fakt. Nie jest wyjątkiem kształtu ani wysokości. */
-    const { container } = render(<FiltrSegmentowy wybrany="a" onWybierz={() => {}}
-      ton={["bg-violet-700 text-white", "bg-violet-50 text-violet-800"]} pozycje={POZYCJE} />);
-    const k = container.querySelector("button")!.className;
-    expect(k).toContain("bg-violet-700");
-    expect(k).not.toContain("bg-wertis-ink");
-    expect(k).toContain("px-2");
-    expect(k).toContain("py-1");
-    expect(k).toContain("text-xs");
-  });
-});
-
-/* ── Tryb kafli ────────────────────────────────────────────────────────────────
-   Kubełki zwrotów jako kafle: ikona, liczba na pierwszym planie, etykieta pod
-   nią. To TEN SAM wybór, więc pilnujemy tego, co jeden kształt wyboru
-   obiecuje: `aria-pressed`, barwy wyboru i jedno kliknięcie na pozycję. */
-describe("FiltrSegmentowy w trybie kafli", () => {
-  const pozycje = [
-    { klucz: "decyzja", etykieta: "Do decyzji", ile: 743, ikona: <svg data-testid="ikona-decyzja" /> },
-    { klucz: null, etykieta: "Wszystkie", ile: 1116 },
-  ] as const;
-
-  it("liczba stoi przed etykietą, a ikona nie wchodzi do nazwy dostępnej", () => {
-    render(<FiltrSegmentowy<string | null> kafle wybrany="decyzja" onWybierz={() => {}}
-      pozycje={[...pozycje]} />);
-    const kafel = screen.getByRole("button", { name: "743 Do decyzji" });
-    expect(kafel).toHaveAttribute("aria-pressed", "true");
-    expect(kafel.className).toContain("bg-wertis-ink");
-    expect(screen.getByTestId("ikona-decyzja").parentElement)
-      .toHaveAttribute("aria-hidden", "true");
-    expect(screen.getByRole("button", { name: "1116 Wszystkie" }))
-      .toHaveAttribute("aria-pressed", "false");
-  });
-
-  it("kliknięcie wybiera tak samo jak pigułka", () => {
-    const wybierz = vi.fn();
-    render(<FiltrSegmentowy<string | null> kafle wybrany="decyzja" onWybierz={wybierz}
-      pozycje={[...pozycje]} />);
-    fireEvent.click(screen.getByRole("button", { name: /Wszystkie/ }));
-    expect(wybierz).toHaveBeenCalledWith(null);
   });
 });

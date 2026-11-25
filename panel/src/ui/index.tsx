@@ -122,10 +122,6 @@ export const Plakietka = ({ status, children, className = "" }:
    „pokaż wszystkie" na końcu — a wspólna jest PIGUŁKA. Opakowanie zostaje
    tam, gdzie zna swoich sąsiadów.                                            */
 
-/** Barwy stanu: [wybrana, niewybrana]. */
-const TON_FILTRA: [string, string] =
-  ["bg-wertis-ink text-white", "bg-slate-100 text-slate-600 hover:bg-slate-200"];
-
 export type PozycjaFiltra<T> = {
   klucz: T;
   etykieta: string;
@@ -136,67 +132,34 @@ export type PozycjaFiltra<T> = {
   ile?: number | "—";
   /** Podpowiedź pod kursorem — pytanie kubełka i jego klawisz skrótu. */
   podpowiedz?: string;
-  /** Ikona pozycji — rysuje się wyłącznie w trybie `kafle`. */
-  ikona?: React.ReactNode;
 };
 
 /* `number` w ograniczeniu, bo okna w dniach (analiza, wymiana) wybiera się
    liczbą, a nie napisem. Klucz Reacta i tak powstaje z `String(p.klucz)`. */
 export function FiltrSegmentowy<T extends string | number | null>({
-  wybrany, onWybierz, pozycje, rowne = false, ton = TON_FILTRA, kafle = false,
+  wybrany, onWybierz, pozycje, rowne = false,
 }: {
-  /**
-   * KAFLE zamiast pigułek — kubełki zwrotów. Kafel kładzie liczbę na
-   * pierwszym planie, bo to po niej operator wybiera, a etykieta schodzi pod
-   * nią, drobniej.
-   *
-   * TO JEST TRYB TEGO SAMEGO WYBORU, nie osobny komponent: ten sam
-   * `aria-pressed`, te same barwy i ten sam próg dotyku, tylko inny układ
-   * wnętrza. Siatkę daje rodzic, bo tylko on zna szerokość kolumny.
-   */
-  kafle?: boolean;
   wybrany: T;
   onWybierz: (v: T) => void;
   pozycje: Array<PozycjaFiltra<T>>;
   /** Równa szerokość pozycji — dla dwóch zakładek dzielących kolumnę na pół. */
   rowne?: boolean;
-  /**
-   * Podmiana samych barw. To jest WYJĄTEK, nie wariant — dziś ma go jedno
-   * miejsce: kategorie Copilota są fioletowe, bo niosą PRZYPUSZCZENIE maszyny,
-   * a nie fakt. Kształt, rozmiar i próg dotyku zostają te same, bo wyjątkiem
-   * jest znaczenie barwy, a nie prawo do własnej pigułki.
-   */
-  ton?: [string, string];
 }) {
-  const [wybrana, niewybrana] = ton;
-  if (kafle) {
-    return <>
-      {pozycje.map((p) => <button key={String(p.klucz)} type="button"
-        aria-pressed={wybrany === p.klucz}
-        title={p.podpowiedz}
-        onClick={() => onWybierz(p.klucz)}
-        className={`flex min-h-11 min-w-0 items-center gap-2 rounded-lg px-2 py-1.5 text-left ${
-          wybrany === p.klucz ? wybrana : niewybrana}`}>
-        {p.ikona && <span aria-hidden="true" className="shrink-0">{p.ikona}</span>}
-        <span className="flex min-w-0 flex-col leading-tight">
-          {/* Liczba PIERWSZA, bo po niej się wybiera; w nazwie dostępnej stoi
-              przed etykietą, a czytnik czyta „743 Do decyzji" — tak jak widać. */}
-          {/* SPACJA między liczbą a etykietą, jak w pigułce niżej: kolumna
-              flex jej nie rysuje, ale bez niej nazwa dostępna brzmi
-              „743Do decyzji". */}
-          {p.ile !== undefined && <><span className="text-sm font-bold tabular-nums">{p.ile}</span>{" "}</>}
-          <span className="truncate text-xs font-medium">{p.etykieta}</span>
-        </span>
-      </button>)}
-    </>;
-  }
+  /* ZERO PRZYGASZA PIGUŁKĘ, liczba dodatnia ją podkreśla. Rząd kubełków ma
+     pokazać, GDZIE JEST PRACA, bez czytania liczb. Przygaszenie to jaśniejsze
+     tło i szare pismo (`slate-600` na `slate-50` przechodzi próg AA), nie
+     przezroczystość, która zabrałaby kontrast. „—” (brak danych) nie jest
+     zerem i się nie przygasza. */
   return <>
     {pozycje.map((p) => <button key={String(p.klucz)} type="button"
       aria-pressed={wybrany === p.klucz}
       title={p.podpowiedz}
       onClick={() => onWybierz(p.klucz)}
       className={`rounded px-2 py-1 text-xs font-semibold ${rowne ? "flex-1" : ""} ${
-        wybrany === p.klucz ? wybrana : niewybrana}`}>
+        wybrany === p.klucz ? "bg-wertis-ink text-white"
+          : p.ile === 0 ? "bg-slate-50 text-slate-600 hover:bg-slate-100"
+          : typeof p.ile === "number" ? "bg-slate-100 text-slate-900 hover:bg-slate-200"
+          : "bg-slate-100 text-slate-600 hover:bg-slate-200"}`}>
       {p.etykieta}
       {/* SPACJA, nie `ml-1`: margines rysuje odstęp, ale nie wchodzi do nazwy
           dostępnej — czytnik ekranu przeczytałby wtedy „Do decyzji3".
@@ -280,17 +243,48 @@ export const Blad = ({ children }: { children: React.ReactNode }) =>
  * dwadzieścia znaków czyta się GORZEJ, nie lepiej — dlatego wypowiedzi mają
  * własny próg czytelności (`Os.tsx`), a nie ten z okna.
  *
- * NA NAJWĘŻSZYM PROGU ŚRODEK NIE MOŻE BYĆ NAJWĘŻSZY. Na `lg` oddaje
- * KONTEKST, nie kolejka: środek ma ok. 360 px przy 1024 i jest najszerszy
- * z trzech. Kolejka zostaje przy 21 rem, bo przy 19 rem kafelki kubełków
- * w Zwrotach ucinają etykiety („Do decy…", „Zamkni…"). Kontekst pokazuje
- * dowody i liczby, które przy 16 rem układają się w dwie kolumny.
+ * POD `xl` SĄ DWIE KOLUMNY, nie trzy. Przy 1180 px (laptop obok Subiekta)
+ * trzy kolumny zostawiają pracy ok. 290 px, za mało na opis wyjątku. Dowody
+ * schodzą więc pod pracę (`SrodekIDowody`). Kolumna listy ma tę samą szerokość
+ * na każdej kolejce, a dowody od `xl` mają 16 rem, żeby środek został szerszy.
  */
-export const SIATKA_TRZECH_KOLUMN =
-  "grid gap-4 lg:min-h-0 lg:flex-1 lg:grid-rows-[minmax(0,1fr)] " +
-  "lg:grid-cols-[21rem_minmax(0,1fr)_16rem] " +
-  "xl:grid-cols-[23rem_minmax(0,1fr)_24rem] " +
+const SIATKA = "grid gap-4 lg:min-h-0 lg:flex-1 lg:grid-rows-[minmax(0,1fr)] ";
+
+export const SIATKA_TRZECH_KOLUMN = SIATKA +
+  "lg:grid-cols-[21rem_minmax(0,1fr)] " +
+  "xl:grid-cols-[21rem_minmax(0,1fr)_16rem] " +
   "2xl:grid-cols-[25rem_minmax(0,1fr)_28rem]";
+
+/**
+ * Skrzynka: trzecia kolumna to kontekst rozmowy i istnieje tylko przy otwartej
+ * rozmowie. Bez niej rozmowa bierze jej szerokość, zamiast zostawiać po prawej
+ * puste pole. Kolumna listy ma szerokość taką samą jak w siatce wyżej.
+ */
+export const SIATKA_SKRZYNKI = (zKontekstem: boolean) =>
+  SIATKA + (zKontekstem
+    ? "lg:grid-cols-[21rem_minmax(0,1fr)_16rem] 2xl:grid-cols-[25rem_minmax(0,1fr)_28rem]"
+    : "lg:grid-cols-[21rem_minmax(0,1fr)] 2xl:grid-cols-[25rem_minmax(0,1fr)]");
+
+/**
+ * Środek i dowody w siatce `SIATKA_TRZECH_KOLUMN`.
+ *
+ * Poniżej `xl` obie karty stoją w JEDNYM przewijanym pojemniku, dowody pod
+ * pracą: kolumna pracy dostaje całą szerokość obok listy, a nie to, co zostaje
+ * po trzeciej kolumnie. Od `xl` pojemnik znika (`contents`) i karty wracają do
+ * siatki jako osobne kolumny, każda z własnym przewijaniem. `shrink-0` na
+ * kartach pilnuje, żeby pojemnik się przewijał, a nie ściskał karty.
+ */
+export function SrodekIDowody({ children }: { children: React.ReactNode }) {
+  return <div className="flex min-h-0 flex-col gap-4 lg:overflow-y-auto xl:contents">{children}</div>;
+}
+
+/* Układ kolumny stoi w stałych kart, a nie przy każdej karcie: obie są kolumnami
+   z własnym przewijaniem, a ekran, który by go pominął, wypchnąłby kartę poza okno. */
+const KARTA_KOLUMNA = "flex min-h-0 flex-col overflow-hidden";
+
+/** Klasy karty w `SrodekIDowody`: praca zajmuje co najmniej okno, dowody schodzą pod nią. */
+export const KARTA_PRACY = `${KARTA_KOLUMNA} lg:min-h-full xl:min-h-0 shrink-0 xl:shrink`;
+export const KARTA_DOWODOW = `${KARTA_KOLUMNA} shrink-0 xl:shrink`;
 
 /** Czas w formacie, który czyta biuro — jedna funkcja na cały panel. */
 /* ── ZNACZNIK CZASU BEZ SEKUND ─────────────────────────────────────────────────

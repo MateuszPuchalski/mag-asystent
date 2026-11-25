@@ -5,7 +5,7 @@ import { ilosc } from "../api/dostawy";
 import { pobierzPlik } from "../api/klient";
 import { Zdjecie } from "../towar/Zdjecie";
 import { useZdrowie } from "../api/rozmowy";
-import { Blad, NaglowekSekcji, Plakietka, Przycisk, Skopiuj, czas, dzien, ile } from "../ui";
+import { Blad, NaglowekSekcji, Plakietka, Przycisk, Pusto, Skopiuj, czas, dzien, ile } from "../ui";
 import { Wyjatek } from "./Wyjatek";
 import { PrzyciskTowaru } from "../towar/Szuflada";
 import { otwarteWyjatki } from "./Kolejka";
@@ -18,7 +18,9 @@ import { otwarteWyjatki } from "./Kolejka";
      ilość, bo odpowiadają na jedno pytanie: ile i czy skończone. Osoba idzie
      pod adres, bo odpowiadają na drugie: gdzie i kto tam położył.
    - PROTOKÓŁ STOI W NAGŁÓWKU DOKUMENTU, nie w osobnej karcie reklamacji.
-     Reklamuje się fakturę, więc druk mieszka przy fakturze.
+     Reklamuje się fakturę, więc druk mieszka przy fakturze. Druki mają
+     własny rząd na końcu nagłówka: w rzędzie tytułu spadają pod niego
+     pojedynczo, raz jeden, raz oba, zależnie od długości numeru i stanu.
 
    ── ZDJĘCIE PRZY KAŻDEJ POZYCJI ────────────────────────────────────────
    Biuro rozpoznaje towar po wyglądzie szybciej niż po numerze.
@@ -103,7 +105,9 @@ function Gdzie({ l }: { l: PozycjaDostawy }) {
 /* Zdjęcie przy pozycji z wyjątkiem słucha TEJ SAMEJ reguły co kolumna zdjęć
    w tabeli: stoi, gdy instalacja ma zdjęcia. Bez źródła byłby to kafel „bez
    zdjęcia" przy każdym wyjątku i 404 w konsoli za każdy. */
-function PozycjaZWyjatkiem({ l, rozwiaz, zdjecia }: { l: PozycjaDostawy; rozwiaz: RozwiazProps; zdjecia: boolean }) {
+function PozycjaZWyjatkiem({ l, rozwiaz, zdjecia, onPowieksz }: {
+  l: PozycjaDostawy; rozwiaz: RozwiazProps; zdjecia: boolean; onPowieksz?: Powieksz;
+}) {
   return <div className="flex gap-3 border-b border-slate-200 py-3 last:border-b-0">
     {zdjecia && <Zdjecie twId={l.twId} rozmiar={44} nazwa={l.name} />}
     <div className="min-w-0 flex-1">
@@ -113,14 +117,18 @@ function PozycjaZWyjatkiem({ l, rozwiaz, zdjecia }: { l: PozycjaDostawy; rozwiaz
         <span className="ml-auto text-right text-sm"><Gdzie l={l} /></span>
       </div>
       <div className="text-sm text-slate-700">{l.name}</div>
-      {otwarteNajpierw(l.problemy).map((p) => <Wyjatek key={p.id} p={p} {...rozwiaz} />)}
+      {otwarteNajpierw(l.problemy).map((p) => <Wyjatek key={p.id} p={p} {...rozwiaz} onPowieksz={onPowieksz} />)}
     </div>
   </div>;
 }
 
 type RozwiazProps = { trwa: boolean; blad: string; onRozwiaz: (id: number, note: string) => void };
+/** Otwiera powiększenie dowodu z hali — okno trzyma ekran, nie dokument. */
+type Powieksz = (url: string) => void;
 
-export function Dokument({ d, rozwiaz }: { d: DokumentDostawy; rozwiaz: RozwiazProps }) {
+export function Dokument({ d, rozwiaz, onPowieksz }: {
+  d: DokumentDostawy; rozwiaz: RozwiazProps; onPowieksz?: Powieksz;
+}) {
   const [bladCsv, setBladCsv] = useState("");
   const zdrowie = useZdrowie();
   const zdjecia = zdrowie.data?.zdjecia != null || zdrowie.data?.zdjeciaWlasne != null;
@@ -148,18 +156,6 @@ export function Dokument({ d, rozwiaz }: { d: DokumentDostawy; rozwiaz: RozwiazP
           {stan.slowo}</span>
         {d.wBuforze && <Plakietka status="new">bufor</Plakietka>}
         {d.wPrzyjeciach && <Plakietka status="new">w przyjęciach</Plakietka>}
-        <span className="ml-auto" />
-        {d.deliveryId != null && maWyjatki && <>
-          <Przycisk onClick={() => { setBladCsv(""); void pobierzPlik(
-            `/api/delivery/${d.deliveryId}/problems.csv`, `reklamacja-${nrPliku}.csv`)
-            .catch((e) => setBladCsv((e as Error).message)); }}>
-            <FileDown size={16} />CSV</Przycisk>
-          {/* Druk w NOWEJ KARCIE, jak dotąd: biuro drukuje protokół i wraca do
-              listy, a karta z drukiem nie ma prawa zabrać mu miejsca w pracy. */}
-          <a className="btn-primary" target="_blank" rel="noopener"
-            href={`/obsluga/druk/protokol/${d.dokId}`}>
-            <Printer size={16} />Protokół dla dostawcy</a>
-        </>}
       </div>
       <p className="mt-1 text-sm text-slate-600">
         {/* Tu stała liczba POZYCJI ze statusem wyjątku („z wyjątkiem 2"),
@@ -185,13 +181,25 @@ export function Dokument({ d, rozwiaz }: { d: DokumentDostawy; rozwiaz: RozwiazP
             Zdjęta z listy — poniżej pozycje z faktury, bo w WERTIS nikt tego nie rozkładał.</p>
         : d.zrodlo === "podglad" && <p className="mt-1 text-sm text-slate-600">
             Nikt jeszcze nie otwierał tego dokumentu — to pozycje z faktury, tak jak zobaczy je kolektor.</p>}
+      {d.deliveryId != null && maWyjatki && <div className="mt-3 flex flex-wrap gap-2">
+        {/* Druk w NOWEJ KARCIE: biuro drukuje protokół i wraca do listy,
+            a karta z drukiem nie ma prawa zabrać mu miejsca w pracy. */}
+        <a className="btn-primary" target="_blank" rel="noopener"
+          href={`/obsluga/druk/protokol/${d.dokId}`}>
+          <Printer size={16} aria-hidden="true" />Protokół dla dostawcy</a>
+        <Przycisk title="Wyjątki tej dostawy jako plik CSV" onClick={() => { setBladCsv(""); void pobierzPlik(
+          `/api/delivery/${d.deliveryId}/problems.csv`, `reklamacja-${nrPliku}.csv`)
+          .catch((e) => setBladCsv((e as Error).message)); }}>
+          <FileDown size={16} aria-hidden="true" />CSV</Przycisk>
+      </div>}
       <Blad>{bladCsv}</Blad>
     </div>
 
     <div className="min-h-0 flex-1 overflow-y-auto px-5 py-3">
       {wyjatkowe.length > 0 && <section className="mb-4">
         <NaglowekSekcji jako="h3">Pozycje z wyjątkiem · {wyjatkowe.length}</NaglowekSekcji>
-        {wyjatkowe.map((l) => <PozycjaZWyjatkiem key={l.lineId ?? l.twId} l={l} rozwiaz={rozwiaz} zdjecia={zdjecia} />)}
+        {wyjatkowe.map((l) => <PozycjaZWyjatkiem key={l.lineId ?? l.twId} l={l} rozwiaz={rozwiaz} zdjecia={zdjecia}
+          onPowieksz={onPowieksz} />)}
       </section>}
 
       {/* Wyjątki bez linii to towar SPOZA dokumentu — schowanie ich byłoby
@@ -199,7 +207,7 @@ export function Dokument({ d, rozwiaz }: { d: DokumentDostawy; rozwiaz: RozwiazP
       {d.problemyBezLinii.length > 0 && <section className="mb-4">
         <NaglowekSekcji jako="h3">
           Wyjątki poza pozycjami dokumentu · {licznikWyjatkow(d.problemyBezLinii)}</NaglowekSekcji>
-        {otwarteNajpierw(d.problemyBezLinii).map((p) => <Wyjatek key={p.id} p={p} {...rozwiaz} />)}
+        {otwarteNajpierw(d.problemyBezLinii).map((p) => <Wyjatek key={p.id} p={p} {...rozwiaz} onPowieksz={onPowieksz} />)}
       </section>}
 
       <NaglowekSekcji jako="h3">
@@ -235,8 +243,8 @@ export function Dokument({ d, rozwiaz }: { d: DokumentDostawy; rozwiaz: RozwiazP
  * dostawy. Środkowa kolumna pokazuje je tak samo jak w dokumencie, żeby
  * ROZWIĄŻ działało wszędzie, gdzie wyjątek widać.
  */
-export function WyjatkiLuzem({ tytul, podtytul, lista, rozwiaz }: {
-  tytul: string; podtytul: string; lista: WyjatekHali[]; rozwiaz: RozwiazProps;
+export function WyjatkiLuzem({ tytul, podtytul, lista, rozwiaz, onPowieksz }: {
+  tytul: string; podtytul: string; lista: WyjatekHali[]; rozwiaz: RozwiazProps; onPowieksz?: Powieksz;
 }) {
   return <>
     <div className="shrink-0 border-b border-slate-200 px-5 py-4">
@@ -244,10 +252,13 @@ export function WyjatkiLuzem({ tytul, podtytul, lista, rozwiaz }: {
       <p className="mt-1 text-sm text-slate-600">{podtytul}</p>
     </div>
     <div className="min-h-0 flex-1 overflow-y-auto px-5 py-3">
+      {/* Po zamknięciu ostatniego wyjątku karta zostaje otwarta. Pusta
+          wyglądałaby jak błąd wczytania, więc mówi, że nic nie zostało. */}
+      {lista.length === 0 && <Pusto waga="lista">Nie ma już otwartych wyjątków bez dokumentu.</Pusto>}
       {lista.map((p) => <div key={p.id} className="border-b border-slate-200 py-2 last:border-b-0">
         <b>{p.sym || p.symObcy || "towar bez kartoteki"}</b>
         {p.name && <span className="ml-2 text-sm text-slate-700">{p.name}</span>}
-        <Wyjatek p={p} {...rozwiaz} />
+        <Wyjatek p={p} {...rozwiaz} onPowieksz={onPowieksz} />
       </div>)}
     </div>
   </>;

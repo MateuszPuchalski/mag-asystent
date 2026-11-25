@@ -157,3 +157,34 @@ export function useSkrotyDzialaja(): boolean {
   }, []);
   return !wPolu && !modalne;
 }
+
+/**
+ * Formularz otwierany W MIEJSCU, pod sprawą, której dotyczy.
+ *
+ * Przycisk otwiera pole i znika, a wycofanie oddaje mu fokus. Pole znika
+ * razem z formularzem i fokus bez adresu spada na początek strony, więc
+ * klawiatura gubi wiersz, przy którym człowiek stał. Jedno miejsce, żeby
+ * dostawy i kosze nie pilnowały tego osobno.
+ */
+export function useFormularzWMiejscu() {
+  const [otwarty, setOtwarty] = useState(false);
+  const przycisk = useRef<HTMLButtonElement | null>(null);
+  const oddajFokus = useRef(false);
+  useEffect(() => {
+    if (otwarty || !oddajFokus.current) return;
+    oddajFokus.current = false;
+    przycisk.current?.focus();
+  }, [otwarty]);
+  return {
+    otwarty,
+    /** Ref przycisku, który formularz otwiera — do niego wraca fokus. */
+    przycisk,
+    otworz: () => setOtwarty(true),
+    wycofaj: () => { oddajFokus.current = true; setOtwarty(false); },
+    /**
+     * Zamyka po udanym zapisie. Formularz schowany samym stanem sprawy
+     * wróciłby z fokusem i dawną treścią, gdyby sprawa otworzyła się na nowo.
+     */
+    zamknij: () => setOtwarty(false),
+  };
+}

@@ -5,15 +5,17 @@ import {
   useArchiwumDostaw, useDokument, useDostawy, useNotatkaDoHali, useOdpowiedziHali, usePozaWertis,
   usePrzeczytane, usePrzywrocDostawe, useRozwiazWyjatek, useWyjatkiOtwarte, useZamknijPozaWertis,
 } from "../api/dostawy";
-import { Blad, Karta, Pole, Pusto, SIATKA_TRZECH_KOLUMN, ile } from "../ui";
+import { Blad, Karta, Pusto, SIATKA_TRZECH_KOLUMN, SrodekIDowody, KARTA_PRACY, KARTA_DOWODOW, ile } from "../ui";
 import { FiltrZWiecej } from "../ui/FiltrZWiecej";
+import { KolumnaKolejki, SzukajWKolejce } from "../ui/KolumnaKolejki";
 import {
   KUBELKI_DOSTAW, KolejkaDostaw, KolejkaPozaWertis, WierszeSpozaOkna, kubelekDokumentu,
   type KubelekDostaw,
 } from "../dostawy/Kolejka";
 import { Dokument, WyjatkiLuzem } from "../dostawy/Dokument";
 import { Kontekst } from "../dostawy/Kontekst";
-import { useOkno } from "../nawigacja/fokus";
+import { klawiszZajety, useOkno } from "../nawigacja/fokus";
+import { useKursorListy } from "../nawigacja/kursor";
 
 /** Kubełki do przeglądania — stoją pod „Więcej”, nie na wierzchu. */
 const WIECEJ_DOSTAW: ReadonlyArray<KubelekDostaw> = ["zamkniete", "poza", "archiwum"];
@@ -102,6 +104,37 @@ export function Dostawy() {
   const opis = KUBELKI_DOSTAW.find((k) => k.id === kubelek);
   const idz = (x: number | "bez") => nawiguj(`/obsluga/dostawy/${x}`);
 
+  /* JEDNA LISTA WIDOCZNA dla rysowania i dla klawiszy. Kursor chodzi po tym,
+     co stoi na ekranie, w tej samej kolejności: najpierw wiersze spoza okna
+     importu, potem dokumenty kubełka po odsianiu frazą. Gdy zamiast listy
+     stoi „wczytuję" albo błąd, kursor nie ma po czym chodzić: klawisz nie
+     może otworzyć wiersza, którego człowiek nie widzi. */
+  const bezListy = lista.isLoading || Boolean(lista.error && !lista.data)
+    || (kubelek === "poza" && !poza.data) || (kubelek === "archiwum" && !archiwum.data);
+  const pozaWidoczne = (poza.data?.documents ?? []).filter((d) => pasuje(d.nrPelny, d.dostawca));
+  const archiwumWidoczne = archiwum.data?.documents ?? [];
+  const kubelekWidoczny = kubelek === "poza" || kubelek === "archiwum" ? []
+    : wKubelku(kubelek).filter((d) => pasuje(d.nrPelny, d.dostawca, d.nrDostawcy));
+  const widoczne: Array<{ id: number | "bez" }> = bezListy ? []
+    : kubelek === "poza" ? pozaWidoczne.map((d) => ({ id: d.dokId }))
+    : kubelek === "archiwum" ? archiwumWidoczne.map((d) => ({ id: d.dokId }))
+    : [...(kubelek === "decyzja" ? spozaOkna.map((g) => ({ id: g.dokId ?? ("bez" as const) })) : []),
+       ...kubelekWidoczny.map((d) => ({ id: d.dokId }))];
+  /* Po zamknięciu ostatniego wyjątku faktura schodzi z DO DECYZJI, a `j` ma
+     otworzyć tę, która stanęła na jej miejscu. Powód przy `nawigacja/kursor.ts`. */
+  /* Nazwa listy dla kursora: dokument zostaje otwarty przy zmianie frazy,
+     a miejsce zapamiętane przed odsianiem nic nie mówi o liście po nim. */
+  const kursor = useKursorListy(widoczne, wybrany, (w) => idz(w.id), `${kubelek} ${q}`);
+  /* BEZ OTWARTEJ SPRAWY KLAWISZ OTWIERA PIERWSZY WIERSZ. Kursor pamięta
+     ostatnie miejsce po to, żeby przeżyć zejście sprawy z listy. Po zmianie
+     kubełka sprawy nie ma wcale, a pamięć z poprzedniej listy otwierałaby
+     wiersz ze środka nowej. */
+  const idzOWiersz = (o: number) => {
+    if (wybrany !== null) return kursor(o);
+    const pierwszy = widoczne[0];
+    if (pierwszy) idz(pierwszy.id);
+  };
+
   /* Do którego kubełka należy wybrana sprawa — `null`, gdy nie wiadomo.
      Archiwum przychodzi z serwera dopiero po otwarciu kubełka, więc
      dokumentu stamtąd nie da się rozpoznać z góry. */
@@ -124,18 +157,41 @@ export function Dostawy() {
     if (wybrany !== null && kubelekWybranego() !== k) nawiguj("/obsluga/dostawy");
   };
 
+  /* TE SAME KLAWISZE CO W ZWROTACH I REKLAMACJACH: `j`/`k` albo strzałki po
+     liście, cyfry po kubełkach. Biuro przechodzi między kolejkami bez zmiany
+     nawyku. Skróty milkną w polu pisania i pod oknem modalnym, inaczej cyfra
+     z notatki zmieniałaby kubełek. */
+  useEffect(() => {
+    const nasluch = (e: KeyboardEvent) => {
+      if (e.ctrlKey || e.altKey || e.metaKey || klawiszZajety(e.target)) return;
+      if (e.key === "ArrowDown" || e.key === "j") { e.preventDefault(); idzOWiersz(1); }
+      else if (e.key === "ArrowUp" || e.key === "k") { e.preventDefault(); idzOWiersz(-1); }
+      /* Cyfry liczą się z długości `KUBELKI_DOSTAW`, więc dopisanie kubełka
+         nie rozjedzie klawiszy. */
+      else if (/^[1-9]$/.test(e.key)) {
+        const k = KUBELKI_DOSTAW[Number(e.key) - 1];
+        if (k) wybierzKubelek(k.id);
+      }
+    };
+    window.addEventListener("keydown", nasluch);
+    return () => window.removeEventListener("keydown", nasluch);
+  });
+
   /* LINK DO DOKUMENTU OTWIERA JEGO KUBEŁEK. Adres `/dostawy/9003` bez
      `?kubelek=` stawał zawsze na „Do decyzji", więc zamknięta albo nietknięta
      faktura otwierała się obok listy, na której jej nie ma. Rozstrzygamy RAZ,
      gdy lista jest znana — dalej kubełek należy do człowieka. */
   const kubelekZLinku = useRef(false);
   useEffect(() => {
-    if (kubelekZLinku.current || parametry.get("kubelek") || !lista.data || !poza.data) return;
+    /* Czekamy, aż lista zdjętych się ROZSTRZYGNIE, nie aż się uda. Gdy padnie,
+       dokument z okna importu dalej da się rozpoznać, a czekanie na dane,
+       które nie przyjdą, zostawiłoby go obok cudzej listy. */
+    if (kubelekZLinku.current || parametry.get("kubelek") || !lista.data || (!poza.data && !poza.error)) return;
     kubelekZLinku.current = true;
     const k = kubelekWybranego();
     if (k) setKubelek(k);
-    // zależności celowo tylko dwie: efekt ma zadziałać raz, gdy obie listy są znane
-  }, [lista.data, poza.data]);
+    // zależności celowo tylko te: efekt ma zadziałać raz, gdy obie listy są rozstrzygnięte
+  }, [lista.data, poza.data, poza.error]);
 
   const rozwiaz = useRozwiazWyjatek();
   const notatka = useNotatkaDoHali();
@@ -158,27 +214,36 @@ export function Dostawy() {
     },
   };
 
+  const zrodloListy = kubelek === "poza" ? poza : kubelek === "archiwum" ? archiwum : lista;
+
   const lewa = (() => {
     if (lista.isLoading) return <Pusto waga="lista">Wczytuję dostawy…</Pusto>;
     /* Błąd BEZ danych zamiast listy: „nic nie czeka na biuro" przy zerwanym
        połączeniu brzmiałoby jak koniec pracy. */
     if (lista.error && !lista.data) return <Blad>{(lista.error as Error).message}</Blad>;
+    /* KAŻDY KUBEŁEK MA WŁASNE ŹRÓDŁO I WŁASNY BŁĄD. Zdjęte dostawy i archiwum
+       przychodzą osobnymi zapytaniami, więc udana lista dostaw nic o nich nie
+       mówi. „Nic nie zdjęto" przy zerwanym zapytaniu ukryłoby pomyłkowe
+       zdjęcie dostawy, a po to ten kubełek jest. */
     if (kubelek === "poza") {
-      return <KolejkaPozaWertis wybrany={dokId} onWybierz={idz}
-        lista={(poza.data?.documents ?? []).filter((d) => pasuje(d.nrPelny, d.dostawca))} />;
+      if (poza.isLoading) return <Pusto waga="lista">Wczytuję zdjęte dostawy…</Pusto>;
+      if (!poza.data) return <Blad>{(poza.error as Error | null)?.message ?? "Nie udało się wczytać zdjętych dostaw."}</Blad>;
+      return <KolejkaPozaWertis wybrany={dokId} onWybierz={idz} lista={pozaWidoczne} />;
     }
     if (kubelek === "archiwum") {
       /* Archiwum przychodzi z serwera już zawężone — filtrowanie go jeszcze
          raz zawężałoby stronę wyników, a nie zbiór. */
       if (archiwum.isLoading) return <Pusto waga="lista">Wczytuję archiwum…</Pusto>;
-      return <KolejkaDostaw dokumenty={archiwum.data?.documents ?? []} zOdpowiedzia={zOdpowiedzia}
+      /* „Archiwum jest puste" bez danych to orzeczenie, że faktury nie ma. */
+      if (!archiwum.data) return <Blad>{(archiwum.error as Error | null)?.message ?? "Nie udało się wczytać archiwum."}</Blad>;
+      return <KolejkaDostaw dokumenty={archiwumWidoczne} zOdpowiedzia={zOdpowiedzia}
         wybrany={dokId} onWybierz={idz}
         pusto={frazaArchiwum ? "Nic w archiwum nie pasuje do wyszukiwania."
           : "Archiwum jest puste — nic jeszcze nie wypadło z okna importu."} />;
     }
     return <>
       {kubelek === "decyzja" && <WierszeSpozaOkna grupy={spozaOkna} wybrany={wybrany} onWybierz={idz} />}
-      <KolejkaDostaw dokumenty={wKubelku(kubelek).filter((d) => pasuje(d.nrPelny, d.dostawca, d.nrDostawcy))}
+      <KolejkaDostaw dokumenty={kubelekWidoczny}
         zOdpowiedzia={zOdpowiedzia} wybrany={dokId} onWybierz={idz}
         pusto={kubelek === "decyzja" && spozaOkna.length ? ""
           : kubelek === "decyzja" ? "Nic nie czeka na biuro — hala rozkłada bez pytań."
@@ -192,8 +257,10 @@ export function Dostawy() {
   /* „Poza WERTIS" nie ma okna importu: serwer oddaje każdą zdjętą dostawę,
      także sprzed miesięcy, więc zdanie o czternastu dniach mówiłoby
      nieprawdę o granicy listy. */
+  /* Bez danych stopka milczy: „0 zdjętych" przy zerwanym zapytaniu byłoby
+     liczbą, której nikt nie policzył. */
   const stopka = kubelek === "poza"
-    ? `${ile(poza.data?.documents.length ?? 0, "zdjęta", "zdjęte", "zdjętych")} z listy — bez granicy okna importu`
+    ? poza.data && `${ile(poza.data.documents.length, "zdjęta", "zdjęte", "zdjętych")} z listy — bez granicy okna importu`
     : kubelek === "archiwum"
     ? archiwum.data && (archiwum.data.ile > archiwum.data.documents.length
         ? `pokazano ${archiwum.data.documents.length} z ${archiwum.data.ile} — zawęź wyszukiwaniem`
@@ -205,54 +272,59 @@ export function Dostawy() {
 
   return <div className="flex flex-col gap-4 lg:h-full lg:min-h-0">
     <div className={SIATKA_TRZECH_KOLUMN}>
-      <Karta className="flex min-h-0 flex-col overflow-hidden">
-        {/* Bez tytułu „Dostawy", bo powtarzałby podświetloną zakładkę
-            nawigacji nad ekranem. */}
-        <nav className="flex shrink-0 flex-wrap gap-1 p-2">
-          {/* „Zamknięte", „Poza WERTIS" i „Archiwum" pod „Więcej":
-              to przeglądanie, nie praca. „Poza WERTIS" zostaje o jedno
-              kliknięcie z licznikiem w opcji, bo ma wyłapać pomyłkowe
-              zdjęcie dostawy. Ten sam komponent co na pozostałych kolejkach. */}
-          <FiltrZWiecej<KubelekDostaw> wybrany={kubelek} onWybierz={wybierzKubelek}
-            wiecej={WIECEJ_DOSTAW}
-            pozycje={KUBELKI_DOSTAW.map((k) => ({ klucz: k.id, etykieta: k.etykieta, ile: liczniki[k.id],
-              podpowiedz: k.pytanie }))} />
-        </nav>
-        <div className="shrink-0 border-t border-slate-200 p-2">
-          <Pole value={fraza} onChange={(e) => setFraza(e.target.value)}
-            placeholder={kubelek === "archiwum" ? "Szukaj w archiwum: numer albo dostawca" : "Numer FZ, faktury dostawcy albo dostawca"}
-            aria-label="Szukaj dostawy" />
-        </div>
-        {/* PYTANIE KUBEŁKA I STOPKA W JEDNYM PAŚMIE, bo mówią o tej samej
-            liście: „co z nią zrobić" i „gdzie się kończy". Granica okna stoi
-            NAD listą, więc ucięte archiwum widać, zanim zacznie się ją
-            czytać. */}
-        <div className="flex shrink-0 flex-wrap items-baseline gap-x-3 border-y border-slate-200 bg-slate-50 px-2 py-1 text-xs text-slate-600">
-          <span className="font-semibold">{opis?.pytanie}</span>
-          <span className="ml-auto">{stopka}</span>
-        </div>
-        <div className="min-h-0 flex-1 overflow-y-auto">{lewa}</div>
+      {/* Kolumna listy z jednej formy (`ui/KolumnaKolejki.tsx`). Bez tytułu
+          „Dostawy”, bo powtarzałby podświetloną zakładkę menu, a kolejka nie ma
+          działań do postawienia w jego rzędzie. */}
+      <KolumnaKolejki etykieta="Kolejka dostaw"
+        /* „Zamknięte", „Poza WERTIS" i „Archiwum" pod „Więcej":
+           to przeglądanie, nie praca. „Poza WERTIS" zostaje o jedno
+           kliknięcie z licznikiem w opcji, bo ma wyłapać pomyłkowe
+           zdjęcie dostawy. */
+        kubelki={<FiltrZWiecej<KubelekDostaw> wybrany={kubelek} onWybierz={wybierzKubelek}
+          wiecej={WIECEJ_DOSTAW}
+          pozycje={KUBELKI_DOSTAW.map((k) => ({ klucz: k.id, etykieta: k.etykieta, ile: liczniki[k.id],
+            podpowiedz: k.pytanie }))} />}
+        szukaj={<SzukajWKolejce wartosc={fraza} onZmien={setFraza} etykieta="Szukaj dostawy"
+          placeholder={kubelek === "archiwum" ? "Szukaj w archiwum: numer albo dostawca" : "Numer FZ, faktury dostawcy albo dostawca"} />}
+        /* PYTANIE KUBEŁKA I STOPKA W JEDNYM PAŚMIE, bo mówią o tej samej
+           liście: „co z nią zrobić" i „gdzie się kończy". Granica okna stoi
+           NAD listą, więc ucięte archiwum widać, zanim zacznie się ją
+           czytać. */
+        drugi={<>
+          <span className="font-semibold text-xs text-slate-600">{opis?.pytanie}</span>
+          <span className="ml-auto text-xs text-slate-600">{stopka}</span>
+        </>}>
+        {lewa}
         {/* Pod listą tylko błąd odświeżenia, gdy dane zostały; bez danych
-            błąd stoi zamiast listy. */}
-        <Blad>{lista.error && lista.data ? (lista.error as Error).message : ""}</Blad>
-      </Karta>
+            błąd stoi zamiast listy. Mówi o źródle listy, którą widać: po
+            przywróceniu dostawy nieodświeżona lista zdjętych dalej by ją
+            pokazywała. */}
+        <Blad>{zrodloListy.error && zrodloListy.data ? (zrodloListy.error as Error).message : ""}</Blad>
+      </KolumnaKolejki>
 
-      <Karta className="flex min-h-0 flex-col overflow-hidden">
+      <SrodekIDowody>
+      <Karta className={KARTA_PRACY}>
         {wybrany === null
           ? <Pusto ikona={Truck}>Wybierz dostawę z kolejki.</Pusto>
           : wybrany === "bez"
-            ? <WyjatkiLuzem tytul="Towar spoza dokumentu"
-                podtytul="Hala zgłosiła towar, którego nie było na żadnej fakturze. Rozstrzygnij każdy z osobna."
-                lista={luzem} rozwiaz={propsRozwiaz} />
+            /* Bez danych nie mówimy „nie ma wyjątków": przy zerwanym połączeniu
+               to zdanie znaczyłoby koniec pracy, a prawda brzmi „nie wiem". */
+            ? wyjatki.isLoading
+              ? <Pusto waga="lista">Wczytuję wyjątki…</Pusto>
+              : !wyjatki.data
+                ? <Pusto waga="lista">{(wyjatki.error as Error | null)?.message ?? "Nie udało się wczytać wyjątków."}</Pusto>
+                : <WyjatkiLuzem tytul="Towar spoza dokumentu"
+                    podtytul="Hala zgłosiła towar, którego nie było na żadnej fakturze. Rozstrzygnij każdy z osobna."
+                    lista={luzem} rozwiaz={propsRozwiaz} onPowieksz={setLupa} />
             : dokument.isLoading
               ? <Pusto waga="lista">Wczytuję dokument…</Pusto>
               : dokument.data
-                ? <Dokument key={dokument.data.dokId} d={dokument.data} rozwiaz={propsRozwiaz} />
+                ? <Dokument key={dokument.data.dokId} d={dokument.data} rozwiaz={propsRozwiaz} onPowieksz={setLupa} />
                 : <Pusto waga="lista">{dokument.error
                     ? (dokument.error as Error).message : "Nie znaleziono dokumentu."}</Pusto>}
       </Karta>
 
-      <Karta className="flex min-h-0 flex-col overflow-hidden">
+      <Karta className={KARTA_DOWODOW}>
         <div className="min-h-0 flex-1 overflow-y-auto">
           {dokument.data && typeof wybrany === "number"
             /* `key` NA DOKUMENCIE. Bez niego pole notatki i otwarty formularz
@@ -270,9 +342,14 @@ export function Dostawy() {
                     { onError: (e) => setBladPoza((e as Error).message) }); },
                   onPrzywroc: () => { setBladPoza(""); przywroc.mutate(dokument.data!.dokId,
                     { onError: (e) => setBladPoza((e as Error).message) }); } }} />
-            : <Pusto waga="lista">Dowody, dostawca i notatki pokażą się po wybraniu dostawy.</Pusto>}
+            /* Towar spoza dokumentu nie ma faktury, więc nie ma też dostawcy
+               ani notatek. Obietnica „pokażą się" kazałaby na nie czekać. */
+            : <Pusto waga="lista">{wybrany === "bez"
+                ? "Towar spoza dokumentu nie ma dostawcy ani notatek. Zdjęcie z hali stoi przy wyjątku."
+                : "Dowody, dostawca i notatki pokażą się po wybraniu dostawy."}</Pusto>}
         </div>
       </Karta>
+      </SrodekIDowody>
     </div>
 
     {/* Powiększenie dowodu: „czy to TA część" przy kartotekach różniących się

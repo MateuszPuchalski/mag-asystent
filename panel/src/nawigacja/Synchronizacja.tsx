@@ -1,6 +1,7 @@
 import { useZdrowie } from "../api/rozmowy";
 import type { Zdrowie } from "../api/typy";
 import { godzina } from "../ui";
+import { podpisPaska } from "./wierszPaska";
 
 /* ── Stan synchronizacji w nagłówku ──────────────────────────────────────────
    Stoi w NAGŁÓWKU, a nie w skrzynce: agent ma go widzieć z każdej zakładki.
@@ -18,19 +19,23 @@ import { godzina } from "../ui";
 
 /** Pełne zdanie o synchronizacji — dymek wskaźnika i wiersz w menu „Więcej". */
 export function zdanieSynchronizacji(i: Zdrowie["allegroInbox"]): string {
-  if (!i.alarm && !i.ostatniaUdanaSynchronizacja) return "Synchronizacja jeszcze się nie odbyła";
+  if (!i.ostatniaUdanaSynchronizacja) {
+    return i.alarm ? "Synchronizacja stanęła, zanim się udała" : "Synchronizacja jeszcze się nie odbyła";
+  }
   return i.alarm
     ? `Synchronizacja stanęła ${godzina(i.ostatniaUdanaSynchronizacja)}`
     : `Synchronizacja ${godzina(i.ostatniaUdanaSynchronizacja)} · ${i.liczbaBledow} błędów`;
 }
 
-export function WskaznikSynchronizacji() {
+export function WskaznikSynchronizacji({ zwiniety = false }: { zwiniety?: boolean }) {
   const { data } = useZdrowie();
   if (!data) return null;
   const i = data.allegroInbox;
   const zle = i.status !== "current";
-  /* Przed pierwszą udaną synchronizacją kropka jest szara, a dymek mówi to
-     zdaniem: nieznane to nie to samo co dobre. */
+  /* Przed pierwszą udaną synchronizacją kropka jest szara, a obok niej stoi
+     zdanie: nieznane to nie to samo co dobre, a gołe „—” przy kropce czytało
+     się jak usterkę wskaźnika. W wąskim pasku zdania nie ma gdzie położyć —
+     zostaje kropka, a zdanie w dymku i w nazwie dla czytnika. */
   const nigdy = !i.ostatniaUdanaSynchronizacja;
   const zdanie = zdanieSynchronizacji(i);
   return <span role="status" title={zdanie} aria-label={zdanie}
@@ -39,9 +44,11 @@ export function WskaznikSynchronizacji() {
     {/* W alarmie bez kropki: czerwone słowo mówi to samo, a 14 px kropki
         z odstępem to akurat tyle, ile brakowało, żeby menu nie spadało
         do drugiego rzędu właśnie wtedy, gdy synchronizacja stoi. */}
-    {i.alarm ? `Stanęła ${godzina(i.ostatniaUdanaSynchronizacja)}` : <>
-      <span className={`h-2 w-2 rounded-full ${
+    {i.alarm ? (nigdy ? "Stanęła" : `Stanęła ${godzina(i.ostatniaUdanaSynchronizacja)}`) : <>
+      <span className={`h-2 w-2 shrink-0 rounded-full ${
         zle ? "bg-red-400" : nigdy ? "bg-slate-500" : "bg-emerald-400"}`} />
-      {godzina(i.ostatniaUdanaSynchronizacja)}</>}
+      {nigdy
+        ? <span className={podpisPaska(zwiniety)}>{zdanie}</span>
+        : godzina(i.ostatniaUdanaSynchronizacja)}</>}
   </span>;
 }
