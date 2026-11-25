@@ -298,7 +298,7 @@ z firmy nie wychodzi ani jeden znak. Klasyfikacja nie pisze do klienta.
   zanonimizowana ma tę tabelę pustą. `COPILOT_ZAPIS_WEJSCIA=0` wyłącza zapis, a kasowanie chodzi
   dalej.
 - **Zestaw testowy puszcza zapisane wejścia jeszcze raz** (`npm run copilot:zestaw`
-  w `server/`, od wydania @wydanie). Do dostawcy idzie to samo zamaskowane
+  w `server/`, od wydania 0.627.1). Do dostawcy idzie to samo zamaskowane
   wejście, które już raz tam poszło, więc nowa treść nie wychodzi. Zmienia się
   model albo instrukcja. Wątek przechodzi przed wysyłką dzisiejszą kontrolę
   maskowania, a sprawa, która jej nie przechodzi, do modelu nie idzie. Polecenie uruchamia człowiek na serwerze z bazą. Bez
