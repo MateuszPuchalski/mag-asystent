@@ -10,6 +10,11 @@ z wersją monorepo" — i właśnie tak przestał być zgodny: `0.3.0` przetrwa�
 sześć zmergowanych zmian, w tym takie, które wymagały nowego uprawnienia SQL.
 Komentarz nie jest mechanizmem.
 
+## 0.628.0 — 25 listopada 2026
+
+**Dziennik szuka po symbolu.** W polu „Towar” można wpisać symbol z kartoteki
+albo jej numer, jak dotąd.
+
 ## 0.627.2 — 25 listopada 2026
 
 **Pasek „Klient dopisał nową wiadomość” znów się zapala.** Gdy klient dopisał
