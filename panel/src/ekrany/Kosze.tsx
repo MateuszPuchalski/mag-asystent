@@ -5,14 +5,17 @@ import {
   useKosze, usePominiete, usePonowMmKosza, usePrzeliczKosz, useSzczegolKosza, useSzukajWKoszach,
   useUsunZMm, useZalatwPominiecie,
 } from "../api/kosze";
-import { Blad, Karta, Pole, Pusto, SIATKA_TRZECH_KOLUMN, SrodekIDowody, KARTA_PRACY, KARTA_DOWODOW } from "../ui";
+import { Blad, Karta, Pusto, SIATKA_TRZECH_KOLUMN, SrodekIDowody, KARTA_PRACY, KARTA_DOWODOW } from "../ui";
 import { FiltrZWiecej } from "../ui/FiltrZWiecej";
+import { KolumnaKolejki, SzukajWKolejce } from "../ui/KolumnaKolejki";
 import { KUBELKI_KOSZY, KolejkaKoszy, KolejkaPominietych, WynikiSzukania, koszeKubelka, kubelekKosza,
   maKlopotMm, type KubelekKoszy } from "../kosze/Kolejka";
 import { Kosz } from "../kosze/Kosz";
 import { KontekstKosza } from "../kosze/Kontekst";
 import { Koszyk, NowyKoszyk } from "../zwroty/Koszyk";
 import { PrzelacznikZwrotow } from "../zwroty/Przelacznik";
+import { useKursorListy } from "../nawigacja/kursor";
+import { useSkaner } from "../skaner";
 
 /** Kubełki „Tylko wgląd” — stoją pod „Więcej”, nie na wierzchu. */
 const WIECEJ_KOSZY: ReadonlyArray<KubelekKoszy> = ["rozlozone", "anulowane"];
@@ -87,15 +90,66 @@ export function Kosze() {
   const idz = (x: number) => nawiguj(`/obsluga/zwroty/kosze/${x}`);
   const szuka = q.length >= 2;
 
+  const bladListy = kosze.error && kosze.data ? (kosze.error as Error).message
+    : szukaj.error ? (szukaj.error as Error).message : "";
+
+  const koszeWidoczne = koszeKubelka(lista, kubelek);
   const lewa = kosze.isLoading ? <Pusto waga="lista">Wczytuję kosze…</Pusto>
     /* Błąd bez danych zamiast „ten kubełek jest pusty". */
     : kosze.error && !kosze.data ? <Blad>{(kosze.error as Error).message}</Blad>
+    /* SZUKANIE I POMINIĘTE MAJĄ WŁASNE ZAPYTANIA, więc własne „nie wiem".
+       „Nic nie pasuje" albo „hala niczego nie pominęła" bez danych
+       to orzeczenie, którego nikt nie sprawdził. Błąd szukania stoi nad
+       listą, więc tu wystarczy nie mówić nieprawdy. */
     : szuka ? (szukaj.isLoading ? <Pusto waga="lista">Szukam w koszach…</Pusto>
-        : <WynikiSzukania lista={szukaj.data?.znalezione ?? []} onWybierz={idz} />)
+        : !szukaj.data ? null
+        : <WynikiSzukania lista={szukaj.data.znalezione} wybranyKosz={wybrany} onWybierz={idz} />)
       : kubelek === "pominiete"
-        ? <KolejkaPominietych lista={pominiete.data?.pominiete ?? []} wybranyKosz={wybrany} onWybierz={idz} />
-        : <KolejkaKoszy kosze={koszeKubelka(lista, kubelek)} wybrany={wybrany} onWybierz={idz}
+        ? (pominiete.isLoading ? <Pusto waga="lista">Wczytuję pominięte…</Pusto>
+          : !pominiete.data
+            ? <Blad>{(pominiete.error as Error | null)?.message ?? "Nie udało się wczytać pominiętych."}</Blad>
+            : <KolejkaPominietych lista={pominiete.data.pominiete} wybranyKosz={wybrany} onWybierz={idz} />)
+        : <KolejkaKoszy kosze={koszeWidoczne} wybrany={wybrany} onWybierz={idz}
             pokazBladMm={kubelek === "mm"} />;
+
+  /* KURSOR CHODZI PO KOSZACH, KTÓRE WIDAĆ. W szukaniu i w pominiętych wiersz
+     to pozycja, a otwiera się kosz, więc kilka wierszy jednego kosza liczy
+     się raz. Gdy zamiast listy stoi „wczytuję" albo błąd, kursor nie ma po
+     czym chodzić. */
+  const bezListy = kosze.isLoading || !kosze.data
+    || (szuka ? !szukaj.data : kubelek === "pominiete" && !pominiete.data);
+  const idKoszy = bezListy ? []
+    : szuka ? (szukaj.data?.znalezione ?? []).map((z) => z.koszId)
+    : kubelek === "pominiete" ? (pominiete.data?.pominiete ?? []).map((p) => p.koszId)
+    : koszeWidoczne.map((k) => k.id);
+  const widoczne = [...new Set(idKoszy)].map((x) => ({ id: x }));
+  /* KOSZ ZOSTAJE OTWARTY PRZY ZMIANIE LISTY, bo ten sam kosz bywa w dwóch
+     kubełkach naraz. Kursor dostaje więc nazwę listy: miejsce zapamiętane
+     w „W pracy" nic nie mówi o wynikach szukania ani o „Problemie z MM". */
+  const kursor = useKursorListy(widoczne, wybrany, (w) => idz(w.id), szuka ? `szukaj ${q}` : kubelek);
+  /* Bez otwartego kosza klawisz otwiera pierwszy wiersz. */
+  const idzOWiersz = (o: number) => {
+    if (wybrany !== null) return kursor(o);
+    const pierwszy = widoczne[0];
+    if (pierwszy) idz(pierwszy.id);
+  };
+  /* TE SAME KLAWISZE CO NA POZOSTAŁYCH KOLEJKACH: `j`/`k` albo strzałki po
+     liście, cyfry po kubełkach.
+
+     SKRÓTY IDĄ PRZEZ NASŁUCH CZYTNIKA, jak w zwrotach. Pasek koszyka nad
+     listą ma pole skanu, a kod zeskanowany obok niego to seria cyfr: goły
+     nasłuch przerzucałby kubełki przy każdym takim skanie. Hak oddaje tu
+     wyłącznie klawisz, który nie był częścią serii, i milczy w polu pisania
+     oraz pod oknem modalnym. Sam skan poza polem nic tu nie robi — kod czyta
+     pole koszyka. */
+  useSkaner(() => {}, (e) => {
+    if (e.key === "ArrowDown" || e.key === "j") { e.preventDefault(); idzOWiersz(1); }
+    else if (e.key === "ArrowUp" || e.key === "k") { e.preventDefault(); idzOWiersz(-1); }
+    else if (/^[1-9]$/.test(e.key)) {
+      const k = KUBELKI_KOSZY[Number(e.key) - 1];
+      if (k) setKubelek(k.id);
+    }
+  });
 
   return <div className="flex flex-col gap-4 lg:h-full lg:min-h-0">
     {/* Jeden rząd nagłówka, jak na liście zwrotów. */}
@@ -105,38 +159,46 @@ export function Kosze() {
     </div>
     <Koszyk />
     <div className={SIATKA_TRZECH_KOLUMN}>
-      <Karta className="flex min-h-0 flex-col overflow-hidden">
-        {/* Bez tytułu „Kosze", bo powtarzałby wybraną zakładkę
-            przełącznika tuż nad nim. */}
-        <nav className="flex shrink-0 flex-wrap gap-1 p-2">
-          {/* „Rozłożone" i „Anulowane" pod „Więcej": oba to „Tylko wgląd".
-              Ten sam komponent co w Skrzynce i reklamacjach. */}
-          <FiltrZWiecej<KubelekKoszy> wybrany={kubelek} onWybierz={setKubelek}
-            wiecej={WIECEJ_KOSZY}
-            pozycje={KUBELKI_KOSZY.map((k) => ({ klucz: k.id, etykieta: k.etykieta,
-              ile: liczniki[k.id], podpowiedz: k.pytanie }))} />
-        </nav>
-        <div className="shrink-0 border-t border-slate-200 p-2">
-          {/* „W którym koszu jechał ten towar?" — pytanie pada po fakcie: towar
-              zniknął albo klient dopomina się o zwrot. */}
-          <Pole value={fraza} onChange={(e) => setFraza(e.target.value)}
-            placeholder="W którym koszu? Symbol, nazwa, kod, kosz albo zwrot" aria-label="Szukaj towaru w koszach" />
-        </div>
-        {!szuka && <div className="shrink-0 border-y border-slate-200 bg-slate-50 px-2 py-1">
-          <span className="text-xs font-semibold text-slate-600">{opis?.pytanie}</span>
-        </div>}
-        <div className="min-h-0 flex-1 overflow-y-auto">{lewa}</div>
-        <Blad>{kosze.error && kosze.data ? (kosze.error as Error).message
-          : szukaj.error ? (szukaj.error as Error).message : ""}</Blad>
-      </Karta>
+      {/* Kolumna listy z jednej formy (`ui/KolumnaKolejki.tsx`). Bez tytułu
+          „Kosze", bo powtarzałby wybraną zakładkę przełącznika tuż nad nim. */}
+      <KolumnaKolejki etykieta="Kolejka koszy"
+        /* „Rozłożone" i „Anulowane" pod „Więcej": oba to „Tylko wgląd". */
+        kubelki={<FiltrZWiecej<KubelekKoszy> wybrany={kubelek} onWybierz={setKubelek}
+          wiecej={WIECEJ_KOSZY}
+          pozycje={KUBELKI_KOSZY.map((k) => ({ klucz: k.id, etykieta: k.etykieta,
+            ile: liczniki[k.id], podpowiedz: k.pytanie }))} />}
+        /* „W którym koszu jechał ten towar?" — pytanie pada po fakcie: towar
+           zniknął albo klient dopomina się o zwrot. Podpowiedź wylicza same
+           klucze szukania, bo dłuższa ucina się w kolumnie 21 rem i gubi
+           ostatni z nich. */
+        szukaj={<SzukajWKolejce wartosc={fraza} onZmien={setFraza} etykieta="Szukaj towaru w koszach"
+          placeholder="Symbol, nazwa, kod, kosz albo zwrot" />}
+        /* Pytanie kubełka znika przy szukaniu, bo wyniki idą ze wszystkich
+           kubełków naraz. */
+        drugi={!szuka && <span className="text-xs font-semibold text-slate-600">{opis?.pytanie}</span>}
+        /* Błąd odświeżenia i szukania stoi NAD listą, nie w niej: pod długim
+           kubełkiem zjechałby poza okno, a lista wyglądałaby na aktualną.
+           Bez danych o koszach błąd stoi zamiast listy. */
+        nad={bladListy && <div className="shrink-0"><Blad>{bladListy}</Blad></div>}>
+        {lewa}
+      </KolumnaKolejki>
 
       <SrodekIDowody>
-      <Karta className={`flex min-h-0 flex-col overflow-hidden ${KARTA_PRACY}`}>
+      <Karta className={KARTA_PRACY}>
         {wybrany === null
           ? <Pusto ikona={Package}>Wybierz kosz z kolejki.</Pusto>
           : szczegol.isLoading ? <Pusto waga="lista">Wczytuję zawartość kosza…</Pusto>
             : szczegol.data
-              ? <Kosz k={szczegol.data.kosz} bezPowrotu={bezPowrotu} ponowMm={problemMm && wybrany !== null ? {
+              /* `key` NA KOSZU. Otwarty formularz i potwierdzenie zdjęcia
+                 z MM należą do jednego kosza. Bez klucza przeszłyby na
+                 następny kosz z tym samym towarem, z drugim krokiem już
+                 otwartym. */
+              ? <Kosz key={szczegol.data.kosz.id} k={szczegol.data.kosz} bezPowrotu={bezPowrotu} zalatw={{
+                  trwa: zalatw.isPending, blad: bladZalatw,
+                  onZalatw: (pozycjaId, notatka) => {
+                    setBladZalatw("");
+                    zalatw.mutate({ pozycjaId, notatka }, { onError: (e) => setBladZalatw((e as Error).message) });
+                  } }} ponowMm={problemMm && wybrany !== null ? {
                   problem: problemMm, trwa: ponow.isPending, blad: bladPonow, wynik: wynikPonow,
                   czekaNaSprawdzenie,
                   usun: { trwa: usunZMm.isPending, blad: bladUsun, wynik: wynikUsun,
@@ -178,16 +240,11 @@ export function Kosze() {
               : <Pusto waga="lista">{szczegol.error ? (szczegol.error as Error).message : "Nie znaleziono kosza."}</Pusto>}
       </Karta>
 
-      <Karta className={`flex min-h-0 flex-col overflow-hidden ${KARTA_DOWODOW}`}>
+      <Karta className={KARTA_DOWODOW}>
         <div className="min-h-0 flex-1 overflow-y-auto">
           {szczegol.data
-            ? <KontekstKosza k={szczegol.data.kosz} zalatw={{
-                trwa: zalatw.isPending, blad: bladZalatw,
-                onZalatw: (pozycjaId, notatka) => {
-                  setBladZalatw("");
-                  zalatw.mutate({ pozycjaId, notatka }, { onError: (e) => setBladZalatw((e as Error).message) });
-                } }} />
-            : <Pusto waga="lista">Zwroty i pominięte pozycje pokażą się po wybraniu kosza.</Pusto>}
+            ? <KontekstKosza k={szczegol.data.kosz} />
+            : <Pusto waga="lista">Zwroty z kosza pokażą się po jego wybraniu.</Pusto>}
         </div>
       </Karta>
       </SrodekIDowody>

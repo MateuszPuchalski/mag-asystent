@@ -336,7 +336,7 @@ describe("Jeden rząd kubełków zamiast kafli", () => {
     expect(screen.queryByText("+6 od zeszłego tygodnia")).not.toBeInTheDocument();
     const szukaj = screen.getByLabelText("Szukaj reklamacji");
     const sito = screen.getByRole("button", { name: /^Moje/ });
-    /* Kolejność kolumny jest wspólna dla czterech kolejek: tytuł, kubełki,
+    /* Kolejność kolumny jest wspólna dla wszystkich kolejek: tytuł, kubełki,
        szukanie, drugi filtr, lista (`ui/KolumnaKolejki.tsx`). */
     expect(kubelki().compareDocumentPosition(szukaj) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     expect(szukaj.compareDocumentPosition(sito) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();

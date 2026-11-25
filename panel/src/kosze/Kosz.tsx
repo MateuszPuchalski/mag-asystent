@@ -1,8 +1,10 @@
-import React, { useState } from "react";
+import React, { useEffect, useId, useState } from "react";
 import { RefreshCw } from "lucide-react";
 import type { PowodBezPowrotu, PozycjaWKoszu, SzczegolKosza, WierszKosza } from "../api/kosze";
+import { useZdrowie } from "../api/rozmowy";
+import { useFormularzWMiejscu } from "../nawigacja/fokus";
 import { Zdjecie } from "../towar/Zdjecie";
-import { Blad, NaglowekSekcji, Przycisk, czas, ile } from "../ui";
+import { Blad, NaglowekSekcji, Pole, Przycisk, czas, ile } from "../ui";
 import { CyklKosza } from "./Cykl";
 import { PrzyciskTowaru } from "../towar/Szuflada";
 
@@ -12,24 +14,31 @@ import { PrzyciskTowaru } from "../towar/Szuflada";
    pokazywał zwykły postęp.
 
    Ta sama trasa co karta kosza w biurze (`/api/biuro/kosze/:id`) — jedno
-   źródło prawdy o zawartości. */
+   źródło prawdy o zawartości.
 
-/** Jedno zdanie o pozycji: co się z nią stało i kto to zrobił. */
-function StanPozycji({ p }: { p: PozycjaWKoszu }) {
-  if (p.status === "skipped") {
-    /* Załatwienie NIE kasuje pominięcia — dopisuje się do niego. Kosz na
-       zawsze zostaje niekompletny, zmienia się tylko to, czy sprawa wisi. */
-    return <>
-      <span className="rounded bg-amber-100 px-1.5 py-0.5 text-xs font-bold text-ranga-uwaga">pominięta</span>
-      <div className="text-xs text-slate-600">„{p.powod || "bez powodu"}”</div>
-      {p.zalatwioneAt && <div className="text-xs text-slate-600">
-        załatwione{p.zalatwionePrzez ? ` · ${p.zalatwionePrzez}` : ""}
-        {p.zalatwioneNotatka ? ` — „${p.zalatwioneNotatka}”` : ""}</div>}
-    </>;
-  }
+   - POMINIĘTE STOJĄ OSOBNO I NA GÓRZE, z „Załatwione" przy sobie. To jedyne
+     pozycje kosza, przy których ktoś czeka na biuro. W tabeli giną między
+     odłożonymi, a w kolumnie obok trzeba je drugi raz odszukać po symbolu.
+     Na wąskim oknie kolumna obok schodzi pod całą tabelę.
+   - TRZY KOLUMNY ZAMIAST CZTERECH (dekalog pkt 2). Adres i stan odpowiadają
+     na jedno pytanie: gdzie to leży i czy już leży. Osobno zabierają nazwie
+     towaru tyle miejsca, że łamie się na trzy linie.
+   - ZDJĘCIE PRZY POZYCJI stoi wtedy, gdy instalacja ma zdjęcia — ta sama
+     reguła i powód co w `dostawy/Dokument.tsx`. */
+
+/**
+ * Gdzie pozycja leży i co się z nią stało — adres ze stanem w jednej komórce.
+ *
+ * Adres faktyczny jest pogrubiony, oczekiwany szary: pierwszy to fakt z hali,
+ * drugi dopiero zamiar.
+ */
+function GdzieIStan({ p }: { p: PozycjaWKoszu }) {
   if (p.status === "done") {
     return <>
-      <span className="rounded bg-emerald-100 px-1.5 py-0.5 text-xs font-bold text-ranga-ok">odłożona</span>
+      <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+        <b>{p.lokFaktyczna ?? p.lokOczekiwana ?? "—"}</b>
+        <span className="rounded bg-emerald-100 px-1.5 py-0.5 text-xs font-bold text-ranga-ok">odłożona</span>
+      </div>
       {p.odlozonoPrzez && <div className="text-xs text-slate-600">
         {p.odlozonoPrzez}{p.odlozonoAt ? ` · ${czas(p.odlozonoAt)}` : ""}</div>}
       {/* Stan MM mówi, czy bufor NAPRAWDĘ się cofnął w Subiekcie — kolejka
@@ -40,7 +49,98 @@ function StanPozycji({ p }: { p: PozycjaWKoszu }) {
           : p.mmStatus ? <div className="text-xs text-slate-600">MM: {p.mmStatus}</div> : null}
     </>;
   }
-  return <span className="text-xs text-slate-600">czeka na hali</span>;
+  return <div className="flex flex-wrap items-baseline gap-x-2 text-slate-600">
+    <span>{p.lokOczekiwana ?? "—"}</span>
+    <span className="text-xs">czeka na hali</span>
+  </div>;
+}
+
+/** Zamknięcie sprawy pominięcia — stan i zapis trzyma ekran. */
+export interface Zalatwianie {
+  trwa: boolean;
+  blad: string;
+  onZalatw: (pozycjaId: number, notatka: string) => void;
+}
+
+/**
+ * Pozycja, którą hala pominęła — z „Załatwione" w miejscu.
+ *
+ * Załatwienie NIE kasuje pominięcia, tylko się do niego dopisuje. Kosz na
+ * zawsze zostaje niekompletny, zmienia się to, czy sprawa wisi. Dlatego
+ * załatwiona pozycja zostaje w tej sekcji, z osobą, czasem i notatką.
+ *
+ * DWA NAPISY NA DWA KROKI. Jeden „Załatwione" na przycisku, który otwiera
+ * pole, i na tym, który zapisuje, każe zgadywać, czy pierwsze kliknięcie już
+ * coś wysłało.
+ */
+function PozycjaPominieta({ p, zdjecia, zalatw, blokujeMm }: {
+  p: PozycjaWKoszu; zdjecia: boolean; zalatw: Zalatwianie; blokujeMm: boolean;
+}) {
+  const formularz = useFormularzWMiejscu();
+  const [notatka, setNotatka] = useState("");
+  const idPodpowiedzi = useId();
+  const anuluj = () => { formularz.wycofaj(); setNotatka(""); };
+  /* ZAŁATWIONA POZYCJA ZAMYKA SWÓJ FORMULARZ I GUBI NOTATKĘ. Hala może
+     pominąć tę samą pozycję drugi raz, a serwer zeruje wtedy załatwienie.
+     Formularz schowany samym `zalatwioneAt` wróciłby przy odświeżeniu sam,
+     z fokusem i dawną notatką, i Enter zamknąłby nowe zgłoszenie hali. */
+  const zalatwiona = Boolean(p.zalatwioneAt);
+  useEffect(() => { if (zalatwiona) { formularz.zamknij(); setNotatka(""); } }, [zalatwiona]);
+  return <div className="flex gap-3 border-b border-slate-200 py-3 last:border-b-0">
+    {zdjecia && <Zdjecie twId={p.twId} rozmiar={44} nazwa={p.nazwa} />}
+    <div className="min-w-0 flex-1">
+      <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+        <b>{p.symbol
+          ? <PrzyciskTowaru twId={p.twId}>{p.symbol}</PrzyciskTowaru> : p.nazwa}</b>
+        <span className="text-sm tabular-nums text-slate-600">{p.ilosc}{p.unit ? ` ${p.unit}` : " szt."}</span>
+        <span className="ml-auto flex shrink-0 items-center gap-2">
+          {p.zalatwioneAt
+            ? <span className="rounded bg-emerald-100 px-1.5 py-0.5 text-xs font-bold text-ranga-ok">załatwiona</span>
+            : <>
+                <span className="rounded bg-amber-100 px-1.5 py-0.5 text-xs font-bold text-ranga-uwaga">pominięta</span>
+                {!formularz.otwarty && <button ref={formularz.przycisk} type="button"
+                  className="btn-secondary !px-2.5 !py-1 !text-xs" onClick={formularz.otworz}>
+                  Oznacz jako załatwione</button>}
+              </>}
+        </span>
+      </div>
+      {p.symbol && <div className="text-sm text-slate-700">{p.nazwa}</div>}
+      <p className="mt-1 text-sm">Hala: „{p.powod || "bez powodu"}”
+        {p.lokOczekiwana && <span className="text-slate-600"> · miała trafić na {p.lokOczekiwana}</span>}</p>
+      {/* Ten sam znacznik co w tabeli: pozycja blokuje MM bez względu na to,
+          w której sekcji stoi. */}
+      {blokujeMm && <p className="mt-1 text-xs font-bold text-ranga-zle">blokuje MM — brak wolnego stanu</p>}
+      {p.zalatwioneAt && <p className="mt-1 text-xs text-slate-600">
+        Załatwione: {p.zalatwionePrzez ? `${p.zalatwionePrzez} · ` : ""}{czas(p.zalatwioneAt)}
+        {p.zalatwioneNotatka && <> — <span className="text-slate-800">{p.zalatwioneNotatka}</span></>}</p>}
+      {formularz.otwarty && !p.zalatwioneAt &&
+        /* Pole w całej szerokości, przyciski pod nim: w jednym rzędzie
+           z przyciskami pole ma kilkadziesiąt pikseli i nie widać, co się
+           wpisuje. Escape wycofuje się jak „Anuluj". */
+        <form className="mt-2"
+          onSubmit={(e) => { e.preventDefault(); zalatw.onZalatw(p.id, notatka.trim()); }}
+          onKeyDown={(e) => { if (e.key === "Escape") { e.stopPropagation(); anuluj(); } }}>
+          <Pole autoFocus value={notatka} onChange={(e) => setNotatka(e.target.value)}
+            placeholder="Jak to załatwiono?" aria-label="Jak załatwiono" aria-describedby={idPodpowiedzi} />
+          <p id={idPodpowiedzi} className="mt-1 text-xs text-slate-600">
+            Opcjonalnie, np. „znalazło się na regale”. Pozycja zostaje pominięta, znika tylko z listy pracy.</p>
+          <div className="mt-2 flex flex-wrap gap-2">
+            <Przycisk wariant="glowny" type="submit" disabled={zalatw.trwa}>Załatwione</Przycisk>
+            <Przycisk type="button" onClick={anuluj}>Anuluj</Przycisk>
+          </div>
+          {/* Błąd przy polu, którego dotyczy, nie pod całą sekcją: przy kilku
+              pominiętych stałby daleko od miejsca, w którym człowiek patrzy. */}
+          {zalatw.blad && <p className="mt-1 text-xs text-ranga-zle">{zalatw.blad}</p>}
+        </form>}
+    </div>
+  </div>;
+}
+
+/** Nagłówek sekcji pominiętych: czekające zawsze, załatwione tylko gdy są. */
+function licznikPominietych(lista: PozycjaWKoszu[]): string {
+  const zalatwione = lista.filter((p) => p.zalatwioneAt).length;
+  return `${lista.length - zalatwione} do załatwienia`
+    + (zalatwione ? ` · ${ile(zalatwione, "załatwiona", "załatwione", "załatwionych")}` : "");
 }
 
 /** Stan ponowienia MM kosza z kłopotem. */
@@ -70,9 +170,10 @@ const PODPOWIEDZ_PRZELICZENIA = "Dokumentu jeszcze nie ma, więc zawartość da 
   + "Przeliczenie układa ją od nowa z ocen „na stan” — zestaw sprzedany jedną ofertą "
   + "wchodzi rozbity, tak jak leży na magazynie.";
 
-export function Kosz({ k, przelicz, ponowMm = null, bezPowrotu = null }: {
+export function Kosz({ k, przelicz, zalatw, ponowMm = null, bezPowrotu = null }: {
   k: SzczegolKosza;
   przelicz: { trwa: boolean; blad: string; wynik: string; onPrzelicz: () => void };
+  zalatw: Zalatwianie;
   ponowMm?: PonowienieMm | null;
   /** Rozłożony ponad dobę, a MM powrotne nie powstało — i dlaczego. */
   bezPowrotu?: PowodBezPowrotu | null;
@@ -80,8 +181,15 @@ export function Kosz({ k, przelicz, ponowMm = null, bezPowrotu = null }: {
   /* Potwierdzenie przy zdjęciu z MM: towar zostaje na magazynie
      źródłowym, a przesunięcie ręką to druga czynność — jeden klik za mało. */
   const [potwierdzUsun, setPotwierdzUsun] = useState<number | null>(null);
+  const zdrowie = useZdrowie();
+  const zdjecia = zdrowie.data?.zdjecia != null || zdrowie.data?.zdjeciaWlasne != null;
   const bezKorekty = k.zwroty.filter((z) => !z.korektaNumer);
-  const pominiete = k.pozycje.filter((p) => p.status === "skipped");
+  /* Czekające przed załatwionymi: biuro wchodzi w kosz po te pierwsze. */
+  const pominiete = k.pozycje.filter((p) => p.status === "skipped")
+    .sort((a, b) => Number(Boolean(a.zalatwioneAt)) - Number(Boolean(b.zalatwioneAt)));
+  const czekajace = pominiete.filter((p) => !p.zalatwioneAt).length;
+  const reszta = k.pozycje.filter((p) => p.status !== "skipped");
+  const blokujeMm = (p: PozycjaWKoszu) => Boolean(k.brakiMm?.some((b) => b.twId === p.twId));
   const powrot = !k.powrot ? null
     : k.powrot.numer ? `powrót MM ${k.powrot.numer}`
       : k.powrot.status === "error" ? "powrót MM w błędzie — sprawdź kolejkę"
@@ -128,24 +236,26 @@ export function Kosz({ k, przelicz, ponowMm = null, bezPowrotu = null }: {
         {/* KTÓRY TOWAR. Sfera mówi „brak towaru" o całym dokumencie;
             read-model stanów wskazuje linię. Pusta lista to też informacja:
             nasza kopia braku nie widzi, więc przyczyna leży poza nią. */}
-        {(k.brakiMm?.length ?? 0) > 0 && <ul className="mt-1 space-y-0.5 text-ranga-zle">
+        {(k.brakiMm?.length ?? 0) > 0 && <ul className="mt-2 space-y-2">
           {k.brakiMm!.map((b) => <li key={`${b.twId}-${b.magazyn}`}>
-            <b>{b.symbol ?? `kartoteka ${b.twId}`}</b>{b.nazwa ? ` · ${b.nazwa}` : ""}
-            {` — MM chce ${b.potrzeba} szt. z ${b.magazyn}, a tam jest ${b.stan}`}
-            {b.rezerwacja > 0 ? `, z czego ${b.rezerwacja} zarezerwowane` : ""}.
-            {/* ZDJĘCIE Z MM — decyzja właściciela. */}
+            <p className="text-ranga-zle"><b>{b.symbol ?? `kartoteka ${b.twId}`}</b>{b.nazwa ? ` · ${b.nazwa}` : ""}
+              {` — MM chce ${b.potrzeba} szt. z ${b.magazyn}, a tam jest ${b.stan}`}
+              {b.rezerwacja > 0 ? `, z czego ${b.rezerwacja} zarezerwowane` : ""}.</p>
+            {/* ZDJĘCIE Z MM — decyzja właściciela. Przycisk pod zdaniem, nie
+                dopisek na jego końcu: to ruch, po którym towar zostaje na
+                magazynie źródłowym, więc ma wyglądać jak ruch. Jeden
+                czasownik w obu krokach, żeby nie zgadywać, czy to to samo. */}
             {ponowMm.usun && (potwierdzUsun === b.twId
-              ? <span className="ml-2 inline-flex flex-wrap items-center gap-1 text-slate-700">
-                  Zostanie na {b.magazyn} — przesuniesz go ręką w Subiekcie.
+              ? <div className="mt-1 flex flex-wrap items-center gap-2 text-slate-700">
+                  <span>Zostanie na {b.magazyn} — przesuniesz go ręką w Subiekcie.</span>
                   <button type="button" disabled={ponowMm.usun.trwa}
                     onClick={() => { ponowMm.usun!.onUsun(b.twId); setPotwierdzUsun(null); }}
-                    className="rounded border border-red-300 bg-white px-1.5 font-semibold text-ranga-zle hover:bg-red-100">
+                    className="rounded-lg border border-red-300 bg-white px-2.5 py-1 text-xs font-bold text-ranga-zle hover:bg-red-100 disabled:opacity-50">
                     Zdejmij z MM</button>
-                  <button type="button" onClick={() => setPotwierdzUsun(null)}
-                    className="underline underline-offset-2">anuluj</button>
-                </span>
-              : <button type="button" onClick={() => setPotwierdzUsun(b.twId)}
-                  className="ml-2 text-xs font-semibold underline underline-offset-2">usuń z MM</button>)}
+                  <Przycisk className="!px-2.5 !py-1 !text-xs" onClick={() => setPotwierdzUsun(null)}>Anuluj</Przycisk>
+                </div>
+              : <Przycisk className="mt-1 !px-2.5 !py-1 !text-xs" onClick={() => setPotwierdzUsun(b.twId)}>
+                  Zdejmij z MM…</Przycisk>)}
           </li>)}
         </ul>}
         {ponowMm.usun?.wynik && <p className="mt-1 text-ranga-ok">{ponowMm.usun.wynik}</p>}
@@ -176,37 +286,43 @@ export function Kosz({ k, przelicz, ponowMm = null, bezPowrotu = null }: {
         {" "}MM wyjdzie, gdy dojdą numery korekt do {ile(bezKorekty.length, "zwrotu", "zwrotów", "zwrotów")}.</p>}
       {pominiete.length > 0 && <p className="mt-1 text-sm">
         <span className="rounded bg-amber-100 px-1.5 py-0.5 text-xs font-bold text-ranga-uwaga">kosz niekompletny</span>
-        {" "}hala pominęła {pominiete.length} poz. — powód przy wierszu niżej.</p>}
+        {" "}hala pominęła {pominiete.length} poz.{czekajace
+          ? ` — ${czekajace} czeka na biuro, niżej.` : " — wszystkie załatwione."}</p>}
     </div>
     <div className="min-h-0 flex-1 overflow-y-auto px-5 py-3">
-      <NaglowekSekcji jako="h3">Zawartość · {k.pozycje.length}</NaglowekSekcji>
-      <table className="mt-1 w-full text-sm">
-        <thead><tr className="border-b border-slate-200 text-left text-xs text-slate-600">
-          <th className="py-1.5 pr-2 font-bold">Towar</th>
-          <th className="w-20 py-1.5 pr-2 font-bold">Ilość</th>
-          <th className="w-28 py-1.5 pr-2 font-bold">Adres</th>
-          <th className="w-44 py-1.5 font-bold">Stan</th></tr></thead>
-        <tbody className="divide-y divide-slate-100">
-          {k.pozycje.map((p) => <tr key={p.id} className="align-top">
-            <td className="py-2 pr-2">
-              <div className="flex gap-2">
-                <Zdjecie twId={p.twId} rozmiar={36} nazwa={p.nazwa} />
-                <div className="min-w-0">{p.symbol && <b className="block"><PrzyciskTowaru twId={p.twId}>{p.symbol}</PrzyciskTowaru></b>}
-                  <span className="text-xs text-slate-600">{p.nazwa}</span></div>
-              </div></td>
-            <td className="py-2 pr-2 font-bold tabular-nums">{p.ilosc}{p.unit ? ` ${p.unit}` : ""}</td>
-            <td className="py-2 pr-2">{p.lokFaktyczna
-              ? <span className="rounded bg-emerald-100 px-1.5 py-0.5 text-xs font-bold text-ranga-ok">{p.lokFaktyczna}</span>
-              : <span className="text-xs text-slate-600">{p.lokOczekiwana ?? "—"}</span>}</td>
-            <td className="py-2"><StanPozycji p={p} />
-              {/* Wiersz, który blokuje MM, oznaczony przy sobie —
-                  żeby nie szukać symbolu z ramki wśród dwudziestu pięciu. */}
-              {k.brakiMm?.some((b) => b.twId === p.twId) &&
-                <span className="mt-1 block text-xs font-bold text-ranga-zle">blokuje MM — brak wolnego stanu</span>}
-            </td>
-          </tr>)}
-        </tbody>
-      </table>
+      {pominiete.length > 0 && <section className="mb-4">
+        <NaglowekSekcji jako="h3">Pominięte przez halę · {licznikPominietych(pominiete)}</NaglowekSekcji>
+        {pominiete.map((p) => <PozycjaPominieta key={p.id} p={p} zdjecia={zdjecia} zalatw={zalatw}
+          blokujeMm={blokujeMm(p)} />)}
+      </section>}
+
+      <NaglowekSekcji jako="h3">
+        {pominiete.length ? "Pozostała zawartość" : "Zawartość"} · {reszta.length}</NaglowekSekcji>
+      {reszta.length
+        ? <table className="mt-1 w-full text-sm">
+            <thead><tr className="border-b border-slate-200 text-left text-xs text-slate-600">
+              {zdjecia && <th className="w-12 py-1.5 pr-2"><span className="sr-only">Zdjęcie</span></th>}
+              <th className="py-1.5 pr-2 font-bold">Towar</th>
+              <th className="w-20 py-1.5 pr-2 font-bold">Ilość</th>
+              <th className="w-48 py-1.5 font-bold">Adres · stan</th></tr></thead>
+            <tbody className="divide-y divide-slate-100">
+              {reszta.map((p) => <tr key={p.id} className="align-top">
+                {zdjecia && <td className="py-2 pr-2"><Zdjecie twId={p.twId} rozmiar={40} nazwa={p.nazwa} /></td>}
+                <td className="py-2 pr-2">
+                  {p.symbol && <b className="block"><PrzyciskTowaru twId={p.twId}>{p.symbol}</PrzyciskTowaru></b>}
+                  <span className="text-xs text-slate-600">{p.nazwa}</span></td>
+                <td className="py-2 pr-2 font-bold tabular-nums">{p.ilosc}{p.unit ? ` ${p.unit}` : ""}</td>
+                <td className="py-2"><GdzieIStan p={p} />
+                  {/* Wiersz, który blokuje MM, oznaczony przy sobie —
+                      żeby nie szukać symbolu z ramki wśród dwudziestu pięciu. */}
+                  {blokujeMm(p) &&
+                    <span className="mt-1 block text-xs font-bold text-ranga-zle">blokuje MM — brak wolnego stanu</span>}
+                </td>
+              </tr>)}
+            </tbody>
+          </table>
+        : <p className="py-2 text-sm text-slate-600">
+            {pominiete.length ? "Poza pominiętymi kosz nie ma pozycji." : "Kosz jest pusty."}</p>}
     </div>
   </>;
 }

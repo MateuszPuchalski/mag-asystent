@@ -9,7 +9,12 @@ import { useRef } from "react";
    w jednej z nich.
 
    Kursor chodzi po liście WIDOCZNEJ, nie po kubełku: przy filtrze `j` idzie
-   do następnego wyniku, a nie do sprawy schowanej przed oczami. */
+   do następnego wyniku, a nie do sprawy schowanej przed oczami.
+
+   PAMIĘĆ MIEJSCA NALEŻY DO JEDNEJ LISTY. Ekran, który przy zmianie kubełka
+   albo frazy zostawia sprawę otwartą, podaje `tryb` — nazwę listy, na którą
+   patrzy. Miejsce zapamiętane na innej liście nic o tej nie mówi i otwierałoby
+   wiersz z jej środka, więc wtedy kursor zaczyna od góry. */
 
 /** Indeks celu ruchu o `o` albo `null` przy pustej liście. */
 export function celKursora(dlugosc: number, miejsce: number, ostatnie: number, o: number): number | null {
@@ -23,12 +28,16 @@ export function celKursora(dlugosc: number, miejsce: number, ostatnie: number, o
 /** Zwraca `idz(o)`, które przechodzi o `o` pozycji po liście widocznej. */
 export function useKursorListy<T extends { id: unknown }>(
   widoczne: readonly T[], wybrany: unknown, otworz: (el: T) => void,
+  /** Nazwa listy, na którą patrzy ekran; jej zmiana unieważnia zapamiętane miejsce. */
+  tryb = "",
 ): (o: number) => void {
   const ostatnie = useRef(0);
+  const trybMiejsca = useRef(tryb);
   const miejsce = widoczne.findIndex((el) => el.id === wybrany);
-  if (miejsce >= 0) ostatnie.current = miejsce;
+  if (miejsce >= 0) { ostatnie.current = miejsce; trybMiejsca.current = tryb; }
   return (o: number) => {
-    const i = celKursora(widoczne.length, widoczne.findIndex((el) => el.id === wybrany), ostatnie.current, o);
+    const pamiec = trybMiejsca.current === tryb ? ostatnie.current : 0;
+    const i = celKursora(widoczne.length, widoczne.findIndex((el) => el.id === wybrany), pamiec, o);
     const nast = i == null ? undefined : widoczne[i];
     if (nast) otworz(nast);
   };

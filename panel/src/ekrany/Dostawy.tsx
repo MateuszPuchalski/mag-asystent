@@ -122,7 +122,9 @@ export function Dostawy() {
        ...kubelekWidoczny.map((d) => ({ id: d.dokId }))];
   /* Po zamknięciu ostatniego wyjątku faktura schodzi z DO DECYZJI, a `j` ma
      otworzyć tę, która stanęła na jej miejscu. Powód przy `nawigacja/kursor.ts`. */
-  const kursor = useKursorListy(widoczne, wybrany, (w) => idz(w.id));
+  /* Nazwa listy dla kursora: dokument zostaje otwarty przy zmianie frazy,
+     a miejsce zapamiętane przed odsianiem nic nie mówi o liście po nim. */
+  const kursor = useKursorListy(widoczne, wybrany, (w) => idz(w.id), `${kubelek} ${q}`);
   /* BEZ OTWARTEJ SPRAWY KLAWISZ OTWIERA PIERWSZY WIERSZ. Kursor pamięta
      ostatnie miejsce po to, żeby przeżyć zejście sprawy z listy. Po zmianie
      kubełka sprawy nie ma wcale, a pamięć z poprzedniej listy otwierałaby
@@ -278,7 +280,7 @@ export function Dostawy() {
            to przeglądanie, nie praca. „Poza WERTIS" zostaje o jedno
            kliknięcie z licznikiem w opcji, bo ma wyłapać pomyłkowe
            zdjęcie dostawy. */
-        kubelki={<FiltrZWiecej<KubelekDostaw> zwarty wybrany={kubelek} onWybierz={wybierzKubelek}
+        kubelki={<FiltrZWiecej<KubelekDostaw> wybrany={kubelek} onWybierz={wybierzKubelek}
           wiecej={WIECEJ_DOSTAW}
           pozycje={KUBELKI_DOSTAW.map((k) => ({ klucz: k.id, etykieta: k.etykieta, ile: liczniki[k.id],
             podpowiedz: k.pytanie }))} />}
@@ -301,7 +303,7 @@ export function Dostawy() {
       </KolumnaKolejki>
 
       <SrodekIDowody>
-      <Karta className={`flex min-h-0 flex-col overflow-hidden ${KARTA_PRACY}`}>
+      <Karta className={KARTA_PRACY}>
         {wybrany === null
           ? <Pusto ikona={Truck}>Wybierz dostawę z kolejki.</Pusto>
           : wybrany === "bez"
@@ -322,7 +324,7 @@ export function Dostawy() {
                     ? (dokument.error as Error).message : "Nie znaleziono dokumentu."}</Pusto>}
       </Karta>
 
-      <Karta className={`flex min-h-0 flex-col overflow-hidden ${KARTA_DOWODOW}`}>
+      <Karta className={KARTA_DOWODOW}>
         <div className="min-h-0 flex-1 overflow-y-auto">
           {dokument.data && typeof wybrany === "number"
             /* `key` NA DOKUMENCIE. Bez niego pole notatki i otwarty formularz
