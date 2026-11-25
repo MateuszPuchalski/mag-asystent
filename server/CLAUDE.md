@@ -70,6 +70,14 @@ zostają w tabeli. Schematu odpowiedzi (`zodOutputFormat`) strażnik nie
 widzi, choć model go czyta. Zmiana pola schematu też podnosi numer.
 *Strażnik: `src/adapters/wersje-instrukcji.test.ts`; schemat: konwencja.*
 
+**Zmianę instrukcji szkicu albo modelu porównaj na zestawie testowym.**
+`npm run copilot:zestaw` puszcza zapisane wejścia szkiców jeszcze raz
+(`services/copilot-zestaw.ts`). Opcja `--instrukcja plik.txt` bierze tekst
+kandydata bez wydania, więc porównanie stoi przed zmianą w kodzie. Powód:
+wydanie trafia do magazynu samo, a testy z atrapą nie powiedzą, co model
+napisze klientowi. Zestaw wymaga bazy z serwera magazynu, więc puszcza go
+właściciel. *Strażnik: konwencja.*
+
 **Księgę pisze jeden pisarz**, `zapiszWKsiedze` z
 `services/copilot-ksiega.ts`. Nowe zadanie modelu podaje w nim źródło,
 wersję i kod błędu z `kodBledu`. Nowa liczba bez wartości to NULL, bo zero
