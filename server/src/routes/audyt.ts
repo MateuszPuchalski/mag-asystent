@@ -43,6 +43,7 @@ function filtr(q: Record<string, string | undefined>): FiltrAudytu {
     bezTypow: q.bez ? q.bez.split(",").map((s) => s.trim()).filter(Boolean) : null,
     userRef: liczba(q.userRef),
     twId: liczba(q.twId),
+    towar: q.towar?.trim() || null,
     device: q.device || null,
     limit: liczba(q.limit),
     offset: liczba(q.offset),

@@ -114,6 +114,38 @@ test("filtr po towarze zwraca TYLKO jego zdarzenia", async () => {
   assert.equal(b.wpisy[0].twId, 1);
 });
 
+test("filtr `towar` szuka po symbolu bez względu na wielkość liter i spacje", async () => {
+  const { token } = zalogowany("biuro");
+  db().prepare("UPDATE sgt_towar SET symbol = 'W32-0203 ' WHERE tw_id = 1").run();
+  zdarzenie({ typ: "location_set", twId: 1 });
+  zdarzenie({ typ: "location_set", twId: 2 });
+  const b = (await get("/api/events?towar=%20w32-0203%20", token)).json();
+  assert.deepEqual(b.wpisy.map((w: { twId: number }) => w.twId), [1]);
+  assert.equal(b.razem, 1);
+});
+
+test("cyfry w polu `towar` to i numer kartoteki, i symbol z samych cyfr", async () => {
+  const { token } = zalogowany("biuro");
+  db()
+    .prepare("INSERT OR REPLACE INTO sgt_towar(tw_id, symbol, nazwa, ean, lokalizacja) VALUES (7,'2','Cyfrowy','','')")
+    .run();
+  zdarzenie({ typ: "scan", twId: 1 });
+  zdarzenie({ typ: "scan", twId: 2 }); // bez kartoteki — numer i tak działa
+  zdarzenie({ typ: "scan", twId: 7 });
+  const b = (await get("/api/events?towar=2", token)).json();
+  assert.deepEqual(b.wpisy.map((w: { twId: number }) => w.twId), [7, 2]);
+});
+
+test("nieznany symbol daje pustą listę, także w CSV", async () => {
+  const { token } = zalogowany("biuro");
+  zdarzenie({ typ: "scan", twId: 1 });
+  const b = (await get("/api/events?towar=NIE-MA", token)).json();
+  assert.equal(b.wpisy.length, 0);
+  assert.equal(b.razem, 0);
+  const r = await get("/api/events/csv?towar=NIE-MA", token);
+  assert.doesNotMatch(r.body, /,scan,/);
+});
+
 test("zakres dat obejmuje CAŁY dzień końcowy", async () => {
   /* Reguła najłatwiejsza do ustawienia odwrotnie: `do=2026-07-20` porównane
      z pełnym znacznikiem czasu odcięłoby wszystko po północy, czyli dokładnie

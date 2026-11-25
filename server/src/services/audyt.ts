@@ -22,6 +22,8 @@ export interface FiltrAudytu {
   bezTypow?: string[] | null;
   userRef?: number | null;
   twId?: number | null;
+  /** Symbol kartoteki albo jej numer, tak jak człowiek wpisał w pole. */
+  towar?: string | null;
   device?: string | null;
   limit?: number | null;
   offset?: number | null;
@@ -84,11 +86,36 @@ function warunki(f: FiltrAudytu): Warunki {
     w.push("tw_id = ?");
     p.push(f.twId);
   }
+  if (f.towar) {
+    const ids = idTowaru(f.towar);
+    /* Nieznany towar daje pustą listę. Pominięty warunek pokazałby cały
+       dziennik jako historię towaru, którego nie ma. */
+    w.push(ids.length ? `tw_id IN (${ids.map(() => "?").join(",")})` : "0");
+    p.push(...ids);
+  }
   if (f.device) {
     w.push("device_id = ?");
     p.push(f.device);
   }
   return { where: w.length ? `WHERE ${w.join(" AND ")}` : "", params: p };
+}
+
+/**
+ * Numery kartotek pod tekstem z pola „Towar”.
+ *
+ * Symbol bywa samymi cyframi, więc cyfry szukają po symbolu I po numerze.
+ * Wybór jednego z nich schowałby część towarów. `TRIM`, bo import z Subiekta
+ * nie przycina `tw_Symbol`. Numer zostaje także bez kartoteki, bo ślad bywa
+ * starszy niż ona.
+ */
+function idTowaru(towar: string): number[] {
+  const ids = (
+    db()
+      .prepare("SELECT tw_id AS id FROM sgt_towar WHERE TRIM(symbol) = ? COLLATE NOCASE")
+      .all(towar) as Array<{ id: number }>
+  ).map((r) => r.id);
+  if (/^\d+$/.test(towar)) ids.push(Number(towar));
+  return ids;
 }
 
 /**

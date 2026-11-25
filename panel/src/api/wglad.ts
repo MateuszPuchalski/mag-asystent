@@ -36,7 +36,8 @@ export interface FiltrDziennika {
   od: string;
   do: string;
   typ: string;
-  twId: string;
+  /** Symbol kartoteki albo jej numer. */
+  towar: string;
   device: string;
   userRef: string;
   limit: number;
@@ -45,7 +46,7 @@ export interface FiltrDziennika {
 }
 
 export const FILTR_PUSTY: FiltrDziennika = {
-  od: "", do: "", typ: "", twId: "", device: "", userRef: "", limit: 100, techniczne: false,
+  od: "", do: "", typ: "", towar: "", device: "", userRef: "", limit: 100, techniczne: false,
 };
 
 /**
@@ -71,7 +72,7 @@ export function paramyDziennika(f: FiltrDziennika): string {
   dodaj("od", f.od ? granicaDoby(f.od, false) : "");
   dodaj("do", f.do ? granicaDoby(f.do, true) : "");
   dodaj("typ", f.typ);
-  dodaj("twId", f.twId.trim());
+  dodaj("towar", f.towar.trim());
   dodaj("device", f.device.trim());
   dodaj("userRef", f.userRef);
   /* Pomiary schowane tylko wtedy, gdy nikt nie prosi o konkretny typ:
