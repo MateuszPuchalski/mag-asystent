@@ -43,6 +43,7 @@ import "./index.css";
 import { CoNowego } from "./coNowego/CoNowego";
 import { SzufladaTowaru } from "./towar/Szuflada";
 import { AlarmDostaw } from "./dostawy/AlarmDostaw";
+import { AlarmInnyTowar } from "./zwroty/AlarmInnyTowar";
 
 /* Jeden cache zapytań na cały panel — budowa i powody w `api/klient-zapytan.ts`. */
 const klient = nowyKlientZapytan();
@@ -287,6 +288,9 @@ function Rama({ wyloguj }: { wyloguj: () => void }) {
     {/* Problem zgłoszony z hali stoi nad pracą na każdym ekranie,
         bo kierowca czeka teraz. Powód w `dostawy/alarm.ts`. */}
     <AlarmDostaw />
+    {/* Klient wskazał powód „inny towar" — zarzut wobec nas. Powód w
+        `zwroty/powodInnyTowar.ts`. */}
+    <AlarmInnyTowar />
     <CoNowego />
     {/* BEZ `max-w` i bez `mx-auto`: ogranicznik szerokości oddawałby
         szerokiemu monitorowi setki pikseli na marginesy, a kolumny stałyby
