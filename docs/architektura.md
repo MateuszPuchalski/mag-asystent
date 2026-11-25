@@ -288,6 +288,12 @@ własny przełącznik, domyślnie wyłączony: coś, co wydaje pieniądze samo, 
 się decyzją, nie aktualizacją. Klucza nie ma w `config`, bo `config` bywa
 wypisywany do diagnostyki; SDK czyta `ANTHROPIC_API_KEY` sam.
 
+**Zmianę modelu albo instrukcji szkicu porównuje zestaw testowy.** Szkic
+zapisuje swoje wejście w `copilot_wejscie`, a `npm run copilot:zestaw` puszcza
+te wejścia jeszcze raz i przepuszcza wynik przez te same sita
+(`services/copilot-zestaw.ts`). Polecenie uruchamia człowiek; taktu ani trasy
+nie ma, bo zestaw wydaje pieniądze i czyta treść rozmów.
+
 ## 12. Wydanie i aktualizacja
 
 PR z fragmentem `zmiany/<nazwa>.md` → zielone CI → auto-scalanie →

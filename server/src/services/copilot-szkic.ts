@@ -94,6 +94,31 @@ export type RodzajFaktu =
 export interface Fakt { id: string; rodzaj: RodzajFaktu; zdanie: string }
 
 /**
+ * Tyle faktu, ile czytają sita: numer i rodzaj. Rodzaj jest tu zwykłym
+ * napisem, bo fakt odczytany z zapisanego tekstu zna go tylko wtedy, gdy
+ * jest rozpoznaniem (`faktyZTekstu`).
+ */
+export interface FaktSita { id: string; rodzaj: string }
+
+/**
+ * Początek zdania faktu „rozpoznanie". Stoi raz, bo po nim zestaw testowy
+ * poznaje ten fakt w tekście, który poszedł do dostawcy.
+ */
+export const WSTEP_ROZPOZNANIA = "Rozpoznanie bieżącej prośby klienta (automat, może się mylić): ";
+
+/**
+ * Fakty odczytane z tekstu wysłanego do dostawcy, czyli z wierszy `F3: …`.
+ * Zestaw testowy ma tylko ten tekst, a sita potrzebują numerów i wiedzy,
+ * który fakt jest rozpoznaniem. Spis zdjęć pod faktami nie zaczyna wiersza
+ * od `F`, więc tu nie wchodzi.
+ */
+export function faktyZTekstu(tekst: string): FaktSita[] {
+  return [...tekst.matchAll(/^(F\d+): (.*)$/gm)].map((m) => ({
+    id: m[1]!, rodzaj: m[2]!.startsWith(WSTEP_ROZPOZNANIA) ? "rozpoznanie" : "nieznany",
+  }));
+}
+
+/**
  * Kategorie, przy których szkic pyta o dane maszyny i części (intake).
  * `WRONG_PRODUCT` jest na liście, bo „przyszło co innego" rozstrzyga się
  * porównaniem numerów i danych z tabliczki.
@@ -207,7 +232,7 @@ export function ustalPewnosc(t: TwierdzenieSurowe): Twierdzenie {
  * dostałby sufit „pewne" za zgadywanie automatu. Instrukcja zabrania takiego
  * powołania, ale sufit pewności stoi w kodzie, nie w dyscyplinie modelu.
  */
-export function zRozpoznaniaNiepewne(tw: Twierdzenie[], fakty: Fakt[]): Twierdzenie[] {
+export function zRozpoznaniaNiepewne(tw: Twierdzenie[], fakty: readonly FaktSita[]): Twierdzenie[] {
   const zRozpoznania = new Set(fakty.filter((f) => f.rodzaj === "rozpoznanie").map((f) => f.id));
   return tw.map((t) => t.odwolanie && zRozpoznania.has(t.odwolanie)
     ? { ...t, zrodlo: "model" as const, pewnosc: "niepewne" as const, obnizona: t.pewnosc !== "niepewne" }
@@ -667,7 +692,7 @@ export function kontekstSzkicu(
       id: number; kategoria: string; akcja: string; wymaga_czlowieka: number;
       brak_danych_zamowienia: number; brak_danych_produktu: number } | undefined : undefined;
   if (rozpoznanie) {
-    dodaj("rozpoznanie", `Rozpoznanie bieżącej prośby klienta (automat, może się mylić): `
+    dodaj("rozpoznanie", WSTEP_ROZPOZNANIA
       + `${rozpoznanie.kategoria}; następny krok: ${rozpoznanie.akcja}`
       + (Number(rozpoznanie.brak_danych_zamowienia) ? "; w rozmowie brakuje danych zamówienia" : "")
       + (Number(rozpoznanie.brak_danych_produktu) ? "; w rozmowie brakuje danych towaru lub maszyny" : "")
@@ -854,7 +879,7 @@ export type WynikSit =
  * klientowi nie.
  */
 export function sitaSzkicu(s: SzkicSurowy, m: {
-  fakty: Fakt[]; material: string; wyslaneZdjecia: ReadonlySet<string>; wynikiN: WynikWywolania[];
+  fakty: readonly FaktSita[]; material: string; wyslaneZdjecia: ReadonlySet<string>; wynikiN: WynikWywolania[];
 }): WynikSit {
   const twierdzenia = zRozpoznaniaNiepewne(ocenTwierdzenia(s.twierdzenia), m.fakty);
   /* ── ODCZYT ZE ZDJĘĆ: NAJPIERW TOŻSAMOŚĆ, POTEM ZAUFANIE ──────────────────
