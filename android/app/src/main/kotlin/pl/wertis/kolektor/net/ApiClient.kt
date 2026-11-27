@@ -16,6 +16,7 @@ import pl.wertis.kolektor.core.net.LicznikCzasow
 import pl.wertis.kolektor.core.net.MmConflict
 import pl.wertis.kolektor.core.net.WertisJson
 import pl.wertis.kolektor.core.net.dlugiePobranie
+import pl.wertis.kolektor.core.net.wolnaListaZSubiekta
 import pl.wertis.kolektor.core.net.mierzyc
 import pl.wertis.kolektor.core.net.naglowekHttp
 import retrofit2.HttpException
@@ -101,12 +102,20 @@ class IdentityHeaderInterceptor(
    człowiekowi. Limit ma pilnować MILCZENIA łącza, nie długości pobierania. */
 private const val SEKUND_DLUGIE_POBRANIE = 60
 
+/* Strona i licznik to dwa zapytania po sobie, każde z limitem 30 s po stronie
+   serwera. */
+private const val SEKUND_WOLNA_LISTA = 65
+
 class LimityCzasuInterceptor : Interceptor {
     override fun intercept(chain: Interceptor.Chain): Response {
         val req = chain.request()
-        if (!dlugiePobranie(req.url.encodedPath)) return chain.proceed(req)
+        val sekund = when {
+            dlugiePobranie(req.url.encodedPath) -> SEKUND_DLUGIE_POBRANIE
+            wolnaListaZSubiekta(req.url.encodedPath) -> SEKUND_WOLNA_LISTA
+            else -> return chain.proceed(req)
+        }
         return chain
-            .withReadTimeout(SEKUND_DLUGIE_POBRANIE, TimeUnit.SECONDS)
+            .withReadTimeout(sekund, TimeUnit.SECONDS)
             .proceed(req)
     }
 }

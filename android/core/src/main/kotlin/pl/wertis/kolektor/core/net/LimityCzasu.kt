@@ -36,3 +36,15 @@ package pl.wertis.kolektor.core.net
  */
 fun dlugiePobranie(sciezka: String): Boolean =
     sciezka.trimEnd('/').endsWith("api/aktualizacja/apk")
+
+/**
+ * Czy to lista, którą serwer składa wprost z bazy Subiekta.
+ *
+ * Serwer daje takiemu zapytaniu 30 s. Przy limicie 10 s kolektor rozłącza się
+ * wcześniej i mówi „brak połączenia", choć sieć działa, a odpowiedź albo
+ * powód odmowy dopiero idzie. Człowiek widzi, że ekran wczytuje, i może
+ * w tym czasie zmienić filtr.
+ */
+fun wolnaListaZSubiekta(sciezka: String): Boolean =
+    sciezka.trimEnd('/').endsWith("api/wymiary/bez-wymiarow")
+

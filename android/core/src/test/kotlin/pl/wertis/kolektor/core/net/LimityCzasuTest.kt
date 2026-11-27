@@ -51,4 +51,11 @@ class LimityCzasuTest {
         assertFalse(dlugiePobranie(""))
         assertFalse(dlugiePobranie("/"))
     }
+
+    @Test fun `dluzej czeka tylko lista z Subiekta, nie pojedynczy towar`() {
+        assertTrue(wolnaListaZSubiekta("/api/wymiary/bez-wymiarow"))
+        assertFalse(wolnaListaZSubiekta("/api/wymiary/123"))
+        assertFalse(dlugiePobranie("/api/wymiary/bez-wymiarow"))
+    }
 }
+
