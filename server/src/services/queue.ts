@@ -5,6 +5,8 @@ import type { MmItem, ZlecenieZw } from "../adapters/sfera.js";
 import type { Pomiar } from "../adapters/wymiary.sgt.js";
 
 export interface EnqueueBase {
+  /** Worker nie weźmie zadania przed tą chwilą (ISO) — okno na cofnięcie. */
+  nieWczesniej?: string;
   createdBy: string;
   /**
    * Konto autora. Puste = bierzemy z bieżącej sesji. Podaje się je wprost
@@ -62,7 +64,7 @@ function insert(
          sesję — dla dotychczasowych wywołań nic się nie zmienia. */
       base.createdByRef === undefined ? currentUserRef() : base.createdByRef,
       base.createdAt ?? null,
-      null
+      base.nieWczesniej ?? null
     );
   return Number(res.lastInsertRowid);
 }

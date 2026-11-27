@@ -33,6 +33,7 @@ export const NAZWA_ZDARZENIA: Record<string, string> = {
   zdjecie_dodane: "Zdjęcie dodane",
   wymiary_pilne: "Lista pilnych do zmierzenia zmieniona",
   wymiary_set: "Waga i wymiary zmierzone",
+  wymiary_cofniete: "Pomiar cofnięty przed zapisem",
   zdjecia_allegro_dopasowane: "Oferty Allegro dobrane do zdjęć",
   zdjecia_allegro_indeks_lista: "Lista naszych ofert Allegro odświeżona",
   zdjecia_allegro_indeks_parametry: "Kody producenta ofert Allegro odczytane",

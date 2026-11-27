@@ -79,8 +79,16 @@ data class PomiarBody(
     val dlugosc: String? = null,
     val szerokosc: String? = null,
     val wysokosc: String? = null,
+    /** Ekran umie cofnąć, więc serwer ma wstrzymać zapis na okno cofnięcia. */
+    val zCofaniem: Boolean = false,
 )
 
 /** Odpowiedź zapisu. Echo pomiaru serwera pomijamy — kolektor go nie rysuje. */
 @Serializable
-data class ZapisPomiaruResponse(val queueId: Long = 0)
+data class ZapisPomiaruResponse(
+    val queueId: Long = 0,
+    /** Symbol i wpisane wartości słowami serwera — napis na pasku „COFNIJ". */
+    val opis: String = "",
+    /** Ile sekund da się cofnąć; 0, gdy zapis poszedł od razu albo serwer jest starszy. */
+    val cofnijDoSekund: Int = 0,
+)

@@ -536,4 +536,12 @@ interface ApiService {
         @Path("twId") twId: Long,
         @Body body: PomiarBody,
     ): ZapisPomiaruResponse
+
+    /** Cofnięcie własnego pomiaru, póki czeka w kolejce; po czasie serwer odmawia 409. */
+    @POST("api/wymiary/{twId}/cofnij/{queueId}")
+    suspend fun cofnijPomiar(
+        @Path("twId") twId: Long,
+        @Path("queueId") queueId: Long,
+        @Body body: RequestBody = EMPTY_BODY,
+    ): OkResponse
 }
