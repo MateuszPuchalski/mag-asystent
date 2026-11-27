@@ -1,6 +1,6 @@
 ---
 rodzaj: patch
-tytul: lista „Do zmierzenia” mniej obciąża Subiekta
+tytul: filtry „Do zmierzenia” nie znikają, a lista mniej obciąża Subiekta
 ---
 
 **Filtry w „Do zmierzenia” nie znikają.** Gdy lista się wczytuje albo nie

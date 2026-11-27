@@ -129,7 +129,8 @@ fun DoZmierzeniaScreen(graph: AppGraph) {
     var formularz by remember { mutableStateOf<TowarDoPomiaru?>(null) }
     var filtr by remember { mutableStateOf(graph.nav.filtrWymiarow) }
 
-    suspend fun wczytaj(od: Int) {
+    /** `true`, gdy na ekran weszła strona z TEGO żądania. */
+    suspend fun wczytaj(od: Int): Boolean {
         val f = filtr
         val z = f.zapytanie(od)
         val numer = ++ostatnieZadanie
@@ -147,7 +148,7 @@ fun DoZmierzeniaScreen(graph: AppGraph) {
             }
             /* Odpowiedź pod wybór, który człowiek już zmienił, wkleiłaby
                stary porządek pod nowy chip. Nowe żądanie jest już w drodze. */
-            if (numer != ostatnieZadanie) return
+            if (numer != ostatnieZadanie) return false
             wlaczone = strona.wlaczone
             powod = strona.powod
             razem = strona.razem
@@ -155,6 +156,7 @@ fun DoZmierzeniaScreen(graph: AppGraph) {
             pozycje = if (od == 0) strona.pozycje else dolaczStrone(pozycje, strona.pozycje)
             offset = od + strona.pozycje.size
             bladListy = null
+            return true
         } catch (e: ApiError) {
             /* Błąd porzuconego wyboru nie opisuje listy, która jest na ekranie. */
             if (numer == ostatnieZadanie) bladListy = e.message ?: "Serwer nie oddał listy"
@@ -164,12 +166,16 @@ fun DoZmierzeniaScreen(graph: AppGraph) {
             // starsze żądanie nie gasi „Wczytuję…” nowszemu, które jeszcze biegnie
             if (numer == ostatnieZadanie) ladowanie = false
         }
+        return false
     }
 
-    suspend fun przeladuj() {
+    /* Porzucone żądanie wraca nawet po minucie, gdy człowiek mierzy już z innej
+       listy. Nie może mu wtedy przestawić wskazanego wiersza ani przewinąć. */
+    suspend fun przeladuj(): Boolean {
         zapisane = emptySet()
-        wczytaj(0)
-        wskazany = nastepnyWolny(pozycje, null, zapisane)?.twId
+        val weszla = wczytaj(0)
+        if (weszla) wskazany = nastepnyWolny(pozycje, null, zapisane)?.twId
+        return weszla
     }
 
     LaunchedEffect(Unit) { przeladuj() }
@@ -185,8 +191,7 @@ fun DoZmierzeniaScreen(graph: AppGraph) {
         wskazany = null
         bladListy = null
         scope.launch {
-            przeladuj()
-            listState.scrollToItem(0)
+            if (przeladuj()) listState.scrollToItem(0)
         }
     }
 
@@ -377,8 +382,7 @@ fun DoZmierzeniaScreen(graph: AppGraph) {
                 } else {
                     // koniec wczytanej listy — następny towar leży na dalszej stronie
                     scope.launch {
-                        wczytaj(offset)
-                        wskazany = nastepnyWolny(pozycje, towar.twId, zapisane)?.twId
+                        if (wczytaj(offset)) wskazany = nastepnyWolny(pozycje, towar.twId, zapisane)?.twId
                     }
                 }
             },
