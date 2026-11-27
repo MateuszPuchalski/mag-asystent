@@ -47,4 +47,3 @@ fun dlugiePobranie(sciezka: String): Boolean =
  */
 fun wolnaListaZSubiekta(sciezka: String): Boolean =
     sciezka.trimEnd('/').endsWith("api/wymiary/bez-wymiarow")
-

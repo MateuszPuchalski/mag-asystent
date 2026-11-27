@@ -184,11 +184,10 @@ export function wzorzecPrefiksu(q: string): string {
  * sumowane w podzapytaniach, porządek domknięty `tw_Id`.
  *
  * Filtr „sprzedane" to złączenie ze zbiorem sprzedanych towarów, a nie
- * `EXISTS` skorelowany z kartoteką. Skorelowany pozwalał bazie liczyć
- * sprzedaż, ze sprawdzaniem faktur do paragonów, osobno dla kartotek,
- * i lista z tym filtrem nie mieściła się w limicie czasu. Zbiór ma ten sam
- * kształt co suma sprzedaży, którą liczy każda strona. Grupowanie daje jeden
- * wiersz na towar, więc złączenie niczego nie dubluje.
+ * `EXISTS` skorelowany z kartoteką. `EXISTS` zaprasza bazę do liczenia
+ * sprzedaży, ze sprawdzaniem faktur do paragonów, osobno dla kartotek. Zbiór
+ * ma ten sam kształt co suma sprzedaży na stronie. Planu to nie wymusza.
+ * Grupowanie daje jeden wiersz na towar, więc złączenie niczego nie dubluje.
  */
 export function budujZapytanieBezWymiarow(opts: {
   pola: Record<Wymiar, string>;

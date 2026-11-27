@@ -58,4 +58,3 @@ class LimityCzasuTest {
         assertFalse(dlugiePobranie("/api/wymiary/bez-wymiarow"))
     }
 }
-

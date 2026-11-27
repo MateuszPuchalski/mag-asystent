@@ -124,4 +124,3 @@ class FiltrWymiarowTest {
         assertEquals("Do zmierzenia: 37 · symbole na W", naglowekListy(37, "W", znane = true))
     }
 }
-

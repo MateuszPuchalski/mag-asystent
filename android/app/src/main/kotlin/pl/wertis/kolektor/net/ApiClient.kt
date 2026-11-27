@@ -103,7 +103,8 @@ class IdentityHeaderInterceptor(
 private const val SEKUND_DLUGIE_POBRANIE = 60
 
 /* Strona i licznik to dwa zapytania po sobie, każde z limitem 30 s po stronie
-   serwera. */
+   serwera. Trzecie, licznik pilnych, liczy tylko wskazane symbole, więc
+   osobnego zapasu nie dostaje. */
 private const val SEKUND_WOLNA_LISTA = 65
 
 class LimityCzasuInterceptor : Interceptor {

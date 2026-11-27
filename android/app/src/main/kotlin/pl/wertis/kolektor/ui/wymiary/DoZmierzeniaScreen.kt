@@ -33,6 +33,8 @@ import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
 import pl.wertis.kolektor.AppGraph
 import pl.wertis.kolektor.core.net.ApiError
@@ -122,6 +124,8 @@ fun DoZmierzeniaScreen(graph: AppGraph) {
     var ladowanie by remember { mutableStateOf(true) } // pierwsza klatka to jeszcze nie pusta lista
     /** Numer ostatniego żądania listy. Tylko ono może zmienić ekran. */
     var ostatnieZadanie by remember { mutableStateOf(0) }
+    /** Wczytanie w drodze — następne je anuluje. */
+    var wDrodze by remember { mutableStateOf<Job?>(null) }
     /** Zapisane z tego kolektora — lista serwera dowie się o nich przy przeładowaniu. */
     var zapisane by remember { mutableStateOf(setOf<Long>()) }
     /** Wiersz wskazany: następny do zmierzenia albo trafiony skanem regału. */
@@ -157,6 +161,8 @@ fun DoZmierzeniaScreen(graph: AppGraph) {
             offset = od + strona.pozycje.size
             bladListy = null
             return true
+        } catch (e: CancellationException) {
+            throw e // anulowane to nie „brak połączenia"
         } catch (e: ApiError) {
             /* Błąd porzuconego wyboru nie opisuje listy, która jest na ekranie. */
             if (numer == ostatnieZadanie) bladListy = e.message ?: "Serwer nie oddał listy"
@@ -178,7 +184,15 @@ fun DoZmierzeniaScreen(graph: AppGraph) {
         return weszla
     }
 
-    LaunchedEffect(Unit) { przeladuj() }
+    /* Porzucone wczytanie trzeba ANULOWAĆ, nie tylko pominąć. OkHttp puszcza
+       naraz pięć żądań do jednego serwera. Kilka dotknięć chipów przy wolnej
+       liście zajęłoby wszystkie, a skan i zapis pomiaru czekałyby w kolejce. */
+    fun wczytajZamiast(blok: suspend () -> Unit) {
+        wDrodze?.cancel()
+        wDrodze = scope.launch { blok() }
+    }
+
+    LaunchedEffect(Unit) { wczytajZamiast { przeladuj() } }
 
     /** Nowy porządek albo filtr: lista od zera, stara znika od razu. */
     fun zmienFiltr(nowy: FiltrWymiarow) {
@@ -190,7 +204,7 @@ fun DoZmierzeniaScreen(graph: AppGraph) {
         offset = 0
         wskazany = null
         bladListy = null
-        scope.launch {
+        wczytajZamiast {
             if (przeladuj()) listState.scrollToItem(0)
         }
     }
@@ -342,7 +356,7 @@ fun DoZmierzeniaScreen(graph: AppGraph) {
                     )
                     if (bladListy != null && !ladowanie) {
                         OutlineButton("SPRÓBUJ JESZCZE RAZ", modifier = Modifier.fillMaxWidth()) {
-                            scope.launch { przeladuj() }
+                            wczytajZamiast { przeladuj() }
                         }
                     }
                 }
@@ -363,7 +377,7 @@ fun DoZmierzeniaScreen(graph: AppGraph) {
                     if (ladowanie) "WCZYTUJĘ…" else "WIĘCEJ",
                     modifier = Modifier.fillMaxWidth(),
                     enabled = !ladowanie,
-                ) { scope.launch { wczytaj(offset) } }
+                ) { wczytajZamiast { wczytaj(offset) } }
             }
         }
     }
@@ -381,14 +395,14 @@ fun DoZmierzeniaScreen(graph: AppGraph) {
                     wskazany = dalej?.twId
                 } else {
                     // koniec wczytanej listy — następny towar leży na dalszej stronie
-                    scope.launch {
+                    wczytajZamiast {
                         if (wczytaj(offset)) wskazany = nastepnyWolny(pozycje, towar.twId, zapisane)?.twId
                     }
                 }
             },
             onWylaczone = {
                 formularz = null
-                scope.launch { przeladuj() }
+                wczytajZamiast { przeladuj() }
             },
         )
     }

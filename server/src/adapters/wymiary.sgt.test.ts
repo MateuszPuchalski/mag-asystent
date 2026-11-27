@@ -128,4 +128,3 @@ test("sprzedane: złączenie ze zbiorem w stronie i liczniku, bez EXISTS na kart
   const bez = budujZapytanieBezWymiarow(opcje);
   for (const q of [bez.strona, bez.razem]) assert.ok(!q.includes(") f ON f.ob_TowId"), q);
 });
-

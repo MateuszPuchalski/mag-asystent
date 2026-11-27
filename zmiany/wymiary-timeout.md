@@ -9,8 +9,8 @@ ekran nie twierdzi już, że wszystko jest zmierzone. Kolektor czeka na tę list
 dłużej niż 10 sekund.
 
 Lista „Do zmierzenia” z filtrem „sprzedane 30 dni” kończyła się błędem po
-30 sekundach. Serwer buduje teraz zbiór sprzedanych towarów i dołącza go do
-listy, zamiast sprawdzać sprzedaż przy każdej kartotece. Czasu na bazie firmy
-nie zmierzono. Licznik pilnych pyta o samą liczbę, a identyczne żądania
+30 sekundach. Zapytanie dołącza teraz do listy zbiór sprzedanych towarów
+zamiast warunku sprawdzanego przy kartotece. Czasu na bazie firmy nie
+zmierzono. Licznik pilnych pyta o samą liczbę, a identyczne żądania
 w trakcie wolnego odczytu czekają na jeden. Pomiar robi
 `tools/pomiar-listy-wymiarow.sql`.
