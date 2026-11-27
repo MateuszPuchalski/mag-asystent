@@ -183,10 +183,12 @@ export function wzorzecPrefiksu(q: string): string {
  * Ten sam kształt co lista bez zdjęcia: tylko niezablokowane, stan i sprzedaż
  * sumowane w podzapytaniach, porządek domknięty `tw_Id`.
  *
- * Sumę stanu i sprzedaży strona łączy tylko wtedy, gdy stoi na niej porządek.
- * Złączenie liczy całą kartotekę, a przy obchodzie regałów te liczby nie
- * ustalają kolejności. `dosumuj` mówi, które z nich policzyć osobno,
- * już tylko dla towarów ze strony (`budujZapytanieSum`).
+ * Filtr „sprzedane" to złączenie ze zbiorem sprzedanych towarów, a nie
+ * `EXISTS` skorelowany z kartoteką. Skorelowany pozwalał bazie liczyć
+ * sprzedaż, ze sprawdzaniem faktur do paragonów, osobno dla kartotek,
+ * i lista z tym filtrem nie mieściła się w limicie czasu. Zbiór ma ten sam
+ * kształt co suma sprzedaży, którą liczy każda strona. Grupowanie daje jeden
+ * wiersz na towar, więc złączenie niczego nie dubluje.
  */
 export function budujZapytanieBezWymiarow(opts: {
   pola: Record<Wymiar, string>;
@@ -201,7 +203,7 @@ export function budujZapytanieBezWymiarow(opts: {
   naStanie?: boolean;
   sprzedane?: boolean;
   sprzedaz?: { fs: number; pa: number; odnosnik?: string };
-}): { strona: string; razem: string; dosumuj: { stan: boolean; sprzedaz: boolean } } {
+}): { strona: string; razem: string } {
   const wymiary = zrodloWymiarow(opts.pola);
   const zrodlo = zrodloSprzedazy(opts.sprzedaz ?? { fs: 2, pa: 21 });
   const brak = ["ISNULL(t.tw_Masa, 0) <= 0", "ISNULL(t.tw_MasaNetto, 0) <= 0", ...WYMIARY.map(pustyTekst)]
@@ -220,9 +222,9 @@ export function budujZapytanieBezWymiarow(opts: {
   if (opts.naStanie) {
     warunki.push("EXISTS (SELECT 1 FROM tw_Stan st WITH (NOLOCK) WHERE st.st_TowId = t.tw_Id AND st.st_Stan > 0)");
   }
-  if (opts.sprzedane) {
-    warunki.push(`EXISTS (SELECT 1 ${zrodlo} AND p.ob_TowId = t.tw_Id AND p.ob_IloscMag > 0)`);
-  }
+  const sprzedane = opts.sprzedane
+    ? `JOIN (SELECT p.ob_TowId ${zrodlo} AND p.ob_IloscMag > 0 GROUP BY p.ob_TowId) f ON f.ob_TowId = t.tw_Id `
+    : "";
   const gdzie = `WHERE ${warunki.join(" AND ")}`;
   const stan =
     "LEFT JOIN (SELECT st_TowId, SUM(st_Stan) AS stan FROM tw_Stan WITH (NOLOCK) GROUP BY st_TowId) s " +
@@ -235,39 +237,16 @@ export function budujZapytanieBezWymiarow(opts: {
   const porzadek = opts.sortuj === "lokalizacja"
     ? `CASE WHEN LTRIM(RTRIM(ISNULL(t.${loc}, ''))) = '' THEN 1 ELSE 0 END, t.${loc}, t.tw_Id`
     : PORZADEK[opts.sortuj ?? "sprzedaz"] ?? PORZADEK.sprzedaz;
-  /* Porządek „sprzedaż" rozstrzyga remis stanem, więc potrzebuje obu sum. */
-  const wedlug = opts.sortuj ?? "sprzedaz";
-  const zeSprzedaza = wedlug === "sprzedaz";
-  const zeStanem = zeSprzedaza || wedlug === "stan";
   return {
-    dosumuj: { stan: !zeStanem, sprzedaz: !zeSprzedaza },
     strona:
       "SELECT t.tw_Id AS twId, t.tw_Symbol AS symbol, t.tw_Nazwa AS nazwa, " +
-      "t.tw_PodstKodKresk AS ean, " +
-      `${zeStanem ? "ISNULL(s.stan, 0)" : "0"} AS stan, ` +
-      `${zeSprzedaza ? "ISNULL(sp.sprzedaz, 0)" : "0"} AS sprzedaz, ` +
+      "t.tw_PodstKodKresk AS ean, ISNULL(s.stan, 0) AS stan, ISNULL(sp.sprzedaz, 0) AS sprzedaz, " +
       `t.${loc} AS lokalizacja, ` +
       "t.tw_Masa AS brutto, t.tw_MasaNetto AS netto, pw.dlugosc, pw.szerokosc, pw.wysokosc " +
-      `FROM tw__Towar t WITH (NOLOCK) ${wymiary} ${zeStanem ? stan : ""} ${zeSprzedaza ? sprzedaz : ""} ${gdzie} ` +
+      `FROM tw__Towar t WITH (NOLOCK) ${sprzedane}${wymiary} ${stan} ${sprzedaz} ${gdzie} ` +
       `ORDER BY ${porzadek} OFFSET @offset ROWS FETCH NEXT @limit ROWS ONLY`,
-    razem: `SELECT COUNT(*) AS razem FROM tw__Towar t WITH (NOLOCK) ${wymiary} ${gdzie}`,
+    razem: `SELECT COUNT(*) AS razem FROM tw__Towar t WITH (NOLOCK) ${sprzedane}${wymiary} ${gdzie}`,
   };
-}
-
-/**
- * Suma stanu albo sprzedaży z okna tylko dla towarów ze strony, parametry
- * `@id0`…. Te same źródła co w liście, więc liczba w wierszu nie zależy od
- * porządku. Strona ma najwyżej 200 wierszy, daleko od limitu parametrów.
- */
-export function budujZapytanieSum(
-  co: "stan" | "sprzedaz", ile: number, sprzedaz: { fs: number; pa: number; odnosnik?: string },
-): string {
-  const znaki = Array.from({ length: Math.trunc(ile) }, (_, i) => `@id${i}`).join(", ");
-  return co === "stan"
-    ? "SELECT st_TowId AS twId, SUM(st_Stan) AS suma FROM tw_Stan WITH (NOLOCK) " +
-      `WHERE st_TowId IN (${znaki}) GROUP BY st_TowId`
-    : `SELECT p.ob_TowId AS twId, SUM(p.ob_IloscMag) AS suma ${zrodloSprzedazy(sprzedaz)} ` +
-      `AND p.ob_TowId IN (${znaki}) GROUP BY p.ob_TowId`;
 }
 
 export interface ZapytanieListy {
@@ -322,7 +301,6 @@ export async function towaryBezWymiarow(z: ZapytanieListy): Promise<{ razem: num
   /* Odnośnik faktury do paragonu tylko wtedy, gdy import go znalazł —
      kolumna, której nie ma, wywróciłaby listę błędem 207. */
   const odnosnik = m.korektaColumn && !brakKolumnyKorekty ? m.korektaColumn : undefined;
-  const sprzedaz = { fs: m.dokTypFS, pa: m.dokTypPA, odnosnik };
   const zapytania = budujZapytanieBezWymiarow({
     pola: polaWymiarow(),
     lokalizacja: m.locColumn,
@@ -332,7 +310,7 @@ export async function towaryBezWymiarow(z: ZapytanieListy): Promise<{ razem: num
     sortuj: z.sortuj,
     naStanie: z.naStanie,
     sprzedane: z.sprzedane,
-    sprzedaz,
+    sprzedaz: { fs: m.dokTypFS, pa: m.dokTypPA, odnosnik },
   });
   const od = new Date(Date.now() - DNI_SPRZEDAZY * 86400_000).toISOString().slice(0, 10);
   const pool = await mssqlPool();
@@ -352,20 +330,7 @@ export async function towaryBezWymiarow(z: ZapytanieListy): Promise<{ razem: num
     .input("offset", sql.Int, z.offset)
     .input("limit", sql.Int, z.limit)
     .query<WierszListy>(zapytania.strona);
-  /* Po kolei, nie równolegle: pula ma cztery połączenia i dzieli je z importem. */
-  const razem = await licz();
-  const wiersze = strona.recordset;
-  for (const co of ["stan", "sprzedaz"] as const) {
-    if (!zapytania.dosumuj[co] || wiersze.length === 0) continue;
-    const r = pool.request().input("odSprzedazy", sql.VarChar(10), od);
-    wiersze.forEach((w, n) => r.input(`id${n}`, sql.Int, w.twId));
-    const sumy = await r.query<{ twId: number; suma: number | string | null }>(
-      budujZapytanieSum(co, wiersze.length, sprzedaz)
-    );
-    const mapa = new Map(sumy.recordset.map((x) => [x.twId, x.suma]));
-    for (const w of wiersze) w[co] = mapa.get(w.twId) ?? 0;
-  }
-  return { razem, pozycje: wiersze.map(naPozycje) };
+  return { razem: await licz(), pozycje: strona.recordset.map(naPozycje) };
 }
 
 /** Towar z obecną wagą i wymiarami — do audytu przed zapisem i do karty w kolektorze. */

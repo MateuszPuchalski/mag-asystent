@@ -8,10 +8,9 @@ wczytała, rząd filtrów zostaje na ekranie i da się zmienić wybór. Po błę
 ekran nie twierdzi już, że wszystko jest zmierzone. Kolektor czeka na tę listę
 dłużej niż 10 sekund.
 
-Lista „Do zmierzenia” kończyła się na kolektorze błędem po 30 sekundach. Przy
-porządku po regałach, symbolu, nazwie i najnowszych serwer sumuje teraz stan
-i sprzedaż tylko dla towarów ze strony. Licznik pilnych pyta o samą liczbę.
-Identyczne żądania w trakcie wolnego odczytu czekają na jeden. Filtr „sprzedane 30 dni” działa jak
-wcześniej, więc z nim lista może nadal przekraczać limit. Czasu na bazie
-firmy nie zmierzono. Porządek po sprzedaży liczy to samo co wcześniej. Pomiar
-robi `tools/pomiar-listy-wymiarow.sql`.
+Lista „Do zmierzenia” z filtrem „sprzedane 30 dni” kończyła się błędem po
+30 sekundach. Serwer buduje teraz zbiór sprzedanych towarów i dołącza go do
+listy, zamiast sprawdzać sprzedaż przy każdej kartotece. Czasu na bazie firmy
+nie zmierzono. Licznik pilnych pyta o samą liczbę, a identyczne żądania
+w trakcie wolnego odczytu czekają na jeden. Pomiar robi
+`tools/pomiar-listy-wymiarow.sql`.
