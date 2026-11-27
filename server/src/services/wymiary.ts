@@ -341,7 +341,9 @@ export function cofnijPomiar(
   if (z.created_by_ref !== autor.ref) {
     return { ok: false, kod: 409, error: "Cofnąć pomiar może tylko ten, kto go zapisał." };
   }
-  if (z.status === "cancelled") return { ok: false, kod: 409, error: "Ten pomiar jest już cofnięty." };
+  /* Powtórzone cofnięcie to sukces: po zgubionej odpowiedzi kolektor pyta
+     drugi raz i musi się dowiedzieć, że towar znów czeka na pomiar. */
+  if (z.status === "cancelled") return { ok: true };
   return {
     ok: false, kod: 409,
     error: "Za późno na cofnięcie — pomiar idzie do Subiekta. Zmierz towar jeszcze raz.",

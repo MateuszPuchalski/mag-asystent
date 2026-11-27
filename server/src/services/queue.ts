@@ -39,8 +39,9 @@ function insert(
      konto to tożsamość. Worker działa POZA żądaniem — nie ma tam sesji ani
      `currentUserRef()` — więc bez tej kolumny zdarzenia „zapis wszedł/nie
      wszedł" umiałyby podać wyłącznie łańcuch znaków, a audyt wiąże po koncie. */
-  // `next_attempt_at` zostaje NULL — zadanie jest do wzięcia od razu. Kolumnę
-  // wypełnia dopiero worker: backoff przy retry i `waiting_for_doc`.
+  // `next_attempt_at` zwykle zostaje NULL — zadanie jest do wzięcia od razu.
+  // Termin ustawia `nieWczesniej` (okno na cofnięcie), a potem worker: backoff
+  // przy retry i `waiting_for_doc`.
   /* Uchwyt bazy jest PARAMETREM, tak jak w `logEvent`. Usługi pracujące na
      przekazanym uchwycie — i wewnątrz `transaction(database, …)` — pisałyby
      przez singleton z INNEGO połączenia: z zewnątrz otwartej transakcji

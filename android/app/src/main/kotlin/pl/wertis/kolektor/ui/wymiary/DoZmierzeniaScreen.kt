@@ -358,7 +358,8 @@ fun DoZmierzeniaScreen(graph: AppGraph) {
                 if (e.status == 409 && doCofniecia?.queueId == d.queueId) doCofniecia = null
             } catch (e: Exception) {
                 graph.feedback.beep(false)
-                graph.effects.toast("Brak połączenia — pomiar nie został cofnięty")
+                // odpowiedź mogła zginąć po cofnięciu, więc nie wiemy, jak jest
+                graph.effects.toast("Brak połączenia — dotknij COFNIJ jeszcze raz")
             } finally {
                 cofanie = false
             }

@@ -272,7 +272,25 @@ test("pomiar z cofaniem czeka w kolejce, a cofnięty nie idzie do Subiekta", asy
   assert.equal(jeden.json().oczekuje, false, "towar wraca na listę do zmierzenia");
   const slad = db().prepare("SELECT tw_id FROM events WHERE type = 'wymiary_cofniete'").all();
   assert.equal(slad.length, 1);
-  assert.match((await cofnij(h, 1, r.queueId)).json().error, /już cofnięty/);
+  assert.equal((await cofnij(h, 1, r.queueId)).statusCode, 200, "powtórka po zgubionej odpowiedzi");
+  assert.equal(db().prepare("SELECT id FROM events WHERE type = 'wymiary_cofniete'").all().length, 1);
+});
+
+test("worker nie bierze wstrzymanego pomiaru ani cofniętego już po wyborze", async () => {
+  const { pickTask, przetworzZadanie } = await import("../worker/kolejka.js");
+  const h = sesja("magazynier");
+  const wstrzymany = (await zapisz(h, 1, { bruttoKg: 1, zCofaniem: true })).json().queueId;
+  assert.equal(pickTask(), undefined);
+
+  db().prepare("UPDATE sfera_queue SET next_attempt_at = NULL WHERE id = ?").run(wstrzymany);
+  const wybrane = pickTask()!;
+  assert.equal(wybrane.id, wstrzymany);
+  /* cofnięcie wchodzi między wybór a przejęcie zadania */
+  db().prepare("UPDATE sfera_queue SET status = 'cancelled' WHERE id = ?").run(wstrzymany);
+  await przetworzZadanie(wybrane, {
+    applySetWymiary: async () => assert.fail("cofnięty pomiar nie idzie do Subiekta"),
+  } as unknown as Parameters<typeof przetworzZadanie>[1]);
+  assert.equal(zadanie(wstrzymany).status, "cancelled");
 });
 
 test("bez zCofaniem zapis rusza od razu i cofnąć go nie można", async () => {
