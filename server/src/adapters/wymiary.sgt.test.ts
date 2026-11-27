@@ -2,6 +2,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import {
   budujZapytanieBezWymiarow, budujZapytanieWag, wzorzecPrefiksu, budujZapytanieWymiarow, tekstWymiaru, zrodloWymiarow,
+  budujZapytanieSum,
 } from "./wymiary.sgt.js";
 
 /* ── Zapytania wag i wymiarów — jedyna logika tego adaptera bez serwera MSSQL ─
@@ -116,3 +117,35 @@ test("pilne: IN z osobnym parametrem na symbol w stronie i liczniku", () => {
   const bez = budujZapytanieBezWymiarow({ pola: POLA, lokalizacja: "tw_Pole1", zFiltrem: false });
   assert.ok(!bez.strona.includes("@pilne"));
 });
+
+/* Obchód regałów jest domyślny na kolektorze. Sumy całej kartoteki dokładały
+   mu pracy, choć o kolejności wierszy decyduje tu sam adres. */
+test("strona sumuje całą kartotekę tylko wtedy, gdy porządek na tym stoi", () => {
+  const dla = (sortuj?: "sprzedaz" | "stan" | "lokalizacja" | "symbol" | "nazwa" | "najnowsze") =>
+    budujZapytanieBezWymiarow({ pola: POLA, lokalizacja: "tw_Pole1", zFiltrem: false, sortuj });
+  for (const s of ["lokalizacja", "symbol", "nazwa", "najnowsze"] as const) {
+    const z = dla(s);
+    assert.ok(!z.strona.includes("dok_Pozycja") && !z.strona.includes("tw_Stan"), z.strona);
+    assert.deepEqual(z.dosumuj, { stan: true, sprzedaz: true });
+  }
+  assert.ok(!dla("stan").strona.includes("dok_Pozycja"));
+  assert.ok(dla("stan").strona.includes("tw_Stan"));
+  assert.deepEqual(dla("stan").dosumuj, { stan: false, sprzedaz: true });
+  for (const z of [dla("sprzedaz"), dla()]) {
+    assert.ok(z.strona.includes("dok_Pozycja") && z.strona.includes("tw_Stan"));
+    assert.deepEqual(z.dosumuj, { stan: false, sprzedaz: false });
+  }
+});
+
+test("sumy dla strony: tylko jej towary, sprzedaż z tych samych dokumentów co lista", () => {
+  const sprzedaz = { fs: 2, pa: 21, odnosnik: "dok_DoDokId" };
+  assert.equal(
+    budujZapytanieSum("stan", 2, sprzedaz),
+    "SELECT st_TowId AS twId, SUM(st_Stan) AS suma FROM tw_Stan WITH (NOLOCK) " +
+      "WHERE st_TowId IN (@id0, @id1) GROUP BY st_TowId"
+  );
+  const z = budujZapytanieSum("sprzedaz", 2, sprzedaz);
+  assert.ok(z.includes("d.dok_DataWyst >= @odSprzedazy AND NOT (d.dok_Typ = 2"), z);
+  assert.ok(z.endsWith("AND p.ob_TowId IN (@id0, @id1) GROUP BY p.ob_TowId"), z);
+});
+

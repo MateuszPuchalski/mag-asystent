@@ -147,6 +147,22 @@ function oczekujace(twIds: number[]): Set<number> {
   return new Set(wiersze.map((w) => w.tw_id));
 }
 
+/* Zapytania listy, które właśnie biegną. Gdy Subiekt odpowiada wolno, ktoś
+   pyta jeszcze raz, i każde pytanie dokładałoby bazie taki sam ciężki odczyt.
+   Identyczne czeka więc na to, które już trwa. Wynik nie zostaje po
+   zakończeniu: to nie cache. */
+const wToku = new Map<string, ReturnType<Zrodlo>>();
+
+function zapytajListe(z: Parameters<Zrodlo>[0]): ReturnType<Zrodlo> {
+  const klucz = JSON.stringify(z);
+  let trwa = wToku.get(klucz);
+  if (!trwa) {
+    trwa = listaZrodla()(z).finally(() => wToku.delete(klucz));
+    wToku.set(klucz, trwa);
+  }
+  return trwa;
+}
+
 /** Strona listy. Wyjątek źródła idzie wyżej: awaria bazy to nie „funkcja wyłączona". */
 export async function listaBezWymiarow(zapytanie: {
   q?: unknown;
@@ -172,14 +188,15 @@ export async function listaBezWymiarow(zapytanie: {
   const tak = (v: unknown) => v === "1" || v === "true";
 
   const pilne = pilneSymbole();
-  const { razem, pozycje } = await listaZrodla()({
+  const { razem, pozycje } = await zapytajListe({
     q, symbolOd, limit, offset, sortuj, naStanie: tak(zapytanie.naStanie), sprzedane: tak(zapytanie.sprzedane),
     pilne: tak(zapytanie.pilne) ? pilne : undefined,
   });
   /* Licznik pilnych bez reszty filtrów: przycisk mówi „tyle zostało z listy
      biura", a nie „tyle pasuje do tego, co akurat zaznaczyłeś". */
-  const pilneRazem = pilne.length === 0 ? 0 : (await listaZrodla()({
-    q: "", symbolOd: "", limit: 1, offset: 0, sortuj, naStanie: false, sprzedane: false, pilne,
+  const pilneRazem = pilne.length === 0 ? 0 : (await zapytajListe({
+    q: "", symbolOd: "", limit: 1, offset: 0, sortuj: "symbol", naStanie: false, sprzedane: false, pilne,
+    tylkoRazem: true,
   })).razem;
   const czeka = oczekujace(pozycje.map((p) => p.twId));
   return {

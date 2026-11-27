@@ -216,3 +216,38 @@ test("lista podaje źródłu symbole pilnych i liczy pilne bez pozostałych filt
   assert.deepEqual(tylko.pozycje.map((p: { symbol: string }) => p.symbol), ["B-02"]);
   assert.deepEqual(widziane, [undefined, ["B-02", "W-99"], ["B-02", "W-99"], ["B-02", "W-99"]]);
 });
+
+test("licznik pilnych pyta o samą liczbę, nie o stronę", async () => {
+  db().prepare("INSERT INTO wymiary_pilne(symbol, dodano_at) VALUES ('A-01', '2026-01-01')").run();
+  const pytania: Array<boolean | undefined> = [];
+  ustawZrodla(async (z) => {
+    pytania.push(z.tylkoRazem);
+    return { razem: 1, pozycje: [] };
+  });
+  assert.equal((await lista(sesja("magazynier"))).json().pilneRazem, 1);
+  assert.deepEqual(pytania, [undefined, true]);
+});
+
+test("identyczne żądanie w trakcie wolnego odczytu nie pyta Subiekta drugi raz", async () => {
+  let ile = 0;
+  let pusc: () => void = () => {};
+  const brama = new Promise<void>((r) => (pusc = r));
+  ustawZrodla(async () => {
+    ile++;
+    await brama;
+    return { razem: 0, pozycje: [] };
+  });
+  const h = sesja("magazynier");
+  const oba = [lista(h), lista(h)];
+  const inne = app.inject({ method: "GET", url: "/api/wymiary/bez-wymiarow?sortuj=stan", headers: h });
+  const wszystkie = Promise.all([...oba, inne]);
+  /* Czekamy na drugie pytanie, a potem chwilę na ewentualne trzecie. */
+  while (ile < 2) await new Promise((r) => setImmediate(r));
+  await new Promise((r) => setTimeout(r, 50));
+  assert.equal(ile, 2, "jeden odczyt na dwa takie same i osobny na inny porządek");
+  pusc();
+  for (const r of await wszystkie) assert.equal(r.statusCode, 200, r.payload);
+  /* Po zakończeniu nic nie zostaje: następne pytanie czyta Subiekt od nowa. */
+  await lista(h);
+  assert.equal(ile, 3);
+});
