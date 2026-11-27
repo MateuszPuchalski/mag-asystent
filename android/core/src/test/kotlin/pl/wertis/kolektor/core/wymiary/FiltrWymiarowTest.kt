@@ -107,4 +107,20 @@ class FiltrWymiarowTest {
     @Test fun `pusta lista pilnych mowi o koncu pracy biura`() {
         assertEquals("Wszystkie pilne towary mają wagę i wymiary.", pustaLista(FiltrWymiarow(pilne = true, naStanie = true)))
     }
+
+    @Test fun `po bledzie lista nie mowi, ze wszystko zmierzone`() {
+        val f = FiltrWymiarow(sprzedane = true)
+        assertEquals("Wczytuję…", trescPustejListy(f, ladowanie = true, nieUdane = true))
+        assertEquals(
+            "Lista się nie wczytała. Zmień filtr albo spróbuj jeszcze raz.",
+            trescPustejListy(f, ladowanie = false, nieUdane = true),
+        )
+        assertEquals(pustaLista(f), trescPustejListy(f, ladowanie = false, nieUdane = false))
+    }
+
+    @Test fun `naglowek bez liczby, dopoki jej nie znamy`() {
+        assertEquals("Do zmierzenia", naglowekListy(0, "", znane = false))
+        assertEquals("Do zmierzenia · symbole na W", naglowekListy(0, "W", znane = false))
+        assertEquals("Do zmierzenia: 37 · symbole na W", naglowekListy(37, "W", znane = true))
+    }
 }

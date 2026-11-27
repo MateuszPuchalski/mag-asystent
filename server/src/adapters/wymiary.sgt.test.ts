@@ -116,3 +116,15 @@ test("pilne: IN z osobnym parametrem na symbol w stronie i liczniku", () => {
   const bez = budujZapytanieBezWymiarow({ pola: POLA, lokalizacja: "tw_Pole1", zFiltrem: false });
   assert.ok(!bez.strona.includes("@pilne"));
 });
+
+test("sprzedane: złączenie ze zbiorem w stronie i liczniku, bez EXISTS na kartotekę", () => {
+  const opcje = { pola: POLA, lokalizacja: "tw_Pole1", zFiltrem: false, sortuj: "lokalizacja" as const };
+  const z = budujZapytanieBezWymiarow({ ...opcje, sprzedane: true });
+  for (const q of [z.strona, z.razem]) {
+    assert.ok(q.includes("AND p.ob_IloscMag > 0 GROUP BY p.ob_TowId) f ON f.ob_TowId = t.tw_Id "), q);
+    assert.ok(!q.includes("AND p.ob_TowId = t.tw_Id"), q);
+    assert.ok(!q.includes("EXISTS (SELECT 1 FROM dok_Pozycja"), q);
+  }
+  const bez = budujZapytanieBezWymiarow(opcje);
+  for (const q of [bez.strona, bez.razem]) assert.ok(!q.includes(") f ON f.ob_TowId"), q);
+});

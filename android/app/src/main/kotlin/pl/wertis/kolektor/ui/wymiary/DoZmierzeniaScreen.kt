@@ -33,6 +33,8 @@ import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
 import pl.wertis.kolektor.AppGraph
 import pl.wertis.kolektor.core.net.ApiError
@@ -48,7 +50,8 @@ import pl.wertis.kolektor.core.wymiary.poczatekSymbolu
 import pl.wertis.kolektor.core.wymiary.pokazPilne
 import pl.wertis.kolektor.core.wymiary.liczbyWiersza
 import pl.wertis.kolektor.core.wymiary.pokazLiczby
-import pl.wertis.kolektor.core.wymiary.pustaLista
+import pl.wertis.kolektor.core.wymiary.naglowekListy
+import pl.wertis.kolektor.core.wymiary.trescPustejListy
 import pl.wertis.kolektor.core.wymiary.zapytanie
 import pl.wertis.kolektor.core.wymiary.zmianaFiltra
 import pl.wertis.kolektor.core.wymiary.dolaczStrone
@@ -61,7 +64,6 @@ import pl.wertis.kolektor.core.wymiary.wolny
 import pl.wertis.kolektor.core.wymiary.wygladaNaKod
 import pl.wertis.kolektor.net.apiCall
 import pl.wertis.kolektor.scan.ScanHandlerEffect
-import pl.wertis.kolektor.ui.components.LoadingRow
 import pl.wertis.kolektor.ui.components.MinTap
 import pl.wertis.kolektor.ui.components.OutlineButton
 import pl.wertis.kolektor.ui.components.WertisTextField
@@ -119,7 +121,11 @@ fun DoZmierzeniaScreen(graph: AppGraph) {
     var wlaczone by remember { mutableStateOf<Boolean?>(null) }
     var powod by remember { mutableStateOf<String?>(null) }
     var bladListy by remember { mutableStateOf<String?>(null) }
-    var ladowanie by remember { mutableStateOf(false) }
+    var ladowanie by remember { mutableStateOf(true) } // pierwsza klatka to jeszcze nie pusta lista
+    /** Numer ostatniego żądania listy. Tylko ono może zmienić ekran. */
+    var ostatnieZadanie by remember { mutableStateOf(0) }
+    /** Wczytanie w drodze — następne je anuluje. */
+    var wDrodze by remember { mutableStateOf<Job?>(null) }
     /** Zapisane z tego kolektora — lista serwera dowie się o nich przy przeładowaniu. */
     var zapisane by remember { mutableStateOf(setOf<Long>()) }
     /** Wiersz wskazany: następny do zmierzenia albo trafiony skanem regału. */
@@ -127,9 +133,11 @@ fun DoZmierzeniaScreen(graph: AppGraph) {
     var formularz by remember { mutableStateOf<TowarDoPomiaru?>(null) }
     var filtr by remember { mutableStateOf(graph.nav.filtrWymiarow) }
 
-    suspend fun wczytaj(od: Int) {
+    /** `true`, gdy na ekran weszła strona z TEGO żądania. */
+    suspend fun wczytaj(od: Int): Boolean {
         val f = filtr
         val z = f.zapytanie(od)
+        val numer = ++ostatnieZadanie
         ladowanie = true
         try {
             val strona = apiCall {
@@ -144,7 +152,7 @@ fun DoZmierzeniaScreen(graph: AppGraph) {
             }
             /* Odpowiedź pod wybór, który człowiek już zmienił, wkleiłaby
                stary porządek pod nowy chip. Nowe żądanie jest już w drodze. */
-            if (f != filtr) return
+            if (numer != ostatnieZadanie) return false
             wlaczone = strona.wlaczone
             powod = strona.powod
             razem = strona.razem
@@ -152,22 +160,39 @@ fun DoZmierzeniaScreen(graph: AppGraph) {
             pozycje = if (od == 0) strona.pozycje else dolaczStrone(pozycje, strona.pozycje)
             offset = od + strona.pozycje.size
             bladListy = null
+            return true
+        } catch (e: CancellationException) {
+            throw e // anulowane to nie „brak połączenia"
         } catch (e: ApiError) {
-            bladListy = e.message ?: "Serwer nie oddał listy"
+            /* Błąd porzuconego wyboru nie opisuje listy, która jest na ekranie. */
+            if (numer == ostatnieZadanie) bladListy = e.message ?: "Serwer nie oddał listy"
         } catch (e: Exception) {
-            bladListy = "Brak połączenia z serwerem"
+            if (numer == ostatnieZadanie) bladListy = "Brak połączenia z serwerem"
         } finally {
-            ladowanie = false
+            // starsze żądanie nie gasi „Wczytuję…” nowszemu, które jeszcze biegnie
+            if (numer == ostatnieZadanie) ladowanie = false
         }
+        return false
     }
 
-    suspend fun przeladuj() {
+    /* Porzucone żądanie wraca nawet po minucie, gdy człowiek mierzy już z innej
+       listy. Nie może mu wtedy przestawić wskazanego wiersza ani przewinąć. */
+    suspend fun przeladuj(): Boolean {
         zapisane = emptySet()
-        wczytaj(0)
-        wskazany = nastepnyWolny(pozycje, null, zapisane)?.twId
+        val weszla = wczytaj(0)
+        if (weszla) wskazany = nastepnyWolny(pozycje, null, zapisane)?.twId
+        return weszla
     }
 
-    LaunchedEffect(Unit) { przeladuj() }
+    /* Porzucone wczytanie trzeba ANULOWAĆ, nie tylko pominąć. OkHttp puszcza
+       naraz pięć żądań do jednego serwera. Kilka dotknięć chipów przy wolnej
+       liście zajęłoby wszystkie, a skan i zapis pomiaru czekałyby w kolejce. */
+    fun wczytajZamiast(blok: suspend () -> Unit) {
+        wDrodze?.cancel()
+        wDrodze = scope.launch { blok() }
+    }
+
+    LaunchedEffect(Unit) { wczytajZamiast { przeladuj() } }
 
     /** Nowy porządek albo filtr: lista od zera, stara znika od razu. */
     fun zmienFiltr(nowy: FiltrWymiarow) {
@@ -178,9 +203,9 @@ fun DoZmierzeniaScreen(graph: AppGraph) {
         razem = 0
         offset = 0
         wskazany = null
-        scope.launch {
-            przeladuj()
-            listState.scrollToItem(0)
+        bladListy = null
+        wczytajZamiast {
+            if (przeladuj()) listState.scrollToItem(0)
         }
     }
 
@@ -289,20 +314,6 @@ fun DoZmierzeniaScreen(graph: AppGraph) {
         true
     }
 
-    if (wlaczone == null) {
-        if (bladListy != null) {
-            Column(Modifier.fillMaxSize().padding(12.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                Text(bladListy.orEmpty(), color = Ink, fontSize = 15.sp)
-                OutlineButton("SPRÓBUJ JESZCZE RAZ", modifier = Modifier.fillMaxWidth(), enabled = !ladowanie) {
-                    scope.launch { przeladuj() }
-                }
-            }
-        } else {
-            LoadingRow("Wczytywanie listy…")
-        }
-        return
-    }
-
     if (wlaczone == false) {
         /* Funkcja wyłączona to stan, nie awaria: serwer mówi zdaniem, czego
            brakuje (np. pól własnych w Subiekcie). Pusta lista udawałaby, że
@@ -325,7 +336,7 @@ fun DoZmierzeniaScreen(graph: AppGraph) {
                 val grupa = poczatekSymbolu(filtr.symbolOd)
                 // filtr symbolu w liczniku: „37" bez grupy brzmiałoby jak cała kartoteka
                 Text(
-                    if (grupa.isEmpty()) "Do zmierzenia: $razem" else "Do zmierzenia: $razem · symbole na $grupa",
+                    naglowekListy(razem, grupa, znane = pozycje.isNotEmpty() || (!ladowanie && bladListy == null)),
                     fontSize = 20.sp,
                     fontWeight = FontWeight.Bold,
                     color = Ink,
@@ -337,12 +348,18 @@ fun DoZmierzeniaScreen(graph: AppGraph) {
         item(key = "filtry") { FiltryListy(filtr, pilneRazem, ::zmienFiltr, ::skanujKod) }
         if (pozycje.isEmpty()) {
             item(key = "pusto") {
-                Text(
-                    // pusta lista mówi, dlaczego jest pusta przy tym filtrze
-                    if (ladowanie) "Wczytuję…" else pustaLista(filtr),
-                    color = InkMute,
-                    modifier = Modifier.fillMaxWidth().cardSurface().padding(16.dp),
-                )
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text(
+                        trescPustejListy(filtr, ladowanie, nieUdane = bladListy != null),
+                        color = InkMute,
+                        modifier = Modifier.fillMaxWidth().cardSurface().padding(16.dp),
+                    )
+                    if (bladListy != null && !ladowanie) {
+                        OutlineButton("SPRÓBUJ JESZCZE RAZ", modifier = Modifier.fillMaxWidth()) {
+                            wczytajZamiast { przeladuj() }
+                        }
+                    }
+                }
             }
         }
         val liczby = filtr.pokazLiczby()
@@ -360,7 +377,7 @@ fun DoZmierzeniaScreen(graph: AppGraph) {
                     if (ladowanie) "WCZYTUJĘ…" else "WIĘCEJ",
                     modifier = Modifier.fillMaxWidth(),
                     enabled = !ladowanie,
-                ) { scope.launch { wczytaj(offset) } }
+                ) { wczytajZamiast { wczytaj(offset) } }
             }
         }
     }
@@ -378,15 +395,14 @@ fun DoZmierzeniaScreen(graph: AppGraph) {
                     wskazany = dalej?.twId
                 } else {
                     // koniec wczytanej listy — następny towar leży na dalszej stronie
-                    scope.launch {
-                        wczytaj(offset)
-                        wskazany = nastepnyWolny(pozycje, towar.twId, zapisane)?.twId
+                    wczytajZamiast {
+                        if (wczytaj(offset)) wskazany = nastepnyWolny(pozycje, towar.twId, zapisane)?.twId
                     }
                 }
             },
             onWylaczone = {
                 formularz = null
-                scope.launch { przeladuj() }
+                wczytajZamiast { przeladuj() }
             },
         )
     }

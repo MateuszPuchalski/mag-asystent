@@ -114,6 +114,25 @@ fun liczbyWiersza(p: PozycjaBezWymiarow): String =
     "sprzedano ${formatQty(p.sprzedaz)} · stan ${formatQty(p.stan)}"
 
 /**
+ * Nagłówek listy. Liczbę pokazuje tylko wtedy, gdy ją znamy: „Do zmierzenia: 0"
+ * w trakcie wczytywania albo po błędzie wyglądałoby jak koniec pracy.
+ */
+fun naglowekListy(razem: Int, grupa: String, znane: Boolean): String {
+    val liczba = if (znane) ": $razem" else ""
+    return if (grupa.isEmpty()) "Do zmierzenia$liczba" else "Do zmierzenia$liczba · symbole na $grupa"
+}
+
+/**
+ * Zdanie w miejscu wierszy. Nieudane wczytanie nie może mówić, że wszystko
+ * jest zmierzone — lista jest pusta, bo nic nie przyszło.
+ */
+fun trescPustejListy(f: FiltrWymiarow, ladowanie: Boolean, nieUdane: Boolean): String = when {
+    ladowanie -> "Wczytuję…"
+    nieUdane -> "Lista się nie wczytała. Zmień filtr albo spróbuj jeszcze raz."
+    else -> pustaLista(f)
+}
+
+/**
  * Pusta lista mówi, DLACZEGO jest pusta przy tym filtrze. Gołe „brak" przy
  * włączonym filtrze wyglądałoby jak awaria albo jak koniec pracy w ogóle.
  */
