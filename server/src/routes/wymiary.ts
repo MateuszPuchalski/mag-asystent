@@ -1,6 +1,6 @@
 import type { FastifyInstance, FastifyReply } from "fastify";
 import { autorOperacji, sesjaZadania } from "../context.js";
-import { listaBezWymiarow, pilneSymbole, towarDoPomiaru, ustawPilne, zapiszPomiar } from "../services/wymiary.js";
+import { cofnijPomiar, listaBezWymiarow, pilneSymbole, towarDoPomiaru, ustawPilne, zapiszPomiar } from "../services/wymiary.js";
 import { ROLE_BIUROWE } from "../services/users.js";
 
 /* ── Waga i wymiary kartotek — biuro i kolektor ──────────────────────────────
@@ -78,6 +78,21 @@ export async function wymiaryRoutes(app: FastifyInstance) {
       return awariaBazy(reply, e);
     }
     if (!wynik.ok) return reply.code(wynik.kod).send({ error: wynik.error });
-    return { queueId: wynik.queueId, pomiar: wynik.pomiar };
+    return {
+      queueId: wynik.queueId, pomiar: wynik.pomiar, opis: wynik.opis, cofnijDoSekund: wynik.cofnijDoSekund,
+    };
+  });
+
+  /** Cofnięcie własnego pomiaru, póki czeka w kolejce. Bez ciała. */
+  app.post<{ Params: { twId: string; queueId: string } }>("/api/wymiary/:twId/cofnij/:queueId", async (req, reply) => {
+    const nie = odmowa(reply); if (nie) return nie;
+    const twId = Number(req.params.twId);
+    const queueId = Number(req.params.queueId);
+    if (!Number.isInteger(twId) || twId <= 0 || !Number.isInteger(queueId) || queueId <= 0) {
+      return reply.code(400).send({ error: "Zły numer towaru albo zadania" });
+    }
+    const w = cofnijPomiar(twId, queueId, autorOperacji(req));
+    if (!w.ok) return reply.code(w.kod).send({ error: w.error });
+    return { ok: true };
   });
 }

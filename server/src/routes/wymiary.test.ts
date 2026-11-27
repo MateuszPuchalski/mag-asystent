@@ -251,3 +251,85 @@ test("identyczne żądanie w trakcie wolnego odczytu nie pyta Subiekta drugi raz
   await lista(h);
   assert.equal(ile, 3);
 });
+
+const cofnij = (headers: Record<string, string>, twId: number, queueId: number) =>
+  app.inject({ method: "POST", url: `/api/wymiary/${twId}/cofnij/${queueId}`, headers });
+const zadanie = (id: number) =>
+  db().prepare("SELECT status, next_attempt_at FROM sfera_queue WHERE id = ?").get(id) as {
+    status: string; next_attempt_at: string | null;
+  };
+
+test("pomiar z cofaniem czeka w kolejce, a cofnięty nie idzie do Subiekta", async () => {
+  const h = sesja("magazynier");
+  const r = (await zapisz(h, 1, { bruttoKg: "1,2", zCofaniem: true })).json();
+  assert.equal(r.cofnijDoSekund, 57);
+  assert.equal(r.opis, "A-01 · brutto 1,2 kg");
+  assert.ok(zadanie(r.queueId).next_attempt_at! > new Date(Date.now() + 50_000).toISOString());
+  const c = await cofnij(h, 1, r.queueId);
+  assert.equal(c.statusCode, 200, c.payload);
+  assert.equal(zadanie(r.queueId).status, "cancelled");
+  const jeden = await app.inject({ method: "GET", url: "/api/wymiary/1", headers: h });
+  assert.equal(jeden.json().oczekuje, false, "towar wraca na listę do zmierzenia");
+  const slad = db().prepare("SELECT tw_id FROM events WHERE type = 'wymiary_cofniete'").all();
+  assert.equal(slad.length, 1);
+  assert.equal((await cofnij(h, 1, r.queueId)).statusCode, 200, "powtórka po zgubionej odpowiedzi");
+  assert.equal(db().prepare("SELECT id FROM events WHERE type = 'wymiary_cofniete'").all().length, 1);
+});
+
+test("worker nie bierze wstrzymanego pomiaru ani cofniętego już po wyborze", async () => {
+  const { pickTask, przetworzZadanie } = await import("../worker/kolejka.js");
+  const h = sesja("magazynier");
+  const wstrzymany = (await zapisz(h, 1, { bruttoKg: 1, zCofaniem: true })).json().queueId;
+  assert.equal(pickTask(), undefined);
+
+  db().prepare("UPDATE sfera_queue SET next_attempt_at = NULL WHERE id = ?").run(wstrzymany);
+  const wybrane = pickTask()!;
+  assert.equal(wybrane.id, wstrzymany);
+  /* cofnięcie wchodzi między wybór a przejęcie zadania */
+  db().prepare("UPDATE sfera_queue SET status = 'cancelled' WHERE id = ?").run(wstrzymany);
+  await przetworzZadanie(wybrane, {
+    applySetWymiary: async () => assert.fail("cofnięty pomiar nie idzie do Subiekta"),
+  } as unknown as Parameters<typeof przetworzZadanie>[1]);
+  assert.equal(zadanie(wstrzymany).status, "cancelled");
+});
+
+test("bez zCofaniem zapis rusza od razu i cofnąć go nie można", async () => {
+  const h = sesja("magazynier");
+  const r = (await zapisz(h, 1, { bruttoKg: 1 })).json();
+  assert.equal(r.cofnijDoSekund, 0);
+  assert.equal(zadanie(r.queueId).next_attempt_at, null);
+  const c = await cofnij(h, 1, r.queueId);
+  assert.equal(c.statusCode, 409);
+  assert.equal(zadanie(r.queueId).status, "pending");
+});
+
+test("cofnięcie odmawia: po oknie, po wzięciu przez worker, cudze i pod złym towarem", async () => {
+  const h = sesja("magazynier");
+  const nowy = async () => (await zapisz(h, 1, { bruttoKg: 1, zCofaniem: true })).json().queueId as number;
+  const ustaw = (id: number, kolumna: "status" | "next_attempt_at", v: string) =>
+    db().prepare(`UPDATE sfera_queue SET ${kolumna} = ? WHERE id = ?`).run(v, id);
+
+  const poOknie = await nowy();
+  ustaw(poOknie, "next_attempt_at", new Date(Date.now() + 1000).toISOString());
+  assert.match((await cofnij(h, 1, poOknie)).json().error, /Za późno/);
+
+  for (const status of ["processing", "done"]) {
+    const id = await nowy();
+    ustaw(id, "status", status);
+    assert.equal((await cofnij(h, 1, id)).statusCode, 409, status);
+    assert.equal(zadanie(id).status, status);
+  }
+
+  const cudzy = await nowy();
+  assert.match((await cofnij(sesja("admin"), 1, cudzy)).json().error, /tylko ten, kto go zapisał/);
+  assert.equal((await cofnij(h, 2, cudzy)).statusCode, 404);
+  assert.equal((await cofnij({}, 1, cudzy)).statusCode, 401);
+  assert.equal(zadanie(cudzy).status, "pending");
+});
+
+test("nowy pomiar zwalnia wstrzymany starszy, żeby go potem nie nadpisał", async () => {
+  const h = sesja("magazynier");
+  const stary = (await zapisz(h, 1, { bruttoKg: 1, zCofaniem: true })).json().queueId;
+  await zapisz(h, 1, { bruttoKg: 2 });
+  assert.equal(zadanie(stary).next_attempt_at, null);
+});

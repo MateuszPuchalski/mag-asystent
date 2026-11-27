@@ -293,8 +293,78 @@ function nettoPonadBrutto(brutto: number | null, netto: number | null): string |
   return `Waga netto (${kg(netto)} kg) większa od brutto (${kg(brutto)} kg) — sprawdź, czy pola nie są zamienione.`;
 }
 
+/* ── Cofnięcie właśnie zapisanego pomiaru ────────────────────────────────────
+   Cofnąć da się tylko pomiar, którego worker jeszcze nie wziął. Wtedy wystarczy
+   anulować zadanie i Subiekt o niczym nie wie. Po zapisie cofnięcie musiałoby
+   czyścić pola kartoteki, a to osobny rodzaj zapisu do bazy firmy.
+
+   Worker bierze zadanie po sekundzie, więc bez wstrzymania nie byłoby czego
+   cofać. Wstrzymujemy tylko zapis z ekranu, który pokazuje „COFNIJ". */
+
+/** Ile sekund pomiar czeka w kolejce, gdy ekran umie go cofnąć. */
+export const OKNO_COFNIECIA_S = 60;
+
+/* Worker bierze zadanie dwoma krokami: czyta je, potem oznacza jako wzięte.
+   Cofnięcie w ostatniej chwili mogłoby trafić między nie i obiecać, że do
+   Subiekta nic nie weszło. Zapas zamyka okno wcześniej. */
+const ZAPAS_COFNIECIA_S = 3;
+
+export type WynikCofniecia = { ok: true } | { ok: false; kod: 404 | 409; error: string };
+
+/** Anuluje własny, jeszcze niewzięty pomiar. Jeden warunkowy UPDATE rozstrzyga wyścig. */
+export function cofnijPomiar(
+  twId: number,
+  queueId: number,
+  autor: { nazwa: string; ref: number | null },
+  teraz = new Date()
+): WynikCofniecia {
+  const d = db();
+  const granica = new Date(teraz.getTime() + ZAPAS_COFNIECIA_S * 1000).toISOString();
+  let cofniete = false;
+  transaction(d, () => {
+    const r = d
+      .prepare(
+        `UPDATE sfera_queue SET status = 'cancelled', processed_at = ?
+         WHERE id = ? AND tw_id = ? AND type = 'set_wymiary' AND status = 'pending' AND attempts = 0
+           AND created_by_ref IS ? AND next_attempt_at > ?`
+      )
+      .run(teraz.toISOString(), queueId, twId, autor.ref, granica);
+    cofniete = r.changes === 1;
+    if (cofniete) logEvent("wymiary_cofniete", autor.nazwa, twId, { queueId }, autor.ref, d);
+  })();
+  if (cofniete) return { ok: true };
+
+  const z = d
+    .prepare("SELECT status, created_by_ref FROM sfera_queue WHERE id = ? AND tw_id = ? AND type = 'set_wymiary'")
+    .get(queueId, twId) as { status: string; created_by_ref: number | null } | undefined;
+  if (!z) return { ok: false, kod: 404, error: "Nie ma takiego pomiaru w kolejce." };
+  if (z.created_by_ref !== autor.ref) {
+    return { ok: false, kod: 409, error: "Cofnąć pomiar może tylko ten, kto go zapisał." };
+  }
+  /* Powtórzone cofnięcie to sukces: po zgubionej odpowiedzi kolektor pyta
+     drugi raz i musi się dowiedzieć, że towar znów czeka na pomiar. */
+  if (z.status === "cancelled") return { ok: true };
+  return {
+    ok: false, kod: 409,
+    error: "Za późno na cofnięcie — pomiar idzie do Subiekta. Zmierz towar jeszcze raz.",
+  };
+}
+
+/**
+ * Nowy pomiar towaru zwalnia wstrzymane wcześniejsze. Inaczej starszy,
+ * czekając swoje okno, wszedłby do Subiekta PO nowszym i go nadpisał.
+ */
+function zwolnijWstrzymane(twId: number): void {
+  db()
+    .prepare(
+      `UPDATE sfera_queue SET next_attempt_at = NULL
+       WHERE type = 'set_wymiary' AND tw_id = ? AND status = 'pending' AND attempts = 0`
+    )
+    .run(twId);
+}
+
 export type WynikZapisu =
-  | { ok: true; queueId: number; pomiar: Pomiar }
+  | { ok: true; queueId: number; pomiar: Pomiar; opis: string; cofnijDoSekund: number }
   | { ok: false; kod: 400 | 404 | 409; error: string };
 
 /**
@@ -326,11 +396,19 @@ export async function zapiszPomiar(
       ? WYMIARY.map((w) => { const cm = p[w]; return cm === null ? "–" : tekstWymiaru(cm); }).join(" × ") + " cm"
       : null,
   ].filter(Boolean).join(", ");
+  const zCofaniem = (cialo as { zCofaniem?: unknown } | null)?.zCofaniem === true;
+  zwolnijWstrzymane(twId);
   const queueId = enqueueSetWymiary(
     twId,
     p,
-    { createdBy: autor.nazwa, createdByRef: autor.ref, twId, label: "Wymiary · " + przed.symbol, detail: opis },
+    {
+      createdBy: autor.nazwa, createdByRef: autor.ref, twId, label: "Wymiary · " + przed.symbol, detail: opis,
+      nieWczesniej: zCofaniem ? new Date(Date.now() + OKNO_COFNIECIA_S * 1000).toISOString() : undefined,
+    },
     { brutto: przed.brutto, netto: przed.netto, dlugosc: przed.dlugosc, szerokosc: przed.szerokosc, wysokosc: przed.wysokosc }
   );
-  return { ok: true, queueId, pomiar: p };
+  return {
+    ok: true, queueId, pomiar: p, opis: `${przed.symbol} · ${opis}`,
+    cofnijDoSekund: zCofaniem ? OKNO_COFNIECIA_S - ZAPAS_COFNIECIA_S : 0,
+  };
 }

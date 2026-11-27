@@ -137,7 +137,12 @@ export function czekaNaDokument(task: Task): boolean {
 /** Wykonanie jednego zadania. Błędy zamienia na status, nie rzuca dalej. */
 export async function przetworzZadanie(task: Task, sfera: SferaAdapter): Promise<void> {
   const payload = JSON.parse(task.payload);
-  db().prepare("UPDATE sfera_queue SET status='processing' WHERE id=?").run(task.id);
+  /* Przejęcie warunkowe. Między wyborem zadania a tym zapisem człowiek mógł je
+     anulować z innego procesu i usłyszał, że do Subiekta nic nie pójdzie. */
+  const przejete = db()
+    .prepare("UPDATE sfera_queue SET status='processing' WHERE id=? AND status IN ('pending', 'waiting_for_doc')")
+    .run(task.id);
+  if (przejete.changes === 0) return;
 
   try {
     if (config.worker.simErrors && Math.random() < 0.45) {

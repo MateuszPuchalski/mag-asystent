@@ -35,6 +35,7 @@ import kotlinx.coroutines.launch
 import pl.wertis.kolektor.AppGraph
 import pl.wertis.kolektor.core.net.ApiError
 import pl.wertis.kolektor.core.net.TowarDoPomiaru
+import pl.wertis.kolektor.core.net.ZapisPomiaruResponse
 import pl.wertis.kolektor.core.wymiary.PolePomiaru
 import pl.wertis.kolektor.core.wymiary.bladPomiaru
 import pl.wertis.kolektor.core.wymiary.cialoPomiaru
@@ -98,6 +99,8 @@ fun PomiarSheet(
     onZapisano: () -> Unit,
     onWylaczone: () -> Unit = {},
     wymagane: Set<PolePomiaru> = emptySet(),
+    /** Podane przez ekran z paskiem „COFNIJ" — tylko wtedy zapis czeka w kolejce. */
+    onPrzyjety: ((ZapisPomiaruResponse) -> Unit)? = null,
 ) {
     val wymuszony = wymagane.isNotEmpty()
     var wpisy by remember(towar.twId) { mutableStateOf(PolePomiaru.entries.associateWith { "" }) }
@@ -139,12 +142,15 @@ fun PomiarSheet(
         wysylka = true
         scope.launch {
             try {
-                apiCall { graph.api.zapiszPomiar(towar.twId, cialoPomiaru(wpisy)) }
+                val przyjety = apiCall {
+                    graph.api.zapiszPomiar(towar.twId, cialoPomiaru(wpisy).copy(zCofaniem = onPrzyjety != null))
+                }
                 graph.feedback.zapis()
                 graph.queueRepo.refreshNow()
                 /* Kartoteka w Subiekcie zmieni się dopiero po workerze. Zdanie
                    mówi to wprost, zamiast udawać, że zapis już tam jest. */
                 graph.effects.toast("Do Subiekta trafi z kolejki")
+                onPrzyjety?.invoke(przyjety)
                 onZapisano()
             } catch (e: ApiError) {
                 // zdanie serwera, nie kod — 400 mówi, które pole i dlaczego

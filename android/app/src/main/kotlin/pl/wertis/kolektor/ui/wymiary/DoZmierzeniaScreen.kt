@@ -35,6 +35,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import pl.wertis.kolektor.AppGraph
 import pl.wertis.kolektor.core.net.ApiError
@@ -126,6 +127,9 @@ fun DoZmierzeniaScreen(graph: AppGraph) {
     var ostatnieZadanie by remember { mutableStateOf(0) }
     /** Wczytanie w drodze — następne je anuluje. */
     var wDrodze by remember { mutableStateOf<Job?>(null) }
+    /** Ostatni pomiar, który da się jeszcze cofnąć — źródło paska „COFNIJ". */
+    var doCofniecia by remember { mutableStateOf<DoCofniecia?>(null) }
+    var cofanie by remember { mutableStateOf(false) }
     /** Zapisane z tego kolektora — lista serwera dowie się o nich przy przeładowaniu. */
     var zapisane by remember { mutableStateOf(setOf<Long>()) }
     /** Wiersz wskazany: następny do zmierzenia albo trafiony skanem regału. */
@@ -325,9 +329,54 @@ fun DoZmierzeniaScreen(graph: AppGraph) {
         return
     }
 
+    /* Pasek znika razem z oknem cofnięcia: przycisk, który może już tylko
+       odmówić, obiecywałby coś, czego nie ma. */
+    LaunchedEffect(doCofniecia) {
+        val d = doCofniecia ?: return@LaunchedEffect
+        delay(d.sekund * 1000L)
+        doCofniecia = null
+    }
+
+    fun cofnij(d: DoCofniecia) {
+        if (cofanie) return
+        cofanie = true
+        scope.launch {
+            try {
+                apiCall { graph.api.cofnijPomiar(d.twId, d.queueId) }
+                zapisane = zapisane - d.twId
+                // lista przeładowana po zapisie zna ten towar jako „w kolejce"
+                pozycje = pozycje.map { if (it.twId == d.twId) it.copy(oczekuje = false) else it }
+                wskazany = d.twId
+                // nowszy pomiar mógł w tym czasie zająć pasek — jego nie ruszamy
+                if (doCofniecia?.queueId == d.queueId) doCofniecia = null
+                graph.queueRepo.refreshNow()
+                graph.feedback.beep(true)
+                graph.effects.toast("Cofnięte — do Subiekta nic nie poszło")
+            } catch (e: ApiError) {
+                graph.feedback.beep(false)
+                graph.effects.toast(e.message ?: "Serwer nie cofnął pomiaru")
+                if (e.status == 409 && doCofniecia?.queueId == d.queueId) doCofniecia = null
+            } catch (e: Exception) {
+                graph.feedback.beep(false)
+                // odpowiedź mogła zginąć po cofnięciu, więc nie wiemy, jak jest
+                graph.effects.toast("Brak połączenia — dotknij COFNIJ jeszcze raz")
+            } finally {
+                cofanie = false
+            }
+        }
+    }
+
+    Column(Modifier.fillMaxSize()) {
+    /* Nad listą, poza przewijaniem: po zapisie lista jedzie do następnego
+       towaru, a droga powrotna ma zostać w tym samym miejscu. */
+    doCofniecia?.let { d ->
+        PasekCofnijPomiar(d.opis, zajety = cofanie, modifier = Modifier.padding(start = 12.dp, end = 12.dp, top = 12.dp)) {
+            cofnij(d)
+        }
+    }
     LazyColumn(
         state = listState,
-        modifier = Modifier.fillMaxSize(),
+        modifier = Modifier.fillMaxWidth().weight(1f),
         contentPadding = PaddingValues(12.dp),
         verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
@@ -381,12 +430,21 @@ fun DoZmierzeniaScreen(graph: AppGraph) {
             }
         }
     }
+    }
 
     formularz?.let { towar ->
         PomiarSheet(
             graph = graph,
             towar = towar,
             onClose = { formularz = null },
+            onPrzyjety = { r ->
+                // starszy serwer nie wstrzymuje zapisu i nie ma czego obiecywać
+                doCofniecia = if (r.cofnijDoSekund > 0) {
+                    DoCofniecia(towar.twId, r.queueId, r.opis, r.cofnijDoSekund)
+                } else {
+                    null
+                }
+            },
             onZapisano = {
                 zapisane = zapisane + towar.twId
                 formularz = null
@@ -405,6 +463,40 @@ fun DoZmierzeniaScreen(graph: AppGraph) {
                 wczytajZamiast { przeladuj() }
             },
         )
+    }
+}
+
+/** Co pokazuje pasek i czym go cofnąć. */
+private data class DoCofniecia(val twId: Long, val queueId: Long, val opis: String, val sekund: Int)
+
+/**
+ * Pasek po zapisie: CO zapisano i COFNIJ. Napis niesie symbol i wartości, bo
+ * pomyłkę rozpoznaje się po nich: zły towar albo zła liczba. Cel 48 dp daje
+ * `OutlineButton`.
+ */
+@Composable
+private fun PasekCofnijPomiar(opis: String, zajety: Boolean, modifier: Modifier = Modifier, onCofnij: () -> Unit) {
+    Row(
+        modifier = modifier
+            .fillMaxWidth()
+            .cardSurface()
+            .padding(start = 12.dp, end = 6.dp, top = 6.dp, bottom = 6.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        Column(Modifier.weight(1f)) {
+            Text("ZAPISANO", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = InkSoft)
+            Text(
+                opis,
+                fontFamily = BarlowCond,
+                fontWeight = FontWeight.Bold,
+                fontSize = 17.sp,
+                color = Ink,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis,
+            )
+        }
+        OutlineButton("COFNIJ", enabled = !zajety, onClick = onCofnij)
     }
 }
 
